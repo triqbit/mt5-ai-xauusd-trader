@@ -328,4 +328,36 @@ This project integrates multiple open-source projects with compatible licenses. 
 
 ---
 
+## 📦 Project Bundle & Code Structure
+
+The repository ships a fully zip-safe, enterprise-grade Python package under `src/`:
+
+```
+mt5-ai-xauusd-trader/
+├── .github/workflows/ci.yml   # GitHub Actions: lint → test → Docker
+├── src/
+│   ├── core/config.py         # Pydantic settings (env-driven, validated)
+│   ├── trading/
+│   │   ├── mt5_connector.py   # MT5 SDK + MetaAPI dual-path connector
+│   │   └── risk_manager.py    # Kelly Criterion + 6-filter risk engine
+│   └── models/ensemble.py     # LSTM + Attention + PPO ensemble model
+├── tests/test_config.py       # Pytest unit tests (no live MT5 required)
+├── Dockerfile                 # Multi-stage production image
+├── main.py                    # CLI entrypoint (--mode live|demo|backtest)
+├── requirements.txt           # Pinned production dependencies
+└── PROJECT_BUNDLE.md          # Full manifest & enterprise compliance checklist
+```
+
+**Quickstart:**
+```bash
+git clone https://github.com/triqbit/mt5-ai-xauusd-trader.git
+cd mt5-ai-xauusd-trader
+pip install -r requirements.txt
+python main.py --mode demo --symbol XAUUSD --verbose
+```
+
+See [PROJECT_BUNDLE.md](PROJECT_BUNDLE.md) for the complete delivery manifest, environment variable reference, CI/CD pipeline details, and enterprise standards compliance checklist.
+
+---
+
 *MT5 AI/ML Trading Bot - Built with institutional-grade trading technology. Trade smarter, not harder.* 🚀
