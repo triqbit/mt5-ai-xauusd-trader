@@ -1,0 +1,91 @@
+# ============================================================
+# MT5 AI/ML Trading Bot - .gitignore
+# ============================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PIPFILE.lock
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Secrets & Credentials
+.env
+.env.*
+config/secrets.yaml
+config/secrets.toml
+*.key
+*.pem
+*.p12
+secrets/
+
+# Model artifacts (large files)
+models/checkpoints/
+models/trained/
+*.pt
+*.pth
+*.onnx
+*.pkl
+
+# Data (large files - use DVC or cloud)
+data/raw/
+data/processed/
+data/cache/
+*.csv
+*.parquet
+*.h5
+*.hdf5
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Docker
+.docker/
+
+# Deployment
+*.tfstate
+*.tfstate.backup
+.terraform/
