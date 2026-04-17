@@ -32,7 +32,8 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ───────────────────────────────────────
-    mt5_login: int = Field(..., description="MT5 account number")
+    int = Field(default=029
+    = Field(..., description="MT5 account number")
     mt5_password: str = Field(..., description="MT5 account password")
     mt5_server: str = Field(..., description="Broker server name")
     mt5_path: str = Field(
