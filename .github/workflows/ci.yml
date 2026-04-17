@@ -28,14 +28,18 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     needs: quality
+    env:
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install deps
-        run: pip install torch numpy pandas pydantic pydantic-settings python-dotenv stable-baselines3 gymnasium structlog pytest pytest-cov
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
       - name: Run tests
         run: pytest tests/ --cov=src -v
         env:
