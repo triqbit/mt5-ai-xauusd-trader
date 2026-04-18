@@ -1,6 +1,6 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
-main.py  —  CLI entrypoint
+main.py —  CLI entrypoint
 
 Usage:
     python main.py --mode demo --algo ensemble
@@ -10,15 +10,16 @@ Usage:
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import structlog
 
 from src.core.config import get_config
@@ -26,8 +27,7 @@ from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
-# ── Logging setup ─────────────────────────────────────────
-
+# ── Logging setup ──────────────────────────────────────────────────────
 def configure_logging(level: str = "INFO") -> None:
     structlog.configure(
         processors=[
@@ -46,12 +46,10 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
-# ── Trading loop ─────────────────────────────────────────
-
+# ── Trading loop ───────────────────────────────────────────────────
 def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
-
     poll_interval = 60  # seconds between signal evaluations
 
     while True:
@@ -61,7 +59,6 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
             tick = connector.get_tick(cfg.symbol)
 
             # 2. Build observation vector (placeholder – replace with feature engine)
-            import numpy as np
             obs = df[['open', 'high', 'low', 'close', 'tick_volume']].values[-1]
 
             # 3. Get ensemble prediction
@@ -79,7 +76,10 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
             lot_size = risk.size_position(
-                cfg.symbol, win_rate=0.58, avg_win=4 * atr, avg_loss=2 * atr
+                cfg.symbol,
+                win_rate=0.58,
+                avg_win=4 * atr,
+                avg_loss=2 * atr
             )
 
             signal = TradeSignal(
@@ -113,8 +113,7 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
         time.sleep(poll_interval)
 
 
-# ── CLI ────────────────────────────────────────────────────
-
+# ── CLI ──────────────────────────────────────────────────────────────
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="MT5 AI/ML Trading Bot – Enterprise Edition"
@@ -134,14 +133,18 @@ def main() -> int:
     log = logging.getLogger("main")
 
     # Override config from CLI
-    import os
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
 
     cfg = get_config()
-    log.info("Configuration loaded | mode=%s algo=%s symbol=%s", cfg.mode, cfg.algorithm, cfg.symbol)
+    log.info(
+        "Configuration loaded | mode=%s algo=%s symbol=%s",
+        cfg.mode,
+        cfg.algorithm,
+        cfg.symbol,
+    )
 
     # Initialise components
     connector = MT5Connector(cfg)
@@ -151,8 +154,8 @@ def main() -> int:
 
     balance = connector.get_account_balance()
     risk = RiskManager(cfg, account_balance=balance)
-
     model = EnsembleModel(device="cpu")
+
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
