@@ -11,7 +11,6 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging
@@ -20,9 +19,10 @@ from datetime import date, datetime
 from typing import Dict
 
 from src.core.config import TradingConfig
+
 logger = logging.getLogger(__name__)
 
-# ── Ray Dalio All-Weather allocation weights ───────────────────
+# ── Ray Dalio All-Weather allocation weights ──────────────────────
 ALLOCATION_WEIGHTS: Dict[str, float] = {
     "XAUUSD": 0.18,   # Gold  - inflation hedge
     "USDCHF": 0.15,   # CHF   - deflation hedge
@@ -38,6 +38,7 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
 @dataclass
 class TradeSignal:
     """Validated trading signal passed to order execution."""
+
     symbol: str
     direction: int          # +1 buy / -1 sell
     entry_price: float
@@ -52,6 +53,7 @@ class TradeSignal:
 @dataclass
 class DailyStats:
     """Intraday PnL tracker reset each trading day."""
+
     date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
@@ -60,8 +62,8 @@ class DailyStats:
 
 class RiskManager:
     """
-    Central risk authority.  Every signal must be approved here
-    before reaching the order router.
+    Central risk authority.
+    Every signal must be approved here before reaching the order router.
     """
 
     def __init__(self, config: TradingConfig, account_balance: float) -> None:
@@ -69,11 +71,10 @@ class RiskManager:
         self.balance = account_balance
         self.peak_equity = account_balance
         self.daily = DailyStats(peak_equity=account_balance)
-        self.open_positions: Dict[str, int] = {}   # symbol -> ticket
+        self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
-    # ── Public API ────────────────────────────────────────
-
+    # ── Public API ──────────────────────────────────────────
     def approve(self, signal: TradeSignal) -> bool:
         """
         Run the full 6-layer risk filter cascade.
@@ -106,14 +107,11 @@ class RiskManager:
         """
         if avg_loss == 0:
             return 0.01  # minimum lot
-
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25 % Kelly
-
         risk_capital = self.balance * self.cfg.risk_per_trade
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
-
         logger.debug(
             "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
             kelly_fraction, risk_capital, lot_size,
@@ -138,8 +136,7 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
-    # ── Private filter layers ────────────────────────────────
-
+    # ── Private filter layers ────────────────────────────────────
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15 % peak-to-valley kills all trading
