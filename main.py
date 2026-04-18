@@ -70,7 +70,7 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
 
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
-        atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
+                    atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
             lot_size = risk.size_position(
