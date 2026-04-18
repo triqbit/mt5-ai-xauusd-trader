@@ -6,7 +6,18 @@ on:
   pull_request:
     branches: [main]
 
+# ===========================================================
+# Self-enforcing CI:
+#   quality  → ruff lint, ruff format check, import sort check
+#   security → pip-audit vulnerability scan
+#   test     → pytest with coverage
+#   docker   → build image (main branch only)
+# ===========================================================
+
 jobs:
+  # -----------------------------------------------------------
+  # JOB 1: Code Quality — lint + format + imports
+  # -----------------------------------------------------------
   quality:
     name: Code Quality
     runs-on: ubuntu-latest
@@ -19,20 +30,46 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install linters
-        run: pip install ruff black mypy
+      - name: Install quality tools
+        run: pip install ruff==0.4.3 mypy==1.10.0
 
-      - name: Lint
+      - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
 
-      - name: Format check
+      - name: Ruff format check (formatting enforced)
         run: ruff format --check src/ main.py
-        continue-on-error: true
 
+      - name: Import sort check (isort via ruff I-rules)
+        run: ruff check --select I src/ main.py
+
+  # -----------------------------------------------------------
+  # JOB 2: Dependency Security — pip-audit CVE scan
+  # -----------------------------------------------------------
+  security:
+    name: Dependency Safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.7.3
+
+      - name: Audit dependencies for known CVEs
+        run: pip-audit --requirement requirements-ci.txt --progress-spinner off
+
+  # -----------------------------------------------------------
+  # JOB 3: Tests — needs quality + security to pass first
+  # -----------------------------------------------------------
   test:
     name: Tests
     runs-on: ubuntu-latest
-    needs: quality
+    needs: [quality, security]
     env:
       PYTHONPATH: .
     steps:
@@ -43,7 +80,7 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install TA-Lib system library
+      - name: Install TA-Lib from source
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y build-essential wget
@@ -55,7 +92,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
           MT5_LOGIN: "0"
@@ -63,6 +100,9 @@ jobs:
           MT5_SERVER: "test"
           MODE: "demo"
 
+  # -----------------------------------------------------------
+  # JOB 4: Docker Build — only on main, needs tests to pass
+  # -----------------------------------------------------------
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
