@@ -11,6 +11,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,16 +23,16 @@ from src.core.config import TradingConfig
 
 logger = logging.getLogger(__name__)
 
-# ── Ray Dalio All-Weather allocation weights ──────────────────────
+# ── Ray Dalio All-Weather allocation weights ────────────────────────────────
 ALLOCATION_WEIGHTS: Dict[str, float] = {
-    "XAUUSD": 0.18,   # Gold  - inflation hedge
-    "USDCHF": 0.15,   # CHF   - deflation hedge
-    "GBPUSD": 0.13,   # GBP   - growth / balanced
-    "EURUSD": 0.12,   # EUR   - growth / balanced
-    "XAGUSD": 0.12,   # Silver - commodity
-    "AUDUSD": 0.15,   # AUD   - commodity currency
-    "USDJPY": 0.08,   # JPY   - carry trade
-    "EURJPY": 0.07,   # EUR/JPY cross
+    "XAUUSD": 0.18,  # Gold  - inflation hedge
+    "USDCHF": 0.15,  # CHF   - deflation hedge
+    "GBPUSD": 0.13,  # GBP   - growth / balanced
+    "EURUSD": 0.12,  # EUR   - growth / balanced
+    "XAGUSD": 0.12,  # Silver - commodity
+    "AUDUSD": 0.15,  # AUD   - commodity currency
+    "USDJPY": 0.08,  # JPY   - carry trade
+    "EURJPY": 0.07,  # EUR/JPY cross
 }
 
 
@@ -40,13 +41,13 @@ class TradeSignal:
     """Validated trading signal passed to order execution."""
 
     symbol: str
-    direction: int          # +1 buy / -1 sell
+    direction: int  # +1 buy / -1 sell
     entry_price: float
     stop_loss: float
     take_profit: float
     lot_size: float
     algorithm: str
-    confidence: float       # 0.0 – 1.0
+    confidence: float  # 0.0 - 1.0
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -74,7 +75,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
-    # ── Public API ──────────────────────────────────────────
+    # ── Public API ─────────────────────────────────────────────────────────
     def approve(self, signal: TradeSignal) -> bool:
         """
         Run the full 6-layer risk filter cascade.
@@ -114,7 +115,9 @@ class RiskManager:
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(
             "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
-            kelly_fraction, risk_capital, lot_size,
+            kelly_fraction,
+            risk_capital,
+            lot_size,
         )
         return lot_size
 
@@ -136,11 +139,13 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
-    # ── Private filter layers ────────────────────────────────────
+    # ── Private filter layers ─────────────────────────────────────────────
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15 % peak-to-valley kills all trading
-            logger.critical("CIRCUIT BREAKER: drawdown=%.1f%% - trading halted", drawdown * 100)
+            logger.critical(
+                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted", drawdown * 100
+            )
             return False
         return True
 
