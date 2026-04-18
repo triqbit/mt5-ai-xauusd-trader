@@ -55,7 +55,7 @@ class MT5Connector:
         self._mt5_available = False
         self._connected = False
 
-    # -- Lifecycle -----------------------------------------------------------
+    # -- Lifecycle ---------------------------------------------------------
 
     def connect(self) -> bool:
         """Establish connection to MT5. Returns True on success."""
@@ -108,7 +108,7 @@ class MT5Connector:
         finally:
             self.disconnect()
 
-    # -- Market Data ---------------------------------------------------------
+    # -- Market Data -------------------------------------------------------
 
     def get_ohlcv(
         self,
@@ -144,7 +144,7 @@ class MT5Connector:
         info = mt5.account_info()
         return info.balance if info else 0.0
 
-    # -- Order Execution -----------------------------------------------------
+    # -- Order Execution ---------------------------------------------------
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
@@ -209,7 +209,7 @@ class MT5Connector:
             logger.error("Close failed for %d: %s", ticket, result)
         return success
 
-    # -- MetaAPI fallback (stub) ---------------------------------------------
+    # -- MetaAPI fallback (stub) -------------------------------------------
 
     def _connect_metaapi(self) -> bool:
         if not self.cfg.metaapi_token:
