@@ -74,7 +74,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
-    # -- Public API ----------------------------------------------------------
+    # -- Public API ---------------------------------------------------------
 
     def approve(self, signal: TradeSignal) -> bool:
         """
@@ -139,7 +139,7 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
-    # -- Private filter layers -----------------------------------------------
+    # -- Private filter layers ----------------------------------------------
 
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
