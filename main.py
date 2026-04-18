@@ -26,7 +26,7 @@ from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
-# -- Logging setup -----------------------------------------------------------
+# -- Logging setup ---------------------------------------------------------
 
 
 def configure_logging(level: str = "INFO") -> None:
@@ -47,7 +47,7 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
-# -- Trading loop ------------------------------------------------------------
+# -- Trading loop ----------------------------------------------------------
 
 
 def run_live(
@@ -108,7 +108,7 @@ def run_live(
             time.sleep(poll_interval)
 
 
-# -- CLI ---------------------------------------------------------------------
+# -- CLI -------------------------------------------------------------------
 
 
 def parse_args() -> argparse.Namespace:
