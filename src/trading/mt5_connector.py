@@ -3,8 +3,8 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/mt5_connector.py
 
 Dual-path MT5 connector:
-  Primary  : Direct MetaTrader5 Python SDK
-  Fallback : MetaAPI cloud (for Mac/Linux or remote deployments)
+    Primary  : Direct MetaTrader5 Python SDK
+    Fallback : MetaAPI cloud (for Mac/Linux or remote deployments)
 
 Author : triqbit
 License: MIT
@@ -30,8 +30,13 @@ ORDER_TIME_GTC = 1
 ORDER_FILLING_IOC = 1
 
 TIMEFRAME_MAP: Dict[str, int] = {
-    "M1": 1, "M5": 5, "M15": 15, "M30": 30,
-    "H1": 60, "H4": 240, "D1": 1440,
+    "M1": 1,
+    "M5": 5,
+    "M15": 15,
+    "M30": 30,
+    "H1": 60,
+    "H4": 240,
+    "D1": 1440,
 }
 
 
@@ -50,11 +55,13 @@ class MT5Connector:
         self._mt5_available = False
         self._connected = False
 
-    # ── Lifecycle ────────────────────────────────────────────
+    # -- Lifecycle -----------------------------------------------------------
+
     def connect(self) -> bool:
         """Establish connection to MT5. Returns True on success."""
         try:
             import MetaTrader5 as mt5  # Windows-only SDK
+
             self._mt5_available = True
             if not mt5.initialize(path=self.cfg.mt5_path):
                 raise MT5ConnectionError(f"mt5.initialize failed: {mt5.last_error()}")
@@ -68,11 +75,13 @@ class MT5Connector:
             info = mt5.account_info()
             logger.info(
                 "MT5 connected | account=%d balance=%.2f server=%s",
-                info.login, info.balance, info.server,
+                info.login,
+                info.balance,
+                info.server,
             )
             return True
         except ImportError:
-            logger.warning("MetaTrader5 SDK not available – using MetaAPI fallback")
+            logger.warning("MetaTrader5 SDK not available - using MetaAPI fallback")
             return self._connect_metaapi()
         except MT5ConnectionError as exc:
             logger.error("MT5 connect error: %s", exc)
@@ -83,6 +92,7 @@ class MT5Connector:
         if self._mt5_available and self._connected:
             try:
                 import MetaTrader5 as mt5
+
                 mt5.shutdown()
             except Exception:
                 pass
@@ -98,7 +108,8 @@ class MT5Connector:
         finally:
             self.disconnect()
 
-    # ── Market Data ──────────────────────────────────────────
+    # -- Market Data ---------------------------------------------------------
+
     def get_ohlcv(
         self,
         symbol: str,
@@ -107,6 +118,7 @@ class MT5Connector:
     ) -> pd.DataFrame:
         """Fetch OHLCV bars from MT5 terminal."""
         import MetaTrader5 as mt5
+
         tf = TIMEFRAME_MAP.get(timeframe, 5)
         rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
         if rates is None or len(rates) == 0:
@@ -120,6 +132,7 @@ class MT5Connector:
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """Return latest bid/ask for symbol."""
         import MetaTrader5 as mt5
+
         tick = mt5.symbol_info_tick(symbol)
         if tick is None:
             raise ValueError(f"No tick data for {symbol}")
@@ -127,16 +140,19 @@ class MT5Connector:
 
     def get_account_balance(self) -> float:
         import MetaTrader5 as mt5
+
         info = mt5.account_info()
         return info.balance if info else 0.0
 
-    # ── Order Execution ───────────────────────────────────────
+    # -- Order Execution -----------------------------------------------------
+
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
         Submit a market order.
         Returns ticket number on success, None on failure.
         """
         import MetaTrader5 as mt5
+
         order_type = ORDER_TYPE_BUY if signal.direction == 1 else ORDER_TYPE_SELL
         request = {
             "action": TRADE_ACTION_DEAL,
@@ -156,13 +172,17 @@ class MT5Connector:
             return None
         logger.info(
             "Order placed | ticket=%d symbol=%s dir=%s lots=%.2f",
-            result.order, signal.symbol, signal.direction, signal.lot_size,
+            result.order,
+            signal.symbol,
+            signal.direction,
+            signal.lot_size,
         )
         return result.order
 
     def close_position(self, ticket: int, symbol: str, lot_size: float) -> bool:
         """Close an open position by ticket."""
         import MetaTrader5 as mt5
+
         tick = self.get_tick(symbol)
         pos = mt5.positions_get(ticket=ticket)
         if not pos:
@@ -189,12 +209,13 @@ class MT5Connector:
             logger.error("Close failed for %d: %s", ticket, result)
         return success
 
-    # ── MetaAPI fallback (stub – extend as needed) ──────────────────
+    # -- MetaAPI fallback (stub) ---------------------------------------------
+
     def _connect_metaapi(self) -> bool:
         if not self.cfg.metaapi_token:
             logger.error("No MetaAPI token configured")
             return False
-        logger.info("MetaAPI fallback – implement async client here")
+        logger.info("MetaAPI fallback - implement async client here")
         # TODO: integrate metaapi_cloud_sdk async client
         return False
 
