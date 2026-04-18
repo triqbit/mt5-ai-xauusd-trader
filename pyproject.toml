@@ -19,29 +19,62 @@ classifiers = [
 where = ["."]
 include = ["src*"]
 
+# ===========================================================
+# Ruff — single tool for lint + format + import sorting
+# Replaces: black, isort, flake8, pyupgrade
+# ===========================================================
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.format]
+# ruff format is the black-compatible formatter
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
 [tool.ruff.lint]
-select = ["E", "F", "I"]
-ignore = ["I001"]
+# E/W = pycodestyle errors/warnings
+# F   = pyflakes
+# I   = isort (import sorting)
+# UP  = pyupgrade (modernise syntax)
+# B   = flake8-bugbear
+# C4  = flake8-comprehensions
+# SIM = flake8-simplify
+# TCH = flake8-type-checking
+# RUF = ruff-specific rules
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "TCH", "RUF"]
+ignore = [
+    "E501",   # line-length handled by formatter
+    "B008",   # do not perform function calls in default args (FastAPI pattern)
+    "TCH001", # TYPE_CHECKING block — allow direct imports for now
+    "TCH002",
+    "TCH003",
+    "RUF012", # mutable class attrs — false positives in pydantic models
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 combine-as-imports = true
 force-single-line = false
+split-on-trailing-comma = true
 
-[tool.black]
-line-length = 100
-target-version = ["py311"]
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]   # assert is fine in tests
 
+# ===========================================================
+# mypy
+# ===========================================================
 [tool.mypy]
 python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
 
+# ===========================================================
+# pytest
+# ===========================================================
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
