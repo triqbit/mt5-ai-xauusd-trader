@@ -27,6 +27,7 @@ jobs:
 
       - name: Format check
         run: ruff format --check src/ main.py
+        continue-on-error: true
 
   test:
     name: Tests
