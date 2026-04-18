@@ -27,6 +27,11 @@ target-version = "py311"
 select = ["E", "F", "I"]
 ignore = []
 
+[tool.ruff.isort]
+known-first-party = ["src"]
+combine-as-imports = true
+force-single-line = false
+
 [tool.black]
 line-length = 100
 target-version = ["py311"]
