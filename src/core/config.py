@@ -31,7 +31,7 @@ class TradingConfig(BaseSettings):
         extra="ignore",
     )
 
-    # ── MT5 Connection ───────────────────────────────────────
+    # ── MT5 Connection ──────────────────────────────────────────────────────────
     mt5_login: int = Field(default=0, description="MT5 account number")
     mt5_password: str = Field(..., description="MT5 account password")
     mt5_server: str = Field(..., description="Broker server name")
@@ -40,37 +40,29 @@ class TradingConfig(BaseSettings):
         description="Path to MT5 terminal executable (Windows only)",
     )
 
-    # ── MetaAPI (cloud fallback) ─────────────────────────────
+    # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
     metaapi_token: str = Field(default="", description="MetaAPI cloud token")
     metaapi_account_id: str = Field(default="", description="MetaAPI account ID")
 
-    # ── Trading parameters ──────────────────────────────────
+    # ── Trading parameters ─────────────────────────────────────────────────────
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
-    mode: Literal["demo", "live", "backtest"] = Field(
-        default="demo", description="Execution mode"
-    )
+    mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
     max_positions: int = Field(default=3, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
 
-    # ── Model ──────────────────────────────────────────────
-    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
-        default="ensemble"
-    )
-    model_path: Path = Field(
-        default=ROOT / "models" / "trained" / "ensemble_latest.pt"
-    )
+    # ── Model ──────────────────────────────────────────────────────────────────
+    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
+    model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
     train_steps: int = Field(default=1_000_000, ge=100_000)
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
 
-    # ── Database ────────────────────────────────────────────
-    database_url: str = Field(
-        default="postgresql://trader:password@localhost:5432/mt5_trades"
-    )
+    # ── Database ────────────────────────────────────────────────────────────
+    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
     redis_url: str = Field(default="redis://localhost:6379/0")
 
-    # ── Monitoring ──────────────────────────────────────────
+    # ── Monitoring ──────────────────────────────────────────────────────────
     prometheus_port: int = Field(default=8000)
     dashboard_port: int = Field(default=8050)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
