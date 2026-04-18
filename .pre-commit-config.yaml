@@ -1,0 +1,86 @@
+# Pre-commit hooks for MT5 AI/ML Trading Bot
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Ruff - Fast Python linter (replaces flake8, isort, pyupgrade)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.5
+    hooks:
+      # Lint and auto-fix
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      # Format code
+      - id: ruff-format
+
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Remove trailing whitespace
+      - id: trailing-whitespace
+      # Ensure files end with newline
+      - id: end-of-file-fixer
+      # Check YAML syntax
+      - id: check-yaml
+      # Check for large files (>500KB)
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      # Check for merge conflicts
+      - id: check-merge-conflict
+      # Check for debug statements
+      - id: debug-statements
+      # Check JSON syntax
+      - id: check-json
+      # Check TOML syntax
+      - id: check-toml
+      # Detect private keys
+      - id: detect-private-key
+      # Fix mixed line endings
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Mypy - Static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.9.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - pydantic>=2.0
+          - pydantic-settings
+        args: [--ignore-missing-imports, --check-untyped-defs]
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.8
+    hooks:
+      - id: bandit
+        args: [-r, src/]
+        exclude: tests/
+
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: package.lock.json
+
+# Global configuration
+default_language_version:
+  python: python3.10
+
+# Skip hooks for specific files
+exclude: |
+  (?x)^(
+    \.git/.*|
+    \.venv/.*|
+    venv/.*|
+    __pycache__/.*|
+    \.pytest_cache/.*|
+    \.mypy_cache/.*|
+    \.ruff_cache/.*|
+    models/.*\.pt|
+    models/.*\.pth|
+    data/.*
+  )$
