@@ -20,7 +20,6 @@ import time
 from pathlib import Path
 
 import structlog
-
 from src.core.config import get_config
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
