@@ -1,12 +1,13 @@
 # ============================================================
 # MT5 AI/ML Trading Bot — Enterprise Edition
-# requirements-ci.txt  —  Linux CI-safe dependencies
+# requirements-ci.txt —  Linux CI-safe dependencies
 #
 # Excludes:
-#   - MetaTrader5    (Windows-only, no Linux wheel)
-#   - TA-Lib         (built from source in ci.yml)
+#   - MetaTrader5      (Windows-only, no Linux wheel)
+#   - TA-Lib           (built from source in ci.yml)
 #   - torch/torchvision/transformers/timm  (too heavy for unit tests)
 #   - stable-baselines3/gymnasium          (pulls torch transitively)
+#   - pandas-ta        (requires Python <3.11; runtime-only dependency)
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
@@ -19,7 +20,6 @@ einops==0.7.0
 # -- Technical Analysis --------------------------------------------
 # TA-Lib C library is built from source in ci.yml
 TA-Lib==0.4.28
-pandas-ta>=0.3.14b0
 mplfinance==0.12.10b0
 
 # -- Data Acquisition ----------------------------------------------
