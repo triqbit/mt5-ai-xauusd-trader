@@ -26,7 +26,7 @@ from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
-# ── Logging setup ──────────────────────────────────────────────────────
+# ── Logging setup ────────────────────────────────────────────────────────────────────
 def configure_logging(level: str = "INFO") -> None:
     structlog.configure(
         processors=[
@@ -45,7 +45,7 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
-# ── Trading loop ───────────────────────────────────────────────────
+# ── Trading loop ───────────────────────────────────────────────────────────────────
 def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
@@ -57,27 +57,28 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
             tick = connector.get_tick(cfg.symbol)
 
-            # 2. Build observation vector (placeholder – replace with feature engine)
+            # 2. Build observation vector (placeholder - replace with feature engine)
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
             # 3. Get ensemble prediction
             direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             if direction == 0:
-                log.debug("HOLD signal – skipping")
+                log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
                 continue
 
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
-                    atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
+            atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
             lot_size = risk.size_position(
                 cfg.symbol,
                 win_rate=0.58,
                 avg_win=4 * atr,
-                avg_loss=2 * atr
+                avg_loss=2 * atr,
             )
 
             signal = TradeSignal(
@@ -103,7 +104,7 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
             risk.update_equity(balance)
 
         except KeyboardInterrupt:
-            log.info("Interrupted by user – shutting down")
+            log.info("Interrupted by user - shutting down")
             break
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
@@ -111,11 +112,9 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
         time.sleep(poll_interval)
 
 
-# ── CLI ──────────────────────────────────────────────────────────────
+# ── CLI ────────────────────────────────────────────────────────────────────────────
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="MT5 AI/ML Trading Bot – Enterprise Edition"
-    )
+    p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
     p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
     p.add_argument("--algo", choices=["ppo", "dreamer", "lstm", "ensemble"], default="ensemble")
     p.add_argument("--symbol", default="XAUUSD")
@@ -165,7 +164,7 @@ def main() -> int:
         if cfg.mode in ("demo", "live"):
             run_live(cfg, connector, risk, model)
         elif cfg.mode == "backtest":
-            log.info("Backtest mode – see scripts/backtest.py")
+            log.info("Backtest mode - see scripts/backtest.py")
     finally:
         connector.disconnect()
 
