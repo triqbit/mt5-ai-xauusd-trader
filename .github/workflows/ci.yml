@@ -12,15 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
+
       - name: Install linters
         run: pip install ruff black mypy
+
       - name: Lint
         run: ruff check src/ main.py
+
       - name: Format check
         run: black --check src/ main.py
 
@@ -32,14 +36,20 @@ jobs:
       PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install dependencies
+
+      - name: Install TA-Lib system library
         run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
+          sudo apt-get update -qq
+          sudo apt-get install -y libta-lib-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-ci.txt
+
       - name: Run tests
         run: pytest tests/ --cov=src -v
         env:
