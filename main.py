@@ -20,6 +20,7 @@ import time
 from pathlib import Path
 
 import structlog
+
 from src.core.config import get_config
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
@@ -57,8 +58,7 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
             tick = connector.get_tick(cfg.symbol)
 
             # 2. Build observation vector (placeholder – replace with feature engine)
-            obs = df[['open', 'high', 'low', 'close', 'tick_volume']].values[-1]
-
+            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
             direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
@@ -70,7 +70,7 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
 
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
-            atr = float((df['high'] - df['low']).rolling(14).mean().iloc[-1])
+        atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
             lot_size = risk.size_position(
