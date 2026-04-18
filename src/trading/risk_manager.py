@@ -3,15 +3,14 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/risk_manager.py
 
 Enterprise risk management engine implementing:
-  - Kelly Criterion position sizing (fractional)
-  - Ray Dalio All-Weather portfolio allocation
-  - Dynamic drawdown protection & circuit breakers
-  - 6-layer entry filter cascade
+    - Kelly Criterion position sizing (fractional)
+    - Ray Dalio All-Weather portfolio allocation
+    - Dynamic drawdown protection & circuit breakers
+    - 6-layer entry filter cascade
 
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging
@@ -23,7 +22,7 @@ from src.core.config import TradingConfig
 
 logger = logging.getLogger(__name__)
 
-# ── Ray Dalio All-Weather allocation weights ────────────────────────────────
+# Ray Dalio All-Weather allocation weights
 ALLOCATION_WEIGHTS: Dict[str, float] = {
     "XAUUSD": 0.18,  # Gold  - inflation hedge
     "USDCHF": 0.15,  # CHF   - deflation hedge
@@ -75,7 +74,8 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
-    # ── Public API ─────────────────────────────────────────────────────────
+    # -- Public API ----------------------------------------------------------
+
     def approve(self, signal: TradeSignal) -> bool:
         """
         Run the full 6-layer risk filter cascade.
@@ -109,7 +109,7 @@ class RiskManager:
         if avg_loss == 0:
             return 0.01  # minimum lot
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
-        kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25 % Kelly
+        kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
         risk_capital = self.balance * self.cfg.risk_per_trade
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
@@ -139,12 +139,14 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
-    # ── Private filter layers ─────────────────────────────────────────────
+    # -- Private filter layers -----------------------------------------------
+
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15 % peak-to-valley kills all trading
+        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted", drawdown * 100
+                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
+                drawdown * 100,
             )
             return False
         return True
@@ -171,9 +173,13 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
+    def _check_minimum_confidence(
+        self, confidence: float, threshold: float = 0.55
+    ) -> bool:
         if confidence < threshold:
-            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
+            logger.debug(
+                "Confidence %.2f below threshold %.2f", confidence, threshold
+            )
             return False
         return True
 
