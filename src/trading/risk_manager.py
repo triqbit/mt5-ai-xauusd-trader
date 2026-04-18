@@ -18,8 +18,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict
-from src.core.config import TradingConfig
 
+from src.core.config import TradingConfig
 logger = logging.getLogger(__name__)
 
 # ── Ray Dalio All-Weather allocation weights ───────────────────
