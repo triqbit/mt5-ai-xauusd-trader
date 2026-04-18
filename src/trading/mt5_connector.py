@@ -9,13 +9,11 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging
-import time
 from contextlib import contextmanager
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import pandas as pd
 
@@ -53,9 +51,8 @@ class MT5Connector:
         self._connected = False
 
     # ── Lifecycle ────────────────────────────────────────────
-
     def connect(self) -> bool:
-        """Establish connection to MT5.  Returns True on success."""
+        """Establish connection to MT5. Returns True on success."""
         try:
             import MetaTrader5 as mt5  # Windows-only SDK
             self._mt5_available = True
@@ -101,8 +98,7 @@ class MT5Connector:
         finally:
             self.disconnect()
 
-    # ── Market Data ─────────────────────────────────────────
-
+    # ── Market Data ──────────────────────────────────────────
     def get_ohlcv(
         self,
         symbol: str,
@@ -134,8 +130,7 @@ class MT5Connector:
         info = mt5.account_info()
         return info.balance if info else 0.0
 
-    # ── Order Execution ──────────────────────────────────────
-
+    # ── Order Execution ───────────────────────────────────────
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
         Submit a market order.
@@ -194,8 +189,7 @@ class MT5Connector:
             logger.error("Close failed for %d: %s", ticket, result)
         return success
 
-    # ── MetaAPI fallback (stub – extend as needed) ──────────────
-
+    # ── MetaAPI fallback (stub – extend as needed) ──────────────────
     def _connect_metaapi(self) -> bool:
         if not self.cfg.metaapi_token:
             logger.error("No MetaAPI token configured")
