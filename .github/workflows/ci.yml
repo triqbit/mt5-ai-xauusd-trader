@@ -26,7 +26,7 @@ jobs:
         run: ruff check src/ main.py
 
       - name: Format check
-                                run: ruff format --check src/ main.py
+        run: ruff format --check src/ main.py
 
   test:
     name: Tests
