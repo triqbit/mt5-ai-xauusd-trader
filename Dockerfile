@@ -15,16 +15,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Build TA-Lib from source (GitHub releases mirror — SourceForge is unreliable in CI)
+# Build TA-Lib from source (GitHub releases mirror - SourceForge is unreliable in CI)
 RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz && \
     tar xf ta-lib-0.6.4-src.tar.gz && \
     cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j$(nproc) && make install && \
     cd .. && rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
 
 # Python dependencies
+# Filter out Windows-only / Linux-incompatible packages before installing
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    grep -vE '^(MetaTrader5|metaapi-cloud-sdk)' requirements.txt > requirements-docker.txt && \
+    pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
 FROM python:3.11-slim AS runtime
