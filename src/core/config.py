@@ -1,14 +1,11 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/config.py
-
 Centralised Pydantic-v2 settings loaded from environment variables
 or a .env file. All secrets stay out of the codebase.
-
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 from functools import lru_cache
