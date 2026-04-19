@@ -116,6 +116,10 @@ class MT5Connector:
         logger.error("All MT5 connection paths failed.")
         return False
 
+    def connect(self) -> bool:
+        """Alias for initialize() to support existing interfaces."""
+        return self.initialize()
+
     def shutdown(self) -> None:
         """Gracefully close all connections."""
         if self._is_initialized:
@@ -123,6 +127,10 @@ class MT5Connector:
                 mt5.shutdown()
             logger.info("MT5 connector shutdown complete.")
             self._is_initialized = False
+
+    def disconnect(self) -> None:
+        """Alias for shutdown() to support existing interfaces."""
+        self.shutdown()
 
     @contextmanager
     def session(self):
@@ -134,14 +142,14 @@ class MT5Connector:
         finally:
             self.shutdown()
 
-    def get_rates(self, symbol: str, timeframe: str, count: int) -> pd.DataFrame:
+    def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
 
         Args:
             symbol: Trading symbol (e.g., 'XAUUSD').
             timeframe: Chart timeframe string (e.g., 'M5').
-            count: Number of bars to retrieve.
+            n_bars: Number of bars to retrieve.
 
         Returns:
             DataFrame containing OHLCV data or empty DataFrame on failure.
@@ -152,7 +160,7 @@ class MT5Connector:
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
-            rates = mt5.copy_rates_from_pos(symbol, tf, 0, count)
+            rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
                 logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
                 return pd.DataFrame()
@@ -163,6 +171,30 @@ class MT5Connector:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
             return pd.DataFrame()
+
+    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+        """Alias for get_rates() to match main.py expectations."""
+        return self.get_rates(symbol, timeframe, n_bars)
+
+    def get_tick(self, symbol: str) -> Dict[str, float]:
+        """
+        Retrieve latest symbol tick (bid/ask).
+
+        Args:
+            symbol: Trading symbol.
+
+        Returns:
+            Dictionary with 'bid' and 'ask' prices.
+        """
+        if not self._is_initialized or self.use_metaapi:
+            return {"bid": 0.0, "ask": 0.0}
+
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None:
+            logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
+            return {"bid": 0.0, "ask": 0.0}
+
+        return {"bid": tick.bid, "ask": tick.ask}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
@@ -179,11 +211,12 @@ class MT5Connector:
 
         if not self.use_metaapi:
             order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
-            price = (
-                mt5.symbol_info_tick(signal.symbol).ask
-                if order_type == ORDER_TYPE_BUY
-                else mt5.symbol_info_tick(signal.symbol).bid
-            )
+            tick = self.get_tick(signal.symbol)
+            price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
+
+            if price == 0:
+                logger.error("Invalid price for order execution.")
+                return None
 
             request = {
                 "action": TRADE_ACTION_DEAL,
@@ -215,6 +248,11 @@ class MT5Connector:
             acc = mt5.account_info()
             return acc._asdict() if acc else {}
         return {}
+
+    def get_account_balance(self) -> float:
+        """Retrieve current account balance."""
+        info = self.get_account_info()
+        return float(info.get("balance", 0.0))
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve current open positions."""
