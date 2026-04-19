@@ -1,18 +1,14 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/models/ensemble.py
-
 Ensemble voting system combining:
   - PPO (Stable-Baselines3)
   - Dreamer V3 (world model RL)
   - LSTM + Multi-head Attention
-
 Weighted confidence voting with dynamic weight adaptation.
-
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging
@@ -30,7 +26,7 @@ logger = logging.getLogger(__name__)
 class LSTMAttentionModel(nn.Module):
     """
     Bidirectional LSTM with multi-head self-attention.
-    Input  : (batch, seq_len, n_features)
+    Input : (batch, seq_len, n_features)
     Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
     """
 
@@ -77,7 +73,6 @@ class LSTMAttentionModel(nn.Module):
 class EnsembleModel:
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
-
     Weights are initialised equally and adapt based on a rolling window
     of each algorithm's realised P&L Sharpe ratio.
     """
@@ -140,7 +135,7 @@ class EnsembleModel:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-                votes["lstm"] = probs
+            votes["lstm"] = probs
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
@@ -185,7 +180,7 @@ class EnsembleModel:
         total = sum(sharpes.values()) or 1.0
         for algo, s in sharpes.items():
             raw = s / total
-            self.weights[algo] = max(raw, 0.05)  # min 5 %
+            self.weights[algo] = max(raw, 0.05)  # min 5%
         # Re-normalise
         total_w = sum(self.weights.values())
         self.weights = {k: v / total_w for k, v in self.weights.items()}
