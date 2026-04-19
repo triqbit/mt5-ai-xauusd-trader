@@ -8,10 +8,10 @@ on:
 
 # ===========================================================
 # Self-enforcing CI:
-#   quality  → ruff lint, ruff format check, import sort check
-#   security → pip-audit vulnerability scan
-#   test     → pytest with coverage
-#   docker   → build image (main branch only)
+# quality → ruff lint, ruff format check, import sort check
+# security → pip-audit vulnerability scan
+# test     → pytest with coverage
+# docker   → build image (main branch only)
 # ===========================================================
 
 jobs:
@@ -77,6 +77,7 @@ jobs:
       PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -112,7 +113,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
+
       - uses: docker/setup-buildx-action@v3
+
       - uses: docker/build-push-action@v5
         with:
           context: .
