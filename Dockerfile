@@ -1,9 +1,9 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
-# Dockerfile  (Python 3.11 slim, multi-stage build)
+# Dockerfile (Python 3.11 slim, multi-stage build)
 # ============================================================
 
-# ─── Stage 1: builder ──────────────────────────────────────────
+# --- Stage 1: builder ------------------------------------------
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -15,18 +15,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Build TA-Lib from source
-RUN wget -q https://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
-    tar xf ta-lib-0.4.0-src.tar.gz && \
-    cd ta-lib && ./configure --prefix=/usr && make -j$(nproc) && make install && \
-    cd .. && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+# Build TA-Lib from source (GitHub releases mirror — SourceForge is unreliable in CI)
+RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz && \
+    tar xf ta-lib-0.6.4-src.tar.gz && \
+    cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j$(nproc) && make install && \
+    cd .. && rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
 
 # Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# ─── Stage 2: runtime ──────────────────────────────────────────
+# --- Stage 2: runtime ------------------------------------------
 FROM python:3.11-slim AS runtime
 
 WORKDIR /app
