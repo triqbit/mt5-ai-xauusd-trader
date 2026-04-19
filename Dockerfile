@@ -21,11 +21,9 @@ RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6
     cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j$(nproc) && make install && \
     cd .. && rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
 
-# Python dependencies
-# Filter out Windows-only / Linux-incompatible packages before installing
-COPY requirements.txt .
+# Python dependencies (Linux-safe subset; excludes Windows-only packages)
+COPY requirements-docker.txt .
 RUN pip install --upgrade pip && \
-    grep -vE '^(MetaTrader5|metaapi-cloud-sdk)' requirements.txt > requirements-docker.txt && \
     pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
