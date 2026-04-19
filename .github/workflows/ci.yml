@@ -8,66 +8,58 @@ on:
 
 # ===========================================================
 # Self-enforcing CI:
-# quality → ruff lint, ruff format check, import sort check
-# security → pip-audit vulnerability scan
-# test     → pytest with coverage
-# docker   → build image (main branch only)
+# quality  -> ruff lint, ruff format check, import sort check
+# security -> pip-audit vulnerability scan
+# test     -> pytest with coverage
+# docker   -> build image (main branch only)
 # ===========================================================
 
 jobs:
+
   # -----------------------------------------------------------
-  # JOB 1: Code Quality — lint + format + imports
+  # JOB 1: Code Quality - lint + format + imports
   # -----------------------------------------------------------
   quality:
     name: Code Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-
       - name: Install quality tools
         run: pip install ruff==0.4.3 mypy==1.10.0
-
       - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
-
       - name: Ruff format (apply formatting)
         run: ruff format src/ main.py
-
       - name: Ruff format check (formatting enforced)
         run: ruff format --check src/ main.py
-
       - name: Import sort check (isort via ruff I-rules)
         run: ruff check --select I src/ main.py
 
   # -----------------------------------------------------------
-  # JOB 2: Dependency Security — pip-audit CVE scan
+  # JOB 2: Dependency Security - pip-audit CVE scan
   # -----------------------------------------------------------
   security:
     name: Dependency Safety
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-
       - name: Install pip-audit
         run: pip install pip-audit==2.7.3
-
       - name: Audit dependencies for known CVEs
         run: pip-audit --requirement requirements-ci.txt --progress-spinner off
 
   # -----------------------------------------------------------
-  # JOB 3: Tests — needs quality + security to pass first
+  # JOB 3: Tests - needs quality + security to pass first
   # -----------------------------------------------------------
   test:
     name: Tests
@@ -77,24 +69,26 @@ jobs:
       PYTHONPATH: .
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-
-      - name: Install TA-Lib from source
+      - name: Install TA-Lib C library from source
         run: |
+          set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y build-essential wget
-          wget -q http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
-          tar -xzf ta-lib-0.4.0-src.tar.gz
-          cd ta-lib && ./configure --prefix=/usr && make -j2 && sudo make install
-          cd .. && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
-
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
-
       - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
@@ -104,7 +98,7 @@ jobs:
           MODE: "demo"
 
   # -----------------------------------------------------------
-  # JOB 4: Docker Build — only on main, needs tests to pass
+  # JOB 4: Docker Build - only on main, needs tests to pass
   # -----------------------------------------------------------
   docker:
     name: Docker Build
@@ -113,9 +107,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
-
       - uses: docker/setup-buildx-action@v3
-
       - uses: docker/build-push-action@v5
         with:
           context: .
