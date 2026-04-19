@@ -1,7 +1,8 @@
 """Tests for src.core.config module."""
-
 import os
+
 import pytest
+
 from src.core.config import TradingConfig
 
 
@@ -11,7 +12,7 @@ def test_config_from_env(monkeypatch):
     monkeypatch.setenv("MT5_PASSWORD", "testpass")
     monkeypatch.setenv("MT5_SERVER", "TestServer-Demo")
     monkeypatch.setenv("MODE", "demo")
-    
+
     cfg = TradingConfig()
     assert cfg.mt5_login == 12345
     assert cfg.mt5_password == "testpass"
