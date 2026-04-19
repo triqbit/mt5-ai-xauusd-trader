@@ -1,11 +1,9 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/mt5_connector.py
-
 Dual-path MT5 connector:
-    Primary  : Direct MetaTrader5 Python SDK
-    Fallback : MetaAPI cloud (for Mac/Linux or remote deployments)
-
+  Primary : Direct MetaTrader5 Python SDK
+  Fallback : MetaAPI cloud (for Mac/Linux or remote deployments)
 Author : triqbit
 License: MIT
 """
@@ -56,7 +54,6 @@ class MT5Connector:
         self._connected = False
 
     # -- Lifecycle ---------------------------------------------------------
-
     def connect(self) -> bool:
         """Establish connection to MT5. Returns True on success."""
         try:
@@ -109,7 +106,6 @@ class MT5Connector:
             self.disconnect()
 
     # -- Market Data -------------------------------------------------------
-
     def get_ohlcv(
         self,
         symbol: str,
@@ -145,7 +141,6 @@ class MT5Connector:
         return info.balance if info else 0.0
 
     # -- Order Execution ---------------------------------------------------
-
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
         Submit a market order.
@@ -210,7 +205,6 @@ class MT5Connector:
         return success
 
     # -- MetaAPI fallback (stub) -------------------------------------------
-
     def _connect_metaapi(self) -> bool:
         if not self.cfg.metaapi_token:
             logger.error("No MetaAPI token configured")
