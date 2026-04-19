@@ -1,13 +1,11 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/risk_manager.py
-
 Enterprise risk management engine implementing:
-    - Kelly Criterion position sizing (fractional)
-    - Ray Dalio All-Weather portfolio allocation
-    - Dynamic drawdown protection & circuit breakers
-    - 6-layer entry filter cascade
-
+  - Kelly Criterion position sizing (fractional)
+  - Ray Dalio All-Weather portfolio allocation
+  - Dynamic drawdown protection & circuit breakers
+  - 6-layer entry filter cascade
 Author : triqbit
 License: MIT
 """
@@ -24,13 +22,13 @@ logger = logging.getLogger(__name__)
 
 # Ray Dalio All-Weather allocation weights
 ALLOCATION_WEIGHTS: Dict[str, float] = {
-    "XAUUSD": 0.18,  # Gold  - inflation hedge
-    "USDCHF": 0.15,  # CHF   - deflation hedge
-    "GBPUSD": 0.13,  # GBP   - growth / balanced
-    "EURUSD": 0.12,  # EUR   - growth / balanced
+    "XAUUSD": 0.18,  # Gold - inflation hedge
+    "USDCHF": 0.15,  # CHF - deflation hedge
+    "GBPUSD": 0.13,  # GBP - growth / balanced
+    "EURUSD": 0.12,  # EUR - growth / balanced
     "XAGUSD": 0.12,  # Silver - commodity
-    "AUDUSD": 0.15,  # AUD   - commodity currency
-    "USDJPY": 0.08,  # JPY   - carry trade
+    "AUDUSD": 0.15,  # AUD - commodity currency
+    "USDJPY": 0.08,  # JPY - carry trade
     "EURJPY": 0.07,  # EUR/JPY cross
 }
 
@@ -75,7 +73,6 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-
     def approve(self, signal: TradeSignal) -> bool:
         """
         Run the full 6-layer risk filter cascade.
@@ -140,7 +137,6 @@ class RiskManager:
         logger.info("Daily stats reset")
 
     # -- Private filter layers ----------------------------------------------
-
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
