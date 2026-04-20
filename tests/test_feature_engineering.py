@@ -1,10 +1,12 @@
 """
 Tests for src/core/feature_engineering.py
 """
+
 import numpy as np
 import pandas as pd
 import pytest
 from src.core.feature_engineering import FeatureEngineer
+
 
 @pytest.fixture
 def synthetic_ohlcv():
@@ -16,19 +18,23 @@ def synthetic_ohlcv():
     returns = np.random.normal(0, 0.0001, 500)
     price = 2000 * np.exp(np.cumsum(returns))
 
-    df = pd.DataFrame({
-        "open": price,
-        "high": price * (1 + np.abs(np.random.normal(0, 0.0002, 500))),
-        "low": price * (1 - np.abs(np.random.normal(0, 0.0002, 500))),
-        "close": price * (1 + np.random.normal(0, 0.0001, 500)),
-        "tick_volume": np.random.randint(100, 1000, 500)
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "open": price,
+            "high": price * (1 + np.abs(np.random.normal(0, 0.0002, 500))),
+            "low": price * (1 - np.abs(np.random.normal(0, 0.0002, 500))),
+            "close": price * (1 + np.random.normal(0, 0.0001, 500)),
+            "tick_volume": np.random.randint(100, 1000, 500),
+        },
+        index=dates,
+    )
 
     # Ensure high is highest and low is lowest
     df["high"] = df[["open", "high", "close"]].max(axis=1)
     df["low"] = df[["open", "low", "close"]].min(axis=1)
 
     return df
+
 
 def test_compute_features_count(synthetic_ohlcv):
     """Verify that we compute at least 140 features."""
@@ -42,6 +48,7 @@ def test_compute_features_count(synthetic_ohlcv):
     assert "RSI_14" in df_features.columns
     assert "MACD_12_26_9" in df_features.columns
     assert "ema_200" in df_features.columns
+
 
 def test_normalize_features(synthetic_ohlcv):
     """Verify normalization logic."""
@@ -57,9 +64,10 @@ def test_normalize_features(synthetic_ohlcv):
             sample = df_norm[col].iloc[-50:]
             # Using 2.0 as a very loose bound for synthetic random walk data
             assert abs(sample.mean()) < 2.0
-            assert sample.std() >= 0.0 # Should be non-negative
+            assert sample.std() >= 0.0  # Should be non-negative
 
     assert not df_norm.isnull().values.any()
+
 
 def test_empty_dataframe():
     """Handle empty input gracefully."""
@@ -68,6 +76,7 @@ def test_empty_dataframe():
     res = fe.compute_features(df)
     assert res.empty
 
+
 def test_mtf_features(synthetic_ohlcv):
     """Verify MTF features are present."""
     fe = FeatureEngineer()
@@ -75,6 +84,7 @@ def test_mtf_features(synthetic_ohlcv):
 
     assert "rsi_14_1h" in df_features.columns
     assert "ema_21_4h" in df_features.columns
+
 
 def test_candle_patterns(synthetic_ohlcv):
     """Verify custom candle patterns."""
