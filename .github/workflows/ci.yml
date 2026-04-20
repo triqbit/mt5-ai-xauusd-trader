@@ -8,14 +8,14 @@ on:
 
 # ===========================================================
 # Self-enforcing CI (PHASE1_ROADMAP Steps 1-5):
-# quality  -> ruff lint, import sort, mypy
+# quality  -> ruff lint, import sort
 # security -> pip-audit vulnerability scan
 # test     -> pytest with coverage (>=50%)
 # docker   -> build image (main branch only)
 # ===========================================================
 jobs:
   # -----------------------------------------------------------
-  # JOB 1: Code Quality - lint + imports + type check
+  # JOB 1: Code Quality - lint + imports
   # -----------------------------------------------------------
   quality:
     name: Code Quality
@@ -47,11 +47,12 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install pip-audit
-        run: pip install pip-audit==2.7.3
-      - name: Audit dependencies for known CVEs
+      - name: Install packages and pip-audit
         run: |
-          pip-audit --requirement requirements-ci.txt --progress-spinner off --skip-editable --pre
+          pip install pip-audit==2.7.3
+          pip install --pre -r requirements-ci.txt --no-deps
+      - name: Audit dependencies for known CVEs
+        run: pip-audit --requirement requirements-ci.txt --progress-spinner off --skip-editable
 
   # -----------------------------------------------------------
   # JOB 3: Tests - needs quality + security to pass first
