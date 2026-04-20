@@ -17,8 +17,8 @@ stable-baselines3>=2.3.2
 
 # -- Technical Analysis --------------------------------------
 TA-Lib>=0.6.4
-# pandas-ta 0.4.x (pre-release); pip install with --pre flag
-pandas-ta>=0.4.67b0
+# pandas-ta: classic community fork supports Python 3.9-3.13
+pandas-ta-classic>=0.4.32
 
 # -- Pydantic / settings -------------------------------------
 pydantic>=2.7.1
