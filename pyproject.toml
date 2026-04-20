@@ -20,7 +20,7 @@ where = ["."]
 include = ["src*"]
 
 # ===========================================================
-# Ruff — single tool for lint + format + import sorting
+# STEP 1 & 3: Ruff -- single tool for lint + format + import sorting
 # Replaces: black, isort, flake8, pyupgrade
 # ===========================================================
 [tool.ruff]
@@ -28,32 +28,33 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.format]
-# ruff format is the black-compatible formatter
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint]
-# Rule sets enabled:
-#   E/W = pycodestyle errors/warnings
-#   F   = pyflakes (undefined names, unused imports)
-#   I   = isort (import sorting — enforced)
-#   B   = flake8-bugbear (likely bugs and design issues)
-#   C4  = flake8-comprehensions (simplify comprehensions)
-#   SIM = flake8-simplify
-#   RUF = ruff-specific rules
+# Enhanced rule sets (STEP 3):
+# E/W = pycodestyle errors/warnings
+# F   = pyflakes (undefined names, unused imports)
+# I   = isort (import sorting -- enforced)
+# N   = pep8-naming
+# B   = flake8-bugbear (likely bugs and design issues)
+# C4  = flake8-comprehensions (simplify comprehensions)
+# SIM = flake8-simplify
+# RUF = ruff-specific rules
 #
-# NOTE: UP (pyupgrade) intentionally excluded until source files
-# are migrated from typing.Dict/List/Optional to built-in generics.
-# Track in: https://github.com/triqbit/mt5-ai-xauusd-trader/issues
-select = ["E", "W", "F", "I", "B", "C4", "SIM", "RUF"]
+# NOTE: UP (pyupgrade) excluded until typing.Dict/List/Optional migrated
+select = ["E", "W", "F", "I", "N", "B", "C4", "SIM", "RUF"]
 ignore = [
-    "E501",   # line-length — handled by ruff format
+    "E501",   # line-length -- handled by ruff format
     "B008",   # function calls in default args (FastAPI Depends pattern)
-    "RUF012", # mutable class attrs — false positives in pydantic models
-    "SIM108", # ternary operator — sometimes less readable
+    "RUF012", # mutable class attrs -- false positives in pydantic models
+    "SIM108", # ternary operator -- sometimes less readable
+    "N803",   # argument name should be lowercase (ML conventions use X)
+    "N806",   # variable in function should be lowercase (ML conventions)
 ]
+fix = true
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -62,21 +63,36 @@ force-single-line = false
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "B011"]   # assert + raise-without-from OK in tests
+"tests/**" = ["S101", "B011"]  # assert + raise-without-from OK in tests
+"__init__.py" = ["F401"]        # allow unused imports in __init__
 
 # ===========================================================
-# mypy
+# STEP 4: mypy -- strict type checking
 # ===========================================================
 [tool.mypy]
 python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
 
 # ===========================================================
-# pytest
+# STEP 5: pytest + coverage
 # ===========================================================
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
-addopts = "--strict-markers --verbose"
+addopts = "--strict-markers --verbose --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=50"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "*/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
