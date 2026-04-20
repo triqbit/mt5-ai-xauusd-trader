@@ -6,14 +6,28 @@ src/trading/execution_filter.py
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
 import pandas as pd
-import pandas_ta as ta  # noqa: F401
+
+try:
+    import pandas_ta as ta  # noqa: F401
+    HAS_PANDAS_TA = True
+except ImportError:
+    HAS_PANDAS_TA = False
+
+try:
+    import talib
+    HAS_TALIB = True
+except ImportError:
+    HAS_TALIB = False
 
 from src.core.config import TradingConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -38,6 +52,8 @@ class ExecutionFilter:
 
     def __init__(self, config: TradingConfig):
         self.cfg = config
+        if not HAS_PANDAS_TA and not HAS_TALIB:
+            logger.warning("Neither pandas-ta nor TA-Lib found. Some filters may fail.")
 
     def validate(
         self,
@@ -78,47 +94,75 @@ class ExecutionFilter:
 
     def _check_atr_volatility(self, df: pd.DataFrame, min_atr: float = 0.5) -> bool:
         """Ensure there is enough volatility to trade."""
-        atr = df.ta.atr(length=14)
+        if HAS_PANDAS_TA:
+            atr = df.ta.atr(length=14)
+        elif HAS_TALIB:
+            atr = pd.Series(
+                talib.ATR(df["high"], df["low"], df["close"], timeperiod=14),
+                index=df.index,
+            )
+        else:
+            return True  # Fallback if no library
+
         if atr is None or len(atr) == 0:
             return False
-        return atr.iloc[-1] > min_atr
+        return bool(atr.iloc[-1] > min_atr)
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int) -> bool:
         """Confirm trend direction using EMA slope."""
-        ema20 = df.ta.ema(length=20)
+        if HAS_PANDAS_TA:
+            ema20 = df.ta.ema(length=20)
+        elif HAS_TALIB:
+            ema20 = pd.Series(talib.EMA(df["close"], timeperiod=20), index=df.index)
+        else:
+            return True
+
         if ema20 is None or len(ema20) < 2:
             return False
         slope = ema20.iloc[-1] - ema20.iloc[-2]
-        return (direction == 1 and slope > 0) or (direction == -1 and slope < 0)
+        return bool((direction == 1 and slope > 0) or (direction == -1 and slope < 0))
 
     def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
         """Check for EMA alignment (20 > 50 > 200 for BUY)."""
-        ema20 = df.ta.ema(length=20)
-        ema50 = df.ta.ema(length=50)
-        ema200 = df.ta.ema(length=200)
+        if HAS_PANDAS_TA:
+            ema20 = df.ta.ema(length=20)
+            ema50 = df.ta.ema(length=50)
+            ema200 = df.ta.ema(length=200)
+        elif HAS_TALIB:
+            ema20 = pd.Series(talib.EMA(df["close"], timeperiod=20), index=df.index)
+            ema50 = pd.Series(talib.EMA(df["close"], timeperiod=50), index=df.index)
+            ema200 = pd.Series(talib.EMA(df["close"], timeperiod=200), index=df.index)
+        else:
+            return True
 
-        if ema200 is None or len(ema200) == 0:
+        if ema200 is None or len(ema200) == 0 or pd.isna(ema200.iloc[-1]):
             return False
 
         e20, e50, e200 = ema20.iloc[-1], ema50.iloc[-1], ema200.iloc[-1]
 
         if direction == 1:  # Buy
-            return e20 > e50 > e200
+            return bool(e20 > e50 > e200)
         elif direction == -1:  # Sell
-            return e20 < e50 < e200
+            return bool(e20 < e50 < e200)
         return False
 
     def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
         """Confirm momentum using RSI."""
-        rsi = df.ta.rsi(length=14)
-        if rsi is None or len(rsi) == 0:
+        if HAS_PANDAS_TA:
+            rsi = df.ta.rsi(length=14)
+        elif HAS_TALIB:
+            rsi = pd.Series(talib.RSI(df["close"], timeperiod=14), index=df.index)
+        else:
+            return True
+
+        if rsi is None or len(rsi) == 0 or pd.isna(rsi.iloc[-1]):
             return False
 
         current_rsi = rsi.iloc[-1]
         if direction == 1:
-            return current_rsi > 50  # Bullish momentum
+            return bool(current_rsi > 50)  # Bullish momentum
         elif direction == -1:
-            return current_rsi < 50  # Bearish momentum
+            return bool(current_rsi < 50)  # Bearish momentum
         return False
 
     def _check_session_filter(self) -> bool:
@@ -141,4 +185,4 @@ class ExecutionFilter:
         """Block if max drawdown limit reached."""
         # Using 10% as default if not in config
         max_dd = getattr(self.cfg, "max_drawdown", 0.10)
-        return current_drawdown < max_dd
+        return bool(current_drawdown < max_dd)
