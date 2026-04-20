@@ -63,6 +63,9 @@ class TradingConfig(BaseSettings):
     prometheus_port: int = Field(default=8000)
     dashboard_port: int = Field(default=8050)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
+    telegram_token: str = Field(default="", description="Telegram Bot API token")
+    telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
+    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     @field_validator("risk_per_trade")
     @classmethod
