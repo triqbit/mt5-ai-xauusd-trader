@@ -5,14 +5,17 @@ Placeholder for DreamerV3 agent.
 """
 
 import numpy as np
+
 from src.models.base_model import BaseModel, Signal
+
 
 class DreamerAgent(BaseModel):
     """
     DreamerV3 agent wrapper (Placeholder).
     Ensures compatibility with the ensemble interface.
     """
-    def __init__(self, model_path: str = None, device: str = "cpu"):
+
+    def __init__(self, model_path: str | None = None, device: str = "cpu"):
         self.model_path = model_path
         self.device = device
         # DreamerV3 implementation would be initialized here

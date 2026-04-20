@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -50,9 +51,7 @@ def configure_logging(level: str = "INFO") -> None:
 # -- Trading loop ----------------------------------------------------------
 
 
-def run_live(
-    cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel
-) -> None:
+def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
@@ -64,7 +63,10 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, per_algo = model.predict(obs)
+            signal_obj = model.predict(obs)
+            direction = signal_obj.direction
+            confidence = signal_obj.confidence
+
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
             if direction == 0:
                 log.debug("HOLD signal - skipping")

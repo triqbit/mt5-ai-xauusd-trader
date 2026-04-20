@@ -14,12 +14,16 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from src.models.base_model import BaseModel, Signal
 
+
 class PPOAgent(BaseModel):
     """
     PPO-based reinforcement learning agent.
     Wraps Stable-Baselines3 PPO for production trading.
     """
-    def __init__(self, env=None, model_path: Optional[Union[str, Path]] = None, device: str = "auto"):
+
+    def __init__(
+        self, env=None, model_path: Optional[Union[str, Path]] = None, device: str = "auto"
+    ):
         self.logger = logging.getLogger(__name__)
         self.device = device
         self.env = DummyVecEnv([lambda: env]) if env else None
@@ -57,7 +61,9 @@ class PPOAgent(BaseModel):
         direction_map = {0: 0, 1: 1, 2: -1}
         direction = direction_map.get(int(action), 0)
 
-        return Signal(direction=direction, confidence=1.0)  # PPO discrete action has 100% confidence in its choice
+        return Signal(
+            direction=direction, confidence=1.0
+        )  # PPO discrete action has 100% confidence in its choice
 
     def train(self, total_timesteps: int = 1_000_000, save_path: Optional[Path] = None):
         """Train the PPO agent."""
@@ -66,7 +72,7 @@ class PPOAgent(BaseModel):
 
         self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
         self.model.learn(total_timesteps=total_timesteps)
-        
+
         if save_path:
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             self.model.save(str(save_path))

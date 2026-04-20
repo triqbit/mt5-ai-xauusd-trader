@@ -5,8 +5,11 @@ Base interface for all AI/ML models in the system.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any, Dict
+
 import numpy as np
+
 
 @dataclass
 class Signal:
@@ -14,9 +17,13 @@ class Signal:
     Standard signal format returned by all models.
     direction: 1 (Buy), -1 (Sell), 0 (Hold)
     confidence: Probability or confidence score [0, 1]
+    metadata: Optional dictionary for additional model-specific data (e.g., per-algo votes)
     """
+
     direction: int
     confidence: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
 
 class BaseModel(ABC):
     """

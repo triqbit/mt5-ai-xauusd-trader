@@ -4,19 +4,24 @@ src/models/lstm_model.py
 LSTM-based sequence model for price prediction.
 """
 
+from pathlib import Path
+from typing import Optional, Union
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from typing import Optional, Union
-from pathlib import Path
 
 from src.models.base_model import BaseModel, Signal
+
 
 class LSTMNet(nn.Module):
     """
     PyTorch LSTM network for sequence processing.
     """
-    def __init__(self, input_size: int, hidden_size: int = 64, num_layers: int = 2, output_size: int = 3):
+
+    def __init__(
+        self, input_size: int, hidden_size: int = 64, num_layers: int = 2, output_size: int = 3
+    ):
         super(LSTMNet, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
@@ -28,12 +33,19 @@ class LSTMNet(nn.Module):
         out = self.fc(out[:, -1, :])
         return out
 
+
 class LSTMModel(BaseModel):
     """
     LSTM sequence model wrapper.
     """
-    def __init__(self, input_size: int = 140, hidden_size: int = 64,
-                 model_path: Optional[Union[str, Path]] = None, device: str = "cpu"):
+
+    def __init__(
+        self,
+        input_size: int = 140,
+        hidden_size: int = 64,
+        model_path: Optional[Union[str, Path]] = None,
+        device: str = "cpu",
+    ):
         self.device = torch.device(device)
         self.model = LSTMNet(input_size, hidden_size).to(self.device)
 
@@ -63,9 +75,9 @@ class LSTMModel(BaseModel):
             # Convert to tensor and add batch dimension
             x = torch.FloatTensor(features).to(self.device)
             if x.dim() == 1:
-                x = x.unsqueeze(0).unsqueeze(0) # (1, 1, input_size)
+                x = x.unsqueeze(0).unsqueeze(0)  # (1, 1, input_size)
             elif x.dim() == 2:
-                x = x.unsqueeze(0) # (1, seq_len, input_size)
+                x = x.unsqueeze(0)  # (1, seq_len, input_size)
 
             logits = self.model(x)
             probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
