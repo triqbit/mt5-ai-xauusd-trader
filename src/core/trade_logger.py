@@ -163,19 +163,39 @@ class TradeLogger:
             return trade.id
 
     def update_trade(
-        self, ticket: int, exit_price: float, pnl: float, drawdown_impact: float = 0.0
+        self,
+        ticket: int,
+        exit_price: float,
+        pnl: Optional[float] = None,
+        drawdown_impact: float = 0.0,
     ) -> None:
-        """Update a trade when it is closed."""
+        """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session() as session:
             trade = session.query(Trade).filter(Trade.ticket == ticket).first()
             if trade:
                 trade.exit_price = exit_price
-                trade.pnl = pnl
+                if pnl is not None:
+                    trade.pnl = pnl
+                else:
+                    # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
+                    # For XAUUSD, contract size is often 100.
+                    contract_size = 100
+                    trade.pnl = (
+                        (exit_price - trade.entry_price)
+                        * trade.direction
+                        * trade.lot_size
+                        * contract_size
+                    )
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
                 session.commit()
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
+
+    def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
+        """Retrieve trade details by ticket ID."""
+        with self.Session() as session:
+            return session.query(Trade).filter(Trade.ticket == ticket).first()
 
     def log_risk_event(
         self,

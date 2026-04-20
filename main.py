@@ -134,16 +134,18 @@ def run_live(
             for symbol, ticket in list(risk.open_positions.items()):
                 if symbol == cfg.symbol and ticket not in current_tickets:
                     # Position closed - in a real scenario we'd fetch deal history
-                    # For this implementation, we'll simulate fetching exit info
                     log.info("Position CLOSED | ticket=%d", ticket)
                     if trade_logger:
-                        # Fetching simulated P&L for demonstration
-                        # In production, use mt5.history_deals_get(ticket=ticket)
-                        trade_logger.update_trade(
-                            ticket=ticket,
-                            exit_price=tick["bid"] if direction == 1 else tick["ask"],
-                            pnl=0.0,  # Placeholder: would be calculated from history
-                        )
+                        # Retrieve trade info from DB to get correct direction
+                        trade_info = trade_logger.get_trade_by_ticket(ticket)
+                        if trade_info:
+                            # For a BUY, exit at BID. For a SELL, exit at ASK.
+                            exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                            # P&L will be calculated automatically by update_trade
+                            trade_logger.update_trade(
+                                ticket=ticket,
+                                exit_price=exit_price,
+                            )
                     closed_tickets.append(symbol)
 
             for sym in closed_tickets:
