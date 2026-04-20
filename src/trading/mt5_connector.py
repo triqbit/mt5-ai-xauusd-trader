@@ -7,17 +7,18 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
-import time
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -25,7 +26,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
-    import asyncio
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -168,9 +169,8 @@ class MT5Connector:
         Returns:
             DataFrame containing OHLCV data or empty DataFrame on failure.
         """
-        if not self._is_initialized:
-            if not self.initialize():
-                return pd.DataFrame()
+        if not self._is_initialized and not self.initialize():
+            return pd.DataFrame()
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
@@ -201,9 +201,8 @@ class MT5Connector:
         Returns:
             Dictionary with 'bid' and 'ask' prices.
         """
-        if not self._is_initialized:
-            if not self.initialize():
-                return {"bid": 0.0, "ask": 0.0}
+        if not self._is_initialized and not self.initialize():
+            return {"bid": 0.0, "ask": 0.0}
 
         if not self.use_metaapi and MT5_AVAILABLE:
             tick = mt5.symbol_info_tick(symbol)
@@ -224,16 +223,22 @@ class MT5Connector:
         Returns:
             Order ticket ID if successful, None otherwise.
         """
-        if not self._is_initialized:
-            if not self.initialize():
-                return None
+        if not self._is_initialized and not self.initialize():
+            return None
 
         if not self.use_metaapi and MT5_AVAILABLE:
             order_type = mt5.ORDER_TYPE_BUY if signal.direction > 0 else mt5.ORDER_TYPE_SELL
 
             # Use provided entry price if available, else get current tick
-            price = signal.entry_price if signal.entry_price > 0 else \
-                    (self.get_tick(signal.symbol)["ask"] if signal.direction > 0 else self.get_tick(signal.symbol)["bid"])
+            price = (
+                signal.entry_price
+                if signal.entry_price > 0
+                else (
+                    self.get_tick(signal.symbol)["ask"]
+                    if signal.direction > 0
+                    else self.get_tick(signal.symbol)["bid"]
+                )
+            )
 
             if price == 0:
                 logger.error("Invalid price for order execution.")
@@ -299,4 +304,4 @@ class MT5Connector:
         return []
 
 
-__all__ = ["MT5Connector", "TIMEFRAME_MAP"]
+__all__ = ["TIMEFRAME_MAP", "MT5Connector"]

@@ -9,15 +9,14 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Dict, List, Optional
+from typing import Dict
 
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal, DailyStats, ALLOCATION_WEIGHTS
+from src.trading.risk_manager import ALLOCATION_WEIGHTS, DailyStats, TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +64,9 @@ class RiskEngine:
         if not self._check_market_conditions(signal):
             return False
 
-        logger.info("Signal APPROVED | %s %d | size=%.2f", signal.symbol, signal.direction, signal.lot_size)
+        logger.info(
+            "Signal APPROVED | %s %d | size=%.2f", signal.symbol, signal.direction, signal.lot_size
+        )
         return True
 
     def calculate_position_size(
@@ -99,12 +100,19 @@ class RiskEngine:
 
         # Apply Position-Level Limits from RISK_LIMITS.md
         # Max 10% of equity per trade
-        max_lot_by_equity = (self.balance * self.cfg.max_position_size_percent) / (entry_price * contract_size / self.cfg.max_leverage)
+        max_lot_by_equity = (self.balance * self.cfg.max_position_size_percent) / (
+            entry_price * contract_size / self.cfg.max_leverage
+        )
 
         lot_size = min(raw_lot_size, max_lot_by_equity)
         lot_size = max(self.cfg.min_lot_size, round(lot_size, 2))
 
-        logger.debug("Position Sizing | risk_amt=%.2f risk_unit=%.2f lots=%.2f", risk_amount, risk_per_unit, lot_size)
+        logger.debug(
+            "Position Sizing | risk_amt=%.2f risk_unit=%.2f lots=%.2f",
+            risk_amount,
+            risk_per_unit,
+            lot_size,
+        )
         return lot_size
 
     def update_equity(self, current_equity: float) -> None:
@@ -141,10 +149,12 @@ class RiskEngine:
                 logger.critical("DAILY HARD STOP: Loss reached %.1f%%", daily_loss_pct * 100)
                 return False
             if daily_loss_pct >= self.cfg.daily_loss_limit:
-                logger.warning("DAILY LIMIT: Loss reached %.1f%% - Halting trading", daily_loss_pct * 100)
+                logger.warning(
+                    "DAILY LIMIT: Loss reached %.1f%% - Halting trading", daily_loss_pct * 100
+                )
                 return False
 
-        if self.daily.trade_count >= 20: # Max trades per day
+        if self.daily.trade_count >= 20:  # Max trades per day
             logger.warning("DAILY LIMIT: Max trades reached (20)")
             return False
 
@@ -165,7 +175,9 @@ class RiskEngine:
     def _check_confidence_limit(self, confidence: float) -> bool:
         """Check model confidence."""
         if confidence < self.cfg.min_confidence:
-            logger.debug("LIMIT: Confidence %.2f below threshold %.2f", confidence, self.cfg.min_confidence)
+            logger.debug(
+                "LIMIT: Confidence %.2f below threshold %.2f", confidence, self.cfg.min_confidence
+            )
             return False
         return True
 

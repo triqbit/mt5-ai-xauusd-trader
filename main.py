@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -51,9 +52,7 @@ def configure_logging(level: str = "INFO") -> None:
 # -- Trading loop ----------------------------------------------------------
 
 
-def run_live(
-    cfg, connector: MT5Connector, risk: RiskEngine, model: EnsembleModel
-) -> None:
+def run_live(cfg, connector: MT5Connector, risk: RiskEngine, model: EnsembleModel) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
@@ -72,7 +71,7 @@ def run_live(
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
 
             # 3. Get ensemble prediction
-            direction, confidence, per_algo = model.predict(obs)
+            direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
             if direction == 0:
                 log.debug("HOLD signal - skipping")
@@ -170,7 +169,7 @@ def main() -> int:
     if not connector.connect():
         log.warning("Could not connect to MT5 - some features may be disabled.")
 
-    balance = connector.get_account_balance() or 10000.0 # Default balance if connector fails
+    balance = connector.get_account_balance() or 10000.0  # Default balance if connector fails
     risk = RiskEngine(cfg, account_balance=balance)
     model = EnsembleModel(device="cpu")
 

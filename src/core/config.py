@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -48,23 +49,33 @@ class TradingConfig(BaseSettings):
 
     # ── Position Limits (from RISK_LIMITS.md) ──────────────────────────────────
     max_positions: int = Field(default=5, ge=1, le=10, description="Max concurrent open positions")
-    max_position_size_percent: float = Field(default=0.10, ge=0.01, le=0.20, description="Max 10% equity per trade")
+    max_position_size_percent: float = Field(
+        default=0.10, ge=0.01, le=0.20, description="Max 10% equity per trade"
+    )
     min_lot_size: float = Field(default=0.01, ge=0.01)
     max_leverage: float = Field(default=10.0, le=50.0)
 
     # ── Risk Limits (from RISK_LIMITS.md) ──────────────────────────────────────
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.02, description="Risk per trade (1% default)")
+    risk_per_trade: float = Field(
+        default=0.01, ge=0.001, le=0.02, description="Risk per trade (1% default)"
+    )
     single_direction_exposure: float = Field(default=0.30, description="Max 30% net long or short")
     total_notional_exposure: float = Field(default=1.00, description="Max 100% of equity")
-    margin_halt_level: float = Field(default=0.80, description="Halt trading at 80% margin utilization")
+    margin_halt_level: float = Field(
+        default=0.80, description="Halt trading at 80% margin utilization"
+    )
 
     # ── Daily & Drawdown Limits (from RISK_LIMITS.md) ──────────────────────────
-    daily_loss_limit: float = Field(default=0.05, ge=0.01, le=0.10, description="Daily emergency stop (5%)")
+    daily_loss_limit: float = Field(
+        default=0.05, ge=0.01, le=0.10, description="Daily emergency stop (5%)"
+    )
     daily_loss_hard_stop: float = Field(default=0.06, description="Hard stop at 6% loss")
     max_drawdown_limit: float = Field(default=0.30, description="Force close all at 30% drawdown")
 
     # ── Model & Execution ──────────────────────────────────────────────────────
-    min_confidence: float = Field(default=0.55, ge=0.50, description="Minimum prediction confidence")
+    min_confidence: float = Field(
+        default=0.55, ge=0.50, description="Minimum prediction confidence"
+    )
     max_slippage: float = Field(default=1.0, description="Max slippage in pips for Gold")
 
     # ── Algorithm & Paths ──────────────────────────────────────────────────────

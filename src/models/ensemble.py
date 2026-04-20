@@ -9,6 +9,7 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -80,7 +81,11 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device if torch.cuda.is_available() and device == "auto" else ("cpu" if device == "auto" else device))
+        self.device = torch.device(
+            device
+            if torch.cuda.is_available() and device == "auto"
+            else ("cpu" if device == "auto" else device)
+        )
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -155,7 +160,7 @@ class EnsembleModel:
         # 3. Dreamer V3 prediction (Placeholder)
         if self._dreamer_model is not None:
             # Placeholder for Dreamer prediction logic
-            probs = np.array([0.33, 0.33, 0.34]) # Mock Neutral
+            probs = np.array([0.33, 0.33, 0.34])  # Mock Neutral
             votes["dreamer"] = probs
 
         if not votes:
@@ -211,7 +216,7 @@ class EnsembleModel:
 
         total = sum(sharpes.values())
         if total == 0:
-            self.weights = {k: 1/len(self.ALGORITHMS) for k in self.ALGORITHMS}
+            self.weights = {k: 1 / len(self.ALGORITHMS) for k in self.ALGORITHMS}
             return
 
         for algo, s in sharpes.items():
