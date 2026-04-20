@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pandas as pd
 import pytest
+
 from src.trading.execution_filter import ExecutionFilter
 
 
@@ -113,6 +114,7 @@ def test_drawdown_breaker(execution_filter):
 
 def test_full_validation_cascade(execution_filter, monkeypatch):
     from datetime import datetime
+
     up_df = create_mock_df(n=500, trend="up", vol="high")
 
     # Ensure session is open
@@ -122,15 +124,11 @@ def test_full_validation_cascade(execution_filter, monkeypatch):
     )
 
     # Valid buy signal
-    decision = execution_filter.validate(
-        up_df, direction=1, current_drawdown=0.02, confidence=0.85
-    )
+    decision = execution_filter.validate(up_df, direction=1, current_drawdown=0.02, confidence=0.85)
     assert decision.signal is True
     assert decision.blocked_by is None
 
     # Blocked by drawdown
-    decision = execution_filter.validate(
-        up_df, direction=1, current_drawdown=0.12, confidence=0.85
-    )
+    decision = execution_filter.validate(up_df, direction=1, current_drawdown=0.12, confidence=0.85)
     assert decision.signal is False
     assert decision.blocked_by == "Drawdown Circuit Breaker"

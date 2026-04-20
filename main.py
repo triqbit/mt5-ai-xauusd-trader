@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -50,9 +51,7 @@ def configure_logging(level: str = "INFO") -> None:
 # -- Trading loop ----------------------------------------------------------
 
 
-def run_live(
-    cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel
-) -> None:
+def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
