@@ -1,25 +1,20 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
 # requirements-docker.txt -- Linux Docker-safe dependencies
-#
-# Excludes:
-#   - MetaTrader5 (Windows-only, no Linux wheel)
-#   - metaapi-cloud-sdk (Windows-only dependency chain)
-#   - pandas-ta (requires Python <3.11; runtime-only)
-#   - torch/torchvision (too heavy; install separately if needed)
-#   - stable-baselines3/gymnasium (pulls torch transitively)
-#   - transformers/timm/einops (too heavy for base image)
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
-# numpy>=2 required by TA-Lib 0.6.x
 numpy>=2.0.0,<3
 scipy==1.13.0
 scikit-learn==1.5.0
 pandas==2.2.2
 
+# -- ML / RL (Now included for EnsembleModel and TradingEnv) -------
+torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+stable-baselines3==2.3.2
+gymnasium==0.29.1
+
 # -- Technical Analysis --------------------------------------------
-# Python wrapper version must be compatible with C lib 0.6.4 built in Dockerfile
 TA-Lib>=0.6.4
 mplfinance==0.12.10b0
 

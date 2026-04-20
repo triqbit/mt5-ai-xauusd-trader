@@ -1,0 +1,24 @@
+services:
+  - type: worker
+    name: mt5-trading-bot
+    runtime: docker
+    dockerContext: .
+    dockerFilePath: ./Dockerfile
+    envVars:
+      - key: MODE
+        value: demo
+      - key: MT5_LOGIN
+        sync: false
+      - key: MT5_PASSWORD
+        sync: false
+      - key: MT5_SERVER
+        sync: false
+      - key: MT5_PATH
+        value: /app/terminal/terminal64.exe
+      - key: ALGORITHM
+        value: ensemble
+      - key: SYMBOL
+        value: XAUUSD
+      - key: TIMEFRAME
+        value: M5
+    previewPullRequest: true

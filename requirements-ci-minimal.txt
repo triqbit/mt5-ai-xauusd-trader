@@ -1,0 +1,9 @@
+numpy==2.2.4
+scipy==1.15.2
+scikit-learn==1.6.1
+pandas==2.2.3
+pydantic==2.11.1
+pydantic-settings==2.8.1
+pytest==9.0.3
+pytest-cov==6.1.0
+torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
