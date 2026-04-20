@@ -2,32 +2,59 @@
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/environment/gym_env.py
 Custom Gymnasium trading environment for RL training.
+Integrated with FeatureEngineer for high-dimensional state representation.
 """
 
 import gymnasium as gym
 import numpy as np
+import pandas as pd
+import logging
 from typing import Optional, Tuple, Dict, Any
+
+from src.models.feature_engineer import FeatureEngineer
+
+logger = logging.getLogger(__name__)
 
 class TradingEnv(gym.Env):
     """
     Custom Gymnasium environment for XAUUSD trading.
-    State: OHLCV + technical indicators (configurable window)
+    State: OHLCV + technical indicators (via FeatureEngineer)
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, data: np.ndarray, initial_balance: float = 10000.0, 
-                 window_size: int = 60, commission: float = 0.0002):
+    def __init__(self, data: pd.DataFrame, initial_balance: float = 10000.0,
+                 window_size: int = 60, commission: float = 0.0002,
+                 feature_engineer: Optional[FeatureEngineer] = None):
         super().__init__()
-        self.data = data
+
+        self.fe = feature_engineer or FeatureEngineer()
+
+        # Process data through feature engineer
+        processed_data = self.fe.generate_features(data)
+        # Drop rows with NaNs caused by indicators
+        before_drop = len(processed_data)
+        processed_data = processed_data.dropna()
+        after_drop = len(processed_data)
+
+        if after_drop == 0:
+            logger.error(f"All data rows were dropped after feature generation. Before: {before_drop}, After: {after_drop}")
+            # Log some of the NaNs to see which columns are causing it
+            nan_counts = processed_data.isna().sum() if before_drop > 0 else "N/A"
+            logger.error(f"NaN counts per column: {nan_counts}")
+
+        # Separate OHLC for price reference and features for observation
+        self.raw_data = processed_data[['open', 'high', 'low', 'close', 'volume']].values
+        self.features = processed_data[self.fe.feature_columns].values
+
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
         
-        n_features = data.shape[1]
+        n_features = self.features.shape[1]
         
-        # Observation: window of market data + portfolio state [balance, position]
+        # Observation: window of features + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
             low=-np.inf, high=np.inf,
             shape=(window_size * n_features + 2,),
@@ -49,7 +76,8 @@ class TradingEnv(gym.Env):
         return self._get_observation(), {}
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict]:
-        current_price = self.data[self.current_step, 3]  # Close price
+        # raw_data index matches features index because they come from same processed_data
+        current_price = self.raw_data[self.current_step, 3]  # Close price
         reward = 0.0
 
         # Execute action
@@ -60,31 +88,37 @@ class TradingEnv(gym.Env):
             pnl = (current_price * (1 - self.commission)) - self.entry_price
             self.balance += pnl
             self.total_pnl += pnl
-            reward = pnl / self.initial_balance * 100  # Normalized reward
+            # reward = pnl / self.initial_balance * 100 # We'll use step-wise reward instead
             self.position = 0.0
             self.entry_price = 0.0
         
-        # Unrealized PnL for intermediate steps
+        # Step-wise reward: Change in portfolio value
+        new_price = self.raw_data[self.current_step + 1, 3] if self.current_step < len(self.features) - 1 else current_price
+
         if self.position == 1:
-            unrealized = current_price - self.entry_price
-            reward += unrealized / self.initial_balance
+            # Reward is the price change
+            price_change = (new_price - current_price) / current_price
+            reward = price_change * 100 # Normalized percentage reward
 
         self.current_step += 1
         
-        terminated = self.balance <= 0 or self.current_step >= len(self.data) - 1
+        terminated = self.balance <= self.initial_balance * 0.5 or self.current_step >= len(self.features) - 1
         truncated = False
         
         info = {
             "balance": self.balance, 
             "position": self.position,
-            "total_pnl": self.total_pnl
+            "total_pnl": self.total_pnl,
+            "step": self.current_step
         }
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
-        window = self.data[self.current_step - self.window_size:self.current_step]
-        # Normalize window
+        # Get window from features
+        window = self.features[self.current_step - self.window_size:self.current_step]
+        # Normalize window (Z-score)
         obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
+        # Portfolio state
         portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
