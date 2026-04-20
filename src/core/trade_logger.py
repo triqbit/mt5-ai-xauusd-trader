@@ -5,6 +5,7 @@ Trade logging system using SQLAlchemy ORM with SQLite.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,7 +25,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Session, relationship, sessionmaker
+from sqlalchemy.orm import relationship, sessionmaker
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -35,7 +36,10 @@ class AuditMixin:
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
     is_deleted = Column(Boolean, default=False)
 
@@ -223,7 +227,7 @@ class TradeLogger:
             # Max Drawdown
             equity_curve = np.cumsum(pnls)
             peak = np.maximum.accumulate(equity_curve)
-            drawdown = (peak - equity_curve)
+            drawdown = peak - equity_curve
             max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
 
             metrics = {

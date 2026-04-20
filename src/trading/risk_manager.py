@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -101,7 +102,12 @@ class RiskManager:
 
         passed = rejection_reason == ""
         if not passed:
-            logger.warning("Signal REJECTED | %s %s | Reason: %s", signal.symbol, signal.direction, rejection_reason)
+            logger.warning(
+                "Signal REJECTED | %s %s | Reason: %s",
+                signal.symbol,
+                signal.direction,
+                rejection_reason,
+            )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
@@ -167,7 +173,7 @@ class RiskManager:
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown*100:.1f}% hit 15% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
                 )
             return False
         return True
@@ -194,13 +200,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 
@@ -216,4 +218,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["RiskManager", "TradeSignal", "DailyStats", "ALLOCATION_WEIGHTS"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]

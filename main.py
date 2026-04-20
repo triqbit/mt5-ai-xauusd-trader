@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -70,7 +71,7 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, per_algo = model.predict(obs)
+            direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -141,7 +142,7 @@ def run_live(
                         trade_logger.update_trade(
                             ticket=ticket,
                             exit_price=tick["bid"] if direction == 1 else tick["ask"],
-                            pnl=0.0, # Placeholder: would be calculated from history
+                            pnl=0.0,  # Placeholder: would be calculated from history
                         )
                     closed_tickets.append(symbol)
 
@@ -199,7 +200,9 @@ def main() -> int:
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
     balance = connector.get_account_balance()
-    trade_logger = TradeLogger(db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db")
+    trade_logger = TradeLogger(
+        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+    )
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
