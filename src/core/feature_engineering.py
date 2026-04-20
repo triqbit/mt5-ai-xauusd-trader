@@ -7,12 +7,13 @@ Computes 140+ features including multi-timeframe indicators.
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import pandas as pd
 import pandas_ta as ta
-import structlog
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class FeatureEngineer:
@@ -205,7 +206,7 @@ class FeatureEngineer:
         df["vp_dist"] = (df["close"] - df["vol_weighted_mean"]) / (df["vol_weighted_mean"] + 1e-8)
 
         # 8. Final touches
-        logger.info("Features computed", count=len(df.columns))
+        logger.info("Features computed | count=%d", len(df.columns))
         return df
 
     def normalize_features(self, df: pd.DataFrame, window: int = 30) -> pd.DataFrame:
