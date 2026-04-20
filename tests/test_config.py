@@ -18,6 +18,7 @@ def test_config_from_env(monkeypatch):
 
 def test_config_defaults():
     """Test TradingConfig has sensible defaults."""
+    # Ensure required fields are set in env or via monkeypatch
     os.environ.update({
         "MT5_LOGIN": "0",
         "MT5_PASSWORD": "test",
@@ -27,14 +28,15 @@ def test_config_defaults():
     assert cfg.symbol == "XAUUSD"
     assert cfg.mode == "demo"
     assert cfg.algorithm == "ensemble"
+    assert cfg.max_positions == 5
+    assert cfg.daily_loss_limit == 0.05
 
 def test_config_risk_validation():
     """Test risk_per_trade validation rejects unsafe values."""
-    os.environ.update({
-        "MT5_LOGIN": "0",
-        "MT5_PASSWORD": "test",
-        "MT5_SERVER": "test",
-        "RISK_PER_TRADE": "0.03",  # 3% - should fail
-    })
+    # We must use monkeypatch here because Pydantic Settings reads from env
     with pytest.raises(ValueError, match="risk_per_trade"):
-        TradingConfig()
+        TradingConfig(
+            mt5_password="test",
+            mt5_server="test",
+            risk_per_trade=0.03 # 3%
+        )
