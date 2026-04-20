@@ -26,6 +26,7 @@ include = ["src*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+fix = true
 
 [tool.ruff.format]
 quote-style = "double"
@@ -36,11 +37,11 @@ line-ending = "auto"
 [tool.ruff.lint]
 # Enhanced rule sets (STEP 3):
 # E/W = pycodestyle errors/warnings
-# F   = pyflakes (undefined names, unused imports)
-# I   = isort (import sorting -- enforced)
-# N   = pep8-naming
-# B   = flake8-bugbear (likely bugs and design issues)
-# C4  = flake8-comprehensions (simplify comprehensions)
+# F = pyflakes (undefined names, unused imports)
+# I = isort (import sorting -- enforced)
+# N = pep8-naming
+# B = flake8-bugbear (likely bugs and design issues)
+# C4 = flake8-comprehensions (simplify comprehensions)
 # SIM = flake8-simplify
 # RUF = ruff-specific rules
 #
@@ -54,7 +55,6 @@ ignore = [
     "N803",   # argument name should be lowercase (ML conventions use X)
     "N806",   # variable in function should be lowercase (ML conventions)
 ]
-fix = true
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -63,8 +63,8 @@ force-single-line = false
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "B011"]  # assert + raise-without-from OK in tests
-"__init__.py" = ["F401"]        # allow unused imports in __init__
+"tests/**" = ["S101", "B011"] # assert + raise-without-from OK in tests
+"__init__.py" = ["F401"] # allow unused imports in __init__
 
 # ===========================================================
 # STEP 4: mypy -- strict type checking
