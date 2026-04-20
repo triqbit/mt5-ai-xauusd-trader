@@ -1,27 +1,18 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
 # requirements-ci.txt -- Linux CI-safe dependencies
-#
-# Excludes:
-#   - MetaTrader5 (Windows-only, no Linux wheel)
-#   - torch/torchvision/transformers/timm (too heavy for unit tests)
-#   - stable-baselines3/gymnasium (pulls torch transitively)
-#   - pandas-ta (requires Python <3.11; runtime-only)
-#
-# TA-Lib C library is built from source in ci.yml (GitHub releases,
-# ta-lib 0.6.4). The Python wrapper TA-Lib>=0.6.4 is listed here
-# and requires numpy>=2.0 (listed below).
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
-# numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
 numpy==2.2.4
 scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
 
+# -- ML / RL (Required for test_models.py) -------------------------
+torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
+
 # -- Technical Analysis --------------------------------------------
-# Python wrapper; C library (0.6.4) built from source in ci.yml
 TA-Lib==0.6.4
 
 # -- Pydantic / settings -------------------------------------------
