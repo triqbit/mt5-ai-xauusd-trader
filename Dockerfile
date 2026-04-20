@@ -24,7 +24,7 @@ RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6
 # Python dependencies (Linux-safe subset; excludes Windows-only packages)
 COPY requirements-docker.txt .
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements-docker.txt
+    pip install --no-cache-dir -r requirements-docker.txt --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple
 
 # --- Stage 2: runtime ------------------------------------------
 FROM python:3.11-slim AS runtime

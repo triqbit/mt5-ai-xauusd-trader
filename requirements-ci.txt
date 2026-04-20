@@ -9,9 +9,6 @@ scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
 
-# -- ML / RL (Required for test_models.py) -------------------------
-torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
-
 # -- Technical Analysis --------------------------------------------
 TA-Lib==0.6.4
 
