@@ -69,7 +69,7 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, per_algo = model.predict(obs)
+            direction, confidence, _ = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
             monitor.check_confidence_degradation(confidence)
             if direction == 0:
