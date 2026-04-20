@@ -19,6 +19,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import structlog
 
 from src.core.config import get_config
