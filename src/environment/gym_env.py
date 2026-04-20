@@ -82,24 +82,28 @@ class TradingEnv(gym.Env):
         reward = 0.0
 
         # Execute action
-        if action == 1 and self.position == 0:  # Buy
+        if action == 1 and self.position == 0:  # Buy (Enter Long)
             self.position = 1.0
             self.entry_price = current_price * (1 + self.commission)
-        elif action == 2 and self.position == 1:  # Sell / Close Long
+        elif action == 2 and self.position == 1:  # Sell (Exit Long)
             pnl = (current_price * (1 - self.commission)) - self.entry_price
             self.balance += pnl
             self.total_pnl += pnl
-            # reward = pnl / self.initial_balance * 100 # We'll use step-wise reward instead
             self.position = 0.0
             self.entry_price = 0.0
 
         # Step-wise reward: Change in portfolio value
-        new_price = self.raw_data[self.current_step + 1, 3] if self.current_step < len(self.features) - 1 else current_price
-
-        if self.position == 1:
-            # Reward is the price change
-            price_change = (new_price - current_price) / current_price
-            reward = price_change * 100 # Normalized percentage reward
+        if self.current_step < len(self.features) - 1:
+            next_price = self.raw_data[self.current_step + 1, 3]
+            if self.position == 1:
+                # Long: reward is price increase
+                price_change = (next_price - current_price) / current_price
+                reward = price_change * 100
+            elif self.position == 0:
+                # Flat: no reward
+                reward = 0.0
+        else:
+            reward = 0.0
 
         self.current_step += 1
 

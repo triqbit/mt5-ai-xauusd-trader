@@ -58,23 +58,35 @@ def run_live(
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     fe = FeatureEngineer()
+    window_size = 60  # Should match TradingEnv window_size
 
     while True:
         try:
-            # 1. Fetch latest market data (at least 300 bars for technical indicator warmup)
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=300)
-            if df.empty:
-                log.warning("Received empty dataframe from MT5 - retrying")
+            # 1. Fetch latest market data
+            # Need enough bars for indicators (200+) plus window_size (60)
+            n_bars = 300 + window_size
+            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=n_bars)
+            if df.empty or len(df) < n_bars:
+                log.warning("Insufficient data from MT5 - retrying | count=%d", len(df))
                 time.sleep(poll_interval)
                 continue
 
             tick = connector.get_tick(cfg.symbol)
+            balance = connector.get_account_balance()
+            # Check if we have an open position for this symbol
+            # Simplified: 1.0 if in risk.open_positions, else 0.0
+            pos_state = 1.0 if cfg.symbol in risk.open_positions else 0.0
 
             # 2. Build observation vector using FeatureEngineer
             processed_df = fe.generate_features(df)
-            processed_df = fe.normalize_features(processed_df, method="zscore")
-            # Get only the features for the last bar
-            obs = processed_df[fe.feature_columns].values[-1]
+            # Use same sliding window normalization as TrainingEnv
+            features = processed_df[fe.feature_columns].values
+            window = features[-window_size:]
+            # Z-score normalization of the window
+            obs_features = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
+            # Concatenate with portfolio state
+            portfolio_state = np.array([balance / 10000.0, pos_state], dtype=np.float32)
+            obs = np.concatenate([obs_features.flatten(), portfolio_state]).astype(np.float32)
 
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)

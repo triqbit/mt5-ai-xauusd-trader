@@ -10,7 +10,12 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta  # noqa: F401
+
+try:
+    import pandas_ta as ta  # noqa: F401
+    PANDAS_TA_AVAILABLE = True
+except ImportError:
+    PANDAS_TA_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +61,10 @@ class FeatureEngineer:
         if not required.issubset(data.columns):
             missing = required - set(data.columns)
             logger.error(f"Missing required columns for feature generation: {missing}")
+            return data
+
+        if not PANDAS_TA_AVAILABLE:
+            logger.error("pandas-ta is not installed. Technical indicators cannot be generated.")
             return data
 
         # Define custom strategies for pandas-ta
