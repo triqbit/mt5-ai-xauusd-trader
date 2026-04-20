@@ -14,7 +14,7 @@
 
 # -- Core numeric / data -------------------------------------------
 # numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
-numpy==2.2.4
+numpy>=2.0,<3.0
 scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
