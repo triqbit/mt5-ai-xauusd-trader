@@ -35,6 +35,7 @@ jobs:
         run: ruff format --check src/ main.py
       - name: Import sort check (isort via ruff I-rules)
         run: ruff check --select I src/ main.py
+
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan
   # -----------------------------------------------------------
@@ -51,7 +52,10 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit==2.7.3
       - name: Audit dependencies for known CVEs
-        run: pip-audit --requirement requirements-ci.txt --progress-spinner off --skip-editable
+        run: |
+          pip install --pre -r requirements-ci.txt --dry-run 2>/dev/null || true
+          pip-audit --requirement requirements-ci.txt --progress-spinner off --skip-editable --pre
+
   # -----------------------------------------------------------
   # JOB 3: Tests - needs quality + security to pass first
   # -----------------------------------------------------------
@@ -96,6 +100,7 @@ jobs:
         with:
           name: coverage-report
           path: coverage.xml
+
   # -----------------------------------------------------------
   # JOB 4: Docker Build - only on main, needs tests to pass
   # -----------------------------------------------------------
