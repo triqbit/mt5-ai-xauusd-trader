@@ -88,7 +88,7 @@ jobs:
           rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
           sudo ldconfig
       - name: Install ML Core (CPU)
-        run: pip install torch==2.2.2 stable-baselines3==2.3.2 gymnasium==0.29.1 --index-url https://download.pytorch.org/whl/cpu
+        run: pip install torch==2.2.2 stable-baselines3==2.3.0 gymnasium==0.29.1 --index-url https://download.pytorch.org/whl/cpu
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
       - name: Run tests with coverage
