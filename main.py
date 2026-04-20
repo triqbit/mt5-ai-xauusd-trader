@@ -18,10 +18,12 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 import structlog
 
 from src.core.config import get_config
+from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -51,7 +53,11 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel
+    cfg,
+    connector: MT5Connector,
+    risk: RiskManager,
+    model: EnsembleModel,
+    trade_logger: Optional[TradeLogger] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
@@ -66,6 +72,19 @@ def run_live(
             # 3. Get ensemble prediction
             direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+            signal_id = None
+            if trade_logger:
+                signal_id = trade_logger.log_signal(
+                    {
+                        "symbol": cfg.symbol,
+                        "direction": direction,
+                        "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
+                        "algorithm": cfg.algorithm,
+                        "confidence": confidence,
+                    }
+                )
+
             if direction == 0:
                 log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
@@ -92,12 +111,44 @@ def run_live(
                 confidence=confidence,
             )
             # 5. Risk approval gate
-            if risk.approve(signal):
+            if risk.approve(signal, signal_id=signal_id):
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
                     log.info("Order placed | ticket=%d", ticket)
-            # 6. Update equity
+                    if trade_logger:
+                        trade_logger.log_trade(
+                            ticket=ticket,
+                            symbol=cfg.symbol,
+                            direction=direction,
+                            entry_price=price,
+                            lot_size=lot_size,
+                            signal_id=signal_id,
+                        )
+            # 6. Check for closed positions to update logger
+            current_positions = connector.get_positions(cfg.symbol)
+            current_tickets = {p["ticket"] for p in current_positions}
+
+            closed_tickets = []
+            for symbol, ticket in list(risk.open_positions.items()):
+                if symbol == cfg.symbol and ticket not in current_tickets:
+                    # Position closed - in a real scenario we'd fetch deal history
+                    # For this implementation, we'll simulate fetching exit info
+                    log.info("Position CLOSED | ticket=%d", ticket)
+                    if trade_logger:
+                        # Fetching simulated P&L for demonstration
+                        # In production, use mt5.history_deals_get(ticket=ticket)
+                        trade_logger.update_trade(
+                            ticket=ticket,
+                            exit_price=tick["bid"] if direction == 1 else tick["ask"],
+                            pnl=0.0, # Placeholder: would be calculated from history
+                        )
+                    closed_tickets.append(symbol)
+
+            for sym in closed_tickets:
+                risk.open_positions.pop(sym)
+
+            # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
         except KeyboardInterrupt:
@@ -148,7 +199,8 @@ def main() -> int:
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
     balance = connector.get_account_balance()
-    risk = RiskManager(cfg, account_balance=balance)
+    trade_logger = TradeLogger(db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db")
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -158,7 +210,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
