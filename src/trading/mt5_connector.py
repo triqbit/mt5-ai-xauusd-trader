@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -262,4 +262,4 @@ class MT5Connector:
         return []
 
 
-__all__ = ["MT5Connector", "TIMEFRAME_MAP"]
+__all__ = ["TIMEFRAME_MAP", "MT5Connector"]

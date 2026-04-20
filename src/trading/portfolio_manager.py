@@ -5,8 +5,8 @@ Handles account monitoring, balance tracking, and aggregate exposure.
 """
 
 import logging
-from typing import Dict, List
-import asyncio
+from typing import Dict
+
 
 class PortfolioManager:
     """
@@ -22,7 +22,7 @@ class PortfolioManager:
         try:
             # Assuming connector has a unified method for account info
             balance_info = await self.connector.get_account_balance()
-            
+
             summary = {
                 "balance": balance_info.get('balance', 0.0),
                 "equity": balance_info.get('equity', 0.0),
@@ -47,7 +47,8 @@ class PortfolioManager:
             else:
                 import MetaTrader5 as mt5
                 positions = mt5.positions_get(symbol=symbol)
-                if positions is None: return 0.0
+                if positions is None:
+                    return 0.0
                 total_lots = sum([p.volume if p.type == mt5.POSITION_TYPE_BUY else -p.volume for p in positions])
                 return total_lots
         except Exception as e:
@@ -58,7 +59,8 @@ class PortfolioManager:
         """Calculates current drawdown percentage."""
         summary = await self.get_account_summary()
         equity = summary.get('equity', initial_balance)
-        if initial_balance <= 0: return 0.0
-        
+        if initial_balance <= 0:
+            return 0.0
+
         drawdown = (initial_balance - equity) / initial_balance * 100
         return max(0.0, drawdown)

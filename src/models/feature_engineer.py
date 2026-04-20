@@ -6,11 +6,11 @@ Supports 140+ technical indicators and multi-timeframe alignment.
 """
 
 import logging
-from typing import List, Optional, Union
+from typing import List
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta as ta  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

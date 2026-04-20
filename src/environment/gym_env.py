@@ -5,11 +5,12 @@ Custom Gymnasium trading environment for RL training.
 Integrated with FeatureEngineer for high-dimensional state representation.
 """
 
+import logging
+from typing import Dict, Optional, Tuple
+
 import gymnasium as gym
 import numpy as np
 import pandas as pd
-import logging
-from typing import Optional, Tuple, Dict, Any
 
 from src.models.feature_engineer import FeatureEngineer
 
@@ -51,19 +52,19 @@ class TradingEnv(gym.Env):
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
-        
+
         n_features = self.features.shape[1]
-        
+
         # Observation: window of features + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
             low=-np.inf, high=np.inf,
             shape=(window_size * n_features + 2,),
             dtype=np.float32
         )
-        
+
         # Actions: 0=Hold, 1=Buy, 2=Sell
         self.action_space = gym.spaces.Discrete(3)
-        
+
         self.reset()
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
@@ -91,7 +92,7 @@ class TradingEnv(gym.Env):
             # reward = pnl / self.initial_balance * 100 # We'll use step-wise reward instead
             self.position = 0.0
             self.entry_price = 0.0
-        
+
         # Step-wise reward: Change in portfolio value
         new_price = self.raw_data[self.current_step + 1, 3] if self.current_step < len(self.features) - 1 else current_price
 
@@ -101,12 +102,12 @@ class TradingEnv(gym.Env):
             reward = price_change * 100 # Normalized percentage reward
 
         self.current_step += 1
-        
+
         terminated = self.balance <= self.initial_balance * 0.5 or self.current_step >= len(self.features) - 1
         truncated = False
-        
+
         info = {
-            "balance": self.balance, 
+            "balance": self.balance,
             "position": self.position,
             "total_pnl": self.total_pnl,
             "step": self.current_step

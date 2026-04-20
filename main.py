@@ -23,6 +23,7 @@ import structlog
 
 from src.core.config import get_config
 from src.models.ensemble import EnsembleModel
+from src.models.feature_engineer import FeatureEngineer
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -56,15 +57,27 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    fe = FeatureEngineer()
+
     while True:
         try:
-            # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+            # 1. Fetch latest market data (at least 300 bars for technical indicator warmup)
+            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=300)
+            if df.empty:
+                log.warning("Received empty dataframe from MT5 - retrying")
+                time.sleep(poll_interval)
+                continue
+
             tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
+            # 2. Build observation vector using FeatureEngineer
+            processed_df = fe.generate_features(df)
+            processed_df = fe.normalize_features(processed_df, method="zscore")
+            # Get only the features for the last bar
+            obs = processed_df[fe.feature_columns].values[-1]
+
             # 3. Get ensemble prediction
-            direction, confidence, per_algo = model.predict(obs)
+            direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
             if direction == 0:
                 log.debug("HOLD signal - skipping")

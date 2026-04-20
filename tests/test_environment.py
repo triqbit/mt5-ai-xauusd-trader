@@ -1,9 +1,11 @@
 import unittest
-import pandas as pd
+
 import numpy as np
-import gymnasium as gym
+import pandas as pd
+
 from src.environment.gym_env import TradingEnv
 from src.models.feature_engineer import FeatureEngineer
+
 
 class TestTradingEnv(unittest.TestCase):
     def setUp(self):
@@ -23,7 +25,7 @@ class TestTradingEnv(unittest.TestCase):
         self.env = TradingEnv(self.df, window_size=10, feature_engineer=self.fe)
 
     def test_reset(self):
-        obs, info = self.env.reset()
+        obs, _info = self.env.reset()
         expected_size = 10 * len(self.env.fe.feature_columns) + 2
         self.assertEqual(len(obs), expected_size)
         self.assertEqual(self.env.balance, 10000.0)
@@ -32,12 +34,12 @@ class TestTradingEnv(unittest.TestCase):
     def test_step_buy_sell(self):
         self.env.reset()
         # Step with Buy action (1)
-        obs, reward, terminated, truncated, info = self.env.step(1)
+        _obs, _reward, _terminated, _truncated, _info = self.env.step(1)
         self.assertEqual(self.env.position, 1.0)
         self.assertGreater(self.env.entry_price, 0)
 
         # Step with Sell action (2) - closes position
-        obs, reward, terminated, truncated, info = self.env.step(2)
+        _obs, _reward, _terminated, _truncated, _info = self.env.step(2)
         self.assertEqual(self.env.position, 0.0)
 
     def test_termination(self):
@@ -50,7 +52,7 @@ class TestTradingEnv(unittest.TestCase):
         # Move through all available steps
         max_steps = len(env_small.features) - env_small.window_size
         for _ in range(max_steps + 1):
-            obs, reward, terminated, truncated, info = env_small.step(0)
+            _obs, _reward, terminated, _truncated, _info = env_small.step(0)
             if terminated:
                 break
         self.assertTrue(terminated)

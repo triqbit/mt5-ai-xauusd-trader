@@ -5,8 +5,8 @@ Handles trade execution, modification, and closure.
 """
 
 import logging
-from typing import Dict, Optional, List
-import asyncio
+from typing import Dict, List, Optional
+
 
 class OrderManager:
     """
@@ -25,7 +25,7 @@ class OrderManager:
         action: 'BUY' or 'SELL'
         """
         self.logger.info(f"Executing {action} order for {volume} lots on {self.symbol}")
-        
+
         try:
             # Get current prices for SL/TP calculation
             tick = await self.connector.get_tick(self.symbol)
@@ -48,7 +48,7 @@ class OrderManager:
         """Calculates absolute price levels for SL and TP based on pips."""
         # Standard pip for Gold (XAUUSD) is often 0.01 or 0.1 depending on broker
         # We'll use 0.1 as a default step for 'pips' in gold context
-        pip_value = 0.1 
+        pip_value = 0.1
         sl = None
         tp = None
 
@@ -56,15 +56,15 @@ class OrderManager:
             sl = price - (sl_pips * pip_value) if action.upper() == "BUY" else price + (sl_pips * pip_value)
         if tp_pips:
             tp = price + (tp_pips * pip_value) if action.upper() == "BUY" else price - (tp_pips * pip_value)
-            
+
         return sl, tp
 
     def _execute_mt5_desktop(self, action: str, volume: float, price: float, sl: Optional[float], tp: Optional[float]) -> Dict:
         """Execution via local MetaTrader5 terminal."""
         import MetaTrader5 as mt5
-        
+
         order_type = mt5.ORDER_TYPE_BUY if action.upper() == "BUY" else mt5.ORDER_TYPE_SELL
-        
+
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": self.symbol,
@@ -79,42 +79,44 @@ class OrderManager:
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
-        
+
         result = mt5.order_send(request)
         if result is None:
             return {"status": "error", "message": "order_send returned None"}
-            
+
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             return {
-                "status": "error", 
-                "retcode": result.retcode, 
+                "status": "error",
+                "retcode": result.retcode,
                 "message": f"MT5 Error: {result.comment}"
             }
-        
+
         return {"status": "success", "order_id": result.order, "deal": result.deal}
 
     async def _execute_metaapi(self, action: str, volume: float, sl: Optional[float], tp: Optional[float]) -> Dict:
         """Execution via MetaAPI Cloud."""
         if not self.connector.connection:
             raise ConnectionError("MetaAPI connection not established.")
-            
+
         try:
             options = {
                 "comment": "AI Trade - MetaAPI",
                 "magic": self.magic_number
             }
-            if sl: options["stopLoss"] = sl
-            if tp: options["takeProfit"] = tp
+            if sl:
+                options["stopLoss"] = sl
+            if tp:
+                options["takeProfit"] = tp
 
             result = await self.connector.connection.create_market_order(
-                self.symbol, 
-                action.upper(), 
-                volume, 
+                self.symbol,
+                action.upper(),
+                volume,
                 options
             )
             return {"status": "success", "order_id": result['orderId']}
         except Exception as e:
-            return {"status": "error", "message": f"MetaAPI Error: {str(e)}"}
+            return {"status": "error", "message": f"MetaAPI Error: {e!s}"}
 
     async def close_all_positions(self):
         """Emergency close for all open positions for this symbol."""
@@ -129,5 +131,6 @@ class OrderManager:
         else:
             import MetaTrader5 as mt5
             positions = mt5.positions_get(symbol=self.symbol)
-            if positions is None: return []
+            if positions is None:
+                return []
             return [p._asdict() for p in positions]

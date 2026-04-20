@@ -9,6 +9,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+
 class PPOAgent:
     """
     PPO-based reinforcement learning agent.
@@ -17,7 +18,7 @@ class PPOAgent:
     def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
         from stable_baselines3 import PPO
         from stable_baselines3.common.vec_env import DummyVecEnv
-        
+
         self.logger = logging.getLogger(__name__)
         self.device = device
         self.env = DummyVecEnv([lambda: env])
@@ -48,7 +49,7 @@ class PPOAgent:
         """Train the PPO agent."""
         self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
         self.model.learn(total_timesteps=total_timesteps)
-        
+
         if save_path:
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             self.model.save(save_path)

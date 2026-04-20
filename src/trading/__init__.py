@@ -5,4 +5,4 @@ from __future__ import annotations
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import DailyStats, RiskManager, TradeSignal
 
-__all__ = ["MT5Connector", "RiskManager", "TradeSignal", "DailyStats"]
+__all__ = ["DailyStats", "MT5Connector", "RiskManager", "TradeSignal"]
