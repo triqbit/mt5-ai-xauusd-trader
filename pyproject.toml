@@ -54,6 +54,7 @@ ignore = [
     "SIM108", # ternary operator -- sometimes less readable
     "N803",   # argument name should be lowercase (ML conventions use X)
     "N806",   # variable in function should be lowercase (ML conventions)
+    "N813",   # CamelCase imported as lowercase (MetaTrader5 as mt5 convention)
 ]
 
 [tool.ruff.lint.isort]
