@@ -17,8 +17,8 @@ stable-baselines3>=2.3.2
 
 # -- Technical Analysis --------------------------------------
 TA-Lib>=0.6.4
-# pandas-ta 0.3.x works on 3.11; install pre-release explicitly
-pandas-ta==0.3.14b0
+# pandas-ta 0.4.x (pre-release); pip install with --pre flag
+pandas-ta>=0.4.67b0
 
 # -- Pydantic / settings -------------------------------------
 pydantic>=2.7.1
