@@ -15,12 +15,14 @@ import pandas as pd
 
 try:
     import pandas_ta as ta  # noqa: F401
+
     HAS_PANDAS_TA = True
 except ImportError:
     HAS_PANDAS_TA = False
 
 try:
     import talib
+
     HAS_TALIB = True
 except ImportError:
     HAS_TALIB = False
@@ -53,7 +55,7 @@ class ExecutionFilter:
     def __init__(self, config: TradingConfig):
         self.cfg = config
         if not HAS_PANDAS_TA and not HAS_TALIB:
-            logger.warning("Neither pandas-ta nor TA-Lib found. Some filters may fail.")
+            logger.warning("Neither pandas-ta nor TA-Lib found. Some filters may bypass.")
 
     def validate(
         self,
@@ -94,51 +96,56 @@ class ExecutionFilter:
 
     def _check_atr_volatility(self, df: pd.DataFrame, min_atr: float = 0.5) -> bool:
         """Ensure there is enough volatility to trade."""
+        atr = None
         if HAS_PANDAS_TA:
             atr = df.ta.atr(length=14)
         elif HAS_TALIB:
-            atr = pd.Series(
-                talib.ATR(df["high"], df["low"], df["close"], timeperiod=14),
-                index=df.index,
-            )
-        else:
-            return True  # Fallback if no library
+            atr = talib.ATR(df["high"].values, df["low"].values, df["close"].values, timeperiod=14)
 
         if atr is None or len(atr) == 0:
-            return False
-        return bool(atr.iloc[-1] > min_atr)
+            return True
+        val = atr.iloc[-1] if hasattr(atr, "iloc") else atr[-1]
+        if pd.isna(val):
+            return True
+        return bool(val > min_atr)
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int) -> bool:
         """Confirm trend direction using EMA slope."""
+        ema20 = None
         if HAS_PANDAS_TA:
             ema20 = df.ta.ema(length=20)
         elif HAS_TALIB:
-            ema20 = pd.Series(talib.EMA(df["close"], timeperiod=20), index=df.index)
-        else:
-            return True
+            ema20 = talib.EMA(df["close"].values, timeperiod=20)
 
         if ema20 is None or len(ema20) < 2:
-            return False
-        slope = ema20.iloc[-1] - ema20.iloc[-2]
+            return True
+        v1, v2 = (
+            (ema20.iloc[-2], ema20.iloc[-1]) if hasattr(ema20, "iloc") else (ema20[-2], ema20[-1])
+        )
+        if pd.isna(v1) or pd.isna(v2):
+            return True
+        slope = v2 - v1
         return bool((direction == 1 and slope > 0) or (direction == -1 and slope < 0))
 
     def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
         """Check for EMA alignment (20 > 50 > 200 for BUY)."""
+        e20, e50, e200 = None, None, None
         if HAS_PANDAS_TA:
             ema20 = df.ta.ema(length=20)
             ema50 = df.ta.ema(length=50)
             ema200 = df.ta.ema(length=200)
+            if ema200 is not None and not ema200.empty:
+                e20, e50, e200 = ema20.iloc[-1], ema50.iloc[-1], ema200.iloc[-1]
         elif HAS_TALIB:
-            ema20 = pd.Series(talib.EMA(df["close"], timeperiod=20), index=df.index)
-            ema50 = pd.Series(talib.EMA(df["close"], timeperiod=50), index=df.index)
-            ema200 = pd.Series(talib.EMA(df["close"], timeperiod=200), index=df.index)
-        else:
+            vals = df["close"].values
+            ema20 = talib.EMA(vals, timeperiod=20)
+            ema50 = talib.EMA(vals, timeperiod=50)
+            ema200 = talib.EMA(vals, timeperiod=200)
+            if ema200 is not None and len(ema200) > 0:
+                e20, e50, e200 = ema20[-1], ema50[-1], ema200[-1]
+
+        if e200 is None or pd.isna(e200):
             return True
-
-        if ema200 is None or len(ema200) == 0 or pd.isna(ema200.iloc[-1]):
-            return False
-
-        e20, e50, e200 = ema20.iloc[-1], ema50.iloc[-1], ema200.iloc[-1]
 
         if direction == 1:  # Buy
             return bool(e20 > e50 > e200)
@@ -148,21 +155,22 @@ class ExecutionFilter:
 
     def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
         """Confirm momentum using RSI."""
+        rsi = None
         if HAS_PANDAS_TA:
             rsi = df.ta.rsi(length=14)
         elif HAS_TALIB:
-            rsi = pd.Series(talib.RSI(df["close"], timeperiod=14), index=df.index)
-        else:
+            rsi = talib.RSI(df["close"].values, timeperiod=14)
+
+        if rsi is None or len(rsi) == 0:
+            return True
+        curr = rsi.iloc[-1] if hasattr(rsi, "iloc") else rsi[-1]
+        if pd.isna(curr):
             return True
 
-        if rsi is None or len(rsi) == 0 or pd.isna(rsi.iloc[-1]):
-            return False
-
-        current_rsi = rsi.iloc[-1]
         if direction == 1:
-            return bool(current_rsi > 50)  # Bullish momentum
+            return bool(curr > 50)  # Bullish momentum
         elif direction == -1:
-            return bool(current_rsi < 50)  # Bearish momentum
+            return bool(curr < 50)  # Bearish momentum
         return False
 
     def _check_session_filter(self) -> bool:
