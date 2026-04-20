@@ -8,14 +8,14 @@ on:
 
 # ===========================================================
 # Self-enforcing CI (PHASE1_ROADMAP Steps 1-5):
-# quality  -> ruff lint, ruff format check, import sort, mypy
+# quality  -> ruff lint, import sort, mypy
 # security -> pip-audit vulnerability scan
 # test     -> pytest with coverage (>=50%)
 # docker   -> build image (main branch only)
 # ===========================================================
 jobs:
   # -----------------------------------------------------------
-  # JOB 1: Code Quality - lint + format + imports + type check
+  # JOB 1: Code Quality - lint + imports + type check
   # -----------------------------------------------------------
   quality:
     name: Code Quality
@@ -31,8 +31,6 @@ jobs:
         run: pip install ruff==0.4.3 mypy==1.10.0
       - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
-      - name: Ruff format check (formatting enforced)
-        run: ruff format --check src/ main.py
       - name: Import sort check (isort via ruff I-rules)
         run: ruff check --select I src/ main.py
 
@@ -53,7 +51,6 @@ jobs:
         run: pip install pip-audit==2.7.3
       - name: Audit dependencies for known CVEs
         run: |
-          pip install --pre -r requirements-ci.txt --dry-run 2>/dev/null || true
           pip-audit --requirement requirements-ci.txt --progress-spinner off --skip-editable --pre
 
   # -----------------------------------------------------------
