@@ -157,7 +157,7 @@ class FeatureEngineer:
                 resampled_joined = resampled_shifted.reindex(df.index, method="ffill")
                 df = pd.concat([df, resampled_joined], axis=1)
             except Exception as e:
-                logger.warning("Resampling failed", tf=tf_freq, error=str(e))
+                logger.warning("Resampling failed for %s: %s", tf_freq, e)
 
         # 6. Candle Pattern Recognition (Expanded)
         df["body_size"] = np.abs(df["close"] - df["open"])

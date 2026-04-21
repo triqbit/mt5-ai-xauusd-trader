@@ -9,6 +9,7 @@ from typing import Dict, Optional, Tuple
 import gymnasium as gym
 import numpy as np
 
+
 class TradingEnv(gym.Env):
     """
     Custom Gymnasium environment for XAUUSD trading.

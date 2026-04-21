@@ -5,6 +5,7 @@ Tests for src/core/feature_engineering.py
 import numpy as np
 import pandas as pd
 import pytest
+
 from src.core.feature_engineering import FeatureEngineer
 
 

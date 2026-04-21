@@ -13,11 +13,11 @@
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
-# numpy>=2.2.6 is required by pandas-ta 0.4.71b0
-numpy>=2.2.6,<3.0
+# numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
+numpy==2.2.4
 scipy==1.15.2
 scikit-learn==1.6.1
-pandas>=2.3.2
+pandas==2.2.3
 
 # -- Technical Analysis --------------------------------------------
 # Python wrapper; C library (0.6.4) built from source in ci.yml
