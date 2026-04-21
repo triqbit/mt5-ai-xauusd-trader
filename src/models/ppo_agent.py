@@ -20,9 +20,6 @@ class PPOAgent:
     Uses Stable-Baselines3 PPO under the hood.
     """
     def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
-        from stable_baselines3 import PPO
-        from stable_baselines3.common.vec_env import DummyVecEnv
-
         self.logger = logging.getLogger(__name__)
         self.device = device
         self.env = DummyVecEnv([lambda: env])
@@ -66,7 +63,6 @@ class PPOAgent:
 
     def evaluate(self, n_eval_episodes: int = 10) -> dict:
         """Evaluate agent performance over n episodes."""
-        from stable_baselines3.common.evaluation import evaluate_policy
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_eval_episodes
         )

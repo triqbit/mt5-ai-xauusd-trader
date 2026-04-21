@@ -5,9 +5,9 @@ Custom Gymnasium trading environment for RL training.
 Integrated with FeatureEngineer for high-dimensional state representation.
 """
 
-import logging
 from __future__ import annotations
 
+import logging
 from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
@@ -26,11 +26,17 @@ class TradingEnv(gym.Env):
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
+
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, data: pd.DataFrame, initial_balance: float = 10000.0,
-                 window_size: int = 60, commission: float = 0.0002,
-                 feature_engineer: Optional[FeatureEngineer] = None):
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        initial_balance: float = 10000.0,
+        window_size: int = 60,
+        commission: float = 0.0002,
+        feature_engineer: Optional[FeatureEngineer] = None,
+    ):
         super().__init__()
 
         self.fe = feature_engineer or FeatureEngineer()
@@ -43,13 +49,15 @@ class TradingEnv(gym.Env):
         after_drop = len(processed_data)
 
         if after_drop == 0:
-            logger.error(f"All data rows were dropped after feature generation. Before: {before_drop}, After: {after_drop}")
+            logger.error(
+                f"All data rows were dropped after feature generation. Before: {before_drop}, After: {after_drop}"
+            )
             # Log some of the NaNs to see which columns are causing it
             nan_counts = processed_data.isna().sum() if before_drop > 0 else "N/A"
             logger.error(f"NaN counts per column: {nan_counts}")
 
         # Separate OHLC for price reference and features for observation
-        self.raw_data = processed_data[['open', 'high', 'low', 'close', 'volume']].values
+        self.raw_data = processed_data[["open", "high", "low", "close", "volume"]].values
         self.features = processed_data[self.fe.feature_columns].values
 
         self.initial_balance = initial_balance
@@ -60,9 +68,7 @@ class TradingEnv(gym.Env):
 
         # Observation: window of features + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
-            shape=(window_size * n_features + 2,),
-            dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(window_size * n_features + 2,), dtype=np.float32
         )
 
         # Actions: 0=Hold, 1=Buy, 2=Sell
@@ -70,7 +76,9 @@ class TradingEnv(gym.Env):
 
         self.reset()
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[Dict] = None
+    ) -> Tuple[np.ndarray, Dict]:
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -110,25 +118,32 @@ class TradingEnv(gym.Env):
 
         self.current_step += 1
 
-        terminated = self.balance <= self.initial_balance * 0.5 or self.current_step >= len(self.features) - 1
+        terminated = (
+            self.balance <= self.initial_balance * 0.5
+            or self.current_step >= len(self.features) - 1
+        )
         truncated = False
 
         info = {
             "balance": self.balance,
             "position": self.position,
             "total_pnl": self.total_pnl,
-            "step": self.current_step
+            "step": self.current_step,
         }
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
         # Get window from features
-        window = self.features[self.current_step - self.window_size:self.current_step]
+        window = self.features[self.current_step - self.window_size : self.current_step]
         # Normalize window (Z-score)
         obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
         # Portfolio state
-        portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
+        portfolio_state = np.array(
+            [self.balance / self.initial_balance, self.position], dtype=np.float32
+        )
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
     def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+        print(
+            f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}"
+        )

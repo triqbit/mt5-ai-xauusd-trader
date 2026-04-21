@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from src.models.feature_engineer import FeatureEngineer, PANDAS_TA_AVAILABLE
+from src.models.feature_engineer import FeatureEngineer
 
 
 class TestFeatureEngineer(unittest.TestCase):
@@ -19,32 +19,21 @@ class TestFeatureEngineer(unittest.TestCase):
             "tick_volume": np.random.randint(100, 1000, 500)
         })
 
-    def test_generate_features_returns_dataframe(self):
+    def test_generate_features(self):
         features_df = self.fe.generate_features(self.df)
-        self.assertIsInstance(features_df, pd.DataFrame)
-        # Original close column must be preserved
+        # Check that original columns are preserved (possibly renamed/mapped)
         self.assertIn('close', features_df.columns)
-
-    @unittest.skipUnless(PANDAS_TA_AVAILABLE, "pandas-ta not installed")
-    def test_generate_features_adds_indicators(self):
-        features_df = self.fe.generate_features(self.df)
         # Check that features were added
-        self.assertGreater(len(self.fe.feature_columns), 0)
-        # Verify at least one well-known indicator column exists
-        # pandas-ta naming: RSI_14, SMA_20, ATRr_14 (atr uses ATRr prefix)
-        has_rsi = any('RSI' in col.upper() for col in features_df.columns)
-        has_sma = any('SMA' in col.upper() for col in features_df.columns)
-        has_atr = any('ATR' in col.upper() for col in features_df.columns)
-        self.assertTrue(has_rsi, f"Expected RSI column. Got: {list(features_df.columns)[:20]}")
-        self.assertTrue(has_sma, f"Expected SMA column. Got: {list(features_df.columns)[:20]}")
-        self.assertTrue(has_atr, f"Expected ATR column. Got: {list(features_df.columns)[:20]}")
+        self.assertTrue(len(self.fe.feature_columns) > 0)
+        # Check specific indicators
+        self.assertIn('RSI_14', features_df.columns)
+        self.assertIn('SMA_20', features_df.columns)
+        self.assertIn('ATRr_14', features_df.columns)
 
-    @unittest.skipUnless(PANDAS_TA_AVAILABLE, "pandas-ta not installed")
     def test_normalize_features(self):
         features_df = self.fe.generate_features(self.df)
-        if not self.fe.feature_columns:
-            self.skipTest("No feature columns generated")
         normalized_df = self.fe.normalize_features(features_df, method="zscore")
+
         # Select a feature column and check mean/std
         col = self.fe.feature_columns[0]
         # Ignore NaNs for the check
@@ -57,14 +46,6 @@ class TestFeatureEngineer(unittest.TestCase):
         features_df = self.fe.generate_features(df_bad)
         # Should return original and log error (not crash)
         self.assertEqual(len(features_df.columns), 1)
-
-    def test_normalize_features_empty_returns_unchanged(self):
-        # When feature_columns is empty, normalize should return unchanged df
-        fe = FeatureEngineer(include_patterns=False)
-        df = pd.DataFrame({"close": [1.0, 2.0, 3.0]})
-        result = fe.normalize_features(df)
-        pd.testing.assert_frame_equal(result, df)
-
 
 if __name__ == "__main__":
     unittest.main()

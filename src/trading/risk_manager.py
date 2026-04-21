@@ -14,11 +14,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Dict
 
 from src.core.config import TradingConfig
-from src.core.monitor import Monitor
-from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
@@ -66,57 +64,31 @@ class RiskManager:
     Every signal must be approved here before reaching the order router.
     """
 
-    def __init__(
-        self,
-        config: TradingConfig,
-        account_balance: float,
-        logger_db: Optional[TradeLogger] = None,
-        monitor: Optional[Monitor] = None,
-    ) -> None:
+    def __init__(self, config: TradingConfig, account_balance: float) -> None:
         self.cfg = config
         self.balance = account_balance
         self.peak_equity = account_balance
         self.daily = DailyStats(peak_equity=account_balance)
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
-        self.trade_logger = logger_db
-        self.monitor = monitor
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(self, signal: TradeSignal) -> bool:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
-
-        passed = rejection_reason == ""
+        checks = [
+            self._check_circuit_breaker(),
+            self._check_daily_loss(),
+            self._check_max_positions(),
+            self._check_symbol_allocation(signal.symbol),
+            self._check_minimum_confidence(signal.confidence),
+            self._check_risk_reward(signal),
+        ]
+        passed = all(checks)
         if not passed:
-            logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
-            )
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
+            logger.warning("Signal REJECTED | %s %s", signal.symbol, signal.direction)
         return passed
 
     def size_position(
@@ -161,10 +133,6 @@ class RiskManager:
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
-        if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -176,13 +144,6 @@ class RiskManager:
                 "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
                 drawdown * 100,
             )
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
-                )
-            if self.monitor:
-                self.monitor.alert_circuit_breaker(drawdown)
             return False
         return True
 

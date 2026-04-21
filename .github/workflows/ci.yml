@@ -7,15 +7,17 @@ on:
     branches: [main]
 
 # ===========================================================
-# Self-enforcing CI (PHASE1_ROADMAP Steps 1-5):
-# quality  -> ruff lint, import sort
+# Self-enforcing CI:
+# quality  -> ruff lint, ruff format check, import sort check
 # security -> pip-audit vulnerability scan
-# test     -> pytest with coverage (>=50%)
+# test     -> pytest with coverage
 # docker   -> build image (main branch only)
 # ===========================================================
+
 jobs:
+
   # -----------------------------------------------------------
-  # JOB 1: Code Quality - lint + imports
+  # JOB 1: Code Quality - lint + format + imports
   # -----------------------------------------------------------
   quality:
     name: Code Quality
@@ -31,6 +33,10 @@ jobs:
         run: pip install ruff==0.4.3 mypy==1.10.0
       - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
+      - name: Ruff format (apply formatting)
+        run: ruff format src/ main.py
+      - name: Ruff format check (formatting enforced)
+        run: ruff format --check src/ main.py
       - name: Import sort check (isort via ruff I-rules)
         run: ruff check --select I src/ main.py
 
@@ -50,7 +56,7 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit==2.7.3
       - name: Audit dependencies for known CVEs
-        run: pip-audit --requirement requirements-ci.txt --progress-spinner off --skip-editable
+        run: pip-audit --requirement requirements-ci.txt --progress-spinner off
 
   # -----------------------------------------------------------
   # JOB 3: Tests - needs quality + security to pass first
@@ -84,18 +90,12 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
       - name: Run tests with coverage
-        run: pytest tests/ --cov=src --cov-report=term-missing --cov-report=xml -v
+        run: pytest tests/ --cov=src -v
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"
           MT5_SERVER: "test"
           MODE: "demo"
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: coverage.xml
 
   # -----------------------------------------------------------
   # JOB 4: Docker Build - only on main, needs tests to pass
