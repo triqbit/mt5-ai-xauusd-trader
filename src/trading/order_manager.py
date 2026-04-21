@@ -39,7 +39,7 @@ class OrderManager:
             if not tick:
                 raise ValueError("Could not retrieve current market price.")
 
-            price = tick['ask'] if action.upper() == "BUY" else tick['bid']
+            price = tick["ask"] if action.upper() == "BUY" else tick["bid"]
             sl, tp = self._calculate_sl_tp(action, price, sl_pips, tp_pips)
 
             if self.connector.use_metaapi:
@@ -140,7 +140,7 @@ class OrderManager:
                 volume,
                 options
             )
-            return {"status": "success", "order_id": result['orderId']}
+            return {"status": "success", "order_id": result["orderId"]}
         except Exception as e:
             return {"status": "error", "message": f"MetaAPI Error: {e!s}"}
 
@@ -153,7 +153,7 @@ class OrderManager:
         """Fetch active positions for the symbol."""
         if self.connector.use_metaapi:
             positions = await self.connector.connection.get_positions()
-            return [p for p in positions if p['symbol'] == self.symbol]
+            return [p for p in positions if p["symbol"] == self.symbol]
         else:
             import MetaTrader5 as mt5
 

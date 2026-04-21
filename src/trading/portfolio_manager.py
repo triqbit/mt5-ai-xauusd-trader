@@ -23,13 +23,14 @@ class PortfolioManager:
         try:
             # Assuming connector has a unified method for account info
             balance_info = await self.connector.get_account_balance()
+
             summary = {
-                "balance": balance_info.get('balance', 0.0),
-                "equity": balance_info.get('equity', 0.0),
-                "margin": balance_info.get('margin', 0.0),
-                "margin_free": balance_info.get('margin_free', 0.0),
-                "margin_level": balance_info.get('margin_level', 0.0),
-                "profit": balance_info.get('profit', 0.0)
+                "balance": balance_info.get("balance", 0.0),
+                "equity": balance_info.get("equity", 0.0),
+                "margin": balance_info.get("margin", 0.0),
+                "margin_free": balance_info.get("margin_free", 0.0),
+                "margin_level": balance_info.get("margin_level", 0.0),
+                "profit": balance_info.get("profit", 0.0),
             }
             return summary
         except Exception as e:
