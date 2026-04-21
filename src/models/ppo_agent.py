@@ -7,14 +7,19 @@ Wraps the PPO algorithm for use with the custom Gymnasium trading environment.
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+import numpy as np
+
+from src.models.base_model import BaseModel, Signal
 
 
-class PPOAgent:
+class PPOAgent(BaseModel):
     """
     PPO-based reinforcement learning agent.
     Uses Stable-Baselines3 PPO under the hood.
     """
+
     def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
         from stable_baselines3 import PPO
         from stable_baselines3.common.vec_env import DummyVecEnv
@@ -55,14 +60,19 @@ class PPOAgent:
             self.model.save(save_path)
             self.logger.info(f"Model saved to {save_path}")
 
-    def predict(self, observation):
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """Generate a trading action from the current observation."""
-        action, _states = self.model.predict(observation, deterministic=True)
-        return action
+        action, _states = self.model.predict(features, deterministic=True)
+        # Assuming action space 0=Hold, 1=Buy, 2=Sell
+        # Signal direction: 1=Buy, -1=Sell, 0=Hold
+        direction_map = {0: 0, 1: 1, 2: -1}
+        direction = direction_map[int(action)]
+        return Signal(direction=direction, confidence=1.0)
 
     def evaluate(self, n_eval_episodes: int = 10) -> dict:
         """Evaluate agent performance over n episodes."""
         from stable_baselines3.common.evaluation import evaluate_policy
+
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_eval_episodes
         )

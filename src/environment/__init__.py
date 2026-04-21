@@ -1,4 +1,5 @@
 """src/environment package - Gymnasium trading environment."""
-from .gym_env import TradingEnv
+
+from src.environment.gym_env import TradingEnv
 
 __all__ = ["TradingEnv"]

@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -72,30 +73,30 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+            sig = model.predict(obs)
+            log.debug("Signal | dir=%d conf=%.3f", sig.direction, sig.confidence)
 
             signal_id = None
             if trade_logger:
                 signal_id = trade_logger.log_signal(
                     {
                         "symbol": cfg.symbol,
-                        "direction": direction,
-                        "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
+                        "direction": sig.direction,
+                        "entry_price": tick["ask"] if sig.direction >= 0 else tick["bid"],
                         "algorithm": cfg.algorithm,
-                        "confidence": confidence,
+                        "confidence": sig.confidence,
                     }
                 )
 
-            if direction == 0:
+            if sig.direction == 0:
                 log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
                 continue
             # 4. Size position
-            price = tick["ask"] if direction == 1 else tick["bid"]
+            price = tick["ask"] if sig.direction == 1 else tick["bid"]
             atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
-            stop_loss = price - direction * 2 * atr
-            take_profit = price + direction * 4 * atr
+            stop_loss = price - sig.direction * 2 * atr
+            take_profit = price + sig.direction * 4 * atr
             lot_size = risk.size_position(
                 cfg.symbol,
                 win_rate=0.58,
@@ -104,13 +105,13 @@ def run_live(
             )
             signal = TradeSignal(
                 symbol=cfg.symbol,
-                direction=direction,
+                direction=sig.direction,
                 entry_price=price,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
                 lot_size=lot_size,
                 algorithm=cfg.algorithm,
-                confidence=confidence,
+                confidence=sig.confidence,
             )
             # 5. Risk approval gate
             if risk.approve(signal, signal_id=signal_id):
@@ -122,7 +123,7 @@ def run_live(
                         trade_logger.log_trade(
                             ticket=ticket,
                             symbol=cfg.symbol,
-                            direction=direction,
+                            direction=sig.direction,
                             entry_price=price,
                             lot_size=lot_size,
                             signal_id=signal_id,
@@ -207,9 +208,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +219,14 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
