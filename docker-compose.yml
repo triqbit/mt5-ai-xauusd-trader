@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mt5-trader:latest
+    container_name: mt5-trader
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs:rw
+    environment:
+      - DATABASE_URL=postgresql://trader:password@postgres:5432/mt5_trades
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+      - "8050:8050"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mt5-postgres
+    environment:
+      - POSTGRES_USER=trader
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=mt5_trades
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: mt5-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
