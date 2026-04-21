@@ -8,11 +8,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime, time
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta  # noqa: F401
 
 from src.trading.risk_manager import TradeSignal
 
