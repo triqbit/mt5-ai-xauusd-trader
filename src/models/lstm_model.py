@@ -7,18 +7,33 @@ LSTM sequence model for short-term price prediction using PyTorch.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
-import torch
-import torch.nn as nn
 
 from .base_model import BaseModel, Signal
 
 logger = logging.getLogger(__name__)
 
+# Conditional inheritance to allow importing without torch
+try:
+    import torch
+    import torch.nn as nn
 
-class LSTMNetwork(nn.Module):
+    if hasattr(torch, "nn"):
+        _Module: Any = nn.Module
+    else:
+        # Handle cases where torch is a namespace but not fully installed
+        _Module = object
+        torch = None  # type: ignore
+        nn = None  # type: ignore
+except ImportError:
+    _Module = object
+    torch = None  # type: ignore
+    nn = None  # type: ignore
+
+
+class LSTMNetwork(_Module):
     """
     Standard LSTM architecture for sequence processing.
     """
@@ -31,6 +46,8 @@ class LSTMNetwork(nn.Module):
         output_size: int = 3,  # 0: Hold, 1: Buy, 2: Sell
         dropout: float = 0.2,
     ) -> None:
+        if nn is None:
+            raise ImportError("torch.nn is required for LSTMNetwork")
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -44,7 +61,7 @@ class LSTMNetwork(nn.Module):
         )
         self.fc = nn.Linear(hidden_size, output_size)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Any) -> Any:
         # x shape: (batch, seq_len, input_size)
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
@@ -79,6 +96,9 @@ class LSTMModel(BaseModel):
             device: Device to run on ('cpu' or 'cuda').
             model_path: Optional path to load weights.
         """
+        if torch is None:
+            raise ImportError("torch is required for LSTMModel")
+
         self.device = torch.device(
             device if torch.cuda.is_available() or device == "cpu" else "cpu"
         )

@@ -9,14 +9,22 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-import gymnasium as gym
 import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# Conditional inheritance for CI compatibility
+try:
+    import gymnasium as gym
 
-class XAUUSDTradingEnv(gym.Env):
+    _Env: Any = gym.Env
+except ImportError:
+    gym = None  # type: ignore
+    _Env = object
+
+
+class XAUUSDTradingEnv(_Env):
     """
     A specialized Gymnasium environment for XAUUSD (Gold) trading.
     This environment handles the data windowing, reward calculation, and
@@ -33,6 +41,8 @@ class XAUUSDTradingEnv(gym.Env):
         commission: float = 0.0002,
         symbol: str = "XAUUSD",
     ) -> None:
+        if gym is None:
+            raise ImportError("gymnasium is required for XAUUSDTradingEnv")
         """
         Initialize the environment.
 

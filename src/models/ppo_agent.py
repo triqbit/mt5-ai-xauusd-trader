@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
-import torch
 
 from .base_model import BaseModel, Signal
 
@@ -81,6 +80,8 @@ class PPOAgent(BaseModel):
         Returns:
             Signal object with direction and confidence.
         """
+        import torch
+
         # Ensure features is the right shape (SB3 expects [batch, features])
         if features.ndim == 1:
             obs = features.reshape(1, -1)

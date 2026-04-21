@@ -14,17 +14,31 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
+# Conditional imports for CI compatibility
+try:
+    import torch
+    import torch.nn as nn
+
+    if hasattr(torch, "nn"):
+        _Module = nn.Module
+    else:
+        torch = None  # type: ignore
+        nn = None  # type: ignore
+        _Module = object  # type: ignore
+except ImportError:
+    torch = None  # type: ignore
+    nn = None  # type: ignore
+    _Module = object  # type: ignore
+
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel(_Module):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
@@ -39,6 +53,8 @@ class LSTMAttentionModel(nn.Module):
         n_heads: int = 8,
         dropout: float = 0.2,
     ) -> None:
+        if nn is None:
+            raise ImportError("torch.nn is required for LSTMAttentionModel")
         super().__init__()
         self.lstm = nn.LSTM(
             input_size=n_features,
@@ -81,7 +97,10 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device)
+        if torch is not None:
+            self.device = torch.device(device)
+        else:
+            self.device = None
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -116,7 +135,7 @@ class EnsembleModel:
     def predict(
         self,
         obs: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional[Any] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
