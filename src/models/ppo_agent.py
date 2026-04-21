@@ -9,15 +9,17 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+
 class PPOAgent:
     """
     PPO-based reinforcement learning agent.
     Uses Stable-Baselines3 PPO under the hood.
     """
+
     def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
         from stable_baselines3 import PPO
         from stable_baselines3.common.vec_env import DummyVecEnv
-        
+
         self.logger = logging.getLogger(__name__)
         self.device = device
         self.env = DummyVecEnv([lambda: env])
@@ -48,7 +50,7 @@ class PPOAgent:
         """Train the PPO agent."""
         self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
         self.model.learn(total_timesteps=total_timesteps)
-        
+
         if save_path:
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             self.model.save(save_path)
@@ -62,6 +64,7 @@ class PPOAgent:
     def evaluate(self, n_eval_episodes: int = 10) -> dict:
         """Evaluate agent performance over n episodes."""
         from stable_baselines3.common.evaluation import evaluate_policy
+
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_eval_episodes
         )
