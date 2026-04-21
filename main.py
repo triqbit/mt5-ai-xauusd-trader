@@ -10,7 +10,6 @@ Usage:
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import argparse
@@ -25,6 +24,7 @@ import structlog
 
 from src.core.config import get_config
 from src.core.trade_logger import TradeLogger
+from src.core.monitor import Monitor
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -59,6 +59,7 @@ def run_live(
     risk: RiskManager,
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
+    monitor: Monitor,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
@@ -154,6 +155,7 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
+            monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -206,6 +208,8 @@ def main() -> int:
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
+    monitor = Monitor(cfg)
+    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -216,6 +220,7 @@ def main() -> int:
     try:
         if cfg.mode in ("demo", "live"):
             run_live(cfg, connector, risk, model, trade_logger=trade_logger)
+            run_live(cfg, connector, risk, model, monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
