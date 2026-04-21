@@ -1,5 +1,20 @@
-"""AI/ML models: ensemble systems and neural architectures."""
+"""
+MT5 AI/ML Trading Bot - Models
+"""
 
-from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+from .base_model import BaseModel, Signal
+from .dreamer_agent import DreamerAgent
+from .ensemble import EnsembleModel
+from .lstm_model import LSTMModel
+from .ppo_agent import PPOAgent
+from .transformer_model import TimeSeriesTransformer
 
-__all__ = ["EnsembleModel", "LSTMAttentionModel"]
+__all__ = [
+    "BaseModel",
+    "DreamerAgent",
+    "EnsembleModel",
+    "LSTMModel",
+    "PPOAgent",
+    "Signal",
+    "TimeSeriesTransformer",
+]
