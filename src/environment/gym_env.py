@@ -4,10 +4,11 @@ src/environment/gym_env.py
 Custom Gymnasium trading environment for RL training.
 """
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+
 
 class TradingEnv(gym.Env):
     """
