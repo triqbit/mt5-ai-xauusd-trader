@@ -77,3 +77,17 @@ class PPOAgent(BaseModel):
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             self.model.save(str(save_path))
             self.logger.info(f"Model saved to {save_path}")
+
+    def predict(self, observation):
+        """Generate a trading action from the current observation."""
+        action, _states = self.model.predict(observation, deterministic=True)
+        return action
+
+    def evaluate(self, n_eval_episodes: int = 10) -> dict:
+        """Evaluate agent performance over n episodes."""
+        from stable_baselines3.common.evaluation import evaluate_policy
+
+        mean_reward, std_reward = evaluate_policy(
+            self.model, self.env, n_eval_episodes=n_eval_episodes
+        )
+        return {"mean_reward": mean_reward, "std_reward": std_reward}
