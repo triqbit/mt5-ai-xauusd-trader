@@ -1,7 +1,7 @@
-
 import numpy as np
-import pytest
+
 from src.environment.gym_env import TradingEnv
+
 
 def test_trading_env_observation_shape():
     n_features = 5
@@ -12,6 +12,7 @@ def test_trading_env_observation_shape():
     obs, _ = env.reset()
     assert obs.shape == (window_size * n_features + 2,)
 
+
 def test_trading_env_step():
     n_features = 5
     window_size = 10
@@ -19,9 +20,10 @@ def test_trading_env_step():
     env = TradingEnv(data, window_size=window_size)
 
     env.reset()
-    obs, reward, terminated, truncated, info = env.step(1) # Buy
+    obs, _reward, _terminated, _truncated, _info = env.step(1)  # Buy
     assert obs.shape == (window_size * n_features + 2,)
     assert env.position == 1.0
+
 
 def test_trading_env_reset():
     n_features = 5
@@ -35,18 +37,13 @@ def test_trading_env_reset():
     assert env.position == 0.0
     assert env.current_step == window_size
 
+
 def test_trading_env_normalization_consistency():
-    n_features = 2
     window_size = 5
     # Constant data for easy check
-    data = np.array([
-        [1.0, 10.0],
-        [2.0, 20.0],
-        [3.0, 30.0],
-        [4.0, 40.0],
-        [5.0, 50.0],
-        [6.0, 60.0]
-    ]).astype(np.float32)
+    data = np.array(
+        [[1.0, 10.0], [2.0, 20.0], [3.0, 30.0], [4.0, 40.0], [5.0, 50.0], [6.0, 60.0]]
+    ).astype(np.float32)
 
     env = TradingEnv(data, window_size=window_size)
     obs, _ = env.reset()
