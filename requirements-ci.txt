@@ -18,6 +18,10 @@ pandas==3.0.2
 TA-Lib==0.6.4
 pandas-ta==0.4.71b0
 
+# -- Database ------------------------------------------------------
+sqlalchemy==2.0.30
+alembic==1.13.1
+
 # -- Pydantic / settings -------------------------------------------
 pydantic==2.13.2
 pydantic-settings==2.13.1
