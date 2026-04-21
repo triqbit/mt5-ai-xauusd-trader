@@ -22,7 +22,7 @@ from pathlib import Path
 
 import structlog
 
-from src.core.config import get_config
+from src.core.config import TradingConfig, get_config
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_engine import RiskEngine
@@ -52,7 +52,9 @@ def configure_logging(level: str = "INFO") -> None:
 # -- Trading loop ----------------------------------------------------------
 
 
-def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel) -> None:
+def run_live(
+    cfg: TradingConfig, connector: MT5Connector, risk: RiskEngine, model: EnsembleModel
+) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
