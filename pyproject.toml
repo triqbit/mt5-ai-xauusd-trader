@@ -26,7 +26,6 @@ include = ["src*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-fix = true
 
 [tool.ruff.format]
 quote-style = "double"
@@ -72,29 +71,9 @@ split-on-trailing-comma = true
 # ===========================================================
 [tool.mypy]
 python_version = "3.11"
-# Adjusted strictness to balance quality and CI stability
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-check_untyped_defs = true
-warn_return_any = false
+strict = true
+warn_return_any = true
 warn_unused_configs = true
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [
-    "MetaTrader5",
-    "metaapi_cloud_sdk",
-    "structlog",
-    "pandas",
-    "numpy",
-    "torch.*",
-    "gymnasium.*",
-    "stable_baselines3.*",
-    "pandas_ta",
-    "plotly.*",
-    "dash.*"
-]
-ignore_missing_imports = true
 
 # ===========================================================
 # STEP 5: pytest + coverage
