@@ -4,6 +4,8 @@ src/models/ppo_agent.py
 Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Optional, Union
@@ -22,7 +24,10 @@ class PPOAgent(BaseModel):
     """
 
     def __init__(
-        self, env=None, model_path: Optional[Union[str, Path]] = None, device: str = "auto"
+        self,
+        env=None,
+        model_path: Optional[Union[str, Path]] = None,
+        device: str = "auto",
     ):
         self.logger = logging.getLogger(__name__)
         self.device = device
@@ -77,12 +82,3 @@ class PPOAgent(BaseModel):
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             self.model.save(str(save_path))
             self.logger.info(f"Model saved to {save_path}")
-
-    def evaluate(self, n_eval_episodes: int = 10) -> dict:
-        """Evaluate agent performance over n episodes."""
-        from stable_baselines3.common.evaluation import evaluate_policy
-
-        mean_reward, std_reward = evaluate_policy(
-            self.model, self.env, n_eval_episodes=n_eval_episodes
-        )
-        return {"mean_reward": mean_reward, "std_reward": std_reward}
