@@ -4,6 +4,8 @@ src/environment/gym_env.py
 Custom Gymnasium trading environment for RL training.
 """
 
+from __future__ import annotations
+
 from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
