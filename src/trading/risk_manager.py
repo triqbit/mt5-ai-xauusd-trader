@@ -9,15 +9,15 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict
+from typing import Dict, Optional
 
 from src.core.config import TradingConfig
+from src.core.monitor import Monitor
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +65,18 @@ class RiskManager:
     Every signal must be approved here before reaching the order router.
     """
 
-    def __init__(self, config: TradingConfig, account_balance: float) -> None:
+    def __init__(
+        self,
+        config: TradingConfig,
+        account_balance: float,
+        monitor: Optional[Monitor] = None,
+    ) -> None:
         self.cfg = config
         self.balance = account_balance
         self.peak_equity = account_balance
         self.daily = DailyStats(peak_equity=account_balance)
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
+        self.monitor = monitor
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
@@ -134,6 +140,10 @@ class RiskManager:
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
+        if self.monitor:
+            self.monitor.send_daily_summary(
+                self.daily.realised_pnl, self.daily.trade_count
+            )
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -145,6 +155,8 @@ class RiskManager:
                 "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
                 drawdown * 100,
             )
+            if self.monitor:
+                self.monitor.alert_circuit_breaker(drawdown)
             return False
         return True
 
@@ -170,9 +182,13 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
+    def _check_minimum_confidence(
+        self, confidence: float, threshold: float = 0.55
+    ) -> bool:
         if confidence < threshold:
-            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
+            logger.debug(
+                "Confidence %.2f below threshold %.2f", confidence, threshold
+            )
             return False
         return True
 
@@ -188,4 +204,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["RiskManager", "TradeSignal", "DailyStats", "ALLOCATION_WEIGHTS"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]
