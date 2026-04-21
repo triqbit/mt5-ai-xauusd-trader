@@ -1,8 +1,8 @@
-"""Initial migration
+"""initial_trade_logger_schema
 
-Revision ID: c1b7f28e5748
+Revision ID: 58eb10982caa
 Revises:
-Create Date: 2026-04-20 12:37:01.704588
+Create Date: 2026-04-21 12:50:04.822680
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'c1b7f28e5748'
+revision: str = '58eb10982caa'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -33,6 +33,9 @@ def upgrade() -> None:
     sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -46,6 +49,9 @@ def upgrade() -> None:
     sa.Column('win_rate', sa.Float(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -54,9 +60,13 @@ def upgrade() -> None:
     sa.Column('event_type', sa.String(length=50), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('symbol', sa.String(length=20), nullable=True),
+    sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('signal_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
     sa.ForeignKeyConstraint(['signal_id'], ['model_signals.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -72,9 +82,13 @@ def upgrade() -> None:
     sa.Column('pnl', sa.Float(), nullable=True),
     sa.Column('drawdown_impact', sa.Float(), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=True),
+    sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('signal_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
     sa.ForeignKeyConstraint(['signal_id'], ['model_signals.id'], ),
     sa.PrimaryKeyConstraint('id')

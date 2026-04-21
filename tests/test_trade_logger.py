@@ -56,9 +56,35 @@ def test_performance_report(logger):
     assert report["max_drawdown"] == 50.0
 
 def test_log_risk_event(logger):
-    logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")
-    # No exception means success, we could query DB to be sure
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    })
+    event_id = logger.log_risk_event(
+        "REJECTED",
+        "Position size too large",
+        symbol="XAUUSD",
+        signal_id=signal_id
+    )
+    assert event_id > 0
     with logger.Session() as session:
         from src.core.trade_logger import RiskEvent
-        event = session.query(RiskEvent).first()
-        assert event.event_type == "CIRCUIT_BREAKER"
+        event = session.query(RiskEvent).filter(RiskEvent.id == event_id).first()
+        assert event.event_type == "REJECTED"
+        assert event.signal_id == signal_id
+        assert event.created_by == "system"
+
+def test_audit_columns(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    }, created_by="test_user")
+
+    with logger.Session() as session:
+        from src.core.trade_logger import ModelSignal
+        signal = session.query(ModelSignal).filter(ModelSignal.id == signal_id).first()
+        assert signal.created_by == "test_user"
+        assert signal.created_at is not None
+        assert signal.updated_at is not None
