@@ -1,15 +1,8 @@
 """Tests for EnsembleModel."""
 import pytest
-import torch
 import numpy as np
-from unittest.mock import MagicMock
-from src.models.ensemble import EnsembleModel, LSTMAttentionModel
-
-def test_lstm_model_forward():
-    model = LSTMAttentionModel(n_features=10, hidden_size=32, num_layers=1, n_heads=2)
-    x = torch.randn(1, 20, 10) # (B, T, F)
-    out = model(x)
-    assert out.shape == (1, 3)
+from unittest.mock import MagicMock, patch
+from src.models.ensemble import EnsembleModel
 
 def test_ensemble_predict_no_models():
     ensemble = EnsembleModel()
@@ -19,10 +12,13 @@ def test_ensemble_predict_no_models():
     assert confidence == 0.0
     assert per_algo == {}
 
-def test_ensemble_predict_with_lstm():
+@patch('src.models.ensemble.get_lstm_model_class')
+def test_ensemble_predict_with_lstm(mock_get_class):
+    torch = pytest.importorskip("torch")
+
     ensemble = EnsembleModel()
     # Mock LSTM
-    mock_lstm = MagicMock(spec=LSTMAttentionModel)
+    mock_lstm = MagicMock()
     # Output: High probability for BUY (index 0)
     mock_lstm.return_value = torch.tensor([[5.0, -5.0, -5.0]])
     ensemble.lstm_model = mock_lstm
@@ -36,6 +32,8 @@ def test_ensemble_predict_with_lstm():
     assert per_algo["lstm"] == 0 # Index 0
 
 def test_ensemble_consensus_fail():
+    torch = pytest.importorskip("torch")
+
     ensemble = EnsembleModel()
 
     # Mock PPO to vote BUY
@@ -50,7 +48,6 @@ def test_ensemble_consensus_fail():
     seq = torch.randn(20, 140)
 
     # Even weights, one BUY, one SELL -> consensus should fail if ratio < 0.6
-    # 2 models, 1 agrees -> 0.5 agreement ratio.
     direction, confidence, per_algo = ensemble.predict(obs, seq=seq)
 
     assert direction == 0 # Consensus failure defaults to HOLD

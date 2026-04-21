@@ -13,61 +13,72 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+if TYPE_CHECKING:
+    import torch
+    import torch.nn as nn
+else:
+    # Lazy imports to support CI environments without torch
+    torch = None
+    nn = None
 
 logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
-    """
-    Bidirectional LSTM with multi-head self-attention.
-    Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
-    """
+def get_lstm_model_class():
+    import torch.nn as nn
 
-    def __init__(
-        self,
-        n_features: int = 140,
-        hidden_size: int = 128,
-        num_layers: int = 2,
-        n_heads: int = 8,
-        dropout: float = 0.2,
-    ) -> None:
-        super().__init__()
-        self.lstm = nn.LSTM(
-            input_size=n_features,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=True,
-            dropout=dropout if num_layers > 1 else 0.0,
-        )
-        self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_size * 2,
-            num_heads=n_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
-        self.norm = nn.LayerNorm(hidden_size * 2)
-        self.head = nn.Sequential(
-            nn.Linear(hidden_size * 2, 64),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(64, 3),
-        )
+    class LSTMAttentionModel(nn.Module):
+        """
+        Bidirectional LSTM with multi-head self-attention.
+        Input : (batch, seq_len, n_features)
+        Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+        """
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (B, T, F)
-        out, _ = self.lstm(x)  # (B, T, 2*H)
-        attn_out, _ = self.attn(out, out, out)
-        out = self.norm(out + attn_out)  # residual
-        pooled = out.mean(dim=1)  # global average pool
-        return self.head(pooled)  # (B, 3)
+        def __init__(
+            self,
+            n_features: int = 140,
+            hidden_size: int = 128,
+            num_layers: int = 2,
+            n_heads: int = 8,
+            dropout: float = 0.2,
+        ) -> None:
+            super().__init__()
+            self.lstm = nn.LSTM(
+                input_size=n_features,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                batch_first=True,
+                bidirectional=True,
+                dropout=dropout if num_layers > 1 else 0.0,
+            )
+            self.attn = nn.MultiheadAttention(
+                embed_dim=hidden_size * 2,
+                num_heads=n_heads,
+                dropout=dropout,
+                batch_first=True,
+            )
+            self.norm = nn.LayerNorm(hidden_size * 2)
+            self.head = nn.Sequential(
+                nn.Linear(hidden_size * 2, 64),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(64, 3),
+            )
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            # x: (B, T, F)
+            out, _ = self.lstm(x)  # (B, T, 2*H)
+            attn_out, _ = self.attn(out, out, out)
+            out = self.norm(out + attn_out)  # residual
+            pooled = out.mean(dim=1)  # global average pool
+            return self.head(pooled)  # (B, 3)
+
+    return LSTMAttentionModel
 
 
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
@@ -81,7 +92,7 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device)
+        self.device_str = device
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -89,7 +100,7 @@ class EnsembleModel:
         }
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
-        self.lstm_model: Optional[LSTMAttentionModel] = None
+        self.lstm_model = None
         self._performance: Dict[str, List[float]] = {k: [] for k in self.ALGORITHMS}
 
     # ── Loading ────────────────────────────────────────────────────────────
@@ -98,7 +109,7 @@ class EnsembleModel:
         try:
             from stable_baselines3 import PPO
 
-            self._ppo_model = PPO.load(str(path), device=self.device)
+            self._ppo_model = PPO.load(str(path), device=self.device_str)
             logger.info("PPO model loaded from %s", path)
         except Exception as exc:
             logger.warning("Could not load PPO: %s", exc)
@@ -106,8 +117,11 @@ class EnsembleModel:
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
         try:
-            model = LSTMAttentionModel(n_features=n_features).to(self.device)
-            state = torch.load(str(path), map_location=self.device, weights_only=True)
+            import torch
+
+            LSTMAttentionModel = get_lstm_model_class()
+            model = LSTMAttentionModel(n_features=n_features).to(self.device_str)
+            state = torch.load(str(path), map_location=self.device_str, weights_only=True)
             model.load_state_dict(state)
             model.eval()
             self.lstm_model = model
@@ -131,7 +145,6 @@ class EnsembleModel:
         if self._ppo_model is not None:
             # SB3 predict returns (action, next_state)
             action, _ = self._ppo_model.predict(obs, deterministic=True)
-            # Convert action to one-hot-like probabilities for blending
             # Assuming action space: 0=buy, 1=sell, 2=hold
             probs = np.zeros(3)
             probs[int(action)] = 1.0
@@ -139,28 +152,24 @@ class EnsembleModel:
 
         # 2. LSTM-Attention prediction
         if self.lstm_model is not None:
+            import torch
+
             if seq is None:
-                # If no sequence provided, use obs repeated as a dummy sequence if possible
-                # or skip. Here we skip if seq is required but missing.
                 logger.debug("LSTM model loaded but no sequence provided.")
             else:
                 with torch.no_grad():
                     # Ensure seq is (B, T, F)
                     if seq.dim() == 2:
                         seq = seq.unsqueeze(0)
-                    logits = self.lstm_model(seq.to(self.device))
+                    logits = self.lstm_model(seq.to(self.device_str))
                     probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
                 votes["lstm"] = probs
-
-        # 3. Dreamer V3 (Placeholder)
-        # if self._dreamer_model is not None: ...
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
             return 0, 0.0, {}
 
         # Weighted average across available models
-        # Normalise weights of available models
         active_weights = {k: self.weights[k] for k in votes}
         total_active_w = sum(active_weights.values())
 
@@ -168,7 +177,6 @@ class EnsembleModel:
         for k, prob in votes.items():
             blended += (active_weights[k] / total_active_w) * prob
 
-        # action_idx: 0=buy, 1=sell, 2=hold
         action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
 
@@ -178,12 +186,14 @@ class EnsembleModel:
         per_algo = {k: float(np.argmax(v)) for k, v in votes.items()}
 
         # Consensus check (Section 4.3 of RISK_LIMITS.md)
-        # Consensus Threshold: Need 60%+ agreement across ensemble
         if len(votes) >= 2:
             agreement_count = sum(1 for v in votes.values() if np.argmax(v) == action_idx)
             agreement_ratio = agreement_count / len(votes)
             if agreement_ratio < 0.6:
-                logger.info("Ensemble consensus failed (%.1f%% agreement) | Returning HOLD", agreement_ratio * 100)
+                logger.info(
+                    "Ensemble consensus failed (%.1f%% agreement) | Returning HOLD",
+                    agreement_ratio * 100,
+                )
                 return 0, confidence, per_algo
 
         return direction, confidence, per_algo
@@ -220,4 +230,4 @@ class EnsembleModel:
         logger.info("Weights rebalanced: %s", self.weights)
 
 
-__all__ = ["EnsembleModel", "LSTMAttentionModel"]
+__all__ = ["EnsembleModel"]
