@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from src.trading.risk_manager import TradeSignal, DailyStats
+from src.trading.risk_manager import DailyStats, TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +183,8 @@ class RiskEngine:
         return True
 
     def _check_daily_loss_cascading(self) -> bool:
-        if self.daily.peak_equity <= 0: return True
+        if self.daily.peak_equity <= 0:
+            return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
         if self.daily.realised_pnl >= 0:
             return True
@@ -197,28 +198,20 @@ class RiskEngine:
         # Section 2.3
         if self.daily.trade_count >= self.cfg.max_daily_trades:
             return False
-        if self.metrics.consecutive_losses >= self.cfg.max_losing_streak:
-            return False
-
-        return True
+        return not self.metrics.consecutive_losses >= self.cfg.max_losing_streak
 
     def _check_periodic_limits(self) -> bool:
         # Section 3
         if self.metrics.weekly_loss > (self.balance * self.cfg.max_weekly_loss):
             return False
-        if self.metrics.monthly_loss > (self.balance * self.cfg.max_monthly_loss):
-            return False
-        return True
+        return not self.metrics.monthly_loss > self.balance * self.cfg.max_monthly_loss
 
     def _check_position_limits(self, signal: TradeSignal) -> bool:
         total_open = sum(len(positions) for positions in self.open_positions.values())
         if total_open >= self.cfg.max_positions:
             return False
 
-        if signal.lot_size < self.cfg.min_lot_size:
-            return False
-
-        return True
+        return not signal.lot_size < self.cfg.min_lot_size
 
     def _check_exposure_limits(self, signal: TradeSignal) -> bool:
         # Section 1.2 Single Direction: Max 30% net long OR short
@@ -239,7 +232,8 @@ class RiskEngine:
     def _check_risk_reward(self, signal: TradeSignal) -> bool:
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
-        if risk == 0: return False
+        if risk == 0:
+            return False
         return (reward / risk) >= 1.5
 
 __all__ = ["RiskEngine", "RiskMetrics"]
