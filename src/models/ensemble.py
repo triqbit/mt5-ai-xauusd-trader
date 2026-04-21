@@ -62,6 +62,7 @@ class LSTMAttentionModel(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (B, T, F)
         out, _ = self.lstm(x)  # (B, T, 2*H)
         attn_out, _ = self.attn(out, out, out)
         out = self.norm(out + attn_out)  # residual
@@ -104,12 +105,15 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
-        model = LSTMAttentionModel(n_features=n_features).to(self.device)
-        state = torch.load(str(path), map_location=self.device)
-        model.load_state_dict(state)
-        model.eval()
-        self.lstm_model = model
-        logger.info("LSTM model loaded from %s", path)
+        try:
+            model = LSTMAttentionModel(n_features=n_features).to(self.device)
+            state = torch.load(str(path), map_location=self.device, weights_only=True)
+            model.load_state_dict(state)
+            model.eval()
+            self.lstm_model = model
+            logger.info("LSTM model loaded from %s", path)
+        except Exception as exc:
+            logger.warning("Could not load LSTM: %s", exc)
 
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
@@ -123,38 +127,65 @@ class EnsembleModel:
         """
         votes: Dict[str, np.ndarray] = {}
 
-        # PPO prediction
+        # 1. PPO prediction
         if self._ppo_model is not None:
+            # SB3 predict returns (action, next_state)
             action, _ = self._ppo_model.predict(obs, deterministic=True)
+            # Convert action to one-hot-like probabilities for blending
+            # Assuming action space: 0=buy, 1=sell, 2=hold
             probs = np.zeros(3)
             probs[int(action)] = 1.0
             votes["ppo"] = probs
 
-        # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
-            with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            votes["lstm"] = probs
+        # 2. LSTM-Attention prediction
+        if self.lstm_model is not None:
+            if seq is None:
+                # If no sequence provided, use obs repeated as a dummy sequence if possible
+                # or skip. Here we skip if seq is required but missing.
+                logger.debug("LSTM model loaded but no sequence provided.")
+            else:
+                with torch.no_grad():
+                    # Ensure seq is (B, T, F)
+                    if seq.dim() == 2:
+                        seq = seq.unsqueeze(0)
+                    logits = self.lstm_model(seq.to(self.device))
+                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                votes["lstm"] = probs
+
+        # 3. Dreamer V3 (Placeholder)
+        # if self._dreamer_model is not None: ...
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
             return 0, 0.0, {}
 
         # Weighted average across available models
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+        # Normalise weights of available models
+        active_weights = {k: self.weights[k] for k in votes}
+        total_active_w = sum(active_weights.values())
+
+        blended = np.zeros(3)
+        for k, prob in votes.items():
+            blended += (active_weights[k] / total_active_w) * prob
+
+        # action_idx: 0=buy, 1=sell, 2=hold
+        action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
+
         direction_map = {0: 1, 1: -1, 2: 0}
         direction = direction_map[action_idx]
-        per_algo = {k: float(np.argmax(votes[k])) for k in votes}
-        logger.debug(
-            "Ensemble | dir=%d conf=%.3f votes=%s",
-            direction,
-            confidence,
-            per_algo,
-        )
+
+        per_algo = {k: float(np.argmax(v)) for k, v in votes.items()}
+
+        # Consensus check (Section 4.3 of RISK_LIMITS.md)
+        # Consensus Threshold: Need 60%+ agreement across ensemble
+        if len(votes) >= 2:
+            agreement_count = sum(1 for v in votes.values() if np.argmax(v) == action_idx)
+            agreement_ratio = agreement_count / len(votes)
+            if agreement_ratio < 0.6:
+                logger.info("Ensemble consensus failed (%.1f%% agreement) | Returning HOLD", agreement_ratio * 100)
+                return 0, confidence, per_algo
+
         return direction, confidence, per_algo
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
@@ -177,10 +208,12 @@ class EnsembleModel:
             mean = arr.mean()
             std = arr.std() + 1e-9
             sharpes[algo] = max(mean / std, 0.0)
+
         total = sum(sharpes.values()) or 1.0
         for algo, s in sharpes.items():
             raw = s / total
             self.weights[algo] = max(raw, 0.05)  # min 5%
+
         # Re-normalise
         total_w = sum(self.weights.values())
         self.weights = {k: v / total_w for k, v in self.weights.items()}

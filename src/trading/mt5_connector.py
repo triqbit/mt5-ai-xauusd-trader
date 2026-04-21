@@ -10,6 +10,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import asyncio
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
@@ -69,6 +70,7 @@ class MT5Connector:
         self.use_metaapi: bool = False
         self.metaapi: Optional[Any] = None
         self.metaapi_connection: Optional[Any] = None
+        self.metaapi_account: Optional[Any] = None
         self._is_initialized: bool = False
 
     def initialize(self) -> bool:
@@ -106,9 +108,18 @@ class MT5Connector:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
                 self.metaapi = MetaApi(self.cfg.metaapi_token)
+
+                async def setup_metaapi():
+                    account = await self.metaapi.metatrader_account_api.get_account(self.cfg.metaapi_account_id)
+                    await account.wait_until_connected()
+                    return account, account.get_streaming_connection()
+
+                loop = self._get_or_create_loop()
+                self.metaapi_account, self.metaapi_connection = loop.run_until_complete(setup_metaapi())
+
                 self.use_metaapi = True
                 self._is_initialized = True
-                logger.info("MetaAPI fallback configured.")
+                logger.info("MetaAPI fallback configured and connected.")
                 return True
             except Exception as e:
                 logger.error("MetaAPI initialization failed: %s", e)
@@ -125,6 +136,9 @@ class MT5Connector:
         if self._is_initialized:
             if not self.use_metaapi and MT5_AVAILABLE:
                 mt5.shutdown()
+            elif self.use_metaapi and self.metaapi_connection:
+                loop = self._get_or_create_loop()
+                loop.run_until_complete(self.metaapi_connection.close())
             logger.info("MT5 connector shutdown complete.")
             self._is_initialized = False
 
@@ -157,10 +171,11 @@ class MT5Connector:
         if not self._is_initialized:
             return pd.DataFrame()
 
-        tf = TIMEFRAME_MAP.get(timeframe, 5)
+        tf_value = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
-            rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+            # Native MT5 uses the mapped integer value
+            rates = mt5.copy_rates_from_pos(symbol, tf_value, 0, n_bars)
             if rates is None:
                 logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
                 return pd.DataFrame()
@@ -168,9 +183,27 @@ class MT5Connector:
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
-            # Placeholder for MetaAPI async rates fetching
-            logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
-            return pd.DataFrame()
+            async def fetch_metaapi_rates():
+                # MetaAPI timeframe format is usually like '1m', '5m', '1h'
+                ma_tf = timeframe.lower()
+                if not any(ma_tf.endswith(suffix) for suffix in ['m', 'h', 'd']):
+                    ma_tf = f"{tf_value}m" if tf_value < 60 else f"{tf_value//60}h"
+
+                candles = await self.metaapi_account.get_historical_candles(symbol, ma_tf, limit=n_bars)
+                return candles
+
+            try:
+                loop = self._get_or_create_loop()
+                candles = loop.run_until_complete(fetch_metaapi_rates())
+                df = pd.DataFrame(candles)
+                if not df.empty:
+                    # MetaAPI response mapping
+                    df.rename(columns={'time': 'time', 'open': 'open', 'high': 'high', 'low': 'low', 'close': 'close', 'volume': 'tick_volume'}, inplace=True)
+                    df["time"] = pd.to_datetime(df["time"])
+                return df
+            except Exception as e:
+                logger.error("MetaAPI get_rates failed: %s", e)
+                return pd.DataFrame()
 
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Alias for get_rates() to match main.py expectations."""
@@ -186,15 +219,27 @@ class MT5Connector:
         Returns:
             Dictionary with 'bid' and 'ask' prices.
         """
-        if not self._is_initialized or self.use_metaapi:
+        if not self._is_initialized:
             return {"bid": 0.0, "ask": 0.0}
 
-        tick = mt5.symbol_info_tick(symbol)
-        if tick is None:
-            logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
-            return {"bid": 0.0, "ask": 0.0}
+        if not self.use_metaapi:
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is None:
+                logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
+                return {"bid": 0.0, "ask": 0.0}
+            return {"bid": tick.bid, "ask": tick.ask}
+        else:
+            async def fetch_metaapi_tick():
+                price = await self.metaapi_account.get_symbol_price(symbol)
+                return price
 
-        return {"bid": tick.bid, "ask": tick.ask}
+            try:
+                loop = self._get_or_create_loop()
+                price = loop.run_until_complete(fetch_metaapi_tick())
+                return {"bid": price['bid'], "ask": price['ask']}
+            except Exception as e:
+                logger.error("MetaAPI get_tick failed: %s", e)
+                return {"bid": 0.0, "ask": 0.0}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
@@ -239,15 +284,42 @@ class MT5Connector:
 
             logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
             return int(result.order)
+        else:
+            async def execute_metaapi_order():
+                action = 'BUY' if signal.direction > 0 else 'SELL'
+                result = await self.metaapi_account.execute_market_order(
+                    signal.symbol, action, signal.lot_size, signal.stop_loss, signal.take_profit,
+                    {'comment': f"AI:{signal.algorithm}", 'magic': 20240419}
+                )
+                return result
 
-        return None
+            try:
+                loop = self._get_or_create_loop()
+                result = loop.run_until_complete(execute_metaapi_order())
+                logger.info("MetaAPI Order PLACED | Ticket #%s | %s", result['orderId'], signal.symbol)
+                return int(result['orderId'])
+            except Exception as e:
+                logger.error("MetaAPI place_order failed: %s", e)
+                return None
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""
-        if self._is_initialized and not self.use_metaapi:
+        if not self._is_initialized:
+            return {}
+
+        if not self.use_metaapi:
             acc = mt5.account_info()
             return acc._asdict() if acc else {}
-        return {}
+        else:
+            async def fetch_metaapi_account():
+                return await self.metaapi_account.get_account_information()
+
+            try:
+                loop = self._get_or_create_loop()
+                return loop.run_until_complete(fetch_metaapi_account())
+            except Exception as e:
+                logger.error("MetaAPI get_account_info failed: %s", e)
+                return {}
 
     def get_account_balance(self) -> float:
         """Retrieve current account balance."""
@@ -256,10 +328,46 @@ class MT5Connector:
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve current open positions."""
-        if self._is_initialized and not self.use_metaapi:
+        if not self._is_initialized:
+            return []
+
+        if not self.use_metaapi:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
             return [p._asdict() for p in positions] if positions else []
-        return []
+        else:
+            async def fetch_metaapi_positions():
+                return await self.metaapi_account.get_positions()
+
+            try:
+                loop = self._get_or_create_loop()
+                positions = loop.run_until_complete(fetch_metaapi_positions())
+                normalized = []
+                for p in positions:
+                    if symbol and p['symbol'] != symbol:
+                        continue
+                    normalized.append({
+                        'ticket': int(p['id']),
+                        'symbol': p['symbol'],
+                        'volume': p['volume'],
+                        'type': 0 if p['type'] == 'POSITION_TYPE_BUY' else 1,
+                        'price_open': p['openPrice'],
+                        'sl': p.get('stopLoss', 0),
+                        'tp': p.get('takeProfit', 0),
+                        'profit': p['profit']
+                    })
+                return normalized
+            except Exception as e:
+                logger.error("MetaAPI get_positions failed: %s", e)
+                return []
+
+    def _get_or_create_loop(self) -> asyncio.AbstractEventLoop:
+        """Helper to safely get or create an event loop."""
+        try:
+            return asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
 
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]
