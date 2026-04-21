@@ -46,10 +46,8 @@ class TimeSeriesTransformer(nn.Module):
         output = self.decoder(output[:, -1, :])
         return torch.softmax(output, dim=-1)
 
-
 class PositionalEncoding(nn.Module):
     """Injects positional information into the sequence."""
-
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -60,9 +58,9 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
-        self.register_buffer("pe", pe)
+        self.register_buffer('pe', pe)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x shape: [batch_size, seq_len, d_model]
-        x = x + self.pe[:, : x.size(1), :]
+        x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)
