@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,12 +21,16 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 import structlog
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.backtester import Backtester
+from src.trading.execution_filter import ExecutionFilter
+from src.trading.feature_engineer import FeatureEngineer
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -64,15 +69,28 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+
+    fe = FeatureEngineer()
+    ef = ExecutionFilter(cfg)
+
     while True:
         try:
             # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+            df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=300)
             tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
-            # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+
+            # 2. Feature Engineering
+            df_features = fe.generate_features(df_raw)
+            if df_features.empty:
+                log.warning("No features generated - skipping")
+                time.sleep(poll_interval)
+                continue
+
+            # 3. Normalize & Get Prediction
+            df_norm = fe.normalize_features(df_features, window=30)
+            obs = df_norm.iloc[-1].values
+            signal_out = model.predict(obs)
+            direction, confidence = signal_out.direction, signal_out.confidence
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -91,9 +109,10 @@ def run_live(
                 log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
                 continue
+
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
-            atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
+            atr = df_features["atr"].iloc[-1]
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
             lot_size = risk.size_position(
@@ -112,8 +131,11 @@ def run_live(
                 algorithm=cfg.algorithm,
                 confidence=confidence,
             )
-            # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
+
+            # 5. Risk approval gate + Execution Filter Cascade
+            decision = ef.validate(cfg.symbol, direction, df_features)
+
+            if decision.approved and risk.approve(signal, signal_id=signal_id):
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
@@ -178,6 +200,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--symbol", default="XAUUSD")
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
+    p.add_argument("--start", help="Backtest start date (YYYY-MM-DD)", default="2023-01-01")
+    p.add_argument("--end", help="Backtest end date (YYYY-MM-DD)", default="2023-12-31")
     p.add_argument("--log-level", default="INFO")
     return p.parse_args()
 
@@ -219,10 +243,53 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            log.info("Starting Backtest from %s to %s", args.start, args.end)
+
+            # Convert dates for filtering
+            start_dt = pd.to_datetime(args.start)
+            end_dt = pd.to_datetime(args.end)
+
+            # 1. Fetch historical data
+            # For a long backtest, we might need many more bars.
+            # Approximate bars: (End - Start) / Timeframe
+            # Assuming M5, 12 bars/hour, 288 bars/day.
+            # 5 years ~= 500,000 bars.
+            total_days = (end_dt - start_dt).days
+            estimated_bars = total_days * 288  # For M5
+
+            df_raw = connector.get_ohlcv(
+                cfg.symbol,
+                cfg.timeframe,
+                n_bars=max(5000, estimated_bars),
+            )
+
+            # Filter by date range
+            if not df_raw.empty:
+                df_raw = df_raw[(df_raw["time"] >= start_dt) & (df_raw["time"] <= end_dt)]
+                df_raw.set_index("time", inplace=True)
+            if df_raw.empty:
+                log.error("No historical data found for backtest")
+                return 1
+
+            # 2. Initialize Backtester
+            backtester = Backtester(model=model, symbol=cfg.symbol, spread=0.2, commission=0.0)
+
+            # 3. Run Backtest
+            report = backtester.run(df_raw)
+
+            # 4. Log Results
+            log.info("Backtest Results:")
+            print("-" * 30)
+            print(f"Annualized Return: {report.annualized_return:.2%}")
+            print(f"Sharpe Ratio:      {report.sharpe_ratio:.2f}")
+            print(f"Max Drawdown:      {report.max_drawdown:.2%}")
+            print(f"Profit Factor:     {report.profit_factor:.2f}")
+            print(f"Total Trades:      {report.total_trades}")
+            print(f"Win Rate:          {report.win_rate:.2%}")
+            print("-" * 30)
+
     finally:
         connector.disconnect()
     return 0

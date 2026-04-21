@@ -9,15 +9,18 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
 import torch.nn as nn
+
+from src.models.base_model import BaseModel, Signal
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +73,7 @@ class LSTMAttentionModel(nn.Module):
 
 
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
-class EnsembleModel:
+class EnsembleModel(BaseModel):
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
     Weights are initialised equally and adapt based on a rolling window
@@ -80,6 +83,7 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
+        super().__init__()
         self.device = torch.device(device)
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
@@ -114,14 +118,16 @@ class EnsembleModel:
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
         self,
-        obs: np.ndarray,
+        features: np.ndarray,
         seq: Optional[torch.Tensor] = None,
-    ) -> Tuple[int, float, Dict[str, float]]:
+        **kwargs,
+    ) -> Signal:
         """
-        Return (direction, confidence, per_algo_probs).
+        Return a Signal object.
         direction: +1 buy, -1 sell, 0 hold
         """
         votes: Dict[str, np.ndarray] = {}
+        obs = features
 
         # PPO prediction
         if self._ppo_model is not None:
@@ -139,7 +145,7 @@ class EnsembleModel:
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
-            return 0, 0.0, {}
+            return Signal(direction=0, confidence=0.0)
 
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
@@ -155,7 +161,11 @@ class EnsembleModel:
             confidence,
             per_algo,
         )
-        return direction, confidence, per_algo
+        return Signal(
+            direction=direction,
+            confidence=confidence,
+            metadata={"per_algo_votes": per_algo},
+        )
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(self, algorithm: str, ret: float) -> None:
