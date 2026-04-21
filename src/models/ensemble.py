@@ -9,7 +9,6 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging
@@ -178,6 +177,8 @@ class EnsembleModel:
         # Note: LSTMAttentionModel and PPO actions might need alignment.
         # Assuming both follow 0:BUY, 1:SELL, 2:HOLD
         action_idx = int(np.argmax(blended))
+        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
         confidence = float(blended[action_idx])
 
         direction_map = {0: 1, 1: -1, 2: 0}
