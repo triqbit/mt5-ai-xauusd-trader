@@ -19,6 +19,7 @@ class PPOAgent:
     PPO-based reinforcement learning agent.
     Uses Stable-Baselines3 PPO under the hood.
     """
+
     def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
         self.logger = logging.getLogger(__name__)
         self.device = device

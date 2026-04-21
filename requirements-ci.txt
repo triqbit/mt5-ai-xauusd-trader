@@ -17,9 +17,7 @@ stable-baselines3>=2.3.2
 
 # -- Technical Analysis --------------------------------------------
 TA-Lib>=0.6.4
-# pandas-ta 0.4.x requires Python 3.12+; 0.3.x works on 3.11
-pandas-ta>=0.3.14b; python_version < "3.12"
-pandas-ta>=0.4.0; python_version >= "3.12"
+pandas-ta>=0.3.14b
 
 # -- Pydantic / settings -------------------------------------------
 pydantic>=2.7.1
