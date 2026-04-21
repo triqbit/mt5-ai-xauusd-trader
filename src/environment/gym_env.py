@@ -23,6 +23,7 @@ class TradingEnv(gym.Env):
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
+
     metadata = {"render_modes": ["human"]}
 
     def __init__(self, data: pd.DataFrame, initial_balance: float = 10000.0,
@@ -57,9 +58,7 @@ class TradingEnv(gym.Env):
 
         # Observation: window of features + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
-            shape=(window_size * n_features + 2,),
-            dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(window_size * n_features + 2,), dtype=np.float32
         )
 
         # Actions: 0=Hold, 1=Buy, 2=Sell
@@ -67,7 +66,9 @@ class TradingEnv(gym.Env):
 
         self.reset()
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[Dict] = None
+    ) -> Tuple[np.ndarray, Dict]:
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -128,4 +129,6 @@ class TradingEnv(gym.Env):
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
     def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+        print(
+            f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}"
+        )

@@ -13,6 +13,7 @@ class PortfolioManager:
     Tracks account health and portfolio-wide metrics.
     Integrates with MT5Connector for real-time data.
     """
+
     def __init__(self, connector):
         self.connector = connector
         self.logger = logging.getLogger(__name__)
@@ -24,12 +25,12 @@ class PortfolioManager:
             balance_info = await self.connector.get_account_balance()
 
             summary = {
-                "balance": balance_info.get('balance', 0.0),
-                "equity": balance_info.get('equity', 0.0),
-                "margin": balance_info.get('margin', 0.0),
-                "margin_free": balance_info.get('margin_free', 0.0),
-                "margin_level": balance_info.get('margin_level', 0.0),
-                "profit": balance_info.get('profit', 0.0)
+                "balance": balance_info.get("balance", 0.0),
+                "equity": balance_info.get("equity", 0.0),
+                "margin": balance_info.get("margin", 0.0),
+                "margin_free": balance_info.get("margin_free", 0.0),
+                "margin_level": balance_info.get("margin_level", 0.0),
+                "profit": balance_info.get("profit", 0.0),
             }
             return summary
         except Exception as e:
@@ -41,11 +42,14 @@ class PortfolioManager:
         try:
             if self.connector.use_metaapi:
                 positions = await self.connector.connection.get_positions()
-                symbol_positions = [p for p in positions if p['symbol'] == symbol]
-                total_lots = sum([p['volume'] if p['type'] == 'BUY' else -p['volume'] for p in symbol_positions])
+                symbol_positions = [p for p in positions if p["symbol"] == symbol]
+                total_lots = sum(
+                    [p["volume"] if p["type"] == "BUY" else -p["volume"] for p in symbol_positions]
+                )
                 return total_lots
             else:
                 import MetaTrader5 as mt5
+
                 positions = mt5.positions_get(symbol=symbol)
                 if positions is None:
                     return 0.0
