@@ -6,7 +6,7 @@ Integrated with FeatureEngineer for high-dimensional state representation.
 """
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
