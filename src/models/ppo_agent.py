@@ -78,11 +78,6 @@ class PPOAgent(BaseModel):
             self.model.save(str(save_path))
             self.logger.info(f"Model saved to {save_path}")
 
-    def predict(self, observation):
-        """Generate a trading action from the current observation."""
-        action, _states = self.model.predict(observation, deterministic=True)
-        return action
-
     def evaluate(self, n_eval_episodes: int = 10) -> dict:
         """Evaluate agent performance over n episodes."""
         from stable_baselines3.common.evaluation import evaluate_policy
