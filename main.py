@@ -59,7 +59,7 @@ def run_live(
     risk: RiskManager,
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
-    monitor: Monitor,
+    monitor: Optional[Monitor] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
