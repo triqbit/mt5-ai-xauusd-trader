@@ -12,7 +12,13 @@ from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
-import pandas_ta  # noqa: F401
+
+try:
+    import pandas_ta as ta
+    PANDAS_TA_AVAILABLE = True
+except ImportError:
+    import talib as ta
+    PANDAS_TA_AVAILABLE = False
 
 from src.trading.risk_manager import TradeSignal
 
@@ -113,14 +119,27 @@ class ExecutionFilter:
         )
 
     def _check_atr_volatility(self, df: pd.DataFrame) -> bool:
-        atr = df.ta.atr(length=self.atr_period)
+        if PANDAS_TA_AVAILABLE:
+            atr = df.ta.atr(length=self.atr_period)
+        else:
+            atr = pd.Series(
+                ta.ATR(df["high"], df["low"], df["close"], timeperiod=self.atr_period),
+                index=df.index,
+            )
+
         if atr is None or len(atr) == 0 or np.isnan(atr.iloc[-1]):
             return False
         current_atr = atr.iloc[-1]
         return bool(self.min_atr <= current_atr <= self.max_atr)
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int) -> bool:
-        ma = df.ta.sma(length=self.ma_period)
+        if PANDAS_TA_AVAILABLE:
+            ma = df.ta.sma(length=self.ma_period)
+        else:
+            ma = pd.Series(
+                ta.SMA(df["close"], timeperiod=self.ma_period), index=df.index
+            )
+
         if ma is None or len(ma) < 2 or np.isnan(ma.iloc[-1]) or np.isnan(ma.iloc[-2]):
             return False
         # Calculate slope: (current - prev) / prev
@@ -132,15 +151,30 @@ class ExecutionFilter:
         return False
 
     def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
-        ema_f = df.ta.ema(length=self.ema_fast)
-        ema_m = df.ta.ema(length=self.ema_mid)
-        ema_s = df.ta.ema(length=self.ema_slow)
+        if PANDAS_TA_AVAILABLE:
+            ema_f = df.ta.ema(length=self.ema_fast)
+            ema_m = df.ta.ema(length=self.ema_mid)
+            ema_s = df.ta.ema(length=self.ema_slow)
+        else:
+            ema_f = pd.Series(
+                ta.EMA(df["close"], timeperiod=self.ema_fast), index=df.index
+            )
+            ema_m = pd.Series(
+                ta.EMA(df["close"], timeperiod=self.ema_mid), index=df.index
+            )
+            ema_s = pd.Series(
+                ta.EMA(df["close"], timeperiod=self.ema_slow), index=df.index
+            )
 
         if ema_f is None or ema_m is None or ema_s is None:
             return False
         if len(ema_f) == 0 or len(ema_m) == 0 or len(ema_s) == 0:
             return False
-        if np.isnan(ema_f.iloc[-1]) or np.isnan(ema_m.iloc[-1]) or np.isnan(ema_s.iloc[-1]):
+        if (
+            np.isnan(ema_f.iloc[-1])
+            or np.isnan(ema_m.iloc[-1])
+            or np.isnan(ema_s.iloc[-1])
+        ):
             return False
 
         f, m, s = ema_f.iloc[-1], ema_m.iloc[-1], ema_s.iloc[-1]
@@ -151,7 +185,13 @@ class ExecutionFilter:
         return False
 
     def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
-        rsi = df.ta.rsi(length=self.rsi_period)
+        if PANDAS_TA_AVAILABLE:
+            rsi = df.ta.rsi(length=self.rsi_period)
+        else:
+            rsi = pd.Series(
+                ta.RSI(df["close"], timeperiod=self.rsi_period), index=df.index
+            )
+
         if rsi is None or len(rsi) == 0 or np.isnan(rsi.iloc[-1]):
             return False
         curr_rsi = rsi.iloc[-1]
