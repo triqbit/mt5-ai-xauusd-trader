@@ -10,7 +10,6 @@ Usage:
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import argparse
@@ -23,6 +22,7 @@ from pathlib import Path
 import structlog
 
 from src.core.config import get_config
+from src.core.monitor import Monitor
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -51,7 +51,13 @@ def configure_logging(level: str = "INFO") -> None:
 # -- Trading loop ----------------------------------------------------------
 
 
-def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleModel) -> None:
+def run_live(
+    cfg,
+    connector: MT5Connector,
+    risk: RiskManager,
+    model: EnsembleModel,
+    monitor: Monitor,
+) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
@@ -68,6 +74,7 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
             confidence = signal_obj.confidence
 
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+            monitor.check_confidence_degradation(confidence)
             if direction == 0:
                 log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
@@ -102,6 +109,7 @@ def run_live(cfg, connector: MT5Connector, risk: RiskManager, model: EnsembleMod
             # 6. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
+            monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -150,7 +158,8 @@ def main() -> int:
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
     balance = connector.get_account_balance()
-    risk = RiskManager(cfg, account_balance=balance)
+    monitor = Monitor(cfg)
+    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -160,7 +169,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model)
+            run_live(cfg, connector, risk, model, monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
