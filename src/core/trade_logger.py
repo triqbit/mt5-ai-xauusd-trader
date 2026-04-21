@@ -10,12 +10,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, List, cast
+from typing import Any, Dict, List, Optional, cast
 
 import numpy as np
 from sqlalchemy import (
     Boolean,
-    Column,
     DateTime,
     Float,
     ForeignKey,
@@ -26,9 +25,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
+
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
+
     pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,9 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
@@ -63,7 +67,9 @@ class ModelSignal(Base, AuditMixin):
     lot_size: Mapped[Optional[float]] = mapped_column(Float)
     algorithm: Mapped[Optional[str]] = mapped_column(String(50))
     confidence: Mapped[Optional[float]] = mapped_column(Float)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # Relationship
     trade: Mapped[Optional["Trade"]] = relationship("Trade", back_populates="signal", uselist=False)
@@ -76,7 +82,9 @@ class Trade(Base, AuditMixin):
     __tablename__ = "trades"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ticket: Mapped[Optional[int]] = mapped_column(Integer, unique=True, index=True, nullable=True)  # Null if rejected
+    ticket: Mapped[Optional[int]] = mapped_column(
+        Integer, unique=True, index=True, nullable=True
+    )  # Null if rejected
     symbol: Mapped[str] = mapped_column(String(20), nullable=False)
     direction: Mapped[int] = mapped_column(Integer, nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
@@ -84,8 +92,12 @@ class Trade(Base, AuditMixin):
     lot_size: Mapped[float] = mapped_column(Float, nullable=False)
     pnl: Mapped[float] = mapped_column(Float, default=0.0)
     drawdown_impact: Mapped[Optional[float]] = mapped_column(Float)  # impact on total drawdown
-    status: Mapped[str] = mapped_column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED, REJECTED
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    status: Mapped[str] = mapped_column(
+        String(20), default="OPEN"
+    )  # OPEN, CLOSED, CANCELLED, REJECTED
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     signal_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("model_signals.id"))
     signal: Mapped[Optional["ModelSignal"]] = relationship("ModelSignal", back_populates="trade")
@@ -100,10 +112,16 @@ class RiskEvent(Base, AuditMixin):
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     symbol: Mapped[Optional[str]] = mapped_column(String(20))
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
-    signal_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("model_signals.id"), nullable=True)
-    signal: Mapped[Optional["ModelSignal"]] = relationship("ModelSignal", back_populates="risk_events")
+    signal_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("model_signals.id"), nullable=True
+    )
+    signal: Mapped[Optional["ModelSignal"]] = relationship(
+        "ModelSignal", back_populates="risk_events"
+    )
 
 
 class PerformanceMetric(Base, AuditMixin):
@@ -112,7 +130,9 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     sharpe_ratio: Mapped[Optional[float]] = mapped_column(Float)
     profit_factor: Mapped[Optional[float]] = mapped_column(Float)
     max_drawdown: Mapped[Optional[float]] = mapped_column(Float)
