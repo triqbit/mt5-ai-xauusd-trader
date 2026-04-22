@@ -23,9 +23,12 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.backtester import Backtester
+from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -179,6 +182,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument("--start", help="Backtest start date YYYY-MM-DD")
+    p.add_argument("--end", help="Backtest end date YYYY-MM-DD")
     return p.parse_args()
 
 
@@ -219,10 +224,50 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            if not args.start or not args.end:
+                log.error("Backtest mode requires --start and --end dates.")
+                return 1
+            log.info("Starting backtest from %s to %s", args.start, args.end)
+
+            # 1. Estimate required bars
+            # M5 = 12 bars/hour = 288 bars/day. 10 years ~ 1M bars.
+            start_dt = datetime.strptime(args.start, "%Y-%m-%d")
+            end_dt = datetime.strptime(args.end, "%Y-%m-%d")
+            days = (end_dt - start_dt).days
+            bars_per_day = 288 # for M5
+            n_bars = (days + 30) * bars_per_day # extra 30 days for indicators warmup
+
+            log.info("Requesting %d bars from MT5", n_bars)
+
+            # Fetch historical data
+            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=n_bars)
+            if df.empty:
+                log.error("No historical data found for backtest.")
+                return 1
+
+            # 2. Filter by date
+            df["time"] = pd.to_datetime(df["time"])
+            df = df[(df["time"] >= args.start) & (df["time"] <= args.end)]
+            if df.empty:
+                log.error("No data found for the specified date range.")
+                return 1
+
+            backtester = Backtester(cfg.symbol, cfg.timeframe)
+            report = backtester.run(df, model)
+            print("\n" + "="*40)
+            print("BACKTEST PERFORMANCE REPORT")
+            print("="*40)
+            print(f"Annualized Return: {report.annualized_return*100:.2f}%")
+            print(f"Sharpe Ratio:      {report.sharpe_ratio:.2f}")
+            print(f"Max Drawdown:      {report.max_drawdown*100:.2f}%")
+            print(f"Profit Factor:     {report.profit_factor:.2f}")
+            print(f"Total Trades:      {report.total_trades}")
+            print(f"Win Rate:          {report.win_rate*100:.2f}%")
+            print(f"Avg MAE:           {report.avg_mae:.2f}")
+            print(f"Avg MFE:           {report.avg_mfe:.2f}")
+            print("="*40 + "\n")
     finally:
         connector.disconnect()
     return 0
