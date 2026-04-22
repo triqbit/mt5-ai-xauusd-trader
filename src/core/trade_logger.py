@@ -14,7 +14,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -54,7 +53,7 @@ class ModelSignal(Base, AuditMixin):
     __table_args__ = (
         Index("idx_model_signals_symbol_created_at", "symbol", "created_at"),
         CheckConstraint("entry_price > 0", name="check_signal_entry_price"),
-        CheckConstraint("lot_size > 0", name="check_signal_lot_size"),
+        CheckConstraint("lot_size >= 0", name="check_signal_lot_size"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -79,7 +78,7 @@ class Trade(Base, AuditMixin):
     __table_args__ = (
         Index("idx_trades_symbol_created_at", "symbol", "created_at"),
         CheckConstraint("entry_price > 0", name="check_trade_entry_price"),
-        CheckConstraint("lot_size > 0", name="check_trade_lot_size"),
+        CheckConstraint("lot_size >= 0", name="check_trade_lot_size"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -223,9 +222,12 @@ class TradeLogger:
                     lot_size=signal.lot_size or 0.0,
                     signal_id=signal_id,
                     status="REJECTED",
+                    pnl=0.0,
+                    drawdown_impact=0.0,
                 )
                 session.add(trade)
-                self.log_risk_event(
+                self._log_risk_event(
+                    session,
                     event_type="TRADE_REJECTED",
                     description=reason,
                     symbol=signal.symbol,
@@ -234,6 +236,23 @@ class TradeLogger:
                 session.commit()
             else:
                 logger.warning("Signal ID %d not found for rejected trade logging.", signal_id)
+
+    def _log_risk_event(
+        self,
+        session: Any,
+        event_type: str,
+        description: str,
+        symbol: Optional[str] = None,
+        signal_id: Optional[int] = None,
+    ) -> None:
+        """Internal method to log risk event using an existing session."""
+        event = RiskEvent(
+            event_type=event_type,
+            description=description,
+            symbol=symbol,
+            signal_id=signal_id,
+        )
+        session.add(event)
 
     def log_risk_event(
         self,
@@ -244,13 +263,7 @@ class TradeLogger:
     ) -> None:
         """Log a risk-related event."""
         with self.Session() as session:
-            event = RiskEvent(
-                event_type=event_type,
-                description=description,
-                symbol=symbol,
-                signal_id=signal_id,
-            )
-            session.add(event)
+            self._log_risk_event(session, event_type, description, symbol, signal_id)
             session.commit()
 
     def read_performance_report(self) -> Dict[str, float]:

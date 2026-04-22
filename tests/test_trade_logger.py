@@ -104,7 +104,7 @@ def test_constraints(logger):
             "entry_price": -100.0
         })
 
-    # Invalid lot size
+    # Invalid lot size (must be >= 0)
     with pytest.raises(sqlalchemy.exc.IntegrityError):
         logger.log_signal({
             "symbol": "XAUUSD",
@@ -112,3 +112,19 @@ def test_constraints(logger):
             "entry_price": 2000.0,
             "lot_size": -0.1
         })
+
+def test_log_rejected_trade_no_lot(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+        # lot_size missing
+    })
+    # Should not raise IntegrityError even though lot_size will be 0.0
+    logger.log_rejected_trade(signal_id, "Filter check failed")
+
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade
+        trade = session.query(Trade).filter(Trade.status == "REJECTED").first()
+        assert trade is not None
+        assert trade.lot_size == 0.0
