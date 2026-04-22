@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 
 
 class TradingEnv(gym.Env):
@@ -19,23 +20,35 @@ class TradingEnv(gym.Env):
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
+
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
-                 window_size: int = 60, commission: float = 0.0002):
+    def __init__(
+        self,
+        data: np.ndarray,
+        initial_balance: float = 10000.0,
+        window_size: int = 60,
+        commission: float = 0.0002,
+    ):
         super().__init__()
         self.data = data
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
 
+        # Pre-calculate rolling stats for normalization to speed up _get_observation
+        df = pd.DataFrame(data)
+        self.rolling_mean = df.rolling(window=window_size).mean().values
+        self.rolling_std = df.rolling(window=window_size).std(ddof=0).values
+
         n_features = data.shape[1]
 
         # Observation: window of market data + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
+            low=-np.inf,
+            high=np.inf,
             shape=(window_size * n_features + 2,),
-            dtype=np.float32
+            dtype=np.float32,
         )
 
         # Actions: 0=Hold, 1=Buy, 2=Sell
@@ -43,7 +56,9 @@ class TradingEnv(gym.Env):
 
         self.reset()
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[Dict] = None
+    ) -> Tuple[np.ndarray, Dict]:
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -64,7 +79,7 @@ class TradingEnv(gym.Env):
             pnl = (current_price * (1 - self.commission)) - self.entry_price
             self.balance += pnl
             self.total_pnl += pnl
-            reward = pnl / self.initial_balance * 100  # Normalized reward
+            reward = (pnl / self.initial_balance) * 100  # Normalized reward
             self.position = 0.0
             self.entry_price = 0.0
 
@@ -81,16 +96,26 @@ class TradingEnv(gym.Env):
         info = {
             "balance": self.balance,
             "position": self.position,
-            "total_pnl": self.total_pnl
+            "total_pnl": self.total_pnl,
         }
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
-        window = self.data[self.current_step - self.window_size:self.current_step]
-        # Normalize window
-        obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
-        portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
+        window = self.data[self.current_step - self.window_size : self.current_step]
+
+        # Use pre-calculated rolling stats for normalization
+        # self.current_step is the index of the NEXT bar, so the window ends at current_step - 1.
+        # The rolling stats at index current_step - 1 correspond to the window [current_step - window_size : current_step].
+        mean = self.rolling_mean[self.current_step - 1]
+        std = self.rolling_std[self.current_step - 1]
+
+        obs = (window - mean) / (std + 1e-8)
+        portfolio_state = np.array(
+            [self.balance / self.initial_balance, self.position], dtype=np.float32
+        )
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
     def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+        print(
+            f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}"
+        )
