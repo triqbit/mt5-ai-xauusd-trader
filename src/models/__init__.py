@@ -1,5 +1,11 @@
 """AI/ML models: ensemble systems and neural architectures."""
 
-from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+from __future__ import annotations
+
+try:
+    from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+except ImportError:
+    EnsembleModel = None
+    LSTMAttentionModel = None
 
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]
