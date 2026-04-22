@@ -71,9 +71,7 @@ class XAUUSDTradingEnv(gym.Env if gym else object):
 
         return self._get_observation(), {}
 
-    def step(
-        self, action: int
-    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """
         Execute one environment step.
         """
@@ -99,9 +97,8 @@ class XAUUSDTradingEnv(gym.Env if gym else object):
         """
         if self.data is None or self.current_step < self.window_size:
             # Return zero observation if data is not available
-            obs_shape = (self.window_size * 0 + 2,) # This is a bit tricky if n_features is unknown
             # Better to use the space shape if available
-            if hasattr(self, 'observation_space'):
+            if hasattr(self, "observation_space"):
                 return np.zeros(self.observation_space.shape, dtype=np.float32)
             return np.zeros(2, dtype=np.float32)
 

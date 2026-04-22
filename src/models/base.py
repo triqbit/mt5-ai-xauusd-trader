@@ -6,6 +6,7 @@ Abstract base class for all AI/ML trading models.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
 import numpy as np
 
 

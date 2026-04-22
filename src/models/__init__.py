@@ -8,10 +8,10 @@ from src.models.ppo_agent import PPOAgent
 
 __all__ = [
     "BaseModel",
-    "Signal",
-    "PPOAgent",
-    "LSTMModel",
     "DreamerAgent",
     "EnsembleModel",
     "LSTMAttentionModel",
+    "LSTMModel",
+    "PPOAgent",
+    "Signal",
 ]

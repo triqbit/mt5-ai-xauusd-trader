@@ -5,6 +5,7 @@ Placeholder DreamerV3 wrapper compatible with the ensemble interface.
 """
 
 import logging
+
 import numpy as np
 
 from src.models.base import BaseModel, Signal
@@ -18,7 +19,7 @@ class DreamerAgent(BaseModel):
     Implements BaseModel interface for ensemble compatibility.
     """
 
-    def __init__(self, model_path: str = None):
+    def __init__(self, model_path: str | None = None):
         """
         Initialise Dreamer agent.
         """
