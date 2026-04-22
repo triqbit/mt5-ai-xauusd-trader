@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: triqbit/mt5-ai-xauusd-trader:latest
+    container_name: mt5-trader
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    ports:
+      - "8000:8000"  # Prometheus
+      - "8050:8050"  # Dash Dashboard
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://trader:trader_password@postgres:5432/mt5_trades
+      - REDIS_URL=redis://redis:6379/0
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mt5-postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=trader
+      - POSTGRES_PASSWORD=trader_password
+      - POSTGRES_DB=mt5_trades
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: mt5-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
