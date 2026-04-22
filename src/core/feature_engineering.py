@@ -8,13 +8,13 @@ Provides 140+ features including MTF, indicators, and candle patterns.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List
 
-import numpy as np
 import pandas as pd
 import talib
 
 logger = logging.getLogger(__name__)
+
 
 class FeatureEngineer:
     """
@@ -22,8 +22,7 @@ class FeatureEngineer:
     and candle patterns from OHLCV data.
     """
 
-    def __init__(self, base_timeframe: str = "M5",
-                 target_timeframes: List[str] = ["M15", "H1"]):
+    def __init__(self, base_timeframe: str = "M5", target_timeframes: List[str] | None = None):
         """
         Initialize FeatureEngineer.
 
@@ -32,7 +31,7 @@ class FeatureEngineer:
             target_timeframes: List of higher timeframes for MTF analysis.
         """
         self.base_timeframe = base_timeframe
-        self.target_timeframes = target_timeframes
+        self.target_timeframes = target_timeframes or ["M15", "H1"]
         self.feature_names: List[str] = []
 
     def compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -128,7 +127,16 @@ class FeatureEngineer:
         df["minus_di"] = talib.MINUS_DI(high, low, close, timeperiod=14)
 
         # Stochastic
-        slowk, slowd = talib.STOCH(high, low, close, fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
+        slowk, slowd = talib.STOCH(
+            high,
+            low,
+            close,
+            fastk_period=5,
+            slowk_period=3,
+            slowk_matype=0,
+            slowd_period=3,
+            slowd_matype=0,
+        )
         df["stoch_k"] = slowk
         df["stoch_d"] = slowd
 
@@ -159,23 +167,31 @@ class FeatureEngineer:
             try:
                 df.index = pd.to_datetime(df.index)
             except Exception:
-                logger.warning("DataFrame index is not DatetimeIndex and conversion failed. Skipping MTF.")
+                logger.warning(
+                    "DataFrame index is not DatetimeIndex and conversion failed. Skipping MTF."
+                )
                 return df
 
         base_df = df.copy()
 
         # Map MT5-style timeframes to pandas frequency strings
         tf_map = {
-            "M1": "1min", "M5": "5min", "M15": "15min", "M30": "30min",
-            "H1": "1h", "H4": "4h", "D1": "1D", "W1": "1W"
+            "M1": "1min",
+            "M5": "5min",
+            "M15": "15min",
+            "M30": "30min",
+            "H1": "1h",
+            "H4": "4h",
+            "D1": "1D",
+            "W1": "1W",
         }
 
         # Also add M1 if we are M5 base to increase feature count
         tfs = list(self.target_timeframes)
         if self.base_timeframe == "M5" and "M1" not in tfs:
-             # M1 can't be added easily if base is M5 as it's downsampling.
-             # We can only upsample.
-             pass
+            # M1 can't be added easily if base is M5 as it's downsampling.
+            # We can only upsample.
+            pass
 
         for tf in tfs:
             if tf not in tf_map:
@@ -184,29 +200,41 @@ class FeatureEngineer:
             freq = tf_map[tf]
 
             # Resample OHLCV
-            resampled = base_df.resample(freq).agg({
-                "open": "first",
-                "high": "max",
-                "low": "min",
-                "close": "last",
-                "tick_volume": "sum"
-            }).dropna()
+            resampled = (
+                base_df.resample(freq)
+                .agg(
+                    {
+                        "open": "first",
+                        "high": "max",
+                        "low": "min",
+                        "close": "last",
+                        "tick_volume": "sum",
+                    }
+                )
+                .dropna()
+            )
 
             if len(resampled) < 20:
                 continue
 
             # Compute more indicators on the resampled data
             resampled[f"rsi_{tf}"] = talib.RSI(resampled["close"], timeperiod=14)
-            resampled[f"atr_{tf}"] = talib.ATR(resampled["high"], resampled["low"], resampled["close"], timeperiod=14)
+            resampled[f"atr_{tf}"] = talib.ATR(
+                resampled["high"], resampled["low"], resampled["close"], timeperiod=14
+            )
             resampled[f"ema20_{tf}"] = talib.EMA(resampled["close"], timeperiod=20)
             resampled[f"macd_{tf}"], _, _ = talib.MACD(resampled["close"])
-            resampled[f"adx_{tf}"] = talib.ADX(resampled["high"], resampled["low"], resampled["close"])
+            resampled[f"adx_{tf}"] = talib.ADX(
+                resampled["high"], resampled["low"], resampled["close"]
+            )
 
             # Merge back (ffill ensures higher TF values are available at lower TF steps)
             cols_to_merge = [f"rsi_{tf}", f"atr_{tf}", f"ema20_{tf}", f"macd_{tf}", f"adx_{tf}"]
 
             # Add distances for higher TF EMAs
-            resampled[f"dist_ema20_{tf}"] = (resampled["close"] - resampled[f"ema20_{tf}"]) / (resampled[f"ema20_{tf}"] + 1e-8)
+            resampled[f"dist_ema20_{tf}"] = (resampled["close"] - resampled[f"ema20_{tf}"]) / (
+                resampled[f"ema20_{tf}"] + 1e-8
+            )
             cols_to_merge.append(f"dist_ema20_{tf}")
 
             # SHIFT BY 1 to avoid lookahead bias!
@@ -219,15 +247,15 @@ class FeatureEngineer:
 
     def _add_candle_patterns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add TA-Lib candle pattern recognition features."""
-        o = df["open"].values
-        h = df["high"].values
-        l = df["low"].values
-        c = df["close"].values
+        op = df["open"].values
+        hi = df["high"].values
+        lo = df["low"].values
+        cl = df["close"].values
 
         pattern_funcs = talib.get_function_groups()["Pattern Recognition"]
         for func_name in pattern_funcs:
             # Pattern functions in TA-Lib take (open, high, low, close)
-            pattern_result = getattr(talib, func_name)(o, h, l, c)
+            pattern_result = getattr(talib, func_name)(op, hi, lo, cl)
             df[func_name.lower()] = pattern_result
 
         return df
