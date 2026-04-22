@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -65,12 +66,12 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
-    last_reset_date = time.strftime("%Y-%m-%d")
+    last_reset_date = datetime.now(timezone.utc).date()
 
     while True:
         try:
             # 0. Daily Reset & Circuit Breaker Check
-            current_date = time.strftime("%Y-%m-%d")
+            current_date = datetime.now(timezone.utc).date()
             if current_date != last_reset_date:
                 risk.reset_daily()
                 last_reset_date = current_date
@@ -161,10 +162,13 @@ def run_live(
                         if trade_info:
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
                             exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
-                            # P&L will be calculated automatically by update_trade
+                            # P&L calculation: (exit - entry) * direction * lot_size * contract_size
+                            pnl = (exit_price - trade_info.entry_price) * trade_info.direction * trade_info.lot_size * cfg.contract_size
+                            risk.record_pnl(pnl)
                             trade_logger.update_trade(
                                 ticket=ticket,
                                 exit_price=exit_price,
+                                pnl=pnl,
                             )
                     closed_tickets.append(symbol)
 

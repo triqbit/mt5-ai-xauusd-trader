@@ -27,6 +27,8 @@ trading_trades_total = Counter("trading_trades_total", "Total trades executed", 
 trading_errors_total = Counter("trading_errors_total", "Total system errors", ["error_type"])
 trading_model_confidence = Gauge("trading_model_confidence", "Current model prediction confidence")
 
+_prometheus_started = False
+
 
 class Monitor:
     """
@@ -47,11 +49,14 @@ class Monitor:
                 logger.error("Failed to initialize Telegram bot: %s", e)
 
         # Start Prometheus server
-        try:
-            start_http_server(self.cfg.prometheus_port)
-            logger.info("Prometheus metrics server started on port %d", self.cfg.prometheus_port)
-        except Exception as e:
-            logger.error("Failed to start Prometheus server: %s", e)
+        global _prometheus_started
+        if not _prometheus_started:
+            try:
+                start_http_server(self.cfg.prometheus_port)
+                _prometheus_started = True
+                logger.info("Prometheus metrics server started on port %d", self.cfg.prometheus_port)
+            except Exception as e:
+                logger.error("Failed to start Prometheus server: %s", e)
 
     def log_equity(self, equity: float) -> None:
         """Record current equity and update Prometheus metric."""

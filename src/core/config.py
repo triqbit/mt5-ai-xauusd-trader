@@ -43,6 +43,7 @@ class TradingConfig(BaseSettings):
 
     # ── Trading parameters ─────────────────────────────────────────────────────
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
+    contract_size: float = Field(default=100.0, description="Contract size for the symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
     max_positions: int = Field(default=3, ge=1, le=10)

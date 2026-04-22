@@ -80,6 +80,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self._breaker_tripped = False
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
@@ -173,18 +174,24 @@ class RiskManager:
         """Verify if the drawdown circuit breaker has been triggered."""
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
-            logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
-                drawdown * 100,
-            )
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+            if not self._breaker_tripped:
+                logger.critical(
+                    "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
+                    drawdown * 100,
                 )
-            if self.monitor:
-                self.monitor.alert_circuit_breaker(drawdown)
+                if self.trade_logger:
+                    self.trade_logger.log_risk_event(
+                        event_type="CIRCUIT_BREAKER",
+                        description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    )
+                if self.monitor:
+                    self.monitor.alert_circuit_breaker(drawdown)
+                self._breaker_tripped = True
             return False
+
+        if self._breaker_tripped:
+            logger.info("Circuit breaker reset - drawdown recovered")
+            self._breaker_tripped = False
         return True
 
     def _check_daily_loss(self) -> bool:
