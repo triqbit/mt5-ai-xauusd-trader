@@ -89,7 +89,7 @@ class RiskManager:
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
-        if not self._check_circuit_breaker():
+        if not self.check_circuit_breaker():
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
@@ -169,7 +169,8 @@ class RiskManager:
         logger.info("Daily stats reset")
 
     # -- Private filter layers ----------------------------------------------
-    def _check_circuit_breaker(self) -> bool:
+    def check_circuit_breaker(self) -> bool:
+        """Verify if the drawdown circuit breaker has been triggered."""
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
@@ -208,12 +209,12 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
-        if confidence < threshold:
+    def _check_minimum_confidence(self, confidence: float) -> bool:
+        if confidence < self.cfg.confidence_threshold:
             logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
+                "Confidence %.2f below threshold %.2f",
+                confidence,
+                self.cfg.confidence_threshold,
             )
             return False
         return True
