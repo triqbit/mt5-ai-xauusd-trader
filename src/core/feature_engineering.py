@@ -13,7 +13,7 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta as ta  # noqa: F401
 import talib
 
 logger = logging.getLogger(__name__)

@@ -33,7 +33,7 @@ class ExecutionFilter:
     Layers: Volatility, Trend Angle, EMA Sequence, Momentum, Session, Circuit Breaker.
     """
 
-    def __init__(self, config: any = None) -> None:
+    def __init__(self, config: Optional[any] = None) -> None:
         self.cfg = config
 
     def validate(
@@ -58,9 +58,8 @@ class ExecutionFilter:
         ts = timestamp or datetime.utcnow()
 
         # 1. Volatility Layer (ATR > 3x average)
-        if "atr" in row and "avg_atr" in row:
-            if row["atr"] > 3 * row["avg_atr"]:
-                return ExecutionDecision(False, "Extreme volatility", "Volatility", ts)
+        if "atr" in row and "avg_atr" in row and row["atr"] > 3 * row["avg_atr"]:
+            return ExecutionDecision(False, "Extreme volatility", "Volatility", ts)
 
         # 2. Trend Angle (EMA 50 slope)
         # Simplified: check if current EMA 50 is above/below EMA 50 from 5 bars ago if available
@@ -74,12 +73,10 @@ class ExecutionFilter:
 
         # 3. EMA Sequence (20 > 50 > 200 for BUY)
         if all(k in row for k in ["ema_20", "ema_50", "ema_200"]):
-            if direction == 1:
-                if not (row["ema_20"] > row["ema_50"] > row["ema_200"]):
-                    return ExecutionDecision(False, "Invalid EMA sequence for BUY", "EMA_Sequence", ts)
-            if direction == -1:
-                if not (row["ema_20"] < row["ema_50"] < row["ema_200"]):
-                    return ExecutionDecision(False, "Invalid EMA sequence for SELL", "EMA_Sequence", ts)
+            if direction == 1 and not (row["ema_20"] > row["ema_50"] > row["ema_200"]):
+                return ExecutionDecision(False, "Invalid EMA sequence for BUY", "EMA_Sequence", ts)
+            if direction == -1 and not (row["ema_20"] < row["ema_50"] < row["ema_200"]):
+                return ExecutionDecision(False, "Invalid EMA sequence for SELL", "EMA_Sequence", ts)
 
         # 4. Momentum (RSI)
         if "rsi" in row:

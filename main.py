@@ -17,18 +17,18 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 import structlog
 
 from src.core.config import get_config
-from src.core.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.backtester import Backtester
-from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
