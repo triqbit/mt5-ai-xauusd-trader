@@ -62,3 +62,53 @@ def test_log_risk_event(logger):
         from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
+
+def test_log_rejected_trade(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0,
+        "lot_size": 0.1
+    })
+    logger.log_rejected_trade(signal_id, "Volatility too high")
+
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade, RiskEvent
+        trade = session.query(Trade).filter(Trade.status == "REJECTED").first()
+        assert trade is not None
+        assert trade.signal_id == signal_id
+
+        event = session.query(RiskEvent).filter(RiskEvent.event_type == "TRADE_REJECTED").first()
+        assert event is not None
+        assert event.description == "Volatility too high"
+
+def test_audit_columns(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    })
+    with logger.Session() as session:
+        from src.core.trade_logger import ModelSignal
+        signal = session.query(ModelSignal).filter(ModelSignal.id == signal_id).first()
+        assert signal.created_at is not None
+        assert signal.updated_at is not None
+
+def test_constraints(logger):
+    import sqlalchemy.exc
+    # Invalid entry price
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 1,
+            "entry_price": -100.0
+        })
+
+    # Invalid lot size
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 1,
+            "entry_price": 2000.0,
+            "lot_size": -0.1
+        })
