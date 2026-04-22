@@ -5,10 +5,11 @@ Ensemble voting system combining:
   - PPO (Stable-Baselines3)
   - Dreamer V3 (world model RL)
   - LSTM + Multi-head Attention
-Weighted confidence voting with dynamic weight adaptation.
+Weighted confidence voting with dynamic weight adaptation based on performance.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,7 +28,7 @@ class LSTMAttentionModel(nn.Module):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+    Output : (batch, 3) -> [Hold, Buy, Sell]
     """
 
     def __init__(
@@ -73,8 +74,7 @@ class LSTMAttentionModel(nn.Module):
 class EnsembleModel:
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
-    Weights are initialised equally and adapt based on a rolling window
-    of each algorithm's realised P&L Sharpe ratio.
+    Standardized Mapping: 0=Hold, 1=Buy, 2=Sell
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
@@ -104,12 +104,15 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
-        model = LSTMAttentionModel(n_features=n_features).to(self.device)
-        state = torch.load(str(path), map_location=self.device)
-        model.load_state_dict(state)
-        model.eval()
-        self.lstm_model = model
-        logger.info("LSTM model loaded from %s", path)
+        try:
+            model = LSTMAttentionModel(n_features=n_features).to(self.device)
+            state = torch.load(str(path), map_location=self.device)
+            model.load_state_dict(state)
+            model.eval()
+            self.lstm_model = model
+            logger.info("LSTM model loaded from %s", path)
+        except Exception as exc:
+            logger.warning("Could not load LSTM: %s", exc)
 
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
@@ -119,6 +122,7 @@ class EnsembleModel:
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
+        Standard Mapping: 0=Hold, 1=Buy, 2=Sell
         direction: +1 buy, -1 sell, 0 hold
         """
         votes: Dict[str, np.ndarray] = {}
@@ -126,6 +130,7 @@ class EnsembleModel:
         # PPO prediction
         if self._ppo_model is not None:
             action, _ = self._ppo_model.predict(obs, deterministic=True)
+            # action: 0=Hold, 1=Buy, 2=Sell
             probs = np.zeros(3)
             probs[int(action)] = 1.0
             votes["ppo"] = probs
@@ -135,6 +140,7 @@ class EnsembleModel:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+            # Mapping: 0=Hold, 1=Buy, 2=Sell
             votes["lstm"] = probs
 
         if not votes:
@@ -144,10 +150,13 @@ class EnsembleModel:
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+        action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
-        direction_map = {0: 1, 1: -1, 2: 0}
+
+        # Standardized Mapping: 0=Hold, 1=Buy, 2=Sell
+        direction_map = {0: 0, 1: 1, 2: -1}
         direction = direction_map[action_idx]
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
