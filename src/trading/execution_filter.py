@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import pandas as pd
-import pandas_ta as ta
 
 logger = logging.getLogger(__name__)
 
@@ -106,8 +105,16 @@ class ExecutionFilter:
         return ExecutionDecision(signal=signal, confidence_score=confidence)
 
     def _check_atr_volatility(self, df: pd.DataFrame) -> bool:
-        atr = ta.atr(df["high"], df["low"], df["close"], length=self.atr_period)
-        if atr is None or atr.empty:
+        # Calculate True Range manually to avoid pandas-ta dependency in CI
+        high = df["high"]
+        low = df["low"]
+        close_prev = df["close"].shift(1)
+        tr = pd.concat(
+            [high - low, (high - close_prev).abs(), (low - close_prev).abs()], axis=1
+        ).max(axis=1)
+        atr = tr.rolling(window=self.atr_period).mean()
+
+        if atr.empty:
             return False
         current_atr = atr.iloc[-1]
         avg_atr = atr.rolling(window=self.atr_avg_period).mean().iloc[-1]
@@ -118,8 +125,8 @@ class ExecutionFilter:
         return bool(current_atr <= 3 * avg_atr)
 
     def _check_trend_angle(self, df: pd.DataFrame, signal: int) -> bool:
-        ema_med = ta.ema(df["close"], length=self.ema_med)
-        if ema_med is None or len(ema_med) < 2:
+        ema_med = df["close"].ewm(span=self.ema_med, adjust=False).mean()
+        if len(ema_med) < 2:
             return False
 
         slope = ema_med.iloc[-1] - ema_med.iloc[-2]
@@ -130,12 +137,9 @@ class ExecutionFilter:
         return False
 
     def _check_ema_sequence(self, df: pd.DataFrame, signal: int) -> bool:
-        ema_f = ta.ema(df["close"], length=self.ema_fast)
-        ema_m = ta.ema(df["close"], length=self.ema_med)
-        ema_s = ta.ema(df["close"], length=self.ema_slow)
-
-        if ema_f is None or ema_m is None or ema_s is None:
-            return False
+        ema_f = df["close"].ewm(span=self.ema_fast, adjust=False).mean()
+        ema_m = df["close"].ewm(span=self.ema_med, adjust=False).mean()
+        ema_s = df["close"].ewm(span=self.ema_slow, adjust=False).mean()
 
         f, m, s = ema_f.iloc[-1], ema_m.iloc[-1], ema_s.iloc[-1]
 
@@ -149,11 +153,18 @@ class ExecutionFilter:
         return False
 
     def _check_momentum(self, df: pd.DataFrame, signal: int) -> bool:
-        rsi = ta.rsi(df["close"], length=self.rsi_period)
-        if rsi is None or rsi.empty:
-            return False
+        delta = df["close"].diff()
+        up = delta.clip(lower=0)
+        down = -delta.clip(upper=0)
+        ma_up = up.rolling(window=self.rsi_period).mean()
+        ma_down = down.rolling(window=self.rsi_period).mean()
 
-        current_rsi = rsi.iloc[-1]
+        if ma_down.iloc[-1] == 0:
+            current_rsi = 100.0 if ma_up.iloc[-1] != 0 else 50.0
+        else:
+            rs = ma_up.iloc[-1] / ma_down.iloc[-1]
+            current_rsi = 100 - (100 / (1 + rs))
+
         if pd.isna(current_rsi):
             return False
 
