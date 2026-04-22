@@ -13,8 +13,13 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta  # noqa: F401
 import talib
+
+try:
+    import pandas_ta as ta  # noqa: F401
+    PANDAS_TA_AVAILABLE = True
+except ImportError:
+    PANDAS_TA_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +88,10 @@ class FeatureEngineer:
 
         # 6. Bulk indicators via pandas_ta
         # This helps reaching 140+ features quickly
-        df.ta.strategy("all")
+        if PANDAS_TA_AVAILABLE:
+            df.ta.strategy("all")
+        else:
+            logger.warning("pandas_ta not available - skipping bulk indicators")
 
         # Clean up
         df.dropna(axis=1, thresh=len(df) * 0.7, inplace=True)
