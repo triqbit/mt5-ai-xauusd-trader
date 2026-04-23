@@ -24,17 +24,24 @@ class TradingEnv(gym.Env):
     def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
                  window_size: int = 60, commission: float = 0.0002):
         super().__init__()
-        self.data = data
+        self.data = data.astype(np.float32)
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
 
-        n_features = data.shape[1]
+        self.n_features = data.shape[1]
+
+        # Precompute rolling mean and std for normalization to speed up _get_observation
+        import pandas as pd
+        df = pd.DataFrame(self.data)
+        self.rolling_means = df.rolling(window=window_size).mean().values.astype(np.float32)
+        self.rolling_stds = df.rolling(window=window_size).std(ddof=0).values.astype(np.float32)
+        self.inv_rolling_stds = 1.0 / (self.rolling_stds + 1e-8)
 
         # Observation: window of market data + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
             low=-np.inf, high=np.inf,
-            shape=(window_size * n_features + 2,),
+            shape=(window_size * self.n_features + 2,),
             dtype=np.float32
         )
 
@@ -86,11 +93,17 @@ class TradingEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
+        idx = self.current_step - 1
+        mean = self.rolling_means[idx]
+        inv_std = self.inv_rolling_stds[idx]
+
         window = self.data[self.current_step - self.window_size:self.current_step]
-        # Normalize window
-        obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
+        # Normalize window using precomputed mean and inverse std
+        # This is O(window_size * n_features) instead of recalculating mean/std
+        obs = (window - mean) * inv_std
+
         portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
-        return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
+        return np.concatenate([obs.ravel(), portfolio_state])
 
     def render(self):
         print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
