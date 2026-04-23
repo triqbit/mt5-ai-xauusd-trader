@@ -7,7 +7,6 @@ LSTM sequence model for price prediction and signal generation.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 import torch
