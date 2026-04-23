@@ -7,16 +7,19 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -24,6 +27,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -175,6 +179,28 @@ class MT5Connector:
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Alias for get_rates() to match main.py expectations."""
         return self.get_rates(symbol, timeframe, n_bars)
+
+    def get_rates_range(
+        self, symbol: str, timeframe: str, start: datetime, end: datetime
+    ) -> pd.DataFrame:
+        """Fetch historical OHLCV data for a specific date range."""
+        if not self._is_initialized:
+            return pd.DataFrame()
+
+        tf = TIMEFRAME_MAP.get(timeframe, 5)
+
+        if not self.use_metaapi:
+            rates = mt5.copy_rates_range(symbol, tf, start, end)
+            if rates is None:
+                logger.error("Failed to copy rates range for %s: %s", symbol, mt5.last_error())
+                return pd.DataFrame()
+            df = pd.DataFrame(rates)
+            df["time"] = pd.to_datetime(df["time"], unit="s")
+            df.set_index("time", inplace=True)
+            return df
+        else:
+            logger.warning("MetaAPI get_rates_range not implemented.")
+            return pd.DataFrame()
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
