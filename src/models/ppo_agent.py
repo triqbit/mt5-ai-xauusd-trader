@@ -7,7 +7,15 @@ Wraps the PPO algorithm for use with the custom Gymnasium trading environment.
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
+
+try:
+    from stable_baselines3 import PPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    HAS_SB3 = True
+except ImportError:
+    HAS_SB3 = False
 
 
 class PPOAgent:
@@ -16,9 +24,9 @@ class PPOAgent:
     Uses Stable-Baselines3 PPO under the hood.
     """
 
-    def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
-        from stable_baselines3 import PPO
-        from stable_baselines3.common.vec_env import DummyVecEnv
+    def __init__(self, env: Any, model_path: Optional[Path] = None, device: str = "auto"):
+        if not HAS_SB3:
+            raise ImportError("stable-baselines3 is required for PPOAgent")
 
         self.logger = logging.getLogger(__name__)
         self.device = device
@@ -63,6 +71,9 @@ class PPOAgent:
 
     def evaluate(self, n_eval_episodes: int = 10) -> dict:
         """Evaluate agent performance over n episodes."""
+        if not HAS_SB3:
+            return {}
+
         from stable_baselines3.common.evaluation import evaluate_policy
 
         mean_reward, std_reward = evaluate_policy(

@@ -6,13 +6,24 @@ Custom Gymnasium trading environment for RL training.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-import gymnasium as gym
+try:
+    import gymnasium as gym
+
+    HAS_GYM = True
+except ImportError:
+    HAS_GYM = False
+
+    class gym:  # type: ignore
+        class Env:
+            pass
+
+
 import numpy as np
 
 
-class TradingEnv(gym.Env):
+class TradingEnv(gym.Env):  # type: ignore
     """
     Custom Gymnasium environment for XAUUSD trading.
     State: OHLCV + technical indicators (configurable window)
@@ -29,6 +40,8 @@ class TradingEnv(gym.Env):
         window_size: int = 60,
         commission: float = 0.0002,
     ):
+        if not HAS_GYM:
+            raise ImportError("gymnasium is required for TradingEnv")
         super().__init__()
         self.data = data
         self.initial_balance = initial_balance
@@ -48,8 +61,8 @@ class TradingEnv(gym.Env):
         self.reset()
 
     def reset(
-        self, seed: Optional[int] = None, options: Optional[Dict] = None
-    ) -> Tuple[np.ndarray, Dict]:
+        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots

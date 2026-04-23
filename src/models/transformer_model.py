@@ -6,11 +6,20 @@ Transformer-based architecture for time-series forecasting and signal generation
 
 import math
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
+    class nn:  # type: ignore
+        class Module:
+            pass
 
 
-class TimeSeriesTransformer(nn.Module):
+class TimeSeriesTransformer(nn.Module):  # type: ignore
     """
     Advanced Transformer model for price action forecasting.
     Input: [batch_size, seq_len, features]
