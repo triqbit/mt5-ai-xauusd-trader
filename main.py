@@ -17,15 +17,19 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import structlog
+from tabulate import tabulate
 
 from src.core.config import get_config
+from src.core.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.backtester import Backtester
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -64,13 +68,23 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    fe = FeatureEngineer()
+
     while True:
         try:
             # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=400)
             tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
+            # 2. Build observation vector using FeatureEngineer
+            df_features = fe.generate_features(df)
+            if df_features.empty:
+                log.warning("No features generated. Warmup period?")
+                time.sleep(poll_interval)
+                continue
+
+            obs = df_features.iloc[-1].values
+
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
@@ -112,8 +126,8 @@ def run_live(
                 algorithm=cfg.algorithm,
                 confidence=confidence,
             )
-            # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
+            # 5. Risk approval gate (with execution filter cascade)
+            if risk.approve(signal, signal_id=signal_id, df_indicators=df_features):
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
@@ -178,6 +192,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--symbol", default="XAUUSD")
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
+    p.add_argument("--start", default="2023-01-01", help="Backtest start date (YYYY-MM-DD)")
+    p.add_argument("--end", default="2023-12-31", help="Backtest end date (YYYY-MM-DD)")
     p.add_argument("--log-level", default="INFO")
     return p.parse_args()
 
@@ -207,9 +223,10 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(
+        cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,10 +236,44 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            log.info("Starting backtest mode...")
+            start_dt = datetime.strptime(args.start, "%Y-%m-%d")
+            end_dt = datetime.strptime(args.end, "%Y-%m-%d")
+
+            # Fetch data for backtest
+            df = connector.get_rates_range(cfg.symbol, cfg.timeframe, start_dt, end_dt)
+            if df.empty:
+                log.error("No historical data fetched for backtest.")
+                return 1
+
+            backtester = Backtester(symbol=cfg.symbol)
+            report, trades = backtester.run(df, model)
+
+            # Display results
+            print("\n" + "=" * 50)
+            print(" BACKTEST PERFORMANCE REPORT")
+            print("=" * 50)
+            results_table = [
+                ["Metric", "Value"],
+                ["Annualized Return", f"{report.annualized_return:.2%}"],
+                ["Sharpe Ratio", f"{report.sharpe_ratio:.2f}"],
+                ["Max Drawdown", f"{report.max_drawdown:.2%}"],
+                ["Profit Factor", f"{report.profit_factor:.2f}"],
+                ["Total Trades", report.total_trades],
+                ["Win Rate", f"{report.win_rate:.2%}"],
+            ]
+            print(tabulate(results_table, headers="firstrow", tablefmt="grid"))
+            print("=" * 50 + "\n")
+
     finally:
         connector.disconnect()
     return 0
