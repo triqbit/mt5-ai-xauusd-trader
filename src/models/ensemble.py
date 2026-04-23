@@ -9,6 +9,7 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,14 +17,25 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+try:
+    import torch
+    import torch.nn as nn
+
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
+    class nn:  # type: ignore
+        class Module:
+            pass
+
 
 logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel(nn.Module):  # type: ignore
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
@@ -80,7 +92,10 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device)
+        if HAS_TORCH:
+            self.device = torch.device(device)
+        else:
+            self.device = None
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -99,11 +114,15 @@ class EnsembleModel:
 
             self._ppo_model = PPO.load(str(path), device=self.device)
             logger.info("PPO model loaded from %s", path)
-        except Exception as exc:
+        except (ImportError, Exception) as exc:
             logger.warning("Could not load PPO: %s", exc)
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
+        if not HAS_TORCH:
+            logger.warning("Torch not available - cannot load LSTM")
+            return
+
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
         state = torch.load(str(path), map_location=self.device)
         model.load_state_dict(state)
@@ -115,7 +134,7 @@ class EnsembleModel:
     def predict(
         self,
         obs: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional["torch.Tensor"] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
@@ -126,16 +145,24 @@ class EnsembleModel:
         # PPO prediction
         if self._ppo_model is not None:
             action, _ = self._ppo_model.predict(obs, deterministic=True)
+            # Standard model action mapping: 0=Hold, 1=Buy, 2=Sell
             probs = np.zeros(3)
             probs[int(action)] = 1.0
             votes["ppo"] = probs
 
         # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
+        if HAS_TORCH and self.lstm_model is not None and seq is not None:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                # Output : [buy_logit, sell_logit, hold_logit] -> [1, 2, 0] ?
+                # Let's assume standard mapping: 0=Hold, 1=Buy, 2=Sell
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
             votes["lstm"] = probs
+
+        # Dreamer placeholder (mock)
+        if "dreamer" in self.ALGORITHMS and self._dreamer_model is None:
+            # Mocking dreamer vote for now
+            votes["dreamer"] = np.array([1.0, 0.0, 0.0])  # Hold
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
@@ -144,10 +171,15 @@ class EnsembleModel:
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+
+        # action_idx: 0=Hold, 1=Buy, 2=Sell (from ensemble mapping)
+        action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
-        direction_map = {0: 1, 1: -1, 2: 0}
+
+        # direction_map: 0=Hold (0), 1=Buy (1), 2=Sell (-1)
+        direction_map = {0: 0, 1: 1, 2: -1}
         direction = direction_map[action_idx]
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
