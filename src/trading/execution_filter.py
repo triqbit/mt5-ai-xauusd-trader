@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Optional
 
 import pandas as pd
 
@@ -48,13 +48,18 @@ class ExecutionFilter:
 
         # Layer 6: Circuit Breaker
         if current_drawdown >= 0.15:
-            logger.warning("Execution Filter | Layer 6 (Circuit Breaker) FAIL: Drawdown %.1f%%", current_drawdown * 100)
+            logger.warning(
+                "Execution Filter | Layer 6 (Circuit Breaker) FAIL: Drawdown %.1f%%",
+                current_drawdown * 100,
+            )
             return False
 
         # Layer 5: Institutional Session Filter (08:00 - 21:00 GMT)
         hour = timestamp.hour
         if not (8 <= hour < 21):
-            logger.debug("Execution Filter | Layer 5 (Session) FAIL: Hour %d outside 08:00-21:00 GMT", hour)
+            logger.debug(
+                "Execution Filter | Layer 5 (Session) FAIL: Hour %d outside 08:00-21:00 GMT", hour
+            )
             return False
 
         # Layers 1-4 require indicators from the latest bar
@@ -72,7 +77,9 @@ class ExecutionFilter:
         atr = latest.get("atr_14", 0)
         atr_ma = latest.get("atr_14_ma_100", 0)
         if atr_ma > 0 and atr > 3 * atr_ma:
-            logger.debug("Execution Filter | Layer 1 (Volatility) FAIL: ATR %.2f > 3x MA %.2f", atr, atr_ma)
+            logger.debug(
+                "Execution Filter | Layer 1 (Volatility) FAIL: ATR %.2f > 3x MA %.2f", atr, atr_ma
+            )
             return False
 
         # Layer 2: EMA Slope Confirmation
@@ -88,14 +95,12 @@ class ExecutionFilter:
         # Layer 3: EMA Sequence (EMA 20 > 50 > 200 for BUY)
         ema_20 = latest.get("ema_20", 0)
         ema_200 = latest.get("ema_200", 0)
-        if signal_direction == 1:
-            if not (ema_20 > ema_50 > ema_200):
-                logger.debug("Execution Filter | Layer 3 (EMA Sequence) FAIL: BUY sequence mismatch")
-                return False
-        elif signal_direction == -1:
-            if not (ema_20 < ema_50 < ema_200):
-                logger.debug("Execution Filter | Layer 3 (EMA Sequence) FAIL: SELL sequence mismatch")
-                return False
+        if signal_direction == 1 and not (ema_20 > ema_50 > ema_200):
+            logger.debug("Execution Filter | Layer 3 (EMA Sequence) FAIL: BUY sequence mismatch")
+            return False
+        if signal_direction == -1 and not (ema_20 < ema_50 < ema_200):
+            logger.debug("Execution Filter | Layer 3 (EMA Sequence) FAIL: SELL sequence mismatch")
+            return False
 
         # Layer 4: RSI Momentum
         rsi = latest.get("rsi_14", 50)

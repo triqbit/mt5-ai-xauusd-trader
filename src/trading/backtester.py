@@ -116,12 +116,11 @@ class Backtester:
         # 1. Vectorized Prediction
         # If the model has a batch predict method, use it. Otherwise, loop.
         if hasattr(model, "predict_batch"):
-            directions, confidences = model.predict_batch(df_features.values)
+            directions, _ = model.predict_batch(df_features.values)
         else:
             # Fallback for models without batch support
             results = [model.predict(obs) for obs in df_features.values]
             directions = np.array([r[0] for r in results])
-            confidences = np.array([r[1] for r in results])
 
         active_trade: Optional[Dict[str, Any]] = None
         current_equity = self.initial_balance
@@ -139,32 +138,31 @@ class Backtester:
 
             drawdown = (peak_equity - current_equity) / peak_equity if peak_equity > 0 else 0
 
-            if active_trade is None:
-                if direction != 0:
-                    # Layer 1-5 validation
-                    # Note: ef.validate is O(1) as it checks the provided df_indicators slice's last bar
-                    if self.ef.validate(direction, df_features.iloc[: idx + 1], drawdown, timestamp):
-                        # Open trade
-                        entry_price = df_raw.iloc[idx]["close"]
-                        # Adjust for spread
-                        if direction == 1:
-                            entry_price += self.spread / 2
-                        else:
-                            entry_price -= self.spread / 2
+            if active_trade is None and direction != 0:
+                # Layer 1-5 validation
+                # Note: ef.validate is O(1) as it checks the provided df_indicators slice's last bar
+                if self.ef.validate(direction, df_features.iloc[: idx + 1], drawdown, timestamp):
+                    # Open trade
+                    entry_price = df_raw.iloc[idx]["close"]
+                    # Adjust for spread
+                    if direction == 1:
+                        entry_price += self.spread / 2
+                    else:
+                        entry_price -= self.spread / 2
 
-                        active_trade = {
-                            "entry_time": timestamp,
-                            "direction": direction,
-                            "entry_price": entry_price,
-                            "mae": 0.0,
-                            "mfe": 0.0,
-                        }
+                    active_trade = {
+                        "entry_time": timestamp,
+                        "direction": direction,
+                        "entry_price": entry_price,
+                        "mae": 0.0,
+                        "mfe": 0.0,
+                    }
             else:
                 # Update MAE/MFE
                 current_price = df_raw.iloc[idx]["close"]
-                pnl_points = (
-                    current_price - active_trade["entry_price"]
-                ) * active_trade["direction"]
+                pnl_points = (current_price - active_trade["entry_price"]) * active_trade[
+                    "direction"
+                ]
                 active_trade["mfe"] = max(active_trade["mfe"], pnl_points)
                 active_trade["mae"] = max(active_trade["mae"], -pnl_points)
 

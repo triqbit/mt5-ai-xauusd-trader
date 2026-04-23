@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -224,9 +225,7 @@ def main() -> int:
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
-    risk = RiskManager(
-        cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor
-    )
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -256,7 +255,7 @@ def main() -> int:
                 return 1
 
             backtester = Backtester(symbol=cfg.symbol)
-            report, trades = backtester.run(df, model)
+            report, _trades = backtester.run(df, model)
 
             # Display results
             print("\n" + "=" * 50)

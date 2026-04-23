@@ -69,7 +69,7 @@ class FeatureEngineer:
         if talib is None:
             return df
 
-        o, h, l, c, v = df["open"], df["high"], df["low"], df["close"], df["tick_volume"]
+        o, h, low, c, v = df["open"], df["high"], df["low"], df["close"], df["tick_volume"]
 
         # Overlap Studies
         df[f"{prefix}sma_10"] = talib.SMA(c, timeperiod=10)
@@ -98,40 +98,40 @@ class FeatureEngineer:
         df[f"{prefix}macd"] = macd
         df[f"{prefix}macd_signal"] = macdsignal
         df[f"{prefix}macd_hist"] = macdhist
-        df[f"{prefix}adx_14"] = talib.ADX(h, l, c, timeperiod=14)
-        df[f"{prefix}adxr_14"] = talib.ADXR(h, l, c, timeperiod=14)
-        df[f"{prefix}cci_14"] = talib.CCI(h, l, c, timeperiod=14)
-        df[f"{prefix}mfi_14"] = talib.MFI(h, l, c, v, timeperiod=14)
-        df[f"{prefix}willr_14"] = talib.WILLR(h, l, c, timeperiod=14)
+        df[f"{prefix}adx_14"] = talib.ADX(h, low, c, timeperiod=14)
+        df[f"{prefix}adxr_14"] = talib.ADXR(h, low, c, timeperiod=14)
+        df[f"{prefix}cci_14"] = talib.CCI(h, low, c, timeperiod=14)
+        df[f"{prefix}mfi_14"] = talib.MFI(h, low, c, v, timeperiod=14)
+        df[f"{prefix}willr_14"] = talib.WILLR(h, low, c, timeperiod=14)
         df[f"{prefix}roc_10"] = talib.ROC(c, timeperiod=10)
         df[f"{prefix}mom_10"] = talib.MOM(c, timeperiod=10)
-        slowk, slowd = talib.STOCH(h, l, c)
+        slowk, slowd = talib.STOCH(h, low, c)
         df[f"{prefix}stoch_k"] = slowk
         df[f"{prefix}stoch_d"] = slowd
 
         # Volatility Indicators
-        df[f"{prefix}atr_14"] = talib.ATR(h, l, c, timeperiod=14)
-        df[f"{prefix}natr_14"] = talib.NATR(h, l, c, timeperiod=14)
-        df[f"{prefix}trange"] = talib.TRANGE(h, l, c)
+        df[f"{prefix}atr_14"] = talib.ATR(h, low, c, timeperiod=14)
+        df[f"{prefix}natr_14"] = talib.NATR(h, low, c, timeperiod=14)
+        df[f"{prefix}trange"] = talib.TRANGE(h, low, c)
         df[f"{prefix}atr_14_ma_100"] = df[f"{prefix}atr_14"].rolling(100).mean()
 
         # Volume Indicators
-        df[f"{prefix}ad"] = talib.AD(h, l, c, v)
-        df[f"{prefix}adosc"] = talib.ADOSC(h, l, c, v)
+        df[f"{prefix}ad"] = talib.AD(h, low, c, v)
+        df[f"{prefix}adosc"] = talib.ADOSC(h, low, c, v)
         df[f"{prefix}obv"] = talib.OBV(c, v)
 
         # Price Transform
-        df[f"{prefix}avgprice"] = talib.AVGPRICE(o, h, l, c)
-        df[f"{prefix}medprice"] = talib.MEDPRICE(h, l)
-        df[f"{prefix}typprice"] = talib.TYPPRICE(h, l, c)
-        df[f"{prefix}wclprice"] = talib.WCLPRICE(h, l, c)
+        df[f"{prefix}avgprice"] = talib.AVGPRICE(o, h, low, c)
+        df[f"{prefix}medprice"] = talib.MEDPRICE(h, low)
+        df[f"{prefix}typprice"] = talib.TYPPRICE(h, low, c)
+        df[f"{prefix}wclprice"] = talib.WCLPRICE(h, low, c)
 
         # Pattern Recognition (subset for brevity, real implementation would have more)
-        df[f"{prefix}cdl2crows"] = talib.CDL2CROWS(o, h, l, c)
-        df[f"{prefix}cdl3blackrows"] = talib.CDL3BLACKCROWS(o, h, l, c)
-        df[f"{prefix}cdl3inside"] = talib.CDL3INSIDE(o, h, l, c)
-        df[f"{prefix}cdlhammer"] = talib.CDLHAMMER(o, h, l, c)
-        df[f"{prefix}cdlengulfing"] = talib.CDLENGULFING(o, h, l, c)
+        df[f"{prefix}cdl2crows"] = talib.CDL2CROWS(o, h, low, c)
+        df[f"{prefix}cdl3blackrows"] = talib.CDL3BLACKCROWS(o, h, low, c)
+        df[f"{prefix}cdl3inside"] = talib.CDL3INSIDE(o, h, low, c)
+        df[f"{prefix}cdlhammer"] = talib.CDLHAMMER(o, h, low, c)
+        df[f"{prefix}cdlengulfing"] = talib.CDLENGULFING(o, h, low, c)
 
         # To reach 140+, we would add many more patterns and variations of timeperiods
         # Adding some generic momentum and oscillators to fill up
@@ -141,7 +141,7 @@ class FeatureEngineer:
             df[f"{prefix}ema_{p}"] = talib.EMA(c, timeperiod=p)
             df[f"{prefix}mom_{p}"] = talib.MOM(c, timeperiod=p)
             df[f"{prefix}roc_{p}"] = talib.ROC(c, timeperiod=p)
-            df[f"{prefix}atr_{p}"] = talib.ATR(h, l, c, timeperiod=p)
+            df[f"{prefix}atr_{p}"] = talib.ATR(h, low, c, timeperiod=p)
 
         return df
 

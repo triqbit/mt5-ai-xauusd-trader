@@ -7,16 +7,19 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -24,6 +27,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -188,9 +192,7 @@ class MT5Connector:
         if not self.use_metaapi:
             rates = mt5.copy_rates_range(symbol, tf, start, end)
             if rates is None:
-                logger.error(
-                    "Failed to copy rates range for %s: %s", symbol, mt5.last_error()
-                )
+                logger.error("Failed to copy rates range for %s: %s", symbol, mt5.last_error())
                 return pd.DataFrame()
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
