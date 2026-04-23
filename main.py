@@ -64,8 +64,17 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    last_reset_date = time.strftime("%Y-%m-%d")
+
     while True:
         try:
+            # 0. Check for daily reset
+            current_date = time.strftime("%Y-%m-%d")
+            if current_date != last_reset_date:
+                log.info("New trading day detected: %s", current_date)
+                risk.reset_daily()
+                last_reset_date = current_date
+
             # 1. Fetch latest market data
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
             tick = connector.get_tick(cfg.symbol)
