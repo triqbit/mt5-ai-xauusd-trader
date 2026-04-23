@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -53,7 +54,9 @@ class TradingConfig(BaseSettings):
     max_positions: int = Field(default=5, ge=1, le=10, description="Max 5 open positions")
 
     # ── Risk Per Trade (RISK_LIMITS.md 1.3) ─────────────────────────────────────
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.02, description="Max 1% risk per trade")
+    risk_per_trade: float = Field(
+        default=0.01, ge=0.001, le=0.02, description="Max 1% risk per trade"
+    )
 
     # ── Exposure Limits (RISK_LIMITS.md 1.2) ────────────────────────────────────
     max_single_direction_pct: float = Field(default=0.30, description="Max 30% net long/short")
@@ -82,7 +85,9 @@ class TradingConfig(BaseSettings):
     model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
     train_steps: int = Field(default=1_000_000, ge=100_000)
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
-    confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0, description="Min 0.55 confidence")
+    confidence_threshold: float = Field(
+        default=0.55, ge=0.0, le=1.0, description="Min 0.55 confidence"
+    )
 
     # ── Database ────────────────────────────────────────────────────────────
     database_url: str = Field(default="sqlite:///trade_log.db")

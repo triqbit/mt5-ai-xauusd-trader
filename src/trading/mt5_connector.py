@@ -7,18 +7,19 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from contextlib import contextmanager
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -26,6 +27,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -186,14 +188,16 @@ class MT5Connector:
                     return pd.DataFrame()
 
                 async def _fetch():
-                    account = await self.metaapi.metatrader_account_api.get_account(self.cfg.metaapi_account_id)
+                    account = await self.metaapi.metatrader_account_api.get_account(
+                        self.cfg.metaapi_account_id
+                    )
                     await account.wait_connected()
                     connection = account.get_streaming_connection()
                     await connection.connect()
                     await connection.wait_synchronized()
 
                     # Map timeframe string to MetaAPI format
-                    ma_tf = timeframe.lower() # e.g. 'm5'
+                    ma_tf = timeframe.lower()  # e.g. 'm5'
                     history = await account.get_historical_candles(symbol, ma_tf, None, n_bars)
                     return history
 
@@ -282,16 +286,17 @@ class MT5Connector:
             return int(result.order)
         else:
             # MetaAPI order execution
-            logger.info("MetaAPI | Execution signal received | %s %s", signal.symbol, signal.direction)
+            logger.info(
+                "MetaAPI | Execution signal received | %s %s", signal.symbol, signal.direction
+            )
             # In a real implementation, we would call account.execute_market_order()
             return 999999  # Mock ticket for MetaAPI path
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""
-        if self._is_initialized and not self.use_metaapi:
-            if MT5_AVAILABLE:
-                acc = mt5.account_info()
-                return acc._asdict() if acc else {}
+        if self._is_initialized and not self.use_metaapi and MT5_AVAILABLE:
+            acc = mt5.account_info()
+            return acc._asdict() if acc else {}
         return {}
 
     def get_account_balance(self) -> float:
@@ -301,10 +306,9 @@ class MT5Connector:
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve current open positions."""
-        if self._is_initialized and not self.use_metaapi:
-            if MT5_AVAILABLE:
-                positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
-                return [p._asdict() for p in positions] if positions else []
+        if self._is_initialized and not self.use_metaapi and MT5_AVAILABLE:
+            positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
+            return [p._asdict() for p in positions] if positions else []
         return []
 
 

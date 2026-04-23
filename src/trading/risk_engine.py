@@ -9,24 +9,27 @@ Institutional-grade risk management engine enforcing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Dict, Optional
+from datetime import date
 
 from src.core.config import TradingConfig
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class DailyStats:
     """Intraday metrics reset daily at 00:00 UTC."""
+
     date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
     peak_equity: float = 0.0
+
 
 class RiskEngine:
     """
@@ -66,11 +69,11 @@ class RiskEngine:
         """
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
 
-        if drawdown >= self.cfg.drawdown_level_5: # 30%
+        if drawdown >= self.cfg.drawdown_level_5:  # 30%
             logger.critical("CIRCUIT BREAKER: 30% Drawdown! Hard Halt.")
             return False
 
-        if drawdown >= self.cfg.drawdown_level_4: # 25%
+        if drawdown >= self.cfg.drawdown_level_4:  # 25%
             logger.error("CIRCUIT BREAKER: 25% Drawdown! Halting new positions.")
             return False
 
@@ -86,18 +89,18 @@ class RiskEngine:
         if self.daily.peak_equity > 0:
             loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
             if self.daily.realised_pnl < 0:
-                if loss_pct >= self.cfg.daily_loss_level_4: # 5%
-                    return 0.0 # HALT
-                elif loss_pct >= self.cfg.daily_loss_level_3: # 4%
+                if loss_pct >= self.cfg.daily_loss_level_4:  # 5%
+                    return 0.0  # HALT
+                elif loss_pct >= self.cfg.daily_loss_level_3:  # 4%
                     multiplier *= 0.25
-                elif loss_pct >= self.cfg.daily_loss_level_2: # 3%
+                elif loss_pct >= self.cfg.daily_loss_level_2:  # 3%
                     multiplier *= 0.50
 
         # 2. Drawdown Cascading
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= self.cfg.drawdown_level_3: # 20%
+        if drawdown >= self.cfg.drawdown_level_3:  # 20%
             multiplier *= 0.50
-        elif drawdown >= self.cfg.drawdown_level_2: # 15%
+        elif drawdown >= self.cfg.drawdown_level_2:  # 15%
             multiplier *= 0.75
 
         return multiplier
@@ -108,7 +111,7 @@ class RiskEngine:
         atr: float,
         entry_price: float,
         stop_loss: float,
-        contract_size: float = 100.0 # Standard Gold contract
+        contract_size: float = 100.0,  # Standard Gold contract
     ) -> float:
         """
         ATR-based dynamic position sizing (RISK_LIMITS.md 1.3).
@@ -144,8 +147,7 @@ class RiskEngine:
 
     def validate_signal(self, confidence: float) -> bool:
         """Validate signal confidence against institutional floors (RISK_LIMITS.md 4.1)."""
-        if confidence < self.cfg.confidence_threshold:
-            return False
-        return True
+        return not confidence < self.cfg.confidence_threshold
 
-__all__ = ["RiskEngine", "DailyStats"]
+
+__all__ = ["DailyStats", "RiskEngine"]

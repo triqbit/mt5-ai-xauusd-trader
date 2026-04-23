@@ -9,6 +9,7 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -143,7 +144,7 @@ class EnsembleModel:
         # Dreamer placeholder (mock)
         if "dreamer" in self.ALGORITHMS and self._dreamer_model is None:
             # Mocking dreamer vote for now
-            votes["dreamer"] = np.array([1.0, 0.0, 0.0]) # Hold
+            votes["dreamer"] = np.array([1.0, 0.0, 0.0])  # Hold
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
