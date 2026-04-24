@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mt5-trader
+    restart: unless-stopped
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"  # Prometheus
+      - "8050:8050"  # Dash Dashboard
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["--mode", "demo", "--algo", "ensemble"]
