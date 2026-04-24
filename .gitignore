@@ -72,6 +72,10 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Databases
+*.db
+*.sqlite
+
 # Testing
 .pytest_cache/
 .coverage
