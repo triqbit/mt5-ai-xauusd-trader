@@ -10,6 +10,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
@@ -30,7 +31,6 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +71,14 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
-    def initialize(self) -> bool:
+    def initialize(self, retries: int = 3, delay: int = 2) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
+
+        Args:
+            retries: Number of retries for connection attempts.
+            delay: Delay in seconds between retries.
 
         Returns:
             True if connection established, False otherwise.
@@ -83,38 +87,71 @@ class MT5Connector:
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
-            try:
-                if mt5.initialize(
-                    path=self.cfg.mt5_path,
-                    login=self.cfg.mt5_login,
-                    password=self.cfg.mt5_password,
-                    server=self.cfg.mt5_server,
-                ):
-                    logger.info("Native MT5 SDK initialized successfully.")
-                    self.use_metaapi = False
-                    self._is_initialized = True
-                    return True
-                else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
-            except Exception as e:
-                logger.error("Native MT5 initialization error: %s", e)
+            for attempt in range(1, retries + 1):
+                try:
+                    if mt5.initialize(
+                        path=self.cfg.mt5_path,
+                        login=self.cfg.mt5_login,
+                        password=self.cfg.mt5_password,
+                        server=self.cfg.mt5_server,
+                    ):
+                        logger.info("Native MT5 SDK initialized successfully (Attempt %d).", attempt)
+                        self.use_metaapi = False
+                        self._is_initialized = True
+                        return True
+                    else:
+                        logger.warning("Native mt5.initialize failed (Attempt %d): %s", attempt, mt5.last_error())
+                except Exception as e:
+                    logger.error("Native MT5 initialization error (Attempt %d): %s", attempt, e)
+
+                if attempt < retries:
+                    time.sleep(delay)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         if METAAPI_AVAILABLE and self.cfg.metaapi_token:
             logger.info("Attempting MetaAPI cloud fallback...")
-            try:
-                self.metaapi = MetaApi(self.cfg.metaapi_token)
-                self.use_metaapi = True
-                self._is_initialized = True
-                logger.info("MetaAPI fallback configured.")
-                return True
-            except Exception as e:
-                logger.error("MetaAPI initialization failed: %s", e)
+            for attempt in range(1, retries + 1):
+                try:
+                    self.metaapi = MetaApi(self.cfg.metaapi_token)
+                    self.use_metaapi = True
+                    self._is_initialized = True
+                    logger.info("MetaAPI fallback configured (Attempt %d).", attempt)
+                    return True
+                except Exception as e:
+                    logger.error("MetaAPI initialization failed (Attempt %d): %s", attempt, e)
+
+                if attempt < retries:
+                    time.sleep(delay)
 
         logger.error("All MT5 connection paths failed.")
         return False
+
+    def health_check(self) -> bool:
+        """
+        Check the status of the connection.
+
+        Returns:
+            True if connection is healthy, False otherwise.
+        """
+        if not self._is_initialized:
+            return False
+
+        if not self.use_metaapi:
+            # Native SDK health check
+            terminal_info = mt5.terminal_info()
+            if terminal_info is None:
+                logger.error("Health check failed: terminal_info is None")
+                return False
+            if not terminal_info.connected:
+                logger.warning("Health check: terminal is not connected to broker")
+                return False
+            return True
+        else:
+            # MetaAPI health check placeholder
+            # In a real implementation, we would check the MetaAPI connection status
+            return self.metaapi is not None
 
     def connect(self) -> bool:
         """Alias for initialize() to support existing interfaces."""
@@ -157,10 +194,13 @@ class MT5Connector:
         if not self._is_initialized:
             return pd.DataFrame()
 
-        tf = TIMEFRAME_MAP.get(timeframe, 5)
+        tf_code = TIMEFRAME_MAP.get(timeframe)
+        if tf_code is None:
+            logger.error("Invalid timeframe: %s", timeframe)
+            return pd.DataFrame()
 
         if not self.use_metaapi:
-            rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+            rates = mt5.copy_rates_from_pos(symbol, tf_code, 0, n_bars)
             if rates is None:
                 logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
                 return pd.DataFrame()
@@ -196,12 +236,12 @@ class MT5Connector:
 
         return {"bid": tick.bid, "ask": tick.ask}
 
-    def place_order(self, signal: TradeSignal) -> Optional[int]:
+    def place_order(self, request: Dict[str, Any]) -> Optional[int]:
         """
-        Execute a market order based on a validated trade signal.
+        Execute an order.
 
         Args:
-            signal: Validated TradeSignal object.
+            request: Order request dictionary.
 
         Returns:
             Order ticket ID if successful, None otherwise.
@@ -210,34 +250,15 @@ class MT5Connector:
             return None
 
         if not self.use_metaapi:
-            order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
-            tick = self.get_tick(signal.symbol)
-            price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
-
-            if price == 0:
-                logger.error("Invalid price for order execution.")
-                return None
-
-            request = {
-                "action": TRADE_ACTION_DEAL,
-                "symbol": signal.symbol,
-                "volume": signal.lot_size,
-                "type": order_type,
-                "price": price,
-                "sl": signal.stop_loss,
-                "tp": signal.take_profit,
-                "magic": 20240419,
-                "comment": f"AI:{signal.algorithm}",
-                "type_time": ORDER_TIME_GTC,
-                "type_filling": ORDER_FILLING_IOC,
-            }
-
             result = mt5.order_send(request)
+            if result is None:
+                logger.error("order_send returned None")
+                return None
             if result.retcode != mt5.TRADE_RETCODE_DONE:
                 logger.error("Order rejected: %s (code: %d)", result.comment, result.retcode)
                 return None
 
-            logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
+            logger.info("Order PLACED | Ticket #%d", result.order)
             return int(result.order)
 
         return None
@@ -253,6 +274,11 @@ class MT5Connector:
         """Retrieve current account balance."""
         info = self.get_account_info()
         return float(info.get("balance", 0.0))
+
+    def get_account_equity(self) -> float:
+        """Retrieve current account equity."""
+        info = self.get_account_info()
+        return float(info.get("equity", 0.0))
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve current open positions."""

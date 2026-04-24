@@ -27,7 +27,7 @@ class LSTMAttentionModel(nn.Module):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+    Output : (batch, 3) -> [hold_logit, buy_logit, sell_logit]
     """
 
     def __init__(
@@ -78,6 +78,8 @@ class EnsembleModel:
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
+    # Standard mapping: 0=Hold, 1=Buy, 2=Sell
+    ACTION_TO_DIRECTION = {0: 0, 1: 1, 2: -1}
 
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
@@ -143,11 +145,16 @@ class EnsembleModel:
 
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+        if total_weight <= 0:
+            logger.warning("Total weight is zero - returning HOLD")
+            return 0, 0.0, {}
+
+        blended = sum((self.weights[k] / total_weight) * votes[k] for k in votes)
+
+        action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
-        direction_map = {0: 1, 1: -1, 2: 0}
-        direction = direction_map[action_idx]
+        direction = self.ACTION_TO_DIRECTION.get(action_idx, 0)
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
