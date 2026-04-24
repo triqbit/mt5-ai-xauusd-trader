@@ -45,18 +45,39 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
+
+    # -- Institutional Risk Limits (RISK_LIMITS.md) --
+    max_positions: int = Field(default=5, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    max_leverage: float = Field(default=10.0, ge=1.0, le=30.0)
+    max_equity_risk_per_trade: float = Field(default=0.1, description="10% of account equity")
+
+    # Daily Cascading Loss Limits
+    daily_loss_limit_l1: float = Field(default=0.02, description="2% Alert")
+    daily_loss_limit_l2: float = Field(default=0.03, description="3% Reduce size 50%")
+    daily_loss_limit_l3: float = Field(default=0.04, description="4% Reduce size 25%")
+    daily_loss_limit_l4: float = Field(default=0.05, description="5% HALT")
+    daily_loss_limit_hard: float = Field(default=0.06, description="6% Force Close")
+
+    daily_win_cap: float = Field(default=0.10, description="10% gain cap")
+    max_daily_trades: int = Field(default=20)
+
+    # Drawdown Circuit Breakers
+    drawdown_limit_l1: float = Field(default=0.10, description="10% Alert")
+    drawdown_limit_l2: float = Field(default=0.15, description="15% Reduce size 75%")
+    drawdown_limit_l3: float = Field(default=0.20, description="20% Reduce size 50%")
+    drawdown_limit_l4: float = Field(default=0.25, description="25% Halt new positions")
+    drawdown_limit_l5: float = Field(default=0.30, description="30% FORCE CLOSE")
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
     model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
     train_steps: int = Field(default=1_000_000, ge=100_000)
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
+    confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
+    database_url: str = Field(default="sqlite:///trading.db")
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
@@ -65,7 +86,6 @@ class TradingConfig(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
     telegram_token: str = Field(default="", description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     @field_validator("risk_per_trade")
     @classmethod
@@ -80,11 +100,15 @@ class TradingConfig(BaseSettings):
 
     @property
     def data_dir(self) -> Path:
-        return ROOT / "data"
+        p = ROOT / "data"
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     @property
     def logs_dir(self) -> Path:
-        return ROOT / "logs"
+        p = ROOT / "logs"
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
 
 @lru_cache(maxsize=1)
