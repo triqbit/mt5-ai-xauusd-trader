@@ -22,7 +22,7 @@ class FeatureEngineer:
     Computes technical indicators, candle patterns, and multi-timeframe features.
     """
 
-    def __init__(self, timeframes: List[str] = None):
+    def __init__(self, timeframes: Optional[List[str]] = None):
         """
         Initialize FeatureEngineer.
 
@@ -158,9 +158,7 @@ class FeatureEngineer:
         features[f"{prefix}_ad"] = talib.AD(high, low, close, volume)
 
         # 8. Candle Patterns (60+)
-        pattern_functions = [
-            func for func in talib.get_function_groups()["Pattern Recognition"]
-        ]
+        pattern_functions = list(talib.get_function_groups()["Pattern Recognition"])
         for pattern in pattern_functions:
             features[f"{prefix}_{pattern.lower()}"] = getattr(talib, pattern)(open_, high, low, close)
 
