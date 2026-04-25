@@ -85,6 +85,10 @@ htmlcov/
 # Docker
 .docker/
 
+# Database
+*.db
+*.sqlite
+
 # Deployment
 *.tfstate
 *.tfstate.backup
