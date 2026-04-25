@@ -5,7 +5,7 @@ Ensemble voting system combining:
   - PPO (Stable-Baselines3)
   - Dreamer V3 (world model RL)
   - LSTM + Multi-head Attention
-Weighted confidence voting with dynamic weight adaptation.
+Performance-weighted consensus voting.
 Author : triqbit
 License: MIT
 """
@@ -27,7 +27,8 @@ class LSTMAttentionModel(nn.Module):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+    Output : (batch, 3) -> [hold_logit, buy_logit, sell_logit]
+    Note: Standardizing mapping: 0=Hold, 1=Buy, 2=Sell
     """
 
     def __init__(
@@ -73,8 +74,7 @@ class LSTMAttentionModel(nn.Module):
 class EnsembleModel:
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
-    Weights are initialised equally and adapt based on a rolling window
-    of each algorithm's realised P&L Sharpe ratio.
+    Weights are performance-weighted based on Sharpe ratio.
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
@@ -86,32 +86,27 @@ class EnsembleModel:
             "dreamer": 1 / 3,
             "lstm": 1 / 3,
         }
-        self._ppo_model = None  # loaded lazily
-        self._dreamer_model = None  # loaded lazily
+        self._ppo_model = None
+        self._dreamer_model = None
         self.lstm_model: Optional[LSTMAttentionModel] = None
         self._performance: Dict[str, List[float]] = {k: [] for k in self.ALGORITHMS}
 
-    # ── Loading ────────────────────────────────────────────────────────────
     def load_ppo(self, path: Path) -> None:
-        """Load a Stable-Baselines3 PPO checkpoint."""
         try:
             from stable_baselines3 import PPO
-
             self._ppo_model = PPO.load(str(path), device=self.device)
-            logger.info("PPO model loaded from %s", path)
+            logger.info("PPO model loaded.")
         except Exception as exc:
             logger.warning("Could not load PPO: %s", exc)
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
-        """Load LSTM-Attention checkpoint."""
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
         state = torch.load(str(path), map_location=self.device)
         model.load_state_dict(state)
         model.eval()
         self.lstm_model = model
-        logger.info("LSTM model loaded from %s", path)
+        logger.info("LSTM model loaded.")
 
-    # ── Inference ───────────────────────────────────────────────────────────
     def predict(
         self,
         obs: np.ndarray,
@@ -120,17 +115,16 @@ class EnsembleModel:
         """
         Return (direction, confidence, per_algo_probs).
         direction: +1 buy, -1 sell, 0 hold
+        Action mapping: 0=Hold, 1=Buy, 2=Sell
         """
         votes: Dict[str, np.ndarray] = {}
 
-        # PPO prediction
         if self._ppo_model is not None:
             action, _ = self._ppo_model.predict(obs, deterministic=True)
             probs = np.zeros(3)
             probs[int(action)] = 1.0
             votes["ppo"] = probs
 
-        # LSTM-Attention prediction
         if self.lstm_model is not None and seq is not None:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
@@ -138,53 +132,43 @@ class EnsembleModel:
             votes["lstm"] = probs
 
         if not votes:
-            logger.warning("No models loaded - returning HOLD")
             return 0, 0.0, {}
 
-        # Weighted average across available models
+        # Weighted consensus
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+
+        action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
-        direction_map = {0: 1, 1: -1, 2: 0}
+
+        # Mapping: 0=Hold, 1=Buy, 2=Sell -> Direction: 0, 1, -1
+        direction_map = {0: 0, 1: 1, 2: -1}
         direction = direction_map[action_idx]
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
-        logger.debug(
-            "Ensemble | dir=%d conf=%.3f votes=%s",
-            direction,
-            confidence,
-            per_algo,
-        )
         return direction, confidence, per_algo
 
-    # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(self, algorithm: str, ret: float) -> None:
-        """Track per-algorithm returns for weight rebalancing."""
         if algorithm in self._performance:
             self._performance[algorithm].append(ret)
             if len(self._performance[algorithm]) >= 50:
                 self._rebalance_weights()
 
-    def _rebalance_weights(self, window: int = 50) -> None:
-        """Reweight by rolling Sharpe ratio (floor 5%)."""
+    def _rebalance_weights(self) -> None:
         sharpes: Dict[str, float] = {}
         for algo, rets in self._performance.items():
-            tail = rets[-window:]
-            if len(tail) < 10:
+            if len(rets) < 10:
                 sharpes[algo] = 1.0
                 continue
-            arr = np.array(tail)
-            mean = arr.mean()
-            std = arr.std() + 1e-9
-            sharpes[algo] = max(mean / std, 0.0)
+            arr = np.array(rets[-50:])
+            sharpes[algo] = max(arr.mean() / (arr.std() + 1e-9), 0.0)
+
         total = sum(sharpes.values()) or 1.0
-        for algo, s in sharpes.items():
-            raw = s / total
-            self.weights[algo] = max(raw, 0.05)  # min 5%
-        # Re-normalise
+        for algo in self.ALGORITHMS:
+            self.weights[algo] = max(sharpes.get(algo, 0.0) / total, 0.05)
+
         total_w = sum(self.weights.values())
         self.weights = {k: v / total_w for k, v in self.weights.items()}
-        logger.info("Weights rebalanced: %s", self.weights)
 
 
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]
