@@ -9,6 +9,7 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,7 +28,7 @@ class LSTMAttentionModel(nn.Module):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+    Output : (batch, 3) -> [hold_logit, buy_logit, sell_logit]
     """
 
     def __init__(
@@ -144,9 +145,9 @@ class EnsembleModel:
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+        action_idx = int(np.argmax(blended))  # 0=hold, 1=buy, 2=sell
         confidence = float(blended[action_idx])
-        direction_map = {0: 1, 1: -1, 2: 0}
+        direction_map = {0: 0, 1: 1, 2: -1}
         direction = direction_map[action_idx]
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(

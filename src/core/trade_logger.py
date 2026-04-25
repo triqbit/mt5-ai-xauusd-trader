@@ -14,7 +14,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
-    Boolean,
     Column,
     DateTime,
     Float,
@@ -24,8 +23,7 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -41,7 +39,7 @@ class AuditMixin:
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False)
+    deleted_at = Column(DateTime, nullable=True)
 
 
 class ModelSignal(Base, AuditMixin):
