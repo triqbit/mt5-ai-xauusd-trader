@@ -1,8 +1,14 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import numpy as np
-import torch
 from src.models.ensemble import EnsembleModel
+
+# Conditional import for torch to support CI environments without it
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 class TestEnsembleModel(unittest.TestCase):
     def setUp(self):
@@ -14,6 +20,7 @@ class TestEnsembleModel(unittest.TestCase):
         self.assertEqual(direction, 0)
         self.assertEqual(confidence, 0.0)
 
+    @unittest.skipUnless(TORCH_AVAILABLE, "torch not available")
     def test_weighted_voting_logic(self):
         # Set specific weights
         self.model.weights = {"ppo": 0.7, "lstm": 0.3}
