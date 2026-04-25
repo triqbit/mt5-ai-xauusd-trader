@@ -47,7 +47,22 @@ class TradingConfig(BaseSettings):
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
     max_positions: int = Field(default=3, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    max_leverage: float = Field(default=10.0, ge=1.0, le=30.0)
+    max_concurrent_positions: int = Field(default=5, ge=1, le=10)
+
+    # Daily Loss Limits (Cascading)
+    daily_loss_limit_lv1: float = Field(default=0.02, description="2% - Alert")
+    daily_loss_limit_lv2: float = Field(default=0.03, description="3% - 50% size")
+    daily_loss_limit_lv3: float = Field(default=0.04, description="4% - 25% size")
+    daily_loss_limit_lv4: float = Field(default=0.05, description="5% - Halt")
+    daily_loss_limit_hard: float = Field(default=0.06, description="6% - Force close")
+
+    # Drawdown Limits
+    drawdown_limit_lv1: float = Field(default=0.10, description="10% - Alert")
+    drawdown_limit_lv2: float = Field(default=0.15, description="15% - 75% size")
+    drawdown_limit_lv3: float = Field(default=0.20, description="20% - 50% size")
+    drawdown_limit_lv4: float = Field(default=0.25, description="25% - Halt new")
+    drawdown_limit_lv5: float = Field(default=0.30, description="30% - Force close all")
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
@@ -65,7 +80,11 @@ class TradingConfig(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
     telegram_token: str = Field(default="", description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+
+    # Confidence Thresholds
+    min_confidence: float = Field(default=0.55, ge=0.0, le=1.0)
+    medium_confidence: float = Field(default=0.65, ge=0.0, le=1.0)
+    high_confidence: float = Field(default=0.75, ge=0.0, le=1.0)
 
     @field_validator("risk_per_trade")
     @classmethod
