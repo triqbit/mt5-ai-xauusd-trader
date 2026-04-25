@@ -186,9 +186,7 @@ class RiskEngine:
         return True
 
     def _check_max_positions(self) -> bool:
-        if len(self.open_positions) >= self.cfg.max_concurrent_positions:
-            return False
-        return True
+        return not len(self.open_positions) >= self.cfg.max_concurrent_positions
 
     def _check_minimum_confidence(self, confidence: float) -> bool:
         return confidence >= self.cfg.min_confidence
