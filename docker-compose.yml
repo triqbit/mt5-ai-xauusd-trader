@@ -1,0 +1,16 @@
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mt5-ai-xauusd-trader:latest
+    container_name: mt5_trader
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs:rw
+    ports:
+      - "8000:8000" # Prometheus
+      - "8050:8050" # Dash
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
