@@ -75,6 +75,9 @@ def run_live(
             direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
+            if monitor:
+                monitor.check_confidence_degradation(confidence)
+
             signal_id = None
             if trade_logger:
                 signal_id = trade_logger.log_signal(
@@ -118,6 +121,8 @@ def run_live(
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
                     log.info("Order placed | ticket=%d", ticket)
+                    if monitor:
+                        monitor.log_trade("buy" if direction == 1 else "sell")
                     if trade_logger:
                         trade_logger.log_trade(
                             ticket=ticket,
@@ -161,6 +166,8 @@ def run_live(
             break
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
+            if monitor:
+                monitor.log_error("loop_error")
             time.sleep(poll_interval)
 
 
@@ -207,9 +214,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +225,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
