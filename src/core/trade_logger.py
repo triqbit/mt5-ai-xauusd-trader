@@ -27,6 +27,8 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
+from src.core.profiler import DB_QUERY_LATENCY
+
 Base = declarative_base()
 logger = logging.getLogger(__name__)
 
@@ -121,7 +123,10 @@ class TradeLogger:
 
     def log_signal(self, signal_data: Dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
-        with self.Session() as session:
+        with (
+            DB_QUERY_LATENCY.labels(query_type="log_signal").time(),
+            self.Session() as session,
+        ):
             signal = ModelSignal(
                 symbol=signal_data["symbol"],
                 direction=signal_data["direction"],
@@ -148,7 +153,10 @@ class TradeLogger:
         status: str = "OPEN",
     ) -> int:
         """Log a trade execution."""
-        with self.Session() as session:
+        with (
+            DB_QUERY_LATENCY.labels(query_type="log_trade").time(),
+            self.Session() as session,
+        ):
             trade = Trade(
                 ticket=ticket,
                 symbol=symbol,
@@ -170,7 +178,10 @@ class TradeLogger:
         drawdown_impact: float = 0.0,
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
-        with self.Session() as session:
+        with (
+            DB_QUERY_LATENCY.labels(query_type="update_trade").time(),
+            self.Session() as session,
+        ):
             trade = session.query(Trade).filter(Trade.ticket == ticket).first()
             if trade:
                 trade.exit_price = exit_price
@@ -220,7 +231,10 @@ class TradeLogger:
         Calculate key performance metrics from closed trades.
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
         """
-        with self.Session() as session:
+        with (
+            DB_QUERY_LATENCY.labels(query_type="read_performance_report").time(),
+            self.Session() as session,
+        ):
             trades = session.query(Trade).filter(Trade.status == "CLOSED").all()
             if not trades:
                 return {

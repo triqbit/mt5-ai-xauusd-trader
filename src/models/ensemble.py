@@ -19,6 +19,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from src.core.profiler import MODEL_INFERENCE_LATENCY
+
 logger = logging.getLogger(__name__)
 
 
@@ -125,7 +127,8 @@ class EnsembleModel:
 
         # PPO prediction
         if self._ppo_model is not None:
-            action, _ = self._ppo_model.predict(obs, deterministic=True)
+            with MODEL_INFERENCE_LATENCY.labels(model_name="ppo").time():
+                action, _ = self._ppo_model.predict(obs, deterministic=True)
             probs = np.zeros(3)
             probs[int(action)] = 1.0
             votes["ppo"] = probs
@@ -133,7 +136,8 @@ class EnsembleModel:
         # LSTM-Attention prediction
         if self.lstm_model is not None and seq is not None:
             with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                with MODEL_INFERENCE_LATENCY.labels(model_name="lstm").time():
+                    logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
             votes["lstm"] = probs
 
@@ -142,13 +146,15 @@ class EnsembleModel:
             return 0, 0.0, {}
 
         # Weighted average across available models
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
-        confidence = float(blended[action_idx])
-        direction_map = {0: 1, 1: -1, 2: 0}
-        direction = direction_map[action_idx]
-        per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+        with MODEL_INFERENCE_LATENCY.labels(model_name="ensemble_blend").time():
+            total_weight = sum(self.weights[k] for k in votes)
+            blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+            action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+            confidence = float(blended[action_idx])
+            direction_map = {0: 1, 1: -1, 2: 0}
+            direction = direction_map[action_idx]
+            per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
             direction,
