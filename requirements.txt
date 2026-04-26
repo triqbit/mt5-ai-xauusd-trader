@@ -9,7 +9,7 @@ torch==2.2.2
 torchvision==0.17.2
 stable-baselines3==2.3.2
 gymnasium==0.29.1
-numpy==1.26.4
+numpy==2.2.4
 scipy==1.13.0
 scikit-learn==1.4.2
 pandas==2.2.2
@@ -20,7 +20,7 @@ timm==0.9.16
 einops==0.7.0
 
 # ── Technical Analysis ──────────────────────────────────────
-TA-Lib==0.4.28
+TA-Lib==0.6.4
 pandas-ta==0.3.14b
 mplfinance==0.12.10b0
 
