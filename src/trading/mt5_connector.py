@@ -30,6 +30,7 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.error_handler import CircuitBreaker, exponential_backoff
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -70,7 +71,13 @@ class MT5Connector:
         self.metaapi: Optional[Any] = None
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
+        self.metaapi_circuit = CircuitBreaker(
+            name="metaapi_cloud",
+            failure_threshold=5,
+            recovery_timeout=60.0
+        )
 
+    @exponential_backoff(retries=3, base_delay=2.0)
     def initialize(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
@@ -105,7 +112,7 @@ class MT5Connector:
         if METAAPI_AVAILABLE and self.cfg.metaapi_token:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
-                self.metaapi = MetaApi(self.cfg.metaapi_token)
+                self.metaapi = self.metaapi_circuit.call(lambda: MetaApi(self.cfg.metaapi_token))
                 self.use_metaapi = True
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured.")

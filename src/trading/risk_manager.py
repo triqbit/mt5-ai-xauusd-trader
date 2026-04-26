@@ -159,6 +159,33 @@ class RiskManager:
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
 
+    def recover_state(self) -> None:
+        """
+        Recover system state from the database after a restart.
+        Restores open positions and daily performance stats.
+        """
+        if not self.trade_logger:
+            logger.warning("TradeLogger not available for state recovery")
+            return
+
+        logger.info("Starting state recovery...")
+
+        # 1. Recover open positions
+        open_trades = self.trade_logger.get_open_trades()
+        for trade in open_trades:
+            self.open_positions[trade.symbol] = trade.ticket
+            logger.info("Recovered open position | symbol=%s ticket=%d", trade.symbol, trade.ticket)
+
+        # 2. Recover daily stats
+        daily_stats = self.trade_logger.get_daily_stats()
+        self.daily.realised_pnl = daily_stats["realised_pnl"]
+        self.daily.trade_count = daily_stats["trade_count"]
+        logger.info(
+            "Recovered daily stats | pnl=%.2f count=%d",
+            self.daily.realised_pnl,
+            self.daily.trade_count
+        )
+
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:

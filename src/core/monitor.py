@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 import telegram
 
 from src.core.config import TradingConfig
+from src.core.error_handler import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,11 @@ class Monitor:
         self.cfg = config
         self.equity_history: List[Dict[str, Any]] = []
         self.bot: Optional[telegram.Bot] = None
+        self.telegram_circuit = CircuitBreaker(
+            name="telegram_api",
+            failure_threshold=3,
+            recovery_timeout=300.0
+        )
 
         if self.cfg.telegram_token:
             try:
@@ -52,10 +58,12 @@ class Monitor:
         try:
             # python-telegram-bot v20+ is async.
             # We use asyncio.run as the main loop is synchronous.
-            asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
+            self.telegram_circuit.call(
+                lambda: asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
+            )
             logger.info("Telegram message sent")
         except Exception as e:
-            logger.error("Failed to send Telegram message: %s", e)
+            logger.error("Failed to send Telegram message (Circuit Breaker may be active): %s", e)
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger."""
