@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
@@ -109,6 +111,20 @@ class PerformanceMetric(Base, AuditMixin):
     max_drawdown = Column(Float)
     total_trades = Column(Integer)
     win_rate = Column(Float)
+
+
+class DriftEvent(Base, AuditMixin):
+    """Logs model performance and concept drift events."""
+
+    __tablename__ = "drift_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    metric_name = Column(String(50), nullable=False)
+    metric_value = Column(Float, nullable=False)
+    threshold = Column(Float, nullable=False)
+    algorithm = Column(String(50))
+    metadata_json = Column(Text)  # Store additional info as JSON string
 
 
 class TradeLogger:
@@ -215,6 +231,19 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
+    def log_drift_event(self, drift_data: Dict[str, Any]) -> None:
+        """Log a drift detection event."""
+        with self.Session() as session:
+            event = DriftEvent(
+                metric_name=drift_data["metric_name"],
+                metric_value=drift_data["metric_value"],
+                threshold=drift_data["threshold"],
+                algorithm=drift_data.get("algorithm"),
+                metadata_json=drift_data.get("metadata_json"),
+            )
+            session.add(event)
+            session.commit()
+
     def read_performance_report(self) -> Dict[str, float]:
         """
         Calculate key performance metrics from closed trades.
@@ -234,7 +263,9 @@ class TradeLogger:
             # Profit Factor
             gross_profit = np.sum(pnls[pnls > 0])
             gross_loss = abs(np.sum(pnls[pnls < 0]))
-            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+            profit_factor = (
+                gross_profit / gross_loss if gross_loss > 0 else float("inf")
+            )
 
             # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
             if len(pnls) > 1:

@@ -5,6 +5,7 @@ Real-time monitoring, equity tracking, and Telegram alerting.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -52,7 +53,9 @@ class Monitor:
         try:
             # python-telegram-bot v20+ is async.
             # We use asyncio.run as the main loop is synchronous.
-            asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
+            asyncio.run(
+                self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
+            )
             logger.info("Telegram message sent")
         except Exception as e:
             logger.error("Failed to send Telegram message: %s", e)

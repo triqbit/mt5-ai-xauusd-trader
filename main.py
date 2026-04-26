@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,12 +21,14 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import structlog
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.models.performance_tracker import PerformanceTracker
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -60,6 +63,7 @@ def run_live(
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
+    tracker: Optional[PerformanceTracker] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
@@ -72,7 +76,7 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            direction, confidence, per_algo_votes = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -85,6 +89,22 @@ def run_live(
                         "algorithm": cfg.algorithm,
                         "confidence": confidence,
                     }
+                )
+
+            # Record prediction in tracker
+            if tracker and direction != 0:
+                # Get full probability distribution if available, else use a placeholder
+                # We'll use a one-hot representation for the predicted action if probs aren't exposed
+                probs = np.zeros(3)
+                action_idx = 0 if direction == 1 else (1 if direction == -1 else 2)
+                probs[action_idx] = confidence
+                tracker.record_prediction(
+                    prediction_id=signal_id or time.time(),
+                    prediction_probs=probs,
+                    confidence=confidence,
+                    direction=direction,
+                    algorithm_weights=model.weights,
+                    algo_decisions=per_algo_votes,
                 )
 
             if direction == 0:
@@ -141,12 +161,26 @@ def run_live(
                         trade_info = trade_logger.get_trade_by_ticket(ticket)
                         if trade_info:
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
-                            exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                            exit_price = (
+                                tick["bid"]
+                                if trade_info.direction == 1
+                                else tick["ask"]
+                            )
                             # P&L will be calculated automatically by update_trade
                             trade_logger.update_trade(
                                 ticket=ticket,
                                 exit_price=exit_price,
                             )
+                            # Record outcome in tracker
+                            if tracker:
+                                # Fetch the updated trade to get P&L
+                                updated_trade = trade_logger.get_trade_by_ticket(ticket)
+                                if updated_trade:
+                                    win = updated_trade.pnl > 0
+                                    tracker.record_outcome(
+                                        prediction_id=updated_trade.signal_id, win=win
+                                    )
+
                     closed_tickets.append(symbol)
 
             for sym in closed_tickets:
@@ -168,7 +202,9 @@ def run_live(
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
+    p = argparse.ArgumentParser(
+        description="MT5 AI/ML Trading Bot - Enterprise Edition"
+    )
     p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
     p.add_argument(
         "--algo",
@@ -205,12 +241,15 @@ def main() -> int:
         return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
-        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+        db_url=(
+            cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+        )
     )
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
     model = EnsembleModel(device="cpu")
+    tracker = PerformanceTracker(cfg, logger_db=trade_logger, monitor=monitor)
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
@@ -219,8 +258,15 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+                tracker=tracker,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
