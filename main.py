@@ -24,6 +24,7 @@ import structlog  # type: ignore
 
 from src.core.config import TradingConfig, get_config
 from src.core.monitor import Monitor
+from src.core.preflight import PreflightCheck
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
@@ -193,6 +194,11 @@ def main() -> int:
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
+    # 1. Pre-flight checks
+    preflight = PreflightCheck(cfg)
+    if not preflight.run_all():
+        log.critical("Pre-flight checks failed. Aborting startup.")
+        return 1
     log.info(
         "Configuration loaded | mode=%s algo=%s symbol=%s",
         cfg.mode,
