@@ -32,6 +32,11 @@ alembic==1.13.1
 pydantic==2.11.1
 pydantic-settings==2.8.1
 
+# -- CLI / Logging / UI -------------------------------------------
+click==8.1.7
+rich==13.7.1
+structlog==24.1.0
+
 # -- Testing -------------------------------------------------------
 pytest==9.0.3
 pytest-cov==6.1.0
