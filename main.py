@@ -17,9 +17,12 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import click
+
+if TYPE_CHECKING:
+    from src.models.ensemble import EnsembleModel
 import structlog
 
 from src.cli.commands import cli

@@ -5,24 +5,19 @@ Enhanced CLI using Click and Rich.
 """
 from __future__ import annotations
 
-import logging
 import os
-import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
 
 import click
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
-from rich.live import Live
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
-from src.core.config import get_config, TradingConfig
-from src.core.trade_logger import TradeLogger, Trade
-from src.core.monitor import Monitor
+from src.core.config import get_config
+from src.core.trade_logger import Trade, TradeLogger
 from src.trading.mt5_connector import MT5Connector
 
 console = Console()
@@ -157,7 +152,7 @@ def validate():
         try:
             db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
             logger_db = TradeLogger(db_url=db_url)
-            with logger_db.engine.connect() as conn:
+            with logger_db.engine.connect():
                 progress.update(task, description="[green]Database Connection: OK")
         except Exception as e:
             progress.update(task, description=f"[red]Database Connection: FAILED ({e})")
@@ -197,8 +192,10 @@ def list_models():
                 mtime = datetime.fromtimestamp(file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
                 status = "[green]READY[/]"
                 m_type = "Unknown"
-                if file.suffix == ".zip": m_type = "PPO / SB3"
-                elif file.suffix == ".pt": m_type = "PyTorch / LSTM"
+                if file.suffix == ".zip":
+                    m_type = "PPO / SB3"
+                elif file.suffix == ".pt":
+                    m_type = "PyTorch / LSTM"
 
                 table.add_row(file.name, m_type, status, mtime)
 
@@ -265,7 +262,6 @@ def tail_logs(lines: int):
                 console.print(line.strip())
     except KeyboardInterrupt:
         console.print("\n[yellow]Stopped tailing logs.[/]")
-
 
 if __name__ == "__main__":
     cli()
