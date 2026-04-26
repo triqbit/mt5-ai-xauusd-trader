@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
@@ -47,7 +47,7 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -80,19 +80,20 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.atr_baseline: Optional[float] = None
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
+            rejection_reason = "Daily loss limit reached (Level 4 HALT)"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
@@ -126,23 +127,34 @@ class RiskManager:
         avg_win: float,
         avg_loss: float,
         pip_value: float = 1.0,
+        current_atr: Optional[float] = None,
     ) -> float:
         """
-        Fractional Kelly Criterion position sizing.
-        Returns lot size capped at max risk per trade.
+        Fractional Kelly Criterion position sizing with risk scaling.
         """
         if avg_loss == 0:
             return 0.01  # minimum lot
+
+        # 1. Base Kelly sizing
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+
+        # 2. Daily Loss Cascading Scale
+        loss_scale = self._get_daily_loss_scale()
+
+        # 3. Volatility Scale
+        vol_scale = self._get_volatility_scale(current_atr)
+
+        # Combined scaling
+        effective_scale = loss_scale * vol_scale
+
+        risk_capital = self.balance * self.cfg.risk_per_trade * effective_scale
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
+
         logger.debug(
-            "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
-            kelly_fraction,
-            risk_capital,
-            lot_size,
+            "Sizing | scale=%.2f (loss=%.2f, vol=%.2f) kelly=%.3f lots=%.2f",
+            effective_scale, loss_scale, vol_scale, kelly_fraction, lot_size
         )
         return lot_size
 
@@ -168,7 +180,55 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
+    def update_atr_baseline(self, baseline: float) -> None:
+        """Update the 30-day ATR baseline for volatility scaling."""
+        self.atr_baseline = baseline
+
     # -- Private filter layers ----------------------------------------------
+    def _get_daily_loss_scale(self) -> float:
+        """
+        Level 1 (2% loss) -> Alert (scale 1.0)
+        Level 2 (3% loss) -> 50% size
+        Level 3 (4% loss) -> 25% size
+        Level 4 (5% loss) -> HALT (scale 0.0)
+        """
+        if self.daily.peak_equity == 0:
+            return 1.0
+
+        loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
+        if self.daily.realised_pnl >= 0:
+            return 1.0
+
+        if loss_pct >= 0.05:
+            return 0.0
+        if loss_pct >= 0.04:
+            return 0.25
+        if loss_pct >= 0.03:
+            return 0.50
+        if loss_pct >= 0.02:
+            logger.warning("Daily Loss Level 1 (2%%) hit - Alerting")
+            return 1.0
+        return 1.0
+
+    def _get_volatility_scale(self, current_atr: Optional[float]) -> float:
+        """
+        Normal Volatility: 1.0
+        High Volatility (>1.5x): 0.75
+        Very High Volatility (>2.0x): 0.50
+        Extreme Volatility (>3.0x): 0.0 (HALT)
+        """
+        if current_atr is None or self.atr_baseline is None or self.atr_baseline == 0:
+            return 1.0
+
+        ratio = current_atr / self.atr_baseline
+        if ratio >= 3.0:
+            return 0.0
+        if ratio >= 2.0:
+            return 0.50
+        if ratio >= 1.5:
+            return 0.75
+        return 1.0
+
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
@@ -187,13 +247,7 @@ class RiskManager:
         return True
 
     def _check_daily_loss(self) -> bool:
-        if self.daily.peak_equity == 0:
-            return True
-        loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
-            return False
-        return True
+        return self._get_daily_loss_scale() > 0
 
     def _check_max_positions(self) -> bool:
         if len(self.open_positions) >= self.cfg.max_positions:

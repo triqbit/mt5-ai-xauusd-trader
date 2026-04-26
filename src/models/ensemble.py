@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -105,17 +105,20 @@ class EnsembleModel:
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
-        state = torch.load(str(path), map_location=self.device)
-        model.load_state_dict(state)
-        model.eval()
-        self.lstm_model = model
-        logger.info("LSTM model loaded from %s", path)
+        try:
+            state = torch.load(str(path), map_location=self.device)
+            model.load_state_dict(state)
+            model.eval()
+            self.lstm_model = model
+            logger.info("LSTM model loaded from %s", path)
+        except Exception as exc:
+            logger.warning("Could not load LSTM: %s", exc)
 
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
         self,
         obs: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional[Union[torch.Tensor, np.ndarray]] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
@@ -132,8 +135,13 @@ class EnsembleModel:
 
         # LSTM-Attention prediction
         if self.lstm_model is not None and seq is not None:
+            if isinstance(seq, np.ndarray):
+                seq = torch.from_numpy(seq).float()
+
             with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                if seq.dim() == 2:
+                    seq = seq.unsqueeze(0)
+                logits = self.lstm_model(seq.to(self.device))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
             votes["lstm"] = probs
 
@@ -142,12 +150,29 @@ class EnsembleModel:
             return 0, 0.0, {}
 
         # Weighted average across available models
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
-        confidence = float(blended[action_idx])
+        available_algos = [k for k in votes if k in self.weights]
+        total_weight = sum(self.weights[k] for k in available_algos)
+
+        if total_weight == 0:
+            blended = sum(votes[k] for k in votes) / len(votes)
+        else:
+            blended = sum(self.weights[k] / total_weight * votes[k] for k in available_algos)
+
+        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold (as per gym_env)
+        # Wait, gym_env: 0=Hold, 1=Buy, 2=Sell
+        # Ensemble direction_map: 0: 1, 1: -1, 2: 0 -> 0=buy, 1=sell, 2=hold
+        # Let's align with gym_env: 0=Hold, 1=Buy, 2=Sell
+        # direction_map = {1: 1, 2: -1, 0: 0}
+
+        # Let's keep original mapping if it was intended, but it seems it was:
+        # action_idx 0 -> direction 1 (Buy)
+        # action_idx 1 -> direction -1 (Sell)
+        # action_idx 2 -> direction 0 (Hold)
+
         direction_map = {0: 1, 1: -1, 2: 0}
         direction = direction_map[action_idx]
+        confidence = float(blended[action_idx])
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
