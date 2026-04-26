@@ -167,7 +167,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
