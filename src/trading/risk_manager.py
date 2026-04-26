@@ -62,8 +62,20 @@ class DailyStats:
 
 class RiskManager:
     """
-    Central risk authority.
-    Every signal must be approved here before reaching the order router.
+    Central risk authority for the trading bot.
+
+    Implements a multi-layered filter cascade to validate signals before execution.
+    It handles position sizing using the Kelly Criterion and monitors account-wide
+    risk metrics like daily loss and maximum drawdown.
+
+    Example:
+        ```python
+        risk_manager = RiskManager(config, account_balance=10000.0)
+        signal = TradeSignal(symbol="XAUUSD", direction=1, ...)
+
+        if risk_manager.approve(signal):
+            print("Signal approved for execution")
+        ```
     """
 
     def __init__(
@@ -85,8 +97,22 @@ class RiskManager:
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Validates a trade signal against a 6-layer risk filter cascade.
+
+        Layers include:
+        1. Circuit Breaker (Max drawdown)
+        2. Daily Loss Limit
+        3. Max Open Positions
+        4. Symbol Allocation (All-Weather Portfolio)
+        5. Minimum Model Confidence
+        6. Risk-Reward Ratio
+
+        Args:
+            signal: The TradeSignal to validate.
+            signal_id: Optional database ID for logging the rejection.
+
+        Returns:
+            True if all filters pass, False otherwise.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():

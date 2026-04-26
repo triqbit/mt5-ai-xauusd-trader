@@ -112,7 +112,19 @@ class PerformanceMetric(Base, AuditMixin):
 
 
 class TradeLogger:
-    """Enterprise trade logging interface."""
+    """
+    Enterprise trade logging interface using SQLAlchemy.
+
+    Provides methods to persist model signals, executed trades, risk events,
+    and performance metrics to a relational database.
+
+    Example:
+        ```python
+        logger = TradeLogger("sqlite:///trades.db")
+        signal_id = logger.log_signal({"symbol": "XAUUSD", "direction": 1, ...})
+        logger.log_trade(ticket=12345, symbol="XAUUSD", signal_id=signal_id, ...)
+        ```
+    """
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
         self.engine = create_engine(db_url)
