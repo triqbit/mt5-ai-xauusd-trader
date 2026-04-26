@@ -39,6 +39,9 @@ COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+# Remove vulnerable vendored packages (setuptools) from runtime
+RUN pip uninstall -y setuptools wheel
+
 # Copy application source
 COPY src/ ./src/
 COPY main.py .
