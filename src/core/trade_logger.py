@@ -8,9 +8,10 @@ License: MIT
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import (
@@ -95,6 +96,19 @@ class RiskEvent(Base, AuditMixin):
     symbol = Column(String(20))
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"), nullable=True)
+
+
+class DeadLetterEvent(Base, AuditMixin):
+    """Logs failed events that require manual intervention or retry."""
+
+    __tablename__ = "dead_letter_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_type = Column(String(50), nullable=False)
+    payload = Column(Text)  # JSON-encoded payload
+    error_message = Column(Text)
+    correlation_id = Column(String(50))
+    resolved = Column(Boolean, default=False)
 
 
 class PerformanceMetric(Base, AuditMixin):
@@ -214,6 +228,47 @@ class TradeLogger:
             )
             session.add(event)
             session.commit()
+
+    def log_dead_letter(
+        self,
+        event_type: str,
+        payload: Dict[str, Any],
+        error_message: str,
+        correlation_id: Optional[str] = None,
+    ) -> int:
+        """Log a failed event to the Dead Letter Queue."""
+        with self.Session() as session:
+            event = DeadLetterEvent(
+                event_type=event_type,
+                payload=json.dumps(payload),
+                error_message=error_message,
+                correlation_id=correlation_id,
+            )
+            session.add(event)
+            session.commit()
+            return event.id
+
+    def get_open_trades(self) -> List[Trade]:
+        """Retrieve all currently open trades."""
+        with self.Session() as session:
+            return session.query(Trade).filter(Trade.status == "OPEN").all()
+
+    def get_daily_stats(self, day: Optional[datetime.date] = None) -> Dict[str, Any]:
+        """Calculate realized PnL and trade count for a specific day."""
+        if day is None:
+            day = datetime.now(timezone.utc).date()
+
+        with self.Session() as session:
+            trades = session.query(Trade).filter(
+                Trade.status == "CLOSED",
+                Trade.updated_at >= datetime.combine(day, datetime.min.time()),
+                Trade.updated_at <= datetime.combine(day, datetime.max.time()),
+            ).all()
+
+            return {
+                "realised_pnl": sum(t.pnl for t in trades) if trades else 0.0,
+                "trade_count": len(trades),
+            }
 
     def read_performance_report(self) -> Dict[str, float]:
         """

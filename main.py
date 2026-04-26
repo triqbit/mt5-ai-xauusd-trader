@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.error_handler import ErrorHandler
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -60,6 +61,7 @@ def run_live(
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
+    error_handler: Optional[ErrorHandler] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
@@ -160,7 +162,14 @@ def run_live(
             log.info("Interrupted by user - shutting down")
             break
         except Exception as exc:
-            log.exception("Unhandled error in trading loop: %s", exc)
+            if error_handler:
+                error_handler.handle_error(
+                    exc,
+                    action="trading_loop_iteration",
+                    dlq_event={"type": "TRADING_LOOP_ERROR", "payload": {"symbol": cfg.symbol}}
+                )
+            else:
+                log.exception("Unhandled error in trading loop: %s", exc)
             time.sleep(poll_interval)
 
 
@@ -199,17 +208,27 @@ def main() -> int:
         cfg.symbol,
     )
     # Initialise components
-    connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
-        return 1
-    balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
+    error_handler = ErrorHandler(trade_logger=trade_logger)
+
+    connector = MT5Connector(cfg)
+    try:
+        if not connector.connect():
+            log.critical("Cannot connect to MT5 terminal. Aborting.")
+            return 1
+    except Exception as e:
+        error_handler.handle_error(e, severity="CRITICAL", action="mt5_connect")
+        return 1
+
+    balance = connector.get_account_balance()
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
+    # Automatic State Recovery
+    risk.recover_state()
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +238,15 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+                error_handler=error_handler
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:

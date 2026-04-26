@@ -123,19 +123,23 @@ class EnsembleModel:
         """
         votes: Dict[str, np.ndarray] = {}
 
-        # PPO prediction
-        if self._ppo_model is not None:
-            action, _ = self._ppo_model.predict(obs, deterministic=True)
-            probs = np.zeros(3)
-            probs[int(action)] = 1.0
-            votes["ppo"] = probs
+        try:
+            # PPO prediction
+            if self._ppo_model is not None:
+                action, _ = self._ppo_model.predict(obs, deterministic=True)
+                probs = np.zeros(3)
+                probs[int(action)] = 1.0
+                votes["ppo"] = probs
 
-        # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
-            with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            votes["lstm"] = probs
+            # LSTM-Attention prediction
+            if self.lstm_model is not None and seq is not None:
+                with torch.no_grad():
+                    logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                votes["lstm"] = probs
+        except Exception as exc:
+            logger.error("Inference failed, degrading gracefully to HOLD", error=str(exc))
+            return 0, 0.0, {}
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
