@@ -61,7 +61,7 @@ class OrderManager:
 
     def _execute_mt5_desktop(self, action: str, volume: float, price: float, sl: Optional[float], tp: Optional[float]) -> Dict:
         """Execution via local MetaTrader5 terminal."""
-        import MetaTrader5 as mt5
+        import MetaTrader5 as mt5  # type: ignore
 
         order_type = mt5.ORDER_TYPE_BUY if action.upper() == "BUY" else mt5.ORDER_TYPE_SELL
 

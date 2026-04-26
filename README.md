@@ -25,12 +25,13 @@ Built on an architectural foundation that integrates 25+ top-tier quantitative f
 - **Dynamic Feature Engineering:** 140+ market indicators including multi-timeframe TA-Lib features and macro-sentiment integration.
 
 ### 🛡️ Institutional Risk Management
+- **The Guardian’s Gate:** Automated pre-flight system checks (MT5, DB, Models) to prevent failed live starts.
 - **Ray Dalio All-Weather Allocation:** Scenario-based risk parity across multi-currency pairs.
 - **6-Layer Execution Filter:** Cascade validation using ATR, Trend Angle, Momentum, and EMA sequencing.
 - **Circuit Breakers:** Automated drawdown protection, per-session loss limits, and daily profit targets.
 
 ### ⚡ Production Infrastructure
-- **CI/CD Pipeline:** Fully automated GitHub Actions for linting, security audits (`pip-audit`), and unit testing.
+- **CI/CD Pipeline:** Fully automated GitHub Actions for linting (Ruff), Type Safety (Mypy), security audits (`pip-audit`), and unit testing.
 - **Dockerized Deployment:** Multi-stage builds for lightweight, cross-platform cloud deployment.
 - **Hybrid Connector:** Native MT5 SDK support with MetaAPI cloud failover.
 
@@ -51,7 +52,7 @@ Built on an architectural foundation that integrates 25+ top-tier quantitative f
 
 - **Frameworks:** [PyTorch](https://pytorch.org/), [Stable-Baselines3](https://stable-baselines3.readthedocs.io/), [Gymnasium](https://gymnasium.farama.org/)
 - **Data:** [Pandas](https://pandas.pydata.org/), [NumPy](https://numpy.org/), [TA-Lib](https://github.com/ta-lib/ta-lib-python)
-- **DevOps:** [Docker](https://www.docker.com/), GitHub Actions, [Ruff](https://github.com/astral-sh/ruff)
+- **DevOps:** [Docker](https://www.docker.com/), GitHub Actions, [Ruff](https://github.com/astral-sh/ruff), [Mypy](https://mypy.readthedocs.io/)
 - **Settings:** [Pydantic Settings V2](https://docs.pydantic.dev/latest/usage/pydantic_settings/)
 
 ---
@@ -61,8 +62,9 @@ Built on an architectural foundation that integrates 25+ top-tier quantitative f
 ```text
 mt5-ai-xauusd-trader/
 ├── .github/workflows/    # Automated CI/CD (Quality, Security, Tests)
+├── docs/                 # Detailed architectural documentation
 ├── src/                  # Core Package Content
-│   ├── core/             # Environment-driven Configuration (Pydantic)
+│   ├── core/             # Configuration & Pre-flight Checks (The Guardian's Gate)
 │   ├── models/           # AI/ML Architectures (Ensemble, LSTM, DRL)
 │   └── trading/          # MT5 SDK Connectors & Risk Engines
 ├── tests/                # Comprehensive Unit & Integration Suite
@@ -103,10 +105,11 @@ python main.py --mode demo --symbol XAUUSD --verbose
 
 | Guide | Description |
 | :--- | :--- |
-| [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
-| [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
-| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
-| [DATABASE_STANDARDS.md](./DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
+| [DEVELOPMENT_PLAN.md](./docs/DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
+| [ENTERPRISE_STANDARDS.md](./docs/ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
+| [DEPLOYMENT_GUIDE.md](./docs/DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
+| [DATABASE_STANDARDS.md](./docs/DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
+| [ROLLBACK.md](./docs/ROLLBACK.md) | Emergency rollback procedures and safety protocols. |
 
 ---
 

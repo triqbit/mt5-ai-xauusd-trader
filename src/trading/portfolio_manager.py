@@ -45,7 +45,7 @@ class PortfolioManager:
                 total_lots = sum([p['volume'] if p['type'] == 'BUY' else -p['volume'] for p in symbol_positions])
                 return total_lots
             else:
-                import MetaTrader5 as mt5
+                import MetaTrader5 as mt5  # type: ignore
                 positions = mt5.positions_get(symbol=symbol)
                 if positions is None:
                     return 0.0
