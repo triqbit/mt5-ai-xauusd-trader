@@ -6,7 +6,6 @@ LSTM sequence model for short-term price prediction using PyTorch.
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import torch
