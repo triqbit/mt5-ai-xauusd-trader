@@ -5,9 +5,10 @@ Advanced risk management rules and protection mechanisms.
 """
 
 import logging
-from enum import Enum
-from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List
+
 import numpy as np
 import pandas as pd
 

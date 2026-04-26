@@ -14,14 +14,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from src.core.config import TradingConfig
-from src.trading.advanced_risk import AdvancedRiskManager, VolatilityRegime
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.trading.advanced_risk import AdvancedRiskManager, VolatilityRegime
 
 logger = logging.getLogger(__name__)
 
