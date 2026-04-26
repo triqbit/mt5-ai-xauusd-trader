@@ -4,11 +4,12 @@ src/utils/synthetic_data.py
 Synthetic market data generation for testing and development.
 """
 
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Dict, Optional
+
 import numpy as np
 import pandas as pd
-from enum import Enum
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
 
 
 class MarketRegime(Enum):
