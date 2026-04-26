@@ -6,25 +6,50 @@ Custom Gymnasium trading environment for RL training.
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, Optional, Tuple
 
-import gymnasium as gym
 import numpy as np
 import pandas as pd
 
+try:
+    import gymnasium as gym
+    GYM_AVAILABLE = True
+except ImportError:
+    GYM_AVAILABLE = False
 
-class TradingEnv(gym.Env):
+logger = logging.getLogger(__name__)
+
+
+class TradingEnvSkeleton:
+    """Base skeleton for TradingEnv when gymnasium is not available."""
+    metadata = {"render_modes": ["human"]}
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def reset(self, *args, **kwargs):
+        raise NotImplementedError("Gymnasium not installed")
+
+    def step(self, *args, **kwargs):
+        raise NotImplementedError("Gymnasium not installed")
+
+
+BaseEnv = gym.Env if GYM_AVAILABLE else TradingEnvSkeleton
+
+
+class TradingEnv(BaseEnv):
     """
     Custom Gymnasium environment for XAUUSD trading.
     State: OHLCV + technical indicators (configurable window)
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
-    metadata = {"render_modes": ["human"]}
 
     def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
                  window_size: int = 60, commission: float = 0.0002):
-        super().__init__()
+        if GYM_AVAILABLE:
+            super().__init__()
         # Pre-cast to float32 for performance and consistency with Gym spaces
         self.data = data.astype(np.float32)
         self.initial_balance = initial_balance
@@ -41,22 +66,23 @@ class TradingEnv(gym.Env):
         self.n_features = n_features
 
         # Observation: window of market data + portfolio state [balance, position]
-        self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
-            shape=(window_size * n_features + 2,),
-            dtype=np.float32
-        )
-
-        # Actions: 0=Hold, 1=Buy, 2=Sell
-        self.action_space = gym.spaces.Discrete(3)
+        if GYM_AVAILABLE:
+            self.observation_space = gym.spaces.Box(
+                low=-np.inf, high=np.inf,
+                shape=(window_size * n_features + 2,),
+                dtype=np.float32
+            )
+            # Actions: 0=Hold, 1=Buy, 2=Sell
+            self.action_space = gym.spaces.Discrete(3)
 
         # Pre-allocate observation buffer to reduce GC pressure
-        self.obs_buffer = np.zeros(self.observation_space.shape, dtype=np.float32)
+        self.obs_buffer = np.zeros((window_size * n_features + 2,), dtype=np.float32)
 
         self.reset()
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
-        super().reset(seed=seed)
+        if GYM_AVAILABLE:
+            super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
         self.entry_price = 0.0
@@ -99,8 +125,6 @@ class TradingEnv(gym.Env):
 
     def _get_observation(self) -> np.ndarray:
         # Vectorized and pre-calculated observation generation
-        # window = self.data[self.current_step - self.window_size:self.current_step]
-        # obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
 
         # rolling_means[i] is mean of data[i-W+1 : i+1]
         # We want mean of data[current_step - window_size : current_step]

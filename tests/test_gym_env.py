@@ -1,8 +1,9 @@
 
 import numpy as np
 import pytest
-from src.environment.gym_env import TradingEnv
+from src.environment.gym_env import TradingEnv, GYM_AVAILABLE
 
+@pytest.mark.skipif(not GYM_AVAILABLE, reason="gymnasium not installed")
 def test_trading_env_obs_shape():
     n_features = 5
     window_size = 10
