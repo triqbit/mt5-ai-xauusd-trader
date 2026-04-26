@@ -11,7 +11,7 @@ import functools
 import logging
 import time
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, Callable, TypeVar
 
 import psutil
 from prometheus_client import Counter, Gauge, Histogram, start_http_server

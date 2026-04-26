@@ -123,22 +123,24 @@ class TradeLogger:
 
     def log_signal(self, signal_data: Dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
-        with DB_QUERY_LATENCY.labels(query_type="log_signal").time():
-            with self.Session() as session:
-                signal = ModelSignal(
-                    symbol=signal_data["symbol"],
-                    direction=signal_data["direction"],
-                    entry_price=signal_data["entry_price"],
-                    stop_loss=signal_data.get("stop_loss"),
-                    take_profit=signal_data.get("take_profit"),
-                    lot_size=signal_data.get("lot_size"),
-                    algorithm=signal_data.get("algorithm"),
-                    confidence=signal_data.get("confidence"),
-                    timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
-                )
-                session.add(signal)
-                session.commit()
-                return signal.id
+        with (
+            DB_QUERY_LATENCY.labels(query_type="log_signal").time(),
+            self.Session() as session,
+        ):
+            signal = ModelSignal(
+                symbol=signal_data["symbol"],
+                direction=signal_data["direction"],
+                entry_price=signal_data["entry_price"],
+                stop_loss=signal_data.get("stop_loss"),
+                take_profit=signal_data.get("take_profit"),
+                lot_size=signal_data.get("lot_size"),
+                algorithm=signal_data.get("algorithm"),
+                confidence=signal_data.get("confidence"),
+                timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
+            )
+            session.add(signal)
+            session.commit()
+            return signal.id
 
     def log_trade(
         self,
@@ -151,20 +153,22 @@ class TradeLogger:
         status: str = "OPEN",
     ) -> int:
         """Log a trade execution."""
-        with DB_QUERY_LATENCY.labels(query_type="log_trade").time():
-            with self.Session() as session:
-                trade = Trade(
-                    ticket=ticket,
-                    symbol=symbol,
-                    direction=direction,
-                    entry_price=entry_price,
-                    lot_size=lot_size,
-                    signal_id=signal_id,
-                    status=status,
-                )
-                session.add(trade)
-                session.commit()
-                return trade.id
+        with (
+            DB_QUERY_LATENCY.labels(query_type="log_trade").time(),
+            self.Session() as session,
+        ):
+            trade = Trade(
+                ticket=ticket,
+                symbol=symbol,
+                direction=direction,
+                entry_price=entry_price,
+                lot_size=lot_size,
+                signal_id=signal_id,
+                status=status,
+            )
+            session.add(trade)
+            session.commit()
+            return trade.id
 
     def update_trade(
         self,
@@ -174,28 +178,30 @@ class TradeLogger:
         drawdown_impact: float = 0.0,
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
-        with DB_QUERY_LATENCY.labels(query_type="update_trade").time():
-            with self.Session() as session:
-                trade = session.query(Trade).filter(Trade.ticket == ticket).first()
-                if trade:
-                    trade.exit_price = exit_price
-                    if pnl is not None:
-                        trade.pnl = pnl
-                    else:
-                        # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
-                        # For XAUUSD, contract size is often 100.
-                        contract_size = 100
-                        trade.pnl = (
-                            (exit_price - trade.entry_price)
-                            * trade.direction
-                            * trade.lot_size
-                            * contract_size
-                        )
-                    trade.drawdown_impact = drawdown_impact
-                    trade.status = "CLOSED"
-                    session.commit()
+        with (
+            DB_QUERY_LATENCY.labels(query_type="update_trade").time(),
+            self.Session() as session,
+        ):
+            trade = session.query(Trade).filter(Trade.ticket == ticket).first()
+            if trade:
+                trade.exit_price = exit_price
+                if pnl is not None:
+                    trade.pnl = pnl
                 else:
-                    logger.warning("Trade with ticket %d not found for update.", ticket)
+                    # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
+                    # For XAUUSD, contract size is often 100.
+                    contract_size = 100
+                    trade.pnl = (
+                        (exit_price - trade.entry_price)
+                        * trade.direction
+                        * trade.lot_size
+                        * contract_size
+                    )
+                trade.drawdown_impact = drawdown_impact
+                trade.status = "CLOSED"
+                session.commit()
+            else:
+                logger.warning("Trade with ticket %d not found for update.", ticket)
 
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""
@@ -225,52 +231,54 @@ class TradeLogger:
         Calculate key performance metrics from closed trades.
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
         """
-        with DB_QUERY_LATENCY.labels(query_type="read_performance_report").time():
-            with self.Session() as session:
-                trades = session.query(Trade).filter(Trade.status == "CLOSED").all()
-                if not trades:
-                    return {
-                        "sharpe_ratio": 0.0,
-                        "profit_factor": 0.0,
-                        "max_drawdown": 0.0,
-                    }
-
-                pnls = np.array([t.pnl for t in trades])
-
-                # Profit Factor
-                gross_profit = np.sum(pnls[pnls > 0])
-                gross_loss = abs(np.sum(pnls[pnls < 0]))
-                profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
-
-                # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
-                if len(pnls) > 1:
-                    avg_ret = np.mean(pnls)
-                    std_ret = np.std(pnls)
-                    sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
-                else:
-                    sharpe = 0.0
-
-                # Max Drawdown
-                equity_curve = np.cumsum(pnls)
-                peak = np.maximum.accumulate(equity_curve)
-                drawdown = peak - equity_curve
-                max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
-
-                metrics = {
-                    "sharpe_ratio": float(sharpe),
-                    "profit_factor": float(profit_factor),
-                    "max_drawdown": float(max_dd),
+        with (
+            DB_QUERY_LATENCY.labels(query_type="read_performance_report").time(),
+            self.Session() as session,
+        ):
+            trades = session.query(Trade).filter(Trade.status == "CLOSED").all()
+            if not trades:
+                return {
+                    "sharpe_ratio": 0.0,
+                    "profit_factor": 0.0,
+                    "max_drawdown": 0.0,
                 }
 
-                # Optionally log these metrics to DB
-                metric_record = PerformanceMetric(
-                    sharpe_ratio=metrics["sharpe_ratio"],
-                    profit_factor=metrics["profit_factor"],
-                    max_drawdown=metrics["max_drawdown"],
-                    total_trades=len(trades),
-                    win_rate=float(np.sum(pnls > 0) / len(pnls)),
-                )
-                session.add(metric_record)
-                session.commit()
+            pnls = np.array([t.pnl for t in trades])
 
-                return metrics
+            # Profit Factor
+            gross_profit = np.sum(pnls[pnls > 0])
+            gross_loss = abs(np.sum(pnls[pnls < 0]))
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+
+            # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
+            if len(pnls) > 1:
+                avg_ret = np.mean(pnls)
+                std_ret = np.std(pnls)
+                sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
+            else:
+                sharpe = 0.0
+
+            # Max Drawdown
+            equity_curve = np.cumsum(pnls)
+            peak = np.maximum.accumulate(equity_curve)
+            drawdown = peak - equity_curve
+            max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
+
+            metrics = {
+                "sharpe_ratio": float(sharpe),
+                "profit_factor": float(profit_factor),
+                "max_drawdown": float(max_dd),
+            }
+
+            # Optionally log these metrics to DB
+            metric_record = PerformanceMetric(
+                sharpe_ratio=metrics["sharpe_ratio"],
+                profit_factor=metrics["profit_factor"],
+                max_drawdown=metrics["max_drawdown"],
+                total_trades=len(trades),
+                win_rate=float(np.sum(pnls > 0) / len(pnls)),
+            )
+            session.add(metric_record)
+            session.commit()
+
+            return metrics
