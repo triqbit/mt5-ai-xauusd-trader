@@ -67,6 +67,13 @@ class TradingConfig(BaseSettings):
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
     confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
+    # ── Drift Detection ─────────────────────────────────────────────────────
+    drift_window_short: int = Field(default=50, description="Short window for drift detection")
+    drift_window_long: int = Field(default=200, description="Long window for drift detection")
+    drift_accuracy_threshold: float = Field(default=0.1, description="Max allowed win rate drop")
+    drift_confidence_threshold: float = Field(default=0.15, description="Max allowed confidence drop")
+    drift_psi_threshold: float = Field(default=0.2, description="Population Stability Index threshold")
+
     @field_validator("risk_per_trade")
     @classmethod
     def risk_must_be_safe(cls, v: float) -> float:

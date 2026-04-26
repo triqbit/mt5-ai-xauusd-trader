@@ -111,6 +111,20 @@ class PerformanceMetric(Base, AuditMixin):
     win_rate = Column(Float)
 
 
+class DriftEvent(Base, AuditMixin):
+    """Logs model performance and concept drift events."""
+
+    __tablename__ = "drift_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    metric_name = Column(String(50), nullable=False)
+    metric_value = Column(Float, nullable=False)
+    threshold = Column(Float, nullable=False)
+    algorithm = Column(String(50))
+    metadata_json = Column(Text)  # Store additional info as JSON string
+
+
 class TradeLogger:
     """Enterprise trade logging interface."""
 
@@ -211,6 +225,19 @@ class TradeLogger:
                 description=description,
                 symbol=symbol,
                 signal_id=signal_id,
+            )
+            session.add(event)
+            session.commit()
+
+    def log_drift_event(self, drift_data: Dict[str, Any]) -> None:
+        """Log a drift detection event."""
+        with self.Session() as session:
+            event = DriftEvent(
+                metric_name=drift_data["metric_name"],
+                metric_value=drift_data["metric_value"],
+                threshold=drift_data["threshold"],
+                algorithm=drift_data.get("algorithm"),
+                metadata_json=drift_data.get("metadata_json"),
             )
             session.add(event)
             session.commit()
