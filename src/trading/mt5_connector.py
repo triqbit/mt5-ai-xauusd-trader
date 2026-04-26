@@ -29,7 +29,9 @@ except ImportError:
     METAAPI_AVAILABLE = False
     MetaApi = None
 
+from pydantic import TypeAdapter, ValidationError
 from src.core.config import TradingConfig
+from src.schemas.market_data import OHLCVData
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -166,7 +168,16 @@ class MT5Connector:
                 return pd.DataFrame()
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
-            return df
+
+            # Validate market data
+            try:
+                data_list = df.to_dict("records")
+                adapter = TypeAdapter(list[OHLCVData])
+                adapter.validate_python(data_list)
+                return df
+            except ValidationError as e:
+                logger.error("Market data validation failed for %s: %s", symbol, e)
+                return pd.DataFrame()
         else:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")

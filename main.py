@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from pydantic import ValidationError
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
@@ -102,18 +103,27 @@ def run_live(
                 avg_win=4 * atr,
                 avg_loss=2 * atr,
             )
-            signal = TradeSignal(
-                symbol=cfg.symbol,
-                direction=direction,
-                entry_price=price,
-                stop_loss=stop_loss,
-                take_profit=take_profit,
-                lot_size=lot_size,
-                algorithm=cfg.algorithm,
-                confidence=confidence,
-            )
+            try:
+                signal = TradeSignal(
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    entry_price=price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    lot_size=lot_size,
+                    algorithm=cfg.algorithm,
+                    confidence=confidence,
+                )
+            except ValidationError as e:
+                log.error("Failed to construct valid TradeSignal: %s", e)
+                if monitor:
+                    monitor.send_message(f"⚠️ Validation Error: Failed to construct TradeSignal for {cfg.symbol}")
+                time.sleep(poll_interval)
+                continue
+
             # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
+            decision = risk.approve(signal, signal_id=signal_id)
+            if decision.approved:
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
