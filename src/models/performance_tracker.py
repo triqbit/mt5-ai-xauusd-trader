@@ -5,12 +5,13 @@ Performance tracking and drift detection system.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import json
 import logging
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -74,7 +75,9 @@ class PerformanceTracker:
     def record_outcome(self, prediction_id: Any, win: bool) -> None:
         """Record the outcome of a prediction."""
         if prediction_id not in self.pending_predictions:
-            logger.debug("record_outcome called for unknown prediction_id: %s", prediction_id)
+            logger.debug(
+                "record_outcome called for unknown prediction_id: %s", prediction_id
+            )
             return
 
         prediction = self.pending_predictions.pop(prediction_id)
@@ -102,7 +105,7 @@ class PerformanceTracker:
             algo_dir = 1 if algo_dir_idx == 0 else (-1 if algo_dir_idx == 1 else 0)
 
             if algo_dir == 0:
-                continue # Hold doesn't count towards win rate degradation in this context
+                continue  # Hold doesn't count towards win rate degradation in this context
 
             # If ensemble direction matches algo direction, then algo win = ensemble win
             if algo_dir == prediction["direction"]:
@@ -153,13 +156,19 @@ class PerformanceTracker:
         if len(self.history) < self.window_short:
             return None
 
-        recent = list(self.history)[-self.window_short:]
-        historical = list(self.history)[:-self.window_short] if len(self.history) > self.window_short else []
+        recent = list(self.history)[-self.window_short :]
+        historical = (
+            list(self.history)[: -self.window_short]
+            if len(self.history) > self.window_short
+            else []
+        )
 
         recent_acc = np.mean([x["win"] for x in recent])
 
         # Compare to baseline (either historical or fixed threshold)
-        baseline_acc = np.mean([x["win"] for x in historical]) if historical else 0.55 # Assume 55% as healthy baseline
+        baseline_acc = (
+            np.mean([x["win"] for x in historical]) if historical else 0.55
+        )  # Assume 55% as healthy baseline
 
         diff = baseline_acc - recent_acc
         if diff > self.cfg.drift_accuracy_threshold:
@@ -169,7 +178,7 @@ class PerformanceTracker:
 
     def _check_confidence_drift(self) -> Optional[Dict[str, Any]]:
         """Detect if model is becoming overconfident or underconfident."""
-        recent = list(self.history)[-self.window_short:]
+        recent = list(self.history)[-self.window_short :]
         avg_conf = np.mean([x["confidence"] for x in recent])
         avg_win = np.mean([x["win"] for x in recent])
 
@@ -177,23 +186,37 @@ class PerformanceTracker:
         calibration_error = abs(avg_conf - avg_win)
         if calibration_error > self.cfg.drift_confidence_threshold:
             self._trigger_alert("Confidence Calibration Drift", avg_conf, avg_win)
-            return {"avg_confidence": avg_conf, "win_rate": avg_win, "error": calibration_error}
+            return {
+                "avg_confidence": avg_conf,
+                "win_rate": avg_win,
+                "error": calibration_error,
+            }
         return None
 
-    def _calculate_psi(self, expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
+    def _calculate_psi(
+        self, expected: np.ndarray, actual: np.ndarray, buckets: int = 10
+    ) -> float:
         """Calculate Population Stability Index."""
+
         def scale_range(data, min_val, max_val):
             return (data - min_val) / (max_val - min_val + 1e-9)
 
         # Quantize into buckets
-        expected_percents = np.histogram(expected, bins=buckets, range=(0, 1))[0] / len(expected)
-        actual_percents = np.histogram(actual, bins=buckets, range=(0, 1))[0] / len(actual)
+        expected_percents = np.histogram(expected, bins=buckets, range=(0, 1))[0] / len(
+            expected
+        )
+        actual_percents = np.histogram(actual, bins=buckets, range=(0, 1))[0] / len(
+            actual
+        )
 
         # Avoid division by zero
         expected_percents = np.clip(expected_percents, 0.0001, 1)
         actual_percents = np.clip(actual_percents, 0.0001, 1)
 
-        psi = np.sum((actual_percents - expected_percents) * np.log(actual_percents / expected_percents))
+        psi = np.sum(
+            (actual_percents - expected_percents)
+            * np.log(actual_percents / expected_percents)
+        )
         return float(psi)
 
     def _check_distribution_shift(self) -> Optional[Dict[str, Any]]:
@@ -201,12 +224,18 @@ class PerformanceTracker:
         if len(self.history) < self.window_long:
             return None
 
-        recent_probs = np.array([x["probs"] for x in list(self.history)[-self.window_short:]]).flatten()
-        historical_probs = np.array([x["probs"] for x in list(self.history)[:-self.window_short]]).flatten()
+        recent_probs = np.array(
+            [x["probs"] for x in list(self.history)[-self.window_short :]]
+        ).flatten()
+        historical_probs = np.array(
+            [x["probs"] for x in list(self.history)[: -self.window_short]]
+        ).flatten()
 
         psi = self._calculate_psi(historical_probs, recent_probs)
         if psi > self.cfg.drift_psi_threshold:
-            self._trigger_alert("Prediction Distribution Shift", psi, self.cfg.drift_psi_threshold)
+            self._trigger_alert(
+                "Prediction Distribution Shift", psi, self.cfg.drift_psi_threshold
+            )
             return {"psi": psi, "threshold": self.cfg.drift_psi_threshold}
         return None
 
@@ -230,8 +259,12 @@ class PerformanceTracker:
             if len(history) < self.window_short:
                 continue
 
-            recent_acc = np.mean(list(history)[-self.window_short:])
-            historical_acc = np.mean(list(history)[:-self.window_short]) if len(history) > self.window_short else 0.55
+            recent_acc = np.mean(list(history)[-self.window_short :])
+            historical_acc = (
+                np.mean(list(history)[: -self.window_short])
+                if len(history) > self.window_short
+                else 0.55
+            )
 
             if (historical_acc - recent_acc) > self.cfg.drift_accuracy_threshold:
                 self._trigger_alert(f"Algo Drift: {algo}", recent_acc, historical_acc)
@@ -239,22 +272,32 @@ class PerformanceTracker:
 
         return drifts if drifts else None
 
-    def _trigger_alert(self, metric_name: str, current_value: float, threshold_or_baseline: float) -> None:
+    def _trigger_alert(
+        self, metric_name: str, current_value: float, threshold_or_baseline: float
+    ) -> None:
         """Log drift event to DB and send monitor alert."""
-        logger.warning("DRIFT DETECTED | %s: %.4f (baseline/threshold: %.4f)",
-                       metric_name, current_value, threshold_or_baseline)
+        logger.warning(
+            "DRIFT DETECTED | %s: %.4f (baseline/threshold: %.4f)",
+            metric_name,
+            current_value,
+            threshold_or_baseline,
+        )
 
         if self.db:
-            self.db.log_drift_event({
-                "metric_name": metric_name,
-                "metric_value": float(current_value),
-                "threshold": float(threshold_or_baseline),
-                "algorithm": self.cfg.algorithm,
-                "metadata_json": json.dumps({
-                    "window_short": self.window_short,
-                    "window_long": self.window_long
-                })
-            })
+            self.db.log_drift_event(
+                {
+                    "metric_name": metric_name,
+                    "metric_value": float(current_value),
+                    "threshold": float(threshold_or_baseline),
+                    "algorithm": self.cfg.algorithm,
+                    "metadata_json": json.dumps(
+                        {
+                            "window_short": self.window_short,
+                            "window_long": self.window_long,
+                        }
+                    ),
+                }
+            )
 
         if self.monitor:
             msg = (

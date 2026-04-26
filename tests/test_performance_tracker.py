@@ -4,7 +4,8 @@ from src.models.performance_tracker import PerformanceTracker
 from src.core.config import TradingConfig
 from unittest.mock import MagicMock
 
-def test_accuracy_drift():
+def test_accuracy_drift(monkeypatch):
+    monkeypatch.delenv("RISK_PER_TRADE", raising=False)
     config = TradingConfig(mt5_password="pass", mt5_server="serv")
     config.drift_window_short = 5
     config.drift_window_long = 10
@@ -26,7 +27,8 @@ def test_accuracy_drift():
     assert "accuracy_degradation" in drifts
     assert drifts["accuracy_degradation"]["recent"] == 0.0
 
-def test_confidence_drift():
+def test_confidence_drift(monkeypatch):
+    monkeypatch.delenv("RISK_PER_TRADE", raising=False)
     config = TradingConfig(mt5_password="pass", mt5_server="serv")
     config.drift_window_short = 5
     config.drift_confidence_threshold = 0.1
@@ -41,7 +43,8 @@ def test_confidence_drift():
     drifts = tracker.check_drift()
     assert "confidence_drift" in drifts
 
-def test_weight_imbalance():
+def test_weight_imbalance(monkeypatch):
+    monkeypatch.delenv("RISK_PER_TRADE", raising=False)
     config = TradingConfig(mt5_password="pass", mt5_server="serv")
     tracker = PerformanceTracker(config)
 

@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -44,7 +45,9 @@ class TradingConfig(BaseSettings):
     # ── Trading parameters ─────────────────────────────────────────────────────
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
-    mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
+    mode: Literal["demo", "live", "backtest"] = Field(
+        default="demo", description="Execution mode"
+    )
     max_positions: int = Field(default=3, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
@@ -56,7 +59,9 @@ class TradingConfig(BaseSettings):
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
+    database_url: str = Field(
+        default="postgresql://trader:password@localhost:5432/mt5_trades"
+    )
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
@@ -68,11 +73,21 @@ class TradingConfig(BaseSettings):
     confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     # ── Drift Detection ─────────────────────────────────────────────────────
-    drift_window_short: int = Field(default=50, description="Short window for drift detection")
-    drift_window_long: int = Field(default=200, description="Long window for drift detection")
-    drift_accuracy_threshold: float = Field(default=0.1, description="Max allowed win rate drop")
-    drift_confidence_threshold: float = Field(default=0.15, description="Max allowed confidence drop")
-    drift_psi_threshold: float = Field(default=0.2, description="Population Stability Index threshold")
+    drift_window_short: int = Field(
+        default=50, description="Short window for drift detection"
+    )
+    drift_window_long: int = Field(
+        default=200, description="Long window for drift detection"
+    )
+    drift_accuracy_threshold: float = Field(
+        default=0.1, description="Max allowed win rate drop"
+    )
+    drift_confidence_threshold: float = Field(
+        default=0.15, description="Max allowed confidence drop"
+    )
+    drift_psi_threshold: float = Field(
+        default=0.2, description="Population Stability Index threshold"
+    )
 
     @field_validator("risk_per_trade")
     @classmethod

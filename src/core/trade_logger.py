@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
@@ -261,7 +263,9 @@ class TradeLogger:
             # Profit Factor
             gross_profit = np.sum(pnls[pnls > 0])
             gross_loss = abs(np.sum(pnls[pnls < 0]))
-            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+            profit_factor = (
+                gross_profit / gross_loss if gross_loss > 0 else float("inf")
+            )
 
             # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
             if len(pnls) > 1:

@@ -10,17 +10,18 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
 import logging
 import os
 import sys
-import numpy as np
 import time
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import structlog
 
 from src.core.config import get_config
@@ -103,7 +104,7 @@ def run_live(
                     confidence=confidence,
                     direction=direction,
                     algorithm_weights=model.weights,
-                    algo_decisions=per_algo_votes
+                    algo_decisions=per_algo_votes,
                 )
 
             if direction == 0:
@@ -160,7 +161,11 @@ def run_live(
                         trade_info = trade_logger.get_trade_by_ticket(ticket)
                         if trade_info:
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
-                            exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                            exit_price = (
+                                tick["bid"]
+                                if trade_info.direction == 1
+                                else tick["ask"]
+                            )
                             # P&L will be calculated automatically by update_trade
                             trade_logger.update_trade(
                                 ticket=ticket,
@@ -173,8 +178,7 @@ def run_live(
                                 if updated_trade:
                                     win = updated_trade.pnl > 0
                                     tracker.record_outcome(
-                                        prediction_id=updated_trade.signal_id,
-                                        win=win
+                                        prediction_id=updated_trade.signal_id, win=win
                                     )
 
                     closed_tickets.append(symbol)
@@ -198,7 +202,9 @@ def run_live(
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
+    p = argparse.ArgumentParser(
+        description="MT5 AI/ML Trading Bot - Enterprise Edition"
+    )
     p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
     p.add_argument(
         "--algo",
@@ -235,7 +241,9 @@ def main() -> int:
         return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
-        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+        db_url=(
+            cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+        )
     )
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
