@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 
 
 class TradingEnv(gym.Env):
@@ -24,12 +25,20 @@ class TradingEnv(gym.Env):
     def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
                  window_size: int = 60, commission: float = 0.0002):
         super().__init__()
-        self.data = data
+        # Pre-cast to float32 for performance and consistency with Gym spaces
+        self.data = data.astype(np.float32)
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
 
+        # Pre-calculate rolling mean and std for O(1) observation generation
+        df = pd.DataFrame(self.data)
+        self.rolling_means = df.rolling(window=window_size).mean().values.astype(np.float32)
+        # Use ddof=0 to match numpy.std() default
+        self.rolling_stds = df.rolling(window=window_size).std(ddof=0).values.astype(np.float32)
+
         n_features = data.shape[1]
+        self.n_features = n_features
 
         # Observation: window of market data + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
@@ -40,6 +49,9 @@ class TradingEnv(gym.Env):
 
         # Actions: 0=Hold, 1=Buy, 2=Sell
         self.action_space = gym.spaces.Discrete(3)
+
+        # Pre-allocate observation buffer to reduce GC pressure
+        self.obs_buffer = np.zeros(self.observation_space.shape, dtype=np.float32)
 
         self.reset()
 
@@ -86,11 +98,26 @@ class TradingEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
+        # Vectorized and pre-calculated observation generation
+        # window = self.data[self.current_step - self.window_size:self.current_step]
+        # obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
+
+        # rolling_means[i] is mean of data[i-W+1 : i+1]
+        # We want mean of data[current_step - window_size : current_step]
+        # This corresponds to index current_step - 1
+        idx = self.current_step - 1
+        mean = self.rolling_means[idx]
+        std = self.rolling_stds[idx]
+
         window = self.data[self.current_step - self.window_size:self.current_step]
-        # Normalize window
-        obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
-        portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
-        return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
+        obs = (window - mean) / (std + 1e-8)
+
+        # Use buffer and ravel() to avoid unnecessary copies
+        self.obs_buffer[:self.window_size * self.n_features] = obs.ravel()
+        self.obs_buffer[-2] = self.balance / self.initial_balance
+        self.obs_buffer[-1] = self.position
+
+        return self.obs_buffer.copy()
 
     def render(self):
         print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
