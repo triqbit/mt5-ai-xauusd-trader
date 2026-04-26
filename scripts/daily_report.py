@@ -11,10 +11,11 @@ from pathlib import Path
 root_path = Path(__file__).resolve().parents[1]
 sys.path.append(str(root_path))
 
-from src.core.config import get_config
-from src.core.monitor import Monitor
-from src.core.trade_logger import TradeLogger, Trade
-from sqlalchemy import and_
+from sqlalchemy import and_  # noqa: E402
+
+from src.core.config import get_config  # noqa: E402
+from src.core.monitor import Monitor  # noqa: E402
+from src.core.trade_logger import Trade, TradeLogger  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("daily_report")
@@ -41,7 +42,6 @@ def generate_report():
 
         if not daily_trades:
             logger.info("No trades found for the last 24 hours.")
-            # monitor.send_message("📅 Daily Report: No trades executed in the last 24 hours.")
             return
 
         total_pnl = sum(t.pnl for t in daily_trades)
@@ -63,7 +63,6 @@ def generate_report():
             f"--------------------------------\n"
         )
 
-        # Add summary of best/worst trade
         if daily_trades:
             best_trade = max(daily_trades, key=lambda t: t.pnl)
             worst_trade = min(daily_trades, key=lambda t: t.pnl)

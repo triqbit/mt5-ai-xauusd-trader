@@ -2,18 +2,18 @@
 Weekly Model Drift Audit Script
 Compares AI predictions against realized trade outcomes.
 """
-import sys
 import logging
-from pathlib import Path
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 # Add project root to sys.path
 root_path = Path(__file__).resolve().parents[1]
 sys.path.append(str(root_path))
 
-from src.core.config import get_config
-from src.core.monitor import Monitor
-from src.core.trade_logger import TradeLogger, ModelSignal
+from src.core.config import get_config  # noqa: E402
+from src.core.monitor import Monitor  # noqa: E402
+from src.core.trade_logger import ModelSignal, TradeLogger  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("model_drift_audit")
@@ -53,8 +53,6 @@ def audit_drift():
 
         logger.info(f"Audit Complete: Accuracy={accuracy:.1f}%, Avg Confidence={avg_confidence:.2f}")
 
-        # Alert if accuracy is significantly lower than confidence (Drift detected)
-        # Or if accuracy falls below a hard threshold
         if accuracy < 52.0:
             msg = (
                 f"⚠️ *Model Drift Alert*\n"
@@ -65,7 +63,7 @@ def audit_drift():
                 f"Market conditions may have shifted. Consider re-training the ensemble."
             )
             monitor.send_message(msg)
-        elif accuracy < avg_confidence * 80: # e.g. if conf is 0.7 (70%) and accuracy is 55%
+        elif accuracy < avg_confidence * 80:
              msg = (
                 f"📉 *Model Performance Warning*\n"
                 f"Accuracy ({accuracy:.1f}%) is lagging behind Model Confidence ({avg_confidence*100:.1f}%).\n"

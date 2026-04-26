@@ -3,7 +3,8 @@ Sentiment Analyzer Module
 Analyzes market sentiment using financial news or social media signals.
 """
 import logging
-from typing import Dict, Optional
+from typing import Dict
+
 
 class SentimentAnalyzer:
     """
@@ -24,8 +25,7 @@ class SentimentAnalyzer:
             return
 
         try:
-            from transformers import AutoTokenizer, AutoModelForSequenceClassification
-            import torch
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
@@ -70,8 +70,8 @@ class SentimentAnalyzer:
         """
         # In reality, fetch recent headlines for the symbol here.
         dummy_headlines = [
-            f"Gold prices steady as investors await inflation data",
-            f"XAUUSD faces resistance near multi-month highs",
+            "Gold prices steady as investors await inflation data",
+            "XAUUSD faces resistance near multi-month highs",
         ]
 
         scores = []

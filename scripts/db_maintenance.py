@@ -2,18 +2,19 @@
 Monthly Database Maintenance Script
 Archives old data and optimizes the database.
 """
-import sys
 import logging
-from pathlib import Path
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
 from sqlalchemy import text
 
 # Add project root to sys.path
 root_path = Path(__file__).resolve().parents[1]
 sys.path.append(str(root_path))
 
-from src.core.config import get_config
-from src.core.trade_logger import TradeLogger, Trade, ModelSignal, RiskEvent
+from src.core.config import get_config  # noqa: E402
+from src.core.trade_logger import ModelSignal, Trade, TradeLogger  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("db_maintenance")
@@ -31,15 +32,11 @@ def run_maintenance():
 
     try:
         with trade_logger.Session() as session:
-            # Note: In a real system, we would move these to an 'archived_trades' table
-            # Here we will just mark as deleted or log count to simulate maintenance
-
             old_trades = session.query(Trade).filter(Trade.created_at < archive_threshold).count()
             old_signals = session.query(ModelSignal).filter(ModelSignal.created_at < archive_threshold).count()
 
             logger.info(f"Found {old_trades} old trades and {old_signals} old signals to archive.")
 
-            # Perform optimization
             if "sqlite" in cfg.database_url:
                 logger.info("Running SQLite VACUUM...")
                 session.execute(text("VACUUM"))
