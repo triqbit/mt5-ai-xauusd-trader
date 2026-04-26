@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
@@ -255,7 +255,7 @@ class TradeLogger:
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
         """
         with self.Session() as session:
-            stmt = select(Trade).where(Trade.status == "CLOSED", Trade.is_deleted == False)
+            stmt = select(Trade).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
             trades = session.execute(stmt).scalars().all()
             if not trades:
                 return {
