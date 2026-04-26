@@ -176,6 +176,40 @@ class MT5Connector:
         """Alias for get_rates() to match main.py expectations."""
         return self.get_rates(symbol, timeframe, n_bars)
 
+    def get_rates_range(
+        self, symbol: str, timeframe: str, date_from: datetime, date_to: datetime
+    ) -> pd.DataFrame:
+        """
+        Fetch historical OHLCV data between two dates.
+
+        Args:
+            symbol: Trading symbol.
+            timeframe: Chart timeframe string.
+            date_from: Start date.
+            date_to: End date.
+
+        Returns:
+            DataFrame containing OHLCV data.
+        """
+        if not self._is_initialized:
+            return pd.DataFrame()
+
+        tf = TIMEFRAME_MAP.get(timeframe, 5)
+
+        if not self.use_metaapi:
+            rates = mt5.copy_rates_range(symbol, tf, date_from, date_to)
+            if rates is None:
+                logger.error(
+                    "Failed to copy rates range for %s: %s", symbol, mt5.last_error()
+                )
+                return pd.DataFrame()
+            df = pd.DataFrame(rates)
+            df["time"] = pd.to_datetime(df["time"], unit="s")
+            return df
+        else:
+            logger.warning("MetaAPI get_rates_range not implemented in sync wrapper.")
+            return pd.DataFrame()
+
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
         Retrieve latest symbol tick (bid/ask).

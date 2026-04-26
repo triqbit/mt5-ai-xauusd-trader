@@ -17,15 +17,19 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
 import structlog
+from tabulate import tabulate
 
 from src.core.config import get_config
+from src.core.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.backtester import Backtester
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -179,6 +183,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument("--start", default="2024-01-01", help="Backtest start date (YYYY-MM-DD)")
+    p.add_argument("--end", default="2024-04-01", help="Backtest end date (YYYY-MM-DD)")
     return p.parse_args()
 
 
@@ -200,7 +206,7 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
+    if cfg.mode != "backtest" and not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
     balance = connector.get_account_balance()
@@ -222,7 +228,39 @@ def main() -> int:
             run_live(cfg, connector, risk, model, trade_logger=trade_logger)
             run_live(cfg, connector, risk, model, monitor)
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            log.info("Starting backtest from %s to %s", args.start, args.end)
+            date_from = datetime.strptime(args.start, "%Y-%m-%d")
+            date_to = datetime.strptime(args.end, "%Y-%m-%d")
+
+            # Fetch data for all timeframes
+            fe = FeatureEngineer(base_timeframe=cfg.timeframe)
+            multi_tf_data = {}
+            for tf in fe.timeframes:
+                # Add 30-day indicators warmup period
+                warmup_start = date_from - timedelta(days=30)
+                df = connector.get_rates_range(cfg.symbol, tf, warmup_start, date_to)
+                if not df.empty:
+                    multi_tf_data[tf] = df
+                    log.info("Fetched %d bars for %s", len(df), tf)
+
+            if not multi_tf_data:
+                log.error("No data fetched for backtest. Ensure MT5 is connected and history is available.")
+                return 1
+
+            backtester = Backtester(cfg, model, fe)
+            report = backtester.run(multi_tf_data, initial_balance=balance)
+
+            table = [
+                ["Metric", "Value"],
+                ["Total Return", f"{report.total_return_pct:.2f}%"],
+                ["Annualized Return", f"{report.annualized_return_pct:.2f}%"],
+                ["Sharpe Ratio", f"{report.sharpe_ratio:.2f}"],
+                ["Max Drawdown", f"{report.max_drawdown_pct:.2f}%"],
+                ["Profit Factor", f"{report.profit_factor:.2f}"],
+                ["Win Rate", f"{report.win_rate_pct:.2f}%"],
+                ["Total Trades", report.total_trades],
+            ]
+            print("\n" + tabulate(table, headers="firstrow", tablefmt="grid") + "\n")
     finally:
         connector.disconnect()
     return 0
