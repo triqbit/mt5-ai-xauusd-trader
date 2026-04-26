@@ -20,9 +20,10 @@ import time
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 import structlog
 
-from src.core.config import get_config
+from src.core.config import get_config, TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -54,7 +55,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
@@ -64,15 +65,27 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    window_size = 60
+
     while True:
         try:
             # 1. Fetch latest market data
+            # Fetch more bars to ensure we have enough for technical indicators if needed
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+            if df.empty or len(df) < window_size:
+                log.warning("Insufficient data fetched. Retrying...")
+                time.sleep(10)
+                continue
+
             tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
+            # 2. Build observation vector and sequence
+            features = ["open", "high", "low", "close", "tick_volume"]
+            current_obs = df[features].values[-1]
+            sequence = df[features].values[-window_size:]
+
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            direction, confidence, _per_algo = model.predict(obs=current_obs, seq=sequence)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -155,7 +168,10 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
+
+            time.sleep(poll_interval)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -207,9 +223,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +234,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
