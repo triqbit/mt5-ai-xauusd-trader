@@ -1,0 +1,12 @@
+services:
+  trader:
+    build: .
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+      - "8050:8050"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
