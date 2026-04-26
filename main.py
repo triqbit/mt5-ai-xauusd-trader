@@ -3,29 +3,32 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 main.py - CLI entrypoint
 
 Usage:
-    python main.py --mode demo --algo ensemble
-    python main.py --mode live --algo ppo
-    python main.py --mode backtest --start 2023-01-01 --end 2023-12-31
+    python main.py run --mode demo --algo ensemble
+    python main.py status
+    python main.py report --period 7d
 
 Author : triqbit
 License: MIT
 """
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
+import click
+
+if TYPE_CHECKING:
+    from src.models.ensemble import EnsembleModel
 import structlog
 
+from src.cli.commands import cli
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -155,7 +158,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -164,33 +168,29 @@ def run_live(
             time.sleep(poll_interval)
 
 
-# -- CLI -------------------------------------------------------------------
+@cli.command()
+@click.option("--mode", type=click.Choice(["demo", "live", "backtest"]), default="demo")
+@click.option(
+    "--algo",
+    type=click.Choice(["ppo", "dreamer", "lstm", "ensemble"]),
+    default="ensemble",
+)
+@click.option("--symbol", default="XAUUSD")
+@click.option("--timeframe", default="M5")
+@click.option("--model-dir", type=click.Path(exists=True, file_okay=False, path_type=Path), default=Path("models/trained"))
+@click.option("--log-level", default="INFO")
+def run(mode, algo, symbol, timeframe, model_dir, log_level):
+    """Run the trading bot."""
+    from src.models.ensemble import EnsembleModel
 
-
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
-    p.add_argument(
-        "--algo",
-        choices=["ppo", "dreamer", "lstm", "ensemble"],
-        default="ensemble",
-    )
-    p.add_argument("--symbol", default="XAUUSD")
-    p.add_argument("--timeframe", default="M5")
-    p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
-    p.add_argument("--log-level", default="INFO")
-    return p.parse_args()
-
-
-def main() -> int:
-    args = parse_args()
-    configure_logging(args.log_level)
+    configure_logging(log_level)
     log = logging.getLogger("main")
     # Override config from CLI
-    os.environ.setdefault("MODE", args.mode)
-    os.environ.setdefault("ALGORITHM", args.algo)
-    os.environ.setdefault("SYMBOL", args.symbol)
-    os.environ.setdefault("TIMEFRAME", args.timeframe)
+    os.environ["MODE"] = mode
+    os.environ["ALGORITHM"] = algo
+    os.environ["SYMBOL"] = symbol
+    os.environ["TIMEFRAME"] = timeframe
+
     cfg = get_config()
     log.info(
         "Configuration loaded | mode=%s algo=%s symbol=%s",
@@ -202,31 +202,31 @@ def main() -> int:
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
-        return 1
+        sys.exit(1)
+
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+
     model = EnsembleModel(device="cpu")
-    ppo_path = args.model_dir / "ppo_xauusd.zip"
-    lstm_path = args.model_dir / "lstm_xauusd.pt"
+    ppo_path = model_dir / "ppo_xauusd.zip"
+    lstm_path = model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
         model.load_ppo(ppo_path)
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
         connector.disconnect()
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    cli()
