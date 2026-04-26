@@ -1,0 +1,121 @@
+name: Pre-Deployment Validation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # 1. CI Validation: Reuse or replicate core CI checks
+  ci-validation:
+    name: CI Checksum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3
+          pip install -r requirements-ci.txt
+      - name: Lint & Format Check
+        run: ruff check src/ main.py && ruff format --check src/ main.py
+      - name: Static Type Check
+        run: mypy src/ main.py
+      - name: Dependency Audit
+        run: pip-audit --requirement requirements-ci.txt
+      - name: Run Tests with Coverage
+        run: |
+          # TA-Lib installation
+          sudo apt-get update -qq && sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j2 && sudo make install && cd ..
+          sudo ldconfig
+          pytest tests/ --cov=src --cov-fail-under=80 -v
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
+
+  # 2. Environment completeness check
+  env-validation:
+    name: Environment Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install Pydantic
+        run: pip install pydantic==2.7.1 pydantic-settings==2.2.1
+      - name: Validate Env Vars
+        run: python scripts/validate_env.py
+        env:
+          # Providing required fields to test validation logic
+          MT5_LOGIN: "123456"
+          MT5_PASSWORD: "dummy_password"
+          MT5_SERVER: "dummy_server"
+          MODE: "demo"
+
+  # 3. Migration Reversibility Check
+  migration-validation:
+    name: Database Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          pip install alembic==1.13.1 sqlalchemy==2.0.30 pydantic==2.7.1 pydantic-settings==2.2.1
+          pip install numpy==1.26.4 structlog==24.1.0 rich==13.7.1
+      - name: Validate Migrations
+        run: ./scripts/validate_migrations.sh
+
+  # 4. Secret Scanning
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 5. Docker Build & Vulnerability Scan
+  docker-validation:
+    name: Docker Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build local image
+        run: docker build -t trading-bot:test .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'trading-bot:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  # 6. Release Notes Validation
+  release-notes-validation:
+    name: Release Notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate CHANGELOG
+        run: ./scripts/validate_release_notes.sh
