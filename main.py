@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+import torch
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
@@ -67,12 +68,26 @@ def run_live(
     while True:
         try:
             # 1. Fetch latest market data
+            # Fetch enough bars for LSTM (e.g., 30)
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+            if df.empty:
+                log.warning("No data returned for %s", cfg.symbol)
+                time.sleep(poll_interval)
+                continue
+
             tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
+
+            # 2. Build observation and sequence
+            # Single observation (last bar)
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
+            # Sequence for LSTM (e.g., last 30 bars)
+            # Normalization would be better here, but let's keep it simple for now as per current architecture
+            seq_data = df[["open", "high", "low", "close", "tick_volume"]].values[-30:]
+            seq_tensor = torch.FloatTensor(seq_data)
+
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            direction, confidence, _per_algo = model.predict(obs, seq=seq_tensor)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -91,17 +106,21 @@ def run_live(
                 log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
                 continue
+
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
+            # Basic ATR calculation
             atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
+
             lot_size = risk.size_position(
                 cfg.symbol,
                 win_rate=0.58,
                 avg_win=4 * atr,
                 avg_loss=2 * atr,
             )
+
             signal = TradeSignal(
                 symbol=cfg.symbol,
                 direction=direction,
@@ -112,6 +131,7 @@ def run_live(
                 algorithm=cfg.algorithm,
                 confidence=confidence,
             )
+
             # 5. Risk approval gate
             if risk.approve(signal, signal_id=signal_id):
                 ticket = connector.place_order(signal)
@@ -127,6 +147,7 @@ def run_live(
                             lot_size=lot_size,
                             signal_id=signal_id,
                         )
+
             # 6. Check for closed positions to update logger
             current_positions = connector.get_positions(cfg.symbol)
             current_tickets = {p["ticket"] for p in current_positions}
@@ -134,15 +155,12 @@ def run_live(
             closed_tickets = []
             for symbol, ticket in list(risk.open_positions.items()):
                 if symbol == cfg.symbol and ticket not in current_tickets:
-                    # Position closed - in a real scenario we'd fetch deal history
+                    # Position closed
                     log.info("Position CLOSED | ticket=%d", ticket)
                     if trade_logger:
-                        # Retrieve trade info from DB to get correct direction
                         trade_info = trade_logger.get_trade_by_ticket(ticket)
                         if trade_info:
-                            # For a BUY, exit at BID. For a SELL, exit at ASK.
                             exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
-                            # P&L will be calculated automatically by update_trade
                             trade_logger.update_trade(
                                 ticket=ticket,
                                 exit_price=exit_price,
@@ -155,7 +173,9 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
+
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -186,11 +206,13 @@ def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
     log = logging.getLogger("main")
+
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
+
     cfg = get_config()
     log.info(
         "Configuration loaded | mode=%s algo=%s symbol=%s",
@@ -198,29 +220,33 @@ def main() -> int:
         cfg.algorithm,
         cfg.symbol,
     )
+
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
+
     balance = connector.get_account_balance()
+
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
+
     if ppo_path.exists():
         model.load_ppo(ppo_path)
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
