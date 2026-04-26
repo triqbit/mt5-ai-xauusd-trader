@@ -15,7 +15,6 @@ from typing import Any, Dict, Optional
 import numpy as np
 from sqlalchemy import (
     Boolean,
-    Column,
     DateTime,
     Float,
     ForeignKey,
@@ -24,24 +23,30 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
-Base = declarative_base()
 logger = logging.getLogger(__name__)
+
+
+class Base(DeclarativeBase):
+    """Modern SQLAlchemy 2.0 Base."""
+
+    pass
 
 
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -49,19 +54,21 @@ class ModelSignal(Base, AuditMixin):
 
     __tablename__ = "model_signals"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False)
-    direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
-    entry_price = Column(Float, nullable=False)
-    stop_loss = Column(Float)
-    take_profit = Column(Float)
-    lot_size = Column(Float)
-    algorithm = Column(String(50))
-    confidence = Column(Float)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    direction: Mapped[int] = mapped_column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    stop_loss: Mapped[Optional[float]] = mapped_column(Float)
+    take_profit: Mapped[Optional[float]] = mapped_column(Float)
+    lot_size: Mapped[Optional[float]] = mapped_column(Float)
+    algorithm: Mapped[Optional[str]] = mapped_column(String(50))
+    confidence: Mapped[Optional[float]] = mapped_column(Float)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # Relationship
-    trade = relationship("Trade", back_populates="signal", uselist=False)
+    trade: Mapped[Optional["Trade"]] = relationship("Trade", back_populates="signal", uselist=False)
 
 
 class Trade(Base, AuditMixin):
@@ -69,19 +76,19 @@ class Trade(Base, AuditMixin):
 
     __tablename__ = "trades"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    ticket = Column(Integer, unique=True, index=True)
-    symbol = Column(String(20), nullable=False)
-    direction = Column(Integer, nullable=False)
-    entry_price = Column(Float, nullable=False)
-    exit_price = Column(Float)
-    lot_size = Column(Float, nullable=False)
-    pnl = Column(Float, default=0.0)
-    drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticket: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    direction: Mapped[int] = mapped_column(Integer, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    exit_price: Mapped[Optional[float]] = mapped_column(Float)
+    lot_size: Mapped[float] = mapped_column(Float, nullable=False)
+    pnl: Mapped[float] = mapped_column(Float, default=0.0)
+    drawdown_impact: Mapped[Optional[float]] = mapped_column(Float)  # impact on total drawdown
+    status: Mapped[str] = mapped_column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
 
-    signal_id = Column(Integer, ForeignKey("model_signals.id"))
-    signal = relationship("ModelSignal", back_populates="trade")
+    signal_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("model_signals.id"))
+    signal: Mapped[Optional["ModelSignal"]] = relationship("ModelSignal", back_populates="trade")
 
 
 class RiskEvent(Base, AuditMixin):
@@ -89,12 +96,14 @@ class RiskEvent(Base, AuditMixin):
 
     __tablename__ = "risk_events"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    event_type = Column(String(50), nullable=False)
-    description = Column(Text)
-    symbol = Column(String(20))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    symbol: Mapped[Optional[str]] = mapped_column(String(20))
 
-    signal_id = Column(Integer, ForeignKey("model_signals.id"), nullable=True)
+    signal_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("model_signals.id"), nullable=True
+    )
 
 
 class PerformanceMetric(Base, AuditMixin):
@@ -102,13 +111,15 @@ class PerformanceMetric(Base, AuditMixin):
 
     __tablename__ = "performance_metrics"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    sharpe_ratio = Column(Float)
-    profit_factor = Column(Float)
-    max_drawdown = Column(Float)
-    total_trades = Column(Integer)
-    win_rate = Column(Float)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    sharpe_ratio: Mapped[Optional[float]] = mapped_column(Float)
+    profit_factor: Mapped[Optional[float]] = mapped_column(Float)
+    max_drawdown: Mapped[Optional[float]] = mapped_column(Float)
+    total_trades: Mapped[Optional[int]] = mapped_column(Integer)
+    win_rate: Mapped[Optional[float]] = mapped_column(Float)
 
 
 class TradeLogger:

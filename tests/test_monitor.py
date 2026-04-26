@@ -26,7 +26,8 @@ class TestMonitor(unittest.TestCase):
     @patch('asyncio.run')
     def test_send_message(self, mock_asyncio_run):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        # Ensure _send_message_async is patched to be an async mock
+        self.monitor._send_message_async = AsyncMock()
 
         self.monitor.send_message("test message")
 
