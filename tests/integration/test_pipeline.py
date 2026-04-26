@@ -1,6 +1,11 @@
 import pytest
 import pandas as pd
 import numpy as np
+
+# Skip if torch or stable_baselines3 is not installed (they are not in requirements-ci.txt)
+pytest.importorskip("torch")
+pytest.importorskip("stable_baselines3")
+
 from unittest.mock import MagicMock, patch
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
