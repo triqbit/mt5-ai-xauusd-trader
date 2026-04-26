@@ -30,6 +30,7 @@ except ImportError:
     MetaApi = None
 
 from pydantic import TypeAdapter, ValidationError
+
 from src.core.config import TradingConfig
 from src.schemas.market_data import OHLCVData
 from src.trading.risk_manager import TradeSignal

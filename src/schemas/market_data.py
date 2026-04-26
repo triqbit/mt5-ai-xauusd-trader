@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field
+
 
 class OHLCVData(BaseModel):
     """Schema for validating individual market bar data."""

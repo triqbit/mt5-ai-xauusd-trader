@@ -14,8 +14,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 from pydantic import ValidationError
-from src.schemas.performance import PerformanceMetrics
-from src.schemas.signals import TradeSignal
 from sqlalchemy import (
     Boolean,
     Column,
@@ -29,6 +27,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+
+from src.schemas.performance import PerformanceMetrics
+from src.schemas.signals import TradeSignal
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)

@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional
+
 from pydantic import BaseModel, Field
+
 
 class TradeSignal(BaseModel):
     """Validated trading signal schema."""

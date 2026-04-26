@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class RiskParameters(BaseModel):
     """Schema for validating risk management configuration."""
     max_positions: int = Field(default=3, ge=1, le=10)

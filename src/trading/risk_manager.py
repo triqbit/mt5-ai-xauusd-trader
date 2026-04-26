@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
@@ -91,7 +91,7 @@ class RiskManager:
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
+        elif signal.confidence is not None and not self._check_minimum_confidence(signal.confidence):
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
@@ -215,6 +215,8 @@ class RiskManager:
         return True
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+        if signal.stop_loss is None or signal.take_profit is None:
+            return True  # Cannot check R:R without SL/TP
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         if risk == 0:

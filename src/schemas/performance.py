@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class PerformanceMetrics(BaseModel):
     """Schema for validating performance reporting data."""
     sharpe_ratio: float
