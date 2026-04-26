@@ -219,4 +219,4 @@ class ConfigManager:
 
     @property
     def audit_trail(self) -> List[Dict[str, Any]]:
-        return self._audit_trail
+        return self._audit_trail.copy()

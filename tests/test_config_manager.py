@@ -6,6 +6,16 @@ import pytest
 from pathlib import Path
 from src.core.config_manager import ConfigManager, MockSecretProvider, ConfigSchema
 
+@pytest.fixture(autouse=True)
+def clear_env(monkeypatch):
+    """Clear environment variables that might interfere with tests."""
+    monkeypatch.delenv("MT5_LOGIN", raising=False)
+    monkeypatch.delenv("MT5_PASSWORD", raising=False)
+    monkeypatch.delenv("MT5_SERVER", raising=False)
+    monkeypatch.delenv("MODE", raising=False)
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("SYMBOL", raising=False)
+
 @pytest.fixture
 def temp_env_file(tmp_path):
     def _create(name, content):
@@ -17,8 +27,6 @@ def temp_env_file(tmp_path):
 def test_config_manager_default_loading(monkeypatch):
     """Test ConfigManager loads default values when no .env is present."""
     monkeypatch.setenv("APP_ENV", "dev")
-    # Ensure no relevant env vars or .env files interfere
-    monkeypatch.delenv("MT5_LOGIN", raising=False)
 
     cm = ConfigManager(env_override="dev")
     assert cm.config.app_env == "dev"
