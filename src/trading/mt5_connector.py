@@ -30,6 +30,7 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.profiler import API_CALL_LATENCY
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -160,7 +161,8 @@ class MT5Connector:
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
-            rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+            with API_CALL_LATENCY.labels(api_name="MT5", endpoint="copy_rates_from_pos").time():
+                rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
                 logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
                 return pd.DataFrame()
@@ -189,7 +191,8 @@ class MT5Connector:
         if not self._is_initialized or self.use_metaapi:
             return {"bid": 0.0, "ask": 0.0}
 
-        tick = mt5.symbol_info_tick(symbol)
+        with API_CALL_LATENCY.labels(api_name="MT5", endpoint="symbol_info_tick").time():
+            tick = mt5.symbol_info_tick(symbol)
         if tick is None:
             logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
             return {"bid": 0.0, "ask": 0.0}
@@ -232,7 +235,8 @@ class MT5Connector:
                 "type_filling": ORDER_FILLING_IOC,
             }
 
-            result = mt5.order_send(request)
+            with API_CALL_LATENCY.labels(api_name="MT5", endpoint="order_send").time():
+                result = mt5.order_send(request)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
                 logger.error("Order rejected: %s (code: %d)", result.comment, result.retcode)
                 return None

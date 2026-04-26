@@ -24,6 +24,11 @@ import structlog
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
+from src.core.profiler import (
+    FEATURE_ENGINEERING_LATENCY,
+    SIGNAL_GENERATION_LATENCY,
+    Profiler,
+)
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
@@ -66,13 +71,17 @@ def run_live(
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
-            # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-            tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
-            # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            Profiler.update_system_metrics()
+            with SIGNAL_GENERATION_LATENCY.time():
+                # 1. Fetch latest market data
+                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                tick = connector.get_tick(cfg.symbol)
+                # 2. Build observation vector
+                with FEATURE_ENGINEERING_LATENCY.labels(timeframe=cfg.timeframe).time():
+                    obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+                # 3. Get ensemble prediction
+                direction, confidence, _per_algo = model.predict(obs)
+
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -198,6 +207,9 @@ def main() -> int:
         cfg.algorithm,
         cfg.symbol,
     )
+
+    # Start Prometheus metrics server
+    Profiler.start(port=cfg.prometheus_port)
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
