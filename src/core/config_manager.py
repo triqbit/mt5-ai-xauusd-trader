@@ -12,13 +12,22 @@ import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Type
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
 logger = logging.getLogger(__name__)
+
+# List of fields that should be masked in audit logs
+SENSITIVE_FIELDS = {
+    "mt5_password",
+    "metaapi_token",
+    "database_url",
+    "redis_url",
+    "telegram_token",
+}
 
 
 class ConfigSchema(BaseSettings):
@@ -28,9 +37,7 @@ class ConfigSchema(BaseSettings):
     """
 
     # -- Environment Metadata --
-    app_env: Literal["dev", "staging", "prod"] = Field(
-        default="dev", validation_alias="APP_ENV"
-    )
+    app_env: Literal["dev", "staging", "prod"] = Field(default="dev")
     version: str = Field(default="1.0.0")
 
     # -- MT5 Connection --
@@ -134,26 +141,18 @@ class ConfigManager:
             env_file = ROOT / ".env"
 
         # 1. Load from environment and .env file via Pydantic
-        # We temporarily create a config to know which keys we might want to fetch from secrets
-        base_config = ConfigSchema(_env_file=env_file if env_file.exists() else None)
-
         # 2. Integrate secrets from the SecretProvider
-        # We override sensitive fields if they exist in the secret provider
         secret_overrides = {}
-        sensitive_fields = [
-            "mt5_password",
-            "metaapi_token",
-            "database_url",
-            "redis_url",
-            "telegram_token",
-        ]
-        for field in sensitive_fields:
+        for field in SENSITIVE_FIELDS:
             secret_val = self._secret_provider.get_secret(field.upper())
             if secret_val:
                 secret_overrides[field] = secret_val
 
+        # 3. Instantiate Schema, ensuring app_env matches self._app_env
         new_config = ConfigSchema(
-            _env_file=env_file if env_file.exists() else None, **secret_overrides
+            _env_file=env_file if env_file.exists() else None,
+            app_env=self._app_env,  # Force match
+            **secret_overrides,
         )
 
         # Log changes if this is a reload
@@ -178,14 +177,17 @@ class ConfigManager:
         self._persist_audit_entry(entry)
 
     def _audit_change(self, old: ConfigSchema, new: ConfigSchema) -> None:
-        """Record changes between configuration versions."""
+        """Record changes between configuration versions, masking sensitive data."""
         old_dict = old.model_dump()
         new_dict = new.model_dump()
-        changes = {
-            k: {"old": str(old_dict[k]), "new": str(new_dict[k])}
-            for k in old_dict
-            if old_dict[k] != new_dict[k]
-        }
+        changes = {}
+        for k in old_dict:
+            if old_dict[k] != new_dict[k]:
+                if k in SENSITIVE_FIELDS:
+                    changes[k] = {"old": "********", "new": "********"}
+                else:
+                    changes[k] = {"old": str(old_dict[k]), "new": str(new_dict[k])}
+
         if changes:
             entry = {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -213,8 +215,6 @@ class ConfigManager:
 
     @property
     def config(self) -> ConfigSchema:
-        if not self._config:
-            self._load_config()
         return self._config  # type: ignore
 
     @property

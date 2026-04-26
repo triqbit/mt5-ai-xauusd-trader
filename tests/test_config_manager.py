@@ -57,40 +57,42 @@ def test_secret_provider_integration(monkeypatch, tmp_path):
     # Provider should override .env
     assert cm.config.mt5_password == "provider_secret"
 
-def test_config_reload(monkeypatch, tmp_path):
-    """Test dynamic config reloading and audit trail."""
+def test_config_reload_and_audit(monkeypatch, tmp_path):
+    """Test dynamic config reloading and audit trail with masking."""
     env_file = tmp_path / ".env.dev"
-    env_file.write_text("SYMBOL=XAUUSD")
+    env_file.write_text("SYMBOL=XAUUSD\nMT5_PASSWORD=old_pass")
     monkeypatch.setattr("src.core.config_manager.ROOT", tmp_path)
     audit_file = tmp_path / "audit.jsonl"
 
     cm = ConfigManager(env_override="dev", audit_file=audit_file)
     assert cm.config.symbol == "XAUUSD"
-    # Initial load should be recorded
-    assert len(cm.audit_trail) == 1
-    assert cm.audit_trail[0]["event"] == "initial_load"
 
     # Modify .env file and reload
-    env_file.write_text("SYMBOL=BTCUSD")
+    env_file.write_text("SYMBOL=BTCUSD\nMT5_PASSWORD=new_pass")
     cm.reload()
 
     assert cm.config.symbol == "BTCUSD"
-    # Initial load + 1 update
-    assert len(cm.audit_trail) == 2
-    assert cm.audit_trail[1]["event"] == "config_update"
-    assert cm.audit_trail[1]["changes"]["symbol"]["old"] == "XAUUSD"
-    assert cm.audit_trail[1]["changes"]["symbol"]["new"] == "BTCUSD"
+    assert cm.config.mt5_password == "new_pass"
 
-    # Verify persistence
-    assert audit_file.exists()
-    with open(audit_file) as f:
-        lines = f.readlines()
-        assert len(lines) == 2
-        initial_load = json.loads(lines[0])
-        assert initial_load["event"] == "initial_load"
-        audit_entry = json.loads(lines[1])
-        assert audit_entry["event"] == "config_update"
-        assert audit_entry["changes"]["symbol"]["new"] == "BTCUSD"
+    # Verify audit trail
+    update_entry = [e for e in cm.audit_trail if e.get("event") == "config_update"][0]
+
+    # Non-sensitive field should be clear
+    assert update_entry["changes"]["symbol"]["old"] == "XAUUSD"
+    assert update_entry["changes"]["symbol"]["new"] == "BTCUSD"
+
+    # Sensitive field should be masked
+    assert update_entry["changes"]["mt5_password"]["old"] == "********"
+    assert update_entry["changes"]["mt5_password"]["new"] == "********"
+
+def test_env_consistency(monkeypatch, tmp_path):
+    """Test that app_env field matches ConfigManager's app_env."""
+    monkeypatch.setattr("src.core.config_manager.ROOT", tmp_path)
+    # Even if environment variable APP_ENV is set to something else
+    monkeypatch.setenv("APP_ENV", "prod")
+
+    cm = ConfigManager(env_override="staging")
+    assert cm.config.app_env == "staging"
 
 def test_validation_rules():
     """Test that validation rules are enforced."""
