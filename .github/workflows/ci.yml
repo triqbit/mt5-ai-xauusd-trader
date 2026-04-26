@@ -33,6 +33,8 @@ jobs:
         run: pip install ruff==0.4.3 mypy==1.10.0
       - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
+      - name: Mypy check (type safety)
+        run: mypy src/ main.py
       - name: Ruff format (apply formatting)
         run: ruff format src/ main.py
       - name: Ruff format check (formatting enforced)

@@ -12,8 +12,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-import numpy as np
-from sqlalchemy import (
+import numpy as np  # type: ignore
+from sqlalchemy import (  # type: ignore
     Boolean,
     Column,
     DateTime,
@@ -24,8 +24,8 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.ext.declarative import declarative_base  # type: ignore
+from sqlalchemy.orm import relationship, sessionmaker  # type: ignore
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)

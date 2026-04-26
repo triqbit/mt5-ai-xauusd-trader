@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
-import gymnasium as gym
-import numpy as np
+import gymnasium as gym  # type: ignore
+import numpy as np  # type: ignore
 
 
 class TradingEnv(gym.Env):

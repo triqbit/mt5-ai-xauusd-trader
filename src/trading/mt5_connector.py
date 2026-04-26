@@ -13,17 +13,17 @@ import logging
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
-import pandas as pd
+import pandas as pd  # type: ignore
 
 try:
-    import MetaTrader5 as mt5
+    import MetaTrader5 as mt5  # type: ignore
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
     mt5 = None
 
 try:
-    from metaapi_cloud_sdk import MetaApi
+    from metaapi_cloud_sdk import MetaApi  # type: ignore
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False

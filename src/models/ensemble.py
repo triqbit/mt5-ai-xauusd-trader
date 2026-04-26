@@ -15,9 +15,9 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import numpy as np
-import torch
-import torch.nn as nn
+import numpy as np  # type: ignore
+import torch  # type: ignore
+import torch.nn as nn  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class EnsembleModel:
     def load_ppo(self, path: Path) -> None:
         """Load a Stable-Baselines3 PPO checkpoint."""
         try:
-            from stable_baselines3 import PPO
+            from stable_baselines3 import PPO  # type: ignore
 
             self._ppo_model = PPO.load(str(path), device=self.device)
             logger.info("PPO model loaded from %s", path)
