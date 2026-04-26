@@ -7,22 +7,27 @@ Custom Gymnasium trading environment for RL training.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple
+
+import numpy as np
+import pandas as pd
 
 try:
     import gymnasium as gym
 except ImportError:
     # Minimal mock for CI/Linux where gymnasium might not be installed
     class gym:
-        class Env: pass
+        class Env:
+            pass
+
         class spaces:
             class Box:
-                def __init__(self, *args, **kwargs): pass
-            class Discrete:
-                def __init__(self, *args, **kwargs): pass
+                def __init__(self, *args, **kwargs):
+                    pass
 
-import numpy as np
-import pandas as pd
+            class Discrete:
+                def __init__(self, *args, **kwargs):
+                    pass
 
 try:
     import pandas_ta as ta

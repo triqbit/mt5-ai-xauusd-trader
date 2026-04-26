@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from src.trading.risk_manager import RiskManager, TradeSignal
+
 
 @pytest.fixture
 def config():

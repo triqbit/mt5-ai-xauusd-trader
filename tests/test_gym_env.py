@@ -1,6 +1,8 @@
-import pytest
 import numpy as np
+import pytest
+
 from src.environment.gym_env import TradingEnv
+
 
 @pytest.fixture
 def dummy_data():
