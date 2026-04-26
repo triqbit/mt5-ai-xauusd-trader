@@ -16,8 +16,6 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
-import numpy as np
-
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -201,9 +199,12 @@ class RiskManager:
         if self.daily.realised_pnl >= 0:
             return 1.0
 
-        if loss_pct >= 0.05: return 0.0
-        if loss_pct >= 0.04: return 0.25
-        if loss_pct >= 0.03: return 0.50
+        if loss_pct >= 0.05:
+            return 0.0
+        if loss_pct >= 0.04:
+            return 0.25
+        if loss_pct >= 0.03:
+            return 0.50
         if loss_pct >= 0.02:
             logger.warning("Daily Loss Level 1 (2%%) hit - Alerting")
             return 1.0
@@ -220,9 +221,12 @@ class RiskManager:
             return 1.0
 
         ratio = current_atr / self.atr_baseline
-        if ratio >= 3.0: return 0.0
-        if ratio >= 2.0: return 0.50
-        if ratio >= 1.5: return 0.75
+        if ratio >= 3.0:
+            return 0.0
+        if ratio >= 2.0:
+            return 0.50
+        if ratio >= 1.5:
+            return 0.75
         return 1.0
 
     def _check_circuit_breaker(self) -> bool:

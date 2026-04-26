@@ -20,10 +20,9 @@ import time
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import structlog
 
-from src.core.config import get_config, TradingConfig
+from src.core.config import TradingConfig, get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
