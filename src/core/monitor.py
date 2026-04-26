@@ -5,6 +5,7 @@ Real-time monitoring, equity tracking, and Telegram alerting.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -43,6 +44,12 @@ class Monitor:
         self.equity_history.append(data)
         logger.debug("Equity logged: %.2f", equity)
 
+    async def _send_message_async(self, text: str) -> None:
+        """Asynchronous helper to send Telegram message."""
+        if not self.bot or not self.cfg.telegram_chat_id:
+            return
+        await self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
+
     def send_message(self, text: str) -> None:
         """Synchronous wrapper to send Telegram message."""
         if not self.bot or not self.cfg.telegram_chat_id:
@@ -52,14 +59,14 @@ class Monitor:
         try:
             # python-telegram-bot v20+ is async.
             # We use asyncio.run as the main loop is synchronous.
-            asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
+            asyncio.run(self._send_message_async(text))
             logger.info("Telegram message sent")
         except Exception as e:
             logger.error("Failed to send Telegram message: %s", e)
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger."""
-        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
+        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown * 100:.2f}%\nTrading Halted."
         self.send_message(msg)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:

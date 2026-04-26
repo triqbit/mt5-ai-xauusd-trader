@@ -1,6 +1,6 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
-src/trading/risk_manager.py
+src/trading/risk_engine.py
 Enterprise risk management engine implementing:
   - Kelly Criterion position sizing (fractional)
   - Ray Dalio All-Weather portfolio allocation
@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -60,7 +61,7 @@ class DailyStats:
     peak_equity: float = 0.0
 
 
-class RiskManager:
+class RiskEngine:
     """
     Central risk authority.
     Every signal must be approved here before reaching the order router.
@@ -80,7 +81,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
-        logger.info("RiskManager initialised | balance=%.2f", account_balance)
+        logger.info("RiskEngine initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
@@ -162,9 +163,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -208,13 +207,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 
@@ -230,4 +225,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskEngine", "TradeSignal"]
