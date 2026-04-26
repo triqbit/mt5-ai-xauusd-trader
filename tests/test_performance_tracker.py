@@ -1,5 +1,9 @@
 import pytest
 import numpy as np
+
+# Skip tests if torch is not installed (CI environment)
+pytest.importorskip("torch")
+
 from src.models.performance_tracker import PerformanceTracker
 from src.core.config import TradingConfig
 from unittest.mock import MagicMock
