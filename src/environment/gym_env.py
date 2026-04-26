@@ -15,9 +15,24 @@ import numpy as np
 class TradingEnv(gym.Env):
     """
     Custom Gymnasium environment for XAUUSD trading.
-    State: OHLCV + technical indicators (configurable window)
-    Actions: 0=Hold, 1=Buy, 2=Sell
-    Reward: Risk-adjusted PnL (normalized)
+
+    This environment simulates trading Gold (XAUUSD) using historical OHLCV data.
+    It provides an interface for reinforcement learning agents to learn optimal
+    trading strategies.
+
+    State: Rolling window of OHLCV data + current portfolio state (balance, position).
+    Actions: 0 (Hold), 1 (Buy), 2 (Sell).
+    Reward: Risk-adjusted PnL normalized by initial balance.
+
+    Example:
+        ```python
+        import numpy as np
+        data = np.random.rand(1000, 5) # Mock OHLCV data
+        env = TradingEnv(data)
+        obs, _ = env.reset()
+        action = env.action_space.sample()
+        next_obs, reward, term, trunc, info = env.step(action)
+        ```
     """
     metadata = {"render_modes": ["human"]}
 

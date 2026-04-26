@@ -55,7 +55,19 @@ TIMEFRAME_MAP: Dict[str, int] = {
 class MT5Connector:
     """
     Enterprise-grade connector for MetaTrader 5.
+
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
+    This class abstracts the underlying connection logic and provides a unified interface
+    for fetching market data and executing orders.
+
+    Example:
+        ```python
+        connector = MT5Connector(config)
+        if connector.connect():
+            rates = connector.get_rates("XAUUSD", "M5", 100)
+            print(rates.head())
+            connector.disconnect()
+        ```
     """
 
     def __init__(self, config: TradingConfig) -> None:
@@ -201,10 +213,18 @@ class MT5Connector:
         Execute a market order based on a validated trade signal.
 
         Args:
-            signal: Validated TradeSignal object.
+            signal: Validated TradeSignal object containing symbol, direction, and size.
 
         Returns:
             Order ticket ID if successful, None otherwise.
+
+        Example:
+            ```python
+            signal = TradeSignal(symbol="XAUUSD", direction=1, lot_size=0.1, ...)
+            ticket = connector.place_order(signal)
+            if ticket:
+                print(f"Order successful: {ticket}")
+            ```
         """
         if not self._is_initialized:
             return None

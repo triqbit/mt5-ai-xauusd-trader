@@ -72,9 +72,22 @@ class LSTMAttentionModel(nn.Module):
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
 class EnsembleModel:
     """
-    Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
-    Weights are initialised equally and adapt based on a rolling window
-    of each algorithm's realised P&L Sharpe ratio.
+    Weighted voting ensemble combining PPO, Dreamer V3, and LSTM-Attention models.
+
+    Weights are initialized equally and adapt dynamically based on a rolling window
+    of each algorithm's realized P&L Sharpe ratio. This ensures the ensemble
+    favors the currently best-performing model.
+
+    Example:
+        ```python
+        ensemble = EnsembleModel(device="cpu")
+        ensemble.load_ppo("models/ppo_model.zip")
+        ensemble.load_lstm("models/lstm_model.pt")
+
+        obs = np.random.rand(140)
+        direction, confidence, votes = ensemble.predict(obs)
+        print(f"Action: {direction}, Confidence: {confidence:.2f}")
+        ```
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
@@ -118,8 +131,17 @@ class EnsembleModel:
         seq: Optional[torch.Tensor] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
-        Return (direction, confidence, per_algo_probs).
-        direction: +1 buy, -1 sell, 0 hold
+        Aggregates predictions from all loaded models using weighted voting.
+
+        Args:
+            obs: Current market observation vector.
+            seq: Historical observation sequence (required for LSTM model).
+
+        Returns:
+            A tuple of (direction, confidence, per_algo_probs):
+            - direction: +1 (Buy), -1 (Sell), or 0 (Hold).
+            - confidence: Weighted probability of the chosen direction.
+            - per_algo_probs: Dictionary of individual model votes.
         """
         votes: Dict[str, np.ndarray] = {}
 

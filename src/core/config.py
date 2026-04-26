@@ -19,7 +19,21 @@ ROOT = Path(__file__).resolve().parents[2]  # repo root
 
 
 class TradingConfig(BaseSettings):
-    """Runtime-configurable trading parameters."""
+    """
+    Runtime-configurable trading parameters for the MT5 AI Trading Bot.
+
+    This class handles loading configuration from environment variables or a .env file
+    using Pydantic Settings. It includes validation logic for risk-sensitive parameters.
+
+    Example:
+        ```python
+        from src.core.config import get_config
+
+        config = get_config()
+        print(f"Trading symbol: {config.symbol}")
+        print(f"Risk per trade: {config.risk_per_trade * 100}%")
+        ```
+    """
 
     model_config = SettingsConfigDict(
         env_file=ROOT / ".env",
