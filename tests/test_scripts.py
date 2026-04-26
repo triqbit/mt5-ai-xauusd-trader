@@ -1,9 +1,8 @@
-import os
 import sys
+import os
 from pathlib import Path
-from unittest.mock import patch
-
 import pytest
+from unittest.mock import MagicMock, patch
 
 # Add project root to sys.path
 root_path = Path(__file__).resolve().parents[1]
@@ -13,6 +12,7 @@ sys.path.append(str(root_path))
 os.environ["MT5_PASSWORD"] = "test"
 os.environ["MT5_SERVER"] = "test"
 os.environ["DATABASE_URL"] = "sqlite:///test_scripts.db"
+os.environ["RISK_PER_TRADE"] = "0.01"
 
 @pytest.fixture(autouse=True)
 def cleanup_db():
@@ -43,6 +43,7 @@ def test_security_audit_smoke(mock_send_message):
     run_audit()
 
 def test_sentiment_smoke():
+    # Avoid importing torch-heavy models in CI
     from src.models.sentiment_analyzer import SentimentAnalyzer
     analyzer = SentimentAnalyzer()
     assert hasattr(analyzer, 'get_symbol_sentiment')

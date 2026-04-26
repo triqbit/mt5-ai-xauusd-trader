@@ -12,6 +12,7 @@ class SentimentAnalyzer:
     In a production environment, this would integrate with an LLM (FinBERT)
     or a News API (e.g., AlphaVantage, NewsAPI).
     """
+
     def __init__(self, model_name: str = "ProsusAI/finbert"):
         self.logger = logging.getLogger(__name__)
         self.model_name = model_name
@@ -31,6 +32,8 @@ class SentimentAnalyzer:
             self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name)
             self._initialized = True
             self.logger.info(f"Sentiment model {self.model_name} initialized.")
+        except ImportError:
+            self.logger.warning("Transformers not installed. Sentiment model skipped.")
         except Exception as e:
             self.logger.error(f"Failed to initialize sentiment model: {e}")
 
@@ -47,6 +50,7 @@ class SentimentAnalyzer:
 
         try:
             import torch
+
             inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True)
             with torch.no_grad():
                 outputs = self.model(**inputs)
@@ -54,11 +58,7 @@ class SentimentAnalyzer:
 
             # FinBERT labels: 0: positive, 1: negative, 2: neutral
             p = probs[0].tolist()
-            return {
-                "positive": p[0],
-                "negative": p[1],
-                "neutral": p[2]
-            }
+            return {"positive": p[0], "negative": p[1], "neutral": p[2]}
         except Exception as e:
             self.logger.error(f"Sentiment analysis failed: {e}")
             return {"positive": 0.0, "negative": 0.0, "neutral": 1.0}
@@ -81,5 +81,6 @@ class SentimentAnalyzer:
             scores.append(score)
 
         return sum(scores) / len(scores) if scores else 0.0
+
 
 __all__ = ["SentimentAnalyzer"]
