@@ -13,12 +13,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.schemas.execution import ExecutionDecision
+from src.schemas.risk import RiskParameters
+from src.schemas.signals import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +36,6 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
     "USDJPY": 0.08,  # JPY - carry trade
     "EURJPY": 0.07,  # EUR/JPY cross
 }
-
-
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
-
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -72,8 +60,14 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        risk_params: Optional[RiskParameters] = None,
     ) -> None:
         self.cfg = config
+        self.risk_params = risk_params or RiskParameters(
+            max_positions=config.max_positions,
+            risk_per_trade=config.risk_per_trade,
+            max_daily_loss=config.max_daily_loss,
+        )
         self.balance = account_balance
         self.peak_equity = account_balance
         self.daily = DailyStats(peak_equity=account_balance)
@@ -83,10 +77,10 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> ExecutionDecision:
         """
         Run the full 6-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns ExecutionDecision indicating if ALL layers pass.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
@@ -97,7 +91,7 @@ class RiskManager:
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
+        elif signal.confidence is not None and not self._check_minimum_confidence(signal.confidence):
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
@@ -117,7 +111,9 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+            return ExecutionDecision(approved=False, reason=rejection_reason, signal=signal)
+
+        return ExecutionDecision(approved=True, reason="All filters passed", signal=signal)
 
     def size_position(
         self,
@@ -135,7 +131,7 @@ class RiskManager:
             return 0.01  # minimum lot
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+        risk_capital = self.balance * self.risk_params.risk_per_trade
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(
@@ -190,14 +186,14 @@ class RiskManager:
         if self.daily.peak_equity == 0:
             return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
+        if self.daily.realised_pnl < 0 and loss_pct >= self.risk_params.max_daily_loss:
             logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
             return False
         return True
 
     def _check_max_positions(self) -> bool:
-        if len(self.open_positions) >= self.cfg.max_positions:
-            logger.debug("Max positions reached (%d)", self.cfg.max_positions)
+        if len(self.open_positions) >= self.risk_params.max_positions:
+            logger.debug("Max positions reached (%d)", self.risk_params.max_positions)
             return False
         return True
 
@@ -219,6 +215,8 @@ class RiskManager:
         return True
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+        if signal.stop_loss is None or signal.take_profit is None:
+            return True  # Cannot check R:R without SL/TP
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         if risk == 0:

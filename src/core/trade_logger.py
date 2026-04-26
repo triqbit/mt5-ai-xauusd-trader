@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import numpy as np
+from pydantic import ValidationError
 from sqlalchemy import (
     Boolean,
     Column,
@@ -26,6 +27,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+
+from src.schemas.performance import PerformanceMetrics
+from src.schemas.signals import TradeSignal
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -121,6 +125,12 @@ class TradeLogger:
 
     def log_signal(self, signal_data: Dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
+        try:
+            TradeSignal.model_validate(signal_data)
+        except ValidationError as e:
+            logger.error("Signal data validation failed for database write: %s", e)
+            raise
+
         with self.Session() as session:
             signal = ModelSignal(
                 symbol=signal_data["symbol"],
@@ -215,19 +225,21 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
-    def read_performance_report(self) -> Dict[str, float]:
+    def read_performance_report(self) -> PerformanceMetrics:
         """
         Calculate key performance metrics from closed trades.
-        Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
+        Returns validated PerformanceMetrics object.
         """
         with self.Session() as session:
             trades = session.query(Trade).filter(Trade.status == "CLOSED").all()
             if not trades:
-                return {
-                    "sharpe_ratio": 0.0,
-                    "profit_factor": 0.0,
-                    "max_drawdown": 0.0,
-                }
+                return PerformanceMetrics(
+                    sharpe_ratio=0.0,
+                    profit_factor=0.0,
+                    max_drawdown=0.0,
+                    total_trades=0,
+                    win_rate=0.0
+                )
 
             pnls = np.array([t.pnl for t in trades])
 
@@ -250,19 +262,23 @@ class TradeLogger:
             drawdown = peak - equity_curve
             max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
 
-            metrics = {
+            metrics_data = {
                 "sharpe_ratio": float(sharpe),
                 "profit_factor": float(profit_factor),
                 "max_drawdown": float(max_dd),
+                "total_trades": len(trades),
+                "win_rate": float(np.sum(pnls > 0) / len(pnls)),
             }
+
+            metrics = PerformanceMetrics.model_validate(metrics_data)
 
             # Optionally log these metrics to DB
             metric_record = PerformanceMetric(
-                sharpe_ratio=metrics["sharpe_ratio"],
-                profit_factor=metrics["profit_factor"],
-                max_drawdown=metrics["max_drawdown"],
-                total_trades=len(trades),
-                win_rate=float(np.sum(pnls > 0) / len(pnls)),
+                sharpe_ratio=metrics.sharpe_ratio,
+                profit_factor=metrics.profit_factor,
+                max_drawdown=metrics.max_drawdown,
+                total_trades=metrics.total_trades,
+                win_rate=metrics.win_rate,
             )
             session.add(metric_record)
             session.commit()

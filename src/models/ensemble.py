@@ -18,6 +18,9 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
+from pydantic import ValidationError
+
+from src.schemas.signals import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +152,25 @@ class EnsembleModel:
         direction_map = {0: 1, 1: -1, 2: 0}
         direction = direction_map[action_idx]
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+
+        # Validate prediction output using a partial TradeSignal-like validation
+        try:
+            # We only validate direction and confidence here as the rest are context-dependent
+            # We can use a temporary TradeSignal to validate
+            TradeSignal.model_validate({
+                "symbol": "VALIDATION",
+                "direction": direction,
+                "entry_price": 1.0,
+                "stop_loss": 1.0,
+                "take_profit": 1.0,
+                "lot_size": 0.1,
+                "algorithm": "ensemble",
+                "confidence": confidence
+            })
+        except ValidationError as e:
+            logger.error("Ensemble prediction validation failed: %s", e)
+            return 0, 0.0, per_algo
+
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
             direction,
