@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,6 @@ from src.core.config import TradingConfig
 from src.core.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
 from src.trading.execution_filter import ExecutionFilter
-from src.trading.risk_manager import RiskManager, TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +33,8 @@ class PerformanceReport:
     profit_factor: float
     win_rate_pct: float
     total_trades: int
+    avg_mae_pct: float
+    avg_mfe_pct: float
 
 
 class Backtester:
@@ -55,122 +56,174 @@ class Backtester:
         self.fe = feature_engineer
         self.spread = spread
         self.commission = commission
-        self.filter = ExecutionFilter()
+        self.filter = ExecutionFilter(timeframe=config.timeframe)
 
-    def run(
+    def run_walk_forward(
         self,
         data: Dict[str, pd.DataFrame],
+        train_window_days: int = 180,
+        test_window_days: int = 30,
         initial_balance: float = 10000.0,
     ) -> PerformanceReport:
         """
-        Run the backtest on provided multi-timeframe data.
+        Execute walk-forward analysis.
         """
-        logger.info("Starting backtest...")
+        all_trades = []
+        equity_curves = []
+        current_balance = initial_balance
 
+        # Get total date range from base timeframe
+        base_df = data[self.cfg.timeframe]
+        start_date = base_df["time"].min()
+        end_date = base_df["time"].max()
+
+        current_test_start = start_date + timedelta(days=train_window_days)
+
+        while current_test_start < end_date:
+            current_test_end = current_test_start + timedelta(days=test_window_days)
+
+            logger.info("Walk-forward window | Test: %s to %s",
+                        current_test_start.date(), current_test_end.date())
+
+            # Slice data for this window
+            window_data = {
+                tf: df[(df["time"] >= current_test_start - timedelta(days=30)) &
+                       (df["time"] < current_test_end)]
+                for tf, df in data.items()
+            }
+
+            # Run backtest for this slice
+            _, window_trades, window_equity = self.run_vectorized(
+                window_data,
+                initial_balance=current_balance,
+                start_ts=current_test_start
+            )
+
+            all_trades.extend(window_trades)
+            equity_curves.append(window_equity)
+            if not window_equity.empty:
+                current_balance = window_equity.iloc[-1]
+
+            current_test_start = current_test_end
+
+        # Merge results
+        if not equity_curves:
+            return self._empty_report()
+
+        full_equity = pd.concat(equity_curves)
+        return self._calculate_metrics(full_equity, all_trades, initial_balance)
+
+    def run_vectorized(
+        self,
+        data: Dict[str, pd.DataFrame],
+        initial_balance: float = 10000.0,
+        start_ts: Optional[datetime] = None
+    ) -> Tuple[PerformanceReport, List[Dict], pd.Series]:
+        """
+        Run a vectorized backtest on a slice of data.
+        """
         # 1. Feature Engineering
         features_df = self.fe.generate_features(data)
         if features_df.empty:
-            logger.error("No features generated. Aborting backtest.")
-            return self._empty_report()
+            return self._empty_report(), [], pd.Series()
 
-        # 2. Vectorized Signal Generation (Simulated)
-        # In a real scenario, we loop through bars or use a vectorized model.
-        # For this engine, we'll iterate through the base timeframe bars.
+        if start_ts:
+            features_df = features_df[features_df.index >= start_ts]
 
-        balance = initial_balance
-        equity_curve = [balance]
-        trades = []
+        if features_df.empty:
+             return self._empty_report(), [], pd.Series()
 
-        # We need the close prices for P&L calculation
+        # 2. Vectorized Signal Generation
+        obs_matrix = features_df.values
+        directions = []
+        for obs in obs_matrix:
+            d, _, _ = self.model.predict(obs)
+            directions.append(d)
+
+        signals = pd.Series(directions, index=features_df.index)
+
+        # 3. Apply Execution Filter (Vectorized where possible)
+        # Layer: Session Filter
+        hours = signals.index.hour
+        session_mask = (hours >= 8) & (hours < 21)
+        signals[~session_mask] = 0
+
+        # 4. P&L Simulation
         base_df = data[self.cfg.timeframe].set_index("time").reindex(features_df.index)
-        close_prices = base_df["close"].values
-        timestamps = features_df.index.to_pydatetime()
+        close = base_df["close"]
+        high = base_df["high"]
+        low = base_df["low"]
 
-        current_position: Optional[Dict] = None
+        trades = []
+        equity = pd.Series(initial_balance, index=features_df.index)
+        balance = initial_balance
 
-        for i in range(len(features_df)):
-            row_features = features_df.iloc[i].values
-            row_indicators = features_df.iloc[i]
-            price = close_prices[i]
-            ts = timestamps[i]
+        active_trade = None
 
-            # Logic for closing existing position
-            if current_position:
-                # Check for Stop Loss or Take Profit
-                is_closed = False
-                pnl = 0.0
+        for ts, sig in signals.items():
+            price = close.loc[ts]
 
-                if current_position["direction"] == 1: # BUY
-                    if price <= current_position["sl"]:
-                        exit_price = current_position["sl"]
-                        is_closed = True
-                    elif price >= current_position["tp"]:
-                        exit_price = current_position["tp"]
-                        is_closed = True
-                else: # SELL
-                    if price >= current_position["sl"]:
-                        exit_price = current_position["sl"]
-                        is_closed = True
-                    elif price <= current_position["tp"]:
-                        exit_price = current_position["tp"]
-                        is_closed = True
+            if active_trade:
+                # Update MAE/MFE
+                if active_trade["direction"] == 1:
+                    mfe = max(active_trade["mfe"], high.loc[ts] - active_trade["entry_price"])
+                    mae = min(active_trade["mae"], low.loc[ts] - active_trade["entry_price"])
+                else:
+                    mfe = max(active_trade["mfe"], active_trade["entry_price"] - low.loc[ts])
+                    mae = min(active_trade["mae"], active_trade["entry_price"] - high.loc[ts])
 
-                if is_closed:
-                    pnl = (exit_price - current_position["entry_price"]) * current_position["direction"] * current_position["lots"] * 100
-                    pnl -= self.commission * current_position["lots"]
+                active_trade["mfe"] = mfe
+                active_trade["mae"] = mae
+
+                # Exit logic
+                atr = features_df.loc[ts].get(f"{self.cfg.timeframe}_atr_14", 1.0)
+                sl = active_trade["entry_price"] - active_trade["direction"] * 2 * atr
+                tp = active_trade["entry_price"] + active_trade["direction"] * 4 * atr
+
+                is_exit = False
+                exit_price = price
+
+                if active_trade["direction"] == 1:
+                    if low.loc[ts] <= sl:
+                        exit_price = sl
+                        is_exit = True
+                    elif high.loc[ts] >= tp:
+                        exit_price = tp
+                        is_exit = True
+                else:
+                    if high.loc[ts] >= sl:
+                        exit_price = sl
+                        is_exit = True
+                    elif low.loc[ts] <= tp:
+                        exit_price = tp
+                        is_exit = True
+
+                if is_exit:
+                    pnl = (exit_price - active_trade["entry_price"]) * active_trade["direction"] * active_trade["lots"] * 100
+                    pnl -= self.commission * active_trade["lots"]
                     balance += pnl
+                    active_trade["exit_time"] = ts
+                    active_trade["exit_price"] = exit_price
+                    active_trade["pnl"] = pnl
+                    trades.append(active_trade)
+                    active_trade = None
 
-                    trades.append({
-                        "entry_time": current_position["entry_time"],
-                        "exit_time": ts,
-                        "direction": current_position["direction"],
-                        "pnl": pnl,
-                        "mae": 0.0, # Placeholder
-                        "mfe": 0.0  # Placeholder
-                    })
-                    current_position = None
+            if not active_trade and sig != 0:
+                # Entry
+                entry_price = price + (sig * self.spread / 2)
+                active_trade = {
+                    "entry_time": ts,
+                    "direction": sig,
+                    "entry_price": entry_price,
+                    "lots": 0.1,
+                    "mfe": 0.0,
+                    "mae": 0.0
+                }
 
-            # Signal generation (if no position)
-            if current_position is None:
-                # Use model to predict
-                direction, confidence, _ = self.model.predict(row_features)
+            equity.loc[ts] = balance
 
-                if direction != 0:
-                    # Create signal object for filter
-                    atr = row_indicators.get(f"{self.cfg.timeframe}_atr_14", 1.0)
-                    sl_dist = 2 * atr
-                    tp_dist = 4 * atr
-
-                    # Apply spread to entry
-                    entry_price = price + (direction * self.spread / 2)
-
-                    sig = TradeSignal(
-                        symbol=self.cfg.symbol,
-                        direction=direction,
-                        entry_price=entry_price,
-                        stop_loss=entry_price - direction * sl_dist,
-                        take_profit=entry_price + direction * tp_dist,
-                        lot_size=0.1, # Fixed for backtest simplicity
-                        algorithm=self.cfg.algorithm,
-                        confidence=confidence,
-                        timestamp=ts
-                    )
-
-                    # Execution Filter
-                    decision = self.filter.validate(sig, row_indicators)
-                    if decision.is_approved:
-                        current_position = {
-                            "direction": direction,
-                            "entry_price": entry_price,
-                            "entry_time": ts,
-                            "sl": sig.stop_loss,
-                            "tp": sig.take_profit,
-                            "lots": sig.lot_size
-                        }
-
-            equity_curve.append(balance)
-
-        return self._calculate_metrics(pd.Series(equity_curve), trades, initial_balance)
+        report = self._calculate_metrics(equity, trades, initial_balance)
+        return report, trades, equity
 
     def _calculate_metrics(
         self,
@@ -182,16 +235,18 @@ class Backtester:
             return self._empty_report()
 
         pnls = np.array([t["pnl"] for t in trades])
+        maes = np.array([abs(t["mae"]) / t["entry_price"] * 100 for t in trades])
+        mfes = np.array([t["mfe"] / t["entry_price"] * 100 for t in trades])
+
         total_return = (equity_series.iloc[-1] - initial_balance) / initial_balance
 
-        # Annualization (roughly assuming 252 trading days)
-        days = (equity_series.index[-1] - equity_series.index[0]) / len(equity_series) * 252
-        # For simplicity, if days is too small, just use total_return
-        ann_return = total_return * (252 / max(len(equity_series) / (24*12), 1))
+        # Annualization
+        timespan = (equity_series.index[-1] - equity_series.index[0]).total_seconds() / (365 * 24 * 3600)
+        ann_return = ((1 + total_return)**(1/timespan) - 1) if timespan > 0 and total_return > -1 else 0.0
 
         # Sharpe
         returns = equity_series.pct_change().dropna()
-        sharpe = (returns.mean() / returns.std() * np.sqrt(252 * 24 * 12)) if returns.std() > 0 else 0.0
+        sharpe = (returns.mean() / returns.std() * np.sqrt(252 * 288)) if returns.std() > 0 else 0.0
 
         # Drawdown
         peak = equity_series.cummax()
@@ -203,7 +258,6 @@ class Backtester:
         gross_loss = abs(pnls[pnls < 0].sum())
         profit_factor = gross_profit / gross_loss if gross_loss > 0 else 100.0
 
-        # Win Rate
         win_rate = len(pnls[pnls > 0]) / len(pnls)
 
         return PerformanceReport(
@@ -213,11 +267,13 @@ class Backtester:
             max_drawdown_pct=max_dd * 100,
             profit_factor=float(profit_factor),
             win_rate_pct=win_rate * 100,
-            total_trades=len(trades)
+            total_trades=len(trades),
+            avg_mae_pct=float(np.mean(maes)),
+            avg_mfe_pct=float(np.mean(mfes))
         )
 
     def _empty_report(self) -> PerformanceReport:
-        return PerformanceReport(0, 0, 0, 0, 0, 0, 0)
+        return PerformanceReport(0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 
 __all__ = ["Backtester", "PerformanceReport"]
