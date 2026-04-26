@@ -19,6 +19,13 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+      - name: Install TA-Lib C library
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j2 && sudo make install && cd ..
+          sudo ldconfig
       - name: Install dependencies
         run: |
           pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3
@@ -31,12 +38,6 @@ jobs:
         run: pip-audit --requirement requirements-ci.txt
       - name: Run Tests with Coverage
         run: |
-          # TA-Lib installation
-          sudo apt-get update -qq && sudo apt-get install -y build-essential wget
-          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
-          tar -xzf ta-lib-0.6.4-src.tar.gz
-          cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j2 && sudo make install && cd ..
-          sudo ldconfig
           pytest tests/ --cov=src --cov-fail-under=80 -v
         env:
           MT5_LOGIN: "0"
@@ -54,7 +55,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install Pydantic
-        run: pip install pydantic==2.7.1 pydantic-settings==2.2.1
+        run: pip install pydantic==2.11.1 pydantic-settings==2.8.1
       - name: Validate Env Vars
         run: python scripts/validate_env.py
         env:
@@ -75,8 +76,8 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: |
-          pip install alembic==1.13.1 sqlalchemy==2.0.30 pydantic==2.7.1 pydantic-settings==2.2.1
-          pip install numpy==1.26.4 structlog==24.1.0 rich==13.7.1
+          pip install alembic==1.13.1 sqlalchemy==2.0.30 pydantic==2.11.1 pydantic-settings==2.8.1
+          pip install numpy==2.2.4 structlog==24.1.0 rich==13.7.1
       - name: Validate Migrations
         run: ./scripts/validate_migrations.sh
 
