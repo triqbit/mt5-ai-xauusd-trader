@@ -6,6 +6,7 @@ Base interfaces and common data structures for all predictive models.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
 import numpy as np
 
 
