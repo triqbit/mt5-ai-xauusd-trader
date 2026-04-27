@@ -26,8 +26,8 @@ from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
-from src.trading.mt5_connector import MT5Connector
 from src.research.reporting import ResearchReporter
+from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
 # -- Logging setup ---------------------------------------------------------
