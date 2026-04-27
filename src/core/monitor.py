@@ -26,6 +26,7 @@ class Monitor:
     """
 
     def __init__(self, config: TradingConfig) -> None:
+        """Initialize the monitor with configuration."""
         self.cfg = config
         self.equity_history: List[Dict[str, Any]] = []
         self.bot: Optional[telegram.Bot] = None

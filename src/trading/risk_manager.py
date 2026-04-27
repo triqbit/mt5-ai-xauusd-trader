@@ -73,6 +73,7 @@ class RiskManager:
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
     ) -> None:
+        """Initialize the RiskManager with configuration and account state."""
         self.cfg = config
         self.balance = account_balance
         self.peak_equity = account_balance
@@ -170,6 +171,7 @@ class RiskManager:
 
     # -- Private filter layers ----------------------------------------------
     def _check_circuit_breaker(self) -> bool:
+        """Check if global drawdown has exceeded the circuit breaker limit."""
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
@@ -187,6 +189,7 @@ class RiskManager:
         return True
 
     def _check_daily_loss(self) -> bool:
+        """Check if today's realised loss has exceeded the daily limit."""
         if self.daily.peak_equity == 0:
             return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
@@ -196,6 +199,7 @@ class RiskManager:
         return True
 
     def _check_max_positions(self) -> bool:
+        """Check if the number of open positions has reached the maximum allowed."""
         if len(self.open_positions) >= self.cfg.max_positions:
             logger.debug("Max positions reached (%d)", self.cfg.max_positions)
             return False
@@ -211,6 +215,7 @@ class RiskManager:
     def _check_minimum_confidence(
         self, confidence: float, threshold: float = 0.55
     ) -> bool:
+        """Verify if signal confidence meets the minimum requirement."""
         if confidence < threshold:
             logger.debug(
                 "Confidence %.2f below threshold %.2f", confidence, threshold
@@ -219,6 +224,7 @@ class RiskManager:
         return True
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+        """Ensure the risk-reward ratio of the signal is acceptable."""
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         if risk == 0:

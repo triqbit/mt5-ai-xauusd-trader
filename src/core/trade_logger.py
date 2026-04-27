@@ -115,6 +115,7 @@ class TradeLogger:
     """Enterprise trade logging interface."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
+        """Initialize the trade logger with the given database URL."""
         self.engine = create_engine(db_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)

@@ -8,8 +8,11 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
+import logging
 import gymnasium as gym
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class TradingEnv(gym.Env):
@@ -22,7 +25,16 @@ class TradingEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
 
     def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
-                 window_size: int = 60, commission: float = 0.0002):
+                 window_size: int = 60, commission: float = 0.0002) -> None:
+        """
+        Initialize the trading environment.
+
+        Args:
+            data: Market data as a NumPy array.
+            initial_balance: Starting account balance.
+            window_size: Number of past steps to include in observations.
+            commission: Per-trade commission as a fraction.
+        """
         super().__init__()
         self.data = data
         self.initial_balance = initial_balance
@@ -44,6 +56,7 @@ class TradingEnv(gym.Env):
         self.reset()
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
+        """Reset the environment to the initial state."""
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -53,6 +66,7 @@ class TradingEnv(gym.Env):
         return self._get_observation(), {}
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict]:
+        """Execute one step in the environment."""
         current_price = self.data[self.current_step, 3]  # Close price
         reward = 0.0
 
@@ -86,11 +100,13 @@ class TradingEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
+        """Construct and return the current observation vector."""
         window = self.data[self.current_step - self.window_size:self.current_step]
         # Normalize window
         obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
         portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
-    def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+    def render(self) -> None:
+        """Render the environment's current state to the console."""
+        logger.info("Step: %d | Balance: $%.2f | Position: %.1f", self.current_step, self.balance, self.position)
