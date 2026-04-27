@@ -191,7 +191,6 @@ class BenchmarkEvaluator:
             done = False
             truncated = False
             initial_balance = getattr(self.env, "initial_balance", 10000.0)
-            balances = [initial_balance]
 
             # For per-episode drawdown
             current_episode_balances = [initial_balance]
