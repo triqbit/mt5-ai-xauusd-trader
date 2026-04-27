@@ -10,10 +10,9 @@ strategy performance under degradation.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -114,10 +113,12 @@ class AdversarialEngine:
         """
         Randomly drop rows to simulate feed instability.
         """
+        if len(data) == 0:
+            return data
         df = pd.DataFrame(data)
         mask = np.random.rand(len(df)) > drop_rate
-        # Ensure we have enough data for the window
-        if mask.sum() < 100: # Arbitrary minimum
+        # Ensure we don't drop everything if data is small
+        if mask.sum() == 0:
             return data
         return df[mask].values
 
@@ -142,7 +143,6 @@ class AdversarialEngine:
         modified_data = data.copy()
         transition_point = int(len(data) * 0.8)
         if transition_point < len(data):
-            last_price = data[transition_point, 3]
             for i in range(transition_point, len(data)):
                 diff = data[i, 3] - data[i-1, 3] if i > 0 else 0
                 # Flip the price movement
