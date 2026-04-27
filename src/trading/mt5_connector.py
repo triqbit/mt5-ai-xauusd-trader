@@ -17,6 +17,7 @@ import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -24,13 +25,14 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
     MetaApi = None
 
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
+from src.trading.risk_engine import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +119,12 @@ class MT5Connector:
         return False
 
     def connect(self) -> bool:
-        """Alias for initialize() to support existing interfaces."""
+        """
+        Alias for initialize() to support existing interfaces.
+
+        Returns:
+            True if connection established, False otherwise.
+        """
         return self.initialize()
 
     def shutdown(self) -> None:
@@ -155,25 +162,42 @@ class MT5Connector:
             DataFrame containing OHLCV data or empty DataFrame on failure.
         """
         if not self._is_initialized:
+            logger.error("Connector not initialized. Call initialize() first.")
             return pd.DataFrame()
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
-            rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
-            if rates is None:
-                logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
+            try:
+                rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+                if rates is None:
+                    logger.error(
+                        "Failed to copy rates for %s: %s", symbol, mt5.last_error()
+                    )
+                    return pd.DataFrame()
+                df = pd.DataFrame(rates)
+                df["time"] = pd.to_datetime(df["time"], unit="s")
+                return df
+            except Exception as e:
+                logger.error("Error fetching rates from Native SDK: %s", e)
                 return pd.DataFrame()
-            df = pd.DataFrame(rates)
-            df["time"] = pd.to_datetime(df["time"], unit="s")
-            return df
         else:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
             return pd.DataFrame()
 
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        """Alias for get_rates() to match main.py expectations."""
+        """
+        Alias for get_rates() to match main.py expectations.
+
+        Args:
+            symbol: Trading symbol.
+            timeframe: Chart timeframe.
+            n_bars: Number of bars.
+
+        Returns:
+            OHLCV DataFrame.
+        """
         return self.get_rates(symbol, timeframe, n_bars)
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
@@ -186,15 +210,23 @@ class MT5Connector:
         Returns:
             Dictionary with 'bid' and 'ask' prices.
         """
-        if not self._is_initialized or self.use_metaapi:
+        if not self._is_initialized:
             return {"bid": 0.0, "ask": 0.0}
 
-        tick = mt5.symbol_info_tick(symbol)
-        if tick is None:
-            logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
-            return {"bid": 0.0, "ask": 0.0}
+        if not self.use_metaapi:
+            try:
+                tick = mt5.symbol_info_tick(symbol)
+                if tick is None:
+                    logger.error(
+                        "Failed to get tick for %s: %s", symbol, mt5.last_error()
+                    )
+                    return {"bid": 0.0, "ask": 0.0}
+                return {"bid": tick.bid, "ask": tick.ask}
+            except Exception as e:
+                logger.error("Error getting tick from Native SDK: %s", e)
+                return {"bid": 0.0, "ask": 0.0}
 
-        return {"bid": tick.bid, "ask": tick.ask}
+        return {"bid": 0.0, "ask": 0.0}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
@@ -207,58 +239,101 @@ class MT5Connector:
             Order ticket ID if successful, None otherwise.
         """
         if not self._is_initialized:
+            logger.error("Connector not initialized. Cannot place order.")
             return None
 
         if not self.use_metaapi:
-            order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
-            tick = self.get_tick(signal.symbol)
-            price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
+            try:
+                order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
+                tick = self.get_tick(signal.symbol)
+                price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
-            if price == 0:
-                logger.error("Invalid price for order execution.")
+                if price == 0:
+                    logger.error("Invalid price for order execution.")
+                    return None
+
+                request = {
+                    "action": TRADE_ACTION_DEAL,
+                    "symbol": signal.symbol,
+                    "volume": float(signal.lot_size),
+                    "type": order_type,
+                    "price": float(price),
+                    "sl": float(signal.stop_loss),
+                    "tp": float(signal.take_profit),
+                    "magic": 20240419,
+                    "comment": f"AI:{signal.algorithm}",
+                    "type_time": ORDER_TIME_GTC,
+                    "type_filling": ORDER_FILLING_IOC,
+                }
+
+                result = mt5.order_send(request)
+                if result is None:
+                    logger.error("order_send returned None. Critical SDK error.")
+                    return None
+
+                if result.retcode != mt5.TRADE_RETCODE_DONE:
+                    logger.error(
+                        "Order rejected: %s (code: %d)", result.comment, result.retcode
+                    )
+                    return None
+
+                logger.info(
+                    "Order PLACED | Ticket #%d | %s", result.order, signal.symbol
+                )
+                return int(result.order)
+            except Exception as e:
+                logger.error("Error placing order via Native SDK: %s", e)
                 return None
-
-            request = {
-                "action": TRADE_ACTION_DEAL,
-                "symbol": signal.symbol,
-                "volume": signal.lot_size,
-                "type": order_type,
-                "price": price,
-                "sl": signal.stop_loss,
-                "tp": signal.take_profit,
-                "magic": 20240419,
-                "comment": f"AI:{signal.algorithm}",
-                "type_time": ORDER_TIME_GTC,
-                "type_filling": ORDER_FILLING_IOC,
-            }
-
-            result = mt5.order_send(request)
-            if result.retcode != mt5.TRADE_RETCODE_DONE:
-                logger.error("Order rejected: %s (code: %d)", result.comment, result.retcode)
-                return None
-
-            logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
-            return int(result.order)
 
         return None
 
     def get_account_info(self) -> Dict[str, Any]:
-        """Retrieve account balance, equity, and margin information."""
+        """
+        Retrieve account balance, equity, and margin information.
+
+        Returns:
+            Dictionary with account information.
+        """
         if self._is_initialized and not self.use_metaapi:
-            acc = mt5.account_info()
-            return acc._asdict() if acc else {}
+            try:
+                acc = mt5.account_info()
+                return acc._asdict() if acc else {}
+            except Exception as e:
+                logger.error("Error getting account info: %s", e)
+                return {}
         return {}
 
     def get_account_balance(self) -> float:
-        """Retrieve current account balance."""
+        """
+        Retrieve current account balance.
+
+        Returns:
+            Account balance as float.
+        """
         info = self.get_account_info()
         return float(info.get("balance", 0.0))
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Retrieve current open positions."""
+        """
+        Retrieve current open positions.
+
+        Args:
+            symbol: Optional symbol to filter positions.
+
+        Returns:
+            List of position dictionaries.
+        """
         if self._is_initialized and not self.use_metaapi:
-            positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
-            return [p._asdict() for p in positions] if positions else []
+            try:
+                positions = (
+                    mt5.positions_get(symbol=symbol)
+                    if symbol
+                    else mt5.positions_get()
+                )
+                return [p._asdict() for p in positions] if positions else []
+            except Exception as e:
+                logger.error("Error getting positions: %s", e)
+                return []
         return []
 
 
