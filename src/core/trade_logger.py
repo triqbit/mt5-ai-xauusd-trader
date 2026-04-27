@@ -111,6 +111,20 @@ class PerformanceMetric(Base, AuditMixin):
     win_rate = Column(Float)
 
 
+class DeadLetterLog(Base, AuditMixin):
+    """Logs failed events, trades, or API calls for later recovery."""
+
+    __tablename__ = "dead_letter_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_type = Column(String(50), nullable=False)
+    payload = Column(Text)  # JSON-encoded representation of the failed event
+    error_message = Column(Text)
+    stack_trace = Column(Text)
+    correlation_id = Column(String(100))
+    status = Column(String(20), default="PENDING")  # PENDING, RESOLVED, IGNORED
+
+
 class TradeLogger:
     """Enterprise trade logging interface."""
 
@@ -214,6 +228,27 @@ class TradeLogger:
             )
             session.add(event)
             session.commit()
+
+    def log_dead_letter(
+        self,
+        event_type: str,
+        payload: str,
+        error_message: str,
+        stack_trace: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+    ) -> int:
+        """Log a failed event to the dead letter queue."""
+        with self.Session() as session:
+            dlq = DeadLetterLog(
+                event_type=event_type,
+                payload=payload,
+                error_message=error_message,
+                stack_trace=stack_trace,
+                correlation_id=correlation_id,
+            )
+            session.add(dlq)
+            session.commit()
+            return dlq.id
 
     def read_performance_report(self) -> Dict[str, float]:
         """

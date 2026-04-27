@@ -125,20 +125,26 @@ class EnsembleModel:
 
         # PPO prediction
         if self._ppo_model is not None:
-            action, _ = self._ppo_model.predict(obs, deterministic=True)
-            probs = np.zeros(3)
-            probs[int(action)] = 1.0
-            votes["ppo"] = probs
+            try:
+                action, _ = self._ppo_model.predict(obs, deterministic=True)
+                probs = np.zeros(3)
+                probs[int(action)] = 1.0
+                votes["ppo"] = probs
+            except Exception as e:
+                logger.error("PPO prediction failed: %s", e)
 
         # LSTM-Attention prediction
         if self.lstm_model is not None and seq is not None:
-            with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            votes["lstm"] = probs
+            try:
+                with torch.no_grad():
+                    logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                votes["lstm"] = probs
+            except Exception as e:
+                logger.error("LSTM prediction failed: %s", e)
 
         if not votes:
-            logger.warning("No models loaded - returning HOLD")
+            logger.warning("All models failed or none loaded - returning HOLD (safe mode)")
             return 0, 0.0, {}
 
         # Weighted average across available models

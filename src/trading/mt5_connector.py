@@ -30,9 +30,13 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.error_handler import CircuitBreaker, retry_with_backoff
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
+
+# Circuit breakers for external APIs
+metaapi_breaker = CircuitBreaker(name="MetaAPI", failure_threshold=3, recovery_timeout=30)
 
 # MT5 constants (replicated so the module loads on Mac/Linux)
 ORDER_TYPE_BUY = 0
@@ -71,6 +75,7 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
+    @retry_with_backoff(retries=3, initial_delay=2.0)
     def initialize(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
@@ -95,7 +100,8 @@ class MT5Connector:
                     self._is_initialized = True
                     return True
                 else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
+                    err = mt5.last_error()
+                    logger.warning("Native mt5.initialize failed: %s", err)
             except Exception as e:
                 logger.error("Native MT5 initialization error: %s", e)
         else:
@@ -103,18 +109,24 @@ class MT5Connector:
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         if METAAPI_AVAILABLE and self.cfg.metaapi_token:
-            logger.info("Attempting MetaAPI cloud fallback...")
-            try:
-                self.metaapi = MetaApi(self.cfg.metaapi_token)
-                self.use_metaapi = True
-                self._is_initialized = True
-                logger.info("MetaAPI fallback configured.")
-                return True
-            except Exception as e:
-                logger.error("MetaAPI initialization failed: %s", e)
+            return self._initialize_metaapi()
 
         logger.error("All MT5 connection paths failed.")
         return False
+
+    @metaapi_breaker
+    def _initialize_metaapi(self) -> bool:
+        """Initialize MetaAPI with circuit breaker protection."""
+        logger.info("Attempting MetaAPI cloud fallback...")
+        try:
+            self.metaapi = MetaApi(self.cfg.metaapi_token)
+            self.use_metaapi = True
+            self._is_initialized = True
+            logger.info("MetaAPI fallback configured.")
+            return True
+        except Exception as e:
+            logger.error("MetaAPI initialization failed: %s", e)
+            raise
 
     def connect(self) -> bool:
         """Alias for initialize() to support existing interfaces."""
