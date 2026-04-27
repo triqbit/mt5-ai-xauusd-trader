@@ -1,0 +1,3 @@
+## 2025-05-15 - [The Power of Immediate Performance Feedback in CLI Trading]
+**Learning:** In high-stakes, automated environments like algorithmic trading, providing immediate, high-contrast visual feedback on system status and performance metrics significantly enhances user trust and situational awareness. Transitioning from plain logs to structured, rich UI elements (like panels for alerts and tables for summaries) helps users quickly digest complex information without parsing dense log streams.
+**Action:** Always implement a professional startup banner to confirm configuration and a detailed performance summary table upon session completion. Use high-visibility components (e.g., `rich.panel.Panel`) for critical system events like risk-management interventions.

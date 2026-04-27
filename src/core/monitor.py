@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import telegram
+from rich.console import Console
+from rich.panel import Panel
 
 from src.core.config import TradingConfig
 
@@ -61,6 +63,18 @@ class Monitor:
         """Send critical alert for circuit breaker trigger."""
         msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
         self.send_message(msg)
+
+        # High-visibility console alert
+        console = Console()
+        console.print(
+            Panel(
+                f"[bold red]CIRCUIT BREAKER TRIGGERED[/bold red]\n"
+                f"[yellow]Drawdown:[/yellow] {drawdown*100:.2f}%\n"
+                f"[white]System status:[/white] [bold red]HALTED[/bold red]",
+                title="⚠️ Risk Alert",
+                border_style="red",
+            )
+        )
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:
         """Send daily P&L and trade count summary."""

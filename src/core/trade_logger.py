@@ -227,6 +227,8 @@ class TradeLogger:
                     "sharpe_ratio": 0.0,
                     "profit_factor": 0.0,
                     "max_drawdown": 0.0,
+                    "total_trades": 0.0,
+                    "win_rate": 0.0,
                 }
 
             pnls = np.array([t.pnl for t in trades])
@@ -254,6 +256,8 @@ class TradeLogger:
                 "sharpe_ratio": float(sharpe),
                 "profit_factor": float(profit_factor),
                 "max_drawdown": float(max_dd),
+                "total_trades": float(len(trades)),
+                "win_rate": float(np.sum(pnls > 0) / len(pnls)),
             }
 
             # Optionally log these metrics to DB
@@ -261,8 +265,8 @@ class TradeLogger:
                 sharpe_ratio=metrics["sharpe_ratio"],
                 profit_factor=metrics["profit_factor"],
                 max_drawdown=metrics["max_drawdown"],
-                total_trades=len(trades),
-                win_rate=float(np.sum(pnls > 0) / len(pnls)),
+                total_trades=int(metrics["total_trades"]),
+                win_rate=metrics["win_rate"],
             )
             session.add(metric_record)
             session.commit()
