@@ -58,6 +58,7 @@ class TradingConfig(BaseSettings):
     # ── Database ────────────────────────────────────────────────────────────
     database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
     redis_url: str = Field(default="redis://localhost:6379/0")
+    confirm_live_trading: bool = Field(default=False, description="Explicit confirmation for live trading")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
     prometheus_port: int = Field(default=8000)
