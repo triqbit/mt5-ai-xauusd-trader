@@ -13,8 +13,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import numpy as np
-from src.schemas.performance import PerformanceMetricsSchema
-from src.schemas.signals import TradeSignalSchema
 from sqlalchemy import (
     Boolean,
     Column,
@@ -28,6 +26,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+
+from src.schemas.performance import PerformanceMetricsSchema
+from src.schemas.signals import TradeSignalSchema
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)

@@ -7,10 +7,10 @@ from .risk import ExecutionDecision, RiskParameters
 from .signals import TradeSignalSchema
 
 __all__ = [
+    "ExecutionDecision",
     "OHLCVData",
     "OHLCVSeries",
     "PerformanceMetricsSchema",
-    "ExecutionDecision",
     "RiskParameters",
     "TradeSignalSchema",
 ]

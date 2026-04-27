@@ -21,11 +21,11 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from pydantic import ValidationError
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from pydantic import ValidationError
 from src.models.ensemble import EnsembleModel
 from src.schemas.signals import TradeSignalSchema
 from src.trading.mt5_connector import MT5Connector

@@ -7,7 +7,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List
 
-from pydantic import BaseModel, Field, ConfigDict
+import pandas as pd
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OHLCVData(BaseModel):
@@ -32,6 +33,5 @@ class OHLCVSeries(BaseModel):
     """Schema for a sequence of OHLCV bars."""
     bars: List[OHLCVData]
 
-    def to_pandas(self):
-        import pandas as pd
+    def to_pandas(self) -> pd.DataFrame:
         return pd.DataFrame([bar.model_dump() for bar in self.bars])

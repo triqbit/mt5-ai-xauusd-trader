@@ -109,6 +109,7 @@ class RiskManager:
             direction=signal.direction,
             timestamp=datetime.now(timezone.utc).timestamp(),
         )
+        logger.info("Risk decision: %s", decision.model_dump_json())
 
         if not passed:
             logger.warning(
