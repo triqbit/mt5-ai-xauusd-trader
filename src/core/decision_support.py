@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from src.models.ensemble import EnsembleModel
+    from src.trading.risk_manager import RiskManager
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
