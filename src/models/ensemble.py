@@ -17,14 +17,22 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+try:
+    import torch
+    import torch.nn as nn
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    nn = None
+    TORCH_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel(nn.Module if TORCH_AVAILABLE else object):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
@@ -82,9 +90,13 @@ class EnsembleModel:
 
     def __init__(self, device: str = "cpu") -> None:
         """Initialize the ensemble model."""
-        self.device = torch.device(
-            device if torch.cuda.is_available() or device != "cuda" else "cpu"
-        )
+        if TORCH_AVAILABLE:
+            self.device = torch.device(
+                device if torch.cuda.is_available() or device != "cuda" else "cpu"
+            )
+        else:
+            self.device = None
+
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -108,6 +120,10 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
+        if not TORCH_AVAILABLE:
+            logger.warning("Torch not available - cannot load LSTM")
+            return
+
         try:
             model = LSTMAttentionModel(n_features=n_features).to(self.device)
             state = torch.load(str(path), map_location=self.device)
@@ -150,7 +166,7 @@ class EnsembleModel:
                 logger.error("PPO prediction failed: %s", e)
 
         # 2. LSTM-Attention Prediction
-        if self.lstm_model is not None and seq is not None:
+        if TORCH_AVAILABLE and self.lstm_model is not None and seq is not None:
             try:
                 with torch.no_grad():
                     # Ensure seq has batch dimension

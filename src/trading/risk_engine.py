@@ -167,7 +167,7 @@ class RiskEngine:
         if confidence < 0.55:
             return 0.0  # Skip trade
         elif confidence < 0.65:
-            confidence_multiplier = 0.5
+            confidence_multiplier = self.cfg.risk_multiplier_low_confidence
         # 0.65+ is 100% sizing
 
         # Daily loss scaling
@@ -179,9 +179,9 @@ class RiskEngine:
         loss_multiplier = 1.0
         if self.stats.realized_pnl < 0:
             if daily_loss_pct >= self.cfg.daily_loss_limit_lvl3:
-                loss_multiplier = 0.25
+                loss_multiplier = self.cfg.risk_multiplier_lvl3
             elif daily_loss_pct >= self.cfg.daily_loss_limit_lvl2:
-                loss_multiplier = 0.50
+                loss_multiplier = self.cfg.risk_multiplier_lvl2
 
         # Drawdown scaling
         drawdown_pct = (
@@ -191,9 +191,9 @@ class RiskEngine:
         )
         dd_multiplier = 1.0
         if drawdown_pct >= self.cfg.drawdown_limit_lvl3:
-            dd_multiplier = 0.50
+            dd_multiplier = self.cfg.risk_multiplier_lvl3
         elif drawdown_pct >= self.cfg.drawdown_limit_lvl2:
-            dd_multiplier = 0.75
+            dd_multiplier = self.cfg.risk_multiplier_lvl2
 
         effective_risk_pct = (
             risk_per_trade_pct * confidence_multiplier * loss_multiplier * dd_multiplier
@@ -213,14 +213,11 @@ class RiskEngine:
         # Standardize lot size for Gold (usually 100 oz per lot, but depends on broker)
         # Assuming 1 pip = 0.01 for Gold, and we want to risk 'risk_amount'
         # Lot Size = Risk Amount / (SL Distance * Pip Value per Lot)
-        # For XAUUSD, 1.0 lot usually means $100 per $1 move.
-        # If sl_distance is $5.00, then 1 lot risks $500.
-        # lot_size = risk_amount / (sl_distance * 100)
-
-        lot_size = risk_amount / (sl_distance * 100)
+        # Risk Amount / (SL Distance * Contract Size)
+        lot_size = risk_amount / (sl_distance * self.cfg.contract_size)
 
         # Max Position Size: 10% of equity per trade
-        max_lot_size = (current_equity * 0.10) / (sl_distance * 100) if sl_distance > 0 else 0.1
+        max_lot_size = (current_equity * 0.10) / (sl_distance * self.cfg.contract_size) if sl_distance > 0 else 0.1
         lot_size = min(lot_size, max_lot_size)
 
         # Floor and Round

@@ -53,6 +53,7 @@ class TradingConfig(BaseSettings):
         default=0.01, ge=0.001, le=0.02, description="Max risk % per trade (0.01 = 1%)"
     )
     max_leverage: float = Field(default=10.0, ge=1.0, le=50.0, description="Max allowed leverage")
+    contract_size: float = Field(default=100.0, description="Contract size (e.g., 100 for XAUUSD)")
 
     # Daily cascading loss limits
     daily_loss_limit_lvl1: float = Field(default=0.02, description="2% loss -> Alert")
@@ -75,6 +76,13 @@ class TradingConfig(BaseSettings):
         default=0.25, description="25% drawdown -> Halt new positions"
     )
     drawdown_limit_hard: float = Field(default=0.30, description="30% drawdown -> Force close all")
+
+    # Risk scaling multipliers
+    risk_multiplier_lvl2: float = Field(default=0.50, description="Multiplier for level 2 risk")
+    risk_multiplier_lvl3: float = Field(default=0.25, description="Multiplier for level 3 risk")
+    risk_multiplier_low_confidence: float = Field(
+        default=0.50, description="Multiplier for medium confidence (0.55-0.65)"
+    )
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")

@@ -1,8 +1,15 @@
 import pytest
 import numpy as np
-import torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+
 from src.models.ensemble import EnsembleModel, LSTMAttentionModel
 
+@pytest.mark.skipif(not TORCH_AVAILABLE, reason="Torch not available")
 def test_lstm_model_forward():
     model = LSTMAttentionModel(n_features=10, hidden_size=16, n_heads=2)
     x = torch.randn(4, 5, 10) # (batch, seq, features)
