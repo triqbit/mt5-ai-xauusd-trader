@@ -2,10 +2,13 @@
 Unit tests for JournalMiner.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade, RiskEvent
+
 from src.analytics.journal_mining import JournalMiner
+from src.core.trade_logger import ModelSignal, RiskEvent, Trade, TradeLogger
+
 
 @pytest.fixture
 def logger_db():
@@ -70,7 +73,7 @@ def populated_miner(logger_db):
             session.add(trade)
 
         # Add some rejections
-        for i in range(5):
+        for _ in range(5):
             rej = RiskEvent(
                 event_type="SIGNAL_REJECTED",
                 description="Daily loss limit reached",

@@ -8,13 +8,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
-from sqlalchemy import func
-from sqlalchemy.orm import Session
 
-from src.core.trade_logger import Trade, ModelSignal, RiskEvent, TradeLogger
+from src.core.trade_logger import RiskEvent, Trade, TradeLogger
 
 logger = logging.getLogger(__name__)
 
