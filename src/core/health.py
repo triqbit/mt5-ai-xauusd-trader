@@ -58,7 +58,7 @@ class HealthCheck:
     def check_disk_space(self, min_gb: float = 1.0) -> ComponentHealth:
         """Verify sufficient disk space for logs and database."""
         path = Path(self.cfg.logs_dir).parent
-        total, used, free = shutil.disk_usage(path)
+        _, _, free = shutil.disk_usage(path)
         free_gb = free / (2**30)
 
         status = HealthStatus.HEALTHY if free_gb > min_gb else HealthStatus.FAILED
@@ -83,7 +83,7 @@ class HealthCheck:
             logger.error("Database health check failed: %s", e)
             return ComponentHealth(
                 status=HealthStatus.FAILED,
-                message=f"Database connection failed: {str(e)}",
+                message=f"Database connection failed: {e!s}",
             )
 
     def check_mt5(self) -> ComponentHealth:
