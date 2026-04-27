@@ -21,7 +21,8 @@ def test_log_signal(logger):
         "direction": 1,
         "entry_price": 2000.0,
         "algorithm": "ppo",
-        "confidence": 0.8
+        "confidence": 0.8,
+        "lot_size": 0.1
     }
     signal_id = logger.log_signal(signal_data)
     assert signal_id > 0
@@ -30,7 +31,10 @@ def test_log_trade(logger):
     signal_id = logger.log_signal({
         "symbol": "XAUUSD",
         "direction": 1,
-        "entry_price": 2000.0
+        "entry_price": 2000.0,
+        "algorithm": "ppo",
+        "confidence": 0.8,
+        "lot_size": 0.1
     })
     trade_id = logger.log_trade(
         ticket=12345,
@@ -51,9 +55,9 @@ def test_performance_report(logger):
     logger.update_trade(2, 2005.0, -50.0)
 
     report = logger.read_performance_report()
-    assert report["profit_factor"] == 2.0
-    assert report["sharpe_ratio"] != 0
-    assert report["max_drawdown"] == 50.0
+    assert report.profit_factor == 2.0
+    assert report.sharpe_ratio != 0
+    assert report.max_drawdown == 50.0
 
 def test_log_risk_event(logger):
     logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")

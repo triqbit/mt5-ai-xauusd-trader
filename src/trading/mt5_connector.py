@@ -30,7 +30,8 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
+from src.schemas.market_data import OHLCVSeries
+from src.schemas.signals import TradeSignalSchema
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +167,15 @@ class MT5Connector:
                 return pd.DataFrame()
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
-            return df
+
+            # Validate data using Pydantic schema
+            try:
+                bars_data = df.to_dict("records")
+                validated_series = OHLCVSeries(bars=bars_data)
+                return validated_series.to_pandas()
+            except Exception as e:
+                logger.error("Market data validation failed for %s: %s", symbol, e)
+                return pd.DataFrame()
         else:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
@@ -196,12 +205,12 @@ class MT5Connector:
 
         return {"bid": tick.bid, "ask": tick.ask}
 
-    def place_order(self, signal: TradeSignal) -> Optional[int]:
+    def place_order(self, signal: TradeSignalSchema) -> Optional[int]:
         """
         Execute a market order based on a validated trade signal.
 
         Args:
-            signal: Validated TradeSignal object.
+            signal: Validated TradeSignalSchema object.
 
         Returns:
             Order ticket ID if successful, None otherwise.

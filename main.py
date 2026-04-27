@@ -21,13 +21,15 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from pydantic import ValidationError
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.schemas.signals import TradeSignalSchema
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_manager import RiskManager
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -76,16 +78,20 @@ def run_live(
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
-            if trade_logger:
-                signal_id = trade_logger.log_signal(
-                    {
-                        "symbol": cfg.symbol,
-                        "direction": direction,
-                        "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
-                        "algorithm": cfg.algorithm,
-                        "confidence": confidence,
-                    }
-                )
+            try:
+                if trade_logger:
+                    signal_id = trade_logger.log_signal(
+                        {
+                            "symbol": cfg.symbol,
+                            "direction": direction,
+                            "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
+                            "algorithm": cfg.algorithm,
+                            "confidence": confidence,
+                            "lot_size": 0.0,  # placeholder for raw signal logging
+                        }
+                    )
+            except ValidationError as ve:
+                log.error("Signal validation failed for logging: %s", ve)
 
             if direction == 0:
                 log.debug("HOLD signal - skipping")
@@ -102,16 +108,24 @@ def run_live(
                 avg_win=4 * atr,
                 avg_loss=2 * atr,
             )
-            signal = TradeSignal(
-                symbol=cfg.symbol,
-                direction=direction,
-                entry_price=price,
-                stop_loss=stop_loss,
-                take_profit=take_profit,
-                lot_size=lot_size,
-                algorithm=cfg.algorithm,
-                confidence=confidence,
-            )
+            try:
+                signal = TradeSignalSchema(
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    entry_price=price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    lot_size=lot_size,
+                    algorithm=cfg.algorithm,
+                    confidence=confidence,
+                )
+            except ValidationError as ve:
+                log.error("Trade signal validation failed: %s", ve)
+                if monitor:
+                    monitor.send_message(f"⚠️ Signal Validation Error: {ve}")
+                time.sleep(poll_interval)
+                continue
+
             # 5. Risk approval gate
             if risk.approve(signal, signal_id=signal_id):
                 ticket = connector.place_order(signal)
