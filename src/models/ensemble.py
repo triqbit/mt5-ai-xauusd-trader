@@ -9,11 +9,12 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -81,7 +82,9 @@ class EnsembleModel:
 
     def __init__(self, device: str = "cpu") -> None:
         """Initialize the ensemble model."""
-        self.device = torch.device(device if torch.cuda.is_available() or device != "cuda" else "cpu")
+        self.device = torch.device(
+            device if torch.cuda.is_available() or device != "cuda" else "cpu"
+        )
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -97,6 +100,7 @@ class EnsembleModel:
         """Load a Stable-Baselines3 PPO checkpoint."""
         try:
             from stable_baselines3 import PPO
+
             self._ppo_model = PPO.load(str(path), device=self.device)
             logger.info("PPO model loaded from %s", path)
         except Exception as exc:

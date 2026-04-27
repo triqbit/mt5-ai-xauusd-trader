@@ -7,17 +7,18 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
-import numpy as np
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -25,6 +26,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -112,7 +114,9 @@ class MT5Connector:
                 self.metaapi = MetaApi(self.cfg.metaapi_token)
                 self.use_metaapi = True
                 self._is_initialized = True
-                logger.info("MetaAPI fallback configured (Note: Async features limited in sync wrapper).")
+                logger.info(
+                    "MetaAPI fallback configured (Note: Async features limited in sync wrapper)."
+                )
                 return True
             except Exception as e:
                 logger.error("MetaAPI initialization failed: %s", e)
@@ -180,10 +184,13 @@ class MT5Connector:
         else:
             # MetaAPI Cloud Fallback
             import asyncio
+
             try:
                 # MetaAPI uses async methods. This is a minimal sync wrapper.
                 async def fetch_metaapi_rates():
-                    account = await self.metaapi.metatrader_account_api.get_account(self.cfg.metaapi_account_id)
+                    account = await self.metaapi.metatrader_account_api.get_account(
+                        self.cfg.metaapi_account_id
+                    )
                     connection = await account.get_streaming_connection()
                     await connection.connect()
                     await connection.wait_synchronized()
@@ -229,7 +236,7 @@ class MT5Connector:
         volume: float,
         sl: Optional[float] = None,
         tp: Optional[float] = None,
-        comment: str = ""
+        comment: str = "",
     ) -> Optional[int]:
         """
         Execute a market order.
@@ -268,8 +275,10 @@ class MT5Connector:
                 "type_time": ORDER_TIME_GTC,
                 "type_filling": ORDER_FILLING_IOC,
             }
-            if sl: request["sl"] = float(sl)
-            if tp: request["tp"] = float(tp)
+            if sl:
+                request["sl"] = float(sl)
+            if tp:
+                request["tp"] = float(tp)
 
             result = mt5.order_send(request)
             if result is None:
@@ -306,4 +315,4 @@ class MT5Connector:
         return []
 
 
-__all__ = ["TIMEFRAME_MAP", "MT5Connector", "ORDER_TYPE_BUY", "ORDER_TYPE_SELL"]
+__all__ = ["ORDER_TYPE_BUY", "ORDER_TYPE_SELL", "TIMEFRAME_MAP", "MT5Connector"]

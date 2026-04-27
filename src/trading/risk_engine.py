@@ -9,20 +9,23 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict
 
 from src.core.config import TradingConfig
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class DailyRiskStats:
     """Intraday risk metrics reset each trading day."""
+
     date: date = field(default_factory=lambda: datetime.now(timezone.utc).date())
     realized_pnl: float = 0.0
     unrealized_pnl: float = 0.0
@@ -30,6 +33,7 @@ class DailyRiskStats:
     trade_count: int = 0
     consecutive_losses: int = 0
     consecutive_wins: int = 0
+
 
 class RiskEngine:
     """
@@ -48,7 +52,14 @@ class RiskEngine:
         self.account_equity_peak: float = 0.0
         self._is_halted: bool = False
 
-    def check_signal(self, symbol: str, direction: int, confidence: float, current_equity: float, open_positions_count: int) -> Dict[str, Any]:
+    def check_signal(
+        self,
+        symbol: str,
+        direction: int,
+        confidence: float,
+        current_equity: float,
+        open_positions_count: int,
+    ) -> Dict[str, Any]:
         """
         Perform a full risk check for a new signal.
 
@@ -64,35 +75,64 @@ class RiskEngine:
         """
         # 1. System Halt Check
         if self._is_halted:
-            return {"approved": False, "reason": "Trading system is HALTED due to critical risk breach."}
+            return {
+                "approved": False,
+                "reason": "Trading system is HALTED due to critical risk breach.",
+            }
 
         # 2. Daily Loss Cascading Checks
-        daily_loss_pct = abs(self.stats.realized_pnl) / self.stats.equity_peak if self.stats.equity_peak > 0 else 0
+        daily_loss_pct = (
+            abs(self.stats.realized_pnl) / self.stats.equity_peak
+            if self.stats.equity_peak > 0
+            else 0
+        )
         if self.stats.realized_pnl < 0:
             if daily_loss_pct >= self.cfg.daily_loss_limit_hard:
                 self._is_halted = True
-                return {"approved": False, "reason": f"Daily HARD STOP reached ({daily_loss_pct:.2%})"}
+                return {
+                    "approved": False,
+                    "reason": f"Daily HARD STOP reached ({daily_loss_pct:.2%})",
+                }
             if daily_loss_pct >= self.cfg.daily_loss_limit_lvl4:
-                return {"approved": False, "reason": f"Daily Emergency Stop reached ({daily_loss_pct:.2%})"}
+                return {
+                    "approved": False,
+                    "reason": f"Daily Emergency Stop reached ({daily_loss_pct:.2%})",
+                }
 
         # 3. Drawdown Cascading Checks
         if current_equity > self.account_equity_peak:
             self.account_equity_peak = current_equity
 
-        drawdown_pct = (self.account_equity_peak - current_equity) / self.account_equity_peak if self.account_equity_peak > 0 else 0
+        drawdown_pct = (
+            (self.account_equity_peak - current_equity) / self.account_equity_peak
+            if self.account_equity_peak > 0
+            else 0
+        )
         if drawdown_pct >= self.cfg.drawdown_limit_hard:
             self._is_halted = True
-            return {"approved": False, "reason": f"Account HARD DRAWDOWN limit reached ({drawdown_pct:.2%})"}
+            return {
+                "approved": False,
+                "reason": f"Account HARD DRAWDOWN limit reached ({drawdown_pct:.2%})",
+            }
         if drawdown_pct >= self.cfg.drawdown_limit_lvl4:
-            return {"approved": False, "reason": f"Account drawdown Halt New Positions reached ({drawdown_pct:.2%})"}
+            return {
+                "approved": False,
+                "reason": f"Account drawdown Halt New Positions reached ({drawdown_pct:.2%})",
+            }
 
         # 4. Position Count Limit
         if open_positions_count >= self.cfg.max_positions:
-            return {"approved": False, "reason": f"Max concurrent positions reached ({self.cfg.max_positions})"}
+            return {
+                "approved": False,
+                "reason": f"Max concurrent positions reached ({self.cfg.max_positions})",
+            }
 
         # 5. Confidence Threshold
         if confidence < self.cfg.confidence_threshold:
-            return {"approved": False, "reason": f"Confidence {confidence:.2f} below threshold {self.cfg.confidence_threshold:.2f}"}
+            return {
+                "approved": False,
+                "reason": f"Confidence {confidence:.2f} below threshold {self.cfg.confidence_threshold:.2f}",
+            }
 
         return {"approved": True, "reason": "All risk checks passed."}
 
@@ -103,7 +143,7 @@ class RiskEngine:
         stop_loss: float,
         atr: float,
         current_equity: float,
-        confidence: float
+        confidence: float,
     ) -> float:
         """
         Calculate ATR-based position size with confidence scaling.
@@ -131,7 +171,11 @@ class RiskEngine:
         # 0.65+ is 100% sizing
 
         # Daily loss scaling
-        daily_loss_pct = abs(self.stats.realized_pnl) / self.stats.equity_peak if self.stats.equity_peak > 0 else 0
+        daily_loss_pct = (
+            abs(self.stats.realized_pnl) / self.stats.equity_peak
+            if self.stats.equity_peak > 0
+            else 0
+        )
         loss_multiplier = 1.0
         if self.stats.realized_pnl < 0:
             if daily_loss_pct >= self.cfg.daily_loss_limit_lvl3:
@@ -140,18 +184,29 @@ class RiskEngine:
                 loss_multiplier = 0.50
 
         # Drawdown scaling
-        drawdown_pct = (self.account_equity_peak - current_equity) / self.account_equity_peak if self.account_equity_peak > 0 else 0
+        drawdown_pct = (
+            (self.account_equity_peak - current_equity) / self.account_equity_peak
+            if self.account_equity_peak > 0
+            else 0
+        )
         dd_multiplier = 1.0
         if drawdown_pct >= self.cfg.drawdown_limit_lvl3:
             dd_multiplier = 0.50
         elif drawdown_pct >= self.cfg.drawdown_limit_lvl2:
             dd_multiplier = 0.75
 
-        effective_risk_pct = risk_per_trade_pct * confidence_multiplier * loss_multiplier * dd_multiplier
+        effective_risk_pct = (
+            risk_per_trade_pct * confidence_multiplier * loss_multiplier * dd_multiplier
+        )
         risk_amount = current_equity * effective_risk_pct
 
         # Distance to stop loss
         sl_distance = abs(entry_price - stop_loss)
+
+        # Validation: Stop loss should be at least 1x ATR away for stability
+        if sl_distance < atr * 0.5:
+            logger.warning("Stop loss distance (%.2f) is too tight compared to ATR (%.2f)", sl_distance, atr)
+
         if sl_distance == 0:
             return 0.01
 
@@ -198,4 +253,5 @@ class RiskEngine:
         if current_equity > self.stats.equity_peak:
             self.stats.equity_peak = current_equity
 
-__all__ = ["RiskEngine", "DailyRiskStats"]
+
+__all__ = ["DailyRiskStats", "RiskEngine"]

@@ -29,6 +29,11 @@ def test_risk_validation():
     with pytest.raises(ValidationError):
         TradingConfig(mt5_password="test", mt5_server="test", risk_per_trade=0.05)
 
-def test_singleton_config():
+def test_singleton_config(monkeypatch):
     """Test that get_config returns a singleton (cached) instance."""
-    pass
+    monkeypatch.setenv("MT5_PASSWORD", "test")
+    monkeypatch.setenv("MT5_SERVER", "test")
+
+    cfg1 = get_config()
+    cfg2 = get_config()
+    assert cfg1 is cfg2

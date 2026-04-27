@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -48,21 +49,31 @@ class TradingConfig(BaseSettings):
 
     # ── Risk Parameters (as per RISK_LIMITS.md) ────────────────────────────────
     max_positions: int = Field(default=5, ge=1, le=10, description="Max concurrent positions")
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.02, description="Max risk % per trade (0.01 = 1%)")
+    risk_per_trade: float = Field(
+        default=0.01, ge=0.001, le=0.02, description="Max risk % per trade (0.01 = 1%)"
+    )
     max_leverage: float = Field(default=10.0, ge=1.0, le=50.0, description="Max allowed leverage")
 
     # Daily cascading loss limits
     daily_loss_limit_lvl1: float = Field(default=0.02, description="2% loss -> Alert")
     daily_loss_limit_lvl2: float = Field(default=0.03, description="3% loss -> Half position size")
-    daily_loss_limit_lvl3: float = Field(default=0.04, description="4% loss -> Quarter position size")
+    daily_loss_limit_lvl3: float = Field(
+        default=0.04, description="4% loss -> Quarter position size"
+    )
     daily_loss_limit_lvl4: float = Field(default=0.05, description="5% loss -> Halt trading")
     daily_loss_limit_hard: float = Field(default=0.06, description="6% loss -> Force close all")
 
     # Drawdown limits
     drawdown_limit_lvl1: float = Field(default=0.10, description="10% drawdown -> Alert")
-    drawdown_limit_lvl2: float = Field(default=0.15, description="15% drawdown -> 75% position size")
-    drawdown_limit_lvl3: float = Field(default=0.20, description="20% drawdown -> 50% position size")
-    drawdown_limit_lvl4: float = Field(default=0.25, description="25% drawdown -> Halt new positions")
+    drawdown_limit_lvl2: float = Field(
+        default=0.15, description="15% drawdown -> 75% position size"
+    )
+    drawdown_limit_lvl3: float = Field(
+        default=0.20, description="20% drawdown -> 50% position size"
+    )
+    drawdown_limit_lvl4: float = Field(
+        default=0.25, description="25% drawdown -> Halt new positions"
+    )
     drawdown_limit_hard: float = Field(default=0.30, description="30% drawdown -> Force close all")
 
     # ── Model ──────────────────────────────────────────────────────────────────
