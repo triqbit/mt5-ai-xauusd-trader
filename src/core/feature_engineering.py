@@ -7,7 +7,6 @@ Feature engineering module for computing 140+ technical indicators and patterns.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
