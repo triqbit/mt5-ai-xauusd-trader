@@ -1,0 +1,84 @@
+name: Auto-Merge Policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  verify-policy:
+    name: Verify Auto-Merge Eligibility
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for High-Risk Changes
+        id: check
+        run: |
+          set -e
+
+          # Define high-risk patterns (using regex-safe escaped dots)
+          HIGH_RISK_PATTERNS=(
+            "src/trading/executor\.py"
+            "src/core/risk_engine\.py"
+            "src/trading/risk_manager\.py"
+            "config/secrets\..*"
+            "\.github/workflows/deploy\..*"
+            "Dockerfile"
+            "migrations/.*"
+          )
+
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...${{ github.head_ref }})
+
+          echo "Checking changed files for high-risk patterns..."
+          ELIGIBLE=true
+          BLOCKED_BY=""
+
+          for file in $CHANGED_FILES; do
+            for pattern in "${HIGH_RISK_PATTERNS[@]}"; do
+              if [[ "$file" =~ $pattern ]]; then
+                echo "🚨 HIGH-RISK DETECTED: $file matches $pattern"
+                ELIGIBLE=false
+                BLOCKED_BY="$BLOCKED_BY $file"
+              fi
+            done
+          done
+
+          # Check for test updates if src files are changed
+          SRC_CHANGED=$(echo "$CHANGED_FILES" | grep "^src/" || true)
+          TESTS_CHANGED=$(echo "$CHANGED_FILES" | grep "^tests/" || true)
+
+          if [ -n "$SRC_CHANGED" ] && [ -z "$TESTS_CHANGED" ]; then
+             echo "🚨 BLOCKING: Source files changed but no tests found in this PR."
+             ELIGIBLE=false
+             BLOCKED_BY="$BLOCKED_BY (Missing tests for src changes)"
+          fi
+
+          echo "eligible=$ELIGIBLE" >> $GITHUB_OUTPUT
+
+          if [ "$ELIGIBLE" = "false" ]; then
+            echo "### 🚨 Auto-Merge Blocked" >> $GITHUB_STEP_SUMMARY
+            echo "This PR modifies high-risk files or lacks required tests, and requires manual escalation:" >> $GITHUB_STEP_SUMMARY
+            for f in $BLOCKED_BY; do echo "- $f" >> $GITHUB_STEP_SUMMARY; done
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Escalation Procedure: Please request a review from a Lead Engineer." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ✅ Auto-Merge Eligible" >> $GITHUB_STEP_SUMMARY
+            echo "This PR follows the low-risk auto-merge policy." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  auto-merge:
+    name: Auto-Merge
+    needs: [verify-policy]
+    if: needs.verify-policy.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable Auto-Merge
+        uses: alexwilson/enable-github-automerge-action@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          merge-method: "SQUASH"
