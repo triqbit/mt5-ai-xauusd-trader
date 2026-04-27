@@ -1,7 +1,14 @@
 
 import numpy as np
 import pytest
+try:
+    import gymnasium as gym
+except ImportError:
+    gym = None
+
 from src.environment.gym_env import TradingEnv
+
+pytestmark = pytest.mark.skipif(gym is None, reason="gymnasium not installed")
 
 def test_trading_env_init():
     data = np.random.randn(100, 5).astype(np.float32)

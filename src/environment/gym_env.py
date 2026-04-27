@@ -8,11 +8,15 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
-import gymnasium as gym
+try:
+    import gymnasium as gym
+except ImportError:
+    gym = None
+
 import numpy as np
 
 
-class TradingEnv(gym.Env):
+class TradingEnv(gym.Env if gym else object):
     """
     Custom Gymnasium environment for XAUUSD trading.
     State: OHLCV + technical indicators (configurable window)
@@ -23,7 +27,8 @@ class TradingEnv(gym.Env):
 
     def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
                  window_size: int = 60, commission: float = 0.0002):
-        super().__init__()
+        if gym:
+            super().__init__()
         self.data = data.astype(np.float32)
         self.initial_balance = initial_balance
         self.window_size = window_size
@@ -43,19 +48,21 @@ class TradingEnv(gym.Env):
         self._obs_buffer = np.zeros(window_size * n_features + 2, dtype=np.float32)
 
         # Observation: window of market data + portfolio state [balance, position]
-        self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
-            shape=(window_size * n_features + 2,),
-            dtype=np.float32
-        )
+        if gym:
+            self.observation_space = gym.spaces.Box(
+                low=-np.inf, high=np.inf,
+                shape=(window_size * n_features + 2,),
+                dtype=np.float32
+            )
 
-        # Actions: 0=Hold, 1=Buy, 2=Sell
-        self.action_space = gym.spaces.Discrete(3)
+            # Actions: 0=Hold, 1=Buy, 2=Sell
+            self.action_space = gym.spaces.Discrete(3)
 
         self.reset()
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
-        super().reset(seed=seed)
+        if gym:
+            super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
         self.entry_price = 0.0
