@@ -26,6 +26,7 @@ from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.research.reporting import ResearchReporter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -179,6 +180,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument("--report", action="store_true", help="Generate research summary report")
     return p.parse_args()
 
 
@@ -200,16 +202,16 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
+    is_connected = connector.connect()
+    if not is_connected and not args.report:
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
-    balance = connector.get_account_balance()
+    balance = connector.get_account_balance() if is_connected else 10000.0
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -217,10 +219,17 @@ def main() -> int:
         model.load_ppo(ppo_path)
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+
+    if args.report:
+        log.info("Generating research summary report...")
+        reporter = ResearchReporter(trade_logger=trade_logger, risk_manager=risk)
+        summary = reporter.generate_summary(report_id=f"CLI_REPORT_{int(time.time())}")
+        print("\n" + summary.to_markdown())
+        return 0
+
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:

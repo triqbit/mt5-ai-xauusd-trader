@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from sqlalchemy import (
@@ -214,6 +214,11 @@ class TradeLogger:
             )
             session.add(event)
             session.commit()
+
+    def get_risk_events(self, limit: int = 100) -> List[RiskEvent]:
+        """Retrieve recent risk events."""
+        with self.Session() as session:
+            return session.query(RiskEvent).order_by(RiskEvent.created_at.desc()).limit(limit).all()
 
     def read_performance_report(self) -> Dict[str, float]:
         """
