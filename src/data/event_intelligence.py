@@ -6,7 +6,7 @@ Macroeconomic event ingestion and risk intelligence.
 
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import List, Optional, Protocol, Dict, Any, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 import structlog
 from pydantic import BaseModel
