@@ -8,13 +8,10 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List
 
 import numpy as np
 from pydantic import BaseModel, Field
-
-logger = logging.getLogger(__name__)
 
 
 class ConfidenceBucket(BaseModel):
