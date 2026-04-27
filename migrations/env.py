@@ -21,6 +21,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.core.trade_logger import Base
+# Import all models to ensure they are registered with Base.metadata for autogenerate
+import src.core.audit_log
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
