@@ -12,15 +12,17 @@ import os
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from src.core.config import TradingConfig
-from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
-from src.trading.mt5_connector import MT5Connector
+
+if TYPE_CHECKING:
+    from src.core.trade_logger import TradeLogger
+    from src.models.ensemble import EnsembleModel
+    from src.trading.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
 
