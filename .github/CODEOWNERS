@@ -1,0 +1,36 @@
+# CODEOWNERS for MT5 AI/ML Trading Bot
+# Enforces module-level ownership and mandatory reviews.
+
+# Global default owners
+* @mt5-bot/maintainers
+
+# Core architecture and configuration
+/src/core/ @mt5-bot/core-maintainers
+/main.py @mt5-bot/core-maintainers
+/pyproject.toml @mt5-bot/core-maintainers
+/requirements.txt @mt5-bot/core-maintainers
+
+# AI/ML Models and Feature Engineering
+/src/models/ @mt5-bot/ml-engineers
+
+# Trading logic, execution engines, and MT5 connectors
+/src/trading/ @mt5-bot/trading-leads
+
+# Environment, state management, and market data
+/src/environment/ @mt5-bot/trading-leads @mt5-bot/ml-engineers
+
+# Infrastructure, CI/CD, and Containerization
+/Dockerfile @mt5-bot/devops-leads
+/.github/ @mt5-bot/devops-leads
+/scripts/ @mt5-bot/devops-leads
+
+# Database migrations and schema standards
+/migrations/ @mt5-bot/core-maintainers
+/DATABASE_STANDARDS.md @mt5-bot/core-maintainers
+
+# Documentation and Standards
+/docs/ @mt5-bot/maintainers
+/*.md @mt5-bot/maintainers
+
+# Test suites
+/tests/ @mt5-bot/maintainers
