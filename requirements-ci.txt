@@ -36,3 +36,6 @@ pydantic-settings==2.8.1
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot
+mkdocs==1.6.0
+mkdocs-material==9.5.21
+mkdocstrings[python]==0.25.1

@@ -55,7 +55,18 @@ TIMEFRAME_MAP: Dict[str, int] = {
 class MT5Connector:
     """
     Enterprise-grade connector for MetaTrader 5.
+
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
+    Handles connection, market data retrieval (OHLCV), account information,
+    and order execution.
+
+    Examples:
+        >>> from src.core.config import get_config
+        >>> cfg = get_config()
+        >>> connector = MT5Connector(cfg)
+        >>> connector.initialize()
+        >>> rates = connector.get_rates("XAUUSD", "M5", 100)
+        >>> print(f"Fetched {len(rates)} bars")
     """
 
     def __init__(self, config: TradingConfig) -> None:

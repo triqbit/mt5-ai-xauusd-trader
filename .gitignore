@@ -89,3 +89,4 @@ htmlcov/
 *.tfstate
 *.tfstate.backup
 .terraform/
+site/

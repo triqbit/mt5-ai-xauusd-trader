@@ -73,8 +73,15 @@ class LSTMAttentionModel(nn.Module):
 class EnsembleModel:
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
+
     Weights are initialised equally and adapt based on a rolling window
     of each algorithm's realised P&L Sharpe ratio.
+
+    Examples:
+        >>> ensemble = EnsembleModel(device="cpu")
+        >>> obs = np.random.randn(140)
+        >>> direction, confidence, votes = ensemble.predict(obs)
+        >>> print(f"Action: {direction}, Confidence: {confidence:.2f}")
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]

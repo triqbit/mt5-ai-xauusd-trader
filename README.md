@@ -103,10 +103,11 @@ python main.py --mode demo --symbol XAUUSD --verbose
 
 | Guide | Description |
 | :--- | :--- |
+| [Full Documentation](https://triqbit.github.io/mt5-ai-xauusd-trader/) | MkDocs site with Architecture, Config, and API docs. |
+| [Architecture](./docs/architecture.md) | Mermaid diagrams and system signal flow. |
+| [Troubleshooting](./docs/troubleshooting.md) | Common MT5 and environment setup errors. |
 | [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
-| [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
-| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
-| [DATABASE_STANDARDS.md](./DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
+| [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards and security policies. |
 
 ---
 
