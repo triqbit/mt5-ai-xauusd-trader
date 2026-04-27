@@ -12,7 +12,8 @@ def base_cfg_data():
         "MT5_PASSWORD": "ValidPassword123!",
         "MT5_SERVER": "Broker-Server",
         "DATABASE_URL": "postgresql://user:pass@localhost/db",
-        "MODEL_PATH": "models/trained/ensemble_latest.pt"
+        "MODEL_PATH": "models/trained/ensemble_latest.pt",
+        "RISK_PER_TRADE": "0.01"
     }
 
 
@@ -33,10 +34,9 @@ def test_validate_valid_config(base_cfg_data, monkeypatch, tmp_path):
 
 def test_validate_invalid_mt5_login(base_cfg_data, monkeypatch):
     """Test validation fails with invalid MT5 login."""
-    monkeypatch.setenv("MT5_LOGIN", "0")
     for k, v in base_cfg_data.items():
-        if k != "MT5_LOGIN":
-            monkeypatch.setenv(k, v)
+        monkeypatch.setenv(k, v)
+    monkeypatch.setenv("MT5_LOGIN", "0")
 
     cfg = TradingConfig()
     result = validate_config(cfg)
@@ -46,10 +46,9 @@ def test_validate_invalid_mt5_login(base_cfg_data, monkeypatch):
 
 def test_validate_placeholder_password(base_cfg_data, monkeypatch):
     """Test validation fails with placeholder password."""
-    monkeypatch.setenv("MT5_PASSWORD", "password")
     for k, v in base_cfg_data.items():
-        if k != "MT5_PASSWORD":
-            monkeypatch.setenv(k, v)
+        monkeypatch.setenv(k, v)
+    monkeypatch.setenv("MT5_PASSWORD", "password")
 
     cfg = TradingConfig()
     result = validate_config(cfg)
@@ -59,10 +58,10 @@ def test_validate_placeholder_password(base_cfg_data, monkeypatch):
 
 def test_validate_live_mode_no_confirmation(base_cfg_data, monkeypatch):
     """Test validation fails in live mode without explicit confirmation."""
-    monkeypatch.setenv("MODE", "live")
-    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "false")
     for k, v in base_cfg_data.items():
         monkeypatch.setenv(k, v)
+    monkeypatch.setenv("MODE", "live")
+    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "false")
 
     cfg = TradingConfig()
     result = validate_config(cfg)
@@ -75,10 +74,10 @@ def test_validate_live_mode_with_confirmation(base_cfg_data, monkeypatch, tmp_pa
     model_file = tmp_path / "model.pt"
     model_file.touch()
 
-    monkeypatch.setenv("MODE", "live")
-    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "true")
     for k, v in base_cfg_data.items():
         monkeypatch.setenv(k, v)
+    monkeypatch.setenv("MODE", "live")
+    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "true")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -91,12 +90,11 @@ def test_validate_incompatible_live_sqlite(base_cfg_data, monkeypatch, tmp_path)
     model_file = tmp_path / "model.pt"
     model_file.touch()
 
+    for k, v in base_cfg_data.items():
+        monkeypatch.setenv(k, v)
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "true")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///test.db")
-    for k, v in base_cfg_data.items():
-        if k != "DATABASE_URL":
-            monkeypatch.setenv(k, v)
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -110,9 +108,9 @@ def test_validate_high_risk_params(base_cfg_data, monkeypatch, tmp_path):
     model_file = tmp_path / "model.pt"
     model_file.touch()
 
-    monkeypatch.setenv("MAX_DAILY_LOSS", "0.15")
     for k, v in base_cfg_data.items():
         monkeypatch.setenv(k, v)
+    monkeypatch.setenv("MAX_DAILY_LOSS", "0.15")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -123,10 +121,9 @@ def test_validate_high_risk_params(base_cfg_data, monkeypatch, tmp_path):
 
 def test_validate_missing_model(base_cfg_data, monkeypatch):
     """Test validation fails if model path does not exist."""
-    monkeypatch.setenv("MODEL_PATH", "non_existent_model.pt")
     for k, v in base_cfg_data.items():
-        if k != "MODEL_PATH":
-            monkeypatch.setenv(k, v)
+        monkeypatch.setenv(k, v)
+    monkeypatch.setenv("MODEL_PATH", "non_existent_model.pt")
 
     cfg = TradingConfig()
     result = validate_config(cfg)
