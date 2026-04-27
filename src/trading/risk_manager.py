@@ -64,6 +64,20 @@ class RiskManager:
     """
     Central risk authority.
     Every signal must be approved here before reaching the order router.
+
+    Implements a 6-layer filter cascade:
+    1. Circuit Breaker (Drawdown)
+    2. Daily Loss Limit
+    3. Max Positions
+    4. Symbol Allocation
+    5. Minimum Confidence
+    6. Risk-Reward Ratio
+
+    Examples:
+        >>> risk = RiskManager(cfg, account_balance=10000.0)
+        >>> signal = TradeSignal(symbol="XAUUSD", direction=1, entry_price=2300, stop_loss=2290, take_profit=2320, lot_size=0.1, algorithm="ensemble", confidence=0.7)
+        >>> if risk.approve(signal):
+        ...     print("Signal approved for execution")
     """
 
     def __init__(
