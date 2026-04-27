@@ -13,13 +13,20 @@ class OrderManager:
     Manages order execution and position tracking.
     Integrates with MT5Connector for dual-path execution (Desktop/MetaAPI).
     """
+
     def __init__(self, connector, symbol: str = "XAUUSD"):
         self.connector = connector
         self.symbol = symbol
         self.logger = logging.getLogger(__name__)
         self.magic_number = 20240501  # Unique ID for AI trades
 
-    async def execute_trade(self, action: str, volume: float, sl_pips: Optional[float] = None, tp_pips: Optional[float] = None) -> Dict:
+    async def execute_trade(
+        self,
+        action: str,
+        volume: float,
+        sl_pips: Optional[float] = None,
+        tp_pips: Optional[float] = None,
+    ) -> Dict:
         """
         Executes a market order with optional SL/TP.
         action: 'BUY' or 'SELL'
@@ -32,7 +39,7 @@ class OrderManager:
             if not tick:
                 raise ValueError("Could not retrieve current market price.")
 
-            price = tick['ask'] if action.upper() == "BUY" else tick['bid']
+            price = tick["ask"] if action.upper() == "BUY" else tick["bid"]
             sl, tp = self._calculate_sl_tp(action, price, sl_pips, tp_pips)
 
             if self.connector.use_metaapi:
@@ -44,7 +51,9 @@ class OrderManager:
             self.logger.error(f"Trade execution failed: {e}")
             return {"status": "error", "message": str(e)}
 
-    def _calculate_sl_tp(self, action: str, price: float, sl_pips: Optional[float], tp_pips: Optional[float]):
+    def _calculate_sl_tp(
+        self, action: str, price: float, sl_pips: Optional[float], tp_pips: Optional[float]
+    ):
         """Calculates absolute price levels for SL and TP based on pips."""
         # Standard pip for Gold (XAUUSD) is often 0.01 or 0.1 depending on broker
         # We'll use 0.1 as a default step for 'pips' in gold context
@@ -53,13 +62,23 @@ class OrderManager:
         tp = None
 
         if sl_pips:
-            sl = price - (sl_pips * pip_value) if action.upper() == "BUY" else price + (sl_pips * pip_value)
+            sl = (
+                price - (sl_pips * pip_value)
+                if action.upper() == "BUY"
+                else price + (sl_pips * pip_value)
+            )
         if tp_pips:
-            tp = price + (tp_pips * pip_value) if action.upper() == "BUY" else price - (tp_pips * pip_value)
+            tp = (
+                price + (tp_pips * pip_value)
+                if action.upper() == "BUY"
+                else price - (tp_pips * pip_value)
+            )
 
         return sl, tp
 
-    def _execute_mt5_desktop(self, action: str, volume: float, price: float, sl: Optional[float], tp: Optional[float]) -> Dict:
+    def _execute_mt5_desktop(
+        self, action: str, volume: float, price: float, sl: Optional[float], tp: Optional[float]
+    ) -> Dict:
         """Execution via local MetaTrader5 terminal."""
         import MetaTrader5 as mt5
 
@@ -88,33 +107,29 @@ class OrderManager:
             return {
                 "status": "error",
                 "retcode": result.retcode,
-                "message": f"MT5 Error: {result.comment}"
+                "message": f"MT5 Error: {result.comment}",
             }
 
         return {"status": "success", "order_id": result.order, "deal": result.deal}
 
-    async def _execute_metaapi(self, action: str, volume: float, sl: Optional[float], tp: Optional[float]) -> Dict:
+    async def _execute_metaapi(
+        self, action: str, volume: float, sl: Optional[float], tp: Optional[float]
+    ) -> Dict:
         """Execution via MetaAPI Cloud."""
         if not self.connector.connection:
             raise ConnectionError("MetaAPI connection not established.")
 
         try:
-            options = {
-                "comment": "AI Trade - MetaAPI",
-                "magic": self.magic_number
-            }
+            options = {"comment": "AI Trade - MetaAPI", "magic": self.magic_number}
             if sl:
                 options["stopLoss"] = sl
             if tp:
                 options["takeProfit"] = tp
 
             result = await self.connector.connection.create_market_order(
-                self.symbol,
-                action.upper(),
-                volume,
-                options
+                self.symbol, action.upper(), volume, options
             )
-            return {"status": "success", "order_id": result['orderId']}
+            return {"status": "success", "order_id": result["orderId"]}
         except Exception as e:
             return {"status": "error", "message": f"MetaAPI Error: {e!s}"}
 
@@ -127,9 +142,10 @@ class OrderManager:
         """Fetch active positions for the symbol."""
         if self.connector.use_metaapi:
             positions = await self.connector.connection.get_positions()
-            return [p for p in positions if p['symbol'] == self.symbol]
+            return [p for p in positions if p["symbol"] == self.symbol]
         else:
             import MetaTrader5 as mt5
+
             positions = mt5.positions_get(symbol=self.symbol)
             if positions is None:
                 return []
