@@ -27,7 +27,7 @@ from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_engine import RiskEngine, TradeSignal
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -56,7 +56,7 @@ def configure_logging(level: str = "INFO") -> None:
 def run_live(
     cfg,
     connector: MT5Connector,
-    risk: RiskManager,
+    risk: RiskEngine,
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
@@ -94,13 +94,16 @@ def run_live(
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
             atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
+            # For simplicity in this demo loop, assume avg_atr = atr
+            # In production, we'd fetch longer history for avg_atr
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
-            lot_size = risk.size_position(
+            lot_size = risk.calculate_position_size(
                 cfg.symbol,
-                win_rate=0.58,
-                avg_win=4 * atr,
-                avg_loss=2 * atr,
+                entry_price=price,
+                stop_loss=stop_loss,
+                atr=atr,
+                avg_atr=atr,
             )
             signal = TradeSignal(
                 symbol=cfg.symbol,
@@ -207,9 +210,10 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskEngine(
+        cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
