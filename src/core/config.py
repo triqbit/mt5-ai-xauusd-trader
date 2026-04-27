@@ -22,7 +22,7 @@ class TradingConfig(BaseSettings):
     """Runtime-configurable trading parameters."""
 
     model_config = SettingsConfigDict(
-        env_file=ROOT / ".env",
+        env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -45,18 +45,35 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+
+    # ── Risk Parameters (as per RISK_LIMITS.md) ────────────────────────────────
+    max_positions: int = Field(default=5, ge=1, le=10, description="Max concurrent positions")
+    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.02, description="Max risk % per trade (0.01 = 1%)")
+    max_leverage: float = Field(default=10.0, ge=1.0, le=50.0, description="Max allowed leverage")
+
+    # Daily cascading loss limits
+    daily_loss_limit_lvl1: float = Field(default=0.02, description="2% loss -> Alert")
+    daily_loss_limit_lvl2: float = Field(default=0.03, description="3% loss -> Half position size")
+    daily_loss_limit_lvl3: float = Field(default=0.04, description="4% loss -> Quarter position size")
+    daily_loss_limit_lvl4: float = Field(default=0.05, description="5% loss -> Halt trading")
+    daily_loss_limit_hard: float = Field(default=0.06, description="6% loss -> Force close all")
+
+    # Drawdown limits
+    drawdown_limit_lvl1: float = Field(default=0.10, description="10% drawdown -> Alert")
+    drawdown_limit_lvl2: float = Field(default=0.15, description="15% drawdown -> 75% position size")
+    drawdown_limit_lvl3: float = Field(default=0.20, description="20% drawdown -> 50% position size")
+    drawdown_limit_lvl4: float = Field(default=0.25, description="25% drawdown -> Halt new positions")
+    drawdown_limit_hard: float = Field(default=0.30, description="30% drawdown -> Force close all")
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
     model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
     train_steps: int = Field(default=1_000_000, ge=100_000)
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
+    confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
+    database_url: str = Field(default="sqlite:///trade_log.db")
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
@@ -65,7 +82,6 @@ class TradingConfig(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
     telegram_token: str = Field(default="", description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     @field_validator("risk_per_trade")
     @classmethod
@@ -80,16 +96,21 @@ class TradingConfig(BaseSettings):
 
     @property
     def data_dir(self) -> Path:
-        return ROOT / "data"
+        data_path = ROOT / "data"
+        data_path.mkdir(exist_ok=True)
+        return data_path
 
     @property
     def logs_dir(self) -> Path:
-        return ROOT / "logs"
+        logs_path = ROOT / "logs"
+        logs_path.mkdir(exist_ok=True)
+        return logs_path
 
 
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
     """Return singleton TradingConfig (cached after first call)."""
+    # In CI/Test environment, we might want to provide dummy values if .env is missing
     return TradingConfig()  # type: ignore[call-arg]
 
 
