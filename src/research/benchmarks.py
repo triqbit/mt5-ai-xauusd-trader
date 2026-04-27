@@ -199,12 +199,13 @@ class BenchmarkEvaluator:
                 action = strategy.predict(obs, info)
                 action = max(0, min(2, int(action)))
 
+                prev_balance = current_episode_balances[-1]
                 next_obs, reward, done, truncated, info = self.env.step(action)
                 current_balance = info.get("balance", initial_balance)
 
-                # step reward in TradingEnv.step is pnl / initial_balance * 100
-                # we want decimal fractional returns for Sharpe
-                step_return = reward / 100.0 if action == 2 else reward
+                # Sharpe Ratio requires returns relative to balance.
+                # Balance change is the ground truth for step returns.
+                step_return = (current_balance - prev_balance) / prev_balance if prev_balance > 0 else 0.0
                 all_step_returns.append(step_return)
 
                 current_episode_balances.append(current_balance)
