@@ -9,21 +9,30 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+try:
+    import torch
+    import torch.nn as nn
+
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    nn = None
+    TORCH_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel(nn.Module if TORCH_AVAILABLE else object):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
@@ -80,14 +89,21 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device)
+        """Initialize the ensemble model."""
+        if TORCH_AVAILABLE:
+            self.device = torch.device(
+                device if torch.cuda.is_available() or device != "cuda" else "cpu"
+            )
+        else:
+            self.device = None
+
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
             "lstm": 1 / 3,
         }
-        self._ppo_model = None  # loaded lazily
-        self._dreamer_model = None  # loaded lazily
+        self._ppo_model: Optional[Any] = None  # loaded lazily
+        self._dreamer_model: Optional[Any] = None  # loaded lazily
         self.lstm_model: Optional[LSTMAttentionModel] = None
         self._performance: Dict[str, List[float]] = {k: [] for k in self.ALGORITHMS}
 
@@ -104,12 +120,19 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
-        model = LSTMAttentionModel(n_features=n_features).to(self.device)
-        state = torch.load(str(path), map_location=self.device)
-        model.load_state_dict(state)
-        model.eval()
-        self.lstm_model = model
-        logger.info("LSTM model loaded from %s", path)
+        if not TORCH_AVAILABLE:
+            logger.warning("Torch not available - cannot load LSTM")
+            return
+
+        try:
+            model = LSTMAttentionModel(n_features=n_features).to(self.device)
+            state = torch.load(str(path), map_location=self.device)
+            model.load_state_dict(state)
+            model.eval()
+            self.lstm_model = model
+            logger.info("LSTM model loaded from %s", path)
+        except Exception as exc:
+            logger.warning("Could not load LSTM: %s", exc)
 
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
@@ -118,37 +141,70 @@ class EnsembleModel:
         seq: Optional[torch.Tensor] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
-        Return (direction, confidence, per_algo_probs).
-        direction: +1 buy, -1 sell, 0 hold
+        Aggregate predictions from all loaded models.
+
+        Args:
+            obs: Flat observation vector for RL models.
+            seq: Sequence tensor for LSTM (batch, seq_len, features).
+
+        Returns:
+            Tuple of (direction, confidence, per_algo_probs).
+            direction: +1 buy, -1 sell, 0 hold.
+            confidence: Weighted probability of the chosen direction.
+            per_algo_probs: Raw output index from each model.
         """
         votes: Dict[str, np.ndarray] = {}
 
-        # PPO prediction
+        # 1. PPO Prediction
         if self._ppo_model is not None:
-            action, _ = self._ppo_model.predict(obs, deterministic=True)
-            probs = np.zeros(3)
-            probs[int(action)] = 1.0
-            votes["ppo"] = probs
+            try:
+                action, _ = self._ppo_model.predict(obs, deterministic=True)
+                probs = np.zeros(3)
+                probs[int(action)] = 1.0
+                votes["ppo"] = probs
+            except Exception as e:
+                logger.error("PPO prediction failed: %s", e)
 
-        # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
-            with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            votes["lstm"] = probs
+        # 2. LSTM-Attention Prediction
+        if TORCH_AVAILABLE and self.lstm_model is not None and seq is not None:
+            try:
+                with torch.no_grad():
+                    # Ensure seq has batch dimension
+                    if seq.dim() == 2:
+                        seq = seq.unsqueeze(0)
+                    logits = self.lstm_model(seq.to(self.device))
+                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                votes["lstm"] = probs
+            except Exception as e:
+                logger.error("LSTM prediction failed: %s", e)
+
+        # 3. Dreamer Prediction (Placeholder)
+        if self._dreamer_model is not None:
+            # Implement Dreamer V3 inference here
+            pass
 
         if not votes:
-            logger.warning("No models loaded - returning HOLD")
+            logger.warning("No models loaded or all predictions failed - returning HOLD")
             return 0, 0.0, {}
 
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
+        if total_weight == 0:
+            return 0, 0.0, {}
+
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+
+        # Mapping: 0=Buy, 1=Sell, 2=Hold (StableBaselines/Gym standard often differs,
+        # but let's stick to the convention defined in this project's ensemble)
+        # Assuming internal convention: 0=Buy, 1=Sell, 2=Hold
+        action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
+
         direction_map = {0: 1, 1: -1, 2: 0}
         direction = direction_map[action_idx]
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
             direction,
@@ -166,7 +222,7 @@ class EnsembleModel:
                 self._rebalance_weights()
 
     def _rebalance_weights(self, window: int = 50) -> None:
-        """Reweight by rolling Sharpe ratio (floor 5%)."""
+        """Reweight models by rolling Sharpe ratio."""
         sharpes: Dict[str, float] = {}
         for algo, rets in self._performance.items():
             tail = rets[-window:]
@@ -177,14 +233,17 @@ class EnsembleModel:
             mean = arr.mean()
             std = arr.std() + 1e-9
             sharpes[algo] = max(mean / std, 0.0)
+
         total = sum(sharpes.values()) or 1.0
-        for algo, s in sharpes.items():
+        for algo in self.ALGORITHMS:
+            s = sharpes.get(algo, 0.0)
             raw = s / total
-            self.weights[algo] = max(raw, 0.05)  # min 5%
+            self.weights[algo] = max(raw, 0.05)  # min 5% floor
+
         # Re-normalise
         total_w = sum(self.weights.values())
         self.weights = {k: v / total_w for k, v in self.weights.items()}
-        logger.info("Weights rebalanced: %s", self.weights)
+        logger.info("Ensemble weights rebalanced: %s", self.weights)
 
 
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]

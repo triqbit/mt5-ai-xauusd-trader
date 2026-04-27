@@ -36,3 +36,5 @@ pydantic-settings==2.8.1
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot
+metaapi-cloud-sdk
+python-socketio>=5.14.0
