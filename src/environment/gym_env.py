@@ -10,6 +10,9 @@ from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class TradingEnv(gym.Env):
@@ -93,4 +96,9 @@ class TradingEnv(gym.Env):
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
     def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+        logger.info(
+            "render",
+            step=self.current_step,
+            balance=round(self.balance, 2),
+            position=self.position,
+        )

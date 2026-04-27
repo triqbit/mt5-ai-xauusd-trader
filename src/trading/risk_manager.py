@@ -209,8 +209,9 @@ class RiskManager:
         return True
 
     def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
+        self, confidence: float
     ) -> bool:
+        threshold = self.cfg.confidence_threshold
         if confidence < threshold:
             logger.debug(
                 "Confidence %.2f below threshold %.2f", confidence, threshold
