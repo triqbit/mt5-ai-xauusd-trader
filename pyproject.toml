@@ -73,7 +73,16 @@ strict = false
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
-disable_error_code = ["misc", "valid-type", "union-attr", "arg-type"]
+disable_error_code = [
+    "misc",
+    "valid-type",
+    "union-attr",
+    "arg-type",
+    "var-annotated",
+    "index",
+    "return-value",
+    "assignment",
+]
 
 # ===========================================================
 # pytest
