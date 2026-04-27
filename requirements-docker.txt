@@ -14,19 +14,20 @@
 # -- Core numeric / data -------------------------------------------
 # numpy>=2 required by TA-Lib 0.6.x
 numpy>=2.0.0,<3
-scipy==1.13.0
-scikit-learn==1.5.0
-pandas==2.2.2
+scipy>=1.13.0
+scikit-learn>=1.5.0
+pandas>=3.0.2
 
 # -- Technical Analysis --------------------------------------------
 # Python wrapper version must be compatible with C lib 0.6.4 built in Dockerfile
 TA-Lib>=0.6.4
+pandas-ta==0.4.71b0
 mplfinance==0.12.10b0
 
 # -- Data Acquisition ----------------------------------------------
 yfinance==0.2.38
-requests==2.31.0
-aiohttp==3.9.5
+requests>=2.32.4
+aiohttp>=3.10.11
 httpx==0.27.0
 
 # -- Database ------------------------------------------------------
@@ -39,12 +40,12 @@ redis==5.0.4
 prometheus-client==0.20.0
 structlog==24.1.0
 rich==13.7.1
-tqdm==4.66.4
+tqdm>=4.67.1
 
 # -- Dashboard / API -----------------------------------------------
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-dash==2.17.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+dash>=2.18.0
 plotly==5.22.0
 
 # -- Configuration -------------------------------------------------
