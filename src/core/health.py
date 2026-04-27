@@ -12,7 +12,6 @@ import os
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
@@ -71,7 +70,7 @@ class HealthCheckSystem:
         """Validate critical configuration parameters."""
         try:
             # Pydantic already validates on init, but we can do extra checks here
-            if self.cfg.is_live and not os.getenv("CONFIRM_LIVE_TRADING") == "true":
+            if self.cfg.is_live and os.getenv("CONFIRM_LIVE_TRADING") != "true":
                 return ComponentStatus(
                     status=HealthStatus.FAILED,
                     message="LIVE mode active but CONFIRM_LIVE_TRADING not set",
