@@ -1,5 +1,8 @@
 from unittest.mock import MagicMock
 
+import pytest
+pytest.importorskip("torch")
+pytest.importorskip("stable_baselines3")
 from src.models.ensemble import EnsembleModel
 from src.trading.risk_manager import RiskManager, TradeSignal
 from src.utils.synthetic_data import generate_synthetic_ohlcv

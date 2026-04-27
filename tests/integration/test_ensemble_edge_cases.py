@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-
+pytest.importorskip("torch")
 from src.models.ensemble import EnsembleModel
 
 
