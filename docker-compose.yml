@@ -1,0 +1,22 @@
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: triqbit/mt5-ai-xauusd-trader:latest
+    container_name: mt5_trader
+    restart: unless-stopped
+    ports:
+      - "8000:8000"  # Prometheus Metrics
+      - "8050:8050"  # Dash Dashboard
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Default to demo mode for safety
+    command: ["--mode", "demo", "--algo", "ensemble"]
+
+networks:
+  default:
+    name: trading_network
