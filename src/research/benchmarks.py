@@ -158,8 +158,13 @@ class RiskFilteredBaseline:
 
     def predict(self, obs: np.ndarray, info: Optional[Dict[str, Any]] = None) -> int:
         # Example filter: avoid trading if recent volatility is too low
-        data = obs[:-2]  # market data part
-        vol = np.std(data)
+        # observation_space shape is (window_size * n_features + 2,)
+        window_size = getattr(self.base_strategy, "window_size", 60)
+        n_features = (len(obs) - 2) // window_size
+        window_data = obs[: window_size * n_features].reshape((window_size, n_features))
+
+        close = window_data[:, 3]
+        vol = np.std(close)
 
         if vol < self.min_volatility:
             return 0
@@ -176,7 +181,8 @@ class BenchmarkEvaluator:
     def evaluate(self, strategy: Strategy, n_episodes: int = 5) -> BenchmarkReport:
         """Run multiple episodes and aggregate results."""
         all_episode_returns = []
-        all_balances = []
+        all_step_returns = []
+        episode_max_drawdowns = []
         total_wins = 0
         total_trades = 0
 
@@ -187,39 +193,56 @@ class BenchmarkEvaluator:
             initial_balance = getattr(self.env, "initial_balance", 10000.0)
             balances = [initial_balance]
 
+            # For per-episode drawdown
+            current_episode_balances = [initial_balance]
+
             while not (done or truncated):
                 action = strategy.predict(obs, info)
                 action = max(0, min(2, int(action)))
 
                 next_obs, reward, done, truncated, info = self.env.step(action)
-                balances.append(info.get("balance", initial_balance))
+                current_balance = info.get("balance", initial_balance)
 
-                # Count trades and wins. reward is non-zero only when a trade is closed in gym_env.py
-                if action == 2 and reward != 0:
+                # step reward in TradingEnv.step is pnl / initial_balance * 100
+                # we want decimal fractional returns for Sharpe
+                step_return = reward / 100.0 if action == 2 else reward
+                all_step_returns.append(step_return)
+
+                current_episode_balances.append(current_balance)
+
+                # Count trades and wins. action=2 is close in TradingEnv.step
+                if action == 2:
                     total_trades += 1
                     if reward > 0:
                         total_wins += 1
 
                 obs = next_obs
 
-            final_return = (info.get("balance", initial_balance) - initial_balance) / initial_balance
+            final_balance = info.get("balance", initial_balance)
+            final_return = (final_balance - initial_balance) / initial_balance
             all_episode_returns.append(final_return)
-            all_balances.extend(balances)
+
+            # Calculate Max Drawdown for this episode
+            ep_balance_arr = np.array(current_episode_balances)
+            peak = np.maximum.accumulate(ep_balance_arr)
+            safe_peak = np.where(peak == 0, 1e-9, peak)
+            drawdown = (peak - ep_balance_arr) / safe_peak
+            episode_max_drawdowns.append(np.max(drawdown))
 
         cumulative_return = np.mean(all_episode_returns)
         win_rate = total_wins / total_trades if total_trades > 0 else 0.0
 
-        # Sharpe Ratio (annualised)
-        returns_series = pd.Series(all_episode_returns)
-        std = returns_series.std()
-        sharpe = (returns_series.mean() / (std + 1e-9)) * np.sqrt(252) if std > 0 else 0.0
+        # Sharpe Ratio (annualised from step-level returns)
+        # We assume each step is a bar (e.g. 1 hour). 252 days * 24 hours = 6048 steps
+        # This is a heuristic, in production it should match timeframe.
+        step_returns_arr = np.array(all_step_returns)
+        mean_step_ret = np.mean(step_returns_arr)
+        std_step_ret = np.std(step_returns_arr) + 1e-9
+        # Assuming 252 trading days and average steps per day (e.g. 24 if H1)
+        # Defaulting to 252 for simplicity in this baseline tool
+        sharpe = (mean_step_ret / std_step_ret) * np.sqrt(252)
 
-        # Max Drawdown
-        balance_arr = np.array(all_balances)
-        peak = np.maximum.accumulate(balance_arr)
-        safe_peak = np.where(peak == 0, 1e-9, peak)
-        drawdown = (peak - balance_arr) / safe_peak
-        max_dd = np.max(drawdown)
+        max_dd = np.mean(episode_max_drawdowns)
 
         return BenchmarkReport(
             strategy_name=strategy.name,
