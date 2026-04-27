@@ -22,7 +22,6 @@ from typing import Optional
 
 import structlog
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from src.core.config import get_config
@@ -191,17 +190,6 @@ def main() -> int:
     log = logging.getLogger("main")
     console = Console()
 
-    # Display startup banner
-    console.print(
-        Panel(
-            f"[bold green]MT5 AI/ML Trading Bot[/bold green]\n"
-            f"[cyan]Mode:[/cyan] {args.mode.upper()}\n"
-            f"[cyan]Algorithm:[/cyan] {args.algo.upper()}\n"
-            f"[cyan]Symbol:[/cyan] {args.symbol}",
-            title="🤖 Palette UX: Professional Trader Edition",
-            border_style="blue",
-        )
-    )
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)

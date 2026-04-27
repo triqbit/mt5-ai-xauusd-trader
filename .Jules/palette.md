@@ -1,3 +1,3 @@
-## 2025-05-15 - [The Power of Immediate Performance Feedback in CLI Trading]
-**Learning:** In high-stakes, automated environments like algorithmic trading, providing immediate, high-contrast visual feedback on system status and performance metrics significantly enhances user trust and situational awareness. Transitioning from plain logs to structured, rich UI elements (like panels for alerts and tables for summaries) helps users quickly digest complex information without parsing dense log streams.
-**Action:** Always implement a professional startup banner to confirm configuration and a detailed performance summary table upon session completion. Use high-visibility components (e.g., `rich.panel.Panel`) for critical system events like risk-management interventions.
+## 2025-05-15 - [The Value of Structured Post-Session Feedback in CLI Tools]
+**Learning:** For command-line trading tools, users benefit immensely from a structured, high-level performance summary at the end of their session. Moving beyond raw logs to a formatted table (using `rich`) helps users immediately quantify their session's success (Win Rate, Sharpe Ratio, etc.) without needing external analysis tools.
+**Action:** Implement a concise performance summary table on application exit to provide clear, actionable feedback on session results.
