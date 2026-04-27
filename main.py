@@ -22,7 +22,8 @@ from typing import Optional
 
 import structlog
 
-from src.core.config import get_config
+from src.core.config import TradingConfig, get_config
+from src.core.error_handler import ErrorHandler
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -54,26 +55,32 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
+    error_handler: ErrorHandler,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
-    log = logging.getLogger("main.live")
-    log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+    log = structlog.get_logger("main.live")
+    log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
             # 1. Fetch latest market data
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
             tick = connector.get_tick(cfg.symbol)
+            if df.empty or not tick["ask"]:
+                log.warning("Market data unavailable - retrying")
+                time.sleep(10)
+                continue
+
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+            log.debug("Signal evaluated", direction=direction, confidence=round(confidence, 3))
 
             signal_id = None
             if trade_logger:
@@ -160,7 +167,11 @@ def run_live(
             log.info("Interrupted by user - shutting down")
             break
         except Exception as exc:
-            log.exception("Unhandled error in trading loop: %s", exc)
+            error_handler.handle_error(
+                error=exc,
+                event_type="TRADING_LOOP_ERROR",
+                context={"symbol": cfg.symbol, "mode": cfg.mode},
+            )
             time.sleep(poll_interval)
 
 
@@ -199,17 +210,22 @@ def main() -> int:
         cfg.symbol,
     )
     # Initialise components
+    trade_logger = TradeLogger(
+        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+    )
+    error_handler = ErrorHandler(trade_logger=trade_logger)
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
+
     balance = connector.get_account_balance()
-    trade_logger = TradeLogger(
-        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
-    )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
+    # State Recovery
+    risk.recover_state()
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +235,15 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                error_handler=error_handler,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:

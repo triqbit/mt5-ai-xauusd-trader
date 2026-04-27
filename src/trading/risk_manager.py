@@ -168,6 +168,36 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
+    def recover_state(self) -> None:
+        """Recover open positions and daily stats from the database."""
+        if not self.trade_logger:
+            return
+
+        logger.info("Attempting state recovery from database...")
+        with self.trade_logger.Session() as session:
+            from src.core.trade_logger import Trade
+
+            # Recover open positions
+            open_trades = session.query(Trade).filter(Trade.status == "OPEN").all()
+            for trade in open_trades:
+                self.open_positions[trade.symbol] = trade.ticket
+                logger.info("Recovered open position | %s ticket=%d", trade.symbol, trade.ticket)
+
+            # Recover daily PnL (for today)
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            daily_trades = (
+                session.query(Trade)
+                .filter(Trade.updated_at >= today_start, Trade.status == "CLOSED")
+                .all()
+            )
+            self.daily.realised_pnl = sum(t.pnl for t in daily_trades)
+            self.daily.trade_count = len(daily_trades)
+            logger.info(
+                "Recovered daily stats | pnl=%.2f trades=%d",
+                self.daily.realised_pnl,
+                self.daily.trade_count,
+            )
+
     # -- Private filter layers ----------------------------------------------
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
