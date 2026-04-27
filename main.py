@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.config_validator import validate_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -198,6 +199,18 @@ def main() -> int:
         cfg.algorithm,
         cfg.symbol,
     )
+
+    # Validate configuration
+    v_result = validate_config(cfg)
+    for warning in v_result.warnings:
+        log.warning("Config Warning: %s", warning)
+
+    if not v_result.is_valid:
+        for error in v_result.errors:
+            log.critical("Config Error: %s", error)
+        log.critical("Application failed to start due to invalid configuration.")
+        return 1
+
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
