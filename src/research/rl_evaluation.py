@@ -105,7 +105,7 @@ class RLEvaluator:
                 curr_position = info.get("position", 0.0)
 
                 # Reward Decomposition logic
-                if curr_position != 0:
+                if prev_position != 0:
                     trade_unrealized_pnl += reward
                     total_unrealized_pnl += reward
 
