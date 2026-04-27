@@ -71,7 +71,7 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
-    def initialize(self) -> bool:
+    def connect(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
@@ -79,7 +79,7 @@ class MT5Connector:
         Returns:
             True if connection established, False otherwise.
         """
-        logger.info("Initializing MT5 connector | mode=%s", self.cfg.mode)
+        logger.info("Connecting MT5 connector | mode=%s", self.cfg.mode)
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
@@ -90,14 +90,14 @@ class MT5Connector:
                     password=self.cfg.mt5_password,
                     server=self.cfg.mt5_server,
                 ):
-                    logger.info("Native MT5 SDK initialized successfully.")
+                    logger.info("Native MT5 SDK connected successfully.")
                     self.use_metaapi = False
                     self._is_initialized = True
                     return True
                 else:
                     logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
             except Exception as e:
-                logger.error("Native MT5 initialization error: %s", e)
+                logger.error("Native MT5 connection error: %s", e)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
@@ -111,38 +111,30 @@ class MT5Connector:
                 logger.info("MetaAPI fallback configured.")
                 return True
             except Exception as e:
-                logger.error("MetaAPI initialization failed: %s", e)
+                logger.error("MetaAPI connection failed: %s", e)
 
         logger.error("All MT5 connection paths failed.")
         return False
 
-    def connect(self) -> bool:
-        """Alias for initialize() to support existing interfaces."""
-        return self.initialize()
-
-    def shutdown(self) -> None:
+    def disconnect(self) -> None:
         """Gracefully close all connections."""
         if self._is_initialized:
             if not self.use_metaapi and MT5_AVAILABLE:
                 mt5.shutdown()
-            logger.info("MT5 connector shutdown complete.")
+            logger.info("MT5 connector disconnect complete.")
             self._is_initialized = False
-
-    def disconnect(self) -> None:
-        """Alias for shutdown() to support existing interfaces."""
-        self.shutdown()
 
     @contextmanager
     def session(self):
         """Context manager for safe connection handling."""
         try:
             if not self._is_initialized:
-                self.initialize()
+                self.connect()
             yield self
         finally:
-            self.shutdown()
+            self.disconnect()
 
-    def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
 
@@ -169,12 +161,8 @@ class MT5Connector:
             return df
         else:
             # Placeholder for MetaAPI async rates fetching
-            logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
+            logger.warning("MetaAPI get_ohlcv not implemented in sync wrapper.")
             return pd.DataFrame()
-
-    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        """Alias for get_rates() to match main.py expectations."""
-        return self.get_rates(symbol, timeframe, n_bars)
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
