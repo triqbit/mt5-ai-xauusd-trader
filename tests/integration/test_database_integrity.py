@@ -1,7 +1,7 @@
+
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
-from unittest.mock import MagicMock
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade
+
 
 def test_database_transaction_rollback(db_logger):
     """
@@ -25,7 +25,8 @@ def test_database_transaction_rollback(db_logger):
     # ticket is unique.
     db_logger.log_trade(ticket=111, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=0.1, signal_id=signal_id)
 
-    with pytest.raises(Exception):
+    from sqlalchemy.exc import IntegrityError
+    with pytest.raises(IntegrityError):
         # This should fail due to unique constraint on ticket
         db_logger.log_trade(ticket=111, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=0.1, signal_id=signal_id)
 

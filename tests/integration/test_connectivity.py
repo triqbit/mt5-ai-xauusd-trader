@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock
 from src.trading.mt5_connector import MT5Connector
+
 
 def test_mt5_failover_to_metaapi(test_config, mock_mt5, mock_metaapi, monkeypatch):
     # Setup MT5 to fail initialization

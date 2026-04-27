@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
+
 import numpy as np
+import pytest
+
 from src.models.ensemble import EnsembleModel
+
 
 def test_ensemble_no_models_loaded():
     model = EnsembleModel(device="cpu")
@@ -57,7 +60,7 @@ def test_ensemble_voting_conflict(monkeypatch):
     obs = np.random.randn(140)
     seq = torch.randn(1, 10, 140)
 
-    direction, confidence, per_algo = model.predict(obs, seq=seq)
+    direction, confidence, _per_algo = model.predict(obs, seq=seq)
 
     # Since weights are equal and PPO is first in iteration?
     # Actually summed. blended = [0.5, 0.5, 0] if we only have 2 models

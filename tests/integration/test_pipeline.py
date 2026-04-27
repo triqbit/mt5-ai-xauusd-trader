@@ -1,9 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
-import numpy as np
-from src.utils.synthetic_data import generate_synthetic_ohlcv
-from src.trading.risk_manager import RiskManager, TradeSignal
+
 from src.models.ensemble import EnsembleModel
+from src.trading.risk_manager import RiskManager, TradeSignal
+from src.utils.synthetic_data import generate_synthetic_ohlcv
+
 
 def test_full_pipeline(test_config, db_logger, connector, monitor, mock_mt5):
     # 1. Setup
@@ -37,7 +37,7 @@ def test_full_pipeline(test_config, db_logger, connector, monitor, mock_mt5):
     # Mock predict to return a strong BUY signal
     model.predict = MagicMock(return_value=(1, 0.85, {"ppo": 1.0}))
 
-    direction, confidence, per_algo = model.predict(obs)
+    direction, confidence, _per_algo = model.predict(obs)
 
     # Trade Logging (Signal)
     signal_id = db_logger.log_signal({
@@ -87,7 +87,7 @@ def test_full_pipeline(test_config, db_logger, connector, monitor, mock_mt5):
 
     # Verify database state
     with db_logger.Session() as session:
-        from src.core.trade_logger import Trade, ModelSignal
+        from src.core.trade_logger import ModelSignal, Trade
         saved_signal = session.query(ModelSignal).filter_by(id=signal_id).first()
         assert saved_signal is not None
         assert saved_signal.direction == 1

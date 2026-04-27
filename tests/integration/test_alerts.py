@@ -1,6 +1,8 @@
+
 import pytest
-from unittest.mock import MagicMock, patch
+
 from src.trading.risk_manager import RiskManager
+
 
 def test_telegram_alert_on_circuit_breaker(test_config, db_logger, monitor, mock_telegram):
     # Setup RiskManager with a low balance to trigger circuit breaker
@@ -14,7 +16,7 @@ def test_telegram_alert_on_circuit_breaker(test_config, db_logger, monitor, mock
     assert passed is False
     # Verify telegram message was sent
     mock_telegram.send_message.assert_called()
-    args, kwargs = mock_telegram.send_message.call_args
+    _args, kwargs = mock_telegram.send_message.call_args
     assert "CRITICAL: Circuit Breaker Triggered!" in kwargs['text']
     assert kwargs['chat_id'] == test_config.telegram_chat_id
 
@@ -23,7 +25,7 @@ def test_confidence_degradation_alert(monitor, mock_telegram, test_config):
     monitor.check_confidence_degradation(0.4)
 
     mock_telegram.send_message.assert_called()
-    args, kwargs = mock_telegram.send_message.call_args
+    _args, kwargs = mock_telegram.send_message.call_args
     assert "WARNING: Model Confidence Degradation" in kwargs['text']
     assert "0.400" in kwargs['text']
 
@@ -33,7 +35,7 @@ def test_daily_summary_alert(risk_manager_with_monitor, mock_telegram):
     risk_manager_with_monitor.reset_daily()
 
     mock_telegram.send_message.assert_called()
-    args, kwargs = mock_telegram.send_message.call_args
+    _args, kwargs = mock_telegram.send_message.call_args
     assert "Daily Summary" in kwargs['text']
     assert "500.00" in kwargs['text']
 

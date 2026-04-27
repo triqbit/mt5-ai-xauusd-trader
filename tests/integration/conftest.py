@@ -1,12 +1,13 @@
-import pytest
 import os
-from unittest.mock import MagicMock, AsyncMock
-import pandas as pd
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from src.core.config import TradingConfig
+from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector
-from src.core.monitor import Monitor
-from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def test_config():
