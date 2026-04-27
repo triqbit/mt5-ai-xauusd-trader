@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -22,7 +23,6 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
-    CheckConstraint,
     select,
 )
 from sqlalchemy.orm import (
@@ -31,7 +31,6 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
     sessionmaker,
-    Session,
 )
 
 logger = logging.getLogger(__name__)
