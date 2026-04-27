@@ -41,7 +41,7 @@ def test_risk_manager_approve_with_audit(risk_manager, audit_logger):
     risk_manager._check_minimum_confidence = MagicMock(return_value=True)
     risk_manager._check_risk_reward = MagicMock(return_value=True)
 
-    assert risk_manager.approve(signal) is True
+    assert risk_manager.approve(signal, signal_id=123) is True
 
     # Verify audit_logger.log was called
     audit_logger.log.assert_called_once()
@@ -49,6 +49,7 @@ def test_risk_manager_approve_with_audit(risk_manager, audit_logger):
     assert kwargs['category'] == "RISK"
     assert kwargs['event_type'] == "RISK_APPROVAL"
     assert "decision_chain" in kwargs['details']
+    assert kwargs['details']['signal_id'] == 123
     assert len(kwargs['details']['decision_chain']) == 6
     assert all(d['passed'] for d in kwargs['details']['decision_chain'])
 
@@ -72,13 +73,14 @@ def test_risk_manager_reject_with_audit(risk_manager, audit_logger):
     risk_manager._check_minimum_confidence = MagicMock(return_value=False) # Fail
     risk_manager._check_risk_reward = MagicMock(return_value=True)
 
-    assert risk_manager.approve(signal) is False
+    assert risk_manager.approve(signal, signal_id=456) is False
 
     # Verify audit_logger.log was called
     audit_logger.log.assert_called_once()
     args, kwargs = audit_logger.log.call_args
     assert kwargs['category'] == "RISK"
     assert "Filter failed: min_confidence" in kwargs['reason']
+    assert kwargs['details']['signal_id'] == 456
 
     chain = kwargs['details']['decision_chain']
     assert chain[4]['filter'] == "min_confidence"

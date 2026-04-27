@@ -12,8 +12,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import Column, DateTime, Integer, String, Text, JSON
-from src.core.trade_logger import Base, AuditMixin
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
+
+from src.core.trade_logger import AuditMixin, Base
 
 logger = logging.getLogger(__name__)
 

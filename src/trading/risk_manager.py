@@ -14,12 +14,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Optional, List, Any
+from typing import Any, Dict, List, Optional
 
+from src.core.audit_log import AuditLogger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from src.core.audit_log import AuditLogger
 
 logger = logging.getLogger(__name__)
 
