@@ -4,7 +4,6 @@ src/core/config_validator.py
 """
 from __future__ import annotations
 
-import os
 from typing import List
 
 from pydantic import BaseModel
