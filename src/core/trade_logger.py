@@ -215,6 +215,11 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
+    def get_risk_events(self, limit: int = 100) -> List[RiskEvent]:
+        """Retrieve recent risk events."""
+        with self.Session() as session:
+            return session.query(RiskEvent).order_by(RiskEvent.created_at.desc()).limit(limit).all()
+
     def read_performance_report(self) -> Dict[str, float]:
         """
         Calculate key performance metrics from closed trades.

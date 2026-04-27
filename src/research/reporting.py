@@ -24,6 +24,7 @@ from src.research.templates import (
     PATTERN_REPORT_TEMPLATE,
     REGIME_REPORT_TEMPLATE,
     RESEARCH_SUMMARY_TEMPLATE,
+    RISK_EVENT_TEMPLATE,
     STRESS_TEST_TEMPLATE,
 )
 from src.trading.risk_manager import RiskManager
@@ -99,6 +100,14 @@ class BenchmarkReport(BaseModel):
     information_ratio: float
 
 
+class RiskEventReport(BaseModel):
+    """Risk management events report."""
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    event_type: str
+    description: str
+    symbol: Optional[str] = None
+
+
 class ResearchSummary(BaseModel):
     """Aggregated research summary report."""
     report_id: str
@@ -110,6 +119,7 @@ class ResearchSummary(BaseModel):
     model_drift: List[DriftReport] = Field(default_factory=list)
     allocations: List[AllocationReport] = Field(default_factory=list)
     benchmarks: List[BenchmarkReport] = Field(default_factory=list)
+    risk_events: List[RiskEventReport] = Field(default_factory=list)
     overall_sentiment: str = "Neutral"
     key_recommendations: List[str] = Field(default_factory=list)
 
@@ -205,6 +215,18 @@ class ResearchSummary(BaseModel):
             ]
         ) or "No benchmark data available."
 
+        risk_events_md = "\n".join(
+            [
+                RISK_EVENT_TEMPLATE.substitute(
+                    timestamp=r.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                    event_type=r.event_type,
+                    description=r.description,
+                    symbol=r.symbol or "N/A",
+                )
+                for r in self.risk_events
+            ]
+        ) or "No risk events recorded."
+
         return RESEARCH_SUMMARY_TEMPLATE.substitute(
             report_id=self.report_id,
             timestamp=self.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -217,6 +239,7 @@ class ResearchSummary(BaseModel):
             hyperparameter_robustness=hyper_md,
             model_drift=drift_md,
             benchmarks=benchmarks_md,
+            risk_audit=risk_events_md,
         )
 
 
@@ -245,6 +268,7 @@ class ResearchReporter:
             hyperparameter_robustness=self._generate_hyperparameter_robustness(),
             model_drift=self._generate_model_drift(),
             benchmarks=self._generate_benchmarks(),
+            risk_events=self._generate_risk_audit(),
         )
         summary.key_recommendations = self._generate_recommendations(summary)
         return summary
@@ -309,6 +333,22 @@ class ResearchReporter:
     def _generate_benchmarks(self) -> List[BenchmarkReport]:
         """Place holder for benchmark comparisons."""
         return []
+
+    def _generate_risk_audit(self) -> List[RiskEventReport]:
+        """Retrieve recent risk events from TradeLogger."""
+        if not self.trade_logger:
+            return []
+
+        events = self.trade_logger.get_risk_events(limit=50)
+        return [
+            RiskEventReport(
+                timestamp=e.created_at,
+                event_type=e.event_type,
+                description=e.description,
+                symbol=e.symbol,
+            )
+            for e in events
+        ]
 
     def _generate_recommendations(self, summary: ResearchSummary) -> List[str]:
         """Generate recommendations based on the summary data."""
