@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from string import Template
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
