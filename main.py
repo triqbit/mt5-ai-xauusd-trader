@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.health import run_startup_gate
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -217,6 +218,10 @@ def main() -> int:
         model.load_ppo(ppo_path)
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+
+    # -- Health Check Gate -----------------------------------------------------
+    run_startup_gate(cfg, connector, trade_logger, model)
+
     try:
         if cfg.mode in ("demo", "live"):
             run_live(cfg, connector, risk, model, trade_logger=trade_logger)
