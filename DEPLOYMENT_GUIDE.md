@@ -6,6 +6,8 @@ Comprehensive guide for deploying the MT5 trading bot to production environments
 
 ## 1. Pre-Deployment Checklist
 
+**IMPORTANT:** Before any production deployment, the formal [Pre-Production Checklist](./docs/PREPROD_CHECKLIST.md) MUST be completed and signed off.
+
 ### 1.1 Code Readiness
 - [ ] All tests passing (100% pass rate)
 - [ ] Code coverage >85%
