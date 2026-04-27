@@ -19,6 +19,7 @@ numpy==2.2.4
 scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
+gymnasium==0.29.1
 
 # -- Technical Analysis --------------------------------------------
 # Python wrapper; C library (0.6.4) built from source in ci.yml
