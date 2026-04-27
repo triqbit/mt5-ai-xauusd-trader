@@ -1,0 +1,47 @@
+name: License Compliance Check
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  license-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-licenses
+          if [ -f requirements.txt ]; then
+            # Install production dependencies for scanning
+            pip install -r requirements.txt --only-binary=:all: || true
+          fi
+
+      - name: Scan Licenses
+        run: |
+          # Allowed: MIT, Apache, BSD, PSF, MPL, LGPL, and specific Proprietary (MetaAPI, NVIDIA)
+          # Disallowed: GPL, AGPL, SSPL
+          # We use --ignore-packages for specific LGPL components that are allowed by policy
+          # but would otherwise be caught by the 'General Public License' partial match.
+
+          pip-licenses \
+            --fail-on "General Public License;Affero;SSPL" \
+            --partial-match \
+            --ignore-packages psycopg2-binary frozendict python-telegram-bot \
+            --summary
+
+      - name: Generate and Print License Report
+        run: |
+          mkdir -p docs
+          pip-licenses --format=markdown --output-file=docs/DEPENDENCY_LICENSES.md
+          echo "## Dependency License Report"
+          cat docs/DEPENDENCY_LICENSES.md
