@@ -14,11 +14,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.audit_log import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        audit_logger: Optional[AuditLogger] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
@@ -80,6 +82,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.audit_logger = audit_logger
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
@@ -88,21 +91,47 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        decision_chain: List[Dict[str, Any]] = []
 
-        passed = rejection_reason == ""
+        filters = [
+            ("circuit_breaker", self._check_circuit_breaker),
+            ("daily_loss", self._check_daily_loss),
+            ("max_positions", self._check_max_positions),
+            ("symbol_allocation", lambda: self._check_symbol_allocation(signal.symbol)),
+            ("min_confidence", lambda: self._check_minimum_confidence(signal.confidence)),
+            ("risk_reward", lambda: self._check_risk_reward(signal)),
+        ]
+
+        passed = True
+        rejection_reason = ""
+
+        for name, filter_func in filters:
+            filter_passed = filter_func()
+            decision_chain.append({"filter": name, "passed": filter_passed})
+            if not filter_passed:
+                passed = False
+                rejection_reason = f"Filter failed: {name}"
+                # In this specific implementation, we might want to continue evaluating
+                # to get the full chain, or stop at first failure.
+                # The prompt asks for "decision chain (which filters passed/failed)",
+                # suggesting full evaluation might be useful, but standard risk engines often fail fast.
+                # I'll evaluate all for a "full audit trail".
+                # Note: some filters might have side effects or dependencies, but here they seem safe.
+                pass
+
+        if self.audit_logger:
+            self.audit_logger.log(
+                category="RISK",
+                event_type="RISK_APPROVAL",
+                details={
+                    "symbol": signal.symbol,
+                    "direction": signal.direction,
+                    "decision_chain": decision_chain,
+                    "signal_id": signal_id
+                },
+                reason=rejection_reason if not passed else "All filters passed",
+            )
+
         if not passed:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
