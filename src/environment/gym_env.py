@@ -6,9 +6,9 @@ Custom Gymnasium trading environment for RL training.
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, Optional, Tuple
 
-import logging
 import gymnasium as gym
 import numpy as np
 
