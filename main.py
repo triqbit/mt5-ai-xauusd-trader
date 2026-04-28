@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +27,7 @@ from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.backtester import BacktestEngine
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -179,6 +181,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument("--start", help="Backtest start date (YYYY-MM-DD)")
+    p.add_argument("--end", help="Backtest end date (YYYY-MM-DD)")
+    p.add_argument("--train-window", type=int, default=180, help="WF train window in days")
+    p.add_argument("--test-window", type=int, default=30, help="WF test window in days")
     return p.parse_args()
 
 
@@ -222,7 +228,46 @@ def main() -> int:
             run_live(cfg, connector, risk, model, trade_logger=trade_logger)
             run_live(cfg, connector, risk, model, monitor)
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            log.info("Starting backtest mode...")
+            start_date = datetime.strptime(args.start, "%Y-%m-%d") if args.start else None
+            end_date = datetime.strptime(args.end, "%Y-%m-%d") if args.end else None
+
+            # Fetch data for backtest
+            # We need enough data, so we'll try to fetch from MT5 if connected
+            # or load from a file if we had a data loader.
+            # For now, we'll use the connector to get historical data.
+            n_bars = 10000 # Default large number for backtest if dates not specified
+            if start_date and end_date:
+                # Approximate number of M5 bars between dates
+                delta = end_date - start_date
+                n_bars = int(delta.total_seconds() / (5 * 60)) + 1000 # buffer
+
+            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=n_bars)
+            if df.empty:
+                log.error("No data fetched for backtest.")
+                return 1
+
+            engine = BacktestEngine(symbol=cfg.symbol)
+            if args.train_window and args.test_window:
+                report, trades = engine.run_walk_forward(
+                    df, model,
+                    train_window_days=args.train_window,
+                    test_window_days=args.test_window
+                )
+            else:
+                report, trades = engine.run(df, model, start_date=start_date, end_date=end_date)
+
+            print("\n" + "="*50)
+            print(" BACKTEST PERFORMANCE REPORT")
+            print("="*50)
+            print(f"Annualized Return: {report.annualized_return:.2f}%")
+            print(f"Sharpe Ratio:      {report.sharpe_ratio:.2f}")
+            print(f"Max Drawdown:      {report.max_drawdown:.2f}%")
+            print(f"Profit Factor:     {report.profit_factor:.2f}")
+            print(f"Total Trades:      {report.total_trades}")
+            print(f"Win Rate:          {report.win_rate:.2f}%")
+            print("="*50 + "\n")
+
     finally:
         connector.disconnect()
     return 0
