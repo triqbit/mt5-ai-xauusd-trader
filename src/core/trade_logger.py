@@ -23,9 +23,10 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    event,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.pool import QueuePool
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -34,14 +35,18 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False)
+    created_by = Column(String(100))
+    updated_by = Column(String(100))
+    is_deleted = Column(Boolean, default=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -50,7 +55,7 @@ class ModelSignal(Base, AuditMixin):
     __tablename__ = "model_signals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
     entry_price = Column(Float, nullable=False)
     stop_loss = Column(Float)
@@ -58,7 +63,7 @@ class ModelSignal(Base, AuditMixin):
     lot_size = Column(Float)
     algorithm = Column(String(50))
     confidence = Column(Float)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationship
     trade = relationship("Trade", back_populates="signal", uselist=False)
@@ -71,14 +76,14 @@ class Trade(Base, AuditMixin):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticket = Column(Integer, unique=True, index=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)
     entry_price = Column(Float, nullable=False)
     exit_price = Column(Float)
     lot_size = Column(Float, nullable=False)
     pnl = Column(Float, default=0.0)
     drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
+    status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
@@ -90,9 +95,9 @@ class RiskEvent(Base, AuditMixin):
     __tablename__ = "risk_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    event_type = Column(String(50), nullable=False)
+    event_type = Column(String(50), nullable=False, index=True)
     description = Column(Text)
-    symbol = Column(String(20))
+    symbol = Column(String(20), index=True)
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"), nullable=True)
 
@@ -103,7 +108,7 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     sharpe_ratio = Column(Float)
     profit_factor = Column(Float)
     max_drawdown = Column(Float)
@@ -115,7 +120,30 @@ class TradeLogger:
     """Enterprise trade logging interface."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
-        self.engine = create_engine(db_url)
+        engine_kwargs = {
+            "poolclass": QueuePool,
+            "pool_size": 20,
+            "max_overflow": 40,
+            "pool_pre_ping": True,
+            "pool_recycle": 3600,
+        }
+
+        if "sqlite" in db_url:
+            # SQLite specific hardening
+            engine_kwargs["connect_args"] = {"timeout": 30}
+            self.engine = create_engine(db_url, **engine_kwargs)
+
+            @event.listens_for(self.engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.close()
+
+        else:
+            self.engine = create_engine(db_url, **engine_kwargs)
+
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
