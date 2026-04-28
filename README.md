@@ -79,7 +79,7 @@ mt5-ai-xauusd-trader/
 ```bash
 git clone https://github.com/triqbit/mt5-ai-xauusd-trader.git
 cd mt5-ai-xauusd-trader
-pip install -r requirements.txt
+make bootstrap
 ```
 
 ### 2. Configuration

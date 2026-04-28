@@ -176,10 +176,11 @@ pydantic>=2.0.0
 EOF
 ```
 
-## STEP 8: Install Requirements
+## STEP 8: Install Requirements (DEPRECATED - Use Makefile)
 
 ```bash
-pip install -r requirements.txt
+# Recommended way to setup environment
+make bootstrap
 ```
 
 ## STEP 9: Create Main Bot File
