@@ -6,10 +6,13 @@ Custom Gymnasium trading environment for RL training.
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class TradingEnv(gym.Env):
@@ -19,10 +22,16 @@ class TradingEnv(gym.Env):
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
+
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
-                 window_size: int = 60, commission: float = 0.0002):
+    def __init__(
+        self,
+        data: np.ndarray,
+        initial_balance: float = 10000.0,
+        window_size: int = 60,
+        commission: float = 0.0002,
+    ):
         super().__init__()
         self.data = data
         self.initial_balance = initial_balance
@@ -93,4 +102,9 @@ class TradingEnv(gym.Env):
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
     def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+        logger.info(
+            "Step: %d | Balance: $%.2f | Position: %.2f",
+            self.current_step,
+            self.balance,
+            self.position,
+        )
