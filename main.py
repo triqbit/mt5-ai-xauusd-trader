@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.health import HealthChecker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -200,16 +201,29 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
+
+    # 🗺️ Atlas: Startup Health Gate
+    model_paths = [
+        args.model_dir / "ppo_xauusd.zip",
+        args.model_dir / "lstm_xauusd.pt",
+        cfg.model_path,
+    ]
+    health = HealthChecker(cfg, connector, model_paths=model_paths)
+    report = health.run_all()
+    if report.status == "failed":
+        log.critical("Startup Health Gate FAILED | report=%s", report.model_dump_json())
         return 1
+    elif report.status == "degraded":
+        log.warning("Startup Health Gate DEGRADED | report=%s", report.model_dump_json())
+    else:
+        log.info("Startup Health Gate PASSED")
+
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +233,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
