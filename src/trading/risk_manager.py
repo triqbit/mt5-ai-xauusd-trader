@@ -19,6 +19,7 @@ from typing import Dict, Optional
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.data.event_intelligence import EventIntelligence
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        event_intel: Optional[EventIntelligence] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
@@ -80,12 +82,13 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.event_intel = event_intel
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full 7-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -97,6 +100,8 @@ class RiskManager:
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
+        elif not self._check_macro_events():
+            rejection_reason = "High-impact macro event active"
         elif not self._check_minimum_confidence(signal.confidence):
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
@@ -135,7 +140,15 @@ class RiskManager:
             return 0.01  # minimum lot
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+
+        # Apply macro event risk multiplier
+        multiplier = 1.0
+        if self.event_intel:
+            multiplier = self.event_intel.get_risk_multiplier()
+            if multiplier < 1.0:
+                logger.info("Applying macro risk multiplier: %.2f", multiplier)
+
+        risk_capital = self.balance * self.cfg.risk_per_trade * multiplier
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(
@@ -205,6 +218,12 @@ class RiskManager:
         """Block trading on symbols not in the All-Weather portfolio."""
         if symbol not in ALLOCATION_WEIGHTS:
             logger.warning("Symbol %s not in approved portfolio", symbol)
+            return False
+        return True
+
+    def _check_macro_events(self) -> bool:
+        """Block execution if high-impact macro events are active."""
+        if self.event_intel and self.event_intel.should_block_execution():
             return False
         return True
 
