@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.health import startup_health_gate
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -207,6 +208,14 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
+
+    # Startup Health Gate
+    try:
+        startup_health_gate(cfg, connector, trade_logger)
+    except RuntimeError as e:
+        log.critical("System health check failed during startup: %s", e)
+        return 1
+
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
