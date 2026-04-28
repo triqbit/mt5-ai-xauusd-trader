@@ -38,7 +38,7 @@ jobs:
       - name: Import sort check
         run: ruff check --select I src/ main.py
       - name: Static type check (mypy - fast check)
-        run: mypy src/ main.py
+        run: python3 -m mypy src/ main.py
 
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan
@@ -90,7 +90,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
       - name: Static type check (mypy - full check)
-        run: mypy src/ main.py
+        run: python3 -m mypy src/ main.py
       - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
