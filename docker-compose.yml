@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mt5-trader
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"  # Prometheus metrics
+      - "8050:8050"  # Dashboard
+    restart: unless-stopped
+    command: ["--mode", "demo", "--algo", "ensemble"]
+
+networks:
+  default:
+    name: mt5-network
