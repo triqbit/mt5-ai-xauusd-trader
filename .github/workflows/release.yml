@@ -1,0 +1,172 @@
+name: Release Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.0.1)'
+        required: true
+        default: '1.0.1'
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # -----------------------------------------------------------
+  # 1. Validation: Tests, Quality, Security (Full Suite)
+  # -----------------------------------------------------------
+  validate:
+    name: Full Validation Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install TA-Lib C library
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
+
+      - name: Install dependencies
+        run: pip install -r requirements-ci.txt ruff mypy pip-audit
+
+      - name: Code Quality (Ruff)
+        run: |
+          ruff check src/ main.py
+          ruff format --check src/ main.py
+
+      - name: Type Safety (Mypy)
+        run: mypy src/
+
+      - name: Security Audit (pip-audit)
+        run: pip-audit --requirement requirements-ci.txt
+
+      - name: Run Tests with Coverage Gate
+        run: |
+          pytest tests/ --cov=src --cov-fail-under=80 -v
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
+
+  # -----------------------------------------------------------
+  # 2. Build & Scan: Docker Production Image
+  # -----------------------------------------------------------
+  build-image:
+    name: Build & Scan Docker
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build local image for scanning
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: triqbit/mt5-ai-xauusd-trader:release-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'triqbit/mt5-ai-xauusd-trader:release-scan'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  # -----------------------------------------------------------
+  # 3. Package: Release Artifacts & Integrity
+  # -----------------------------------------------------------
+  package:
+    name: Package Artifacts
+    needs: build-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run Packaging Script
+        run: |
+          VERSION=${{ github.event.inputs.version || github.ref_name }}
+          VERSION=${VERSION#v}
+          bash scripts/package_release.sh "$VERSION"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: release-v*.tar.gz
+
+  # -----------------------------------------------------------
+  # 4. Sign-off: Manual Approval Gate
+  # -----------------------------------------------------------
+  sign-off:
+    name: Pre-Production Sign-off
+    needs: package
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Await Approval
+        run: echo "Artifacts validated and packaged. Awaiting manual sign-off in Production environment."
+
+  # -----------------------------------------------------------
+  # 5. Release: GitHub Release & Notes
+  # -----------------------------------------------------------
+  publish:
+    name: Publish GitHub Release
+    needs: sign-off
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download packaged artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package
+
+      - name: Generate Changelog
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          configuration: ".github/changelog_config.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          name: Release ${{ github.event.inputs.version || github.ref_name }}
+          body: ${{ steps.build_changelog.outputs.changelog }}
+          files: release-v*.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
