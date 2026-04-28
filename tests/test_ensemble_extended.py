@@ -1,11 +1,11 @@
 """Extended tests for src.models.ensemble module."""
 import pytest
 import numpy as np
-import torch
 from unittest.mock import MagicMock
 from src.models.ensemble import EnsembleModel
 
 def test_ensemble_predict_weighted_consensus():
+    torch = pytest.importorskip("torch")
     ensemble = EnsembleModel(device="cpu")
 
     # Mock PPO
