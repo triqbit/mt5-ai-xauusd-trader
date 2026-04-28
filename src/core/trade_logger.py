@@ -8,7 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
+import structlog
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -28,7 +28,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 Base = declarative_base()
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class AuditMixin:
@@ -190,7 +190,7 @@ class TradeLogger:
                 trade.status = "CLOSED"
                 session.commit()
             else:
-                logger.warning("Trade with ticket %d not found for update.", ticket)
+                logger.warning("Trade not found for update", ticket=ticket)
 
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""

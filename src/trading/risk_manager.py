@@ -11,7 +11,7 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
@@ -20,7 +20,7 @@ from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Ray Dalio All-Weather allocation weights
 ALLOCATION_WEIGHTS: Dict[str, float] = {
@@ -88,6 +88,12 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
+        log = logger.bind(
+            symbol=signal.symbol,
+            direction=signal.direction,
+            signal_id=signal_id,
+        )
+
         rejection_reason = ""
         if not self._check_circuit_breaker():
             rejection_reason = "Circuit breaker active"
@@ -102,14 +108,18 @@ class RiskManager:
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
 
+        log.debug(
+            "Risk check complete",
+            passed=rejection_reason == "",
+            reason=rejection_reason,
+            balance=round(self.balance, 2),
+            peak_equity=round(self.peak_equity, 2),
+            open_positions=len(self.open_positions),
+        )
+
         passed = rejection_reason == ""
         if not passed:
-            logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
-            )
+            log.warning("Signal REJECTED", reason=rejection_reason)
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
@@ -139,10 +149,11 @@ class RiskManager:
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(
-            "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
-            kelly_fraction,
-            risk_capital,
-            lot_size,
+            "Kelly sizing",
+            symbol=symbol,
+            kelly=round(kelly_fraction, 4),
+            risk_capital=round(risk_capital, 2),
+            lot_size=lot_size,
         )
         return lot_size
 
@@ -173,8 +184,8 @@ class RiskManager:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
-                drawdown * 100,
+                "CIRCUIT BREAKER triggered",
+                drawdown_pct=round(drawdown * 100, 2),
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
