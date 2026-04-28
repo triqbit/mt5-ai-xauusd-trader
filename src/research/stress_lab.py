@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
-import pandas as pd
 from pydantic import BaseModel, Field
 
 from src.environment.gym_env import TradingEnv
@@ -96,11 +95,10 @@ class AdversarialTradingEnv(gym.Wrapper):
         unwrapped = self.env.unwrapped
 
         # 1. Service Degradation (Action Failure)
-        if self.scenario.service_degradation > 0:
-            if np.random.random() < self.scenario.service_degradation:
-                logger.warning("Service degradation: action %d failed", action)
-                self.failed_executions += 1
-                action = 0  # Force HOLD
+        if self.scenario.service_degradation > 0 and np.random.random() < self.scenario.service_degradation:
+            logger.warning("Service degradation: action %d failed", action)
+            self.failed_executions += 1
+            action = 0  # Force HOLD
 
         # 2. Execution Delay
         if self.scenario.execution_delay_steps > 0:
@@ -118,12 +116,11 @@ class AdversarialTradingEnv(gym.Wrapper):
         original_price = unwrapped.data[unwrapped.current_step, 3]
 
         # Simulate Fake Breakout (Price spiking then reversing)
-        if self.scenario.fake_breakout_prob > 0 and action != 0:
-            if np.random.random() < self.scenario.fake_breakout_prob:
-                # Spike price against the direction to trap the trader
-                spike = original_price * 0.002 * (1 if action == 1 else -1)
-                unwrapped.data[unwrapped.current_step, 3] += spike
-                logger.debug("Fake breakout injected at step %d", unwrapped.current_step)
+        if self.scenario.fake_breakout_prob > 0 and action != 0 and np.random.random() < self.scenario.fake_breakout_prob:
+            # Spike price against the direction to trap the trader
+            spike = original_price * 0.002 * (1 if action == 1 else -1)
+            unwrapped.data[unwrapped.current_step, 3] += spike
+            logger.debug("Fake breakout injected at step %d", unwrapped.current_step)
 
         # 4. Standard execution logic through the wrapped env
         obs, reward, terminated, truncated, info = self.env.step(action)
