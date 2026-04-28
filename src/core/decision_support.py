@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from src.models.regime_detector import MarketRegime
 from src.core.explainability import SignalExplanation
+from src.models.regime_detector import MarketRegime
 
 logger = logging.getLogger(__name__)
 
