@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 from sqlalchemy import (
@@ -26,6 +26,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+
+from src.schemas.performance import PerformanceMetricsSchema
+from src.schemas.trading import (
+    ModelSignalSchema,
+    TradeExecutionSchema,
+    TradeSignalSchema,
+)
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -119,19 +126,34 @@ class TradeLogger:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def log_signal(self, signal_data: Dict[str, Any]) -> int:
-        """Log a new model signal and return its ID."""
+    def log_signal(
+        self,
+        signal_data: Union[TradeSignalSchema, ModelSignalSchema, Dict[str, Any]],
+    ) -> int:
+        """
+        Log a new model signal and return its ID.
+
+        Args:
+            signal_data: TradeSignalSchema, ModelSignalSchema object or a dictionary.
+        """
+        if isinstance(signal_data, dict):
+            # Try ModelSignalSchema first as it's more permissive (includes HOLD)
+            try:
+                signal_data = ModelSignalSchema(**signal_data)
+            except Exception:
+                signal_data = TradeSignalSchema(**signal_data)
+
         with self.Session() as session:
             signal = ModelSignal(
-                symbol=signal_data["symbol"],
-                direction=signal_data["direction"],
-                entry_price=signal_data["entry_price"],
-                stop_loss=signal_data.get("stop_loss"),
-                take_profit=signal_data.get("take_profit"),
-                lot_size=signal_data.get("lot_size"),
-                algorithm=signal_data.get("algorithm"),
-                confidence=signal_data.get("confidence"),
-                timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
+                symbol=signal_data.symbol,
+                direction=signal_data.direction,
+                entry_price=signal_data.entry_price,
+                stop_loss=getattr(signal_data, "stop_loss", None),
+                take_profit=getattr(signal_data, "take_profit", None),
+                lot_size=getattr(signal_data, "lot_size", None),
+                algorithm=signal_data.algorithm,
+                confidence=signal_data.confidence,
+                timestamp=signal_data.timestamp,
             )
             session.add(signal)
             session.commit()
@@ -139,24 +161,28 @@ class TradeLogger:
 
     def log_trade(
         self,
-        ticket: int,
-        symbol: str,
-        direction: int,
-        entry_price: float,
-        lot_size: float,
+        trade_data: Union[TradeExecutionSchema, Dict[str, Any]],
         signal_id: Optional[int] = None,
-        status: str = "OPEN",
     ) -> int:
-        """Log a trade execution."""
+        """
+        Log a trade execution.
+
+        Args:
+            trade_data: TradeExecutionSchema object or a dictionary containing trade details.
+            signal_id: Optional ID of the signal that triggered this trade.
+        """
+        if isinstance(trade_data, dict):
+            trade_data = TradeExecutionSchema(**trade_data)
+
         with self.Session() as session:
             trade = Trade(
-                ticket=ticket,
-                symbol=symbol,
-                direction=direction,
-                entry_price=entry_price,
-                lot_size=lot_size,
+                ticket=trade_data.ticket,
+                symbol=trade_data.symbol,
+                direction=trade_data.direction,
+                entry_price=trade_data.entry_price,
+                lot_size=trade_data.lot_size,
                 signal_id=signal_id,
-                status=status,
+                status=trade_data.status,
             )
             session.add(trade)
             session.commit()
@@ -250,21 +276,23 @@ class TradeLogger:
             drawdown = peak - equity_curve
             max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
 
-            metrics = {
-                "sharpe_ratio": float(sharpe),
-                "profit_factor": float(profit_factor),
-                "max_drawdown": float(max_dd),
-            }
+            metrics = PerformanceMetricsSchema(
+                sharpe_ratio=float(sharpe),
+                profit_factor=float(profit_factor),
+                max_drawdown=float(max_dd),
+                total_trades=len(trades),
+                win_rate=float(np.sum(pnls > 0) / len(pnls)) if trades else 0.0,
+            )
 
             # Optionally log these metrics to DB
             metric_record = PerformanceMetric(
-                sharpe_ratio=metrics["sharpe_ratio"],
-                profit_factor=metrics["profit_factor"],
-                max_drawdown=metrics["max_drawdown"],
-                total_trades=len(trades),
-                win_rate=float(np.sum(pnls > 0) / len(pnls)),
+                sharpe_ratio=metrics.sharpe_ratio,
+                profit_factor=metrics.profit_factor,
+                max_drawdown=metrics.max_drawdown,
+                total_trades=metrics.total_trades,
+                win_rate=metrics.win_rate,
             )
             session.add(metric_record)
             session.commit()
 
-            return metrics
+            return metrics.model_dump()

@@ -30,7 +30,7 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
+from src.schemas.trading import TradeSignalSchema
 
 logger = logging.getLogger(__name__)
 
@@ -196,12 +196,12 @@ class MT5Connector:
 
         return {"bid": tick.bid, "ask": tick.ask}
 
-    def place_order(self, signal: TradeSignal) -> Optional[int]:
+    def place_order(self, signal: TradeSignalSchema) -> Optional[int]:
         """
         Execute a market order based on a validated trade signal.
 
         Args:
-            signal: Validated TradeSignal object.
+            signal: Validated TradeSignalSchema object.
 
         Returns:
             Order ticket ID if successful, None otherwise.

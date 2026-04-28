@@ -26,8 +26,9 @@ from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.schemas.trading import ModelSignalSchema, TradeSignalSchema
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_manager import RiskManager
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -75,22 +76,24 @@ def run_live(
             direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
+            entry_price = tick["ask"] if direction >= 0 else tick["bid"]
+            model_signal = ModelSignalSchema(
+                symbol=cfg.symbol,
+                direction=direction,
+                entry_price=entry_price,
+                algorithm=cfg.algorithm,
+                confidence=confidence,
+            )
+
             signal_id = None
             if trade_logger:
-                signal_id = trade_logger.log_signal(
-                    {
-                        "symbol": cfg.symbol,
-                        "direction": direction,
-                        "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
-                        "algorithm": cfg.algorithm,
-                        "confidence": confidence,
-                    }
-                )
+                signal_id = trade_logger.log_signal(model_signal)
 
             if direction == 0:
                 log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
                 continue
+
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
             atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
@@ -102,7 +105,7 @@ def run_live(
                 avg_win=4 * atr,
                 avg_loss=2 * atr,
             )
-            signal = TradeSignal(
+            signal = TradeSignalSchema(
                 symbol=cfg.symbol,
                 direction=direction,
                 entry_price=price,
@@ -111,7 +114,9 @@ def run_live(
                 lot_size=lot_size,
                 algorithm=cfg.algorithm,
                 confidence=confidence,
+                timestamp=model_signal.timestamp,
             )
+
             # 5. Risk approval gate
             if risk.approve(signal, signal_id=signal_id):
                 ticket = connector.place_order(signal)
@@ -120,11 +125,13 @@ def run_live(
                     log.info("Order placed | ticket=%d", ticket)
                     if trade_logger:
                         trade_logger.log_trade(
-                            ticket=ticket,
-                            symbol=cfg.symbol,
-                            direction=direction,
-                            entry_price=price,
-                            lot_size=lot_size,
+                            {
+                                "ticket": ticket,
+                                "symbol": cfg.symbol,
+                                "direction": direction,
+                                "entry_price": price,
+                                "lot_size": lot_size,
+                            },
                             signal_id=signal_id,
                         )
             # 6. Check for closed positions to update logger
@@ -155,7 +162,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -207,9 +215,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +226,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:

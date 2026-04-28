@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.schemas.trading import TradeSignalSchema
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +34,6 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
     "USDJPY": 0.08,  # JPY - carry trade
     "EURJPY": 0.07,  # EUR/JPY cross
 }
-
-
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
-
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -83,10 +69,16 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(self, signal: TradeSignalSchema, signal_id: Optional[int] = None) -> bool:
         """
         Run the full 6-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+
+        Args:
+            signal: The TradeSignalSchema to validate.
+            signal_id: Optional ID from the trade logger.
+
+        Returns:
+            True only if ALL layers pass.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
@@ -218,7 +210,8 @@ class RiskManager:
             return False
         return True
 
-    def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+    def _check_risk_reward(self, signal: TradeSignalSchema, min_rr: float = 1.5) -> bool:
+        """Check if the reward-to-risk ratio meets the minimum requirement."""
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         if risk == 0:
@@ -230,4 +223,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignalSchema"]
