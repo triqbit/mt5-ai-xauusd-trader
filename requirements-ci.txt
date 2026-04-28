@@ -5,7 +5,7 @@
 # Excludes:
 #   - MetaTrader5 (Windows-only, no Linux wheel)
 #   - torch/torchvision/transformers/timm (too heavy for unit tests)
-#   - stable-baselines3/gymnasium (pulls torch transitively)
+#   - stable-baselines3 (pulls torch transitively)
 #   - pandas-ta (requires Python <3.11; runtime-only)
 #
 # TA-Lib C library is built from source in ci.yml (GitHub releases,
@@ -23,6 +23,9 @@ pandas==2.2.3
 # -- Technical Analysis --------------------------------------------
 # Python wrapper; C library (0.6.4) built from source in ci.yml
 TA-Lib==0.6.4
+
+# -- RL Environment -----------------------------------------------
+gymnasium==0.29.1
 
 # -- Database ------------------------------------------------------
 sqlalchemy==2.0.30
