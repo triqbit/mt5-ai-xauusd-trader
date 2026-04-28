@@ -88,22 +88,40 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        decision_chain = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
 
-        passed = rejection_reason == ""
+        passed = all(decision_chain.values())
+
+        if self.trade_logger and hasattr(self.trade_logger, "audit"):
+            self.trade_logger.audit.log_risk_decision(
+                passed=passed,
+                decision_chain=decision_chain,
+                signal_id=signal_id,
+            )
+
         if not passed:
+            # Find first failed reason for legacy logging
+            rejection_reason = next(
+                (k for k, v in decision_chain.items() if not v), "Unknown risk violation"
+            )
+
+            if self.trade_logger and hasattr(self.trade_logger, "audit"):
+                self.trade_logger.audit.log_trade_blocked(
+                    reason=rejection_reason,
+                    signal_details={
+                        "symbol": signal.symbol,
+                        "direction": signal.direction,
+                        "confidence": signal.confidence,
+                        "signal_id": signal_id,
+                    },
+                )
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
@@ -118,6 +136,20 @@ class RiskManager:
                     signal_id=signal_id,
                 )
         return passed
+
+    def manual_halt(self, reason: str, actor: str = "OPERATOR") -> None:
+        """Emergency stop triggered by operator."""
+        logger.critical("MANUAL HALT TRIGGERED | Reason: %s", reason)
+        if self.trade_logger and hasattr(self.trade_logger, "audit"):
+            self.trade_logger.audit.log_operator_action(
+                action="MANUAL_HALT",
+                reason=reason,
+                actor=actor,
+            )
+        # In a real system, this might set a global halt flag or shut down the process
+        self.peak_equity = float("inf")  # Force circuit breaker for safety
+        if self.monitor:
+            self.monitor.send_message(f"🚨 MANUAL HALT: {reason}")
 
     def size_position(
         self,
