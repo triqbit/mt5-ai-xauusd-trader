@@ -30,9 +30,9 @@ class Monitor:
         self.equity_history: List[Dict[str, Any]] = []
         self.bot: Optional[telegram.Bot] = None
 
-        if self.cfg.telegram_token:
+        if self.cfg.telegram_token.get_secret_value():
             try:
-                self.bot = telegram.Bot(token=self.cfg.telegram_token)
+                self.bot = telegram.Bot(token=self.cfg.telegram_token.get_secret_value())
                 logger.info("Telegram bot initialized")
             except Exception as e:
                 logger.error("Failed to initialize Telegram bot: %s", e)

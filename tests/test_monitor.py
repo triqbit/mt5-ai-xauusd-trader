@@ -10,7 +10,8 @@ from src.core.config import TradingConfig
 class TestMonitor(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock(spec=TradingConfig)
-        self.config.telegram_token = "fake_token"
+        self.config.telegram_token = MagicMock()
+        self.config.telegram_token.get_secret_value.return_value = "fake_token"
         self.config.telegram_chat_id = "fake_chat_id"
         self.config.confidence_threshold = 0.6
 

@@ -105,7 +105,8 @@ class EnsembleModel:
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
-        state = torch.load(str(path), map_location=self.device)
+        # Use weights_only=True for security (prevents arbitrary code execution)
+        state = torch.load(str(path), map_location=self.device, weights_only=True)
         model.load_state_dict(state)
         model.eval()
         self.lstm_model = model
