@@ -118,44 +118,72 @@ class EnsembleModel:
         seq: Optional[torch.Tensor] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
-        Return (direction, confidence, per_algo_probs).
-        direction: +1 buy, -1 sell, 0 hold
+        Aggregate signals from multiple models into a single ensemble decision.
+
+        Args:
+            obs: Observation vector for PPO/RL models.
+            seq: Sequence tensor for LSTM/Attention models.
+
+        Returns:
+            Tuple of (direction, confidence, per_algorithm_decisions).
+            direction: +1 (Buy), -1 (Sell), 0 (Hold).
+            confidence: Probability of the winning direction (0.0 to 1.0).
         """
         votes: Dict[str, np.ndarray] = {}
 
-        # PPO prediction
+        # 1. PPO Signal
         if self._ppo_model is not None:
-            action, _ = self._ppo_model.predict(obs, deterministic=True)
-            probs = np.zeros(3)
-            probs[int(action)] = 1.0
-            votes["ppo"] = probs
+            try:
+                action, _ = self._ppo_model.predict(obs, deterministic=True)
+                probs = np.zeros(3)
+                probs[int(action)] = 1.0
+                votes["ppo"] = probs
+            except Exception as e:
+                logger.error("PPO prediction failed: %s", e)
 
-        # LSTM-Attention prediction
+        # 2. Dreamer Signal (Stub)
+        if self._dreamer_model is not None:
+             # Placeholder for Dreamer V3 inference
+             pass
+
+        # 3. LSTM-Attention Signal
         if self.lstm_model is not None and seq is not None:
-            with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            votes["lstm"] = probs
+            try:
+                with torch.no_grad():
+                    logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                votes["lstm"] = probs
+            except Exception as e:
+                logger.error("LSTM prediction failed: %s", e)
 
         if not votes:
-            logger.warning("No models loaded - returning HOLD")
+            logger.warning("No model signals available - defaulting to HOLD")
             return 0, 0.0, {}
 
-        # Weighted average across available models
+        # 4. Weighted Signal Aggregation
         total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
-        confidence = float(blended[action_idx])
+        if total_weight == 0:
+            return 0, 0.0, {}
+
+        blended_probs = np.zeros(3)
+        for algo, probs in votes.items():
+            blended_probs += (self.weights[algo] / total_weight) * probs
+
+        action_idx = int(np.argmax(blended_probs))
+        confidence = float(blended_probs[action_idx])
+
+        # Action mapping: 0=Buy, 1=Sell, 2=Hold (matching standard RL action spaces)
         direction_map = {0: 1, 1: -1, 2: 0}
-        direction = direction_map[action_idx]
-        per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+        direction = direction_map.get(action_idx, 0)
+
+        per_algo_decisions = {k: float(np.argmax(v)) for k, v in votes.items()}
+
         logger.debug(
-            "Ensemble | dir=%d conf=%.3f votes=%s",
-            direction,
-            confidence,
-            per_algo,
+            "Ensemble Decision | dir=%d | conf=%.3f | weights=%s",
+            direction, confidence, {k: round(self.weights[k], 2) for k in votes}
         )
-        return direction, confidence, per_algo
+
+        return direction, confidence, per_algo_decisions
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(self, algorithm: str, ret: float) -> None:
