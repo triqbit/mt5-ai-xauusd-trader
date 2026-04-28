@@ -9,7 +9,7 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
@@ -32,7 +32,7 @@ except ImportError:
 from src.core.config import TradingConfig
 from src.trading.risk_manager import TradeSignal
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # MT5 constants (replicated so the module loads on Mac/Linux)
 ORDER_TYPE_BUY = 0
@@ -234,10 +234,21 @@ class MT5Connector:
 
             result = mt5.order_send(request)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                logger.error("Order rejected: %s (code: %d)", result.comment, result.retcode)
+                logger.error(
+                    "Order rejected",
+                    comment=result.comment,
+                    retcode=result.retcode,
+                    symbol=signal.symbol,
+                )
                 return None
 
-            logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
+            logger.info(
+                "Order PLACED",
+                ticket=result.order,
+                symbol=signal.symbol,
+                direction=signal.direction,
+                volume=signal.lot_size,
+            )
             return int(result.order)
 
         return None

@@ -61,8 +61,8 @@ def run_live(
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
-    log = logging.getLogger("main.live")
-    log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+    log = structlog.get_logger("main.live")
+    log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
@@ -73,7 +73,6 @@ def run_live(
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
             if trade_logger:
@@ -86,6 +85,10 @@ def run_live(
                         "confidence": confidence,
                     }
                 )
+
+            # Bind signal_id to logger for correlation
+            iteration_log = log.bind(signal_id=signal_id)
+            iteration_log.debug("Inference complete", direction=direction, confidence=confidence)
 
             if direction == 0:
                 log.debug("HOLD signal - skipping")
@@ -117,7 +120,7 @@ def run_live(
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
-                    log.info("Order placed | ticket=%d", ticket)
+                    iteration_log.info("Trade executed", ticket=ticket)
                     if trade_logger:
                         trade_logger.log_trade(
                             ticket=ticket,
@@ -135,7 +138,7 @@ def run_live(
             for symbol, ticket in list(risk.open_positions.items()):
                 if symbol == cfg.symbol and ticket not in current_tickets:
                     # Position closed - in a real scenario we'd fetch deal history
-                    log.info("Position CLOSED | ticket=%d", ticket)
+                    log.info("Position CLOSED", ticket=ticket, symbol=symbol)
                     if trade_logger:
                         # Retrieve trade info from DB to get correct direction
                         trade_info = trade_logger.get_trade_by_ticket(ticket)
@@ -160,7 +163,7 @@ def run_live(
             log.info("Interrupted by user - shutting down")
             break
         except Exception as exc:
-            log.exception("Unhandled error in trading loop: %s", exc)
+            log.exception("Unhandled error in trading loop", error=str(exc))
             time.sleep(poll_interval)
 
 
@@ -185,7 +188,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
-    log = logging.getLogger("main")
+    log = structlog.get_logger("main")
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
@@ -207,9 +210,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +221,14 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:

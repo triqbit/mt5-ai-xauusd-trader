@@ -11,7 +11,7 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -19,7 +19,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
@@ -150,10 +150,11 @@ class EnsembleModel:
         direction = direction_map[action_idx]
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(
-            "Ensemble | dir=%d conf=%.3f votes=%s",
-            direction,
-            confidence,
-            per_algo,
+            "Ensemble prediction complete",
+            direction=direction,
+            confidence=round(confidence, 3),
+            votes=per_algo,
+            weights={k: round(v, 3) for k, v in self.weights.items()},
         )
         return direction, confidence, per_algo
 

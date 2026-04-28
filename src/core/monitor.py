@@ -8,7 +8,7 @@ License: MIT
 from __future__ import annotations
 
 import asyncio
-import logging
+import structlog
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -16,7 +16,7 @@ import telegram
 
 from src.core.config import TradingConfig
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class Monitor:
@@ -41,12 +41,12 @@ class Monitor:
         """Record current equity with timestamp."""
         data = {"timestamp": datetime.now(timezone.utc), "equity": equity}
         self.equity_history.append(data)
-        logger.debug("Equity logged: %.2f", equity)
+        logger.debug("Equity logged", equity=round(equity, 2))
 
     def send_message(self, text: str) -> None:
         """Synchronous wrapper to send Telegram message."""
         if not self.bot or not self.cfg.telegram_chat_id:
-            logger.debug("Telegram bot not configured, message not sent: %s", text)
+            logger.debug("Telegram bot not configured", message=text)
             return
 
         try:
@@ -55,7 +55,7 @@ class Monitor:
             asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
             logger.info("Telegram message sent")
         except Exception as e:
-            logger.error("Failed to send Telegram message: %s", e)
+            logger.error("Failed to send Telegram message", error=str(e))
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger."""
