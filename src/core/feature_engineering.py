@@ -5,7 +5,7 @@ This module computes 140+ features from raw OHLCV data using TA-Lib,
 including multi-timeframe indicators, candle patterns, and volume profile.
 """
 
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 import pandas as pd
