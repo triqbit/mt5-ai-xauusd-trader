@@ -1,0 +1,48 @@
+name: License Compliance Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  license-check:
+    name: License Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-licenses
+          # Install as much as possible for scanning, ignoring failures for platform-specific bins
+          pip install -r requirements.txt || true
+
+      - name: Verify License Policy
+        run: |
+          # Use --allow-only to enforce the approved license list.
+          # Includes permissive, weak copyleft (LGPL, MPL), vendor-specific (NVIDIA/Proprietary),
+          # and specific variants seen in the dependency tree.
+          pip-licenses \
+            --allow-only "MIT;Apache;BSD;PSF;ISC;Unlicense;MPL;LGPL;Proprietary;NVIDIA;CC0;0BSD;UNKNOWN;Zlib;CNRI-Python;Mozilla Public License;Python Software Foundation License" \
+            --partial-match
+
+      - name: Generate License Report
+        if: always()
+        run: |
+          pip-licenses --format=markdown --output-file=DEPENDENCY_LICENSES_ARTIFACT.md --with-urls
+
+      - name: Upload License Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-license-report
+          path: DEPENDENCY_LICENSES_ARTIFACT.md
