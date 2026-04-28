@@ -7,10 +7,11 @@ Reinforcement Learning evaluation framework for disciplined performance analysis
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Tuple, Any, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -209,7 +210,7 @@ class RLEvaluator:
                 regime_name=str(regime),
                 avg_reward=float(group["reward"].mean()),
                 win_rate=float(group["win"].mean()),
-                count=int(len(group))
+                count=len(group)
             ))
         return analysis
 
@@ -251,7 +252,7 @@ class RLEvaluator:
                 data = self.env.data
                 step = self.env.current_step
                 action = 1 if data[step, self.price_idx] > data[step-1, self.price_idx] else 2
-            except:
+            except Exception:
                 action = 0
             _, reward, term, trunc, _ = self.env.step(action)
             total += reward
