@@ -89,3 +89,8 @@ htmlcov/
 *.tfstate
 *.tfstate.backup
 .terraform/
+
+# Database & Backups
+trades.db
+backups/
+*.db
