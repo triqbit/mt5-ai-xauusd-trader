@@ -33,6 +33,7 @@ from src.core.config import TradingConfig
 from src.core.error_handler import CircuitBreaker, retry_with_backoff
 from src.trading.risk_manager import TradeSignal
 
+
 class MT5Error(Exception):
     """Base class for MT5 connector exceptions."""
     pass
