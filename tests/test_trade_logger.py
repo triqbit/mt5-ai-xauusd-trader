@@ -30,7 +30,8 @@ def test_log_trade(logger):
     signal_id = logger.log_signal({
         "symbol": "XAUUSD",
         "direction": 1,
-        "entry_price": 2000.0
+        "entry_price": 2000.0,
+        "lot_size": 0.1
     })
     trade_id = logger.log_trade(
         ticket=12345,
@@ -41,6 +42,57 @@ def test_log_trade(logger):
         signal_id=signal_id
     )
     assert trade_id > 0
+
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade
+        trade = session.query(Trade).filter(Trade.id == trade_id).first()
+        assert trade.ticket == 12345
+        assert trade.created_at is not None
+        assert hasattr(trade, "created_by")
+
+def test_log_rejected_trade(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0,
+        "lot_size": 0.1
+    })
+    trade_id = logger.log_trade(
+        ticket=None,
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000.0,
+        lot_size=0.1,
+        signal_id=signal_id,
+        status="REJECTED"
+    )
+    assert trade_id > 0
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade
+        trade = session.query(Trade).filter(Trade.id == trade_id).first()
+        assert trade.ticket is None
+        assert trade.status == "REJECTED"
+
+def test_check_constraints(logger):
+    from sqlalchemy.exc import IntegrityError
+    # Test invalid entry price
+    with pytest.raises(IntegrityError):
+        logger.log_trade(
+            ticket=999,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=-10.0,
+            lot_size=0.1
+        )
+
+    # Test invalid lot size
+    with pytest.raises(IntegrityError):
+        logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 1,
+            "entry_price": 2000.0,
+            "lot_size": -0.1
+        })
 
 def test_performance_report(logger):
     # Log some closed trades
