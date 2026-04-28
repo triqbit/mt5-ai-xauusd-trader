@@ -5,7 +5,7 @@ DreamerV3 wrapper compatible with the ensemble interface.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 import numpy as np
 

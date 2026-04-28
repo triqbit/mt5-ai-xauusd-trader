@@ -6,7 +6,6 @@ Common interfaces and data structures for all AI models.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 
