@@ -8,7 +8,7 @@ Supports rolling windows, robustness scoring, and anti-overfitting safeguards.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Protocol, Tuple
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -52,9 +52,6 @@ class MovingAverageStrategy:
         close = data[:, 3]
 
         # Calculate EMAs
-        alpha_fast = 2 / (self.fast_ema + 1)
-        alpha_slow = 2 / (self.slow_ema + 1)
-
         ema_fast = self._ema(close, self.fast_ema)
         ema_slow = self._ema(close, self.slow_ema)
 
@@ -242,7 +239,7 @@ class WalkForwardOptimizer:
                 stability[key] = float(std / mean)
             else:
                 # Categorical params: fraction of unique values
-                unique = len(set(str(p.get(key)) for p in all_params))
+                unique = len({str(p.get(key)) for p in all_params})
                 stability[key] = float(unique / len(all_params))
 
         return stability
