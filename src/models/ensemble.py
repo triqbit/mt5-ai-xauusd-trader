@@ -19,6 +19,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from src.models.dynamic_ensemble import (
+    DynamicWeightAdapter,
+    MarketContext,
+    ModelPerformance,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,11 +87,13 @@ class EnsembleModel:
 
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
-        self.weights: Dict[str, float] = {
-            "ppo": 1 / 3,
-            "dreamer": 1 / 3,
-            "lstm": 1 / 3,
-        }
+        self.adapter = DynamicWeightAdapter(
+            model_names=self.ALGORITHMS,
+            decay_factor=0.95,  # smooth adaptation
+            max_weight_change=0.05,  # cap abrupt swings
+            min_weight=0.1,  # ensure model diversity
+        )
+        self.weights: Dict[str, float] = self.adapter.get_weights()
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
         self.lstm_model: Optional[LSTMAttentionModel] = None
@@ -158,33 +166,51 @@ class EnsembleModel:
         return direction, confidence, per_algo
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
-    def record_return(self, algorithm: str, ret: float) -> None:
-        """Track per-algorithm returns for weight rebalancing."""
+    def record_return(
+        self,
+        algorithm: str,
+        ret: float,
+        market_context: Optional[MarketContext] = None,
+        accuracy: float = 0.5,
+        calibration: float = 0.5,
+    ) -> None:
+        """
+        Track per-algorithm returns and update dynamic weights.
+        """
         if algorithm in self._performance:
             self._performance[algorithm].append(ret)
             if len(self._performance[algorithm]) >= 50:
-                self._rebalance_weights()
+                # Prepare performance map
+                perf_data: Dict[str, ModelPerformance] = {}
+                for algo in self.ALGORITHMS:
+                    rets = self._performance[algo][-50:]
+                    if not rets:
+                        perf_data[algo] = ModelPerformance()
+                        continue
 
-    def _rebalance_weights(self, window: int = 50) -> None:
-        """Reweight by rolling Sharpe ratio (floor 5%)."""
-        sharpes: Dict[str, float] = {}
-        for algo, rets in self._performance.items():
-            tail = rets[-window:]
-            if len(tail) < 10:
-                sharpes[algo] = 1.0
-                continue
-            arr = np.array(tail)
-            mean = arr.mean()
-            std = arr.std() + 1e-9
-            sharpes[algo] = max(mean / std, 0.0)
-        total = sum(sharpes.values()) or 1.0
-        for algo, s in sharpes.items():
-            raw = s / total
-            self.weights[algo] = max(raw, 0.05)  # min 5%
-        # Re-normalise
-        total_w = sum(self.weights.values())
-        self.weights = {k: v / total_w for k, v in self.weights.items()}
-        logger.info("Weights rebalanced: %s", self.weights)
+                    # Calculate recent metrics
+                    arr = np.array(rets)
+                    # Use win rate as a proxy for accuracy if not provided
+                    win_rate = float(np.mean(arr > 0))
+
+                    # Higher degradation if returns are significantly negative
+                    degradation = 1.0 if np.mean(rets) < -0.01 else 0.0
+
+                    perf_data[algo] = ModelPerformance(
+                        accuracy=max(win_rate, 0.01),
+                        calibration_score=calibration,  # passed from caller
+                        degradation_signal=degradation
+                    )
+
+                # Use default context if none provided
+                ctx = market_context or MarketContext(
+                    regime="unknown",
+                    volatility=1.0,
+                    drift_detected=False
+                )
+
+                self.weights = self.adapter.update_weights(perf_data, ctx)
+                logger.info("Ensemble weights updated via DynamicWeightAdapter: %s", self.weights)
 
 
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]
