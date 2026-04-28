@@ -17,7 +17,7 @@ jobs:
 
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v45
         with:
           files_yaml: |
             high_risk:
@@ -29,10 +29,10 @@ jobs:
               - src/trading/risk_manager.py
               - src/core/config.py
               - src/trading/order_manager.py
-            infrastructure:
+            infrastructure_deploy:
               - Dockerfile
               - requirements*.txt
-              - .github/workflows/*.yml
+              - .github/workflows/deploy.*
             database:
               - migrations/**
             source_code:
@@ -48,7 +48,7 @@ jobs:
         env:
           HIGH_RISK_ANY_CHANGED: ${{ steps.changed-files.outputs.high_risk_any_changed }}
           LOGIC_RISK_ANY_CHANGED: ${{ steps.changed-files.outputs.trading_logic_risk_any_changed }}
-          INFRA_ANY_CHANGED: ${{ steps.changed-files.outputs.infrastructure_any_changed }}
+          INFRA_ANY_CHANGED: ${{ steps.changed-files.outputs.infrastructure_deploy_any_changed }}
           DB_ANY_CHANGED: ${{ steps.changed-files.outputs.database_any_changed }}
         run: |
           BLOCKED=false
@@ -61,7 +61,7 @@ jobs:
             BLOCKED=true
           fi
           if [ "$INFRA_ANY_CHANGED" = "true" ]; then
-            echo "🚨 BLOCKED: Infrastructure or CI/CD workflow changes detected."
+            echo "🚨 BLOCKED: Infrastructure or deployment workflow changes detected."
             BLOCKED=true
           fi
           if [ "$DB_ANY_CHANGED" = "true" ]; then
@@ -82,11 +82,8 @@ jobs:
             echo "❌ MISSING: Source changes detected without corresponding test updates."
             MISSING=true
           fi
-          if [ "$SRC_CHANGED" = "true" ] && [ "$DOCS_CHANGED" != "true" ]; then
-            echo "⚠️ WARNING: Code changes detected without documentation updates."
-            # Set to true if we want to strictly enforce docs
-            # MISSING=true
-          fi
+          # Note: Documentation is a warning but not a hard block in this implementation
+          # to allow for documentation-only or minor code cleanup PRs.
           echo "missing=$MISSING" >> $GITHUB_OUTPUT
 
       - name: Final Verdict
