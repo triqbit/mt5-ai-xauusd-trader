@@ -11,8 +11,7 @@ import logging
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 from sqlalchemy import text
