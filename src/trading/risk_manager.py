@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -83,37 +83,47 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
+    def validate_signal_full(self, signal: TradeSignal) -> Tuple[bool, List[str]]:
+        """
+        Evaluate all risk layers and return all rejection reasons.
+        Returns (passed, reasons).
+        """
+        reasons = []
+        if not self._check_circuit_breaker():
+            reasons.append("Circuit breaker active")
+        if not self._check_daily_loss():
+            reasons.append("Daily loss limit reached")
+        if not self._check_max_positions():
+            reasons.append("Max positions reached")
+        if not self._check_symbol_allocation(signal.symbol):
+            reasons.append(f"Symbol {signal.symbol} not in portfolio")
+        if not self._check_minimum_confidence(signal.confidence):
+            reasons.append(f"Confidence {signal.confidence:.2f} too low")
+        if not self._check_risk_reward(signal):
+            reasons.append("Risk-Reward ratio too low")
+
+        return len(reasons) == 0, reasons
+
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        passed, reasons = self.validate_signal_full(signal)
 
-        passed = rejection_reason == ""
         if not passed:
+            rejection_reason = reasons[0] if reasons else "Unknown"
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
+                "Signal REJECTED | %s %s | Reason: %s | All Reasons: %s",
                 signal.symbol,
                 signal.direction,
                 rejection_reason,
+                reasons,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
+                    description=", ".join(reasons),
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
