@@ -47,13 +47,16 @@ line-ending = "auto"
 # NOTE: UP (pyupgrade) intentionally excluded until source files
 # are migrated from typing.Dict/List/Optional to built-in generics.
 # Track in: https://github.com/triqbit/mt5-ai-xauusd-trader/issues
-select = ["E", "W", "F", "I", "B", "C4", "SIM", "RUF"]
+select = ["E", "W", "F", "I", "B", "C4", "SIM", "RUF", "D", "ANN"]
 ignore = [
     "E501",   # line-length — handled by ruff format
     "B008",   # function calls in default args (FastAPI Depends pattern)
     "RUF012", # mutable class attrs — false positives in pydantic models
     "SIM108", # ternary operator — sometimes less readable
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -79,4 +82,4 @@ warn_unused_configs = true
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
-addopts = "--strict-markers --verbose"
+addopts = "--strict-markers --verbose --cov=src --cov-report=term-missing --cov-fail-under=80"

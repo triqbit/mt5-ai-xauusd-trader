@@ -2,8 +2,11 @@
 Integration tests for TradeLogger.
 """
 import os
+
 import pytest
+
 from src.core.trade_logger import TradeLogger
+
 
 @pytest.fixture
 def logger():
