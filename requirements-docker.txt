@@ -6,8 +6,6 @@
 #   - MetaTrader5 (Windows-only, no Linux wheel)
 #   - metaapi-cloud-sdk (Windows-only dependency chain)
 #   - pandas-ta (requires Python <3.11; runtime-only)
-#   - torch/torchvision (too heavy; install separately if needed)
-#   - stable-baselines3/gymnasium (pulls torch transitively)
 #   - transformers/timm/einops (too heavy for base image)
 # ============================================================
 
@@ -42,7 +40,7 @@ rich==13.7.1
 tqdm==4.66.4
 
 # -- Notifications -------------------------------------------------
-# 21.x supports httpx>=0.27 (resolves conflict with httpx==0.27.0 above)
+# 21.x supports httpx>=0.27
 python-telegram-bot==21.3
 
 # -- Dashboard / API -----------------------------------------------
@@ -63,3 +61,10 @@ pytz==2024.1
 click==8.1.7
 tabulate==0.9.0
 joblib==1.4.2
+
+# -- ML / RL (CPU-only torch; no CUDA wheels pulled) ---------------
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.3.0+cpu
+torchvision==0.18.0+cpu
+stable-baselines3==2.3.2
+gymnasium==0.29.1
