@@ -1,0 +1,121 @@
+name: Changelog & Release
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - 'v*'
+
+jobs:
+  release:
+    if: github.event.head_commit.author.name != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Changelog
+        id: build_changelog
+        uses: mikepenz/release-changelog-builder-action@v3
+        with:
+          configuration: ".github/changelog_config.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine Version Bump
+        id: bump_logic
+        run: |
+          # Default to patch
+          BUMP="patch"
+
+          # Detect PR number from merge commit or squash merge
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          PR_NUMBER=$(echo "$COMMIT_MSG" | grep -oP '\(#\K\d+(?=\))' | head -1)
+
+          if [ -z "$PR_NUMBER" ]; then
+             # Fallback for standard merge commits
+             PR_NUMBER=$(echo "$COMMIT_MSG" | grep -oP 'Merge pull request #\K\d+' | head -1)
+          fi
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Detected PR #$PR_NUMBER"
+            LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name')
+
+            if echo "$LABELS" | grep -q "release:major"; then
+              BUMP="major"
+            elif echo "$LABELS" | grep -qE "release:minor|feature"; then
+              BUMP="minor"
+            fi
+          else
+            echo "No PR number detected in commit message. Defaulting to patch."
+          fi
+
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Current Version
+        id: current_version
+        run: |
+          VERSION=$(grep -oP '__version__\s*=\s*["'\'']\K[^"'\'']+' src/__init__.py)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate New Version
+        id: new_version
+        run: |
+          VERSION=${{ steps.current_version.outputs.version }}
+          BUMP=${{ steps.bump_logic.outputs.bump }}
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          if [ "$BUMP" == "major" ]; then
+            NEW_VERSION="$((MAJOR + 1)).0.0"
+          elif [ "$BUMP" == "minor" ]; then
+            NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+          else
+            NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          fi
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update Version Files
+        run: |
+          NEW_VERSION=${{ steps.new_version.outputs.version }}
+          # Robust replacement for src/__init__.py
+          sed -i -E "s/__version__\s*=\s*[\"'][^\"']+[\"']/__version__ = \"$NEW_VERSION\"/" src/__init__.py
+          # Robust replacement for pyproject.toml
+          sed -i -E "s/^version\s*=\s*[\"'][^\"']+[\"']/version = \"$NEW_VERSION\"/" pyproject.toml
+
+      - name: Update CHANGELOG.md
+        run: |
+          NEW_VERSION=${{ steps.new_version.outputs.version }}
+          DATE=$(date +%Y-%m-%d)
+          CONTENT='${{ steps.build_changelog.outputs.changelog }}'
+
+          # Prepare the new entry
+          NEW_ENTRY="## [$NEW_VERSION] - $DATE\n\n$CONTENT\n"
+
+          # Insert after the header (usually the first few lines of CHANGELOG.md)
+          # We look for the first line starting with ## [ and insert before it
+          sed -i "0,/## \[/s/## \[/\n$NEW_ENTRY\n## \[/" CHANGELOG.md
+
+      - name: Commit and Push Changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "github-actions[bot]"
+          git add src/__init__.py pyproject.toml CHANGELOG.md
+          git commit -m "chore(release): bump version to ${{ steps.new_version.outputs.version }} [skip ci]"
+          git push origin main
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: ${{ steps.build_changelog.outputs.changelog }}
+          tag_name: v${{ steps.new_version.outputs.version }}
+          name: Release v${{ steps.new_version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

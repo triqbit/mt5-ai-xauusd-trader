@@ -1,0 +1,45 @@
+{
+  "categories": [
+    {
+      "title": "🚀 Features",
+      "labels": ["feature", "enhancement", "release:minor"]
+    },
+    {
+      "title": "🐛 Fixes",
+      "labels": ["fix", "bug", "release:patch"]
+    },
+    {
+      "title": "🛡️ Security",
+      "labels": ["security"]
+    },
+    {
+      "title": "📖 Documentation",
+      "labels": ["documentation", "docs"]
+    },
+    {
+      "title": "⚙️ Configuration",
+      "labels": ["configuration", "chore"]
+    },
+    {
+      "title": "🧪 Tests",
+      "labels": ["test"]
+    },
+    {
+      "title": "🏗️ Breaking Changes",
+      "labels": ["breaking", "release:major"]
+    }
+  ],
+  "ignore_labels": [
+    "ignore"
+  ],
+  "sort": "ASC",
+  "template": "${{CHANGELOG}}",
+  "pr_template": "- ${{TITLE}} (#${{NUMBER}}) by @${{AUTHOR}}",
+  "empty_template": "- No changes found",
+  "label_extractor": [
+    {
+      "pattern": "(feat|fix|docs|style|refactor|perf|test|chore|security|breaking): (.*)",
+      "target": "$1"
+    }
+  ]
+}
