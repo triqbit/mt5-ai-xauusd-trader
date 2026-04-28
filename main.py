@@ -72,8 +72,16 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+            if trade_logger and hasattr(trade_logger, "audit"):
+                trade_logger.audit.log_model_prediction(
+                    model_name="ensemble",
+                    prediction=direction,
+                    confidence=confidence,
+                    votes=per_algo,
+                )
 
             signal_id = None
             if trade_logger:
@@ -155,9 +163,15 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
+            if trade_logger and hasattr(trade_logger, "audit"):
+                trade_logger.audit.log_operator_action(
+                    action="SHUTDOWN",
+                    reason="User KeyboardInterrupt",
+                )
             break
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
@@ -207,9 +221,21 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
+
+    if trade_logger and hasattr(trade_logger, "audit"):
+        trade_logger.audit.log_deployment(
+            version="1.0.0",  # Replace with dynamic version if available
+            environment=cfg.mode,
+            metadata={"algo": cfg.algorithm, "symbol": cfg.symbol},
+        )
+        trade_logger.audit.log_config_change(
+            reason="Initial startup",
+            old_config={},
+            new_config=cfg.model_dump(exclude={"mt5_password", "metaapi_token", "telegram_token"}),
+        )
+
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +245,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
