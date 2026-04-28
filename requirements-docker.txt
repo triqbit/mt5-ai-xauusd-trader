@@ -41,6 +41,9 @@ structlog==24.1.0
 rich==13.7.1
 tqdm==4.66.4
 
+# -- Notifications -------------------------------------------------
+python-telegram-bot==20.7
+
 # -- Dashboard / API -----------------------------------------------
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
