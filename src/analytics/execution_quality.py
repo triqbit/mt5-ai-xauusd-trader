@@ -4,8 +4,8 @@ src/analytics/execution_quality.py
 Measures execution efficiency and trade quality to distinguish alpha from execution.
 """
 
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -18,9 +18,13 @@ class ExecutionMetrics(BaseModel):
     symbol: str
     slippage_pips: float = Field(..., description="Execution slippage in pips.")
     fill_quality_score: float = Field(..., ge=0.0, le=1.0, description="Score from 0 to 1.")
-    timing_efficiency: float = Field(..., ge=0.0, le=1.0, description="How well timed the entry was.")
+    timing_efficiency: float = Field(
+        ..., ge=0.0, le=1.0, description="How well timed the entry was."
+    )
     edge_capture: float = Field(..., description="Spread-adjusted edge capture.")
-    post_entry_drift_pips: Dict[str, float] = Field(default_factory=dict, description="Price drift after entry.")
+    post_entry_drift_pips: Dict[str, float] = Field(
+        default_factory=dict, description="Price drift after entry."
+    )
 
 
 class FillQuality(BaseModel):
@@ -37,7 +41,9 @@ class TradeQualityReport(BaseModel):
 
     execution_metrics: List[ExecutionMetrics]
     aggregate_fill_quality: FillQuality
-    blocked_trade_opportunity_cost: float = Field(..., description="Total PnL missed by rejected signals.")
+    blocked_trade_opportunity_cost: float = Field(
+        ..., description="Total PnL missed by rejected signals."
+    )
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 

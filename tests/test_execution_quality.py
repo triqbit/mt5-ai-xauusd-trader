@@ -3,6 +3,7 @@ Tests for Execution Quality Analytics.
 """
 
 import pytest
+
 from src.analytics.execution_quality import ExecutionAnalyzer
 
 
