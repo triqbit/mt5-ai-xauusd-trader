@@ -31,14 +31,14 @@ jobs:
           cache: pip
       - name: Install quality tools
         run: pip install ruff==0.4.3 mypy==1.10.0
-      - name: Ruff lint (auto-fixable violations fail the build)
+      - name: Ruff lint
         run: ruff check src/ main.py
-      - name: Ruff format (apply formatting)
-        run: ruff format src/ main.py
-      - name: Ruff format check (formatting enforced)
+      - name: Ruff format check
         run: ruff format --check src/ main.py
-      - name: Import sort check (isort via ruff I-rules)
+      - name: Import sort check
         run: ruff check --select I src/ main.py
+      - name: Static type check (mypy - fast check)
+        run: python3 -m mypy src/ main.py
 
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan
@@ -89,6 +89,8 @@ jobs:
           sudo ldconfig
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
+      - name: Static type check (mypy - full check)
+        run: python3 -m mypy src/ main.py
       - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
