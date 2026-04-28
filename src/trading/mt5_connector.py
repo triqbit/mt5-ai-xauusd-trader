@@ -30,7 +30,24 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.error_handler import CircuitBreaker, retry_with_backoff
 from src.trading.risk_manager import TradeSignal
+
+class MT5Error(Exception):
+    """Base class for MT5 connector exceptions."""
+    pass
+
+class MT5ConnectionError(MT5Error):
+    """Raised when connection to MT5 fails."""
+    pass
+
+class MT5ExecutionError(MT5Error):
+    """Raised when trade execution fails."""
+    pass
+
+class MT5DataError(MT5Error):
+    """Raised when market data retrieval fails."""
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +87,9 @@ class MT5Connector:
         self.metaapi: Optional[Any] = None
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
+        self._metaapi_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60, name="metaapi")
 
+    @retry_with_backoff(retries=3, initial_delay=2.0)
     def initialize(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
@@ -95,7 +114,8 @@ class MT5Connector:
                     self._is_initialized = True
                     return True
                 else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
+                    err_msg = f"Native mt5.initialize failed: {mt5.last_error()}"
+                    logger.warning(err_msg)
             except Exception as e:
                 logger.error("Native MT5 initialization error: %s", e)
         else:
@@ -104,17 +124,21 @@ class MT5Connector:
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         if METAAPI_AVAILABLE and self.cfg.metaapi_token:
             logger.info("Attempting MetaAPI cloud fallback...")
-            try:
+
+            def _init_metaapi():
                 self.metaapi = MetaApi(self.cfg.metaapi_token)
                 self.use_metaapi = True
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured.")
                 return True
+
+            try:
+                return self._metaapi_breaker.call(_init_metaapi)
             except Exception as e:
                 logger.error("MetaAPI initialization failed: %s", e)
 
         logger.error("All MT5 connection paths failed.")
-        return False
+        raise MT5ConnectionError("All MT5 connection paths failed.")
 
     def connect(self) -> bool:
         """Alias for initialize() to support existing interfaces."""
@@ -142,6 +166,7 @@ class MT5Connector:
         finally:
             self.shutdown()
 
+    @retry_with_backoff(retries=2, initial_delay=1.0, exceptions=(MT5DataError,))
     def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
@@ -155,6 +180,7 @@ class MT5Connector:
             DataFrame containing OHLCV data or empty DataFrame on failure.
         """
         if not self._is_initialized:
+            logger.warning("Connector not initialized. Call initialize() first.")
             return pd.DataFrame()
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
@@ -162,8 +188,9 @@ class MT5Connector:
         if not self.use_metaapi:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
-                logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
-                return pd.DataFrame()
+                err_msg = f"Failed to copy rates for {symbol}: {mt5.last_error()}"
+                logger.error(err_msg)
+                raise MT5DataError(err_msg)
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df

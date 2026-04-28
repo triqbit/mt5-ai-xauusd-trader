@@ -23,10 +23,11 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.error_handler import CircuitBreaker, CircuitBreakerError
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
-from src.trading.mt5_connector import MT5Connector
+from src.trading.mt5_connector import MT5Connector, MT5Error
 from src.trading.risk_manager import RiskManager, TradeSignal
 
 # -- Logging setup ---------------------------------------------------------
@@ -64,102 +65,123 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    loop_breaker = CircuitBreaker(failure_threshold=10, recovery_timeout=300, name="trading_loop")
+
     while True:
         try:
-            # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-            tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
-            # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
-            signal_id = None
-            if trade_logger:
-                signal_id = trade_logger.log_signal(
-                    {
-                        "symbol": cfg.symbol,
-                        "direction": direction,
-                        "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
-                        "algorithm": cfg.algorithm,
-                        "confidence": confidence,
-                    }
+            def _step():
+                # 1. Fetch latest market data
+                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                if df.empty:
+                    log.warning("No market data available - skipping step")
+                    return
+                tick = connector.get_tick(cfg.symbol)
+                if tick["bid"] == 0:
+                    log.warning("Invalid tick data - skipping step")
+                    return
+
+                # 2. Build observation vector
+                obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+                # 3. Get ensemble prediction
+                direction, confidence, _per_algo = model.predict(obs)
+                log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+                signal_id = None
+                if trade_logger:
+                    signal_id = trade_logger.log_signal(
+                        {
+                            "symbol": cfg.symbol,
+                            "direction": direction,
+                            "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
+                            "algorithm": cfg.algorithm,
+                            "confidence": confidence,
+                        }
+                    )
+
+                if direction == 0:
+                    log.debug("HOLD signal - skipping")
+                    return
+
+                # 4. Size position
+                price = tick["ask"] if direction == 1 else tick["bid"]
+                atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
+                stop_loss = price - direction * 2 * atr
+                take_profit = price + direction * 4 * atr
+                lot_size = risk.size_position(
+                    cfg.symbol,
+                    win_rate=0.58,
+                    avg_win=4 * atr,
+                    avg_loss=2 * atr,
                 )
-
-            if direction == 0:
-                log.debug("HOLD signal - skipping")
-                time.sleep(poll_interval)
-                continue
-            # 4. Size position
-            price = tick["ask"] if direction == 1 else tick["bid"]
-            atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
-            stop_loss = price - direction * 2 * atr
-            take_profit = price + direction * 4 * atr
-            lot_size = risk.size_position(
-                cfg.symbol,
-                win_rate=0.58,
-                avg_win=4 * atr,
-                avg_loss=2 * atr,
-            )
-            signal = TradeSignal(
-                symbol=cfg.symbol,
-                direction=direction,
-                entry_price=price,
-                stop_loss=stop_loss,
-                take_profit=take_profit,
-                lot_size=lot_size,
-                algorithm=cfg.algorithm,
-                confidence=confidence,
-            )
-            # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
-                ticket = connector.place_order(signal)
-                if ticket:
-                    risk.open_positions[cfg.symbol] = ticket
-                    log.info("Order placed | ticket=%d", ticket)
-                    if trade_logger:
-                        trade_logger.log_trade(
-                            ticket=ticket,
-                            symbol=cfg.symbol,
-                            direction=direction,
-                            entry_price=price,
-                            lot_size=lot_size,
-                            signal_id=signal_id,
-                        )
-            # 6. Check for closed positions to update logger
-            current_positions = connector.get_positions(cfg.symbol)
-            current_tickets = {p["ticket"] for p in current_positions}
-
-            closed_tickets = []
-            for symbol, ticket in list(risk.open_positions.items()):
-                if symbol == cfg.symbol and ticket not in current_tickets:
-                    # Position closed - in a real scenario we'd fetch deal history
-                    log.info("Position CLOSED | ticket=%d", ticket)
-                    if trade_logger:
-                        # Retrieve trade info from DB to get correct direction
-                        trade_info = trade_logger.get_trade_by_ticket(ticket)
-                        if trade_info:
-                            # For a BUY, exit at BID. For a SELL, exit at ASK.
-                            exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
-                            # P&L will be calculated automatically by update_trade
-                            trade_logger.update_trade(
+                signal = TradeSignal(
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    entry_price=price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    lot_size=lot_size,
+                    algorithm=cfg.algorithm,
+                    confidence=confidence,
+                )
+                # 5. Risk approval gate
+                if risk.approve(signal, signal_id=signal_id):
+                    ticket = connector.place_order(signal)
+                    if ticket:
+                        risk.open_positions[cfg.symbol] = ticket
+                        log.info("Order placed | ticket=%d", ticket)
+                        if trade_logger:
+                            trade_logger.log_trade(
                                 ticket=ticket,
-                                exit_price=exit_price,
+                                symbol=cfg.symbol,
+                                direction=direction,
+                                entry_price=price,
+                                lot_size=lot_size,
+                                signal_id=signal_id,
                             )
-                    closed_tickets.append(symbol)
+                # 6. Check for closed positions to update logger
+                current_positions = connector.get_positions(cfg.symbol)
+                current_tickets = {p["ticket"] for p in current_positions}
 
-            for sym in closed_tickets:
-                risk.open_positions.pop(sym)
+                closed_tickets = []
+                for symbol, ticket in list(risk.open_positions.items()):
+                    if symbol == cfg.symbol and ticket not in current_tickets:
+                        # Position closed - in a real scenario we'd fetch deal history
+                        log.info("Position CLOSED | ticket=%d", ticket)
+                        if trade_logger:
+                            # Retrieve trade info from DB to get correct direction
+                            trade_info = trade_logger.get_trade_by_ticket(ticket)
+                            if trade_info:
+                                # For a BUY, exit at BID. For a SELL, exit at ASK.
+                                exit_price = (
+                                    tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                                )
+                                # P&L will be calculated automatically by update_trade
+                                trade_logger.update_trade(
+                                    ticket=ticket,
+                                    exit_price=exit_price,
+                                )
+                        closed_tickets.append(symbol)
 
-            # 7. Update equity
-            balance = connector.get_account_balance()
-            risk.update_equity(balance)
-            monitor.log_equity(balance)
+                for sym in closed_tickets:
+                    risk.open_positions.pop(sym)
+
+                # 7. Update equity
+                balance = connector.get_account_balance()
+                risk.update_equity(balance)
+                if monitor:
+                    monitor.log_equity(balance)
+
+            loop_breaker.call(_step)
+            time.sleep(poll_interval)
+
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
-        except Exception as exc:
+        except CircuitBreakerError as exc:
+            log.error("Trading halted by circuit breaker: %s", exc)
+            time.sleep(poll_interval * 5)  # Longer wait when circuit is open
+        except (MT5Error, Exception) as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
             time.sleep(poll_interval)
 
@@ -200,16 +222,20 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
+    try:
+        if not connector.connect():
+            log.critical("Cannot connect to MT5 terminal. Aborting.")
+            return 1
+    except MT5Error as exc:
+        log.critical("MT5 connection failed with error: %s", exc)
         return 1
+
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +245,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
