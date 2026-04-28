@@ -1,0 +1,103 @@
+name: Auto-Merge Policy
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  enforce-policy:
+    name: Policy Enforcement
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files_yaml: |
+            high_risk:
+              - src/trading/executor.py
+              - src/core/risk_engine.py
+              - config/secrets.*
+              - .github/workflows/deploy.*
+            trading_logic_risk:
+              - src/trading/risk_manager.py
+              - src/core/config.py
+              - src/trading/order_manager.py
+            infrastructure_deploy:
+              - Dockerfile
+              - requirements*.txt
+              - .github/workflows/deploy.*
+            database:
+              - migrations/**
+            source_code:
+              - src/**
+            tests:
+              - tests/**
+            docs:
+              - "*.md"
+              - docs/**
+
+      - name: Verify High-Risk and Logic Changes
+        id: safety-check
+        env:
+          HIGH_RISK_ANY_CHANGED: ${{ steps.changed-files.outputs.high_risk_any_changed }}
+          LOGIC_RISK_ANY_CHANGED: ${{ steps.changed-files.outputs.trading_logic_risk_any_changed }}
+          INFRA_ANY_CHANGED: ${{ steps.changed-files.outputs.infrastructure_deploy_any_changed }}
+          DB_ANY_CHANGED: ${{ steps.changed-files.outputs.database_any_changed }}
+        run: |
+          BLOCKED=false
+          if [ "$HIGH_RISK_ANY_CHANGED" = "true" ]; then
+            echo "🚨 BLOCKED: High-risk system files modified."
+            BLOCKED=true
+          fi
+          if [ "$LOGIC_RISK_ANY_CHANGED" = "true" ]; then
+            echo "🚨 BLOCKED: Trading logic or risk parameter files modified."
+            BLOCKED=true
+          fi
+          if [ "$INFRA_ANY_CHANGED" = "true" ]; then
+            echo "🚨 BLOCKED: Infrastructure or deployment workflow changes detected."
+            BLOCKED=true
+          fi
+          if [ "$DB_ANY_CHANGED" = "true" ]; then
+            echo "🚨 BLOCKED: Database migrations detected."
+            BLOCKED=true
+          fi
+          echo "blocked=$BLOCKED" >> $GITHUB_OUTPUT
+
+      - name: Verify Quality Requirements
+        id: requirement-check
+        env:
+          SRC_CHANGED: ${{ steps.changed-files.outputs.source_code_any_changed }}
+          TESTS_CHANGED: ${{ steps.changed-files.outputs.tests_any_changed }}
+          DOCS_CHANGED: ${{ steps.changed-files.outputs.docs_any_changed }}
+        run: |
+          MISSING=false
+          if [ "$SRC_CHANGED" = "true" ] && [ "$TESTS_CHANGED" != "true" ]; then
+            echo "❌ MISSING: Source changes detected without corresponding test updates."
+            MISSING=true
+          fi
+          # Note: Documentation is a warning but not a hard block in this implementation
+          # to allow for documentation-only or minor code cleanup PRs.
+          echo "missing=$MISSING" >> $GITHUB_OUTPUT
+
+      - name: Final Verdict
+        run: |
+          echo "--- Auto-Merge Policy Result ---"
+          if [ "${{ steps.safety-check.outputs.blocked }}" = "true" ]; then
+            echo "Result: 🚨 BLOCKED and ESCALATED"
+            echo "Reason: PR contains high-risk modifications requiring manual senior review."
+            exit 1
+          elif [ "${{ steps.requirement-check.outputs.missing }}" = "true" ]; then
+            echo "Result: ❌ BLOCKED"
+            echo "Reason: PR lacks required test updates for source changes."
+            exit 1
+          else
+            echo "Result: ✅ PASS (Policy sub-checks)"
+            echo "Note: Auto-merge still requires all CI checks to pass and required approvals."
+          fi
