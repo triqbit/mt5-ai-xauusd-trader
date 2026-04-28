@@ -6,7 +6,7 @@ import pytest
 from src.core.config import TradingConfig
 
 
-def test_config_from_env(monkeypatch):
+def test_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test TradingConfig loads from environment variables."""
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "testpass")
@@ -19,7 +19,7 @@ def test_config_from_env(monkeypatch):
     assert cfg.mt5_server == "TestServer-Demo"
     assert cfg.mode == "demo"
 
-def test_config_defaults():
+def test_config_defaults() -> None:
     """Test TradingConfig has sensible defaults."""
     os.environ.update({
         "MT5_LOGIN": "0",
@@ -31,7 +31,7 @@ def test_config_defaults():
     assert cfg.mode == "demo"
     assert cfg.algorithm == "ensemble"
 
-def test_config_risk_validation():
+def test_config_risk_validation() -> None:
     """Test risk_per_trade validation rejects unsafe values."""
     os.environ.update({
         "MT5_LOGIN": "0",

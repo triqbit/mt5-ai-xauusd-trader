@@ -1,9 +1,9 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/core/trade_logger.py
 Trade logging system using SQLAlchemy ORM with SQLite.
 Author : triqbit
-License: MIT
+License: MIT.
 """
 
 from __future__ import annotations
@@ -114,6 +114,11 @@ class TradeLogger:
     """Enterprise trade logging interface."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
+        """Initialize the TradeLogger.
+
+        Args:
+            db_url: The database URL.
+        """
         self.engine = create_engine(db_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
@@ -215,9 +220,12 @@ class TradeLogger:
             session.commit()
 
     def read_performance_report(self) -> Dict[str, float]:
-        """
-        Calculate key performance metrics from closed trades.
+        """Calculate key performance metrics from closed trades.
+
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
+
+        Returns:
+            A dictionary containing performance metrics.
         """
         with self.Session() as session:
             trades = session.query(Trade).filter(Trade.status == "CLOSED").all()

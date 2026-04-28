@@ -1,21 +1,38 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/models/ppo_agent.py
 Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 Wraps the PPO algorithm for use with the custom Gymnasium trading environment.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+import numpy as np
+
+if TYPE_CHECKING:
+    import gymnasium as gym
 
 
 class PPOAgent:
-    """
-    PPO-based reinforcement learning agent.
+    """PPO-based reinforcement learning agent.
+
     Uses Stable-Baselines3 PPO under the hood.
     """
-    def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
+
+    def __init__(
+        self, env: gym.Env, model_path: Optional[Path] = None, device: str = "auto"
+    ) -> None:
+        """Initialize the PPO agent.
+
+        Args:
+            env: The trading environment.
+            model_path: Path to existing model.
+            device: Computing device.
+        """
         from stable_baselines3 import PPO
         from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -45,7 +62,7 @@ class PPOAgent:
                 device=device,
             )
 
-    def train(self, total_timesteps: int = 1_000_000, save_path: Optional[Path] = None):
+    def train(self, total_timesteps: int = 1_000_000, save_path: Optional[Path] = None) -> None:
         """Train the PPO agent."""
         self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
         self.model.learn(total_timesteps=total_timesteps)
@@ -55,10 +72,17 @@ class PPOAgent:
             self.model.save(save_path)
             self.logger.info(f"Model saved to {save_path}")
 
-    def predict(self, observation):
-        """Generate a trading action from the current observation."""
+    def predict(self, observation: np.ndarray) -> int:
+        """Generate a trading action from the current observation.
+
+        Args:
+            observation: Current market observation.
+
+        Returns:
+            int: The selected action.
+        """
         action, _states = self.model.predict(observation, deterministic=True)
-        return action
+        return int(action)
 
     def evaluate(self, n_eval_episodes: int = 10) -> dict:
         """Evaluate agent performance over n episodes."""

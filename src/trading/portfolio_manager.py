@@ -1,19 +1,29 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/trading/portfolio_manager.py
 Handles account monitoring, balance tracking, and aggregate exposure.
 """
+from __future__ import annotations
 
 import logging
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
+
+if TYPE_CHECKING:
+    from .mt5_connector import MT5Connector
 
 
 class PortfolioManager:
-    """
-    Tracks account health and portfolio-wide metrics.
+    """Tracks account health and portfolio-wide metrics.
+
     Integrates with MT5Connector for real-time data.
     """
-    def __init__(self, connector):
+
+    def __init__(self, connector: MT5Connector) -> None:
+        """Initialize the PortfolioManager.
+
+        Args:
+            connector: The MT5 connector instance.
+        """
         self.connector = connector
         self.logger = logging.getLogger(__name__)
 

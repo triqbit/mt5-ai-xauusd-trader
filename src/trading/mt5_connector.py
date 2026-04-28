@@ -1,15 +1,16 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/trading/mt5_connector.py
 Dual-path MT5 connector:
  Primary : Direct MetaTrader5 Python SDK
  Fallback : MetaAPI cloud (for Mac/Linux or remote deployments)
 Author : triqbit
-License: MIT
+License: MIT.
 """
 from __future__ import annotations
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
@@ -53,14 +54,13 @@ TIMEFRAME_MAP: Dict[str, int] = {
 
 
 class MT5Connector:
-    """
-    Enterprise-grade connector for MetaTrader 5.
+    """Enterprise-grade connector for MetaTrader 5.
+
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
     """
 
     def __init__(self, config: TradingConfig) -> None:
-        """
-        Initialize the connector with configuration.
+        """Initialize the connector with configuration.
 
         Args:
             config: TradingConfig object containing credentials and settings.
@@ -72,8 +72,8 @@ class MT5Connector:
         self._is_initialized: bool = False
 
     def initialize(self) -> bool:
-        """
-        Establish connection to MT5 terminal or MetaAPI cloud.
+        """Establish connection to MT5 terminal or MetaAPI cloud.
+
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
 
         Returns:
@@ -133,8 +133,12 @@ class MT5Connector:
         self.shutdown()
 
     @contextmanager
-    def session(self):
-        """Context manager for safe connection handling."""
+    def session(self) -> Generator[MT5Connector, None, None]:
+        """Context manager for safe connection handling.
+
+        Yields:
+            MT5Connector: The connector instance.
+        """
         try:
             if not self._is_initialized:
                 self.initialize()
@@ -143,8 +147,7 @@ class MT5Connector:
             self.shutdown()
 
     def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        """
-        Fetch historical OHLCV data.
+        """Fetch historical OHLCV data.
 
         Args:
             symbol: Trading symbol (e.g., 'XAUUSD').
@@ -177,8 +180,7 @@ class MT5Connector:
         return self.get_rates(symbol, timeframe, n_bars)
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
-        """
-        Retrieve latest symbol tick (bid/ask).
+        """Retrieve latest symbol tick (bid/ask).
 
         Args:
             symbol: Trading symbol.
@@ -197,8 +199,7 @@ class MT5Connector:
         return {"bid": tick.bid, "ask": tick.ask}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
-        """
-        Execute a market order based on a validated trade signal.
+        """Execute a market order based on a validated trade signal.
 
         Args:
             signal: Validated TradeSignal object.

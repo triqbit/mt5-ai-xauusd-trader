@@ -53,6 +53,10 @@ ignore = [
     "B008",   # function calls in default args (FastAPI Depends pattern)
     "RUF012", # mutable class attrs — false positives in pydantic models
     "SIM108", # ternary operator — sometimes less readable
+    "ANN101", # missing type annotation for `self`
+    "ANN102", # missing type annotation for `cls`
+    "D203",   # one-blank-line-before-class (conflicts with D211)
+    "D213",   # multi-line-summary-second-line (conflicts with D212)
 ]
 
 [tool.ruff.lint.pydocstyle]
