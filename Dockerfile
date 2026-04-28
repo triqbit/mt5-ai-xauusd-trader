@@ -6,6 +6,7 @@
 # --- Stage 1: builder ------------------------------------------
 FROM python:3.11-slim AS builder
 
+ARG TARGETARCH
 WORKDIR /app
 
 # Prevent Python from writing .pyc files and enable unbuffered logging
@@ -32,6 +33,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Python dependencies
 COPY requirements-docker.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        pip install --no-cache-dir torch==2.3.0+cpu torchvision==0.18.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu; \
+    else \
+        pip install --no-cache-dir torch==2.3.0 torchvision==0.18.0; \
+    fi && \
     pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
@@ -42,7 +48,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/opt/venv/bin:$PATH"
-ENV LD_LIBRARY_PATH="/usr/lib:$LD_LIBRARY_PATH"
+ENV LD_LIBRARY_PATH="/usr/lib"
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
