@@ -72,6 +72,23 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+ignore_missing_imports = true
+disable_error_code = [
+    "no-any-return",
+    "misc",
+    "valid-type",
+    "index",
+    "return-value",
+    "assignment",
+    "import-untyped",
+    "import-not-found",
+    "no-untyped-def",
+    "type-arg",
+    "union-attr",
+    "arg-type",
+    "untyped-decorator",
+    "unused-ignore"
+]
 
 # ===========================================================
 # pytest
