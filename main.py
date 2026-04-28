@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from pydantic import ValidationError
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
@@ -168,63 +169,117 @@ def run_live(
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
+    p = argparse.ArgumentParser(
+        description="MT5 AI/ML Trading Bot - Enterprise Edition",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p.add_argument(
+        "--mode",
+        choices=["demo", "live", "backtest"],
+        default="demo",
+        help="Execution mode (demo for paper trading, live for real money)",
+    )
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
         default="ensemble",
+        help="Trading algorithm to use",
     )
-    p.add_argument("--symbol", default="XAUUSD")
-    p.add_argument("--timeframe", default="M5")
-    p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
-    p.add_argument("--log-level", default="INFO")
+    p.add_argument("--symbol", default="XAUUSD", help="Primary trading symbol")
+    p.add_argument("--timeframe", default="M5", help="Chart timeframe (M1, M5, H1, etc.)")
+    p.add_argument(
+        "--model-dir",
+        type=Path,
+        default=Path("models/trained"),
+        help="Path to directory containing trained models",
+    )
+    p.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging verbosity level",
+    )
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
-    log = logging.getLogger("main")
+    log = structlog.get_logger("main")
+
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
-    cfg = get_config()
+
+    try:
+        cfg = get_config()
+    except ValidationError as exc:
+        missing_fields = [str(e["loc"][0]) for e in exc.errors() if e["type"] == "missing"]
+        if missing_fields:
+            log.critical(
+                "Configuration Error: Missing required environment variables",
+                missing=missing_fields,
+            )
+            print(f"\n❌ FATAL: Missing required environment variables: {', '.join(missing_fields)}")
+            print("👉 Please copy .env.example to .env and fill in your credentials.\n")
+        else:
+            log.critical("Configuration Error", error=str(exc))
+        return 1
+
+    # Pre-flight Check
     log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
+        "🚀 Starting MT5 AI Trader",
+        mode=cfg.mode,
+        algorithm=cfg.algorithm,
+        symbol=cfg.symbol,
+        timeframe=cfg.timeframe,
     )
+
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
+
     balance = connector.get_account_balance()
+    log.info("MT5 Connected", account_balance=balance)
+
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(
+        cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor
+    )
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
         model.load_ppo(ppo_path)
+        log.info("PPO model loaded", path=str(ppo_path))
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+        log.info("LSTM model loaded", path=str(lstm_path))
+
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            log.info("Backtest mode selected - see scripts/backtest.py for execution")
     finally:
         connector.disconnect()
+        log.info("MT5 Disconnected")
+
     return 0
 
 
