@@ -74,9 +74,15 @@ class Trade(Base, AuditMixin):
     symbol = Column(String(20), nullable=False)
     direction = Column(Integer, nullable=False)
     entry_price = Column(Float, nullable=False)
+    requested_price = Column(Float)
+    entry_spread = Column(Float)
     exit_price = Column(Float)
+    exit_spread = Column(Float)
     lot_size = Column(Float, nullable=False)
     pnl = Column(Float, default=0.0)
+    execution_latency_ms = Column(Integer)
+    mfe = Column(Float)  # Max Favorable Excursion
+    mae = Column(Float)  # Max Adverse Excursion
     drawdown_impact = Column(Float)  # impact on total drawdown
     status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
 
@@ -146,6 +152,9 @@ class TradeLogger:
         lot_size: float,
         signal_id: Optional[int] = None,
         status: str = "OPEN",
+        requested_price: Optional[float] = None,
+        entry_spread: Optional[float] = None,
+        execution_latency_ms: Optional[int] = None,
     ) -> int:
         """Log a trade execution."""
         with self.Session() as session:
@@ -154,6 +163,9 @@ class TradeLogger:
                 symbol=symbol,
                 direction=direction,
                 entry_price=entry_price,
+                requested_price=requested_price,
+                entry_spread=entry_spread,
+                execution_latency_ms=execution_latency_ms,
                 lot_size=lot_size,
                 signal_id=signal_id,
                 status=status,
@@ -168,12 +180,18 @@ class TradeLogger:
         exit_price: float,
         pnl: Optional[float] = None,
         drawdown_impact: float = 0.0,
+        exit_spread: Optional[float] = None,
+        mfe: Optional[float] = None,
+        mae: Optional[float] = None,
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session() as session:
             trade = session.query(Trade).filter(Trade.ticket == ticket).first()
             if trade:
                 trade.exit_price = exit_price
+                trade.exit_spread = exit_spread
+                trade.mfe = mfe
+                trade.mae = mae
                 if pnl is not None:
                     trade.pnl = pnl
                 else:
