@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
