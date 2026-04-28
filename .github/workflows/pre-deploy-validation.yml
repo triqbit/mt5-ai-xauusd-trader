@@ -1,0 +1,108 @@
+name: Pre-Deploy Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # 1. CI Checks (Consolidated Gate)
+  ci-gate:
+    name: CI Checks (Lint, Test, Security, Coverage)
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install TA-Lib C library
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
+
+      - name: Install dependencies
+        run: |
+          pip install ruff mypy pip-audit pytest pytest-cov
+          pip install -r requirements-ci.txt
+
+      - name: Linting (Ruff)
+        run: ruff check src/ main.py
+
+      - name: Type Checking (Mypy)
+        run: mypy src/ main.py
+
+      - name: Security Audit (pip-audit)
+        run: pip-audit --requirement requirements-ci.txt
+
+      - name: Tests and Coverage (min 80%)
+        run: pytest tests/ --cov=src --cov-fail-under=80 -v
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
+
+  # 2. Deployment Gates
+  deploy-gates:
+    name: Deployment Gates
+    runs-on: ubuntu-latest
+    needs: ci-gate
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-ci.txt
+
+      - name: Validate Environment Variable Completeness
+        run: python scripts/validate_env.py
+
+      - name: Validate Database Migrations (Reversibility)
+        run: python scripts/validate_migrations.py
+
+      - name: Validate Release Notes
+        run: python scripts/validate_release_notes.py
+
+      - name: Secret Detection (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Build
+        run: docker build -t mt5-trader-gate:${{ github.sha }} .
+
+      - name: Docker Vulnerability Scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'mt5-trader-gate:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
