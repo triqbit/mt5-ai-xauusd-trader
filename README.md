@@ -99,6 +99,18 @@ python main.py --mode demo --symbol XAUUSD --verbose
 
 ---
 
+## 🏛️ Technical Credibility & Evidence
+
+For engineers and stakeholders requiring deep technical assurance:
+
+| Resource | Description |
+| :--- | :--- |
+| [**Architecture Overview**](./docs/ARCHITECTURE_QUICK.md) | High-level system map and data flow. |
+| [**Audit & Evidence Index**](./docs/audits/INDEX.md) | Centralized hub for technical evidence and audit reports. |
+| [**Enterprise Standards**](./ENTERPRISE_STANDARDS.md) | Pydantic V2 implementation, typing, and testing protocols. |
+
+---
+
 ## 📜 Documentation Index
 
 | Guide | Description |
