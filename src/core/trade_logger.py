@@ -14,7 +14,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
-    Boolean,
     Column,
     DateTime,
     Float,
@@ -104,7 +103,7 @@ class TradeLogger:
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
         self.engine = create_engine(db_url)
         # Import AuditLog here to ensure it's registered before create_all
-        from src.core.audit_log import AuditLog, AuditLogger
+        from src.core.audit_log import AuditLog as AuditLog, AuditLogger
 
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)

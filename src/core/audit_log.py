@@ -9,10 +9,9 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import Column, Integer, JSON, String, Text
+from sqlalchemy import JSON, Column, Integer, String, Text
 
 from src.core.database import AuditMixin, Base
 
