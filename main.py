@@ -1,6 +1,6 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
-main.py - CLI entrypoint
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
+main.py - CLI entrypoint.
 
 Usage:
     python main.py --mode demo --algo ensemble
@@ -22,7 +22,7 @@ from typing import Optional
 
 import structlog
 
-from src.core.config import get_config
+from src.core.config import TradingConfig, get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -33,6 +33,11 @@ from src.trading.risk_manager import RiskManager, TradeSignal
 
 
 def configure_logging(level: str = "INFO") -> None:
+    """Configure structured logging.
+
+    Args:
+        level: Log level.
+    """
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
@@ -54,13 +59,23 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
+    """Run live trading loop.
+
+    Args:
+        cfg: Configuration.
+        connector: MT5 connector.
+        risk: Risk manager.
+        model: ML model.
+        trade_logger: Trade logger.
+        monitor: Real-time monitor.
+    """
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
@@ -168,6 +183,11 @@ def run_live(
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command line arguments.
+
+    Returns:
+        argparse.Namespace: Arguments.
+    """
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
     p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
     p.add_argument(
@@ -183,6 +203,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Main entrypoint.
+
+    Returns:
+        int: Exit code.
+    """
     args = parse_args()
     configure_logging(args.log_level)
     log = logging.getLogger("main")

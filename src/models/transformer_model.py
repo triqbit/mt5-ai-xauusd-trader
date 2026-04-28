@@ -1,5 +1,5 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/models/transformer_model.py
 Transformer-based architecture for time-series forecasting and signal generation.
 """
@@ -11,13 +11,29 @@ import torch.nn as nn
 
 
 class TimeSeriesTransformer(nn.Module):
-    """
-    Advanced Transformer model for price action forecasting.
+    """Advanced Transformer model for price action forecasting.
+
     Input: [batch_size, seq_len, features]
-    Output: [batch_size, 3] (Buy, Sell, Hold)
+    Output: [batch_size, 3] (Buy, Sell, Hold).
     """
-    def __init__(self, input_dim: int, model_dim: int = 128, num_heads: int = 8,
-                 num_layers: int = 4, dropout: float = 0.1):
+
+    def __init__(
+        self,
+        input_dim: int,
+        model_dim: int = 128,
+        num_heads: int = 8,
+        num_layers: int = 4,
+        dropout: float = 0.1,
+    ) -> None:
+        """Initialize TimeSeriesTransformer.
+
+        Args:
+            input_dim: Input feature dimension.
+            model_dim: Model internal dimension.
+            num_heads: Number of attention heads.
+            num_layers: Number of encoder layers.
+            dropout: Dropout probability.
+        """
         super().__init__()
         self.model_dim = model_dim
         self.pos_encoder = PositionalEncoding(model_dim, dropout)
@@ -37,6 +53,14 @@ class TimeSeriesTransformer(nn.Module):
         self.decoder = nn.Linear(model_dim, 3)  # Output: [Long, Short, Neutral] probabilities
 
     def forward(self, src: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            src: Input tensor.
+
+        Returns:
+            torch.Tensor: Output logits.
+        """
         # src shape: [batch_size, seq_len, input_dim]
         src = self.input_projection(src) * math.sqrt(self.model_dim)
         src = self.pos_encoder(src)
@@ -48,7 +72,15 @@ class TimeSeriesTransformer(nn.Module):
 
 class PositionalEncoding(nn.Module):
     """Injects positional information into the sequence."""
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000) -> None:
+        """Initialize PositionalEncoding.
+
+        Args:
+            d_model: Model dimension.
+            dropout: Dropout probability.
+            max_len: Maximum sequence length.
+        """
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -61,6 +93,14 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: Input tensor.
+
+        Returns:
+            torch.Tensor: Encoded tensor.
+        """
         # x shape: [batch_size, seq_len, d_model]
         x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)

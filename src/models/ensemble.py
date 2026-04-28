@@ -1,5 +1,5 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/models/ensemble.py
 Ensemble voting system combining:
   - PPO (Stable-Baselines3)
@@ -7,7 +7,7 @@ Ensemble voting system combining:
   - LSTM + Multi-head Attention
 Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
-License: MIT
+License: MIT.
 """
 from __future__ import annotations
 
@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
 class LSTMAttentionModel(nn.Module):
-    """
-    Bidirectional LSTM with multi-head self-attention.
+    """Bidirectional LSTM with multi-head self-attention.
+
     Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit].
     """
 
     def __init__(
@@ -38,6 +38,15 @@ class LSTMAttentionModel(nn.Module):
         n_heads: int = 8,
         dropout: float = 0.2,
     ) -> None:
+        """Initialize LSTM-Attention model.
+
+        Args:
+            n_features: Number of input features.
+            hidden_size: Hidden size of LSTM.
+            num_layers: Number of LSTM layers.
+            n_heads: Number of attention heads.
+            dropout: Dropout rate.
+        """
         super().__init__()
         self.lstm = nn.LSTM(
             input_size=n_features,
@@ -62,6 +71,14 @@ class LSTMAttentionModel(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: Input tensor.
+
+        Returns:
+            torch.Tensor: Output logits.
+        """
         out, _ = self.lstm(x)  # (B, T, 2*H)
         attn_out, _ = self.attn(out, out, out)
         out = self.norm(out + attn_out)  # residual
@@ -71,8 +88,8 @@ class LSTMAttentionModel(nn.Module):
 
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
 class EnsembleModel:
-    """
-    Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
+    """Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
+
     Weights are initialised equally and adapt based on a rolling window
     of each algorithm's realised P&L Sharpe ratio.
     """
@@ -80,6 +97,11 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
+        """Initialize EnsembleModel.
+
+        Args:
+            device: Device to run models on.
+        """
         self.device = torch.device(device)
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
@@ -117,9 +139,16 @@ class EnsembleModel:
         obs: np.ndarray,
         seq: Optional[torch.Tensor] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
-        """
-        Return (direction, confidence, per_algo_probs).
-        direction: +1 buy, -1 sell, 0 hold
+        """Return (direction, confidence, per_algo_probs).
+
+        direction: +1 buy, -1 sell, 0 hold.
+
+        Args:
+            obs: Current observation.
+            seq: Optional sequence data.
+
+        Returns:
+            Tuple[int, float, Dict[str, float]]: (direction, confidence, probabilities).
         """
         votes: Dict[str, np.ndarray] = {}
 

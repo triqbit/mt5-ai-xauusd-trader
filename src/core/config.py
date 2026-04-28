@@ -1,10 +1,10 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/core/config.py
 Centralised Pydantic-v2 settings loaded from environment variables
 or a .env file. All secrets stay out of the codebase.
 Author : triqbit
-License: MIT
+License: MIT.
 """
 from __future__ import annotations
 
@@ -70,20 +70,34 @@ class TradingConfig(BaseSettings):
     @field_validator("risk_per_trade")
     @classmethod
     def risk_must_be_safe(cls, v: float) -> float:
+        """Ensure risk per trade is within safe limits.
+
+        Args:
+            v: The risk per trade value.
+
+        Returns:
+            The validated risk per trade.
+
+        Raises:
+            ValueError: If risk_per_trade > 2%.
+        """
         if v > 0.02:
             raise ValueError("risk_per_trade > 2% is not permitted in production.")
         return v
 
     @property
     def is_live(self) -> bool:
+        """Check if the current mode is live."""
         return self.mode == "live"
 
     @property
     def data_dir(self) -> Path:
+        """Get the data directory."""
         return ROOT / "data"
 
     @property
     def logs_dir(self) -> Path:
+        """Get the logs directory."""
         return ROOT / "logs"
 
 

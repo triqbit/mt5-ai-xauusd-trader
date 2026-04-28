@@ -35,4 +35,8 @@ pydantic-settings==2.8.1
 # -- Testing -------------------------------------------------------
 pytest==9.0.3
 pytest-cov==6.1.0
+pytest-asyncio
+gymnasium
+torch
+stable-baselines3
 python-telegram-bot

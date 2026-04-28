@@ -1,12 +1,14 @@
-"""
-Integration tests for TradeLogger.
-"""
+"""Integration tests for TradeLogger."""
 import os
+
 import pytest
+
 from src.core.trade_logger import TradeLogger
 
+
 @pytest.fixture
-def logger():
+def logger() -> TradeLogger:
+    """Provide a clean TradeLogger instance for each test."""
     db_path = "test_trades.db"
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -15,7 +17,8 @@ def logger():
     if os.path.exists(db_path):
         os.remove(db_path)
 
-def test_log_signal(logger):
+def test_log_signal(logger: TradeLogger) -> None:
+    """Test logging a model signal."""
     signal_data = {
         "symbol": "XAUUSD",
         "direction": 1,
@@ -26,7 +29,8 @@ def test_log_signal(logger):
     signal_id = logger.log_signal(signal_data)
     assert signal_id > 0
 
-def test_log_trade(logger):
+def test_log_trade(logger: TradeLogger) -> None:
+    """Test logging an executed trade."""
     signal_id = logger.log_signal({
         "symbol": "XAUUSD",
         "direction": 1,
@@ -42,7 +46,8 @@ def test_log_trade(logger):
     )
     assert trade_id > 0
 
-def test_performance_report(logger):
+def test_performance_report(logger: TradeLogger) -> None:
+    """Test calculating performance report."""
     # Log some closed trades
     logger.log_trade(1, "XAUUSD", 1, 2000.0, 0.1, status="OPEN")
     logger.update_trade(1, 2010.0, 100.0)
@@ -55,7 +60,8 @@ def test_performance_report(logger):
     assert report["sharpe_ratio"] != 0
     assert report["max_drawdown"] == 50.0
 
-def test_log_risk_event(logger):
+def test_log_risk_event(logger: TradeLogger) -> None:
+    """Test logging a risk event."""
     logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")
     # No exception means success, we could query DB to be sure
     with logger.Session() as session:

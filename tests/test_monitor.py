@@ -1,14 +1,17 @@
-"""
-Tests for Monitor class.
-"""
+"""Tests for Monitor class."""
 import unittest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime, timezone
-from src.core.monitor import Monitor
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+
 from src.core.config import TradingConfig
+from src.core.monitor import Monitor
+
 
 class TestMonitor(unittest.TestCase):
-    def setUp(self):
+    """Test suite for Monitor."""
+
+    def setUp(self) -> None:
+        """Set up test environment."""
         self.config = MagicMock(spec=TradingConfig)
         self.config.telegram_token = "fake_token"
         self.config.telegram_chat_id = "fake_chat_id"
@@ -17,14 +20,16 @@ class TestMonitor(unittest.TestCase):
         with patch('telegram.Bot'):
             self.monitor = Monitor(self.config)
 
-    def test_log_equity(self):
+    def test_log_equity(self) -> None:
+        """Test equity logging."""
         self.monitor.log_equity(10000.0)
         self.assertEqual(len(self.monitor.equity_history), 1)
         self.assertEqual(self.monitor.equity_history[0]["equity"], 10000.0)
         self.assertIsInstance(self.monitor.equity_history[0]["timestamp"], datetime)
 
     @patch('asyncio.run')
-    def test_send_message(self, mock_asyncio_run):
+    def test_send_message(self, mock_asyncio_run: MagicMock) -> None:
+        """Test sending message."""
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = MagicMock()
 
@@ -33,14 +38,16 @@ class TestMonitor(unittest.TestCase):
         mock_asyncio_run.assert_called_once()
 
     @patch('src.core.monitor.Monitor.send_message')
-    def test_alert_circuit_breaker(self, mock_send_message):
+    def test_alert_circuit_breaker(self, mock_send_message: MagicMock) -> None:
+        """Test circuit breaker alert."""
         self.monitor.alert_circuit_breaker(0.15)
         mock_send_message.assert_called_once()
         self.assertIn("Circuit Breaker", mock_send_message.call_args[0][0])
         self.assertIn("15.00%", mock_send_message.call_args[0][0])
 
     @patch('src.core.monitor.Monitor.send_message')
-    def test_send_daily_summary(self, mock_send_message):
+    def test_send_daily_summary(self, mock_send_message: MagicMock) -> None:
+        """Test daily summary."""
         self.monitor.send_daily_summary(500.0, 10)
         mock_send_message.assert_called_once()
         self.assertIn("Daily Summary", mock_send_message.call_args[0][0])
@@ -48,7 +55,8 @@ class TestMonitor(unittest.TestCase):
         self.assertIn("10", mock_send_message.call_args[0][0])
 
     @patch('src.core.monitor.Monitor.send_message')
-    def test_check_confidence_degradation(self, mock_send_message):
+    def test_check_confidence_degradation(self, mock_send_message: MagicMock) -> None:
+        """Test confidence degradation check."""
         # Case 1: Below threshold
         self.monitor.check_confidence_degradation(0.5)
         mock_send_message.assert_called_once()

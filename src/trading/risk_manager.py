@@ -1,5 +1,5 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/trading/risk_manager.py
 Enterprise risk management engine implementing:
   - Kelly Criterion position sizing (fractional)
@@ -7,7 +7,7 @@ Enterprise risk management engine implementing:
   - Dynamic drawdown protection & circuit breakers
   - 6-layer entry filter cascade
 Author : triqbit
-License: MIT
+License: MIT.
 """
 from __future__ import annotations
 
@@ -61,8 +61,8 @@ class DailyStats:
 
 
 class RiskManager:
-    """
-    Central risk authority.
+    """Central risk authority.
+
     Every signal must be approved here before reaching the order router.
     """
 
@@ -73,6 +73,14 @@ class RiskManager:
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
     ) -> None:
+        """Initialize the RiskManager.
+
+        Args:
+            config: Trading configuration.
+            account_balance: Initial account balance.
+            logger_db: Trade logger database instance.
+            monitor: Real-time monitor instance.
+        """
         self.cfg = config
         self.balance = account_balance
         self.peak_equity = account_balance
@@ -84,9 +92,16 @@ class RiskManager:
 
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
-        """
-        Run the full 6-layer risk filter cascade.
+        """Run the full 6-layer risk filter cascade.
+
         Returns True only if ALL layers pass.
+
+        Args:
+            signal: The trade signal to validate.
+            signal_id: Optional database signal ID.
+
+        Returns:
+            bool: True if approved, False otherwise.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
@@ -127,9 +142,19 @@ class RiskManager:
         avg_loss: float,
         pip_value: float = 1.0,
     ) -> float:
-        """
-        Fractional Kelly Criterion position sizing.
+        """Fractional Kelly Criterion position sizing.
+
         Returns lot size capped at max risk per trade.
+
+        Args:
+            symbol: The trading symbol.
+            win_rate: Historical win rate (0-1).
+            avg_win: Average win in pips.
+            avg_loss: Average loss in pips.
+            pip_value: Value of one pip in currency.
+
+        Returns:
+            float: Calculated lot size.
         """
         if avg_loss == 0:
             return 0.01  # minimum lot

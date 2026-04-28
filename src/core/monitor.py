@@ -1,9 +1,9 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/core/monitor.py
 Real-time monitoring, equity tracking, and Telegram alerting.
 Author : triqbit
-License: MIT
+License: MIT.
 """
 from __future__ import annotations
 
@@ -20,12 +20,17 @@ logger = logging.getLogger(__name__)
 
 
 class Monitor:
-    """
-    Real-time monitoring and alerting system.
+    """Real-time monitoring and alerting system.
+
     Tracks equity curve and sends alerts via Telegram.
     """
 
     def __init__(self, config: TradingConfig) -> None:
+        """Initialize the Monitor.
+
+        Args:
+            config: The trading configuration.
+        """
         self.cfg = config
         self.equity_history: List[Dict[str, Any]] = []
         self.bot: Optional[telegram.Bot] = None

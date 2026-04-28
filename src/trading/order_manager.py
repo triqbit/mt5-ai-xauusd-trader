@@ -1,28 +1,50 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
+"""MT5 AI/ML Trading Bot - Enterprise Edition.
+
 src/trading/order_manager.py
 Handles trade execution, modification, and closure.
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+
+from .mt5_connector import MT5Connector
 
 
 class OrderManager:
-    """
-    Manages order execution and position tracking.
+    """Manages order execution and position tracking.
+
     Integrates with MT5Connector for dual-path execution (Desktop/MetaAPI).
     """
-    def __init__(self, connector, symbol: str = "XAUUSD"):
+
+    def __init__(self, connector: MT5Connector, symbol: str = "XAUUSD") -> None:
+        """Initialize the OrderManager.
+
+        Args:
+            connector: The MT5 connector instance.
+            symbol: The trading symbol.
+        """
         self.connector = connector
         self.symbol = symbol
         self.logger = logging.getLogger(__name__)
         self.magic_number = 20240501  # Unique ID for AI trades
 
-    async def execute_trade(self, action: str, volume: float, sl_pips: Optional[float] = None, tp_pips: Optional[float] = None) -> Dict:
-        """
-        Executes a market order with optional SL/TP.
-        action: 'BUY' or 'SELL'
+    async def execute_trade(
+        self,
+        action: str,
+        volume: float,
+        sl_pips: Optional[float] = None,
+        tp_pips: Optional[float] = None,
+    ) -> Dict:
+        """Executes a market order with optional SL/TP.
+
+        Args:
+            action: 'BUY' or 'SELL'.
+            volume: Lot size.
+            sl_pips: Stop loss pips.
+            tp_pips: Take profit pips.
+
+        Returns:
+            Dict: Execution result status.
         """
         self.logger.info(f"Executing {action} order for {volume} lots on {self.symbol}")
 
@@ -44,7 +66,9 @@ class OrderManager:
             self.logger.error(f"Trade execution failed: {e}")
             return {"status": "error", "message": str(e)}
 
-    def _calculate_sl_tp(self, action: str, price: float, sl_pips: Optional[float], tp_pips: Optional[float]):
+    def _calculate_sl_tp(
+        self, action: str, price: float, sl_pips: Optional[float], tp_pips: Optional[float]
+    ) -> Tuple[Optional[float], Optional[float]]:
         """Calculates absolute price levels for SL and TP based on pips."""
         # Standard pip for Gold (XAUUSD) is often 0.01 or 0.1 depending on broker
         # We'll use 0.1 as a default step for 'pips' in gold context
@@ -118,7 +142,7 @@ class OrderManager:
         except Exception as e:
             return {"status": "error", "message": f"MetaAPI Error: {e!s}"}
 
-    async def close_all_positions(self):
+    async def close_all_positions(self) -> None:
         """Emergency close for all open positions for this symbol."""
         # To be implemented with position tracking
         pass
