@@ -83,18 +83,16 @@ pip install -r requirements.txt
 ```
 
 ### 2. Configuration
-Create a `.env` file based on `src/core/config.py` defaults:
-```env
-MT5_LOGIN=your_account
-MT5_PASSWORD=your_password
-MT5_SERVER=your_broker_server
-MODE=demo
+Create a `.env` file by copying the template and filling in your credentials:
+```bash
+cp .env.example .env
+# Edit .env with your MT5 account details
 ```
 
 ### 3. Execution
 ```bash
-# Run validation and start in demo mode
-python main.py --mode demo --symbol XAUUSD --verbose
+# Start the bot in demo mode
+python main.py --mode demo --symbol XAUUSD
 ```
 
 ---
