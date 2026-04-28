@@ -1,0 +1,28 @@
+# CODEOWNERS for MT5 AI/ML Trading Bot
+# This file defines the individuals or teams that are responsible for code in the repository.
+
+# Global owners
+* @andonly1348
+
+# Enterprise Control, Release & Governance
+/.github/ @andonly1348
+/docs/ @andonly1348
+/src/core/ @andonly1348
+/migrations/ @andonly1348
+/main.py @andonly1348
+
+# Trading Engine and Execution (Jules01/Jules03)
+/src/trading/ @andonly1348
+
+# AI/ML Models and Intelligence (Jules04)
+/src/models/ @andonly1348
+
+# Security and Infrastructure (Jules02)
+/Dockerfile @andonly1348
+/.pre-commit-config.yaml @andonly1348
+
+# Configuration and Dependencies
+/pyproject.toml @andonly1348
+/requirements.txt @andonly1348
+/requirements-ci.txt @andonly1348
+/requirements-docker.txt @andonly1348
