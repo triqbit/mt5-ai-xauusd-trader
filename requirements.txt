@@ -21,7 +21,7 @@ einops==0.7.0
 
 # ── Technical Analysis ──────────────────────────────────────
 TA-Lib==0.4.28
-pandas-ta==0.3.14b
+pandas-ta==0.4.71b0
 mplfinance==0.12.10b0
 
 # ── Data Acquisition ────────────────────────────────────────
@@ -66,6 +66,7 @@ hypothesis==6.100.1
 
 # ── DevOps / CI ─────────────────────────────────────────────
 pre-commit==3.7.0
+pip-audit==2.7.3
 black==24.4.2
 ruff==0.4.3
 mypy==1.10.0
