@@ -1,7 +1,7 @@
 
 import numpy as np
 import pytest
-import torch
+
 from src.models import PPOAgent, LSTMModel, DreamerAgent, Signal
 from src.trading.trading_env import TradingEnv
 
@@ -11,6 +11,7 @@ def test_signal_dataclass():
     assert sig.confidence == 0.8
 
 def test_lstm_model_predict():
+    pytest.importorskip("torch")
     input_dim = 64
     model = LSTMModel(input_dim=input_dim)
     features = np.random.randn(10, input_dim).astype(np.float32)
@@ -35,6 +36,15 @@ def test_ppo_agent_predict_no_model():
     assert isinstance(signal, Signal)
     assert signal.direction == 0
     assert signal.confidence == 0.0
+
+def test_ppo_agent_predict_with_model():
+    pytest.importorskip("stable_baselines3")
+    # This might still fail if no environment is provided to init,
+    # but at least we skip the import error.
+    agent = PPOAgent()
+    features = np.random.randn(100).astype(np.float32)
+    signal = agent.predict(features)
+    assert isinstance(signal, Signal)
 
 def test_trading_env_skeleton():
     env = TradingEnv()

@@ -5,17 +5,26 @@ LSTM sequence model for short-term price prediction using PyTorch.
 """
 
 import logging
+from typing import Any
 
 import numpy as np
-import torch
-import torch.nn as nn
 
 from .base import BaseModel, Signal
 
 logger = logging.getLogger(__name__)
 
+# Handle missing torch for CI/restricted environments
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+    NN_BASE = nn.Module
+except ImportError:
+    TORCH_AVAILABLE = False
+    NN_BASE = object  # type: ignore
 
-class LSTMModel(nn.Module, BaseModel):
+
+class LSTMModel(NN_BASE, BaseModel):  # type: ignore
     """
     LSTM-based sequence model for market prediction.
     Input shape: (batch, seq_len, n_features)
@@ -30,6 +39,9 @@ class LSTMModel(nn.Module, BaseModel):
         output_dim: int = 3,
         dropout: float = 0.2,
     ):
+        if not TORCH_AVAILABLE:
+            raise ImportError("PyTorch is required for LSTMModel.")
+
         super(LSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
@@ -44,7 +56,7 @@ class LSTMModel(nn.Module, BaseModel):
         self.fc = nn.Linear(hidden_dim, output_dim)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Any) -> Any:
         """
         Forward pass of the model.
         Args:
@@ -52,6 +64,9 @@ class LSTMModel(nn.Module, BaseModel):
         Returns:
             Output tensor of shape (batch, output_dim)
         """
+        if not TORCH_AVAILABLE:
+            raise ImportError("PyTorch is required for LSTMModel.")
+
         # Initialize hidden state with zeros
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_dim).to(x.device)
@@ -72,6 +87,10 @@ class LSTMModel(nn.Module, BaseModel):
         Returns:
             Signal: The generated trading signal.
         """
+        if not TORCH_AVAILABLE:
+            logger.error("PyTorch not available - cannot run LSTMModel.predict")
+            return Signal(direction=0, confidence=0.0)
+
         self.eval()
         with torch.no_grad():
             # Convert numpy array to torch tensor
@@ -96,11 +115,15 @@ class LSTMModel(nn.Module, BaseModel):
 
     def save(self, path: str):
         """Save model weights."""
+        if not TORCH_AVAILABLE:
+            raise ImportError("PyTorch is required for LSTMModel.")
         torch.save(self.state_dict(), path)
         logger.info("Model saved to %s", path)
 
     def load(self, path: str):
         """Load model weights."""
+        if not TORCH_AVAILABLE:
+            raise ImportError("PyTorch is required for LSTMModel.")
         self.load_state_dict(torch.load(path))
         self.eval()
         logger.info("Model loaded from %s", path)
