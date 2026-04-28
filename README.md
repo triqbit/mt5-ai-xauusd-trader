@@ -106,6 +106,7 @@ python main.py --mode demo --symbol XAUUSD --verbose
 | [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
 | [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
+| [PREPROD_CHECKLIST.md](./docs/PREPROD_CHECKLIST.md) | Mandatory formal gate checklist for production deployment. |
 | [DATABASE_STANDARDS.md](./DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
 
 ---
