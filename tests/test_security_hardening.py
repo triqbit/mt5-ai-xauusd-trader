@@ -11,7 +11,6 @@ except ImportError:
 
 from unittest.mock import patch, MagicMock
 from pathlib import Path
-from src.models.ensemble import EnsembleModel
 
 def test_config_secrets_masking(monkeypatch):
     """Verify that sensitive fields are masked in TradingConfig."""
@@ -40,6 +39,7 @@ def test_config_secrets_masking(monkeypatch):
 def test_ensemble_load_lstm_weights_only():
     """Verify that load_lstm uses weights_only=True."""
     pytest.importorskip("torch")
+    from src.models.ensemble import EnsembleModel
 
     # We need a dummy path
     dummy_path = Path("dummy.pt")
