@@ -107,6 +107,14 @@ python main.py --mode demo --symbol XAUUSD --verbose
 | [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
 | [DATABASE_STANDARDS.md](./DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Contribution workflow, branching strategy, and safety boundaries. |
+| [CONTRIBUTION_MAP.md](./docs/CONTRIBUTION_MAP.md) | Visual guide to safe and sensitive areas of the codebase. |
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! To ensure safety and reliability, please follow our [Contributing Guidelines](./CONTRIBUTING.md) and review the [Contribution Map](./docs/CONTRIBUTION_MAP.md) before making changes.
 
 ---
 
