@@ -38,4 +38,5 @@ pytest-cov==6.1.0
 pytest-asyncio
 gymnasium
 torch
+stable-baselines3
 python-telegram-bot
