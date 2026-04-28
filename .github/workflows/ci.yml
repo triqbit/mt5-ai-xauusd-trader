@@ -37,9 +37,7 @@ jobs:
         run: ruff format --check src/ main.py
       - name: Import sort check
         run: ruff check --select I src/ main.py
-      - name: Install dependencies for mypy
-        run: pip install -r requirements-ci.txt
-      - name: Static type check (mypy)
+      - name: Static type check (mypy - fast check)
         run: mypy src/ main.py
 
   # -----------------------------------------------------------
@@ -91,6 +89,8 @@ jobs:
           sudo ldconfig
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
+      - name: Static type check (mypy - full check)
+        run: mypy src/ main.py
       - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
