@@ -6,11 +6,17 @@ Transformer-based architecture for time-series forecasting and signal generation
 
 import math
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+    nn = None
 
 
-class TimeSeriesTransformer(nn.Module):
+class TimeSeriesTransformer(nn.Module if HAS_TORCH else object):
     """
     Advanced Transformer model for price action forecasting.
     Input: [batch_size, seq_len, features]
@@ -36,7 +42,7 @@ class TimeSeriesTransformer(nn.Module):
         self.input_projection = nn.Linear(input_dim, model_dim)
         self.decoder = nn.Linear(model_dim, 3)  # Output: [Long, Short, Neutral] probabilities
 
-    def forward(self, src: torch.Tensor) -> torch.Tensor:
+    def forward(self, src: "torch.Tensor") -> "torch.Tensor":
         # src shape: [batch_size, seq_len, input_dim]
         src = self.input_projection(src) * math.sqrt(self.model_dim)
         src = self.pos_encoder(src)
@@ -46,7 +52,7 @@ class TimeSeriesTransformer(nn.Module):
         output = self.decoder(output[:, -1, :])
         return torch.softmax(output, dim=-1)
 
-class PositionalEncoding(nn.Module):
+class PositionalEncoding(nn.Module if HAS_TORCH else object):
     """Injects positional information into the sequence."""
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
         super().__init__()
@@ -60,7 +66,7 @@ class PositionalEncoding(nn.Module):
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: "torch.Tensor") -> "torch.Tensor":
         # x shape: [batch_size, seq_len, d_model]
         x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)

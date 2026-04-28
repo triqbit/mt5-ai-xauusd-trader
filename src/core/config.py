@@ -45,9 +45,29 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
+    max_positions: int = Field(default=5, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+
+    # ── Risk Circuit Breakers (RISK_LIMITS.md) ───────────────────────────────
+    # Daily Loss thresholds
+    daily_loss_alert_pct: float = Field(default=0.02)
+    daily_loss_half_size_pct: float = Field(default=0.03)
+    daily_loss_quarter_size_pct: float = Field(default=0.04)
+    daily_loss_halt_pct: float = Field(default=0.05)
+    daily_loss_emergency_pct: float = Field(default=0.06)
+
+    # Drawdown thresholds
+    drawdown_alert_pct: float = Field(default=0.10)
+    drawdown_75pct_size_pct: float = Field(default=0.15)
+    drawdown_50pct_size_pct: float = Field(default=0.20)
+    drawdown_halt_pct: float = Field(default=0.25)
+    drawdown_force_close_pct: float = Field(default=0.30)
+
+    # Volatility thresholds (ATR / ATR_SMA_30)
+    volatility_high_threshold: float = Field(default=1.5)
+    volatility_very_high_threshold: float = Field(default=2.0)
+    volatility_extreme_threshold: float = Field(default=3.0)
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
