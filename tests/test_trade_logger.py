@@ -20,6 +20,9 @@ def test_log_signal(logger):
         "symbol": "XAUUSD",
         "direction": 1,
         "entry_price": 2000.0,
+        "stop_loss": 1980.0,
+        "take_profit": 2040.0,
+        "lot_size": 0.1,
         "algorithm": "ppo",
         "confidence": 0.8
     }
@@ -30,24 +33,46 @@ def test_log_trade(logger):
     signal_id = logger.log_signal({
         "symbol": "XAUUSD",
         "direction": 1,
-        "entry_price": 2000.0
+        "entry_price": 2000.0,
+        "stop_loss": 1980.0,
+        "take_profit": 2040.0,
+        "lot_size": 0.1,
+        "algorithm": "ppo",
+        "confidence": 0.8
     })
     trade_id = logger.log_trade(
-        ticket=12345,
-        symbol="XAUUSD",
-        direction=1,
-        entry_price=2000.0,
-        lot_size=0.1,
+        {
+            "ticket": 12345,
+            "symbol": "XAUUSD",
+            "direction": 1,
+            "entry_price": 2000.0,
+            "lot_size": 0.1,
+            "status": "OPEN"
+        },
         signal_id=signal_id
     )
     assert trade_id > 0
 
 def test_performance_report(logger):
     # Log some closed trades
-    logger.log_trade(1, "XAUUSD", 1, 2000.0, 0.1, status="OPEN")
+    logger.log_trade({
+        "ticket": 1,
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0,
+        "lot_size": 0.1,
+        "status": "OPEN"
+    })
     logger.update_trade(1, 2010.0, 100.0)
 
-    logger.log_trade(2, "XAUUSD", -1, 2000.0, 0.1, status="OPEN")
+    logger.log_trade({
+        "ticket": 2,
+        "symbol": "XAUUSD",
+        "direction": -1,
+        "entry_price": 2000.0,
+        "lot_size": 0.1,
+        "status": "OPEN"
+    })
     logger.update_trade(2, 2005.0, -50.0)
 
     report = logger.read_performance_report()
