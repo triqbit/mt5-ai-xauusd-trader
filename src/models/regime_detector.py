@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict
 
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
