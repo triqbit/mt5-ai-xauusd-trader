@@ -24,6 +24,7 @@ import structlog
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
+from src.core.profiler import profile
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
@@ -67,12 +68,21 @@ def run_live(
     while True:
         try:
             # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-            tick = connector.get_tick(cfg.symbol)
+            with profile("data_ingestion", symbol=cfg.symbol):
+                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                tick = connector.get_tick(cfg.symbol)
+
+            if df.empty or not tick["bid"]:
+                log.warning("No market data available - skipping")
+                time.sleep(poll_interval)
+                continue
+
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            with profile("model_inference", algorithm=cfg.algorithm):
+                direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -113,8 +123,12 @@ def run_live(
                 confidence=confidence,
             )
             # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
-                ticket = connector.place_order(signal)
+            with profile("risk_check", symbol=cfg.symbol):
+                approved = risk.approve(signal, signal_id=signal_id)
+
+            if approved:
+                with profile("order_execution", symbol=cfg.symbol):
+                    ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
                     log.info("Order placed | ticket=%d", ticket)
@@ -207,9 +221,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +232,14 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
