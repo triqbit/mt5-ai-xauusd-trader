@@ -87,7 +87,6 @@ class BacktestEngine:
         end_date = data.index[-1]
 
         all_trades: List[BacktestTrade] = []
-        current_balance = self.initial_balance
 
         logger.info("Starting Walk-Forward Backtest | %s to %s", start_date, end_date)
 
@@ -162,11 +161,11 @@ class BacktestEngine:
             return PerformanceReport(0, 0, 0, 0, 0, 0), []
 
         # Vectorized signal generation
-        # We can't fully vectorize if model is complex, but we can predict in batches
         norm_features = self.fe.normalize(df_features)
 
-        # For simplicity in this implementation, we'll still loop but keep it tight
-        # Real vectorization would be: signals = model.predict_batch(norm_features)
+        # Batch predict signals to speed up simulation
+        logger.info("Batch predicting signals...")
+        all_signals = [model.predict(f) for f in norm_features.values]
 
         trades: List[BacktestTrade] = []
         balance = self.initial_balance
@@ -186,8 +185,8 @@ class BacktestEngine:
             current_time = time_values[i]
             current_price = price_values[i]
 
-            # Model prediction
-            signal_obj = model.predict(feature_values[i])
+            # Use pre-predicted signal
+            signal_obj = all_signals[i]
             direction = signal_obj.direction
             confidence = signal_obj.confidence
 
@@ -248,7 +247,8 @@ class BacktestEngine:
                 decision = self.filter.validate(temp_signal, df_features.iloc[max(0, i-30):i+1], current_drawdown)
 
                 if decision.is_allowed:
-                    entry_price = current_price + (direction * self.spread / 2)
+                    # Apply full spread at entry for conservative simulation
+                    entry_price = current_price + (direction * self.spread)
                     current_trade = {
                         "ticket": ticket_counter,
                         "direction": direction,
@@ -282,7 +282,8 @@ class BacktestEngine:
         # Duration for annualization
         duration = end_time - start_time
         years = duration.total_seconds() / (365.25 * 24 * 3600)
-        if years <= 0: years = 1/365.25 # Minimum 1 day
+        if years <= 0:
+            years = 1 / 365.25  # Minimum 1 day
 
         total_return_pct = (final_balance - self.initial_balance) / self.initial_balance
         # Correct Annualized Return: (1 + total_return)^(1/years) - 1

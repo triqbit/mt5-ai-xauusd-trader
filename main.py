@@ -193,10 +193,10 @@ def main() -> int:
     configure_logging(args.log_level)
     log = logging.getLogger("main")
     # Override config from CLI
-    os.environ.setdefault("MODE", args.mode)
-    os.environ.setdefault("ALGORITHM", args.algo)
-    os.environ.setdefault("SYMBOL", args.symbol)
-    os.environ.setdefault("TIMEFRAME", args.timeframe)
+    os.environ["MODE"] = args.mode
+    os.environ["ALGORITHM"] = args.algo
+    os.environ["SYMBOL"] = args.symbol
+    os.environ["TIMEFRAME"] = args.timeframe
     cfg = get_config()
     log.info(
         "Configuration loaded | mode=%s algo=%s symbol=%s",
@@ -225,8 +225,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Starting backtest mode...")
             start_date = datetime.strptime(args.start, "%Y-%m-%d") if args.start else None

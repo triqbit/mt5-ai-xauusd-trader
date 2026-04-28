@@ -130,12 +130,15 @@ class FeatureEngineer:
 
         return df
 
-    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
+    def normalize(self, df: pd.DataFrame, window: int = 100) -> pd.DataFrame:
         """
-        Apply stateless Z-score normalization.
+        Apply rolling Z-score normalization to prevent look-ahead bias.
         """
-        # Exclude columns that shouldn't be normalized (like binary patterns if they were binary)
-        # But for RL we usually normalize everything.
         numeric_df = df.select_dtypes(include=[np.number])
-        normalized = (numeric_df - numeric_df.mean()) / (numeric_df.std() + 1e-8)
-        return normalized
+        rolling_mean = numeric_df.rolling(window=window).mean()
+        rolling_std = numeric_df.rolling(window=window).std()
+
+        normalized = (numeric_df - rolling_mean) / (rolling_std + 1e-8)
+        # For the initial part of the window, we can use expanding or global mean
+        # but to be safe, we'll just forward fill or use a large warmup.
+        return normalized.fillna(0.0)
