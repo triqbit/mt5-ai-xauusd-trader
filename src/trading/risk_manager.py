@@ -47,6 +47,7 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
+    model_votes: Dict[str, int] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -57,6 +58,7 @@ class DailyStats:
     date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
+    consecutive_losses: int = 0
     peak_equity: float = 0.0
 
 
@@ -95,10 +97,16 @@ class RiskManager:
             rejection_reason = "Daily loss limit reached"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
+        elif not self._check_daily_trade_limit():
+            rejection_reason = "Daily trade limit reached"
+        elif not self._check_consecutive_losses():
+            rejection_reason = "Max consecutive losses reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
         elif not self._check_minimum_confidence(signal.confidence):
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
+        elif not self._check_ensemble_dissent(signal.model_votes):
+            rejection_reason = "Ensemble models in direct opposition"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
 
@@ -155,9 +163,13 @@ class RiskManager:
             self.daily.peak_equity = current_equity
 
     def record_pnl(self, pnl: float) -> None:
-        """Accumulate intraday realised PnL."""
+        """Accumulate intraday realised PnL and track consecutive losses."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+        if pnl < 0:
+            self.daily.consecutive_losses += 1
+        else:
+            self.daily.consecutive_losses = 0
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -201,6 +213,18 @@ class RiskManager:
             return False
         return True
 
+    def _check_daily_trade_limit(self) -> bool:
+        if self.daily.trade_count >= self.cfg.max_daily_trades:
+            logger.warning("Daily trade limit hit: %d", self.cfg.max_daily_trades)
+            return False
+        return True
+
+    def _check_consecutive_losses(self) -> bool:
+        if self.daily.consecutive_losses >= self.cfg.max_consecutive_losses:
+            logger.warning("Max consecutive losses hit: %d", self.cfg.max_consecutive_losses)
+            return False
+        return True
+
     def _check_symbol_allocation(self, symbol: str) -> bool:
         """Block trading on symbols not in the All-Weather portfolio."""
         if symbol not in ALLOCATION_WEIGHTS:
@@ -215,6 +239,19 @@ class RiskManager:
             logger.debug(
                 "Confidence %.2f below threshold %.2f", confidence, threshold
             )
+            return False
+        return True
+
+    def _check_ensemble_dissent(self, model_votes: Dict[str, int]) -> bool:
+        """
+        Detect model instability.
+        Reject if any two models are in direct opposition (one BUY, one SELL).
+        """
+        if not model_votes:
+            return True
+        votes = list(model_votes.values())
+        if 1 in votes and -1 in votes:
+            logger.warning("Ensemble DISSENT: models in direct opposition %s", model_votes)
             return False
         return True
 
