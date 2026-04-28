@@ -7,7 +7,7 @@ Generator for rare but plausible market situations for stress testing and strate
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Union
 
 import numpy as np
 import pandas as pd
