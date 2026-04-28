@@ -2,7 +2,13 @@
 import pytest
 from pydantic import SecretStr
 from src.core.config import TradingConfig
-import torch
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 from src.models.ensemble import EnsembleModel
@@ -31,20 +37,22 @@ def test_config_secrets_masking(monkeypatch):
     assert isinstance(config.mt5_password, SecretStr)
     assert config.mt5_password.get_secret_value() == "secret_password"
 
-@patch("torch.load")
-def test_ensemble_load_lstm_weights_only(mock_load):
+def test_ensemble_load_lstm_weights_only():
     """Verify that load_lstm uses weights_only=True."""
-    mock_load.return_value = {}
-    model = EnsembleModel(device="cpu")
+    pytest.importorskip("torch")
 
     # We need a dummy path
     dummy_path = Path("dummy.pt")
 
-    with patch("src.models.ensemble.LSTMAttentionModel") as mock_lstm_class:
-        mock_lstm = MagicMock()
-        mock_lstm_class.return_value = mock_lstm
+    model = EnsembleModel(device="cpu")
 
-        model.load_lstm(dummy_path)
+    with patch("torch.load") as mock_load:
+        mock_load.return_value = {}
+        with patch("src.models.ensemble.LSTMAttentionModel") as mock_lstm_class:
+            mock_lstm = MagicMock()
+            mock_lstm_class.return_value = mock_lstm
+
+            model.load_lstm(dummy_path)
 
         mock_load.assert_called_once()
         args, kwargs = mock_load.call_args
