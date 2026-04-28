@@ -21,6 +21,10 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.panel import Panel
+from rich.table import Table
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
@@ -33,11 +37,12 @@ from src.trading.risk_manager import RiskManager, TradeSignal
 
 
 def configure_logging(level: str = "INFO") -> None:
+    """Initialize structured logging with Rich terminal output."""
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
-            structlog.dev.ConsoleRenderer(),
+            structlog.dev.ConsoleRenderer(colors=True),
         ],
         wrapper_class=structlog.BoundLogger,
         context_class=dict,
@@ -45,8 +50,9 @@ def configure_logging(level: str = "INFO") -> None:
     )
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True, markup=True)],
     )
 
 
@@ -182,10 +188,33 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def display_welcome_banner(cfg, balance: float) -> None:
+    """Display a delightful startup dashboard."""
+    console = Console()
+
+    table = Table(show_header=False, box=None, padding=(0, 1))
+    table.add_row("[bold blue]Symbol[/]", f"[white]{cfg.symbol}[/]")
+    table.add_row("[bold blue]Timeframe[/]", f"[white]{cfg.timeframe}[/]")
+    table.add_row("[bold blue]Mode[/]", f"[bold {'green' if cfg.mode == 'live' else 'yellow'}]{cfg.mode.upper()}[/]")
+    table.add_row("[bold blue]Algorithm[/]", f"[magenta]{cfg.algorithm}[/]")
+    table.add_row("[bold blue]Account Balance[/]", f"[bold cyan]${balance:,.2f}[/]")
+
+    panel = Panel(
+        table,
+        title="[bold gold1]MT5 AI/ML Trading Bot[/]",
+        subtitle="[italic grey70]Enterprise Edition v1.0[/]",
+        border_style="gold1",
+        expand=False,
+    )
+    console.print("\n", panel, "\n")
+
+
 def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
     log = logging.getLogger("main")
+    console = Console()
+
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
@@ -200,16 +229,21 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
-        return 1
-    balance = connector.get_account_balance()
+
+    with console.status("[bold green]Connecting to MetaTrader 5 terminal...") as status:
+        if not connector.connect():
+            log.critical("Cannot connect to MT5 terminal. Aborting.")
+            return 1
+        balance = connector.get_account_balance()
+        status.update("[bold green]Connection established. Fetching account data...")
+
+    display_welcome_banner(cfg, balance)
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -217,10 +251,17 @@ def main() -> int:
         model.load_ppo(ppo_path)
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
