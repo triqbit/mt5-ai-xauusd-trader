@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 
 
 class TradingEnv(gym.Env):
@@ -24,12 +25,21 @@ class TradingEnv(gym.Env):
     def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
                  window_size: int = 60, commission: float = 0.0002):
         super().__init__()
-        self.data = data
+        self.data = data.astype(np.float32)
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
 
         n_features = data.shape[1]
+
+        # Pre-calculate rolling stats for normalization to avoid expensive per-step calculations
+        df = pd.DataFrame(self.data)
+        self.rolling_mean = df.rolling(window=window_size).mean().values.astype(np.float32)
+        # Using ddof=0 to match numpy.std() default behavior
+        self.rolling_std = df.rolling(window=window_size).std(ddof=0).values.astype(np.float32)
+
+        # Pre-allocate observation buffer to reduce GC pressure and allocation overhead
+        self._obs_buffer = np.zeros(window_size * n_features + 2, dtype=np.float32)
 
         # Observation: window of market data + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
@@ -86,11 +96,21 @@ class TradingEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
+        # Use pre-calculated rolling stats for lightning fast normalization
+        idx = self.current_step - 1
+        mean = self.rolling_mean[idx]
+        std = self.rolling_std[idx]
+
         window = self.data[self.current_step - self.window_size:self.current_step]
-        # Normalize window
-        obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
-        portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
-        return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
+        normalized_window = (window - mean) / (std + 1e-8)
+
+        # Update pre-allocated buffer instead of concatenating and casting
+        self._obs_buffer[:-2] = normalized_window.ravel()
+        self._obs_buffer[-2] = self.balance / self.initial_balance
+        self._obs_buffer[-1] = self.position
+
+        # Return a copy to prevent external modification of the internal buffer
+        return self._obs_buffer.copy()
 
     def render(self):
         print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
