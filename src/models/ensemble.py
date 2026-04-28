@@ -19,6 +19,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from src.models.base import BaseModel, Signal
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,7 +72,7 @@ class LSTMAttentionModel(nn.Module):
 
 
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
-class EnsembleModel:
+class EnsembleModel(BaseModel):
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
     Weights are initialised equally and adapt based on a rolling window
@@ -113,6 +115,18 @@ class EnsembleModel:
 
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
+        self,
+        obs: np.ndarray,
+        seq: Optional[torch.Tensor] = None,
+    ) -> Signal:
+        """
+        Return Signal(direction, confidence).
+        direction: +1 buy, -1 sell, 0 hold
+        """
+        res_dir, res_conf, _ = self.predict_full(obs, seq)
+        return Signal(direction=res_dir, confidence=res_conf)
+
+    def predict_full(
         self,
         obs: np.ndarray,
         seq: Optional[torch.Tensor] = None,
