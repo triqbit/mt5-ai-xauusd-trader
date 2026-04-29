@@ -9,6 +9,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import os
+import platform
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -118,6 +120,25 @@ class TradeLogger:
         self.engine = create_engine(db_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
+        self._secure_db_permissions(db_url)
+
+    def _secure_db_permissions(self, db_url: str) -> None:
+        """Ensure SQLite database file has restricted permissions (0600)."""
+        if db_url.startswith("sqlite:///"):
+            db_path = db_url.replace("sqlite:///", "")
+            if not db_path:
+                return
+
+            # Resolve relative paths
+            if not os.path.isabs(db_path):
+                db_path = os.path.abspath(db_path)
+
+            if os.path.exists(db_path) and platform.system() != "Windows":
+                try:
+                    os.chmod(db_path, 0o600)
+                    logger.info("Secure permissions (0600) applied to %s", db_path)
+                except Exception as e:
+                    logger.warning("Failed to set permissions on %s: %s", db_path, e)
 
     def log_signal(self, signal_data: Dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
