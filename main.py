@@ -17,6 +17,7 @@ import logging
 import os
 import sys
 import time
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -64,8 +65,17 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    last_reset_date = date.today()
+
     while True:
         try:
+            # 0. Check for daily reset
+            current_date = date.today()
+            if current_date > last_reset_date:
+                log.info("New day detected - resetting risk stats")
+                risk.reset_daily()
+                last_reset_date = current_date
+
             # 1. Fetch latest market data
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
             tick = connector.get_tick(cfg.symbol)
@@ -74,6 +84,9 @@ def run_live(
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+            if monitor:
+                monitor.check_confidence_degradation(confidence)
 
             signal_id = None
             if trade_logger:
@@ -118,6 +131,8 @@ def run_live(
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
                     log.info("Order placed | ticket=%d", ticket)
+                    if monitor:
+                        monitor.record_trade()
                     if trade_logger:
                         trade_logger.log_trade(
                             ticket=ticket,
@@ -143,10 +158,12 @@ def run_live(
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
                             exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
                             # P&L will be calculated automatically by update_trade
-                            trade_logger.update_trade(
+                            trade_info = trade_logger.update_trade(
                                 ticket=ticket,
                                 exit_price=exit_price,
                             )
+                            if trade_info:
+                                risk.record_pnl(trade_info.pnl)
                     closed_tickets.append(symbol)
 
             for sym in closed_tickets:
@@ -155,7 +172,9 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                drawdown = (risk.peak_equity - balance) / risk.peak_equity if risk.peak_equity > 0 else 0
+                monitor.log_equity(balance, drawdown=drawdown)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -207,9 +226,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +237,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
