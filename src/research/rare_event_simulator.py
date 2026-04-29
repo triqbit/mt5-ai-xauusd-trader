@@ -4,10 +4,11 @@ src/research/rare_event_simulator.py
 Generates rare but plausible market situations for stress testing.
 """
 
-import numpy as np
-import pandas as pd
 from enum import Enum
 from typing import Optional
+
+import numpy as np
+import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 
 
