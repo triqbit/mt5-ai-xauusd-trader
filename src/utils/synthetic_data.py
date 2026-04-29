@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from typing import Optional, List, Union
 
 
 class ScenarioGenerator:
@@ -54,7 +53,6 @@ class ScenarioGenerator:
         prices = df["close"].values
 
         # Apply crash
-        crash_start_price = prices[crash_at]
         prices[crash_at:] = prices[crash_at:] * (1 - crash_depth)
 
         # Partial recovery
