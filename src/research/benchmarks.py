@@ -8,8 +8,7 @@ Compares advanced models against classic algorithmic baselines.
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
+from typing import Any, List, Protocol
 
 import numpy as np
 import pandas as pd
@@ -175,7 +174,8 @@ class ModelWrapper:
                 # Handle different model interfaces
                 if hasattr(self.model, "predict"):
                     action = self.model.predict(observation)
-                    if isinstance(action, tuple): action = action[0]
+                    if isinstance(action, tuple):
+                        action = action[0]
                     signals[i] = int(action)
             except Exception as e:
                 logger.debug(f"Prediction failed at step {i}: {e}")
