@@ -147,7 +147,7 @@ class MT5Connector:
             logger.info("MetaAPI fallback configured.")
             return True
         except Exception as e:
-            raise MT5ConnectionError(f"MetaAPI initialization failed: {e}")
+            raise MT5ConnectionError(f"MetaAPI initialization failed: {e}") from e
 
     def connect(self) -> bool:
         """Alias for initialize() to support existing interfaces."""

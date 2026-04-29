@@ -4,10 +4,11 @@ src/core/error_handler.py
 Implementation of Circuit Breaker pattern for resilience.
 """
 
-import time
 import logging
+import time
 from enum import Enum
-from typing import Callable, Any, Optional
+from typing import Any, Callable, Optional
+
 from src.core.exceptions import CircuitBreakerError
 
 logger = logging.getLogger(__name__)
@@ -62,11 +63,14 @@ class CircuitBreaker:
 
     def _check_state(self):
         """Checks if the circuit should move from OPEN to HALF_OPEN."""
-        if self.state == CircuitState.OPEN and self.last_failure_time:
-            if (time.time() - self.last_failure_time) >= self.recovery_timeout:
-                logger.info("Circuit Breaker '%s' transitioning to HALF_OPEN", self.name)
-                self.state = CircuitState.HALF_OPEN
-                self.success_count = 0
+        if (
+            self.state == CircuitState.OPEN
+            and self.last_failure_time
+            and (time.time() - self.last_failure_time) >= self.recovery_timeout
+        ):
+            logger.info("Circuit Breaker '%s' transitioning to HALF_OPEN", self.name)
+            self.state = CircuitState.HALF_OPEN
+            self.success_count = 0
 
     def _handle_success(self):
         if self.state == CircuitState.HALF_OPEN:
