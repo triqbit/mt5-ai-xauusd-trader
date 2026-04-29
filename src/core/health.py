@@ -12,7 +12,7 @@ import shutil
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import structlog
 from pydantic import BaseModel, Field
@@ -79,7 +79,7 @@ class HealthChecker:
         except Exception as e:
             return ComponentHealth(
                 status=HealthStatus.FAILED,
-                message=f"MT5 probe exception: {str(e)}",
+                message=f"MT5 probe exception: {e!s}",
             )
 
     def check_database(self, logger_db: Any) -> ComponentHealth:
@@ -94,7 +94,7 @@ class HealthChecker:
         except Exception as e:
             return ComponentHealth(
                 status=HealthStatus.FAILED,
-                message=f"Database probe failed: {str(e)}",
+                message=f"Database probe failed: {e!s}",
             )
 
     def check_models(self, model_dir: Optional[Path] = None) -> ComponentHealth:
@@ -128,7 +128,7 @@ class HealthChecker:
 
     def check_disk_space(self, min_gb: float = 1.0) -> ComponentHealth:
         """Verify sufficient disk space for logs and DB."""
-        total, used, free = shutil.disk_usage(os.getcwd())
+        _, _, free = shutil.disk_usage(os.getcwd())
         free_gb = free / (2**30)
         if free_gb > min_gb:
             return ComponentHealth(
