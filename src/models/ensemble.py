@@ -19,6 +19,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from src.models.dynamic_ensemble import (
+    DynamicWeightAdapter,
+    MarketContext,
+    MarketRegime,
+    ModelPerformance,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,23 +80,24 @@ class LSTMAttentionModel(nn.Module):
 class EnsembleModel:
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
-    Weights are initialised equally and adapt based on a rolling window
-    of each algorithm's realised P&L Sharpe ratio.
+    Weights are adapted dynamically based on market regime and performance.
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
-        self.weights: Dict[str, float] = {
-            "ppo": 1 / 3,
-            "dreamer": 1 / 3,
-            "lstm": 1 / 3,
-        }
+        self.adapter = DynamicWeightAdapter(self.ALGORITHMS)
+        self.weights = self.adapter.current_weights
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
         self.lstm_model: Optional[LSTMAttentionModel] = None
-        self._performance: Dict[str, List[float]] = {k: [] for k in self.ALGORITHMS}
+
+        # Tracks for updating the adapter
+        self.current_context = MarketContext(regime=MarketRegime.UNKNOWN)
+        self.algo_performance: Dict[str, ModelPerformance] = {
+            alg: ModelPerformance() for alg in self.ALGORITHMS
+        }
 
     # ── Loading ────────────────────────────────────────────────────────────
     def load_ppo(self, path: Path) -> None:
@@ -158,33 +166,18 @@ class EnsembleModel:
         return direction, confidence, per_algo
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
-    def record_return(self, algorithm: str, ret: float) -> None:
-        """Track per-algorithm returns for weight rebalancing."""
-        if algorithm in self._performance:
-            self._performance[algorithm].append(ret)
-            if len(self._performance[algorithm]) >= 50:
-                self._rebalance_weights()
+    def update_context(self, context: MarketContext) -> None:
+        """Update market context and refresh weights."""
+        self.current_context = context
+        self.weights = self.adapter.get_weights(self.current_context, self.algo_performance)
+        logger.info("Ensemble weights updated for regime %s: %s", context.regime, self.weights)
 
-    def _rebalance_weights(self, window: int = 50) -> None:
-        """Reweight by rolling Sharpe ratio (floor 5%)."""
-        sharpes: Dict[str, float] = {}
-        for algo, rets in self._performance.items():
-            tail = rets[-window:]
-            if len(tail) < 10:
-                sharpes[algo] = 1.0
-                continue
-            arr = np.array(tail)
-            mean = arr.mean()
-            std = arr.std() + 1e-9
-            sharpes[algo] = max(mean / std, 0.0)
-        total = sum(sharpes.values()) or 1.0
-        for algo, s in sharpes.items():
-            raw = s / total
-            self.weights[algo] = max(raw, 0.05)  # min 5%
-        # Re-normalise
-        total_w = sum(self.weights.values())
-        self.weights = {k: v / total_w for k, v in self.weights.items()}
-        logger.info("Weights rebalanced: %s", self.weights)
+    def update_algo_performance(self, algorithm: str, perf: ModelPerformance) -> None:
+        """Update per-algorithm performance metrics."""
+        if algorithm in self.algo_performance:
+            self.algo_performance[algorithm] = perf
+            # Refresh weights after performance update
+            self.weights = self.adapter.get_weights(self.current_context, self.algo_performance)
 
 
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]
