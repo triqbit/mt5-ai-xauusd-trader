@@ -41,7 +41,7 @@ tqdm==4.66.4
 
 # -- Notifications -------------------------------------------------
 # 21.x supports httpx>=0.27
-python-telegram-bot==21.3
+python-telegram-bot==21.10
 
 # -- Dashboard / API -----------------------------------------------
 fastapi==0.111.0
