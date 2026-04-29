@@ -38,3 +38,33 @@ def test_config_risk_validation():
     })
     with pytest.raises(ValueError, match="risk_per_trade"):
         TradingConfig()
+
+def test_config_risk_parameters(monkeypatch):
+    """Test new risk management fields in TradingConfig."""
+    monkeypatch.setenv("MT5_PASSWORD", "test")
+    monkeypatch.setenv("MT5_SERVER", "test")
+    monkeypatch.setenv("RISK_PER_TRADE", "0.01")
+    monkeypatch.setenv("MAX_CONSECUTIVE_LOSSES", "5")
+    monkeypatch.setenv("MAX_DAILY_TRADES", "20")
+    monkeypatch.setenv("MIN_RISK_REWARD", "2.5")
+
+    cfg = TradingConfig()
+    assert cfg.max_consecutive_losses == 5
+    assert cfg.max_daily_trades == 20
+    assert cfg.min_risk_reward == 2.5
+
+def test_config_timeframe_validation(monkeypatch):
+    """Test timeframe Literal validation."""
+    monkeypatch.setenv("MT5_PASSWORD", "test")
+    monkeypatch.setenv("MT5_SERVER", "test")
+    monkeypatch.setenv("RISK_PER_TRADE", "0.01")
+
+    # Valid timeframe
+    monkeypatch.setenv("TIMEFRAME", "H1")
+    cfg = TradingConfig()
+    assert cfg.timeframe == "H1"
+
+    # Invalid timeframe
+    monkeypatch.setenv("TIMEFRAME", "M2")
+    with pytest.raises(ValueError):
+        TradingConfig()
