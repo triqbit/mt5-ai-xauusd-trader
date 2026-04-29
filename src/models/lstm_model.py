@@ -5,7 +5,6 @@ LSTM sequence model using PyTorch for short-term price prediction.
 """
 
 import logging
-from typing import Optional
 
 import numpy as np
 
