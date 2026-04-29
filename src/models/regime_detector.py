@@ -9,7 +9,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
