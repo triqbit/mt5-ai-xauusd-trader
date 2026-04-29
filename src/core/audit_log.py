@@ -16,7 +16,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.core.database import Base, AuditMixin
+from src.core.database import AuditMixin, Base
 
 logger = logging.getLogger(__name__)
 

@@ -24,7 +24,8 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import relationship, sessionmaker
-from src.core.database import Base, AuditMixin
+
+from src.core.database import AuditMixin, Base
 
 logger = logging.getLogger(__name__)
 

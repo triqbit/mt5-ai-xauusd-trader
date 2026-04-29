@@ -22,10 +22,10 @@ from typing import Optional
 
 import structlog
 
+from src.core.audit_log import AuditLogger
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from src.core.audit_log import AuditLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -174,7 +174,7 @@ def run_live(
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
             if audit_logger:
-                audit_logger.log_operator_action("EMERGENCY_HALT", f"Unhandled error: {str(exc)}")
+                audit_logger.log_operator_action("EMERGENCY_HALT", f"Unhandled error: {exc!s}")
             time.sleep(poll_interval)
 
 

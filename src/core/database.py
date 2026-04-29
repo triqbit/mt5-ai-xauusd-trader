@@ -8,7 +8,8 @@ License: MIT
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, Boolean
+
+from sqlalchemy import Boolean, Column, DateTime
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
