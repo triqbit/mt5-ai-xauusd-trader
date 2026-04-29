@@ -50,7 +50,7 @@ class ModelSignal(Base, AuditMixin):
     __tablename__ = "model_signals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
     entry_price = Column(Float, nullable=False)
     stop_loss = Column(Float)
@@ -58,7 +58,7 @@ class ModelSignal(Base, AuditMixin):
     lot_size = Column(Float)
     algorithm = Column(String(50))
     confidence = Column(Float)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationship
     trade = relationship("Trade", back_populates="signal", uselist=False)
@@ -71,14 +71,14 @@ class Trade(Base, AuditMixin):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticket = Column(Integer, unique=True, index=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)
     entry_price = Column(Float, nullable=False)
     exit_price = Column(Float)
     lot_size = Column(Float, nullable=False)
     pnl = Column(Float, default=0.0)
     drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
+    status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
@@ -90,9 +90,9 @@ class RiskEvent(Base, AuditMixin):
     __tablename__ = "risk_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    event_type = Column(String(50), nullable=False)
+    event_type = Column(String(50), nullable=False, index=True)
     description = Column(Text)
-    symbol = Column(String(20))
+    symbol = Column(String(20), index=True)
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"), nullable=True)
 
@@ -103,7 +103,7 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     sharpe_ratio = Column(Float)
     profit_factor = Column(Float)
     max_drawdown = Column(Float)
