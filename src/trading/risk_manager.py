@@ -90,17 +90,17 @@ class RiskManager:
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
+            rejection_reason = "Circuit breaker active (drawdown limit exceeded)"
         elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
+            rejection_reason = f"Daily loss limit reached ({self.cfg.max_daily_loss*100:.1f}%)"
         elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
+            rejection_reason = f"Max positions reached ({self.cfg.max_positions})"
         elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
+            rejection_reason = f"Symbol {signal.symbol} not in approved All-Weather portfolio"
         elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
+            rejection_reason = f"Confidence {signal.confidence:.2f} below threshold (0.55)"
         elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+            rejection_reason = "Risk-Reward ratio too low (minimum 1.5 required)"
 
         passed = rejection_reason == ""
         if not passed:

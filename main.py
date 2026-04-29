@@ -182,22 +182,44 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def show_banner(log: logging.Logger) -> None:
+    """Display a simple character-based startup banner."""
+    banner = r"""
+    ============================================================
+    |        MT5 AI/ML TRADING BOT - ENTERPRISE EDITION        |
+    |      Optimized for XAUUSD | Deep RL & Ensemble Strategy  |
+    ============================================================
+    """
+    for line in banner.strip().split("\n"):
+        log.info(line)
+
+
+def show_config_summary(log: logging.Logger, cfg) -> None:
+    """Display runtime configuration summary."""
+    log.info("--- Runtime Configuration ---")
+    log.info(f"  Mode:          {cfg.mode.upper()}")
+    log.info(f"  Algorithm:     {cfg.algorithm.upper()}")
+    log.info(f"  Symbol:        {cfg.symbol}")
+    log.info(f"  Timeframe:     {cfg.timeframe}")
+    log.info(f"  Max Positions: {cfg.max_positions}")
+    log.info(f"  Risk/Trade:    {cfg.risk_per_trade * 100:.2f}%")
+    log.info(f"  Device:        {cfg.device}")
+    log.info("-----------------------------")
+
+
 def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
     log = logging.getLogger("main")
+    show_banner(log)
+
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
-    log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
-    )
+    show_config_summary(log, cfg)
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
