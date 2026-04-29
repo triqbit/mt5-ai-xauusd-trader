@@ -45,9 +45,16 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
+    max_positions: int = Field(default=5, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
+    max_leverage: int = Field(default=10, ge=1, le=50)
+    max_single_direction_exposure: float = Field(default=0.3, ge=0.1, le=1.0)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    daily_win_cap: float = Field(default=0.10, ge=0.01, le=0.50)
+    max_trades_per_day: int = Field(default=20, ge=1, le=100)
+    max_losing_streak: int = Field(default=3, ge=1, le=10)
+    atr_period: int = Field(default=14, ge=5, le=50)
+    max_slippage_pips: float = Field(default=2.0, ge=0.1, le=10.0)
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
