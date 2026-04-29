@@ -13,7 +13,13 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta  # noqa: F401
+
+try:
+    import pandas_ta as ta  # noqa: F401
+    PANDAS_TA_AVAILABLE = True
+except ImportError:
+    PANDAS_TA_AVAILABLE = False
+
 from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger(__name__)
@@ -41,6 +47,13 @@ class FeatureEngineer:
             DataFrame with additional features.
         """
         df = df.copy()
+
+        if not PANDAS_TA_AVAILABLE:
+            logger.warning("pandas-ta not available. Using fallback features.")
+            df["returns"] = df["close"].pct_change()
+            df["volatility"] = df["returns"].rolling(window=20).std()
+            df.dropna(inplace=True)
+            return df
 
         # 1. Basic indicators
         df.ta.rsi(length=14, append=True)
