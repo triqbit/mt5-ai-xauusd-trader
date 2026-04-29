@@ -1,6 +1,11 @@
 import numpy as np
 import pytest
+
+# Skip this test in CI if gymnasium is not installed
+gymnasium = pytest.importorskip("gymnasium")
+
 from src.environment.gym_env import TradingEnv
+
 
 def test_observation_consistency():
     # Use fixed seed for reproducibility
