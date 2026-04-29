@@ -11,15 +11,15 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import structlog
 import torch
 import torch.nn as nn
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
@@ -148,14 +148,17 @@ class EnsembleModel:
         confidence = float(blended[action_idx])
         direction_map = {0: 1, 1: -1, 2: 0}
         direction = direction_map[action_idx]
-        per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+        per_algo = {k: int(np.argmax(votes[k])) for k in votes}
+        per_algo_directions = {k: direction_map[v] for k, v in per_algo.items()}
+
         logger.debug(
-            "Ensemble | dir=%d conf=%.3f votes=%s",
-            direction,
-            confidence,
-            per_algo,
+            "Ensemble prediction",
+            direction=direction,
+            confidence=round(confidence, 4),
+            votes=per_algo_directions,
+            weights={k: round(v, 4) for k, v in self.weights.items() if k in votes}
         )
-        return direction, confidence, per_algo
+        return direction, confidence, per_algo_directions
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(self, algorithm: str, ret: float) -> None:

@@ -11,16 +11,17 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
+
+import structlog
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Ray Dalio All-Weather allocation weights
 ALLOCATION_WEIGHTS: Dict[str, float] = {
@@ -88,6 +89,8 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
+        log = logger.bind(symbol=signal.symbol, direction=signal.direction, signal_id=signal_id)
+
         rejection_reason = ""
         if not self._check_circuit_breaker():
             rejection_reason = "Circuit breaker active"
@@ -104,12 +107,7 @@ class RiskManager:
 
         passed = rejection_reason == ""
         if not passed:
-            logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
-            )
+            log.warning("Signal REJECTED", reason=rejection_reason)
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
@@ -117,6 +115,9 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+        else:
+            log.info("Signal APPROVED")
+
         return passed
 
     def size_position(
