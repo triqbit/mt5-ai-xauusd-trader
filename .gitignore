@@ -34,6 +34,7 @@ env/
 # Secrets & Credentials
 .env
 .env.*
+!.env.example
 config/secrets.yaml
 config/secrets.toml
 *.key

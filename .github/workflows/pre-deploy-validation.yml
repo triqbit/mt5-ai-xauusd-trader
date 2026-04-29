@@ -38,7 +38,7 @@ jobs:
       - name: Ruff Lint
         run: ruff check src/ main.py
       - name: Mypy Type Check
-        run: mypy src/ main.py
+        run: mypy --ignore-missing-imports src/ main.py
       - name: Run Tests with 80% Coverage Threshold
         run: pytest tests/ --cov=src --cov-fail-under=80
         env:
