@@ -9,9 +9,8 @@ License: MIT
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import List
 
-import numpy as np
 import pandas as pd
 import talib
 from sklearn.preprocessing import StandardScaler
@@ -35,6 +34,7 @@ class FeatureEngineer:
         self.primary_tf = primary_tf
         self.scaler = StandardScaler()
         self.is_fitted = False
+        self.feature_columns: List[str] = []
 
         # Define candle patterns available in TA-Lib
         self.candle_names = talib.get_function_groups()['Pattern Recognition']
@@ -121,6 +121,11 @@ class FeatureEngineer:
 
             # Drop OHLCV from resampled to avoid collisions
             resampled = resampled.drop(columns=['open', 'high', 'low', 'close', 'volume'])
+
+            # Shift resampled data to prevent look-ahead bias
+            # Resampled bars are labeled by their start time, so we must shift them
+            # to ensure we only use the data once the bar is actually closed.
+            resampled = resampled.shift(1)
 
             # Merge back to original data using forward fill
             original_df = pd.merge_asof(
@@ -211,14 +216,27 @@ class FeatureEngineer:
         # 7. Normalization
         if fit_scaler:
             self.scaler.fit(features_df)
+            self.feature_columns = features_df.columns.tolist()
             self.is_fitted = True
 
         if self.is_fitted:
+            # Ensure we only use columns present during fitting
+            missing_cols = set(self.feature_columns) - set(features_df.columns)
+            if missing_cols:
+                # If some features are missing in the current data, we can't normalize properly
+                # For now, let's just use what we have if it matches, or handle appropriately
+                # Ideally, we should pad with zeros or handle as a failure
+                for col in missing_cols:
+                    features_df[col] = 0.0
+
+            # Only use and reorder columns to match fit order
+            features_df = features_df[self.feature_columns]
+
             normalized_data = self.scaler.transform(features_df)
             normalized_df = pd.DataFrame(
                 normalized_data,
                 index=features_df.index,
-                columns=features_df.columns
+                columns=self.feature_columns
             )
             return normalized_df
 
