@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.health import HealthChecker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -198,18 +199,20 @@ def main() -> int:
         cfg.algorithm,
         cfg.symbol,
     )
+
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
-        return 1
-    balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+
+    # Production health check & startup gate
+    health = HealthChecker(cfg)
+    health.run_startup_gate(connector, trade_logger, model_dir=args.model_dir)
+
+    balance = connector.get_account_balance()
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +222,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
