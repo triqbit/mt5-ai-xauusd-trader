@@ -95,7 +95,16 @@ class MT5Connector:
                     self._is_initialized = True
                     return True
                 else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
+                    error_code, error_desc = mt5.last_error()
+                    logger.error(f"Native MT5 initialization failed | Error: {error_code} ({error_desc})")
+                    print("\n ❌ MT5 CONNECTION ERROR")
+                    print(f" Error Code: {error_code}")
+                    print(f" Description: {error_desc}")
+                    print("\n Troubleshooting tips:")
+                    print(f" 1. Ensure MT5 terminal path is correct: {self.cfg.mt5_path}")
+                    print(f" 2. Check if account {self.cfg.mt5_login} exists on server {self.cfg.mt5_server}")
+                    print(" 3. Verify that the MT5 terminal is actually running or can be launched.")
+                    print(" 4. On Linux/Mac, ensure you have configured MetaAPI fallback if not using Windows.")
             except Exception as e:
                 logger.error("Native MT5 initialization error: %s", e)
         else:
