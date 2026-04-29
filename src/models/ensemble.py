@@ -86,6 +86,7 @@ class EnsembleModel:
             "dreamer": 1 / 3,
             "lstm": 1 / 3,
         }
+        self._normalized_weights: Optional[Dict[str, float]] = None
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
         self.lstm_model: Optional[LSTMAttentionModel] = None
@@ -142,8 +143,13 @@ class EnsembleModel:
             return 0, 0.0, {}
 
         # Weighted average across available models
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+        # Cache normalized weights to avoid redundant calculations in the hot inference path
+        available_keys = tuple(sorted(votes.keys()))
+        if self._normalized_weights is None or set(self._normalized_weights.keys()) != set(available_keys):
+            total_weight = sum(self.weights[k] for k in available_keys)
+            self._normalized_weights = {k: self.weights[k] / total_weight for k in available_keys}
+
+        blended = sum(self._normalized_weights[k] * votes[k] for k in available_keys)
         action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
         confidence = float(blended[action_idx])
         direction_map = {0: 1, 1: -1, 2: 0}
@@ -184,6 +190,7 @@ class EnsembleModel:
         # Re-normalise
         total_w = sum(self.weights.values())
         self.weights = {k: v / total_w for k, v in self.weights.items()}
+        self._normalized_weights = None  # Reset cache
         logger.info("Weights rebalanced: %s", self.weights)
 
 
