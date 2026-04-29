@@ -1,0 +1,131 @@
+name: Release Orchestration
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to release (e.g. v1.2.0)'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # -----------------------------------------------------------
+  # PHASE 1: Validation Gates
+  # -----------------------------------------------------------
+  validate:
+    name: Validation Gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install TA-Lib C library from source
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements-ci.txt
+          pip install pydantic pydantic-settings ruff mypy pytest-cov
+
+      - name: Code Quality (Ruff)
+        run: ruff check src/ main.py
+
+      - name: Type Checking (Mypy)
+        run: mypy src/
+
+      - name: Unit & Integration Tests
+        run: pytest tests/ --cov=src --cov-report=xml
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
+          DATABASE_URL: "sqlite:///test.db"
+
+      - name: Environment Validation
+        run: python scripts/validate_env.py
+
+  # -----------------------------------------------------------
+  # PHASE 2: Artifact Creation, Security & Release
+  # -----------------------------------------------------------
+  # Consolidating Build, Scan, and Release into one job to ensure
+  # the local Docker image is available for packaging without complex artifact transfers.
+  release:
+    name: Build, Scan and Publish
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: triqbit/mt5-ai-xauusd-trader:${{ github.event.inputs.version || github.ref_name }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Security Scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'triqbit/mt5-ai-xauusd-trader:${{ github.event.inputs.version || github.ref_name }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Package Release Artifacts
+        run: |
+          chmod +x scripts/package_release.sh
+          # Pass version exactly as received (script handles normalization)
+          ./scripts/package_release.sh ${{ github.event.inputs.version || github.ref_name }}
+
+      - name: Generate Changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          name: Release ${{ github.event.inputs.version || github.ref_name }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          files: |
+            releases/release-${{ github.event.inputs.version || github.ref_name }}.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
