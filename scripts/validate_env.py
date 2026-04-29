@@ -1,4 +1,5 @@
 import sys
+import os
 from pathlib import Path
 from src.core.config import TradingConfig
 
@@ -6,15 +7,18 @@ def validate_env_example():
     """
     Validates that .env.example contains all keys defined in TradingConfig.
     """
-    root = Path(__file__).resolve().parents[1]
+    # Current working directory is usually the repo root in CI
+    root = Path(os.getcwd())
     env_example_path = root / ".env.example"
 
+    print(f"Checking for .env.example at: {env_example_path}")
+
     if not env_example_path.exists():
-        print("Error: .env.example file not found.")
+        print(f"Error: .env.example file not found at {env_example_path}")
+        print(f"Current directory contents: {os.listdir(root)}")
         return False
 
     # Get keys from TradingConfig (Pydantic model)
-    # We use model_fields in Pydantic v2
     config_keys = set(TradingConfig.model_fields.keys())
 
     # Read keys from .env.example

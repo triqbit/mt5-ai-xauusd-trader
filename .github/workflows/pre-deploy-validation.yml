@@ -18,6 +18,19 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+      - name: Install TA-Lib C library
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
       - name: Install dependencies
         run: |
           pip install ruff mypy pytest pytest-cov
@@ -84,7 +97,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Gitleaks Scan
-        uses: gitleaks/gitleaks-action@v2.3.7
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -97,7 +110,7 @@ jobs:
       - name: Build Docker Image
         run: docker build -t mt5-ai-trader:test .
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: 'mt5-ai-trader:test'
           format: 'table'
