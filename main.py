@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.config_validator import ValidationSeverity, validate_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -198,6 +199,23 @@ def main() -> int:
         cfg.algorithm,
         cfg.symbol,
     )
+
+    # Validate configuration
+    result = validate_config(cfg)
+    for issue in result.issues:
+        msg = f"Config Validation {issue.severity}: [{issue.field}] {issue.message}"
+        if issue.value:
+            msg += f" (Value: {issue.value})"
+
+        if issue.severity == ValidationSeverity.CRITICAL:
+            log.error(msg)
+        else:
+            log.warning(msg)
+
+    if result.has_critical:
+        log.critical("Application launch blocked due to critical configuration issues.")
+        return 1
+
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
