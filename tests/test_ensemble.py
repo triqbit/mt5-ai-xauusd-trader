@@ -1,7 +1,9 @@
 """Tests for src.models.ensemble module."""
 import pytest
 import numpy as np
-import torch
+
+torch = pytest.importorskip("torch")
+
 from src.models.ensemble import EnsembleModel, LSTMAttentionModel
 
 def test_lstm_attention_model_output_shape():
