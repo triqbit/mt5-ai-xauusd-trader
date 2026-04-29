@@ -13,7 +13,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from src.core.config import TradingConfig
 
