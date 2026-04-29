@@ -1,0 +1,48 @@
+name: License Compliance Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  license-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-licenses
+          # Install production dependencies for accurate scanning
+          # We expect requirements.txt to be installable in a standard Ubuntu env
+          # excluding heavy C-extensions if necessary using --prefer-binary
+          pip install -r requirements.txt --prefer-binary
+
+      - name: Run License Audit
+        run: |
+          echo "Scanning for disallowed licenses (GPL, AGPL)..."
+          # This command will exit with code 1 if any non-allowed licenses are found.
+          # --partial-match is used to handle composite licenses (e.g. MIT AND PSF-2.0)
+          # We allow common permissive licenses.
+          pip-licenses \
+            --allow-only "MIT;Apache-2.0;BSD;PSF-2.0;ISC;Unlicense;CC0;LGPL;MPL;Python Software Foundation License;BSD-3-Clause;BSD-2-Clause" \
+            --partial-match \
+            --summary
+
+      - name: Generate License Report
+        run: |
+          pip-licenses --format=markdown --output-file=docs/DEPENDENCY_LICENSES.md --with-urls
+
+      - name: Upload License Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-license-report
+          path: docs/DEPENDENCY_LICENSES.md
