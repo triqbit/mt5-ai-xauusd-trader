@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class MarketRegime(str, Enum):
     TRENDING = "TRENDING"
     RANGING = "RANGING"

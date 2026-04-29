@@ -2,13 +2,13 @@
 
 from src.core.config import TradingConfig, get_config
 from src.core.decision_support import DecisionPacket, DecisionSupport
-from src.core.explainability import SignalExplanation, SignalExplainer
+from src.core.explainability import SignalExplainer, SignalExplanation
 
 __all__ = [
-    "TradingConfig",
-    "get_config",
     "DecisionPacket",
     "DecisionSupport",
-    "SignalExplanation",
     "SignalExplainer",
+    "SignalExplanation",
+    "TradingConfig",
+    "get_config",
 ]
