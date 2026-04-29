@@ -15,9 +15,17 @@ class PPOAgent:
     PPO-based reinforcement learning agent.
     Uses Stable-Baselines3 PPO under the hood.
     """
+
     def __init__(self, env, model_path: Optional[Path] = None, device: str = "auto"):
-        from stable_baselines3 import PPO
-        from stable_baselines3.common.vec_env import DummyVecEnv
+        try:
+            from stable_baselines3 import PPO
+            from stable_baselines3.common.vec_env import DummyVecEnv
+        except ImportError:
+            logging.getLogger(__name__).warning(
+                "stable_baselines3 not found - PPOAgent unavailable"
+            )
+            self.model = None
+            return
 
         self.logger = logging.getLogger(__name__)
         self.device = device
@@ -47,6 +55,8 @@ class PPOAgent:
 
     def train(self, total_timesteps: int = 1_000_000, save_path: Optional[Path] = None):
         """Train the PPO agent."""
+        if self.model is None:
+            raise RuntimeError("PPO model not initialised (SB3 likely missing)")
         self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
         self.model.learn(total_timesteps=total_timesteps)
 
@@ -57,12 +67,17 @@ class PPOAgent:
 
     def predict(self, observation):
         """Generate a trading action from the current observation."""
+        if self.model is None:
+            return 0  # HOLD if no model
         action, _states = self.model.predict(observation, deterministic=True)
         return action
 
     def evaluate(self, n_eval_episodes: int = 10) -> dict:
         """Evaluate agent performance over n episodes."""
+        if self.model is None:
+            return {"mean_reward": 0.0, "std_reward": 0.0}
         from stable_baselines3.common.evaluation import evaluate_policy
+
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_eval_episodes
         )
