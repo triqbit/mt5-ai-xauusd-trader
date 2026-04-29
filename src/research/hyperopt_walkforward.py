@@ -5,11 +5,12 @@ Disciplined Walk-Forward Optimization (WFO) for strategy parameter validation.
 """
 
 import logging
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from pydantic import BaseModel, Field
+from typing import Any, Callable, Dict, List
+
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from pydantic import BaseModel, Field
+
 
 class OptimizationWindow(BaseModel):
     """Defines a single train/test window for walk-forward optimization."""
@@ -139,7 +140,7 @@ class WalkForwardOptimizer:
         # 3. Parameter Stability
         # We look at how many unique parameter sets were chosen across windows.
         # High stability = few changes.
-        unique_param_sets = len(set(tuple(sorted(r.params.items())) for r in results))
+        unique_param_sets = len({tuple(sorted(r.params.items())) for r in results})
         stability = 1.0 - (unique_param_sets - 1) / len(results) if len(results) > 1 else 1.0
 
         # Overall Robustness Score: Weighted combination
