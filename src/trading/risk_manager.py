@@ -47,6 +47,7 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
+    votes: Dict[str, int] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -57,6 +58,7 @@ class DailyStats:
     date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
+    consecutive_losses: int = 0
     peak_equity: float = 0.0
 
 
@@ -101,6 +103,12 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_consecutive_losses():
+            rejection_reason = f"Consecutive loss limit hit ({self.daily.consecutive_losses})"
+        elif not self._check_max_daily_trades():
+            rejection_reason = f"Max daily trades hit ({self.daily.trade_count})"
+        elif not self._check_ensemble_consensus(signal):
+            rejection_reason = "Ensemble dissent detected"
 
         passed = rejection_reason == ""
         if not passed:
@@ -155,9 +163,13 @@ class RiskManager:
             self.daily.peak_equity = current_equity
 
     def record_pnl(self, pnl: float) -> None:
-        """Accumulate intraday realised PnL."""
+        """Accumulate intraday realised PnL and track consecutive losses."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+        if pnl < 0:
+            self.daily.consecutive_losses += 1
+        elif pnl > 0:
+            self.daily.consecutive_losses = 0
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -227,6 +239,38 @@ class RiskManager:
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
             return False
+        return True
+
+    def _check_consecutive_losses(self) -> bool:
+        if self.daily.consecutive_losses >= self.cfg.max_consecutive_losses:
+            logger.warning(
+                "Consecutive loss limit hit: %d", self.daily.consecutive_losses
+            )
+            return False
+        return True
+
+    def _check_max_daily_trades(self) -> bool:
+        if self.daily.trade_count >= self.cfg.max_daily_trades:
+            logger.warning("Max daily trades hit: %d", self.daily.trade_count)
+            return False
+        return True
+
+    def _check_ensemble_consensus(self, signal: TradeSignal) -> bool:
+        """Reject if any two models in the ensemble provide direct opposition (BUY vs SELL)."""
+        if self.cfg.ensemble_dissent_allowed:
+            return True
+
+        if not signal.votes:
+            return True
+
+        actions = list(signal.votes.values())
+        has_buy = any(a == 1 for a in actions)
+        has_sell = any(a == -1 for a in actions)
+
+        if has_buy and has_sell:
+            logger.warning("Ensemble DISSENT: detected BUY and SELL votes simultaneously")
+            return False
+
         return True
 
 
