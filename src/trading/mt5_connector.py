@@ -102,7 +102,7 @@ class MT5Connector:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
-        if METAAPI_AVAILABLE and self.cfg.metaapi_token:
+        if METAAPI_AVAILABLE and self.cfg.metaapi_token and self.cfg.metaapi_account_id:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
                 self.metaapi = MetaApi(self.cfg.metaapi_token)
