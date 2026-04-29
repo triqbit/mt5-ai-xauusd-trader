@@ -19,7 +19,7 @@ def test_config_from_env(monkeypatch):
 def test_config_defaults():
     """Test TradingConfig has sensible defaults."""
     os.environ.update({
-        "MT5_LOGIN": "0",
+        "MT5_LOGIN": "12345",
         "MT5_PASSWORD": "test",
         "MT5_SERVER": "test",
     })

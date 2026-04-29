@@ -30,6 +30,7 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.constants import TIMEFRAME_MAP
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -40,16 +41,6 @@ ORDER_TYPE_SELL = 1
 TRADE_ACTION_DEAL = 1
 ORDER_TIME_GTC = 1
 ORDER_FILLING_IOC = 1
-
-TIMEFRAME_MAP: Dict[str, int] = {
-    "M1": 1,
-    "M5": 5,
-    "M15": 15,
-    "M30": 30,
-    "H1": 60,
-    "H4": 240,
-    "D1": 1440,
-}
 
 
 class MT5Connector:

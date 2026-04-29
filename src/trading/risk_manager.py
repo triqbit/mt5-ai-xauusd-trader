@@ -13,41 +13,56 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Dict, Optional
+from datetime import date, datetime, timezone
+from typing import Dict, Literal, Optional
+
+from pydantic import BaseModel, Field, field_validator
 
 from src.core.config import TradingConfig
+from src.core.constants import ALLOCATION_WEIGHTS
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
-# Ray Dalio All-Weather allocation weights
-ALLOCATION_WEIGHTS: Dict[str, float] = {
-    "XAUUSD": 0.18,  # Gold - inflation hedge
-    "USDCHF": 0.15,  # CHF - deflation hedge
-    "GBPUSD": 0.13,  # GBP - growth / balanced
-    "EURUSD": 0.12,  # EUR - growth / balanced
-    "XAGUSD": 0.12,  # Silver - commodity
-    "AUDUSD": 0.15,  # AUD - commodity currency
-    "USDJPY": 0.08,  # JPY - carry trade
-    "EURJPY": 0.07,  # EUR/JPY cross
-}
 
+class TradeSignal(BaseModel):
+    """
+    Validated trading signal passed to order execution.
+    Enforces strict typing and value constraints using Pydantic.
+    """
 
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
+    symbol: str = Field(..., description="Trading symbol (e.g., 'XAUUSD').")
+    direction: Literal[1, -1] = Field(..., description="Trade direction: 1 for BUY, -1 for SELL.")
+    entry_price: float = Field(..., gt=0, description="Target entry price.")
+    stop_loss: float = Field(..., gt=0, description="Stop loss price.")
+    take_profit: float = Field(..., gt=0, description="Take profit price.")
+    lot_size: float = Field(..., gt=0, description="Position size in lots.")
+    algorithm: str = Field(..., description="Algorithm that generated the signal.")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Model confidence (0.0 to 1.0).")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    @field_validator("stop_loss", "take_profit")
+    @classmethod
+    def validate_prices(cls, v: float, info) -> float:
+        """Ensure SL and TP are on the correct side of entry price."""
+        if "entry_price" not in info.data or "direction" not in info.data:
+            return v
+
+        entry = info.data["entry_price"]
+        direction = info.data["direction"]
+
+        if info.field_name == "stop_loss":
+            if direction == 1 and v >= entry:
+                raise ValueError("Stop loss must be below entry price for BUY signals.")
+            if direction == -1 and v <= entry:
+                raise ValueError("Stop loss must be above entry price for SELL signals.")
+        elif info.field_name == "take_profit":
+            if direction == 1 and v <= entry:
+                raise ValueError("Take profit must be above entry price for BUY signals.")
+            if direction == -1 and v >= entry:
+                raise ValueError("Take profit must be below entry price for SELL signals.")
+        return v
 
 
 @dataclass
@@ -171,7 +186,7 @@ class RiskManager:
     # -- Private filter layers ----------------------------------------------
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
+        if drawdown >= self.cfg.circuit_breaker_threshold:
             logger.critical(
                 "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
                 drawdown * 100,
@@ -208,9 +223,8 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float) -> bool:
+        threshold = self.cfg.confidence_threshold
         if confidence < threshold:
             logger.debug(
                 "Confidence %.2f below threshold %.2f", confidence, threshold
@@ -218,7 +232,8 @@ class RiskManager:
             return False
         return True
 
-    def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+    def _check_risk_reward(self, signal: TradeSignal) -> bool:
+        min_rr = self.cfg.min_risk_reward
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         if risk == 0:

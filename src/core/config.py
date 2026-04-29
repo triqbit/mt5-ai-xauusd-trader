@@ -15,11 +15,16 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.core.constants import ALLOCATION_WEIGHTS, TIMEFRAME_MAP
+
 ROOT = Path(__file__).resolve().parents[2]  # repo root
 
 
 class TradingConfig(BaseSettings):
-    """Runtime-configurable trading parameters."""
+    """
+    Enterprise-grade configuration for the MT5 AI Trading Bot.
+    All values can be overridden via environment variables or a .env file.
+    """
 
     model_config = SettingsConfigDict(
         env_file=ROOT / ".env",
@@ -29,43 +34,137 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
-    mt5_login: int = Field(default=0, description="MT5 account number")
-    mt5_password: str = Field(..., description="MT5 account password")
-    mt5_server: str = Field(..., description="Broker server name")
+    mt5_login: int = Field(
+        default=0,
+        gt=0,
+        description="MT5 account number. Must be a positive integer.",
+    )
+    mt5_password: str = Field(..., description="MT5 account password for authentication.")
+    mt5_server: str = Field(..., description="Broker server name (e.g., 'Exness-MT5Trial6').")
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
-        description="Path to MT5 terminal executable (Windows only)",
+        description="Full path to the MT5 terminal executable (Windows only).",
     )
 
     # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
-    metaapi_token: str = Field(default="", description="MetaAPI cloud token")
-    metaapi_account_id: str = Field(default="", description="MetaAPI account ID")
+    metaapi_token: str = Field(
+        default="",
+        description="MetaAPI cloud token for remote/non-Windows deployments.",
+    )
+    metaapi_account_id: str = Field(
+        default="",
+        description="MetaAPI cloud account ID.",
+    )
 
     # ── Trading parameters ─────────────────────────────────────────────────────
-    symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
-    timeframe: str = Field(default="M5", description="Primary chart timeframe")
-    mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    symbol: str = Field(
+        default="XAUUSD",
+        description="The primary trading symbol. Must be in the approved allocation portfolio.",
+    )
+    timeframe: Literal["M1", "M5", "M15", "M30", "H1", "H4", "D1"] = Field(
+        default="M5",
+        description="The chart timeframe for analysis and execution.",
+    )
+    mode: Literal["demo", "live", "backtest"] = Field(
+        default="demo",
+        description="Bot execution mode. 'live' enables real order execution.",
+    )
+    max_positions: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum concurrent open positions allowed.",
+    )
+    risk_per_trade: float = Field(
+        default=0.01,
+        ge=0.001,
+        le=0.05,
+        description="Percentage of equity to risk per trade (0.01 = 1%).",
+    )
+    max_daily_loss: float = Field(
+        default=0.05,
+        ge=0.01,
+        le=0.20,
+        description="Maximum daily drawdown before halting (0.05 = 5%).",
+    )
+
+    # ── Risk Management Thresholds ──────────────────────────────────────────
+    circuit_breaker_threshold: float = Field(
+        default=0.15,
+        ge=0.05,
+        le=0.30,
+        description="Maximum peak-to-valley drawdown before total system halt.",
+    )
+    min_risk_reward: float = Field(
+        default=1.5,
+        ge=1.0,
+        le=5.0,
+        description="Minimum risk-to-reward ratio for trade approval.",
+    )
+    confidence_threshold: float = Field(
+        default=0.55,
+        ge=0.0,
+        le=1.0,
+        description="Minimum model confidence (0-1) required to signal a trade.",
+    )
 
     # ── Model ──────────────────────────────────────────────────────────────────
-    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
-    model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
-    train_steps: int = Field(default=1_000_000, ge=100_000)
-    device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
+    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
+        default="ensemble",
+        description="The AI/ML algorithm used for market prediction.",
+    )
+    model_path: Path = Field(
+        default=ROOT / "models" / "trained" / "ensemble_latest.pt",
+        description="Path to the trained model weights file.",
+    )
+    train_steps: int = Field(
+        default=1_000_000,
+        ge=100_000,
+        description="Total training steps if running in training mode.",
+    )
+    device: Literal["cpu", "cuda", "mps", "auto"] = Field(
+        default="auto",
+        description="Compute device for model inference.",
+    )
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
-    redis_url: str = Field(default="redis://localhost:6379/0")
+    database_url: str = Field(
+        default="postgresql://trader:password@localhost:5432/mt5_trades",
+        description="SQLAlchemy database connection URL for trade logging.",
+    )
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis URL for caching and distributed coordination.",
+    )
 
     # ── Monitoring ──────────────────────────────────────────────────────────
-    prometheus_port: int = Field(default=8000)
-    dashboard_port: int = Field(default=8050)
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
-    telegram_token: str = Field(default="", description="Telegram Bot API token")
-    telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    prometheus_port: int = Field(
+        default=8000,
+        description="Port for Prometheus metrics exporter.",
+    )
+    dashboard_port: int = Field(
+        default=8050,
+        description="Port for the internal Dash/Plotly monitor.",
+    )
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO",
+        description="Logging verbosity level.",
+    )
+    telegram_token: str = Field(
+        default="",
+        description="Telegram Bot API token for remote alerts.",
+    )
+    telegram_chat_id: str = Field(
+        default="",
+        description="Telegram Chat ID to receive signals and status reports.",
+    )
+
+    @field_validator("symbol")
+    @classmethod
+    def symbol_must_be_approved(cls, v: str) -> str:
+        if v not in ALLOCATION_WEIGHTS:
+            raise ValueError(f"Symbol {v} is not in the approved ALLOCATION_WEIGHTS portfolio.")
+        return v
 
     @field_validator("risk_per_trade")
     @classmethod
