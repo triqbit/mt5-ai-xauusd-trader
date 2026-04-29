@@ -15,7 +15,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.core.constants import ALLOCATION_WEIGHTS, TIMEFRAME_MAP
+from src.core.constants import ALLOCATION_WEIGHTS
 
 ROOT = Path(__file__).resolve().parents[2]  # repo root
 
