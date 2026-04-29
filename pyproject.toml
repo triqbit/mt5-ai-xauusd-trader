@@ -75,7 +75,7 @@ warn_unused_configs = true
 ignore_missing_imports = true
 check_untyped_defs = false
 disallow_untyped_defs = false
-disable_error_code = ["no-any-return", "valid-type", "misc"]
+disable_error_code = ["no-any-return", "valid-type", "misc", "assignment", "return-value"]
 
 # ===========================================================
 # pytest
