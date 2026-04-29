@@ -94,7 +94,7 @@ MODE=demo
 ### 3. Execution
 ```bash
 # Run validation and start in demo mode
-python main.py --mode demo --symbol XAUUSD --verbose
+python main.py --mode demo --symbol XAUUSD
 ```
 
 ---
@@ -103,10 +103,10 @@ python main.py --mode demo --symbol XAUUSD --verbose
 
 | Guide | Description |
 | :--- | :--- |
-| [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
-| [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
-| [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
-| [DATABASE_STANDARDS.md](./DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
+| [DEVELOPMENT_PLAN.md](docs/product/DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
+| [ENTERPRISE_STANDARDS.md](docs/quality/ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
+| [DEPLOYMENT_GUIDE.md](docs/runbooks/DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
+| [DATABASE_STANDARDS.md](docs/quality/DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
 
 ---
 
