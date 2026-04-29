@@ -71,7 +71,7 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
-    def initialize(self) -> bool:
+    def connect(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
@@ -116,11 +116,7 @@ class MT5Connector:
         logger.error("All MT5 connection paths failed.")
         return False
 
-    def connect(self) -> bool:
-        """Alias for initialize() to support existing interfaces."""
-        return self.initialize()
-
-    def shutdown(self) -> None:
+    def disconnect(self) -> None:
         """Gracefully close all connections."""
         if self._is_initialized:
             if not self.use_metaapi and MT5_AVAILABLE:
@@ -128,21 +124,17 @@ class MT5Connector:
             logger.info("MT5 connector shutdown complete.")
             self._is_initialized = False
 
-    def disconnect(self) -> None:
-        """Alias for shutdown() to support existing interfaces."""
-        self.shutdown()
-
     @contextmanager
     def session(self):
         """Context manager for safe connection handling."""
         try:
             if not self._is_initialized:
-                self.initialize()
+                self.connect()
             yield self
         finally:
-            self.shutdown()
+            self.disconnect()
 
-    def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
 
@@ -169,12 +161,8 @@ class MT5Connector:
             return df
         else:
             # Placeholder for MetaAPI async rates fetching
-            logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
+            logger.warning("MetaAPI get_ohlcv not implemented in sync wrapper.")
             return pd.DataFrame()
-
-    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        """Alias for get_rates() to match main.py expectations."""
-        return self.get_rates(symbol, timeframe, n_bars)
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """

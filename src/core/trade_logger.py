@@ -24,10 +24,13 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    """Base class for SQLAlchemy models."""
+
+    pass
 logger = logging.getLogger(__name__)
 
 
