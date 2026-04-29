@@ -8,14 +8,12 @@ License: MIT
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import sys
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -94,7 +92,7 @@ class HealthChecker:
                 session.execute(text("SELECT 1"))
             return ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
-            return ComponentStatus(status=HealthStatus.FAILED, message=f"Database unreachable: {str(e)}")
+            return ComponentStatus(status=HealthStatus.FAILED, message=f"Database unreachable: {e!s}")
 
     def check_mt5(self) -> ComponentStatus:
         """Verify MT5 connection."""

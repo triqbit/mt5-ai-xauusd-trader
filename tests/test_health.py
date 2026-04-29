@@ -1,8 +1,10 @@
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
-from src.core.health import HealthChecker, HealthStatus
+
 from src.core.config import TradingConfig
+from src.core.health import ComponentStatus, HealthChecker, HealthStatus
+
 
 @pytest.fixture
 def mock_cfg():
@@ -77,7 +79,8 @@ def test_check_disk_space(mock_disk_usage, checker):
     assert status.status == HealthStatus.HEALTHY
     assert status.details["free_mb"] == 200
 
-from src.core.health import ComponentStatus
+
+
 
 def test_get_full_report(checker):
     checker.check_database = MagicMock(return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="ok"))
