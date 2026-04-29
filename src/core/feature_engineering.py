@@ -9,11 +9,11 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta as ta  # noqa: F401
 from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger(__name__)

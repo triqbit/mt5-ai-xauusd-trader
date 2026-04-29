@@ -9,9 +9,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -19,7 +18,6 @@ import pandas as pd
 from src.core.config import TradingConfig
 from src.core.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
-from src.trading.risk_manager import RiskManager, TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +27,7 @@ class PerformanceReport:
     """
     Standardised performance metrics matching README.md benchmarks.
     """
+
     annualized_return: float = 0.0
     sharpe_ratio: float = 0.0
     max_drawdown: float = 0.0
@@ -53,13 +52,14 @@ class PerformanceReport:
     def __str__(self) -> str:
         d = self.to_dict()
         lines = [f"{k:25}: {v:>10.2f}" for k, v in d.items()]
-        return "\n".join(["Performance Report", "=" * 40] + lines)
+        return "\n".join(["Performance Report", "=" * 40, *lines])
 
 
 class BacktestEngine:
     """
     Institutional-grade backtesting engine.
     """
+
     def __init__(
         self,
         config: TradingConfig,
@@ -120,12 +120,15 @@ class BacktestEngine:
             # Exit logic
             if current_position != 0 and (sig != current_position and sig != 0):
                 exit_price = price - current_position * (self.spread / 2)
-                pnl = (exit_price - entry_price) * current_position * lot_size * self.contract_size - self.commission * lot_size
+                pnl = (
+                    (exit_price - entry_price) * current_position * lot_size * self.contract_size
+                    - self.commission * lot_size
+                )
 
                 # Calculate MAE/MFE using NumPy
                 idx_entry = df.index.get_loc(entry_time)
-                trade_slice_high = highs[idx_entry:i+1]
-                trade_slice_low = lows[idx_entry:i+1]
+                trade_slice_high = highs[idx_entry : i + 1]
+                trade_slice_low = lows[idx_entry : i + 1]
 
                 if current_position == 1:
                     mfe = (np.max(trade_slice_high) - entry_price) * lot_size * self.contract_size
@@ -134,24 +137,29 @@ class BacktestEngine:
                     mfe = (entry_price - np.min(trade_slice_low)) * lot_size * self.contract_size
                     mae = (entry_price - np.max(trade_slice_high)) * lot_size * self.contract_size
 
-                self.trades.append({
-                    "entry_time": entry_time,
-                    "exit_time": times[i],
-                    "direction": current_position,
-                    "entry_price": entry_price,
-                    "exit_price": exit_price,
-                    "pnl": pnl,
-                    "mae": mae,
-                    "mfe": mfe
-                })
+                self.trades.append(
+                    {
+                        "entry_time": entry_time,
+                        "exit_time": times[i],
+                        "direction": current_position,
+                        "entry_price": entry_price,
+                        "exit_price": exit_price,
+                        "pnl": pnl,
+                        "mae": mae,
+                        "mfe": mfe,
+                    }
+                )
                 current_position = 0
 
             # Entry logic
-            if current_position == 0 and sig != 0:
-                if conf >= self.cfg.confidence_threshold:
-                    current_position = sig
-                    entry_price = price + current_position * (self.spread / 2)
-                    entry_time = times[i]
+            if (
+                current_position == 0
+                and sig != 0
+                and conf >= self.cfg.confidence_threshold
+            ):
+                current_position = sig
+                entry_price = price + current_position * (self.spread / 2)
+                entry_time = times[i]
 
         return self._calculate_metrics(df)
 
@@ -165,8 +173,10 @@ class BacktestEngine:
         total_len = len(data)
 
         for start in range(0, total_len - train_window - test_window, test_window):
-            test_data = data.iloc[start+train_window:start+train_window+test_window]
-            logger.info("Running walk-forward window: %s to %s", test_data.index[0], test_data.index[-1])
+            test_data = data.iloc[start + train_window : start + train_window + test_window]
+            logger.info(
+                "Running walk-forward window: %s to %s", test_data.index[0], test_data.index[-1]
+            )
             report = self.run(test_data)
             reports.append(report)
 
@@ -177,7 +187,6 @@ class BacktestEngine:
             return PerformanceReport()
 
         pnls = np.array([t["pnl"] for t in self.trades])
-        total_pnl = np.sum(pnls)
         win_rate = np.sum(pnls > 0) / len(pnls)
 
         gross_profit = np.sum(pnls[pnls > 0])
@@ -191,7 +200,11 @@ class BacktestEngine:
 
         daily_equity = trade_df["pnl"].resample("D").sum().cumsum() + self.initial_balance
         # Forward fill days with no trades to maintain current balance
-        daily_equity = daily_equity.reindex(pd.date_range(df.index[0], df.index[-1], freq="D")).ffill().fillna(self.initial_balance)
+        daily_equity = (
+            daily_equity.reindex(pd.date_range(df.index[0], df.index[-1], freq="D"))
+            .ffill()
+            .fillna(self.initial_balance)
+        )
 
         daily_returns = daily_equity.pct_change().dropna()
         if len(daily_returns) > 1 and daily_returns.std() > 0:
@@ -219,5 +232,5 @@ class BacktestEngine:
             total_trades=len(self.trades),
             win_rate=float(win_rate),
             mae_avg=float(np.mean([t["mae"] for t in self.trades])),
-            mfe_avg=float(np.mean([t["mfe"] for t in self.trades]))
+            mfe_avg=float(np.mean([t["mfe"] for t in self.trades])),
         )
