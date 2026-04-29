@@ -4,4 +4,4 @@ __version__ = "1.0.0"
 __author__ = "triqbit"
 __license__ = "MIT"
 
-__all__ = []
+__all__: list[str] = []

@@ -32,7 +32,8 @@ alembic==1.13.1
 pydantic==2.11.1
 pydantic-settings==2.8.1
 
-# -- Testing -------------------------------------------------------
+# -- Testing & Quality ---------------------------------------------
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot
+mypy==1.10.0

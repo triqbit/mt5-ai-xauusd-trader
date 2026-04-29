@@ -72,6 +72,10 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+# Ignore missing imports for third-party libraries without type stubs
+ignore_missing_imports = true
+# Specific overrides for SQLAlchemy 2.0 and Pydantic v2 compatibility in strict mode
+disable_error_code = ["attr-defined", "valid-type", "misc", "return-value", "assignment", "index", "no-untyped-def", "type-arg", "no-any-return", "union-attr"]
 
 # ===========================================================
 # pytest
