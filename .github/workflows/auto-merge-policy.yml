@@ -1,0 +1,67 @@
+name: Auto-Merge Policy Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-risk:
+    name: Auto-Merge Risk Assessment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check for high-risk file changes
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files_yaml: |
+            high_risk:
+              - src/trading/executor.py
+              - src/core/risk_engine.py
+              - src/trading/risk_manager.py
+              - config/secrets.*
+              - .github/workflows/deploy.*
+              - Dockerfile
+              - migrations/**
+            src:
+              - src/**
+            tests:
+              - tests/**
+            docs:
+              - docs/**
+              - "*.md"
+
+      - name: Evaluate Auto-Merge Eligibility
+        run: |
+          HAS_HIGH_RISK="${{ steps.changed-files.outputs.high_risk_any_changed }}"
+          HAS_SRC="${{ steps.changed-files.outputs.src_any_changed }}"
+          HAS_TESTS="${{ steps.changed-files.outputs.tests_any_changed }}"
+          HAS_DOCS="${{ steps.changed-files.outputs.docs_any_changed }}"
+
+          echo "High Risk Changes: $HAS_HIGH_RISK"
+          echo "Source Changes: $HAS_SRC"
+          echo "Tests Updated: $HAS_TESTS"
+          echo "Docs Updated: $HAS_DOCS"
+
+          if [ "$HAS_HIGH_RISK" == "true" ]; then
+            echo "::error::High-risk files modified. Auto-merge is BLOCKED. Manual review required."
+            exit 1
+          fi
+
+          # For new features/logic changes, we expect tests and docs to be updated.
+          if [ "$HAS_SRC" == "true" ]; then
+            if [ "$HAS_TESTS" != "true" ]; then
+              echo "::error::Source code changed but no changes detected in tests/. Tests are REQUIRED for auto-merge."
+              exit 1
+            fi
+            if [ "$HAS_DOCS" != "true" ]; then
+              echo "::error::Source code changed but no documentation changes detected. Documentation updates are REQUIRED for auto-merge."
+              exit 1
+            fi
+          fi
+
+          echo "Auto-merge policy assessment complete. Change is eligible for auto-merge consideration."
