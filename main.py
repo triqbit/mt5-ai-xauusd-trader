@@ -168,17 +168,30 @@ def run_live(
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
+    p = argparse.ArgumentParser(
+        description="MT5 AI/ML Trading Bot - Enterprise Edition",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p.add_argument(
+        "--mode",
+        choices=["demo", "live", "backtest"],
+        help="Execution mode (overrides MODE env var)",
+    )
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
-        default="ensemble",
+        help="Algorithm to use (overrides ALGORITHM env var)",
     )
-    p.add_argument("--symbol", default="XAUUSD")
-    p.add_argument("--timeframe", default="M5")
+    p.add_argument("--symbol", help="Trading symbol (overrides SYMBOL env var)")
+    p.add_argument("--timeframe", help="Chart timeframe (overrides TIMEFRAME env var)")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip confirmation for live mode",
+    )
     return p.parse_args()
 
 
@@ -186,30 +199,52 @@ def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
     log = logging.getLogger("main")
-    # Override config from CLI
-    os.environ.setdefault("MODE", args.mode)
-    os.environ.setdefault("ALGORITHM", args.algo)
-    os.environ.setdefault("SYMBOL", args.symbol)
-    os.environ.setdefault("TIMEFRAME", args.timeframe)
+
+    # Override config from CLI if provided
+    if args.mode:
+        os.environ["MODE"] = args.mode
+    if args.algo:
+        os.environ["ALGORITHM"] = args.algo
+    if args.symbol:
+        os.environ["SYMBOL"] = args.symbol
+    if args.timeframe:
+        os.environ["TIMEFRAME"] = args.timeframe
+
     cfg = get_config()
-    log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
-    )
+
+    # -- Pre-flight check --------------------------------------------------
+    print("\n" + "=" * 50)
+    print(" 🛠️  MT5 AI TRADER - PRE-FLIGHT CHECK")
+    print("=" * 50)
+    print(f" MODE:      {cfg.mode.upper()}")
+    print(f" ALGO:      {cfg.algorithm}")
+    print(f" SYMBOL:    {cfg.symbol}")
+    print(f" TIMEFRAME: {cfg.timeframe}")
+    print(f" DB:        {cfg.database_url.split('@')[-1] if '@' in cfg.database_url else cfg.database_url}")
+    print(f" RISK:      {cfg.risk_per_trade*100:.1f}% per trade")
+    print("=" * 50 + "\n")
+
+    if cfg.mode == "live" and not args.yes:
+        print(" ⚠️  WARNING: LIVE TRADING MODE ENABLED")
+        print(" Real capital is at risk. MT5 account: " + str(cfg.mt5_login))
+        confirm = input(" Type 'confirm' to proceed: ")
+        if confirm.lower() != "confirm":
+            log.info("Live mode aborted by operator.")
+            return 0
+
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
+
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +254,14 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
