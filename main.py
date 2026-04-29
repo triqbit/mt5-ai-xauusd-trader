@@ -17,15 +17,18 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import structlog
 
 from src.core.config import get_config
+from src.core.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.backtester import BacktestEngine
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -58,6 +61,7 @@ def run_live(
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
+    fe: FeatureEngineer,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -70,7 +74,8 @@ def run_live(
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
             tick = connector.get_tick(cfg.symbol)
             # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+            features_df = fe.extract_features(df)
+            obs = fe.transform(features_df)[-1]
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
@@ -178,6 +183,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--symbol", default="XAUUSD")
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
+    p.add_argument("--start", type=str, default="2023-01-01", help="Backtest start date (YYYY-MM-DD)")
+    p.add_argument("--end", type=str, default="2023-12-31", help="Backtest end date (YYYY-MM-DD)")
     p.add_argument("--log-level", default="INFO")
     return p.parse_args()
 
@@ -199,6 +206,49 @@ def main() -> int:
         cfg.symbol,
     )
     # Initialise components
+    fe = FeatureEngineer()
+    model = EnsembleModel(device="cpu")
+    ppo_path = args.model_dir / "ppo_xauusd.zip"
+    lstm_path = args.model_dir / "lstm_xauusd.pt"
+    if ppo_path.exists():
+        model.load_ppo(ppo_path)
+    if lstm_path.exists():
+        model.load_lstm(lstm_path)
+
+    if cfg.mode == "backtest":
+        log.info("Starting backtest from %s to %s", args.start, args.end)
+        connector = MT5Connector(cfg)
+        if not connector.connect():
+            log.critical("Cannot connect to MT5 for data. Aborting.")
+            return 1
+
+        # Convert start/end to datetime for bar calculation
+        start_dt = datetime.strptime(args.start, "%Y-%m-%d")
+        end_dt = datetime.strptime(args.end, "%Y-%m-%d")
+
+        # Roughly calculate bars needed (M5 = 5 mins)
+        delta = end_dt - start_dt
+        bars_needed = int(delta.total_seconds() / (5 * 60))
+
+        log.info("Fetching %d bars for backtest...", bars_needed)
+        df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=bars_needed)
+
+        if df.empty:
+            log.error("No data fetched for backtest.")
+            return 1
+
+        # Set index to time
+        df.set_index("time", inplace=True)
+
+        # Fit FeatureEngineer on initial data
+        fe.fit(fe.extract_features(df.head(min(len(df), 2000))))
+
+        engine = BacktestEngine(cfg, fe, model)
+        report = engine.run(df)
+        print(report)
+        connector.disconnect()
+        return 0
+
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
@@ -207,22 +257,12 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
-    model = EnsembleModel(device="cpu")
-    ppo_path = args.model_dir / "ppo_xauusd.zip"
-    lstm_path = args.model_dir / "lstm_xauusd.pt"
-    if ppo_path.exists():
-        model.load_ppo(ppo_path)
-    if lstm_path.exists():
-        model.load_lstm(lstm_path)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
-        elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            run_live(cfg, connector, risk, model, fe, trade_logger=trade_logger, monitor=monitor)
     finally:
         connector.disconnect()
     return 0
