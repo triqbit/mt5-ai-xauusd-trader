@@ -1,19 +1,19 @@
 """Research modules for evaluation, optimization, and stress testing."""
 
 from src.research.rl_evaluation import (
-    RLEvaluator,
-    RLPerformanceReport,
+    BuyAndHoldAgent,
     EpisodeMetrics,
     RandomAgent,
-    BuyAndHoldAgent,
+    RLEvaluator,
+    RLPerformanceReport,
     SupervisedOracleAgent,
 )
 
 __all__ = [
+    "BuyAndHoldAgent",
+    "EpisodeMetrics",
     "RLEvaluator",
     "RLPerformanceReport",
-    "EpisodeMetrics",
     "RandomAgent",
-    "BuyAndHoldAgent",
     "SupervisedOracleAgent",
 ]
