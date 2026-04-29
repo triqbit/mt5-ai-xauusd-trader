@@ -1,0 +1,137 @@
+name: Pre-Deployment Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # 1. Quality Gate: Lint, Type Check, and Tests with Coverage
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install ruff mypy pytest pytest-cov
+          pip install -r requirements-ci.txt
+      - name: Ruff Lint
+        run: ruff check src/ main.py
+      - name: Mypy Type Check
+        run: mypy src/ main.py
+      - name: Run Tests with 80% Coverage Threshold
+        run: pytest tests/ --cov=src --cov-fail-under=80
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
+          PYTHONPATH: .
+
+  # 2. Environment Gate: Ensure .env.example is complete
+  environment:
+    name: Environment Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install pydantic pydantic-settings
+      - name: Validate .env.example completeness
+        run: python scripts/validate_env.py
+        env:
+          PYTHONPATH: .
+
+  # 3. Migration Gate: Validate Alembic migrations are reversible
+  migrations:
+    name: Migration Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install alembic sqlalchemy pydantic-settings structlog numpy pandas
+      - name: Test Migration Upgrade/Downgrade
+        run: |
+          export DATABASE_URL="sqlite:///test_migrations.db"
+          alembic upgrade head
+          alembic downgrade base
+        env:
+          PYTHONPATH: .
+
+  # 4. Security Gate: Scan for hardcoded secrets
+  security:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 5. Artifact Gate: Build Docker image and pass vulnerability scan
+  artifact:
+    name: Artifact Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build Docker Image
+        run: docker build -t mt5-ai-trader:test .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: 'mt5-ai-trader:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  # 6. Release Gate: Validate release notes and versioning
+  release:
+    name: Release Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check if CHANGELOG.md exists and is non-empty
+        run: |
+          if [ ! -s CHANGELOG.md ]; then
+            echo "Error: CHANGELOG.md is missing or empty."
+            exit 1
+          fi
+      - name: Validate version consistency
+        run: |
+          PYPROJECT_VERSION=$(grep -m 1 "version =" pyproject.toml | cut -d '"' -f 2)
+          CHANGELOG_VERSION=$(grep -m 1 "## \[" CHANGELOG.md | cut -d '[' -f 2 | cut -d ']' -f 1)
+          if [ "$PYPROJECT_VERSION" != "$CHANGELOG_VERSION" ]; then
+            echo "Error: Version mismatch! pyproject.toml: $PYPROJECT_VERSION, CHANGELOG.md: $CHANGELOG_VERSION"
+            exit 1
+          fi
+
+  # Final Deployment Approval Job
+  validate-deployment:
+    name: Deployment Validation Complete
+    runs-on: ubuntu-latest
+    needs: [quality, environment, migrations, security, artifact, release]
+    steps:
+      - name: Success
+        run: echo "All deployment validation gates passed successfully."
