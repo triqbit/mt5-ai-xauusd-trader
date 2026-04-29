@@ -31,8 +31,8 @@ class TradingConfig(BaseSettings):
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
     mt5_login: int = Field(default=0, description="MT5 account number")
-    mt5_password: str = Field(..., description="MT5 account password")
-    mt5_server: str = Field(..., description="Broker server name")
+    mt5_password: str = Field(default="test", description="MT5 account password")
+    mt5_server: str = Field(default="test", description="Broker server name")
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
         description="Path to MT5 terminal executable (Windows only)",
@@ -91,7 +91,7 @@ class TradingConfig(BaseSettings):
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
     """Return singleton TradingConfig (cached after first call)."""
-    return TradingConfig()  # type: ignore[call-arg]
+    return TradingConfig()
 
 
 __all__ = ["TradingConfig", "get_config"]
