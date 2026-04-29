@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 
 
 class TradingEnv(gym.Env):
@@ -19,23 +20,37 @@ class TradingEnv(gym.Env):
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
+
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
-                 window_size: int = 60, commission: float = 0.0002):
+    def __init__(
+        self,
+        data: np.ndarray,
+        initial_balance: float = 10000.0,
+        window_size: int = 60,
+        commission: float = 0.0002,
+    ):
         super().__init__()
-        self.data = data
+        # Pre-cast to float32 for faster arithmetic
+        self.data = data.astype(np.float32)
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
 
         n_features = data.shape[1]
 
+        # Optimization: Pre-calculate rolling mean and std to avoid redundant window-wise computations
+        # Using ddof=0 to match original numpy.std() default
+        df = pd.DataFrame(self.data)
+        self._rolling_means = df.rolling(window=window_size).mean().values.astype(np.float32)
+        self._rolling_stds = df.rolling(window=window_size).std(ddof=0).values.astype(np.float32)
+
+        # Pre-allocate observation buffer to minimize memory allocations during step()
+        self._obs_buffer = np.zeros(window_size * n_features + 2, dtype=np.float32)
+
         # Observation: window of market data + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
-            shape=(window_size * n_features + 2,),
-            dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(window_size * n_features + 2,), dtype=np.float32
         )
 
         # Actions: 0=Hold, 1=Buy, 2=Sell
@@ -43,7 +58,9 @@ class TradingEnv(gym.Env):
 
         self.reset()
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[Dict] = None
+    ) -> Tuple[np.ndarray, Dict]:
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -78,19 +95,28 @@ class TradingEnv(gym.Env):
         terminated = self.balance <= 0 or self.current_step >= len(self.data) - 1
         truncated = False
 
-        info = {
-            "balance": self.balance,
-            "position": self.position,
-            "total_pnl": self.total_pnl
-        }
+        info = {"balance": self.balance, "position": self.position, "total_pnl": self.total_pnl}
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
-        window = self.data[self.current_step - self.window_size:self.current_step]
-        # Normalize window
-        obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
-        portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
-        return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
+        # Optimization: Use pre-calculated rolling statistics indexed by current_step - 1
+        idx = self.current_step - 1
+        mean = self._rolling_means[idx]
+        std = self._rolling_stds[idx]
+
+        window = self.data[self.current_step - self.window_size : self.current_step]
+
+        # Vectorized normalization
+        normalized_window = (window - mean) / (std + 1e-8)
+
+        # Update pre-allocated buffer instead of concatenating
+        self._obs_buffer[:-2] = normalized_window.ravel()
+        self._obs_buffer[-2] = self.balance / self.initial_balance
+        self._obs_buffer[-1] = self.position
+
+        return self._obs_buffer.copy()
 
     def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+        print(
+            f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}"
+        )
