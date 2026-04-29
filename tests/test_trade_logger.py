@@ -62,3 +62,23 @@ def test_log_risk_event(logger):
         from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
+
+def test_soft_delete(logger):
+    # Log a trade
+    ticket = 555
+    logger.log_trade(ticket, "XAUUSD", 1, 2000.0, 0.1)
+
+    # Verify it exists
+    trade = logger.get_trade_by_ticket(ticket)
+    assert trade is not None
+
+    # Soft delete it manually (since there is no soft_delete method yet)
+    with logger.Session() as session:
+        with session.begin():
+            from src.core.trade_logger import Trade
+            trade_db = session.query(Trade).filter_by(ticket=ticket).first()
+            trade_db.is_deleted = True
+
+    # Verify it is no longer returned by get_trade_by_ticket
+    trade_deleted = logger.get_trade_by_ticket(ticket)
+    assert trade_deleted is None

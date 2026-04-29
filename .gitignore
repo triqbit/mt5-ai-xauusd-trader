@@ -89,3 +89,8 @@ htmlcov/
 *.tfstate
 *.tfstate.backup
 .terraform/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
