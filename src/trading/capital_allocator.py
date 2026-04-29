@@ -7,8 +7,9 @@ Institutional-grade capital management and adaptive budgeting.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Dict, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
