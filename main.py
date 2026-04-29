@@ -111,6 +111,7 @@ def run_live(
                 lot_size=lot_size,
                 algorithm=cfg.algorithm,
                 confidence=confidence,
+                votes=_per_algo,
             )
             # 5. Risk approval gate
             if risk.approve(signal, signal_id=signal_id):
@@ -142,11 +143,23 @@ def run_live(
                         if trade_info:
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
                             exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
-                            # P&L will be calculated automatically by update_trade
+                            # P&L calculation
+                            contract_size = 100
+                            pnl = (
+                                (exit_price - trade_info.entry_price)
+                                * trade_info.direction
+                                * trade_info.lot_size
+                                * contract_size
+                            )
+
+                            # P&L will be calculated automatically by update_trade if not provided
                             trade_logger.update_trade(
                                 ticket=ticket,
                                 exit_price=exit_price,
+                                pnl=pnl,
                             )
+                            # Update risk manager counters
+                            risk.record_pnl(pnl)
                     closed_tickets.append(symbol)
 
             for sym in closed_tickets:
