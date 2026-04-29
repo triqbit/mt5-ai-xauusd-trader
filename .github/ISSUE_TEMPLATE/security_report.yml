@@ -1,0 +1,35 @@
+name: 🛡️ Security Report
+description: Report a security vulnerability (will be handled confidentially)
+labels: ["security", "critical"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **WARNING:** Do not disclose sensitive vulnerability details in public issues.
+        If this is a critical zero-day, please follow our coordinated disclosure policy.
+  - type: textarea
+    id: vulnerability
+    attributes:
+      label: Vulnerability Description
+      description: What is the nature of the security risk?
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Potential Impact
+      description: What could an attacker achieve by exploiting this?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction (if safe)
+      description: Steps to demonstrate the issue.
+  - type: checkboxes
+    id: checkboxes
+    attributes:
+      label: Privacy
+      options:
+        - label: I understand this will be triaged by the security maintainers.
+          required: true

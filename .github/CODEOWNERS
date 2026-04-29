@@ -1,0 +1,14 @@
+# GitHub CODEOWNERS File
+# See https://help.github.com/articles/about-code-owners/ for more info.
+
+# Global ownership - Jules03 as primary guardian of shippability
+* @andonly1348
+
+# Module-level ownership
+/src/core/       @andonly1348
+/src/trading/    @maintainer-trading
+/src/models/     @maintainer-models
+/tests/          @maintainer-quality
+/migrations/     @andonly1348
+/.github/        @andonly1348
+/docs/           @andonly1348

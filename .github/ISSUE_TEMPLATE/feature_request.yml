@@ -1,0 +1,32 @@
+name: ✨ Feature Request
+description: Propose a new feature or improvement for the bot
+labels: ["enhancement", "proposal"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A clear and concise description of the proposed feature.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / Use Case
+      description: Why is this feature needed? What problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Proposed Implementation (Optional)
+      description: If you have ideas on how to implement this, please share them.
+  - type: checkboxes
+    id: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: This is a new feature, not a bug fix.
+          required: true
+        - label: I have considered the performance and risk management impact.
+          required: true
