@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
 
+from src.core.audit_log import AuditLogger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -72,6 +73,7 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        audit_logger: Optional[AuditLogger] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
@@ -80,6 +82,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.audit_logger = audit_logger
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
@@ -88,21 +91,24 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        filter_results = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
 
-        passed = rejection_reason == ""
+        passed = all(filter_results.values())
+        rejection_reason = ""
+        if not passed:
+            # Find the first failing filter for the reason
+            for filter_name, result in filter_results.items():
+                if not result:
+                    rejection_reason = f"Filter failed: {filter_name}"
+                    break
+
         if not passed:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
@@ -117,6 +123,20 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+            if self.audit_logger:
+                self.audit_logger.log_trade_blocked(
+                    symbol=signal.symbol,
+                    reason=rejection_reason,
+                    filter_results=filter_results,
+                )
+        else:
+            if self.audit_logger:
+                self.audit_logger.log_risk_decision(
+                    symbol=signal.symbol,
+                    passed=True,
+                    chain=filter_results,
+                )
+
         return passed
 
     def size_position(

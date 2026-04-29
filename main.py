@@ -22,6 +22,7 @@ from typing import Optional
 
 import structlog
 
+from src.core.audit_log import AuditLogger
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -60,6 +61,7 @@ def run_live(
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
@@ -72,8 +74,16 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+            if audit_logger:
+                audit_logger.log_model_prediction(
+                    symbol=cfg.symbol,
+                    outcome=direction,
+                    confidence=confidence,
+                    votes=per_algo,
+                )
 
             signal_id = None
             if trade_logger:
@@ -158,9 +168,13 @@ def run_live(
             monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
+            if audit_logger:
+                audit_logger.log_operator_action("MANUAL_SHUTDOWN", "User interrupted the process")
             break
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
+            if audit_logger:
+                audit_logger.log_operator_action("EMERGENCY_HALT", f"Unhandled error: {exc!s}")
             time.sleep(poll_interval)
 
 
@@ -198,18 +212,32 @@ def main() -> int:
         cfg.algorithm,
         cfg.symbol,
     )
+
+    db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
     balance = connector.get_account_balance()
-    trade_logger = TradeLogger(
-        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
-    )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
+
+    trade_logger = TradeLogger(db_url=db_url)
+    audit_logger = AuditLogger(db_url=db_url)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+
+    # Log deployment and config snapshot
+    audit_logger.log_deployment(
+        version="1.0.0", environment=cfg.mode, config_snapshot=cfg.model_dump()
+    )
+
+    risk = RiskManager(
+        cfg,
+        account_balance=balance,
+        logger_db=trade_logger,
+        monitor=monitor,
+        audit_logger=audit_logger,
+    )
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +247,15 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+                audit_logger=audit_logger,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:

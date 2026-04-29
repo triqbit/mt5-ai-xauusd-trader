@@ -14,7 +14,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
-    Boolean,
     Column,
     DateTime,
     Float,
@@ -24,24 +23,11 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-Base = declarative_base()
+from src.core.database import AuditMixin, Base
+
 logger = logging.getLogger(__name__)
-
-
-class AuditMixin:
-    """Audit columns as per DATABASE_STANDARDS.md."""
-
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False,
-    )
-    is_deleted = Column(Boolean, default=False)
 
 
 class ModelSignal(Base, AuditMixin):
