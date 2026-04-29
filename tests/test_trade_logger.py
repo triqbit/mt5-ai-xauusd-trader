@@ -30,7 +30,8 @@ def test_log_trade(logger):
     signal_id = logger.log_signal({
         "symbol": "XAUUSD",
         "direction": 1,
-        "entry_price": 2000.0
+        "entry_price": 2000.0,
+        "lot_size": 0.1
     })
     trade_id = logger.log_trade(
         ticket=12345,
@@ -38,22 +39,62 @@ def test_log_trade(logger):
         direction=1,
         entry_price=2000.0,
         lot_size=0.1,
-        signal_id=signal_id
+        signal_id=signal_id,
+        signal_source="ensemble"
     )
     assert trade_id > 0
+    trade = logger.get_trade_by_ticket(12345)
+    assert trade.signal_source == "ensemble"
+    assert trade.entry_time is not None
+
+def test_log_rejected_trade(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0,
+        "lot_size": 0.1
+    })
+    trade_id = logger.log_trade(
+        ticket=None,
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000.0,
+        lot_size=0.1,
+        signal_id=signal_id,
+        status="REJECTED"
+    )
+    assert trade_id > 0
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade
+        trade = session.query(Trade).get(trade_id)
+        assert trade.status == "REJECTED"
+        assert trade.ticket is None
 
 def test_performance_report(logger):
     # Log some closed trades
     logger.log_trade(1, "XAUUSD", 1, 2000.0, 0.1, status="OPEN")
-    logger.update_trade(1, 2010.0, 100.0)
+    logger.update_trade(1, 2010.0, pnl=100.0)
 
     logger.log_trade(2, "XAUUSD", -1, 2000.0, 0.1, status="OPEN")
-    logger.update_trade(2, 2005.0, -50.0)
+    logger.update_trade(2, 2005.0, pnl=-50.0)
 
     report = logger.read_performance_report()
     assert report["profit_factor"] == 2.0
     assert report["sharpe_ratio"] != 0
     assert report["max_drawdown"] == 50.0
+
+def test_performance_report_robustness(logger):
+    # Empty case
+    report = logger.read_performance_report()
+    assert report["profit_factor"] == 0.0
+    assert report["sharpe_ratio"] == 0.0
+    assert report["max_drawdown"] == 0.0
+
+    # Only profits
+    logger.log_trade(3, "XAUUSD", 1, 2000.0, 0.1, status="OPEN")
+    logger.update_trade(3, 2010.0, pnl=100.0)
+    report = logger.read_performance_report()
+    assert report["profit_factor"] == float("inf")
 
 def test_log_risk_event(logger):
     logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")
