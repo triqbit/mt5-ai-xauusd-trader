@@ -59,8 +59,22 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+      - name: Install TA-Lib C library
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
       - name: Install dependencies
-        run: pip install pydantic pydantic-settings
+        run: |
+          pip install -r requirements-ci.txt
       - name: Validate .env.example completeness
         run: python scripts/validate_env.py
         env:
@@ -77,9 +91,22 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+      - name: Install TA-Lib C library
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
       - name: Install dependencies
         run: |
-          pip install alembic sqlalchemy pydantic-settings structlog numpy pandas
+          pip install -r requirements-ci.txt
       - name: Test Migration Upgrade/Downgrade
         run: |
           export DATABASE_URL="sqlite:///test_migrations.db"
@@ -110,7 +137,7 @@ jobs:
       - name: Build Docker Image
         run: docker build -t mt5-ai-trader:test .
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@v0.24.0
         with:
           image-ref: 'mt5-ai-trader:test'
           format: 'table'
