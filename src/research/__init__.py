@@ -10,12 +10,12 @@ from src.research.reporting import (
 )
 
 __all__ = [
-    "ResearchReport",
-    "RegimeStats",
-    "StressTestResult",
-    "HyperparamRobustness",
-    "TradePattern",
-    "ModelDrift",
     "AllocationInsight",
     "BenchmarkComp",
+    "HyperparamRobustness",
+    "ModelDrift",
+    "RegimeStats",
+    "ResearchReport",
+    "StressTestResult",
+    "TradePattern",
 ]

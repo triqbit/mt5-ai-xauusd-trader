@@ -7,9 +7,8 @@ License: MIT
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, List
 
 from pydantic import BaseModel, Field
 
@@ -92,7 +91,7 @@ class ResearchReport(BaseModel):
             if not rows:
                 return "_No data available for this section._"
             divider = "| " + " | ".join(["---"] * (header.count("|") - 1)) + " |"
-            return "\n".join([header, divider] + rows)
+            return "\n".join([header, divider, *rows])
 
         regime_rows = [
             templates.REGIME_TABLE_ROW.format(**r.model_dump()) for r in self.regimes
