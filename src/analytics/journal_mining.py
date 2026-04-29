@@ -9,9 +9,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, time, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import List
 
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
@@ -160,11 +159,9 @@ class JournalMiner:
                     cond = VolatilityCondition.HIGH
 
                 # False positive: Signal rejected (no trade) or resulting in a loss
-                is_false_positive = False
-                if not s.trade:
-                    is_false_positive = True
-                elif s.trade.status == "CLOSED" and (s.trade.pnl or 0.0) <= 0:
-                    is_false_positive = True
+                is_false_positive = not s.trade or (
+                    s.trade.status == "CLOSED" and (s.trade.pnl or 0.0) <= 0
+                )
 
                 data.append(
                     {
