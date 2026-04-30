@@ -1,39 +1,51 @@
-# Acceptance Criteria: Hardened Risk Management
+# Acceptance Criteria: Risk Management Engine
 
 ## Functional Acceptance Criteria
-- **Behavior:** Enforce strict risk limits including max positions, risk per trade, and daily drawdown circuit breakers.
+- **Behavior:**
+  - Must implement a 6-layer filter cascade (Circuit Breaker, Daily Loss, Max Positions, Symbol Allocation, Minimum Confidence, Risk-Reward Ratio).
+  - Must calculate position sizing using Fractional Kelly Criterion (capped at 25% Kelly and 2% account risk).
+  - Must support Ray Dalio All-Weather portfolio allocation weights.
+  - Must automatically halt trading if peak-to-valley drawdown exceeds 15%.
 - **Edge Cases:**
-    - Handle scenarios where the account balance cannot be retrieved (fail-safe: lock trading).
-    - Handle multi-position risk correlation (e.g., gold vs. silver).
-    - Correctly calculate lot size for fractional accounts.
+  - Handle cases where account balance or equity drops to zero.
+  - Handle symbols not present in the `ALLOCATION_WEIGHTS` map.
+  - Handle extreme market volatility where ATR-based stops might be excessively large.
 - **Inputs/Outputs:**
-    - **Inputs:** `TradeSignal`, current account balance, open positions.
-    - **Outputs:** `RiskApproval` (Boolean), calculated lot size, reason for rejection.
+  - Input: `TradeSignal` object containing symbol, direction, entry, SL, TP, confidence.
+  - Output: Boolean `approve()` result and calculated `lot_size`.
 
 ## Technical Acceptance
 - **Test Coverage:**
-    - Property-based testing for position sizing logic (e.g., using Hypothesis).
-    - Unit tests for all circuit breaker scenarios (100% coverage).
+  - Unit tests for `RiskManager` covering all 6 filter layers individually.
+  - Unit tests for Kelly Criterion calculation with various win/loss ratios.
+  - Integration tests verifying `RiskManager` interaction with `TradeLogger` for rejection events.
 - **Performance:**
-    - Risk approval latency < 10ms.
+  - Approval logic must execute in < 5ms to minimize total execution latency.
 - **Error Handling:**
-    - Any error in risk calculation must result in a "REJECT" signal for safety.
-- **Observability:**
-    - Log every risk rejection with the specific rule violated (e.g., "Daily loss limit reached").
+  - Log specific rejection reasons for every failed signal.
+  - Gracefully handle missing `Monitor` or `TradeLogger` instances (optional dependencies).
+- **Logging/Observability:**
+  - Critical alerts for Circuit Breaker activation.
+  - Structured logs for every signal approval/rejection.
 
 ## Operational Acceptance
 - **Documentation:**
-    - Maintain `RISK_LIMITS.md` with current production parameters.
-    - Provide a runbook for emergency manual override of the risk manager.
+  - Documented risk parameters in `RISK_LIMITS.md`.
+  - Runbook for recovering from a Circuit Breaker halt.
 - **Configuration:**
-    - All risk limits must be defined in Pydantic settings with strict validation ranges.
+  - Configurable via `TradingConfig` (Pydantic): `risk_per_trade`, `max_daily_loss`, `max_positions`.
 - **Rollback:**
-    - Changes to risk logic must be reversible via git revert without affecting other modules.
+  - Ability to reset daily stats manually if needed via CLI/API.
 - **Monitoring:**
-    - Alert immediately on any "Risk Reject" event in a live account.
+  - Prometheus metrics for daily PnL and current drawdown.
+  - Telegram alerts for daily loss limit hits.
 
 ## Release Readiness
-- **Deployment:** Must be bundled with the core trading engine.
-- **Backward Compatibility:** Risk settings should be versioned to avoid misconfiguration after upgrades.
-- **Migration:** Existing risk parameters must be validated against new schema constraints.
-- **Sign-off:** Mandatory sign-off from the Risk Officer.
+- **Deployment:**
+  - Can be deployed as part of the core trading engine.
+- **Backward Compatibility:**
+  - Must support existing `TradingConfig` schema.
+- **Migration:**
+  - No database migrations required for the engine itself, but `TradeLogger` must support risk event logging.
+- **Stakeholder Sign-off:**
+  - Requires sign-off from Head of Risk and Lead Quant Researcher.

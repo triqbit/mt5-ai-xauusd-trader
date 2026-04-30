@@ -71,7 +71,7 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
-    def initialize(self) -> bool:
+    def connect(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
@@ -116,9 +116,9 @@ class MT5Connector:
         logger.error("All MT5 connection paths failed.")
         return False
 
-    def connect(self) -> bool:
-        """Alias for initialize() to support existing interfaces."""
-        return self.initialize()
+    def initialize(self) -> bool:
+        """Deprecated alias for connect()."""
+        return self.connect()
 
     def shutdown(self) -> None:
         """Gracefully close all connections."""
@@ -142,7 +142,7 @@ class MT5Connector:
         finally:
             self.shutdown()
 
-    def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
 
@@ -172,9 +172,9 @@ class MT5Connector:
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
             return pd.DataFrame()
 
-    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        """Alias for get_rates() to match main.py expectations."""
-        return self.get_rates(symbol, timeframe, n_bars)
+    def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+        """Deprecated alias for get_ohlcv()."""
+        return self.get_ohlcv(symbol, timeframe, n_bars)
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
