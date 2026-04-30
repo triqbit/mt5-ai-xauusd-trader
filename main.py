@@ -23,7 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
-from src.core.exceptions import MT5ConnectionError, MarketDataError, TradingBotError
+from src.core.exceptions import MarketDataError, MT5ConnectionError, TradingBotError
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel

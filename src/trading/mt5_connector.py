@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from src.core.exceptions import MT5ConnectionError, MarketDataError, OrderExecutionError
+from src.core.exceptions import MarketDataError, MT5ConnectionError, OrderExecutionError
 
 try:
     import MetaTrader5 as mt5
