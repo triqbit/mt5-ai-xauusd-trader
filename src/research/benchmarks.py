@@ -6,10 +6,11 @@ Benchmarking framework to compare advanced models against baseline strategies.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Protocol, Tuple, Union, Any
+from typing import Any, Dict, List, Protocol
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 
 class BenchmarkStrategy(Protocol):
@@ -140,7 +141,7 @@ class BenchmarkEvaluator:
         self.df = df
         self.initial_balance = initial_balance
         self.commission = commission
-        self.results: Dict[str, Dict[str, Any]] = {}
+        self.results: Dict[str, Any] = {}
 
     def evaluate_all(self, strategies: List[BenchmarkStrategy]) -> pd.DataFrame:
         """Run evaluation for all provided strategies."""
@@ -165,10 +166,10 @@ class BenchmarkEvaluator:
         entry_price = 0.0
 
         for i in range(1, n):
-            current_sig = signals[i-1]
+            current_sig = signals[i - 1]
             current_price = close[i]
-            prev_price = close[i-1]
-            current_equity = equity[i-1]
+            prev_price = close[i - 1]
+            current_equity = equity[i - 1]
 
             # Handle position transitions
             if current_sig == 1 and position == 0:  # Enter Long
@@ -185,9 +186,6 @@ class BenchmarkEvaluator:
                 pnl = entry_price - (current_price * (1 + self.commission))
                 trade_pnls.append(pnl)
                 position = 0
-            elif (current_sig == -1 and position == 1) or (current_sig == 1 and position == -1):
-                # Reverse position (not explicitly handled in simple logic, so we close first)
-                pass # Already handled by close logic above if we assumed signals are stateful
 
             # Calculate daily change in equity
             if position == 1:
@@ -199,7 +197,7 @@ class BenchmarkEvaluator:
             else:
                 equity[i] = current_equity
 
-            daily_returns[i] = (equity[i] - equity[i-1]) / equity[i-1]
+            daily_returns[i] = (equity[i] - equity[i - 1]) / equity[i - 1]
 
         # Final aggregate metrics
         total_return = (equity[-1] - self.initial_balance) / self.initial_balance
@@ -225,7 +223,7 @@ class BenchmarkEvaluator:
             "Sharpe Ratio": sharpe,
             "Max Drawdown": max_drawdown,
             "Win Rate": win_rate,
-            "Num Trades": len(trade_pnls)
+            "Num Trades": len(trade_pnls),
         }
 
     def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> Dict[str, Any]:
@@ -238,8 +236,6 @@ class BenchmarkEvaluator:
 
         s_returns = self.results.get(strategy_name + "_returns", np.array([]))
         b_returns = self.results.get(baseline_name + "_returns", np.array([]))
-
-        from scipy import stats
 
         # Welch's t-test on return distributions
         t_stat, p_value = stats.ttest_ind(s_returns, b_returns, equal_var=False)
@@ -254,7 +250,7 @@ class BenchmarkEvaluator:
             "Relative Return": outperformance / (abs(b_metrics["Total Return"]) + 1e-9),
             "T-Statistic": float(t_stat),
             "P-Value": float(p_value),
-            "Significant": bool(p_value < 0.05) if not np.isnan(p_value) else False
+            "Significant": bool(p_value < 0.05) if not np.isnan(p_value) else False,
         }
 
 
@@ -329,6 +325,7 @@ class TransformerAdapter:
         This adapter handles a single sequence or a batch of sequences.
         """
         import torch
+
         self.model.eval()
         signals = np.zeros(len(df))
 
@@ -346,7 +343,7 @@ class TransformerAdapter:
             # Simple case: treat the whole DF as one sequence for a single prediction at the end
             # or treat as a batch of independent rows (less likely for transformer).
             # For this adapter, we provide a basic pass-through.
-            data = data.unsqueeze(0) # [1, n_steps, features]
+            data = data.unsqueeze(0)  # [1, n_steps, features]
 
         with torch.no_grad():
             probs = self.model(data)
