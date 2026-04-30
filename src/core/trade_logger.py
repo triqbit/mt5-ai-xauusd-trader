@@ -58,6 +58,7 @@ class ModelSignal(Base, AuditMixin):
     lot_size = Column(Float)
     algorithm = Column(String(50))
     confidence = Column(Float)
+    volatility = Column(Float)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
@@ -131,6 +132,7 @@ class TradeLogger:
                 lot_size=signal_data.get("lot_size"),
                 algorithm=signal_data.get("algorithm"),
                 confidence=signal_data.get("confidence"),
+                volatility=signal_data.get("volatility"),
                 timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
             )
             session.add(signal)
