@@ -1,8 +1,8 @@
-"""Initial migration
+"""initial schema
 
-Revision ID: c1b7f28e5748
+Revision ID: cac12fb82a01
 Revises:
-Create Date: 2026-04-20 12:37:01.704588
+Create Date: 2026-04-30 13:16:05.043904
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'c1b7f28e5748'
+revision: str = 'cac12fb82a01'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -33,7 +33,12 @@ def upgrade() -> None:
     sa.Column('timestamp', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
+    sa.CheckConstraint('direction IN (-1, 0, 1)', name='check_signal_direction_valid'),
+    sa.CheckConstraint('entry_price > 0', name='check_signal_entry_price_positive'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('performance_metrics',
@@ -46,6 +51,9 @@ def upgrade() -> None:
     sa.Column('win_rate', sa.Float(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -57,6 +65,9 @@ def upgrade() -> None:
     sa.Column('signal_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
     sa.ForeignKeyConstraint(['signal_id'], ['model_signals.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -68,14 +79,23 @@ def upgrade() -> None:
     sa.Column('direction', sa.Integer(), nullable=False),
     sa.Column('entry_price', sa.Float(), nullable=False),
     sa.Column('exit_price', sa.Float(), nullable=True),
+    sa.Column('entry_time', sa.DateTime(), nullable=True),
+    sa.Column('exit_time', sa.DateTime(), nullable=True),
     sa.Column('lot_size', sa.Float(), nullable=False),
     sa.Column('pnl', sa.Float(), nullable=True),
     sa.Column('drawdown_impact', sa.Float(), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=True),
+    sa.Column('signal_source', sa.String(length=50), nullable=True),
     sa.Column('signal_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('updated_at', sa.DateTime(), nullable=False),
+    sa.Column('created_by', sa.String(length=100), nullable=True),
+    sa.Column('updated_by', sa.String(length=100), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(), nullable=True),
     sa.Column('is_deleted', sa.Boolean(), nullable=True),
+    sa.CheckConstraint('direction IN (-1, 1)', name='check_trade_direction_valid'),
+    sa.CheckConstraint('entry_price > 0', name='check_trade_entry_price_positive'),
+    sa.CheckConstraint('lot_size > 0', name='check_trade_lot_size_positive'),
     sa.ForeignKeyConstraint(['signal_id'], ['model_signals.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

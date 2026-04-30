@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -24,7 +25,7 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 Base = declarative_base()
@@ -41,6 +42,9 @@ class AuditMixin:
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    created_by = Column(String(100))
+    updated_by = Column(String(100))
+    deleted_at = Column(DateTime)
     is_deleted = Column(Boolean, default=False)
 
 
@@ -60,28 +64,42 @@ class ModelSignal(Base, AuditMixin):
     confidence = Column(Float)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_signal_entry_price_positive"),
+        CheckConstraint("direction IN (-1, 0, 1)", name="check_signal_direction_valid"),
+    )
+
     # Relationship
     trade = relationship("Trade", back_populates="signal", uselist=False)
 
 
 class Trade(Base, AuditMixin):
-    """Logs every executed trade."""
+    """Logs every executed or rejected trade."""
 
     __tablename__ = "trades"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    ticket = Column(Integer, unique=True, index=True)
+    ticket = Column(Integer, unique=True, index=True, nullable=True)  # Nullable for rejected trades
     symbol = Column(String(20), nullable=False)
     direction = Column(Integer, nullable=False)
     entry_price = Column(Float, nullable=False)
     exit_price = Column(Float)
+    entry_time = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    exit_time = Column(DateTime)
     lot_size = Column(Float, nullable=False)
     pnl = Column(Float, default=0.0)
     drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
+    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED, REJECTED
+    signal_source = Column(String(50))  # Algorithm or source name
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
+
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_trade_entry_price_positive"),
+        CheckConstraint("lot_size > 0", name="check_trade_lot_size_positive"),
+        CheckConstraint("direction IN (-1, 1)", name="check_trade_direction_valid"),
+    )
 
 
 class RiskEvent(Base, AuditMixin):
@@ -116,6 +134,8 @@ class TradeLogger:
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
         self.engine = create_engine(db_url)
+        # In production, migrations are preferred over metadata.create_all
+        # but kept for simple local/test initialization.
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
@@ -139,15 +159,17 @@ class TradeLogger:
 
     def log_trade(
         self,
-        ticket: int,
+        ticket: Optional[int],
         symbol: str,
         direction: int,
         entry_price: float,
         lot_size: float,
         signal_id: Optional[int] = None,
         status: str = "OPEN",
+        signal_source: Optional[str] = None,
+        entry_time: Optional[datetime] = None,
     ) -> int:
-        """Log a trade execution."""
+        """Log a trade execution or rejection."""
         with self.Session() as session:
             trade = Trade(
                 ticket=ticket,
@@ -157,6 +179,8 @@ class TradeLogger:
                 lot_size=lot_size,
                 signal_id=signal_id,
                 status=status,
+                signal_source=signal_source,
+                entry_time=entry_time or datetime.now(timezone.utc),
             )
             session.add(trade)
             session.commit()
@@ -166,14 +190,16 @@ class TradeLogger:
         self,
         ticket: int,
         exit_price: float,
+        exit_time: Optional[datetime] = None,
         pnl: Optional[float] = None,
         drawdown_impact: float = 0.0,
-    ) -> None:
+    ) -> Optional[Trade]:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session() as session:
             trade = session.query(Trade).filter(Trade.ticket == ticket).first()
             if trade:
                 trade.exit_price = exit_price
+                trade.exit_time = exit_time or datetime.now(timezone.utc)
                 if pnl is not None:
                     trade.pnl = pnl
                 else:
@@ -189,13 +215,20 @@ class TradeLogger:
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
                 session.commit()
+                session.refresh(trade)
+                session.expunge(trade)
+                return trade
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
+                return None
 
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
-            return session.query(Trade).filter(Trade.ticket == ticket).first()
+            trade = session.query(Trade).filter(Trade.ticket == ticket).first()
+            if trade:
+                session.expunge(trade)
+            return trade
 
     def log_risk_event(
         self,
@@ -240,6 +273,8 @@ class TradeLogger:
             if len(pnls) > 1:
                 avg_ret = np.mean(pnls)
                 std_ret = np.std(pnls)
+                # Using 252 as a proxy for annualization if trades were daily,
+                # but standard practice for per-trade can vary.
                 sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
             else:
                 sharpe = 0.0
