@@ -10,15 +10,14 @@ from typing import Dict, Optional, Tuple
 
 try:
     import gymnasium as gym
-    _HAS_GYM = True
 except ImportError:
-    _HAS_GYM = False
+    gym = None
 
 import numpy as np
 import pandas as pd
 
 
-class TradingEnv(gym.Env if _HAS_GYM else object):
+class TradingEnv(gym.Env if gym else object):
     """
     Custom Gymnasium environment for XAUUSD trading.
     State: OHLCV + technical indicators (configurable window)
@@ -46,19 +45,21 @@ class TradingEnv(gym.Env if _HAS_GYM else object):
         self.obs_buffer = np.zeros(self.obs_dim, dtype=np.float32)
 
         # Observation: window of market data + portfolio state [balance, position]
-        self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
-            shape=(self.obs_dim,),
-            dtype=np.float32
-        )
+        if gym:
+            self.observation_space = gym.spaces.Box(
+                low=-np.inf, high=np.inf,
+                shape=(self.obs_dim,),
+                dtype=np.float32
+            )
 
-        # Actions: 0=Hold, 1=Buy, 2=Sell
-        self.action_space = gym.spaces.Discrete(3)
+            # Actions: 0=Hold, 1=Buy, 2=Sell
+            self.action_space = gym.spaces.Discrete(3)
 
         self.reset()
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
-        super().reset(seed=seed)
+        if gym:
+            super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
         self.entry_price = 0.0

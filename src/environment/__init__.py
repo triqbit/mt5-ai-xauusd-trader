@@ -1,7 +1,7 @@
 """src/environment package - Gymnasium trading environment."""
-try:
+import contextlib
+
+with contextlib.suppress(ImportError):
     from .gym_env import TradingEnv
-except ImportError:
-    pass
 
 __all__ = ["TradingEnv"]
