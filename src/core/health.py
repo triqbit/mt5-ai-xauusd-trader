@@ -5,6 +5,7 @@ Enterprise-grade health monitoring and startup validation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -78,7 +79,9 @@ class HealthCheck:
             with logger_db.Session() as session:
                 # Use sqlalchemy.text() for compliance and security
                 session.execute(text("SELECT 1"))
-            return ComponentHealth(status=HealthStatus.HEALTHY, message="Database connection verified")
+            return ComponentHealth(
+                status=HealthStatus.HEALTHY, message="Database connection verified"
+            )
         except Exception as e:
             logger.error("Database health check failed: %s", e)
             return ComponentHealth(
@@ -89,7 +92,9 @@ class HealthCheck:
     def check_mt5(self) -> ComponentHealth:
         """Verify MetaTrader 5 connectivity."""
         if not self.connector:
-            return ComponentHealth(status=HealthStatus.DEGRADED, message="MT5 connector not provided")
+            return ComponentHealth(
+                status=HealthStatus.DEGRADED, message="MT5 connector not provided"
+            )
 
         if self.connector._is_initialized:
             # Check if we can get a tick to verify real connection

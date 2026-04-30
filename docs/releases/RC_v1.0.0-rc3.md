@@ -6,7 +6,7 @@
 ---
 
 ## 🏛️ Executive Summary
-This release candidate (v1.0.0-rc3) achieves critical architecture harmonization and introduces institutional-grade reliability features. It resolves the logic fragmentation identified in RC2, integrates a comprehensive startup health gate, and provides standardized operational runbooks. This version establishes the most stable enterprise baseline to date.
+This release candidate (v1.0.0-rc3) achieves critical architecture harmonization and introduces institutional-grade reliability features. It resolves logic fragmentation by removing stale abstractions, integrates a comprehensive startup health gate, and provides standardized operational runbooks. Additionally, it hardens system security by updating core ML dependencies to non-vulnerable versions.
 
 ---
 
@@ -15,6 +15,7 @@ This release candidate (v1.0.0-rc3) achieves critical architecture harmonization
 ### 1. Architecture Harmonization
 - **Source**: `origin/fix/jules05-harmonization-6949952969784913660`
 - **Rationale**: Consolidates component initialization in `main.py` and standardizes the `MT5Connector` interface. Resolves multi-agent logic duplication.
+- **Cleanup**: Removed stale `OrderManager` and `PortfolioManager` modules.
 - **Verification**: `tests/test_harmonization.py` passing (2/2).
 
 ### 2. Enterprise Health Gate
@@ -24,8 +25,8 @@ This release candidate (v1.0.0-rc3) achieves critical architecture harmonization
 
 ### 3. Security & Dependency Hardening
 - **Source**: `origin/dependency-management-and-security-16960673108976038504`
-- **Rationale**: Synchronizes dependencies across environments and applies security fixes (e.g., PyTorch safe loading). Standardizes on `python-telegram-bot`.
-- **Verification**: CI-safe dependency check and standard test suite execution.
+- **Rationale**: Updated `torch` (2.11.0), `torchvision` (0.26.0), and `stable-baselines3` (2.8.0) to resolve critical security vulnerabilities (PYSEC-2025-41, GHSA-3749-ghw9-m3mg). Standardized on `python-telegram-bot`.
+- **Verification**: Local verification of dependency safety and full test suite execution.
 
 ### 4. Operational Runbooks
 - **Source**: `origin/add-operational-runbooks-1241299720848641225`
@@ -55,7 +56,8 @@ The following branches touch high-risk trading logic or risk parameters and rema
 1. **Core Unit Testing**: Executed 25 tests with 100% pass rate in the sandbox.
 2. **Harmonization Check**: Verified RiskManager initialization with both TradeLogger and Monitor.
 3. **Health Gate Validation**: Verified that all probes (Disk, DB, MT5, Model) return correct `HealthStatus`.
-4. **Linting**: Verified zero regressions using `ruff check`.
+4. **Security Audit**: Verified non-vulnerable versions of core ML libraries are pinned.
+5. **Linting**: Verified zero regressions using `ruff check`.
 
 ---
 
