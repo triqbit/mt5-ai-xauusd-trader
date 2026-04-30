@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.health import HealthGate
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -169,6 +170,7 @@ def run_live(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
+    p.add_argument("--verbose", action="store_true", help="Enable debug logging")
     p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
     p.add_argument(
         "--algo",
@@ -184,21 +186,29 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    configure_logging(args.log_level)
-    log = logging.getLogger("main")
+    log_level = "DEBUG" if args.verbose else args.log_level
+    configure_logging(log_level)
+    log = structlog.get_logger("main")
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
+
+    # 1. Health Gate (Pre-flight checks)
+    health = HealthGate(cfg)
+    if not health.run_all_checks():
+        log.critical("System health check FAILED. Aborting.")
+        return 1
+
     log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
+        "config_loaded",
+        mode=cfg.mode,
+        algo=cfg.algorithm,
+        symbol=cfg.symbol,
     )
-    # Initialise components
+    # 2. Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
