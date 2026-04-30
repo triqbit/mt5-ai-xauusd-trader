@@ -33,6 +33,7 @@ pydantic==2.11.1
 pydantic-settings==2.8.1
 
 # -- Testing -------------------------------------------------------
+Jinja2==3.1.6
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot
