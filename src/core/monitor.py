@@ -64,10 +64,11 @@ class Monitor:
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:
         """Send daily P&L and trade count summary."""
+        indicator = "🟢" if pnl >= 0 else "🔴"
         status = "PROFIT" if pnl >= 0 else "LOSS"
         msg = (
             f"📅 Daily Summary - {datetime.now(timezone.utc).date()}\n"
-            f"Status: {status}\n"
+            f"Status: {indicator} {status}\n"
             f"Net P&L: {pnl:.2f}\n"
             f"Trades: {trades}"
         )
