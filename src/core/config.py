@@ -48,6 +48,14 @@ class TradingConfig(BaseSettings):
     max_positions: int = Field(default=3, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    max_daily_trades: int = Field(default=10, ge=1, le=50, description="Max trades per day")
+    max_consecutive_losses: int = Field(default=3, ge=1, le=10, description="Max consecutive losses")
+    circuit_breaker_threshold: float = Field(
+        default=0.15, ge=0.05, le=0.50, description="Drawdown threshold to halt trading"
+    )
+    min_risk_reward: float = Field(
+        default=1.5, ge=1.0, le=5.0, description="Minimum allowed risk-to-reward ratio"
+    )
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
@@ -66,6 +74,34 @@ class TradingConfig(BaseSettings):
     telegram_token: str = Field(default="", description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
     confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    ensemble_dissent_allowed: bool = Field(
+        default=False, description="Allow trade if ensemble models disagree significantly"
+    )
+
+    @field_validator("symbol")
+    @classmethod
+    def validate_symbol(cls, v: str) -> str:
+        allowed = [
+            "XAUUSD",
+            "USDCHF",
+            "GBPUSD",
+            "EURUSD",
+            "XAGUSD",
+            "AUDUSD",
+            "USDJPY",
+            "EURJPY",
+        ]
+        if v.upper() not in allowed:
+            raise ValueError(f"Symbol {v} not in supported list: {allowed}")
+        return v.upper()
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe(cls, v: str) -> str:
+        allowed = ["M1", "M5", "M15", "M30", "H1", "H4", "D1"]
+        if v.upper() not in allowed:
+            raise ValueError(f"Timeframe {v} not in supported list: {allowed}")
+        return v.upper()
 
     @field_validator("risk_per_trade")
     @classmethod
