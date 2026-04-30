@@ -8,12 +8,17 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
-import gymnasium as gym
+try:
+    import gymnasium as gym
+    _HAS_GYM = True
+except ImportError:
+    _HAS_GYM = False
+
 import numpy as np
 import pandas as pd
 
 
-class TradingEnv(gym.Env):
+class TradingEnv(gym.Env if _HAS_GYM else object):
     """
     Custom Gymnasium environment for XAUUSD trading.
     State: OHLCV + technical indicators (configurable window)

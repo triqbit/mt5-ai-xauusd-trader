@@ -1,5 +1,10 @@
 import numpy as np
 import pytest
+
+# Skip tests if gymnasium or pandas is missing (CI safety)
+pytest.importorskip("gymnasium")
+pytest.importorskip("pandas")
+
 from src.environment.gym_env import TradingEnv
 
 def test_observation_consistency():

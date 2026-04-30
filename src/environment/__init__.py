@@ -1,4 +1,7 @@
 """src/environment package - Gymnasium trading environment."""
-from .gym_env import TradingEnv
+try:
+    from .gym_env import TradingEnv
+except ImportError:
+    pass
 
 __all__ = ["TradingEnv"]
