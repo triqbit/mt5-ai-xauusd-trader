@@ -1,0 +1,213 @@
+name: Release Orchestration
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.0.0)'
+        required: true
+      dry_run:
+        description: 'Dry run (do not tag or publish)'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  # -----------------------------------------------------------
+  # JOB 1: Validation - Quality, Security, Tests, Compliance
+  # -----------------------------------------------------------
+  validate:
+    name: Release Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install TA-Lib C library
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
+
+      - name: Install dependencies
+        run: |
+          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses pytest pytest-cov
+          pip install -r requirements-ci.txt
+
+      - name: Ruff Check
+        run: ruff check src/ main.py
+
+      - name: Ruff Format Check
+        run: ruff format --check src/ main.py
+
+      - name: Mypy Check
+        run: mypy src/ --ignore-missing-imports
+
+      - name: Dependency Audit
+        run: pip-audit --requirement requirements-ci.txt
+
+      - name: License Compliance Check
+        run: |
+          pip-licenses --summary --fail-on GPL AGPL
+          pip-licenses --format=markdown --output-file=docs/DEPENDENCY_LICENSES.md
+
+      - name: Run Tests
+        run: pytest tests/ --cov=src --cov-report=xml
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
+
+      - name: Validate Environment Config
+        run: python scripts/validate_env.py
+
+      - name: Verify Pre-Prod Checklist
+        run: |
+          if [ ! -f docs/PREPROD_CHECKLIST.md ]; then
+            echo "Error: PREPROD_CHECKLIST.md missing!"
+            exit 1
+          fi
+          if ! grep -q "\[x\]" docs/PREPROD_CHECKLIST.md; then
+            echo "Warning: PREPROD_CHECKLIST.md has no completed items."
+          fi
+
+      - name: Upload Compliance Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: docs/DEPENDENCY_LICENSES.md
+
+  # -----------------------------------------------------------
+  # JOB 2: Build - Docker Image and Security Scan
+  # -----------------------------------------------------------
+  build:
+    name: Docker Build & Scan
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "TAG=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: |
+            triqbit/mt5-ai-xauusd-trader:${{ github.sha }}
+            triqbit/mt5-ai-xauusd-trader:${{ steps.version.outputs.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'triqbit/mt5-ai-xauusd-trader:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  # -----------------------------------------------------------
+  # JOB 3: Release - Tags, Changelog, Artifacts, GitHub Release
+  # -----------------------------------------------------------
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false') || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "TAG=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download Compliance Report
+        uses: actions/download-artifact@v4
+        with:
+          name: compliance-report
+          path: docs/
+
+      - name: Generate Changelog
+        id: changelog
+        uses: Conventional-Changelog/github-action-generate-changelog@v1
+        with:
+          path-to-changelog: CHANGELOG.md
+
+      - name: Package Release Artifacts
+        run: |
+          mkdir -p release
+          zip -r release/mt5-ai-xauusd-trader-${{ steps.version.outputs.VERSION }}.zip . -x "*.git*" "tests/*" ".env" "*.db" "release/*"
+          sha256sum release/mt5-ai-xauusd-trader-${{ steps.version.outputs.VERSION }}.zip > release/checksums.txt
+
+      - name: Create Git Tag (if manual)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          if git rev-parse ${{ steps.version.outputs.TAG }} >/dev/null 2>&1; then
+            echo "Tag ${{ steps.version.outputs.TAG }} already exists."
+          else
+            git tag -a ${{ steps.version.outputs.TAG }} -m "Release ${{ steps.version.outputs.VERSION }}"
+            git push origin ${{ steps.version.outputs.TAG }}
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body_path: CHANGELOG.md
+          files: |
+            release/mt5-ai-xauusd-trader-${{ steps.version.outputs.VERSION }}.zip
+            release/checksums.txt
+            docs/DEPENDENCY_LICENSES.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
