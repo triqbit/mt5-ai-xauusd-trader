@@ -1,0 +1,34 @@
+name: Daily PR Triage
+
+on:
+  schedule:
+    - cron: '0 13 * * *' # 13:00 UTC = 17:00 GMT+4
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Generate PR Triage Report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python generate_triage_report.py
+
+      - name: Commit and push report
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/status/PR_TRIAGE_DAILY.md
+          git diff --quiet && git diff --staged --quiet || (git commit -m "DX: update daily PR triage dashboard" && git push)
