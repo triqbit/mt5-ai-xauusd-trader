@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
@@ -47,7 +47,9 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
 @dataclass
@@ -73,6 +75,15 @@ class RiskManager:
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
     ) -> None:
+        """
+        Initialize the RiskManager.
+
+        Args:
+            config: Trading configuration.
+            account_balance: Current account balance.
+            logger_db: TradeLogger instance for recording events.
+            monitor: Monitor instance for alerting.
+        """
         self.cfg = config
         self.balance = account_balance
         self.peak_equity = account_balance
@@ -170,6 +181,12 @@ class RiskManager:
 
     # -- Private filter layers ----------------------------------------------
     def _check_circuit_breaker(self) -> bool:
+        """
+        Check if the peak-to-valley drawdown exceeds the circuit breaker limit.
+
+        Returns:
+            True if within limits, False if trading should be halted.
+        """
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
@@ -187,6 +204,12 @@ class RiskManager:
         return True
 
     def _check_daily_loss(self) -> bool:
+        """
+        Check if the daily realized loss exceeds the maximum allowed percentage.
+
+        Returns:
+            True if within limits, False otherwise.
+        """
         if self.daily.peak_equity == 0:
             return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
@@ -196,6 +219,12 @@ class RiskManager:
         return True
 
     def _check_max_positions(self) -> bool:
+        """
+        Check if the number of open positions is within the maximum limit.
+
+        Returns:
+            True if within limits, False otherwise.
+        """
         if len(self.open_positions) >= self.cfg.max_positions:
             logger.debug("Max positions reached (%d)", self.cfg.max_positions)
             return False
@@ -211,6 +240,12 @@ class RiskManager:
     def _check_minimum_confidence(
         self, confidence: float, threshold: float = 0.55
     ) -> bool:
+        """
+        Check if signal confidence meets the minimum threshold.
+
+        Returns:
+            True if confidence is high enough, False otherwise.
+        """
         if confidence < threshold:
             logger.debug(
                 "Confidence %.2f below threshold %.2f", confidence, threshold
@@ -219,6 +254,12 @@ class RiskManager:
         return True
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+        """
+        Check if the risk-to-reward ratio meets the minimum requirement.
+
+        Returns:
+            True if R:R is favorable, False otherwise.
+        """
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         if risk == 0:

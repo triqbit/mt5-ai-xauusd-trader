@@ -37,6 +37,8 @@ jobs:
 
       - name: Check for High-Risk Files
         id: risk-check
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
           HIGH_RISK_PATTERNS=(
             "src/trading/executor.py"
@@ -52,7 +54,7 @@ jobs:
           )
 
           TOUCHED_HIGH_RISK=false
-          IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
+          IFS="|" read -ra FILES <<< "$ALL_CHANGED_FILES"
           for file in "${FILES[@]}"; do
             for pattern in "${HIGH_RISK_PATTERNS[@]}"; do
               if [[ "$file" =~ $pattern ]]; then
@@ -72,11 +74,13 @@ jobs:
 
       - name: Check for Tests and Documentation
         id: compliance-check
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
           HAS_TESTS=false
           HAS_DOCS=false
           SOURCE_MODIFIED=false
-          IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
+          IFS="|" read -ra FILES <<< "$ALL_CHANGED_FILES"
           for file in "${FILES[@]}"; do
             if [[ "$file" =~ ^tests/ ]]; then HAS_TESTS=true; fi
             if [[ "$file" =~ ^docs/ || "$file" =~ \.md$ ]]; then HAS_DOCS=true; fi
@@ -95,17 +99,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          RISK_STATUS: ${{ steps.risk-check.outputs.risk_status }}
+          SOURCE_MODIFIED: ${{ steps.compliance-check.outputs.source_modified }}
+          HAS_TESTS: ${{ steps.compliance-check.outputs.has_tests }}
+          HAS_DOCS: ${{ steps.compliance-check.outputs.has_docs }}
         run: |
           REASON=""
-          if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
+          if [ "$RISK_STATUS" = "blocked" ]; then
             REASON="🚨 High-risk files modified."
-            gh pr edit $PR_NUMBER --add-label "escalated-risk"
+            gh pr edit $PR_NUMBER --add-label "escalated-risk" 2>/dev/null || echo "Warning: Could not add label"
           fi
-          if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
-            if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
+          if [ "$SOURCE_MODIFIED" = "true" ]; then
+            if [ "$HAS_TESTS" = "false" ]; then
               REASON="$REASON\n❌ Source code modified but no tests added."
             fi
-            if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
+            if [ "$HAS_DOCS" = "false" ]; then
               REASON="$REASON\n❌ Source code modified but no documentation updated."
             fi
           fi
