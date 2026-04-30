@@ -120,6 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     if: success()
     steps:
+      - uses: actions/checkout@v5
       - name: Enable Auto-Merge
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
