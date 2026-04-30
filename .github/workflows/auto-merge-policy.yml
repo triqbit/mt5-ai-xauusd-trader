@@ -1,0 +1,129 @@
+name: Auto-Merge Policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+    branches: [main]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+jobs:
+  enforce-policy:
+    name: Enforce Auto-Merge Policy
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    outputs:
+      risk_status: ${{ steps.risk-check.outputs.risk_status }}
+      has_tests: ${{ steps.compliance-check.outputs.has_tests }}
+      has_docs: ${{ steps.compliance-check.outputs.has_docs }}
+      source_modified: ${{ steps.compliance-check.outputs.source_modified }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          separator: "|"
+
+      - name: Check for High-Risk Files
+        id: risk-check
+        run: |
+          HIGH_RISK_PATTERNS=(
+            "src/trading/executor.py"
+            "src/core/risk_engine.py"
+            "src/trading/order_manager.py"
+            "src/trading/risk_manager.py"
+            "src/trading/mt5_connector.py"
+            "config/secrets.*"
+            ".github/workflows/deploy.*"
+            ".github/workflows/ci.yml"
+            "Dockerfile"
+            "migrations/.*"
+          )
+
+          TOUCHED_HIGH_RISK=false
+          IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
+          for file in "${FILES[@]}"; do
+            for pattern in "${HIGH_RISK_PATTERNS[@]}"; do
+              if [[ "$file" =~ $pattern ]]; then
+                echo "🚨 HIGH-RISK FILE DETECTED: $file"
+                TOUCHED_HIGH_RISK=true
+              fi
+            done
+          done
+
+          if [ "$TOUCHED_HIGH_RISK" = "true" ]; then
+            echo "risk_status=blocked" >> $GITHUB_OUTPUT
+            echo "::error::High-risk files touched. Auto-merge is strictly PROHIBITED."
+          else
+            echo "risk_status=pass" >> $GITHUB_OUTPUT
+            echo "✅ No high-risk files detected."
+          fi
+
+      - name: Check for Tests and Documentation
+        id: compliance-check
+        run: |
+          HAS_TESTS=false
+          HAS_DOCS=false
+          SOURCE_MODIFIED=false
+          IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
+          for file in "${FILES[@]}"; do
+            if [[ "$file" =~ ^tests/ ]]; then HAS_TESTS=true; fi
+            if [[ "$file" =~ ^docs/ || "$file" =~ \.md$ ]]; then HAS_DOCS=true; fi
+            if [[ "$file" =~ ^src/ || "$file" == "main.py" ]]; then SOURCE_MODIFIED=true; fi
+          done
+
+          echo "has_tests=$HAS_TESTS" >> $GITHUB_OUTPUT
+          echo "has_docs=$HAS_DOCS" >> $GITHUB_OUTPUT
+          echo "source_modified=$SOURCE_MODIFIED" >> $GITHUB_OUTPUT
+
+      - name: Handle Violations
+        if: |
+          steps.risk-check.outputs.risk_status == 'blocked' ||
+          (steps.compliance-check.outputs.source_modified == 'true' &&
+           (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false'))
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          REASON=""
+          if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
+            REASON="🚨 High-risk files modified."
+            gh pr edit $PR_NUMBER --add-label "escalated-risk"
+          fi
+          if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
+            if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
+              REASON="$REASON\n❌ Source code modified but no tests added."
+            fi
+            if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
+              REASON="$REASON\n❌ Source code modified but no documentation updated."
+            fi
+          fi
+
+          gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review and merge required."
+          gh pr merge $PR_NUMBER --disable-auto || true
+          exit 1
+
+  enable-auto-merge:
+    name: Enable Auto-Merge
+    needs: enforce-policy
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v5
+      - name: Enable Auto-Merge
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge $PR_NUMBER --auto --squash --delete-branch
