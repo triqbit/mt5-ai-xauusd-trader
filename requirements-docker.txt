@@ -24,7 +24,7 @@ mplfinance==0.12.10b0
 # -- Data Acquisition ----------------------------------------------
 yfinance==0.2.38
 requests==2.31.0
-aiohttp==3.9.5
+aiohttp==3.11.13
 httpx==0.27.0
 
 # -- Database ------------------------------------------------------
@@ -64,7 +64,7 @@ joblib==1.4.2
 
 # -- ML / RL (CPU-only torch; no CUDA wheels pulled) ---------------
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.3.0+cpu
-torchvision==0.18.0+cpu
+torch==2.6.0+cpu
+torchvision==0.21.0+cpu
 stable-baselines3==2.3.2
 gymnasium==0.29.1
