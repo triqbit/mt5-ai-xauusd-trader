@@ -96,8 +96,6 @@ jobs:
           MT5_PASSWORD: "test"
           MT5_SERVER: "test"
           MODE: "demo"
-      - name: Migration Reversibility Check
-        run: python scripts/verify_migrations.py
 
   # -----------------------------------------------------------
   # JOB 4: Docker Build - only on main, needs tests to pass

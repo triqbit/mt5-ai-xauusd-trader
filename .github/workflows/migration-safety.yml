@@ -1,0 +1,25 @@
+name: Migration Safety
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Migration Reversibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install sqlalchemy==2.0.30 alembic==1.13.1 pydantic==2.11.1 pydantic-settings==2.8.1
+
+      - name: Run Migration Reversibility Check
+        run: python scripts/verify_migrations.py
