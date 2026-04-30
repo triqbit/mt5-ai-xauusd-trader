@@ -6,6 +6,10 @@ on:
       version:
         description: 'Version to release (e.g. 1.0.0)'
         required: true
+      prerelease:
+        description: 'Is this a pre-release?'
+        type: boolean
+        default: false
       dry_run:
         description: 'Dry run (do not tag or publish)'
         type: boolean
@@ -191,6 +195,25 @@ jobs:
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Update Version in Files
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false'
+        run: |
+          # Update pyproject.toml
+          sed -i "s/^version = \".*\"/version = \"${{ steps.version.outputs.VERSION }}\"/" pyproject.toml
+
+          # Update src/__init__.py if it exists
+          if [ -f "src/__init__.py" ]; then
+            sed -i "s/__version__ = \".*\"/__version__ = \"${{ steps.version.outputs.VERSION }}\"/" src/__init__.py
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml src/__init__.py
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: bump version to ${{ steps.version.outputs.VERSION }} [skip ci]"
+            git push origin main
+          fi
+
       - name: Download Compliance Report
         uses: actions/download-artifact@v4
         with:
@@ -232,6 +255,6 @@ jobs:
             release/checksums.txt
             docs/DEPENDENCY_LICENSES.md
           draft: false
-          prerelease: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
