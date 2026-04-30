@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import datetime
 from datetime import timezone
-import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,11 +20,12 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-
 # --- Models ---
+
 
 class RegimeAnalysis(BaseModel):
     """Analysis of market regimes detected during the period."""
+
     current_regime: str
     regime_distribution: Dict[str, float]  # Regime Name -> Percentage of time
     volatility_profile: str
@@ -35,6 +35,7 @@ class RegimeAnalysis(BaseModel):
 
 class StressTestOutcome(BaseModel):
     """Results from scenario-based stress testing."""
+
     scenario_name: str
     max_drawdown: float
     recovery_period_bars: int
@@ -45,6 +46,7 @@ class StressTestOutcome(BaseModel):
 
 class HyperparameterRobustness(BaseModel):
     """Insight into parameter stability across walk-forward windows."""
+
     parameter_name: str
     optimal_value: Any
     stability_score: float = Field(..., ge=0.0, le=1.0)
@@ -54,6 +56,7 @@ class HyperparameterRobustness(BaseModel):
 
 class TradePatternFindings(BaseModel):
     """Patterns identified in trade journals (e.g., via JournalMiner)."""
+
     pattern_name: str
     frequency: int
     win_rate_impact: float
@@ -63,6 +66,7 @@ class TradePatternFindings(BaseModel):
 
 class ModelDriftObservation(BaseModel):
     """Observations regarding concept drift or performance degradation."""
+
     model_id: str
     metric_name: str
     baseline_value: float
@@ -73,6 +77,7 @@ class ModelDriftObservation(BaseModel):
 
 class AllocationInsight(BaseModel):
     """Insights into capital allocation efficiency."""
+
     strategy_id: str
     allocated_weight: float
     performance_contribution: float
@@ -82,6 +87,7 @@ class AllocationInsight(BaseModel):
 
 class BenchmarkComparison(BaseModel):
     """Comparison against standard benchmarks."""
+
     benchmark_name: str
     strategy_return: float
     benchmark_return: float
@@ -92,8 +98,11 @@ class BenchmarkComparison(BaseModel):
 
 class ResearchReport(BaseModel):
     """Unified structure for a high-quality research summary."""
+
     report_id: str
-    timestamp: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(timezone.utc))
+    timestamp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(timezone.utc)
+    )
     period_start: datetime.date
     period_end: datetime.date
     summary: str
@@ -112,6 +121,7 @@ class ResearchReport(BaseModel):
 
 # --- Reporter ---
 
+
 class ResearchReporter:
     """Orchestrates the generation and formatting of research reports."""
 
@@ -122,22 +132,26 @@ class ResearchReporter:
             loader=FileSystemLoader(str(self.template_dir)),
             autoescape=False,
             trim_blocks=True,
-            lstrip_blocks=True
+            lstrip_blocks=True,
         )
 
-    def generate_markdown(self, report: ResearchReport, template_name: str = "research_report_template.md") -> str:
+    def generate_markdown(
+        self, report: ResearchReport, template_name: str = "research_report_template.md"
+    ) -> str:
         """Renders the research report into a Markdown string using Jinja2."""
         template = self.jinja_env.get_template(template_name)
         return template.render(report.model_dump())
 
     def display_in_terminal(self, report: ResearchReport) -> None:
         """Displays a beautiful summary of the report in the terminal."""
-        self.console.print(Panel(
-            f"[bold blue]Research Report:[/bold blue] {report.report_id}\n"
-            f"[dim]Period: {report.period_start} to {report.period_end}[/dim]",
-            title="Institutional Research Summary",
-            expand=False
-        ))
+        self.console.print(
+            Panel(
+                f"[bold blue]Research Report:[/bold blue] {report.report_id}\n"
+                f"[dim]Period: {report.period_start} to {report.period_end}[/dim]",
+                title="Institutional Research Summary",
+                expand=False,
+            )
+        )
 
         self.console.print(f"\n[bold]Executive Summary:[/bold]\n{report.summary}")
 
@@ -149,7 +163,7 @@ class ResearchReporter:
             table.add_column("Volatility")
             for k, v in ra.regime_distribution.items():
                 row_style = "bold cyan" if k == ra.current_regime else ""
-                table.add_row(k, f"{v*100:.1f}", ra.volatility_profile, style=row_style)
+                table.add_row(k, f"{v * 100:.1f}", ra.volatility_profile, style=row_style)
             self.console.print(table)
 
         if report.stress_tests:
@@ -160,7 +174,9 @@ class ResearchReporter:
             table.add_column("Status", justify="center")
             for st in report.stress_tests:
                 status = "[green]PASS[/green]" if st.passed else "[red]FAIL[/red]"
-                table.add_row(st.scenario_name, f"{st.max_drawdown:.2%}", f"{st.pnl_impact:.2f}", status)
+                table.add_row(
+                    st.scenario_name, f"{st.max_drawdown:.2%}", f"{st.pnl_impact:.2f}", status
+                )
             self.console.print(table)
 
         if report.hyperparameter_robustness:
@@ -170,13 +186,20 @@ class ResearchReporter:
             table.add_column("Stability", justify="right")
             table.add_column("Noise Sens.")
             for hr in report.hyperparameter_robustness:
-                table.add_row(hr.parameter_name, str(hr.optimal_value), f"{hr.stability_score:.2f}", hr.sensitivity_to_noise)
+                table.add_row(
+                    hr.parameter_name,
+                    str(hr.optimal_value),
+                    f"{hr.stability_score:.2f}",
+                    hr.sensitivity_to_noise,
+                )
             self.console.print(table)
 
         if report.trade_patterns:
             self.console.print("\n[bold]Trade Pattern Findings:[/bold]")
             for tp in report.trade_patterns:
-                self.console.print(f"• [cyan]{tp.pattern_name}[/cyan] (Freq: {tp.frequency}) | Impact: [green]{tp.win_rate_impact:+.2%}[/green]")
+                self.console.print(
+                    f"• [cyan]{tp.pattern_name}[/cyan] (Freq: {tp.frequency}) | Impact: [green]{tp.win_rate_impact:+.2%}[/green]"
+                )
 
         if report.model_drift:
             table = Table(title="Model Health & Drift", title_style="bold yellow")
@@ -186,7 +209,12 @@ class ResearchReporter:
             table.add_column("Drift Score", justify="right")
             for md_obs in report.model_drift:
                 color = "red" if md_obs.drift_detected else "green"
-                table.add_row(md_obs.model_id, md_obs.metric_name, f"{md_obs.current_value:.4f}", f"[{color}]{md_obs.drift_score:.2f}[/{color}]")
+                table.add_row(
+                    md_obs.model_id,
+                    md_obs.metric_name,
+                    f"{md_obs.current_value:.4f}",
+                    f"[{color}]{md_obs.drift_score:.2f}[/{color}]",
+                )
             self.console.print(table)
 
         if report.allocation_insights:
@@ -197,7 +225,13 @@ class ResearchReporter:
             table.add_column("Marginal Sharpe", justify="right")
             for ai in report.allocation_insights:
                 color = "red" if ai.over_allocated else "white"
-                table.add_row(ai.strategy_id, f"{ai.allocated_weight:.2%}", f"{ai.performance_contribution:.2%}", f"{ai.marginal_sharpe:.2f}", style=color)
+                table.add_row(
+                    ai.strategy_id,
+                    f"{ai.allocated_weight:.2%}",
+                    f"{ai.performance_contribution:.2%}",
+                    f"{ai.marginal_sharpe:.2f}",
+                    style=color,
+                )
             self.console.print(table)
 
         if report.benchmarks:
@@ -208,7 +242,13 @@ class ResearchReporter:
             table.add_column("Strategy Ret.", justify="right")
             table.add_column("Benchmark Ret.", justify="right")
             for bc in report.benchmarks:
-                table.add_row(bc.benchmark_name, f"{bc.alpha:.2f}", f"{bc.beta:.2f}", f"{bc.strategy_return:.2%}", f"{bc.benchmark_return:.2%}")
+                table.add_row(
+                    bc.benchmark_name,
+                    f"{bc.alpha:.2f}",
+                    f"{bc.beta:.2f}",
+                    f"{bc.strategy_return:.2%}",
+                    f"{bc.benchmark_return:.2%}",
+                )
             self.console.print(table)
 
     def export_to_file(self, report: ResearchReport, output_dir: Path) -> Path:
