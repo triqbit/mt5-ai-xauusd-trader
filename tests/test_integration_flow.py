@@ -6,7 +6,10 @@ Verifies end-to-end integration across all system components.
 import time
 import pytest
 import numpy as np
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None
 import os
 from unittest.mock import MagicMock, patch, Mock
 from datetime import datetime, timezone
@@ -17,7 +20,11 @@ from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
-from src.models.ensemble import EnsembleModel
+
+if torch:
+    from src.models.ensemble import EnsembleModel
+else:
+    EnsembleModel = MagicMock
 
 # --- Fixtures ---
 
@@ -52,6 +59,8 @@ def mock_connector(mock_cfg):
         connector = MT5Connector(mock_cfg)
         connector.connect()
         return connector
+
+pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
 # --- Path 1: Full Trading Flow ---
 

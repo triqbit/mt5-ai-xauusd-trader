@@ -32,8 +32,6 @@ jobs:
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v45
-        with:
-          separator: "|"
 
       - name: Check for High-Risk Files
         id: risk-check
@@ -52,8 +50,7 @@ jobs:
           )
 
           TOUCHED_HIGH_RISK=false
-          IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
-          for file in "${FILES[@]}"; do
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             for pattern in "${HIGH_RISK_PATTERNS[@]}"; do
               if [[ "$file" =~ $pattern ]]; then
                 echo "🚨 HIGH-RISK FILE DETECTED: $file"
@@ -76,8 +73,7 @@ jobs:
           HAS_TESTS=false
           HAS_DOCS=false
           SOURCE_MODIFIED=false
-          IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
-          for file in "${FILES[@]}"; do
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [[ "$file" =~ ^tests/ ]]; then HAS_TESTS=true; fi
             if [[ "$file" =~ ^docs/ || "$file" =~ \.md$ ]]; then HAS_DOCS=true; fi
             if [[ "$file" =~ ^src/ || "$file" == "main.py" ]]; then SOURCE_MODIFIED=true; fi
@@ -99,7 +95,7 @@ jobs:
           REASON=""
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
             REASON="🚨 High-risk files modified."
-            gh pr edit $PR_NUMBER --add-label "escalated-risk"
+            gh pr edit $PR_NUMBER --add-label "escalated-risk" || echo "Failed to add label"
           fi
           if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
             if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
