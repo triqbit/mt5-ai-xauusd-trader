@@ -16,13 +16,16 @@ import argparse
 import logging
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
 
 import structlog
+import uvicorn
 
 from src.core.config import get_config
+from src.core.health import HealthChecker, create_health_app
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -198,25 +201,52 @@ def main() -> int:
         cfg.algorithm,
         cfg.symbol,
     )
-    # Initialise components
+
+    # 1. Initialise core components for health checks
     connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
-        return 1
-    balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
-    monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
     model = EnsembleModel(device="cpu")
+
+    # 2. Startup health gate & config validation
+    health_checker = HealthChecker(
+        config=cfg,
+        connector=connector,
+        trade_logger=trade_logger,
+        model=model,
+    )
+    # We load models before health check to verify they are present
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
         model.load_ppo(ppo_path)
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+
+    # Hard gate: MT5 must connect before we proceed
+    if not connector.connect():
+        log.critical("Initial MT5 connection failed.")
+        sys.exit(1)
+
+    health_checker.run_startup_health_gate()
+
+    # 3. Start health server in background
+    health_app = create_health_app(health_checker)
+    health_thread = threading.Thread(
+        target=uvicorn.run,
+        args=(health_app,),
+        kwargs={"host": "0.0.0.0", "port": cfg.prometheus_port, "log_level": "error"},
+        daemon=True,
+    )
+    health_thread.start()
+    log.info("Health server started on port %d", cfg.prometheus_port)
+
+    # 4. Initialise remaining components
+    balance = connector.get_account_balance()
+    monitor = Monitor(cfg)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
     try:
         if cfg.mode in ("demo", "live"):
             run_live(cfg, connector, risk, model, trade_logger=trade_logger)
