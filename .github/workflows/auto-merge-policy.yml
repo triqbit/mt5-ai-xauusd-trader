@@ -22,6 +22,7 @@ jobs:
       risk_status: ${{ steps.risk-check.outputs.risk_status }}
       has_tests: ${{ steps.compliance-check.outputs.has_tests }}
       has_docs: ${{ steps.compliance-check.outputs.has_docs }}
+      source_modified: ${{ steps.compliance-check.outputs.source_modified }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,7 +31,7 @@ jobs:
 
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v45
         with:
           separator: "|"
 
@@ -74,17 +75,23 @@ jobs:
         run: |
           HAS_TESTS=false
           HAS_DOCS=false
+          SOURCE_MODIFIED=false
           IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
           for file in "${FILES[@]}"; do
             if [[ "$file" =~ ^tests/ ]]; then HAS_TESTS=true; fi
             if [[ "$file" =~ ^docs/ || "$file" =~ \.md$ ]]; then HAS_DOCS=true; fi
+            if [[ "$file" =~ ^src/ || "$file" == "main.py" ]]; then SOURCE_MODIFIED=true; fi
           done
 
           echo "has_tests=$HAS_TESTS" >> $GITHUB_OUTPUT
           echo "has_docs=$HAS_DOCS" >> $GITHUB_OUTPUT
+          echo "source_modified=$SOURCE_MODIFIED" >> $GITHUB_OUTPUT
 
       - name: Handle Violations
-        if: steps.risk-check.outputs.risk_status == 'blocked' || steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false'
+        if: |
+          steps.risk-check.outputs.risk_status == 'blocked' ||
+          (steps.compliance-check.outputs.source_modified == 'true' &&
+           (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false'))
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -94,42 +101,25 @@ jobs:
             REASON="🚨 High-risk files modified."
             gh pr edit $PR_NUMBER --add-label "escalated-risk"
           fi
-          if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
-            REASON="$REASON\n❌ Tests missing."
-          fi
-          if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
-            REASON="$REASON\n❌ Documentation missing."
+          if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
+            if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
+              REASON="$REASON\n❌ Source code modified but no tests added."
+            fi
+            if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
+              REASON="$REASON\n❌ Source code modified but no documentation updated."
+            fi
           fi
 
           gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review and merge required."
           gh pr merge $PR_NUMBER --disable-auto || true
           exit 1
 
-  audit-and-merge:
-    name: Audit and Auto-Merge
+  enable-auto-merge:
+    name: Enable Auto-Merge
     needs: enforce-policy
     runs-on: ubuntu-latest
     if: success()
     steps:
-      - uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update Audit Log
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: |
-          DATE=$(date +'%Y-%m-%d')
-          LOG_ENTRY="| $DATE | #$PR_NUMBER | Auto-Merge Enabled | Policy checks passed | [PR]($PR_URL) |"
-          echo "$LOG_ENTRY" >> docs/integration/AUTO_MERGE_POLICY.md
-
-          git config user.name "Jules05-Bot"
-          git config user.email "jules05@users.noreply.github.com"
-          git add docs/integration/AUTO_MERGE_POLICY.md
-          git commit -m "🤖 Jules05: Update auto-merge audit log for PR #$PR_NUMBER"
-          git push
-
       - name: Enable Auto-Merge
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

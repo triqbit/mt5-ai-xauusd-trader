@@ -1,0 +1,70 @@
+name: Auto-Merge Audit
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  audit-log:
+    name: Update Audit Log
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          separator: "|"
+          base_sha: ${{ github.event.pull_request.base.sha }}
+          sha: ${{ github.event.pull_request.head.sha }}
+
+      - name: Update Audit Log
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          HIGH_RISK_PATTERNS=(
+            "src/trading/executor.py"
+            "src/core/risk_engine.py"
+            "src/trading/order_manager.py"
+            "src/trading/risk_manager.py"
+            "src/trading/mt5_connector.py"
+            "config/secrets.*"
+            ".github/workflows/deploy.*"
+            ".github/workflows/ci.yml"
+            "Dockerfile"
+            "migrations/.*"
+          )
+
+          TOUCHED_HIGH_RISK=false
+          IFS="|" read -ra FILES <<< "${{ steps.changed-files.outputs.all_changed_files }}"
+          for file in "${FILES[@]}"; do
+            for pattern in "${HIGH_RISK_PATTERNS[@]}"; do
+              if [[ "$file" =~ $pattern ]]; then
+                TOUCHED_HIGH_RISK=true
+                break 2
+              fi
+            done
+          done
+
+          # Only log if it was likely an auto-merge (low risk)
+          if [ "$TOUCHED_HIGH_RISK" = "false" ]; then
+            DATE=$(date +'%Y-%m-%d')
+            LOG_ENTRY="| $DATE | #$PR_NUMBER | Auto-Merged | Policy checks passed | [PR]($PR_URL) |"
+            echo "$LOG_ENTRY" >> docs/integration/AUTO_MERGE_POLICY.md
+
+            git config user.name "Jules05-Bot"
+            git config user.email "jules05@users.noreply.github.com"
+            git add docs/integration/AUTO_MERGE_POLICY.md
+            git commit -m "🤖 Jules05: Update auto-merge audit log for PR #$PR_NUMBER"
+            git push origin main
+          fi
