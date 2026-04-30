@@ -8,7 +8,7 @@ Provides metrics for stability, turnover, drawdown, and regime sensitivity.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Protocol, Tuple, Union
+from typing import Dict, List, Optional, Protocol, Union
 
 import numpy as np
 import pandas as pd
@@ -321,7 +321,8 @@ class RLEvaluator:
         low_vol_idx = vol <= median_vol
 
         def calc_sharpe(r):
-            if len(r) < 2: return 0.0
+            if len(r) < 2:
+                return 0.0
             return (np.mean(r) / (np.std(r) + 1e-9)) * np.sqrt(self.periods_per_year)
 
         trending_s = calc_sharpe(rets[high_vol_idx])
