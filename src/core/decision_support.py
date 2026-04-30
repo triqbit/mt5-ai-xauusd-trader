@@ -180,9 +180,11 @@ class DecisionSupport:
         """Simulate risk approval to find rejection reason without side effects."""
         # Copy of logic from RiskManager.approve to avoid state changes or logging
         # In a real system, RiskManager should have a 'check' method that returns the reason.
-        if self.risk_manager.peak_equity > 0:
-            if (self.risk_manager.peak_equity - self.risk_manager.balance) / self.risk_manager.peak_equity >= 0.15:
-                return "Circuit breaker active"
+        if (
+            self.risk_manager.peak_equity > 0
+            and (self.risk_manager.peak_equity - self.risk_manager.balance) / self.risk_manager.peak_equity >= 0.15
+        ):
+            return "Circuit breaker active"
 
         if self.risk_manager.daily.peak_equity > 0:
             loss_pct = abs(self.risk_manager.daily.realised_pnl) / self.risk_manager.daily.peak_equity
