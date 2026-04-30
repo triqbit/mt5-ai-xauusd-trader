@@ -41,7 +41,24 @@ repos:
       - id: detect-private-key
 
   # -----------------------------------------------------------
-  # 3. pip-audit — dependency vulnerability scanner
+  # 3. mypy — static type checker
+  # -----------------------------------------------------------
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        name: mypy (static type check)
+        additional_dependencies:
+          - pydantic>=2.0
+          - pydantic-settings
+          - sqlalchemy>=2.0
+          - structlog
+          - types-requests
+          - types-setuptools
+        args: [--ignore-missing-imports]
+
+  # -----------------------------------------------------------
+  # 4. pip-audit — dependency vulnerability scanner
   #    Fails the commit if any package has a known CVE
   # -----------------------------------------------------------
   - repo: https://github.com/pypa/pip-audit
