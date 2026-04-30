@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.config_validator import ConfigValidator, ValidationLevel
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -192,6 +193,22 @@ def main() -> int:
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
+
+    # Startup validation gate
+    validator = ConfigValidator()
+    result = validator.validate(cfg)
+    for issue in result.issues:
+        level = issue.level.value
+        msg = f"Config Validation {level} | field={issue.field} | {issue.message}"
+        if issue.level == ValidationLevel.ERROR:
+            log.error(msg)
+        else:
+            log.warning(msg)
+
+    if not result.is_valid:
+        log.critical("Critical configuration error(s) detected. Aborting startup.")
+        return 1
+
     log.info(
         "Configuration loaded | mode=%s algo=%s symbol=%s",
         cfg.mode,
