@@ -73,7 +73,10 @@ def run_live(
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+            # Calculate volatility (standard deviation of last 20 close prices)
+            volatility = float(df["close"].rolling(20).std().iloc[-1])
+            log.debug("Signal | dir=%d conf=%.3f vol=%.4f", direction, confidence, volatility)
 
             signal_id = None
             if trade_logger:
@@ -84,6 +87,7 @@ def run_live(
                         "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
                         "algorithm": cfg.algorithm,
                         "confidence": confidence,
+                        "volatility": volatility,
                     }
                 )
 
