@@ -7,13 +7,12 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
-import os
-import psutil
 import socket
-from typing import Dict, List, Any
+from typing import Any, Dict
 
+import psutil
 import structlog
+
 from src.core.config import TradingConfig
 
 logger = structlog.get_logger(__name__)
