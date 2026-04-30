@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: triqbit/mt5-ai-xauusd-trader:latest
+    container_name: mt5_trader
+    restart: unless-stopped
+    ports:
+      - "8000:8000"  # Prometheus Metrics
+      - "8050:8050"  # Dash Dashboard
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    environment:
+      - LOG_LEVEL=INFO
+      - PYTHONUNBUFFERED=1
+    # Example command to run backtest via compose
+    # command: ["--mode", "backtest", "--start", "2023-01-01", "--end", "2023-12-31"]
+
+networks:
+  default:
+    name: mt5_network
