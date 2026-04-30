@@ -6,10 +6,13 @@ Custom Gymnasium trading environment for RL training.
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+import logging
+from typing import Any, Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class TradingEnv(gym.Env):
@@ -21,8 +24,22 @@ class TradingEnv(gym.Env):
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
-                 window_size: int = 60, commission: float = 0.0002):
+    def __init__(
+        self,
+        data: np.ndarray,
+        initial_balance: float = 10000.0,
+        window_size: int = 60,
+        commission: float = 0.0002,
+    ) -> None:
+        """
+        Initialize the trading environment.
+
+        Args:
+            data: Market data array (OHLCV).
+            initial_balance: Starting account balance.
+            window_size: Number of past bars included in observation.
+            commission: Trading fee per transaction.
+        """
         super().__init__()
         self.data = data
         self.initial_balance = initial_balance
@@ -43,7 +60,19 @@ class TradingEnv(gym.Env):
 
         self.reset()
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        """
+        Reset the environment state for a new episode.
+
+        Args:
+            seed: Random seed.
+            options: Additional reset options.
+
+        Returns:
+            Initial observation and info dictionary.
+        """
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -52,7 +81,18 @@ class TradingEnv(gym.Env):
         self.total_pnl = 0.0
         return self._get_observation(), {}
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict]:
+    def step(
+        self, action: int
+    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+        """
+        Execute one step in the environment.
+
+        Args:
+            action: 0=Hold, 1=Buy, 2=Sell.
+
+        Returns:
+            Tuple of (obs, reward, terminated, truncated, info).
+        """
         current_price = self.data[self.current_step, 3]  # Close price
         reward = 0.0
 
@@ -86,11 +126,23 @@ class TradingEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
-        window = self.data[self.current_step - self.window_size:self.current_step]
+        """
+        Construct the observation vector from market data and portfolio state.
+
+        Returns:
+            Flattened numpy array observation.
+        """
+        window = self.data[self.current_step - self.window_size : self.current_step]
         # Normalize window
         obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
         portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
         return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
 
-    def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+    def render(self) -> None:
+        """Render the environment state (console log)."""
+        logger.info(
+            "Step: %d | Balance: $%.2f | Position: %.2f",
+            self.current_step,
+            self.balance,
+            self.position,
+        )

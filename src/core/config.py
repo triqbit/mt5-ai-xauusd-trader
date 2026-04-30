@@ -70,20 +70,24 @@ class TradingConfig(BaseSettings):
     @field_validator("risk_per_trade")
     @classmethod
     def risk_must_be_safe(cls, v: float) -> float:
+        """Validate that risk per trade is within safe bounds (max 2%)."""
         if v > 0.02:
             raise ValueError("risk_per_trade > 2% is not permitted in production.")
         return v
 
     @property
     def is_live(self) -> bool:
+        """Check if the current mode is live trading."""
         return self.mode == "live"
 
     @property
     def data_dir(self) -> Path:
+        """Get the data directory path."""
         return ROOT / "data"
 
     @property
     def logs_dir(self) -> Path:
+        """Get the logs directory path."""
         return ROOT / "logs"
 
 
