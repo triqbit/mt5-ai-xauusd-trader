@@ -25,7 +25,12 @@ import structlog
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
+
+try:
+    from src.models.ensemble import EnsembleModel
+except ImportError:
+    EnsembleModel = None
+
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -117,7 +122,7 @@ def run_live(
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
-                    log.info("Order placed | ticket=%d", ticket)
+                    log.info("🚀 Order PLACED | ticket=%d | symbol=%s", ticket, cfg.symbol)
                     if trade_logger:
                         trade_logger.log_trade(
                             ticket=ticket,
@@ -135,7 +140,7 @@ def run_live(
             for symbol, ticket in list(risk.open_positions.items()):
                 if symbol == cfg.symbol and ticket not in current_tickets:
                     # Position closed - in a real scenario we'd fetch deal history
-                    log.info("Position CLOSED | ticket=%d", ticket)
+                    log.info("✅ Position CLOSED | ticket=%d", ticket)
                     if trade_logger:
                         # Retrieve trade info from DB to get correct direction
                         trade_info = trade_logger.get_trade_by_ticket(ticket)
@@ -169,20 +174,66 @@ def run_live(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
+    p.add_argument(
+        "--mode",
+        choices=["demo", "live", "backtest"],
+        default="demo",
+        help="Execution mode: demo (forward testing), live (real money), or backtest",
+    )
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
         default="ensemble",
+        help="The AI model architecture to use for signal generation",
     )
-    p.add_argument("--symbol", default="XAUUSD")
-    p.add_argument("--timeframe", default="M5")
-    p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
-    p.add_argument("--log-level", default="INFO")
+    p.add_argument(
+        "--symbol",
+        default="XAUUSD",
+        help="The financial instrument to trade (default: XAUUSD)",
+    )
+    p.add_argument(
+        "--timeframe",
+        default="M5",
+        help="The chart timeframe for analysis (e.g., M1, M5, H1)",
+    )
+    p.add_argument(
+        "--model-dir",
+        type=Path,
+        default=Path("models/trained"),
+        help="Directory containing the pre-trained model weights",
+    )
+    p.add_argument(
+        "--log-level",
+        default="INFO",
+        help="Set the logging verbosity level (DEBUG, INFO, WARNING, ERROR)",
+    )
     return p.parse_args()
 
 
+BANNER = """
+[bold gold1]
+ ╔══════════════════════════════════════════════════════════════════════════╗
+ ║                                                                          ║
+ ║   ███╗   ███╗████████╗███████╗    █████╗ ██╗                             ║
+ ║   ████╗ ████║╚══██╔══╝██╔════╝   ██╔══██╗██║                             ║
+ ║   ██╔████╔██║   ██║   ███████╗   ███████║██║                             ║
+ ║   ██║╚██╔╝██║   ██║   ╚════██║   ██╔══██║██║                             ║
+ ║   ██║ ╚═╝ ██║   ██║   ███████║██╗██║  ██║██║                             ║
+ ║   ╚═╝     ╚═╝   ╚═╝   ╚══════╝╚═╝╚═╝  ╚═╝╚═╝                             ║
+ ║                                                                          ║
+ ║           MT5 AI/ML TRADING BOT - ENTERPRISE EDITION                     ║
+ ║           [italic sky_blue1]Developed for Institutional Gold Trading (XAUUSD)[/]           ║
+ ║                                                                          ║
+ ╚══════════════════════════════════════════════════════════════════════════╝
+[/]
+"""
+
+
 def main() -> int:
+    from rich.console import Console
+    console = Console()
+    console.print(BANNER)
+
     args = parse_args()
     configure_logging(args.log_level)
     log = logging.getLogger("main")
@@ -192,12 +243,18 @@ def main() -> int:
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
-    log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
-    )
+
+    from rich.table import Table
+    table = Table(title="Trading Configuration", title_style="bold magenta")
+    table.add_column("Parameter", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_row("Execution Mode", cfg.mode.upper())
+    table.add_row("Algorithm", cfg.algorithm.upper())
+    table.add_row("Symbol", cfg.symbol)
+    table.add_row("Timeframe", cfg.timeframe)
+    table.add_row("Risk per Trade", f"{cfg.risk_per_trade * 100:.1f}%")
+    table.add_row("Max Daily Loss", f"{cfg.max_daily_loss * 100:.1f}%")
+    console.print(table)
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
@@ -207,9 +264,15 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(
+        cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor
+    )
+
+    if EnsembleModel is None:
+        log.critical("AI Model dependencies (torch/SB3) missing. Cannot start bot.")
+        return 1
+
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +282,14 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:

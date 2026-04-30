@@ -105,7 +105,7 @@ class RiskManager:
         passed = rejection_reason == ""
         if not passed:
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
+                "🛡️ Signal REJECTED ❌ | %s %s | Reason: %s",
                 signal.symbol,
                 signal.direction,
                 rejection_reason,
