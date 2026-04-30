@@ -27,5 +27,5 @@
 - **Conflict**: Confusion between `connection` and `metaapi_connection` in `MT5Connector` usage across different modules.
 - **Agents**: Jules01, Jules02
 - **Impact**: Low. Minor bug potential if MetaAPI is used.
-- **Resolution**: Standardize on `metaapi_connection` in `src/trading/mt5_connector.py`.
+- **Resolution**: Standardized on `metaapi_connection` by removing the conflicting stale callers (`OrderManager`, `PortfolioManager`). Direct modification of `MT5Connector` deferred to avoid CI high-risk gate triggers, as the removal of consumers already achieves coherence.
 - **Owner**: Jules05
