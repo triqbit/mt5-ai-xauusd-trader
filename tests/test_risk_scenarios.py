@@ -1,7 +1,9 @@
+
 import pytest
-from unittest.mock import MagicMock
+
 from src.trading.risk_manager import RiskManager, TradeSignal, TradingConfig
 from src.utils.synthetic_data import ScenarioGenerator
+
 
 @pytest.fixture
 def config():

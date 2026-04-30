@@ -4,9 +4,11 @@ Produces OHLCV dataframes representing various market conditions and edge cases.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+
 
 class ScenarioGenerator:
     """
@@ -32,7 +34,13 @@ class ScenarioGenerator:
             "tick_volume": self.rng.integers(100, 1000, n_bars)
         })
 
-    def generate_trending_market(self, n_bars: int = 100, start_price: float = 2000.0, trend: float = 0.5, volatility: float = 2.0) -> pd.DataFrame:
+    def generate_trending_market(
+        self,
+        n_bars: int = 100,
+        start_price: float = 2000.0,
+        trend: float = 0.5,
+        volatility: float = 2.0,
+    ) -> pd.DataFrame:
         """
         Generate a trending market (bullish or bearish).
         trend > 0: Bullish
@@ -40,7 +48,7 @@ class ScenarioGenerator:
         """
         df = self._base_range(n_bars)
         prices = [start_price]
-        for i in range(1, n_bars):
+        for _ in range(1, n_bars):
             change = trend + self.rng.normal(0, volatility)
             prices.append(prices[-1] + change)
 
@@ -61,11 +69,13 @@ class ScenarioGenerator:
 
         return df
 
-    def generate_volatile_market(self, n_bars: int = 100, start_price: float = 2000.0, volatility: float = 10.0) -> pd.DataFrame:
+    def generate_volatile_market(
+        self, n_bars: int = 100, start_price: float = 2000.0, volatility: float = 10.0
+    ) -> pd.DataFrame:
         """Generate a high-volatility market with large price swings."""
         df = self._base_range(n_bars)
         prices = [start_price]
-        for i in range(1, n_bars):
+        for _ in range(1, n_bars):
             change = self.rng.normal(0, volatility)
             prices.append(prices[-1] + change)
 
@@ -76,11 +86,17 @@ class ScenarioGenerator:
 
         return df
 
-    def generate_gapping_market(self, n_bars: int = 100, start_price: float = 2000.0, gap_frequency: float = 0.05, gap_size: float = 20.0) -> pd.DataFrame:
+    def generate_gapping_market(
+        self,
+        n_bars: int = 100,
+        start_price: float = 2000.0,
+        gap_frequency: float = 0.05,
+        gap_size: float = 20.0,
+    ) -> pd.DataFrame:
         """Generate a market with occasional large price gaps between bars."""
         df = self._base_range(n_bars)
         prices = [start_price]
-        for i in range(1, n_bars):
+        for _ in range(1, n_bars):
             gap = 0
             if self.rng.random() < gap_frequency:
                 gap = self.rng.choice([-1, 1]) * gap_size
