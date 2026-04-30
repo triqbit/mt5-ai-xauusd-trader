@@ -35,9 +35,15 @@ from src.trading.risk_manager import RiskManager, TradeSignal
 
 
 def configure_logging(level: str = "INFO") -> None:
+    # Map string level to logging numeric level
+    log_level = getattr(logging, level.upper(), logging.INFO)
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
+            structlog.processors.add_log_level,
+            structlog.processors.filter_by_level,
+            structlog.processors.format_exc_info,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
             structlog.dev.ConsoleRenderer(),
@@ -47,7 +53,7 @@ def configure_logging(level: str = "INFO") -> None:
         logger_factory=structlog.PrintLoggerFactory(),
     )
     logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
+        level=log_level,
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
