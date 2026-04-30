@@ -5,6 +5,7 @@ Enterprise health gate for system sanity checks.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import socket
@@ -16,6 +17,7 @@ import structlog
 from src.core.config import TradingConfig
 
 logger = structlog.get_logger(__name__)
+
 
 class HealthGate:
     """
