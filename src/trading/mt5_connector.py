@@ -10,10 +10,13 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+
+from src.core.exceptions import MT5ConnectionError, MarketDataError, OrderExecutionError
 
 try:
     import MetaTrader5 as mt5
@@ -71,9 +74,9 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
-    def initialize(self) -> bool:
+    def initialize(self, max_retries: int = 3) -> bool:
         """
-        Establish connection to MT5 terminal or MetaAPI cloud.
+        Establish connection to MT5 terminal or MetaAPI cloud with retry logic.
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
 
         Returns:
@@ -83,35 +86,48 @@ class MT5Connector:
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
-            try:
-                if mt5.initialize(
-                    path=self.cfg.mt5_path,
-                    login=self.cfg.mt5_login,
-                    password=self.cfg.mt5_password,
-                    server=self.cfg.mt5_server,
-                ):
-                    logger.info("Native MT5 SDK initialized successfully.")
-                    self.use_metaapi = False
-                    self._is_initialized = True
-                    return True
-                else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
-            except Exception as e:
-                logger.error("Native MT5 initialization error: %s", e)
+            for attempt in range(max_retries):
+                try:
+                    if mt5.initialize(
+                        path=self.cfg.mt5_path,
+                        login=self.cfg.mt5_login,
+                        password=self.cfg.mt5_password,
+                        server=self.cfg.mt5_server,
+                    ):
+                        logger.info("Native MT5 SDK initialized successfully.")
+                        self.use_metaapi = False
+                        self._is_initialized = True
+                        return True
+                    else:
+                        error_code = mt5.last_error()
+                        logger.warning(
+                            "Native mt5.initialize attempt %d failed: %s",
+                            attempt + 1,
+                            error_code,
+                        )
+                        if attempt < max_retries - 1:
+                            time.sleep(2**attempt)
+                except Exception as e:
+                    logger.error("Native MT5 initialization error on attempt %d: %s", attempt + 1, e)
+                    if attempt < max_retries - 1:
+                        time.sleep(2**attempt)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         if METAAPI_AVAILABLE and self.cfg.metaapi_token:
             logger.info("Attempting MetaAPI cloud fallback...")
-            try:
-                self.metaapi = MetaApi(self.cfg.metaapi_token)
-                self.use_metaapi = True
-                self._is_initialized = True
-                logger.info("MetaAPI fallback configured.")
-                return True
-            except Exception as e:
-                logger.error("MetaAPI initialization failed: %s", e)
+            for attempt in range(max_retries):
+                try:
+                    self.metaapi = MetaApi(self.cfg.metaapi_token)
+                    self.use_metaapi = True
+                    self._is_initialized = True
+                    logger.info("MetaAPI fallback configured.")
+                    return True
+                except Exception as e:
+                    logger.error("MetaAPI initialization attempt %d failed: %s", attempt + 1, e)
+                    if attempt < max_retries - 1:
+                        time.sleep(2**attempt)
 
         logger.error("All MT5 connection paths failed.")
         return False
@@ -142,31 +158,49 @@ class MT5Connector:
         finally:
             self.shutdown()
 
-    def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+    def get_rates(
+        self, symbol: str, timeframe: str, n_bars: int, max_retries: int = 3
+    ) -> pd.DataFrame:
         """
-        Fetch historical OHLCV data.
+        Fetch historical OHLCV data with retry logic.
 
         Args:
             symbol: Trading symbol (e.g., 'XAUUSD').
             timeframe: Chart timeframe string (e.g., 'M5').
             n_bars: Number of bars to retrieve.
+            max_retries: Number of retry attempts.
 
         Returns:
-            DataFrame containing OHLCV data or empty DataFrame on failure.
+            DataFrame containing OHLCV data.
+
+        Raises:
+            MT5ConnectionError: If connector is not initialized.
+            MarketDataError: If data fetching fails after retries.
         """
         if not self._is_initialized:
-            return pd.DataFrame()
+            raise MT5ConnectionError("Connector not initialized. Call initialize() first.")
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
-            rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
-            if rates is None:
-                logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
-                return pd.DataFrame()
-            df = pd.DataFrame(rates)
-            df["time"] = pd.to_datetime(df["time"], unit="s")
-            return df
+            for attempt in range(max_retries):
+                rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+                if rates is not None and len(rates) > 0:
+                    df = pd.DataFrame(rates)
+                    df["time"] = pd.to_datetime(df["time"], unit="s")
+                    return df
+
+                error_code = mt5.last_error()
+                logger.warning(
+                    "Failed to copy rates for %s (attempt %d): %s",
+                    symbol,
+                    attempt + 1,
+                    error_code,
+                )
+                if attempt < max_retries - 1:
+                    time.sleep(1.0 * (attempt + 1))
+
+            raise MarketDataError(f"Failed to fetch rates for {symbol} after {max_retries} attempts.")
         else:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
@@ -176,27 +210,45 @@ class MT5Connector:
         """Alias for get_rates() to match main.py expectations."""
         return self.get_rates(symbol, timeframe, n_bars)
 
-    def get_tick(self, symbol: str) -> Dict[str, float]:
+    def get_tick(self, symbol: str, max_retries: int = 3) -> Dict[str, float]:
         """
-        Retrieve latest symbol tick (bid/ask).
+        Retrieve latest symbol tick (bid/ask) with retry logic.
 
         Args:
             symbol: Trading symbol.
+            max_retries: Number of retry attempts.
 
         Returns:
             Dictionary with 'bid' and 'ask' prices.
+
+        Raises:
+            MT5ConnectionError: If connector is not initialized.
+            MarketDataError: If tick data cannot be retrieved.
         """
-        if not self._is_initialized or self.use_metaapi:
+        if not self._is_initialized:
+            raise MT5ConnectionError("Connector not initialized.")
+
+        if self.use_metaapi:
             return {"bid": 0.0, "ask": 0.0}
 
-        tick = mt5.symbol_info_tick(symbol)
-        if tick is None:
-            logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
-            return {"bid": 0.0, "ask": 0.0}
+        for attempt in range(max_retries):
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is not None:
+                return {"bid": tick.bid, "ask": tick.ask}
 
-        return {"bid": tick.bid, "ask": tick.ask}
+            error_code = mt5.last_error()
+            logger.warning(
+                "Failed to get tick for %s (attempt %d): %s",
+                symbol,
+                attempt + 1,
+                error_code,
+            )
+            if attempt < max_retries - 1:
+                time.sleep(0.5 * (attempt + 1))
 
-    def place_order(self, signal: TradeSignal) -> Optional[int]:
+        raise MarketDataError(f"Failed to get tick for {symbol} after {max_retries} attempts.")
+
+    def place_order(self, signal: TradeSignal) -> int:
         """
         Execute a market order based on a validated trade signal.
 
@@ -204,19 +256,23 @@ class MT5Connector:
             signal: Validated TradeSignal object.
 
         Returns:
-            Order ticket ID if successful, None otherwise.
+            Order ticket ID if successful.
+
+        Raises:
+            MT5ConnectionError: If connector is not initialized.
+            OrderExecutionError: If order placement is rejected.
         """
         if not self._is_initialized:
-            return None
+            raise MT5ConnectionError("Connector not initialized.")
 
         if not self.use_metaapi:
             order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
+            # get_tick now raises MarketDataError on failure
             tick = self.get_tick(signal.symbol)
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
             if price == 0:
-                logger.error("Invalid price for order execution.")
-                return None
+                raise OrderExecutionError(f"Invalid price {price} for {signal.symbol}")
 
             request = {
                 "action": TRADE_ACTION_DEAL,
@@ -233,14 +289,18 @@ class MT5Connector:
             }
 
             result = mt5.order_send(request)
+            if result is None:
+                raise OrderExecutionError("mt5.order_send returned None")
+
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                logger.error("Order rejected: %s (code: %d)", result.comment, result.retcode)
-                return None
+                err_msg = f"Order rejected: {result.comment} (code: {result.retcode})"
+                logger.error(err_msg)
+                raise OrderExecutionError(err_msg)
 
             logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
             return int(result.order)
 
-        return None
+        raise OrderExecutionError("MetaAPI place_order not implemented in sync wrapper.")
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""

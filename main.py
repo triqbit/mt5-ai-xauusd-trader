@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.exceptions import MT5ConnectionError, MarketDataError, TradingBotError
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -67,8 +68,23 @@ def run_live(
     while True:
         try:
             # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-            tick = connector.get_tick(cfg.symbol)
+            try:
+                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                tick = connector.get_tick(cfg.symbol)
+            except MT5ConnectionError as e:
+                log.warning("Connection lost. Attempting to reconnect: %s", e)
+                if connector.initialize():
+                    log.info("Reconnected successfully.")
+                    continue
+                else:
+                    log.error("Reconnection failed. Waiting %d seconds.", poll_interval)
+                    time.sleep(poll_interval)
+                    continue
+            except MarketDataError as e:
+                log.warning("Market data transient error: %s. Skipping cycle.", e)
+                time.sleep(poll_interval)
+                continue
+
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
@@ -159,8 +175,11 @@ def run_live(
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
+        except TradingBotError as exc:
+            log.error("Trading logic error: %s", exc)
+            time.sleep(poll_interval)
         except Exception as exc:
-            log.exception("Unhandled error in trading loop: %s", exc)
+            log.exception("Unhandled system error in trading loop: %s", exc)
             time.sleep(poll_interval)
 
 
@@ -200,7 +219,7 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
+    if not connector.initialize():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
     balance = connector.get_account_balance()
