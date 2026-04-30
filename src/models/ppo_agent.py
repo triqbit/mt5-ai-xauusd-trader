@@ -9,23 +9,21 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
-import numpy as np
-from src.models import BaseModel, Signal
+from src.models.base import BaseModel, Signal
 
 logger = logging.getLogger(__name__)
+
 
 class PPOAgent(BaseModel):
     """
     PPO-based reinforcement learning agent.
     Uses Stable-Baselines3 PPO under the hood.
     """
+
     def __init__(
-        self,
-        env: Optional[Any] = None,
-        model_path: Optional[Path] = None,
-        device: str = "auto"
+        self, env: Optional[Any] = None, model_path: Optional[Path] = None, device: str = "auto"
     ) -> None:
         try:
             from stable_baselines3 import PPO
@@ -108,9 +106,7 @@ class PPOAgent(BaseModel):
         confidence = 1.0 if direction != 0 else 0.0
 
         return Signal(
-            direction=direction,
-            confidence=confidence,
-            metadata={"raw_action": action_val}
+            direction=direction, confidence=confidence, metadata={"raw_action": action_val}
         )
 
     def evaluate(self, n_eval_episodes: int = 10) -> Dict[str, float]:
@@ -119,6 +115,7 @@ class PPOAgent(BaseModel):
             return {"mean_reward": 0.0, "std_reward": 0.0}
 
         from stable_baselines3.common.evaluation import evaluate_policy
+
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_eval_episodes
         )

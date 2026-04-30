@@ -7,25 +7,23 @@ LSTM sequence model using PyTorch for short-term price prediction.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
-import numpy as np
 import torch
 import torch.nn as nn
-from src.models import BaseModel, Signal
+
+from src.models.base import BaseModel, Signal
 
 logger = logging.getLogger(__name__)
+
 
 class LSTMPredictor(nn.Module):
     """
     Core PyTorch LSTM network.
     """
+
     def __init__(
-        self,
-        input_size: int = 10,
-        hidden_size: int = 64,
-        num_layers: int = 2,
-        output_size: int = 3
+        self, input_size: int = 10, hidden_size: int = 64, num_layers: int = 2, output_size: int = 3
     ) -> None:
         super().__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
@@ -44,12 +42,9 @@ class LSTMModel(BaseModel):
     """
     LSTM-based price prediction model wrapper.
     """
+
     def __init__(
-        self,
-        input_size: int = 10,
-        hidden_size: int = 64,
-        num_layers: int = 2,
-        device: str = "cpu"
+        self, input_size: int = 10, hidden_size: int = 64, num_layers: int = 2, device: str = "cpu"
     ) -> None:
         self.device = torch.device(device)
         self.model = LSTMPredictor(input_size, hidden_size, num_layers).to(self.device)
@@ -87,7 +82,7 @@ class LSTMModel(BaseModel):
         return Signal(
             direction=direction,
             confidence=float(confidence),
-            metadata={"logits": logits.cpu().numpy().tolist()}
+            metadata={"logits": logits.cpu().numpy().tolist()},
         )
 
     def load_state_dict(self, path: str) -> None:

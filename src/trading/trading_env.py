@@ -7,7 +7,7 @@ Gymnasium-compatible XAUUSD trading environment skeleton.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -15,11 +15,13 @@ from gymnasium import spaces
 
 logger = logging.getLogger(__name__)
 
+
 class XAUUSDTradingEnv(gym.Env):
     """
     Standard Gymnasium environment for XAUUSD trading.
     This skeleton provides the interface required for RL agents like PPO.
     """
+
     metadata = {"render_modes": ["human"]}
 
     def __init__(
@@ -27,7 +29,7 @@ class XAUUSDTradingEnv(gym.Env):
         df: Optional[Any] = None,
         window_size: int = 24,
         initial_balance: float = 10000.0,
-        render_mode: Optional[str] = None
+        render_mode: Optional[str] = None,
     ) -> None:
         super().__init__()
         self.df = df
@@ -40,20 +42,15 @@ class XAUUSDTradingEnv(gym.Env):
 
         # Define observation space: Simplified placeholder for OHLCV + indicators
         # In production, this would be based on the actual feature set
-        n_features = 10 # Example feature count
+        n_features = 10  # Example feature count
         self.observation_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(window_size, n_features),
-            dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(window_size, n_features), dtype=np.float32
         )
 
         self.reset()
 
     def reset(
-        self,
-        seed: Optional[int] = None,
-        options: Optional[Dict[str, Any]] = None
+        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """Reset the environment state."""
         super().reset(seed=seed)

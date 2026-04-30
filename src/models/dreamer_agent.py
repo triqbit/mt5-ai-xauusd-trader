@@ -9,20 +9,19 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-import numpy as np
-from src.models import BaseModel, Signal
+from src.models.base import BaseModel, Signal
 
 logger = logging.getLogger(__name__)
+
 
 class DreamerAgent(BaseModel):
     """
     Placeholder wrapper for DreamerV3 model.
     DreamerV3 is a world model-based reinforcement learning algorithm.
     """
+
     def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        model_path: Optional[str] = None
+        self, config: Optional[Dict[str, Any]] = None, model_path: Optional[str] = None
     ) -> None:
         self.config = config or {}
         self.model_path = model_path
@@ -45,11 +44,7 @@ class DreamerAgent(BaseModel):
         # Placeholder logic: return HOLD with 0 confidence
         logger.debug("DreamerAgent.predict: Placeholder implementation called.")
 
-        return Signal(
-            direction=0,
-            confidence=0.0,
-            metadata={"status": "placeholder"}
-        )
+        return Signal(direction=0, confidence=0.0, metadata={"status": "placeholder"})
 
     def train(self, data: Any) -> None:
         """Placeholder for training loop."""

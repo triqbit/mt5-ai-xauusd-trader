@@ -2,11 +2,12 @@
 Unit tests for production model stubs and their common interface.
 """
 
-import pytest
 import numpy as np
-import torch
-from src.models import Signal, BaseModel, PPOAgent, LSTMModel, DreamerAgent
+import pytest
+
+from src.models import BaseModel, DreamerAgent, LSTMModel, PPOAgent, Signal
 from src.trading.trading_env import XAUUSDTradingEnv
+
 
 def test_signal_dataclass():
     """Verify Signal dataclass initialization."""
@@ -14,6 +15,7 @@ def test_signal_dataclass():
     assert sig.direction == 1
     assert sig.confidence == 0.85
     assert sig.metadata["test"] is True
+
 
 def test_ppo_agent_interface():
     """Verify PPOAgent implements BaseModel and returns Signal."""
@@ -33,6 +35,7 @@ def test_ppo_agent_interface():
     except ImportError:
         pytest.skip("stable-baselines3 not installed")
 
+
 def test_lstm_model_interface():
     """Verify LSTMModel implements BaseModel and returns Signal."""
     model = LSTMModel(input_size=10, hidden_size=32)
@@ -45,6 +48,7 @@ def test_lstm_model_interface():
     assert sig.direction in [-1, 0, 1]
     assert 0.0 <= sig.confidence <= 1.0
 
+
 def test_dreamer_agent_interface():
     """Verify DreamerAgent implements BaseModel and returns Signal."""
     agent = DreamerAgent()
@@ -54,8 +58,9 @@ def test_dreamer_agent_interface():
 
     sig = agent.predict(features)
     assert isinstance(sig, Signal)
-    assert sig.direction == 0 # Current placeholder behavior
+    assert sig.direction == 0  # Current placeholder behavior
     assert sig.confidence == 0.0
+
 
 def test_base_model_inheritance():
     """Ensure all models inherit from BaseModel."""
