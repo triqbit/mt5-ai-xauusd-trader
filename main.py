@@ -155,7 +155,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -179,7 +180,31 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument("--check", action="store_true", help="Perform pre-flight checks and exit")
     return p.parse_args()
+
+
+def print_preflight_banner(cfg, connector: MT5Connector) -> None:
+    """Print a visual summary of the trading configuration."""
+    print("\n" + "=" * 60)
+    print(" 🚀 MT5 AI/ML TRADER - PRE-FLIGHT CHECK")
+    print("=" * 60)
+    print(f"  Mode        : {cfg.mode.upper()}")
+    print(f"  Symbol      : {cfg.symbol}")
+    print(f"  Timeframe   : {cfg.timeframe}")
+    print(f"  Algorithm   : {cfg.algorithm}")
+    print(f"  Account     : {cfg.mt5_login if cfg.mt5_login else 'Not Set'}")
+    print(f"  Server      : {cfg.mt5_server}")
+
+    conn_path = "MetaAPI Cloud" if connector.use_metaapi else "Native MT5 SDK"
+    print(f"  Connection  : {conn_path}")
+
+    # Risk summary
+    print("-" * 60)
+    print(f"  Risk/Trade  : {cfg.risk_per_trade * 100:.2f}%")
+    print(f"  Max Daily L : {cfg.max_daily_loss * 100:.2f}%")
+    print(f"  Max Pos     : {cfg.max_positions}")
+    print("=" * 60 + "\n")
 
 
 def main() -> int:
@@ -192,24 +217,43 @@ def main() -> int:
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
-    log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
-    )
+
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
+    connection_ok = connector.connect()
+
+    # Pre-flight check display
+    print_preflight_banner(cfg, connector)
+
+    if not connection_ok:
         log.critical("Cannot connect to MT5 terminal. Aborting.")
+        print("\n" + "!" * 60)
+        print(" ❌ CONNECTION FAILURE TROUBLESHOOTING")
+        print("!" * 60)
+        print("  1. Ensure MetaTrader 5 terminal is RUNNING.")
+        print("  2. Verify MT5_LOGIN, MT5_PASSWORD, and MT5_SERVER in .env")
+        print("  3. Check 'Allow Algo Trading' in MT5 > Tools > Options > Expert Advisors")
+        print("  4. If on Linux/Mac, ensure MetaAPI token is set for cloud fallback.")
+        print("!" * 60 + "\n")
         return 1
+
+    if args.check:
+        log.info("Pre-flight check successful. --check mode active, exiting.")
+        return 0
+
+    if cfg.mode == "live" and not args.check:
+        print("⚠️  WARNING: You are about to start LIVE trading.")
+        confirm = input("Are you sure you want to continue? (y/N): ")
+        if confirm.lower() != "y":
+            log.info("Live mode aborted by user.")
+            return 0
+
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +263,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
