@@ -17,12 +17,14 @@ logger = logging.getLogger(__name__)
 
 class HyperparameterSet(BaseModel):
     """Container for a set of hyperparameters."""
+
     params: Dict[str, Any]
     id: Optional[str] = None
 
 
 class WindowConfig(BaseModel):
     """Indices for a single walk-forward window."""
+
     window_id: int
     train_start: int
     train_end: int
@@ -32,6 +34,7 @@ class WindowConfig(BaseModel):
 
 class WindowResult(BaseModel):
     """Performance metrics for a single window."""
+
     window_id: int
     params: HyperparameterSet
     is_metrics: Dict[str, float]
@@ -41,6 +44,7 @@ class WindowResult(BaseModel):
 
 class WalkForwardConfig(BaseModel):
     """Configuration for the walk-forward process."""
+
     train_window_size: int
     test_window_size: int
     step_size: int
@@ -51,6 +55,7 @@ class WalkForwardConfig(BaseModel):
 
 class WalkForwardSummary(BaseModel):
     """Overall results of the walk-forward optimization."""
+
     best_params: HyperparameterSet
     robustness_score: float
     avg_oos_performance: float
@@ -60,8 +65,10 @@ class WalkForwardSummary(BaseModel):
 
 class Evaluator(Protocol):
     """Protocol for an evaluator that can score a parameter set on a data slice."""
-    def evaluate(self, params: Dict[str, Any], start_idx: int, end_idx: int) -> Dict[str, float]:
-        ...
+
+    def evaluate(
+        self, params: Dict[str, Any], start_idx: int, end_idx: int
+    ) -> Dict[str, float]: ...
 
 
 class WalkForwardOptimizer:
@@ -82,18 +89,22 @@ class WalkForwardOptimizer:
         current_test_start = self.config.train_window_size
 
         while current_test_start + self.config.test_window_size <= self.data_length:
-            train_start = 0 if self.config.anchored else (current_test_start - self.config.train_window_size)
+            train_start = (
+                0 if self.config.anchored else (current_test_start - self.config.train_window_size)
+            )
             train_end = current_test_start
             test_start = current_test_start
             test_end = current_test_start + self.config.test_window_size
 
-            windows.append(WindowConfig(
-                window_id=window_id,
-                train_start=train_start,
-                train_end=train_end,
-                test_start=test_start,
-                test_end=test_end
-            ))
+            windows.append(
+                WindowConfig(
+                    window_id=window_id,
+                    train_start=train_start,
+                    train_end=train_end,
+                    test_start=test_start,
+                    test_end=test_end,
+                )
+            )
 
             current_test_start += self.config.step_size
             window_id += 1
@@ -157,7 +168,7 @@ class WalkForwardOptimizer:
         self,
         evaluator: Evaluator,
         param_candidates: List[HyperparameterSet],
-        metric_key: str = "sharpe"
+        metric_key: str = "sharpe",
     ) -> WalkForwardSummary:
         """
         Runs the full walk-forward process.
@@ -196,7 +207,7 @@ class WalkForwardOptimizer:
                     params=best_window_params,
                     is_metrics={metric_key: best_window_is_metric},
                     oos_metrics=oos_metrics,
-                    is_oos_ratio=is_oos_ratio
+                    is_oos_ratio=is_oos_ratio,
                 )
                 window_results.append(res)
                 param_history.append(best_window_params.params)
@@ -216,14 +227,14 @@ class WalkForwardOptimizer:
             robustness_score=robustness_score,
             avg_oos_performance=avg_oos,
             window_results=window_results,
-            stability_metrics=stability_metrics
+            stability_metrics=stability_metrics,
         )
 
     def rank_candidates(
         self,
         evaluator: Evaluator,
         param_candidates: List[HyperparameterSet],
-        metric_key: str = "sharpe"
+        metric_key: str = "sharpe",
     ) -> List[Tuple[HyperparameterSet, float]]:
         """
         Ranks parameter sets by their average OOS robustness across all windows.

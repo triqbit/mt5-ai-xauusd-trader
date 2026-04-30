@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class StrategyResult(BaseModel):
     """Structured performance metrics for a strategy."""
+
     name: str
     total_return: float
     cagr: float
@@ -35,6 +36,7 @@ class StrategyResult(BaseModel):
 
 class Strategy(Protocol):
     """Protocol for all strategies to ensure consistent interface."""
+
     name: str
 
     def generate_signals(self, data: np.ndarray) -> np.ndarray:
@@ -48,8 +50,10 @@ class Strategy(Protocol):
 
 # ── Baseline Strategies ──────────────────────────────────────────────────
 
+
 class EMACrossoverStrategy:
     """Classic EMA Crossover baseline."""
+
     def __init__(self, fast_period: int = 12, slow_period: int = 26, name: str = "EMA_Crossover"):
         self.fast_period = fast_period
         self.slow_period = slow_period
@@ -68,6 +72,7 @@ class EMACrossoverStrategy:
 
 class MomentumStrategy:
     """Basic price momentum strategy."""
+
     def __init__(self, period: int = 14, threshold: float = 0.0, name: str = "Momentum"):
         self.period = period
         self.threshold = threshold
@@ -85,6 +90,7 @@ class MomentumStrategy:
 
 class VolatilityBreakoutStrategy:
     """Donchian Channel / Volatility breakout baseline."""
+
     def __init__(self, period: int = 20, name: str = "Vol_Breakout"):
         self.period = period
         self.name = name
@@ -105,6 +111,7 @@ class VolatilityBreakoutStrategy:
 
 class NaiveDirectionalStrategy:
     """Always Buy (direction=1) or Always Sell (direction=2)."""
+
     def __init__(self, direction: int = 1, name: str = "Buy_and_Hold"):
         self.direction = direction
         self.name = name
@@ -118,6 +125,7 @@ class RiskFilteredBaseline:
     Heuristic baseline that filters signals based on simple volatility threshold.
     Only allows trades if volatility (ATR proxy) is within a reasonable range.
     """
+
     def __init__(self, base_strategy: Strategy, vol_period: int = 14, max_vol_mult: float = 2.0):
         self.base_strategy = base_strategy
         self.vol_period = vol_period
@@ -141,11 +149,13 @@ class RiskFilteredBaseline:
 
 # ── Model Wrapper ────────────────────────────────────────────────────────
 
+
 class ModelWrapper:
     """
     Wraps an RL Agent or Ensemble for benchmarking.
     Simulates the sliding window and state representation required by models.
     """
+
     def __init__(self, model: Any, window_size: int = 60, name: str = "AdvancedModel"):
         self.model = model
         self.window_size = window_size
@@ -186,8 +196,10 @@ class ModelWrapper:
 
 # ── Evaluator ───────────────────────────────────────────────────────────
 
+
 class BenchmarkEvaluator:
     """Evaluates and compares multiple strategies."""
+
     def __init__(self, initial_balance: float = 10000.0, commission: float = 0.0002):
         self.initial_balance = initial_balance
         self.commission = commission
@@ -208,14 +220,14 @@ class BenchmarkEvaluator:
         gross_loss = 0.0
 
         for i in range(1, len(data)):
-            current_action = int(signals[i-1])
+            current_action = int(signals[i - 1])
             price = close[i]
-            prev_price = close[i-1]
+            prev_price = close[i - 1]
 
             step_return = 0.0
 
             # Handle existing positions
-            if position == 1: # Long
+            if position == 1:  # Long
                 step_return = (price - prev_price) / prev_price
                 # Exit signal (Hold or Sell)
                 if current_action in [0, 2]:
@@ -229,7 +241,7 @@ class BenchmarkEvaluator:
                         gross_loss += abs(trade_pnl)
                     position = 0
 
-            elif position == 2: # Short
+            elif position == 2:  # Short
                 step_return = (prev_price - price) / prev_price
                 # Exit signal (Hold or Buy)
                 if current_action in [0, 1]:
@@ -263,7 +275,11 @@ class BenchmarkEvaluator:
         sharpe = (avg_ret / (rets_arr.std() + 1e-9)) * np.sqrt(252) if len(rets_arr) > 0 else 0.0
 
         downside_rets = rets_arr[rets_arr < 0]
-        sortino = (avg_ret / (downside_rets.std() + 1e-9)) * np.sqrt(252) if len(downside_rets) > 0 else 0.0
+        sortino = (
+            (avg_ret / (downside_rets.std() + 1e-9)) * np.sqrt(252)
+            if len(downside_rets) > 0
+            else 0.0
+        )
 
         cum_rets = np.cumsum(returns)
         running_max = np.maximum.accumulate(cum_rets)
@@ -285,7 +301,7 @@ class BenchmarkEvaluator:
             profit_factor=profit_factor,
             total_trades=total_trades,
             volatility=vol,
-            returns=returns
+            returns=returns,
         )
 
     def compare(self, strategies: List[Strategy], data: np.ndarray) -> pd.DataFrame:
@@ -304,5 +320,5 @@ class BenchmarkEvaluator:
         """Calculate p-value using t-test to see if res1 is statistically different from res2."""
         if not res1.returns or not res2.returns:
             return 1.0
-        t_stat, p_val = stats.ttest_ind(res1.returns, res2.returns, equal_var=False)
+        _t_stat, p_val = stats.ttest_ind(res1.returns, res2.returns, equal_var=False)
         return float(p_val)

@@ -5,6 +5,7 @@ Real-time monitoring, equity tracking, and Telegram alerting with Prometheus met
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -99,7 +100,7 @@ class Monitor:
         Send critical alert for circuit breaker trigger and update Prometheus.
         """
         DRAWDOWN.set(drawdown)
-        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
+        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown * 100:.2f}%\nTrading Halted."
         self.send_message(msg)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:

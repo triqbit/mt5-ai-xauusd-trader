@@ -37,7 +37,7 @@ class FeatureEngineer:
         self.feature_columns: List[str] = []
 
         # Define candle patterns available in TA-Lib
-        self.candle_names = talib.get_function_groups()['Pattern Recognition']
+        self.candle_names = talib.get_function_groups()["Pattern Recognition"]
 
     def compute_base_indicators(self, df: pd.DataFrame, prefix: str = "") -> pd.DataFrame:
         """
@@ -50,34 +50,36 @@ class FeatureEngineer:
             DataFrame with added indicators.
         """
         df = df.copy()
-        close = df['close'].values
-        high = df['high'].values
-        low = df['low'].values
+        close = df["close"].values
+        high = df["high"].values
+        low = df["low"].values
 
         # RSI
-        df[f'{prefix}RSI'] = talib.RSI(close, timeperiod=14)
+        df[f"{prefix}RSI"] = talib.RSI(close, timeperiod=14)
 
         # MACD
         macd, macdsignal, macdhist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-        df[f'{prefix}MACD'] = macd
-        df[f'{prefix}MACD_signal'] = macdsignal
-        df[f'{prefix}MACD_hist'] = macdhist
+        df[f"{prefix}MACD"] = macd
+        df[f"{prefix}MACD_signal"] = macdsignal
+        df[f"{prefix}MACD_hist"] = macdhist
 
         # ATR
-        df[f'{prefix}ATR'] = talib.ATR(high, low, close, timeperiod=14)
+        df[f"{prefix}ATR"] = talib.ATR(high, low, close, timeperiod=14)
 
         # Bollinger Bands
         upper, middle, lower = talib.BBANDS(close, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
-        df[f'{prefix}BB_upper'] = upper
-        df[f'{prefix}BB_middle'] = middle
-        df[f'{prefix}BB_lower'] = lower
-        df[f'{prefix}BB_width'] = (upper - lower) / middle
+        df[f"{prefix}BB_upper"] = upper
+        df[f"{prefix}BB_middle"] = middle
+        df[f"{prefix}BB_lower"] = lower
+        df[f"{prefix}BB_width"] = (upper - lower) / middle
 
         # EMA stacks
         for period in [8, 21, 50, 200]:
-            df[f'{prefix}EMA_{period}'] = talib.EMA(close, timeperiod=period)
+            df[f"{prefix}EMA_{period}"] = talib.EMA(close, timeperiod=period)
             # Distance from EMA as a feature
-            df[f'{prefix}DIST_EMA_{period}'] = (close - df[f'{prefix}EMA_{period}']) / df[f'{prefix}EMA_{period}']
+            df[f"{prefix}DIST_EMA_{period}"] = (close - df[f"{prefix}EMA_{period}"]) / df[
+                f"{prefix}EMA_{period}"
+            ]
 
         return df
 
@@ -98,7 +100,7 @@ class FeatureEngineer:
             "M15": "15min",
             "H1": "1h",
             "H4": "4h",
-            "D1": "1d"
+            "D1": "1d",
         }
 
         original_df = df.copy()
@@ -108,19 +110,19 @@ class FeatureEngineer:
                 continue
 
             # Resample
-            resampled = df.resample(tf_freq).agg({
-                'open': 'first',
-                'high': 'max',
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum'
-            }).dropna()
+            resampled = (
+                df.resample(tf_freq)
+                .agg(
+                    {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
+                )
+                .dropna()
+            )
 
             # Compute indicators on resampled data
             resampled = self.compute_base_indicators(resampled, prefix=f"{tf_name}_")
 
             # Drop OHLCV from resampled to avoid collisions
-            resampled = resampled.drop(columns=['open', 'high', 'low', 'close', 'volume'])
+            resampled = resampled.drop(columns=["open", "high", "low", "close", "volume"])
 
             # Shift resampled data to prevent look-ahead bias
             # Resampled bars are labeled by their start time, so we must shift them
@@ -133,7 +135,7 @@ class FeatureEngineer:
                 resampled.sort_index(),
                 left_index=True,
                 right_index=True,
-                direction='backward'
+                direction="backward",
             )
 
         return original_df
@@ -148,10 +150,10 @@ class FeatureEngineer:
         Returns:
             DataFrame with candle pattern features.
         """
-        op = df['open'].values
-        hi = df['high'].values
-        lo = df['low'].values
-        cl = df['close'].values
+        op = df["open"].values
+        hi = df["high"].values
+        lo = df["low"].values
+        cl = df["close"].values
 
         for pattern in self.candle_names:
             # Pattern recognition functions return -100, 0, or 100
@@ -170,14 +172,14 @@ class FeatureEngineer:
         Returns:
             DataFrame with volume features.
         """
-        cl = df['close'].values
-        hi = df['high'].values
-        lo = df['low'].values
-        vo = df['volume'].values
+        cl = df["close"].values
+        hi = df["high"].values
+        lo = df["low"].values
+        vo = df["volume"].values
 
-        df['OBV'] = talib.OBV(cl, vo)
-        df['AD'] = talib.AD(hi, lo, cl, vo)
-        df['ADOSC'] = talib.ADOSC(hi, lo, cl, vo, fastperiod=3, slowperiod=10)
+        df["OBV"] = talib.OBV(cl, vo)
+        df["AD"] = talib.AD(hi, lo, cl, vo)
+        df["ADOSC"] = talib.ADOSC(hi, lo, cl, vo, fastperiod=3, slowperiod=10)
 
         return df
 
@@ -206,12 +208,12 @@ class FeatureEngineer:
 
         # 5. Handle NaNs from indicators warmup
         # Drop columns that are all NaN (might happen with some MTF features if data is short)
-        df = df.dropna(axis=1, how='all')
+        df = df.dropna(axis=1, how="all")
         # Drop rows with NaNs (warmup period)
         df = df.dropna()
 
         # 6. Drop OHLCV before normalization
-        features_df = df.drop(columns=['open', 'high', 'low', 'close', 'volume'])
+        features_df = df.drop(columns=["open", "high", "low", "close", "volume"])
 
         # 7. Normalization
         if fit_scaler:
@@ -234,9 +236,7 @@ class FeatureEngineer:
 
             normalized_data = self.scaler.transform(features_df)
             normalized_df = pd.DataFrame(
-                normalized_data,
-                index=features_df.index,
-                columns=self.feature_columns
+                normalized_data, index=features_df.index, columns=self.feature_columns
             )
             return normalized_df
 
