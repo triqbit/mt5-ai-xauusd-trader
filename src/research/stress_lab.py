@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Protocol, Tuple, Union
+from typing import List, Protocol
 
 import numpy as np
 import pandas as pd
@@ -211,15 +211,19 @@ class StressLab:
 
             # Dynamic stressors
             current_spread = self.base_spread
-            if StressType.SPREAD_WIDENING in stressors:
+            if (
+                StressType.SPREAD_WIDENING in stressors
+                and random.random() < 0.1 * intensity
+            ):
                 # Randomly widen spread up to 10x
-                if random.random() < 0.1 * intensity:
-                    current_spread *= (1 + random.uniform(2, 10) * intensity)
+                current_spread *= 1 + random.uniform(2, 10) * intensity
 
             service_available = True
-            if StressType.DEGRADED_SERVICE in stressors:
-                if random.random() < 0.02 * intensity:
-                    service_available = False
+            if (
+                StressType.DEGRADED_SERVICE in stressors
+                and random.random() < 0.02 * intensity
+            ):
+                service_available = False
 
             # Build observation (mocking the expected format)
             # In a real scenario, this would use a proper feature engineer
@@ -228,21 +232,19 @@ class StressLab:
             action = 0
             if service_available:
                 action = strategy.predict(obs)
-            else:
-                if i % 10 == 0: # Log only occasionally to avoid bloat
-                    self.report_entries.append(FailurePoint(
-                        timestamp=datetime.now(timezone.utc),
-                        stress_type=StressType.DEGRADED_SERVICE,
-                        condition="API Timeout / Connection Lost",
-                        impact="Missed signal or unable to close",
-                        severity=intensity
-                    ))
+            elif i % 10 == 0:  # Log only occasionally to avoid bloat
+                self.report_entries.append(FailurePoint(
+                    timestamp=datetime.now(timezone.utc),
+                    stress_type=StressType.DEGRADED_SERVICE,  # Using service as proxy for system collapse
+                    condition="API Timeout / Connection Lost",
+                    impact="Missed signal or unable to close",
+                    severity=intensity,
+                ))
 
             # Slippage logic
             slippage = 0.0
-            if StressType.SLIPPAGE_SPIKES in stressors:
-                if random.random() < 0.05 * intensity:
-                    slippage = current_close * 0.0005 * intensity
+            if StressType.SLIPPAGE_SPIKES in stressors and random.random() < 0.05 * intensity:
+                slippage = current_close * 0.0005 * intensity
 
             # Order Execution
             if action == 1 and position == 0: # Buy
@@ -290,9 +292,9 @@ class StressLab:
 
 
 __all__ = [
-    "StressLab",
-    "StressType",
-    "StressReport",
     "FailurePoint",
     "ResilienceMetrics",
+    "StressLab",
+    "StressReport",
+    "StressType",
 ]
