@@ -1,0 +1,364 @@
+"""
+MT5 AI/ML Trading Bot - Enterprise Edition
+src/research/benchmarks.py
+Benchmarking framework to compare advanced models against baseline strategies.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Protocol
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+
+class BenchmarkStrategy(Protocol):
+    """Protocol for all strategies and baselines to ensure consistent evaluation."""
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate signals for a given dataset.
+        Args:
+            df: DataFrame containing OHLCV data and technical indicators.
+        Returns:
+            np.ndarray: Array of signals (1: Buy, -1: Sell, 0: Hold).
+        """
+        ...
+
+    @property
+    def name(self) -> str:
+        """Return the name of the strategy."""
+        ...
+
+
+class EMACrossoverStrategy:
+    """Simple EMA Crossover baseline."""
+
+    def __init__(self, fast_window: int = 9, slow_window: int = 21):
+        self.fast_window = fast_window
+        self.slow_window = slow_window
+
+    @property
+    def name(self) -> str:
+        return f"EMA_Crossover_{self.fast_window}_{self.slow_window}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        fast_ema = df["close"].ewm(span=self.fast_window, adjust=False).mean()
+        slow_ema = df["close"].ewm(span=self.slow_window, adjust=False).mean()
+
+        signals = np.zeros(len(df))
+        signals[fast_ema > slow_ema] = 1
+        signals[fast_ema < slow_ema] = -1
+        return signals
+
+
+class MomentumStrategy:
+    """Momentum-based (ROC) baseline."""
+
+    def __init__(self, window: int = 14):
+        self.window = window
+
+    @property
+    def name(self) -> str:
+        return f"Momentum_ROC_{self.window}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        roc = df["close"].pct_change(periods=self.window)
+        signals = np.zeros(len(df))
+        signals[roc > 0] = 1
+        signals[roc < 0] = -1
+        return signals
+
+
+class VolatilityBreakoutStrategy:
+    """Bollinger Band Breakout baseline."""
+
+    def __init__(self, window: int = 20, num_std: float = 2.0):
+        self.window = window
+        self.num_std = num_std
+
+    @property
+    def name(self) -> str:
+        return f"Volatility_Breakout_{self.window}_{self.num_std}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        rolling_mean = df["close"].rolling(window=self.window).mean()
+        rolling_std = df["close"].rolling(window=self.window).std()
+        upper_band = rolling_mean + (rolling_std * self.num_std)
+        lower_band = rolling_mean - (rolling_std * self.num_std)
+
+        signals = np.zeros(len(df))
+        signals[df["close"] > upper_band] = 1
+        signals[df["close"] < lower_band] = -1
+        return signals
+
+
+class NaiveDirectionalStrategy:
+    """Naive 'Follow the Leader' (last candle direction) strategy."""
+
+    @property
+    def name(self) -> str:
+        return "Naive_Directional"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        diff = df["close"].diff()
+        signals = np.zeros(len(df))
+        signals[diff > 0] = 1
+        signals[diff < 0] = -1
+        return signals
+
+
+class RiskFilteredBaseline:
+    """EMA Crossover strategy with a simple volatility filter."""
+
+    def __init__(self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02):
+        self.fast_window = fast_window
+        self.slow_window = slow_window
+        self.vol_threshold_pct = vol_threshold_pct
+
+    @property
+    def name(self) -> str:
+        return f"Risk_Filtered_EMA_{self.vol_threshold_pct}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        fast_ema = df["close"].ewm(span=self.fast_window, adjust=False).mean()
+        slow_ema = df["close"].ewm(span=self.slow_window, adjust=False).mean()
+        volatility = df["close"].rolling(window=20).std() / df["close"]
+
+        signals = np.zeros(len(df))
+        # Only trade if volatility is below threshold
+        mask = (volatility < self.vol_threshold_pct)
+        signals[mask & (fast_ema > slow_ema)] = 1
+        signals[mask & (fast_ema < slow_ema)] = -1
+        return signals
+
+
+class BenchmarkEvaluator:
+    """Evaluates multiple strategies and generates comparative reports."""
+
+    def __init__(self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002):
+        self.df = df
+        self.initial_balance = initial_balance
+        self.commission = commission
+        self.results: Dict[str, Any] = {}
+
+    def evaluate_all(self, strategies: List[BenchmarkStrategy]) -> pd.DataFrame:
+        """Run evaluation for all provided strategies."""
+        summary = {}
+        for strategy in strategies:
+            signals = strategy.predict(self.df)
+            metrics = self._calculate_metrics(signals, strategy.name)
+            self.results[strategy.name] = metrics
+            summary[strategy.name] = metrics
+
+        return pd.DataFrame(summary).T
+
+    def _calculate_metrics(self, signals: np.ndarray, name: str) -> Dict[str, Any]:
+        """Backtest signals and calculate performance metrics using equity curve."""
+        close = self.df["close"].values
+        n = len(signals)
+        equity = np.ones(n) * self.initial_balance
+        daily_returns = np.zeros(n)
+        trade_pnls = []
+
+        position = 0
+        entry_price = 0.0
+
+        for i in range(1, n):
+            current_sig = signals[i - 1]
+            current_price = close[i]
+            prev_price = close[i - 1]
+            current_equity = equity[i - 1]
+
+            # Handle position transitions
+            if current_sig == 1 and position == 0:  # Enter Long
+                position = 1
+                entry_price = prev_price * (1 + self.commission)
+            elif current_sig == -1 and position == 1:  # Close Long
+                pnl = (current_price * (1 - self.commission)) - entry_price
+                trade_pnls.append(pnl)
+                position = 0
+            elif current_sig == -1 and position == 0:  # Enter Short
+                position = -1
+                entry_price = prev_price * (1 - self.commission)
+            elif current_sig == 1 and position == -1:  # Close Short
+                pnl = entry_price - (current_price * (1 + self.commission))
+                trade_pnls.append(pnl)
+                position = 0
+
+            # Calculate daily change in equity
+            if position == 1:
+                change = (current_price - prev_price) / prev_price
+                equity[i] = current_equity * (1 + change)
+            elif position == -1:
+                change = (prev_price - current_price) / prev_price
+                equity[i] = current_equity * (1 + change)
+            else:
+                equity[i] = current_equity
+
+            daily_returns[i] = (equity[i] - equity[i - 1]) / equity[i - 1]
+
+        # Final aggregate metrics
+        total_return = (equity[-1] - self.initial_balance) / self.initial_balance
+
+        sharpe = 0.0
+        if np.std(daily_returns) > 0:
+            # Assuming 252 trading days for annualization
+            sharpe = np.mean(daily_returns) / np.std(daily_returns) * np.sqrt(252)
+
+        peak = np.maximum.accumulate(equity)
+        drawdown = (peak - equity) / peak
+        max_drawdown = np.max(drawdown) if len(drawdown) > 0 else 0
+
+        win_rate = 0.0
+        if len(trade_pnls) > 0:
+            win_rate = len([p for p in trade_pnls if p > 0]) / len(trade_pnls)
+
+        # Store daily returns for statistical testing
+        self.results[name + "_returns"] = daily_returns
+
+        return {
+            "Total Return": total_return,
+            "Sharpe Ratio": sharpe,
+            "Max Drawdown": max_drawdown,
+            "Win Rate": win_rate,
+            "Num Trades": len(trade_pnls),
+        }
+
+    def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> Dict[str, Any]:
+        """Perform statistical comparison between a strategy and a baseline."""
+        if strategy_name not in self.results or baseline_name not in self.results:
+            return {"error": "Strategy or baseline not found in results."}
+
+        s_metrics = self.results[strategy_name]
+        b_metrics = self.results[baseline_name]
+
+        s_returns = self.results.get(strategy_name + "_returns", np.array([]))
+        b_returns = self.results.get(baseline_name + "_returns", np.array([]))
+
+        # Welch's t-test on return distributions
+        t_stat, p_value = stats.ttest_ind(s_returns, b_returns, equal_var=False)
+
+        # Simple relative performance
+        outperformance = s_metrics["Total Return"] - b_metrics["Total Return"]
+        sharpe_diff = s_metrics["Sharpe Ratio"] - b_metrics["Sharpe Ratio"]
+
+        return {
+            "Outperformance": outperformance,
+            "Sharpe Improvement": sharpe_diff,
+            "Relative Return": outperformance / (abs(b_metrics["Total Return"]) + 1e-9),
+            "T-Statistic": float(t_stat),
+            "P-Value": float(p_value),
+            "Significant": bool(p_value < 0.05) if not np.isnan(p_value) else False,
+        }
+
+
+class EnsembleAdapter:
+    """Adapter for EnsembleModel to match BenchmarkStrategy interface."""
+
+    def __init__(self, model: Any, name: str = "Ensemble_Model"):
+        self.model = model
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        EnsembleModel expected 'obs' as [open, high, low, close, tick_volume].
+        This adapter iterates through the DataFrame to provide per-step predictions.
+        """
+        signals = np.zeros(len(df))
+        for i in range(len(df)):
+            obs = df.iloc[i][["open", "high", "low", "close", "tick_volume"]].values
+            # EnsembleModel.predict returns (direction, confidence, per_algo)
+            direction, _, _ = self.model.predict(obs)
+            signals[i] = direction
+        return signals
+
+
+class PPOAdapter:
+    """Adapter for PPOAgent to match BenchmarkStrategy interface."""
+
+    def __init__(self, agent: Any, name: str = "PPO_Agent"):
+        self.agent = agent
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        PPOAgent.predict expects the final observation vector.
+        Note: The input 'df' should ideally be pre-processed to match
+        the environment's observation space (windowing + normalization).
+        """
+        signals = np.zeros(len(df))
+        for i in range(len(df)):
+            # Fallback to entire row if not pre-processed
+            obs = df.iloc[i].values
+            action = self.agent.predict(obs)
+            # Action space: 0=Hold, 1=Buy, 2=Sell
+            direction_map = {0: 0, 1: 1, 2: -1}
+            signals[i] = direction_map.get(int(action), 0)
+        return signals
+
+
+class TransformerAdapter:
+    """Adapter for TimeSeriesTransformer to match BenchmarkStrategy interface."""
+
+    def __init__(self, model: Any, name: str = "Transformer_Model", device: str = "cpu"):
+        self.model = model
+        self._name = name
+        self.device = device
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Transformer expects input shape: [batch, seq_len, features].
+        This adapter handles a single sequence or a batch of sequences.
+        """
+        import torch
+
+        self.model.eval()
+        signals = np.zeros(len(df))
+
+        # Determine if we should treat the whole DF as one sequence or per-row.
+        # Most transformers in this repo use a window_size (e.g., 60).
+        # For evaluation, we typically want per-step prediction using the lookback.
+
+        data = torch.FloatTensor(df.values).to(self.device)
+
+        # If data is 2D [n_steps, features], and the model expects [batch, seq, feat]
+        # we might need to create sliding windows.
+        # Here we assume the model can take the 2D input if unsqueezed or handled internally.
+
+        if data.dim() == 2:
+            # Simple case: treat the whole DF as one sequence for a single prediction at the end
+            # or treat as a batch of independent rows (less likely for transformer).
+            # For this adapter, we provide a basic pass-through.
+            data = data.unsqueeze(0)  # [1, n_steps, features]
+
+        with torch.no_grad():
+            probs = self.model(data)
+            actions = torch.argmax(probs, dim=-1).cpu().numpy()
+
+        # Logic: 0=Buy, 1=Sell, 2=Hold based on src/models/transformer_model.py
+        direction_map = {0: 1, 1: -1, 2: 0}
+
+        # If we get a single action back (batch size 1)
+        if actions.ndim == 1 and len(actions) == 1:
+            signals[-1] = direction_map.get(int(actions[0]), 0)
+        else:
+            # Map batch actions to signals
+            for i, act in enumerate(actions):
+                if i < len(signals):
+                    signals[i] = direction_map.get(int(act), 0)
+
+        return signals
