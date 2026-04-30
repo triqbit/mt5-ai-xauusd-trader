@@ -99,7 +99,7 @@ jobs:
           REASON=""
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
             REASON="🚨 High-risk files modified."
-            gh pr edit $PR_NUMBER --add-label "escalated-risk"
+            gh pr edit $PR_NUMBER --add-label "escalated-risk" || echo "Warning: Could not add label"
           fi
           if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
             if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then

@@ -41,3 +41,25 @@ def test_config_singleton_loading():
         cfg2 = get_config()
         assert isinstance(cfg1, TradingConfig)
         assert cfg1 is cfg2
+
+def test_risk_manager_timestamp_utc():
+    """Verify TradeSignal timestamp uses UTC."""
+    from src.trading.risk_manager import TradeSignal
+    from datetime import datetime, timezone, timedelta
+
+    signal = TradeSignal(
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000.0,
+        stop_loss=1990.0,
+        take_profit=2020.0,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.9
+    )
+
+    # Check if timestamp is aware and is UTC
+    assert signal.timestamp.tzinfo == timezone.utc
+    # Check if it's close to current time
+    now = datetime.now(timezone.utc)
+    assert abs(signal.timestamp - now) < timedelta(seconds=5)
