@@ -87,22 +87,20 @@ class RiskManager:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
+        Logs detailed decision chain for audit compliance.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        chain = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "minimum_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
 
-        passed = rejection_reason == ""
+        passed = all(chain.values())
+        rejection_reason = next((k for k, v in chain.items() if not v), "")
+
         if not passed:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
@@ -116,6 +114,19 @@ class RiskManager:
                     description=rejection_reason,
                     symbol=signal.symbol,
                     signal_id=signal_id,
+                )
+                # Full audit trail for compliance
+                self.trade_logger.audit.log_trade_blocked(
+                    symbol=signal.symbol,
+                    reason=rejection_reason,
+                    decision_chain=chain
+                )
+        else:
+            if self.trade_logger:
+                self.trade_logger.audit.log_event(
+                    event_type="RISK_APPROVAL",
+                    description=f"Risk engine approved {signal.symbol} trade",
+                    metadata={"symbol": signal.symbol, "decision_chain": chain}
                 )
         return passed
 
@@ -144,6 +155,18 @@ class RiskManager:
             risk_capital,
             lot_size,
         )
+        if self.trade_logger:
+            self.trade_logger.audit.log_event(
+                event_type="POSITION_SIZING",
+                description=f"Sized {symbol} at {lot_size} lots",
+                metadata={
+                    "symbol": symbol,
+                    "kelly_fraction": kelly_fraction,
+                    "risk_capital": risk_capital,
+                    "lot_size": lot_size,
+                    "win_rate": win_rate
+                }
+            )
         return lot_size
 
     def update_equity(self, current_equity: float) -> None:
@@ -180,6 +203,11 @@ class RiskManager:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
                     description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                )
+                self.trade_logger.audit.log_operator_action(
+                    action="CIRCUIT_BREAKER_HALT",
+                    reason=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    actor="SYSTEM"
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
