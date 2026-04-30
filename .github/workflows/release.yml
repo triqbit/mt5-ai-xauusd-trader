@@ -84,15 +84,39 @@ jobs:
       - name: Validate Environment Config
         run: python scripts/validate_env.py
 
+      - name: Migration Reversibility Check
+        run: python scripts/verify_migrations.py
+
       - name: Verify Pre-Prod Checklist
         run: |
-          if [ ! -f docs/PREPROD_CHECKLIST.md ]; then
-            echo "Error: PREPROD_CHECKLIST.md missing!"
+          CHECKLIST="docs/PREPROD_CHECKLIST.md"
+          if [ ! -f "$CHECKLIST" ]; then
+            echo "::error::PREPROD_CHECKLIST.md missing!"
             exit 1
           fi
-          if ! grep -q "\[x\]" docs/PREPROD_CHECKLIST.md; then
-            echo "Warning: PREPROD_CHECKLIST.md has no completed items."
+
+          # Define mandatory items that must be checked [x]
+          MANDATORY_ITEMS=(
+            "unit tests pass"
+            "Security scan"
+            "Risk limits"
+            "Monitoring"
+            "Rollback plan"
+          )
+
+          MISSING=0
+          for item in "${MANDATORY_ITEMS[@]}"; do
+            if ! grep -i "\[x\].*$item" "$CHECKLIST" > /dev/null; then
+              echo "::error::Mandatory checklist item not completed: $item"
+              MISSING=$((MISSING+1))
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "::error::$MISSING mandatory checklist items are incomplete. Release blocked."
+            exit 1
           fi
+          echo "Pre-prod checklist validation passed."
 
       - name: Upload Compliance Report
         uses: actions/upload-artifact@v4
