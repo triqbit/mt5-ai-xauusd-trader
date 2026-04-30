@@ -148,7 +148,7 @@ class EnsembleModel:
         confidence = float(blended[action_idx])
         direction_map = {0: 1, 1: -1, 2: 0}
         direction = direction_map[action_idx]
-        per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+        per_algo = {k: direction_map[int(np.argmax(votes[k]))] for k in votes}
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
             direction,

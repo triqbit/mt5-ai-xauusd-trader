@@ -46,10 +46,15 @@ class TradingConfig(BaseSettings):
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
     max_positions: int = Field(default=3, ge=1, le=10)
+    max_daily_trades: int = Field(default=10, ge=1, le=50)
+    max_consecutive_losses: int = Field(default=3, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    circuit_breaker_threshold: float = Field(default=0.15, ge=0.05, le=0.50)
+    min_risk_reward: float = Field(default=1.5, ge=1.0, le=5.0)
 
     # ── Model ──────────────────────────────────────────────────────────────────
+    ensemble_dissent_allowed: bool = Field(default=False)
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
     model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
     train_steps: int = Field(default=1_000_000, ge=100_000)
