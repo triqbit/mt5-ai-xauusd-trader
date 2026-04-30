@@ -79,8 +79,16 @@ class EnsembleModel:
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
-    def __init__(self, device: str = "cpu") -> None:
+    def __init__(self, device: str = "cpu", consensus_threshold: float = 0.60) -> None:
+        """
+        Initialize the ensemble.
+
+        Args:
+            device: Computing device ('cpu', 'cuda', etc.)
+            consensus_threshold: Minimum confidence required to issue a non-hold signal.
+        """
         self.device = torch.device(device)
+        self.consensus_threshold = consensus_threshold
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -111,6 +119,12 @@ class EnsembleModel:
         self.lstm_model = model
         logger.info("LSTM model loaded from %s", path)
 
+    def load_dreamer(self, path: Path) -> None:
+        """Load a Dreamer V3 checkpoint."""
+        # Placeholder for Dreamer V3 loading logic
+        logger.info("Dreamer V3 model loading requested from %s (stub)", path)
+        self._dreamer_model = MagicMock() # Placeholder for now
+
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
         self,
@@ -123,19 +137,28 @@ class EnsembleModel:
         """
         votes: Dict[str, np.ndarray] = {}
 
-        # PPO prediction
+        # 1. PPO prediction
         if self._ppo_model is not None:
             action, _ = self._ppo_model.predict(obs, deterministic=True)
+            # action: 0=buy, 1=sell, 2=hold (assuming this mapping)
             probs = np.zeros(3)
             probs[int(action)] = 1.0
             votes["ppo"] = probs
 
-        # LSTM-Attention prediction
+        # 2. LSTM-Attention prediction
         if self.lstm_model is not None and seq is not None:
             with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                # Ensure seq has batch dimension
+                input_seq = seq if len(seq.shape) == 3 else seq.unsqueeze(0)
+                logits = self.lstm_model(input_seq.to(self.device))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
             votes["lstm"] = probs
+
+        # 3. Dreamer V3 prediction (stub)
+        if self._dreamer_model is not None:
+            # Placeholder for Dreamer V3 inference
+            probs = np.array([0.33, 0.33, 0.34]) # Neutral vote
+            votes["dreamer"] = probs
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
@@ -143,12 +166,23 @@ class EnsembleModel:
 
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+        blended = sum((self.weights[k] / total_weight) * votes[k] for k in votes)
+
         action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
         confidence = float(blended[action_idx])
+
+        # Enforce consensus threshold: if confidence < threshold, return HOLD (action 2)
+        if action_idx != 2 and confidence < self.consensus_threshold:
+            logger.debug("Consensus not reached (conf=%.2f < %.2f) - defaulting to HOLD",
+                        confidence, self.consensus_threshold)
+            action_idx = 2
+            confidence = float(blended[2])
+
         direction_map = {0: 1, 1: -1, 2: 0}
         direction = direction_map[action_idx]
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
             direction,
@@ -186,5 +220,5 @@ class EnsembleModel:
         self.weights = {k: v / total_w for k, v in self.weights.items()}
         logger.info("Weights rebalanced: %s", self.weights)
 
-
+from unittest.mock import MagicMock
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]
