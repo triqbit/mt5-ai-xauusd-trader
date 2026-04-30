@@ -1,0 +1,14 @@
+# MT5 AI/ML Trading Bot Code Owners
+# This file defines the owners of various parts of the codebase.
+# For more information, see https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners
+* @andonly1348
+
+# Module-specific owners
+/src/core/ @andonly1348
+/src/trading/ @maintainer-trading
+/src/models/ @maintainer-models
+/.github/ @andonly1348
+/docs/ @andonly1348
+/migrations/ @andonly1348
