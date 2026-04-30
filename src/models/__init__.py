@@ -1,5 +1,10 @@
 """AI/ML models: ensemble systems and neural architectures."""
 
-from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+import contextlib
 
-__all__ = ["EnsembleModel", "LSTMAttentionModel"]
+from src.models.dynamic_ensemble import DynamicEnsemble
+
+with contextlib.suppress(ImportError):
+    from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+
+__all__ = ["EnsembleModel", "LSTMAttentionModel", "DynamicEnsemble"]
