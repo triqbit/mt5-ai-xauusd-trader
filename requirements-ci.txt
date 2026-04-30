@@ -22,7 +22,6 @@ pandas==2.2.3
 # -- Technical Analysis --------------------------------------------
 # Python wrapper; C library (0.6.4) built from source in ci.yml
 TA-Lib==0.6.4
-pandas-ta==0.3.14b
 
 # -- Database ------------------------------------------------------
 sqlalchemy==2.0.30

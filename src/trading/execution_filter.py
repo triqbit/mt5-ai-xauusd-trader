@@ -14,7 +14,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
 
 from src.core.config import TradingConfig
 from src.trading.risk_manager import TradeSignal
@@ -77,6 +76,31 @@ class ExecutionFilter:
             blocked_by=None
         )
 
+    def _calculate_atr(self, df: pd.DataFrame, length: int = 14) -> pd.Series:
+        """Calculate Average True Range."""
+        high_low = df["high"] - df["low"]
+        high_close = (df["high"] - df["close"].shift()).abs()
+        low_close = (df["low"] - df["close"].shift()).abs()
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = ranges.max(axis=1)
+        return true_range.rolling(window=length).mean()
+
+    def _calculate_ema(self, series: pd.Series, length: int) -> pd.Series:
+        """Calculate Exponential Moving Average."""
+        return series.ewm(span=length, adjust=False).mean()
+
+    def _calculate_rsi(self, series: pd.Series, length: int = 14) -> pd.Series:
+        """Calculate Relative Strength Index."""
+        delta = series.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+
+        avg_gain = gain.ewm(com=length - 1, adjust=False).mean()
+        avg_loss = loss.ewm(com=length - 1, adjust=False).mean()
+
+        rs = avg_gain / avg_loss
+        return 100 - (100 / (1 + rs))
+
     def _check_atr_volatility(self, df: pd.DataFrame) -> bool:
         """
         Layer 1: ATR Volatility Threshold.
@@ -85,12 +109,11 @@ class ExecutionFilter:
         if len(df) < 15:
             return True
 
-        atr = ta.atr(df["high"], df["low"], df["close"], length=14)
-        if atr is None or len(atr) < 30:
-            # Not enough data for 30-period average, but we can still check against available
-            if atr is not None and not atr.empty:
-                current_atr = atr.iloc[-1]
-                avg_atr = atr.mean()
+        atr = self._calculate_atr(df, length=14)
+        if len(atr) < 30:
+            current_atr = atr.iloc[-1]
+            avg_atr = atr.mean()
+            if not np.isnan(avg_atr) and avg_atr != 0:
                 if current_atr > 3.0 * avg_atr:
                     return False
             return True
@@ -115,8 +138,8 @@ class ExecutionFilter:
         if len(df) < 20:
             return True
 
-        ema20 = ta.ema(df["close"], length=20)
-        if ema20 is None or len(ema20) < 3:
+        ema20 = self._calculate_ema(df["close"], length=20)
+        if len(ema20) < 3:
             return True
 
         # Last 3 points of EMA20
@@ -147,12 +170,9 @@ class ExecutionFilter:
         if len(df) < 200:
             return True
 
-        ema20 = ta.ema(df["close"], length=20)
-        ema50 = ta.ema(df["close"], length=50)
-        ema200 = ta.ema(df["close"], length=200)
-
-        if ema20 is None or ema50 is None or ema200 is None:
-            return True
+        ema20 = self._calculate_ema(df["close"], length=20)
+        ema50 = self._calculate_ema(df["close"], length=50)
+        ema200 = self._calculate_ema(df["close"], length=200)
 
         e20, e50, e200 = ema20.iloc[-1], ema50.iloc[-1], ema200.iloc[-1]
 
@@ -207,11 +227,11 @@ class ExecutionFilter:
         BUY: RSI > 50 and RSI < 75
         SELL: RSI < 50 and RSI > 25
         """
-        if len(df) < 14:
+        if len(df) < 15:  # Need at least length + 1
             return True
 
-        rsi = ta.rsi(df["close"], length=14)
-        if rsi is None or rsi.empty:
+        rsi = self._calculate_rsi(df["close"], length=14)
+        if rsi.empty or np.isnan(rsi.iloc[-1]):
             return True
 
         current_rsi = rsi.iloc[-1]
