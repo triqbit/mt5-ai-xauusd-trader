@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Dict
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,7 +29,7 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
-    mt5_login: int = Field(default=0, description="MT5 account number")
+    mt5_login: int = Field(..., description="MT5 account number")
     mt5_password: str = Field(..., description="MT5 account password")
     mt5_server: str = Field(..., description="Broker server name")
     mt5_path: str = Field(
@@ -45,18 +45,39 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
 
-    # ── Model ──────────────────────────────────────────────────────────────────
+    # ── Risk Parameters (as per RISK_LIMITS.md) ───────────────────────────────
+    max_positions: int = Field(default=5, ge=1, le=10, description="Max concurrent positions")
+    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05, description="Max risk % per trade")
+    max_leverage: float = Field(default=10.0, ge=1.0, le=30.0, description="Max leverage")
+
+    # Daily limits
+    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.10, description="Hard daily loss limit")
+    daily_loss_levels: Dict[int, float] = Field(
+        default={1: 0.02, 2: 0.03, 3: 0.04, 4: 0.05},
+        description="Cascading daily loss levels for circuit breakers"
+    )
+    max_daily_trades: int = Field(default=20, ge=1, description="Max trades per day")
+    max_losing_streak: int = Field(default=3, ge=1, description="Max consecutive losses")
+
+    # Drawdown limits
+    max_drawdown: float = Field(default=0.30, ge=0.05, le=0.50, description="Hard equity drawdown limit")
+    drawdown_levels: Dict[int, float] = Field(
+        default={1: 0.10, 2: 0.15, 3: 0.20, 4: 0.25, 5: 0.30},
+        description="Cascading drawdown levels for position reduction"
+    )
+
+    # ── Model & Ensemble ───────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
     model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
     train_steps: int = Field(default=1_000_000, ge=100_000)
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
 
+    confidence_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
+    consensus_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
+
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
+    database_url: str = Field(default="sqlite:///trades.db")
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
@@ -65,7 +86,6 @@ class TradingConfig(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
     telegram_token: str = Field(default="", description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     @field_validator("risk_per_trade")
     @classmethod

@@ -1,8 +1,10 @@
-"""Trading modules: connectors and risk management."""
-
-from __future__ import annotations
-
+"""
+MT5 AI/ML Trading Bot - Enterprise Edition
+src/trading/__init__.py
+Author : triqbit
+License: MIT
+"""
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import DailyStats, RiskManager, TradeSignal
+from src.trading.risk_engine import DailyStats, RiskEngine, TradeSignal
 
-__all__ = ["DailyStats", "MT5Connector", "RiskManager", "TradeSignal"]
+__all__ = ["DailyStats", "MT5Connector", "RiskEngine", "TradeSignal"]

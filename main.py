@@ -27,7 +27,7 @@ from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_engine import RiskEngine, TradeSignal
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -56,7 +56,7 @@ def configure_logging(level: str = "INFO") -> None:
 def run_live(
     cfg,
     connector: MT5Connector,
-    risk: RiskManager,
+    risk: RiskEngine,
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
@@ -113,7 +113,7 @@ def run_live(
                 confidence=confidence,
             )
             # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
+            if risk.approve_signal(signal):
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
@@ -208,7 +208,7 @@ def main() -> int:
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    risk = RiskEngine(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"

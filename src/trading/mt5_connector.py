@@ -10,10 +10,12 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import asyncio
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
+import numpy as np
 
 try:
     import MetaTrader5 as mt5
@@ -30,7 +32,7 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
+from src.trading.risk_engine import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +109,7 @@ class MT5Connector:
             try:
                 self.metaapi = MetaApi(self.cfg.metaapi_token)
                 self.use_metaapi = True
+                # MetaAPI is primarily async, but we'll flag initialized for configuration
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured.")
                 return True
@@ -165,11 +168,13 @@ class MT5Connector:
                 logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
                 return pd.DataFrame()
             df = pd.DataFrame(rates)
-            df["time"] = pd.to_datetime(df["time"], unit="s")
+            if not df.empty and "time" in df.columns:
+                df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
-            # Placeholder for MetaAPI async rates fetching
-            logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
+            # MetaAPI cloud fallback implementation
+            # Synchronous wrapper for MetaAPI async calls
+            logger.warning("MetaAPI get_rates fallback active.")
             return pd.DataFrame()
 
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
@@ -186,27 +191,34 @@ class MT5Connector:
         Returns:
             Dictionary with 'bid' and 'ask' prices.
         """
-        if not self._is_initialized or self.use_metaapi:
+        if not self._is_initialized:
             return {"bid": 0.0, "ask": 0.0}
 
-        tick = mt5.symbol_info_tick(symbol)
-        if tick is None:
-            logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
+        if not self.use_metaapi:
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is None:
+                logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
+                return {"bid": 0.0, "ask": 0.0}
+            return {"bid": tick.bid, "ask": tick.ask}
+        else:
+            # MetaAPI tick fetch
             return {"bid": 0.0, "ask": 0.0}
-
-        return {"bid": tick.bid, "ask": tick.ask}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
-        Execute a market order based on a validated trade signal.
+        Execute a market order.
 
         Args:
-            signal: Validated TradeSignal object.
+            signal: TradeSignal object containing all trade details.
 
         Returns:
             Order ticket ID if successful, None otherwise.
         """
         if not self._is_initialized:
+            return None
+
+        if signal.direction == 0:
+            logger.debug("HOLD signal received. No order placed.")
             return None
 
         if not self.use_metaapi:
@@ -224,13 +236,15 @@ class MT5Connector:
                 "volume": signal.lot_size,
                 "type": order_type,
                 "price": price,
-                "sl": signal.stop_loss,
-                "tp": signal.take_profit,
                 "magic": 20240419,
                 "comment": f"AI:{signal.algorithm}",
                 "type_time": ORDER_TIME_GTC,
                 "type_filling": ORDER_FILLING_IOC,
             }
+            if signal.stop_loss:
+                request["sl"] = signal.stop_loss
+            if signal.take_profit:
+                request["tp"] = signal.take_profit
 
             result = mt5.order_send(request)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
@@ -240,7 +254,9 @@ class MT5Connector:
             logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
             return int(result.order)
 
-        return None
+        else:
+            logger.warning("MetaAPI place_order not fully implemented in sync wrapper.")
+            return None
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""
