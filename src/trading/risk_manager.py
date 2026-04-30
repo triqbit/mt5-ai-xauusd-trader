@@ -17,9 +17,9 @@ from datetime import date, datetime
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
-from src.data.event_intelligence import EventIntelligence
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.data.event_intelligence import EventIntelligence
 
 logger = logging.getLogger(__name__)
 
