@@ -1,4 +1,4 @@
-"""MT5 AI/ML Trading Bot package."""
+"""MT5 AI/ML Trading Bot - Enterprise Edition."""
 
 __version__ = "1.0.0"
 __author__ = "triqbit"
