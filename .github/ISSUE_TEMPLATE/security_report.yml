@@ -1,0 +1,23 @@
+name: Security Report
+description: Report a security vulnerability.
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **WARNING**: If this is a critical security vulnerability, please do NOT open a public issue.
+        Instead, follow the security reporting procedure defined in our SECURITY.md (if available) or contact the maintainers directly.
+  - type: textarea
+    id: vulnerability-details
+    attributes:
+      label: Vulnerability Details
+      description: Describe the security vulnerability.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is the potential impact of this vulnerability?
+    validations:
+      required: true
