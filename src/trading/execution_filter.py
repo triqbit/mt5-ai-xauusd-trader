@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pandas_ta as ta
 
 from src.core.config import TradingConfig
@@ -156,14 +156,12 @@ class ExecutionFilter:
 
         e20, e50, e200 = ema20.iloc[-1], ema50.iloc[-1], ema200.iloc[-1]
 
-        if direction == 1:
-            if not (e20 > e50 > e200):
-                logger.debug("EMA Sequence rejection (BUY): %s, %s, %s", e20, e50, e200)
-                return False
-        elif direction == -1:
-            if not (e20 < e50 < e200):
-                logger.debug("EMA Sequence rejection (SELL): %s, %s, %s", e20, e50, e200)
-                return False
+        if direction == 1 and not (e20 > e50 > e200):
+            logger.debug("EMA Sequence rejection (BUY): %s, %s, %s", e20, e50, e200)
+            return False
+        if direction == -1 and not (e20 < e50 < e200):
+            logger.debug("EMA Sequence rejection (SELL): %s, %s, %s", e20, e50, e200)
+            return False
 
         return True
 
@@ -182,10 +180,7 @@ class ExecutionFilter:
             return False
         if weekday == 5:  # Saturday
             return False
-        if weekday == 6 and hour < 17:  # Sunday
-            return False
-
-        return True
+        return not (weekday == 6 and hour < 17)
 
     def _check_drawdown(self, account_stats: dict) -> bool:
         """
@@ -221,13 +216,11 @@ class ExecutionFilter:
 
         current_rsi = rsi.iloc[-1]
 
-        if direction == 1:
-            if current_rsi <= 50 or current_rsi >= 75:
-                logger.debug("Momentum rejection (BUY): RSI %.2f", current_rsi)
-                return False
-        elif direction == -1:
-            if current_rsi >= 50 or current_rsi <= 25:
-                logger.debug("Momentum rejection (SELL): RSI %.2f", current_rsi)
-                return False
+        if direction == 1 and (current_rsi <= 50 or current_rsi >= 75):
+            logger.debug("Momentum rejection (BUY): RSI %.2f", current_rsi)
+            return False
+        if direction == -1 and (current_rsi >= 50 or current_rsi <= 25):
+            logger.debug("Momentum rejection (SELL): RSI %.2f", current_rsi)
+            return False
 
         return True
