@@ -36,3 +36,4 @@ pydantic-settings==2.8.1
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot
+rich==13.7.1

@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.decision_support import DecisionSupport
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -63,6 +64,7 @@ def run_live(
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+    decision_support = DecisionSupport(risk)
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
@@ -72,7 +74,7 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -112,7 +114,18 @@ def run_live(
                 algorithm=cfg.algorithm,
                 confidence=confidence,
             )
-            # 5. Risk approval gate
+
+            # 5. Decision Support Gate
+            perf_metrics = trade_logger.read_performance_report() if trade_logger else {}
+            packet = decision_support.generate_packet(
+                signal=signal,
+                consensus=per_algo,
+                ohlcv_data=df,
+                performance_metrics=perf_metrics,
+            )
+            decision_support.console.print(decision_support.format_for_terminal(packet))
+
+            # 6. Risk approval gate
             if risk.approve(signal, signal_id=signal_id):
                 ticket = connector.place_order(signal)
                 if ticket:
@@ -207,9 +220,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +231,7 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
