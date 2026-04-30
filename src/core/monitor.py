@@ -9,14 +9,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import telegram
+from prometheus_client import Counter, Gauge, start_http_server
 
 from src.core.config import TradingConfig
 
 logger = logging.getLogger(__name__)
+
+# Prometheus Metrics
+EQUITY_GAUGE = Gauge("trading_equity", "Current account equity")
+DRAWDOWN_GAUGE = Gauge("trading_drawdown", "Current account drawdown")
+DAILY_PNL_GAUGE = Gauge("trading_daily_pnl", "Daily realized P&L")
+CONFIDENCE_GAUGE = Gauge("model_confidence", "Current model prediction confidence")
+TRADE_COUNTER = Counter("trades_total", "Total number of trades executed")
 
 
 class Monitor:
@@ -27,8 +36,15 @@ class Monitor:
 
     def __init__(self, config: TradingConfig) -> None:
         self.cfg = config
-        self.equity_history: List[Dict[str, Any]] = []
+        self.equity_history: deque[Dict[str, Any]] = deque(maxlen=1000)
         self.bot: Optional[telegram.Bot] = None
+
+        # Start Prometheus Metrics Server
+        try:
+            start_http_server(self.cfg.prometheus_port)
+            logger.info("Prometheus metrics server started on port %d", self.cfg.prometheus_port)
+        except Exception as e:
+            logger.error("Failed to start Prometheus server: %s", e)
 
         if self.cfg.telegram_token:
             try:
@@ -41,7 +57,18 @@ class Monitor:
         """Record current equity with timestamp."""
         data = {"timestamp": datetime.now(timezone.utc), "equity": equity}
         self.equity_history.append(data)
+        EQUITY_GAUGE.set(equity)
         logger.debug("Equity logged: %.2f", equity)
+
+    def log_trade(self) -> None:
+        """Increment the total trade counter."""
+        TRADE_COUNTER.inc()
+        logger.debug("Trade logged")
+
+    def log_confidence(self, confidence: float) -> None:
+        """Update model confidence metric."""
+        CONFIDENCE_GAUGE.set(confidence)
+        logger.debug("Model confidence logged: %.3f", confidence)
 
     def send_message(self, text: str) -> None:
         """Synchronous wrapper to send Telegram message."""
@@ -59,11 +86,13 @@ class Monitor:
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger."""
+        DRAWDOWN_GAUGE.set(drawdown)
         msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
         self.send_message(msg)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:
         """Send daily P&L and trade count summary."""
+        DAILY_PNL_GAUGE.set(pnl)
         status = "PROFIT" if pnl >= 0 else "LOSS"
         msg = (
             f"📅 Daily Summary - {datetime.now(timezone.utc).date()}\n"
@@ -75,6 +104,7 @@ class Monitor:
 
     def check_confidence_degradation(self, confidence: float) -> None:
         """Send warning if model confidence falls below threshold."""
+        CONFIDENCE_GAUGE.set(confidence)
         if confidence < self.cfg.confidence_threshold:
             msg = (
                 f"⚠️ WARNING: Model Confidence Degradation\n"
