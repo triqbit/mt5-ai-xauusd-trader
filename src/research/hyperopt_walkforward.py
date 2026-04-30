@@ -7,13 +7,12 @@ Disciplined walk-forward optimization with parameter stability analysis and robu
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, List, Protocol, Tuple
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +193,10 @@ class WalkForwardOptimizer:
             logger.info("Optimizing Window %d/%d", i + 1, len(windows))
 
             study = optuna.create_study(direction="maximize")
-            study.optimize(lambda t: self._objective(t, train_data), n_trials=self.n_trials)
+            study.optimize(
+                lambda t, td=train_data: self._objective(t, td),
+                n_trials=self.n_trials,
+            )
 
             best_params = study.best_params
 
