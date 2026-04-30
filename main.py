@@ -25,6 +25,7 @@ import structlog
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.data.event_intelligence import EventIntelligence, MockEventProvider
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -60,12 +61,17 @@ def run_live(
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
+    event_intel: Optional[EventIntelligence] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
+            # 0. Refresh event intelligence (mock provider used here)
+            if event_intel:
+                event_intel.refresh_events(MockEventProvider.get_upcoming_events())
+
             # 1. Fetch latest market data
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
             tick = connector.get_tick(cfg.symbol)
@@ -207,9 +213,15 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    event_intel = EventIntelligence()
+    risk = RiskManager(
+        cfg,
+        account_balance=balance,
+        logger_db=trade_logger,
+        monitor=monitor,
+        event_intel=event_intel,
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +231,15 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+                event_intel=event_intel,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
