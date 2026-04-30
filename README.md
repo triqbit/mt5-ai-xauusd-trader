@@ -93,8 +93,11 @@ MODE=demo
 
 ### 3. Execution
 ```bash
-# Run validation and start in demo mode
-python main.py --mode demo --symbol XAUUSD --verbose
+# Run pre-flight checks to verify connectivity and configuration
+python main.py --check
+
+# Start in demo mode
+python main.py --mode demo --symbol XAUUSD
 ```
 
 ---
