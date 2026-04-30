@@ -7,7 +7,7 @@ Compute 140+ features from raw OHLCV data using TA-Lib.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Union
+from typing import List
 
 import numpy as np
 import pandas as pd
