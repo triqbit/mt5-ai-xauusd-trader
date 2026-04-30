@@ -1,0 +1,143 @@
+name: Pre-Deployment Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # -----------------------------------------------------------
+  # JOB 1: Integrity & Quality Gates
+  # -----------------------------------------------------------
+  integrity:
+    name: Integrity Gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install TA-Lib C library
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential wget
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
+          ./configure --prefix=/usr
+          make -j2
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+          sudo ldconfig
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-ci.txt
+          pip install ruff mypy
+
+      - name: Code Quality (Ruff)
+        run: ruff check src/ main.py
+
+      - name: Type Check (Mypy)
+        run: mypy --ignore-missing-imports src/ main.py
+
+      - name: Tests & Coverage (25% Threshold)
+        run: |
+          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=25
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
+
+      - name: Environment Variable Completeness Check
+        run: |
+          # Verify that all Pydantic fields in config.py are documented in .env.example
+          python -c "
+          import sys
+          from src.core.config import TradingConfig
+          with open('.env.example', 'r') as f:
+              content = f.read()
+
+          missing = []
+          # Extract field names from TradingConfig
+          fields = TradingConfig.model_fields.keys()
+          for field in fields:
+              env_key = field.upper()
+              if env_key not in content:
+                  missing.append(env_key)
+
+          if missing:
+              print(f'Error: Missing environment variables in .env.example: {missing}')
+              sys.exit(1)
+          print('Environment variable check passed.')
+          "
+
+      - name: Database Migration Validation
+        run: |
+          # Test if migrations can be applied and rolled back
+          alembic upgrade head
+          alembic downgrade -1
+          alembic upgrade head
+        env:
+          DATABASE_URL: "sqlite:///test_migration.db"
+
+      - name: Release Notes Validation
+        run: |
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Error: RELEASE_NOTES.md is missing or empty."
+            exit 1
+          fi
+          echo "Release notes validated."
+
+  # -----------------------------------------------------------
+  # JOB 2: Security Scanning
+  # -----------------------------------------------------------
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret Detection (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency Audit
+        run: |
+          pip install pip-audit
+          pip-audit --requirement requirements-ci.txt
+
+  # -----------------------------------------------------------
+  # JOB 3: Container Validation
+  # -----------------------------------------------------------
+  container:
+    name: Container Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: |
+          docker build -t mt5-trader-test:${{ github.sha }} .
+
+      - name: Scan Image for Vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: 'mt5-trader-test:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

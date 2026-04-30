@@ -143,7 +143,8 @@ class EnsembleModel:
 
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+        # Ensure sum has an explicit start value of 0.0 to avoid Literal[0] inference issues with numpy arrays
+        blended = sum((self.weights[k] / total_weight * votes[k] for k in votes), np.zeros(3))
         action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
         confidence = float(blended[action_idx])
         direction_map = {0: 1, 1: -1, 2: 0}
