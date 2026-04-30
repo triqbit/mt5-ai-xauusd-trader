@@ -7,10 +7,9 @@ Journal mining engine for detecting hidden patterns in executed and rejected tra
 from __future__ import annotations
 
 import logging
-from datetime import datetime, time, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -104,7 +103,7 @@ class JournalMiner:
                 return "London/NY Overlap"
             elif 17 <= hour < 22:
                 return "New York"
-            elif 22 <= hour or hour < 8:
+            elif hour >= 22 or hour < 8:
                 return "Asia/Pacific"
             return "Other"
 
@@ -117,7 +116,6 @@ class JournalMiner:
 
         for name, group in df.groupby("session"):
             wins = group["is_win"].sum()
-            losses = group["pnl"] < 0
             gross_profit = group[group["pnl"] > 0]["pnl"].sum()
             gross_loss = abs(group[group["pnl"] < 0]["pnl"].sum())
             pf = gross_profit / gross_loss if gross_loss > 0 else float("inf")
