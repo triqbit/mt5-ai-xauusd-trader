@@ -68,7 +68,7 @@ class MT5Connector:
         self.cfg = config
         self.use_metaapi: bool = False
         self.metaapi: Optional[Any] = None
-        self.metaapi_connection: Optional[Any] = None
+        self.metaapi_connection: Optional[Any] = None  # Authoritative MetaAPI connection attribute
         self._is_initialized: bool = False
 
     def initialize(self) -> bool:
