@@ -47,6 +47,7 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
+    votes: Dict[str, float] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -57,6 +58,7 @@ class DailyStats:
     date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
+    consecutive_losses: int = 0
     peak_equity: float = 0.0
 
 
@@ -77,6 +79,7 @@ class RiskManager:
         self.balance = account_balance
         self.peak_equity = account_balance
         self.daily = DailyStats(peak_equity=account_balance)
+        self.consecutive_losses = 0
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
@@ -85,7 +88,7 @@ class RiskManager:
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -93,6 +96,10 @@ class RiskManager:
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
+        elif not self._check_daily_trade_cap():
+            rejection_reason = "Daily trade cap reached"
+        elif not self._check_consecutive_losses():
+            rejection_reason = "Consecutive loss limit reached"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
@@ -101,6 +108,8 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_ensemble_consensus(signal):
+            rejection_reason = "Ensemble dissent detected"
 
         passed = rejection_reason == ""
         if not passed:
@@ -155,9 +164,16 @@ class RiskManager:
             self.daily.peak_equity = current_equity
 
     def record_pnl(self, pnl: float) -> None:
-        """Accumulate intraday realised PnL."""
+        """Accumulate intraday realised PnL and track consecutive losses."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+
+        if pnl < 0:
+            self.consecutive_losses += 1
+            self.daily.consecutive_losses = self.consecutive_losses
+        else:
+            self.consecutive_losses = 0
+            self.daily.consecutive_losses = 0
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -169,9 +185,59 @@ class RiskManager:
         logger.info("Daily stats reset")
 
     # -- Private filter layers ----------------------------------------------
+    def _check_ensemble_consensus(self, signal: TradeSignal) -> bool:
+        """
+        Block trades if any constituent model disagrees with the ensemble direction.
+        Only active if ensemble_dissent_allowed is False.
+        """
+        if self.cfg.ensemble_dissent_allowed or not signal.votes:
+            return True
+
+        # Check if any model voted for the opposite direction
+        # signal.direction is +1 (buy) or -1 (sell)
+        # signal.votes contains per-algo direction
+        for algo, vote in signal.votes.items():
+            if vote != 0 and vote != signal.direction:
+                logger.warning(
+                    "ENSEMBLE DISSENT | %s voted %d against ensemble %d",
+                    algo,
+                    vote,
+                    signal.direction,
+                )
+                return False
+        return True
+
+    def _check_consecutive_losses(self) -> bool:
+        """Block trading if consecutive loss limit is reached."""
+        if self.consecutive_losses >= self.cfg.max_consecutive_losses:
+            logger.warning(
+                "CONSECUTIVE LOSSES: %d hit limit %d",
+                self.consecutive_losses,
+                self.cfg.max_consecutive_losses,
+            )
+            return False
+        return True
+
+    def _check_daily_trade_cap(self) -> bool:
+        """
+        Block trading if daily trade count limit is reached.
+        Includes both closed trades and currently open positions.
+        """
+        total_trades = self.daily.trade_count + len(self.open_positions)
+        if total_trades >= self.cfg.max_daily_trades:
+            logger.warning(
+                "DAILY TRADE CAP: %d total (closed=%d, open=%d) hit limit %d",
+                total_trades,
+                self.daily.trade_count,
+                len(self.open_positions),
+                self.cfg.max_daily_trades,
+            )
+            return False
+        return True
+
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
+        if drawdown >= self.cfg.circuit_breaker_threshold:
             logger.critical(
                 "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
                 drawdown * 100,
@@ -179,7 +245,7 @@ class RiskManager:
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit {self.cfg.circuit_breaker_threshold*100:.1f}% limit",
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
@@ -208,9 +274,8 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float) -> bool:
+        threshold = self.cfg.confidence_threshold
         if confidence < threshold:
             logger.debug(
                 "Confidence %.2f below threshold %.2f", confidence, threshold
@@ -218,7 +283,8 @@ class RiskManager:
             return False
         return True
 
-    def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+    def _check_risk_reward(self, signal: TradeSignal) -> bool:
+        min_rr = self.cfg.min_risk_reward
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         if risk == 0:

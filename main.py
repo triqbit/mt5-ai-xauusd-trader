@@ -72,8 +72,8 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+            direction, confidence, per_algo = model.predict(obs)
+            log.debug("Signal | dir=%d conf=%.3f votes=%s", direction, confidence, per_algo)
 
             signal_id = None
             if trade_logger:
@@ -111,6 +111,7 @@ def run_live(
                 lot_size=lot_size,
                 algorithm=cfg.algorithm,
                 confidence=confidence,
+                votes=per_algo,
             )
             # 5. Risk approval gate
             if risk.approve(signal, signal_id=signal_id):
@@ -147,6 +148,10 @@ def run_live(
                                 ticket=ticket,
                                 exit_price=exit_price,
                             )
+                            # Retrieve updated trade to get calculated PnL
+                            updated_trade = trade_logger.get_trade_by_ticket(ticket)
+                            if updated_trade and updated_trade.pnl is not None:
+                                risk.record_pnl(updated_trade.pnl)
                     closed_tickets.append(symbol)
 
             for sym in closed_tickets:
@@ -207,9 +212,8 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,8 +223,14 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(
+                cfg,
+                connector,
+                risk,
+                model,
+                trade_logger=trade_logger,
+                monitor=monitor,
+            )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
     finally:
