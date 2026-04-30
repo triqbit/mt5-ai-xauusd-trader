@@ -4,6 +4,7 @@ src/core/database.py
 Base database definitions and mixins.
 """
 from datetime import datetime, timezone
+
 from sqlalchemy import Boolean, Column, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 

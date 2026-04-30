@@ -14,7 +14,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
-    Boolean,
     Column,
     DateTime,
     Float,

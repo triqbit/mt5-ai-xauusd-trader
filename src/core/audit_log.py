@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
-from src.core.database import Base, AuditMixin
+
+from src.core.database import AuditMixin, Base
 
 logger = logging.getLogger(__name__)
 
