@@ -8,11 +8,10 @@ License: MIT
 from __future__ import annotations
 
 import logging
-import os
 import shutil
-from enum import Enum
-from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, Response
 from pydantic import BaseModel, Field
@@ -20,9 +19,9 @@ from sqlalchemy import text
 
 from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
-from src.trading.mt5_connector import MT5Connector
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +88,7 @@ class HealthChecker:
                 db_status = "HEALTHY"
                 db_msg = "Database connection verified"
             except Exception as e:
-                db_msg = f"Database connection failed: {str(e)}"
+                db_msg = f"Database connection failed: {e!s}"
         checks["database"] = {"status": db_status, "message": db_msg}
 
         # 3. MT5 Check (if not in backtest mode)
@@ -136,7 +135,7 @@ class HealthChecker:
                 disk_msg = f"Critical disk space: {free_gb:.2f} GB free"
         except Exception as e:
             disk_status = "DEGRADED"
-            disk_msg = f"Could not check disk space: {str(e)}"
+            disk_msg = f"Could not check disk space: {e!s}"
         checks["disk_space"] = {"status": disk_status, "message": disk_msg, "free_gb": f"{free_gb:.2f}" if 'free_gb' in locals() else "N/A"}
 
         # Overall Status

@@ -63,9 +63,14 @@ class ConfigValidator:
             logger.warning("Model path %s does not exist. Application may fail during inference.", self.cfg.model_path)
 
         # 5. Database URL Check
-        if "postgresql" in self.cfg.database_url and "password" in self.cfg.database_url:
-            if "@localhost" in self.cfg.database_url:
-                logger.warning("Using PostgreSQL on localhost with default 'password'. Not recommended for production.")
+        if (
+            "postgresql" in self.cfg.database_url
+            and "password" in self.cfg.database_url
+            and "@localhost" in self.cfg.database_url
+        ):
+            logger.warning(
+                "Using PostgreSQL on localhost with default 'password'. Not recommended for production."
+            )
 
         is_valid = len(errors) == 0
         return is_valid, errors
