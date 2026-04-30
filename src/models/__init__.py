@@ -12,7 +12,7 @@ __all__ = [
     "EnsembleModel",
     "LSTMAttentionModel",
     "MarketRegime",
+    "PPOAgent",
     "RegimeDetector",
     "RegimeType",
-    "PPOAgent",
 ]
