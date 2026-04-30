@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
+
+from pydantic import BaseModel, Field, model_validator
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -35,19 +37,41 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
 }
 
 
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
+class TradeSignal(BaseModel):
+    """
+    Validated trading signal passed to order execution.
+    Uses Pydantic for strict schema enforcement and logical price validation.
+    """
 
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    symbol: str = Field(..., description="Trading symbol (e.g., XAUUSD)")
+    direction: int = Field(..., description="+1 for BUY, -1 for SELL")
+    entry_price: float = Field(..., gt=0)
+    stop_loss: float = Field(..., gt=0)
+    take_profit: float = Field(..., gt=0)
+    lot_size: float = Field(..., ge=0.01)
+    algorithm: str = Field(..., description="Source algorithm name")
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    votes: Dict[str, int] = Field(default_factory=dict, description="Individual model votes (+1, -1, 0)")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @model_validator(mode="after")
+    def validate_prices(self) -> "TradeSignal":
+        """Ensure SL/TP are logically placed relative to entry price."""
+        if self.direction == 1:  # BUY
+            if self.stop_loss >= self.entry_price:
+                raise ValueError(f"Stop loss ({self.stop_loss}) must be below entry ({self.entry_price}) for BUY")
+            if self.take_profit <= self.entry_price:
+                raise ValueError(f"Take profit ({self.take_profit}) must be above entry ({self.entry_price}) for BUY")
+        elif self.direction == -1:  # SELL
+            if self.stop_loss <= self.entry_price:
+                raise ValueError(f"Stop loss ({self.stop_loss}) must be above entry ({self.entry_price}) for SELL")
+            if self.take_profit >= self.entry_price:
+                raise ValueError(f"Take profit ({self.take_profit}) must be below entry ({self.entry_price}) for SELL")
+        elif self.direction == 0:
+            pass  # HOLD signals don't need SL/TP validation
+        else:
+            raise ValueError(f"Invalid direction: {self.direction}. Must be 1, -1, or 0.")
+        return self
 
 
 @dataclass
@@ -85,7 +109,7 @@ class RiskManager:
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full 7-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -93,6 +117,8 @@ class RiskManager:
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
+        elif not self._check_daily_trades():
+            rejection_reason = "Daily trade count limit reached"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
@@ -101,6 +127,8 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_ensemble_dissent(signal):
+            rejection_reason = "Ensemble dissent - high disagreement"
 
         passed = rejection_reason == ""
         if not passed:
@@ -171,15 +199,17 @@ class RiskManager:
     # -- Private filter layers ----------------------------------------------
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
+        threshold = self.cfg.circuit_breaker_threshold
+        if drawdown >= threshold:
             logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
+                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted (threshold=%.1f%%)",
                 drawdown * 100,
+                threshold * 100,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit {threshold * 100:.1f}% limit",
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
@@ -191,7 +221,21 @@ class RiskManager:
             return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
         if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
+            logger.warning(
+                "Daily loss limit hit: %.1f%% (limit=%.1f%%)",
+                loss_pct * 100,
+                self.cfg.max_daily_loss * 100,
+            )
+            return False
+        return True
+
+    def _check_daily_trades(self) -> bool:
+        if self.daily.trade_count >= self.cfg.max_daily_trades:
+            logger.warning(
+                "Daily trade limit hit: %d (limit=%d)",
+                self.daily.trade_count,
+                self.cfg.max_daily_trades,
+            )
             return False
         return True
 
@@ -208,9 +252,8 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float) -> bool:
+        threshold = self.cfg.confidence_threshold
         if confidence < threshold:
             logger.debug(
                 "Confidence %.2f below threshold %.2f", confidence, threshold
@@ -218,14 +261,39 @@ class RiskManager:
             return False
         return True
 
-    def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+    def _check_risk_reward(self, signal: TradeSignal) -> bool:
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
+        min_rr = self.cfg.min_risk_reward
         if risk == 0:
             return False
         rr = reward / risk
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
+            return False
+        return True
+
+    def _check_ensemble_dissent(self, signal: TradeSignal) -> bool:
+        """
+        Check if models in the ensemble are in direct opposition.
+        If ensemble_dissent_allowed is False, a mix of +1 and -1 votes
+        will trigger a rejection.
+        """
+        if self.cfg.ensemble_dissent_allowed:
+            return True
+
+        votes_list = list(signal.votes.values())
+        if not votes_list:
+            return True
+
+        has_buy = 1 in votes_list
+        has_sell = -1 in votes_list
+
+        if has_buy and has_sell:
+            logger.warning(
+                "Ensemble DISSENT detected | BUY and SELL votes present: %s",
+                signal.votes,
+            )
             return False
         return True
 
