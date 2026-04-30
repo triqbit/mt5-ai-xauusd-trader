@@ -2,10 +2,13 @@
 Targeted tests for database reliability improvements.
 """
 import os
+
 import pytest
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from src.core.trade_logger import TradeLogger, Trade, ModelSignal
+
+from src.core.trade_logger import ModelSignal, Trade, TradeLogger
+
 
 @pytest.fixture
 def logger():
@@ -88,13 +91,12 @@ def test_transaction_atomicity(logger):
     # but we want to see if it affects anything else.
     # Actually, logger.Session.begin() ensures the whole block is atomic.
 
-    with pytest.raises(IntegrityError):
-        with logger.Session.begin() as session:
-            s1 = ModelSignal(symbol="X1", direction=1, entry_price=100, lot_size=0.1, confidence=0.5)
-            session.add(s1)
-            # s2 will fail due to CheckConstraint
-            s2 = ModelSignal(symbol="X2", direction=1, entry_price=-100, lot_size=0.1, confidence=0.5)
-            session.add(s2)
+    with pytest.raises(IntegrityError), logger.Session.begin() as session:
+        s1 = ModelSignal(symbol="X1", direction=1, entry_price=100, lot_size=0.1, confidence=0.5)
+        session.add(s1)
+        # s2 will fail due to CheckConstraint
+        s2 = ModelSignal(symbol="X2", direction=1, entry_price=-100, lot_size=0.1, confidence=0.5)
+        session.add(s2)
 
     # Verify s1 was NOT committed
     with logger.Session() as session:

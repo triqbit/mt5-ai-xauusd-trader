@@ -188,7 +188,7 @@ class TradeLogger:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session.begin() as session:
             stmt = select(Trade).where(
-                and_(Trade.ticket == ticket, Trade.is_deleted == False)
+                and_(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             )
             trade = session.execute(stmt).scalar_one_or_none()
             if trade:
@@ -214,7 +214,7 @@ class TradeLogger:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
             stmt = select(Trade).where(
-                and_(Trade.ticket == ticket, Trade.is_deleted == False)
+                and_(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             )
             return session.execute(stmt).scalar_one_or_none()
 
@@ -243,7 +243,7 @@ class TradeLogger:
         # We use .begin() here because we might log performance metrics to the DB
         with self.Session.begin() as session:
             stmt = select(Trade).where(
-                and_(Trade.status == "CLOSED", Trade.is_deleted == False)
+                and_(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
             )
             trades = session.execute(stmt).scalars().all()
             if not trades:
