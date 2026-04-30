@@ -170,6 +170,17 @@ class TradeLogger:
         drawdown_impact: float = 0.0,
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
+        # Symbol-aware contract size mapping
+        contract_sizes = {
+            "XAUUSD": 100,
+            "XAGUSD": 5000,
+            "EURUSD": 100000,
+            "GBPUSD": 100000,
+            "USDJPY": 100000,
+            "AUDUSD": 100000,
+            "USDCHF": 100000,
+        }
+
         with self.Session() as session:
             trade = session.query(Trade).filter(Trade.ticket == ticket).first()
             if trade:
@@ -178,8 +189,7 @@ class TradeLogger:
                     trade.pnl = pnl
                 else:
                     # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
-                    # For XAUUSD, contract size is often 100.
-                    contract_size = 100
+                    contract_size = contract_sizes.get(trade.symbol, 100)
                     trade.pnl = (
                         (exit_price - trade.entry_price)
                         * trade.direction
