@@ -56,7 +56,7 @@ class TradingConfig(BaseSettings):
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
+    database_url: str = Field(default="sqlite:///trades.db")
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
