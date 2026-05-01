@@ -1,0 +1,3 @@
+## 2025-05-15 - [Institutional-Grade CLI UX]
+**Learning:** Institutional-grade trading bots benefit significantly from high-fidelity CLI visuals (banners, tables) using `rich`, as they improve operator confidence and situational awareness. However, UI enhancements in core execution loops must be implemented with minimal diff footprints to avoid breaking institutional standards for performance and risk.
+**Action:** Use `rich.panel.Panel` and `rich.table.Table` for startup and validation reporting. Avoid re-indenting core trading logic blocks for visual feedback (like status spinners) unless the diff remains extremely small (< 50 lines).

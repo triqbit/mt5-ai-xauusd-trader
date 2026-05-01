@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,6 +22,11 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from rich.box import ROUNDED
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from src.core.config import get_config
 from src.core.config_validator import ConfigValidator
@@ -30,6 +36,10 @@ from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
+
+# -- UI Setup --------------------------------------------------------------
+
+console = Console()
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -186,6 +196,23 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+
+    # 1. Show Professional Banner
+    banner = Text(
+        "MT5 AI/ML TRADING BOT\nInstitutional-Grade XAUUSD Intelligence",
+        style="bold gold1",
+        justify="center",
+    )
+    console.print(
+        Panel(
+            banner,
+            box=ROUNDED,
+            subtitle="[dim]Enterprise Edition v1.0.0[/dim]",
+            subtitle_align="right",
+            border_style="gold1",
+        )
+    )
+
     configure_logging(args.log_level)
     log = logging.getLogger("main")
     # Override config from CLI
@@ -199,23 +226,35 @@ def main() -> int:
     validator = ConfigValidator(cfg)
     result = validator.validate()
 
-    if not result.success:
-        log.critical("Startup validation FAILED")
-        for err in result.errors:
-            level = "CRITICAL" if err.critical else "WARNING"
-            log.error(f"  [{level}] {err.field}: {err.message}")
-        return 1
-
     if result.errors:
-        for err in result.errors:
-            log.warning(f"  [WARNING] {err.field}: {err.message}")
+        val_table = Table(
+            title="Startup Validation Issues",
+            box=ROUNDED,
+            border_style="red" if not result.success else "yellow",
+        )
+        val_table.add_column("Field", style="cyan")
+        val_table.add_column("Level", style="bold")
+        val_table.add_column("Message")
 
-    log.info(
-        "Configuration loaded and validated | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
-    )
+        for err in result.errors:
+            level_str = "CRITICAL" if err.critical else "WARNING"
+            level_style = "bold red" if err.critical else "bold yellow"
+            val_table.add_row(err.field, Text(level_str, style=level_style), err.message)
+
+        console.print(val_table)
+        if not result.success:
+            log.critical("Startup validation FAILED")
+            return 1
+
+    # 2. Show Active Configuration Summary
+    cfg_table = Table(title="Active Session Configuration", box=ROUNDED, border_style="blue")
+    cfg_table.add_column("Parameter", style="cyan")
+    cfg_table.add_column("Value", style="bold white")
+    cfg_table.add_row("Mode", cfg.mode.upper())
+    cfg_table.add_row("Algorithm", cfg.algorithm.upper())
+    cfg_table.add_row("Symbol", cfg.symbol)
+    cfg_table.add_row("Timeframe", cfg.timeframe)
+    console.print(cfg_table)
     # Initialise components
     connector = MT5Connector(cfg)
     if not connector.connect():
