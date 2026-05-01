@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -74,10 +75,13 @@ def run_live(
                 df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
                 tick = connector.get_tick(cfg.symbol)
             except MT5ConnectionError as exc:
-                log.warning("MT5 Connection lost in trading loop: %s. Attempting reconnection...", exc)
+                log.warning(
+                    "MT5 Connection lost in trading loop: %s. Attempting reconnection...",
+                    exc,
+                )
                 try:
                     connector.initialize()
-                    continue # Re-attempt data fetch in next iteration immediately
+                    continue  # Re-attempt data fetch in next iteration immediately
                 except MT5ConnectionError:
                     log.error("Reconnection failed. Waiting for next poll interval.")
                     time.sleep(poll_interval)

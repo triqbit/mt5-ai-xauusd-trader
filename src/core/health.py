@@ -12,7 +12,9 @@ import logging
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, Optional
+
+# Late import for EnsembleModel to avoid dependency on torch at module level
+from typing import TYPE_CHECKING, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.encoders import jsonable_encoder
@@ -21,25 +23,31 @@ from pydantic import BaseModel, Field
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
 from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 
+if TYPE_CHECKING:
+    from src.models.ensemble import EnsembleModel
+
 logger = logging.getLogger(__name__)
+
 
 class HealthStatus(str, Enum):
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     FAILED = "failed"
 
+
 class ComponentStatus(BaseModel):
     status: HealthStatus
     message: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+
 class HealthReport(BaseModel):
     status: HealthStatus
     components: Dict[str, ComponentStatus]
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class HealthChecker:
     """
@@ -51,7 +59,7 @@ class HealthChecker:
         config: TradingConfig,
         connector: Optional[MT5Connector] = None,
         trade_logger: Optional[TradeLogger] = None,
-        model: Optional[EnsembleModel] = None,
+        model: Optional["EnsembleModel"] = None,
     ) -> None:
         self.cfg = config
         self.connector = connector
@@ -65,7 +73,9 @@ class HealthChecker:
     def check_database(self) -> ComponentStatus:
         """Verify database reachability."""
         if not self.trade_logger:
-            return ComponentStatus(status=HealthStatus.FAILED, message="TradeLogger not initialized")
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message="TradeLogger not initialized"
+            )
 
         try:
             # Simple connectivity check using SQLAlchemy engine
@@ -74,12 +84,16 @@ class HealthChecker:
             return ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
-            return ComponentStatus(status=HealthStatus.FAILED, message=f"Database unreachable: {e!s}")
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message=f"Database unreachable: {e!s}"
+            )
 
     def check_mt5(self) -> ComponentStatus:
         """Verify MT5 connection status."""
         if not self.connector:
-            return ComponentStatus(status=HealthStatus.FAILED, message="MT5Connector not initialized")
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message="MT5Connector not initialized"
+            )
 
         if self.connector._is_initialized:
             return ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection alive")
@@ -89,7 +103,9 @@ class HealthChecker:
     def check_models(self) -> ComponentStatus:
         """Verify models are loaded in the ensemble."""
         if not self.model:
-            return ComponentStatus(status=HealthStatus.FAILED, message="EnsembleModel not initialized")
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message="EnsembleModel not initialized"
+            )
 
         loaded = []
         if self.model._ppo_model is not None:
@@ -98,11 +114,12 @@ class HealthChecker:
             loaded.append("LSTM")
 
         if not loaded:
-            return ComponentStatus(status=HealthStatus.FAILED, message="No models loaded in ensemble")
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message="No models loaded in ensemble"
+            )
 
         return ComponentStatus(
-            status=HealthStatus.HEALTHY,
-            message=f"Models loaded: {', '.join(loaded)}"
+            status=HealthStatus.HEALTHY, message=f"Models loaded: {', '.join(loaded)}"
         )
 
     def check_config(self) -> ComponentStatus:
@@ -114,14 +131,14 @@ class HealthChecker:
             if result.errors:
                 return ComponentStatus(
                     status=HealthStatus.DEGRADED,
-                    message=f"Config valid with warnings: {'; '.join(e.message for e in result.errors)}"
+                    message=f"Config valid with warnings: {'; '.join(e.message for e in result.errors)}",
                 )
             return ComponentStatus(status=HealthStatus.HEALTHY, message="Configuration valid")
         else:
             critical_errors = [e.message for e in result.errors if e.critical]
             return ComponentStatus(
                 status=HealthStatus.FAILED,
-                message=f"Configuration invalid: {'; '.join(critical_errors)}"
+                message=f"Configuration invalid: {'; '.join(critical_errors)}",
             )
 
     def check_disk_space(self, min_mb: int = 100) -> ComponentStatus:
@@ -131,7 +148,9 @@ class HealthChecker:
             try:
                 logs_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
-                return ComponentStatus(status=HealthStatus.FAILED, message=f"Cannot create logs directory: {e}")
+                return ComponentStatus(
+                    status=HealthStatus.FAILED, message=f"Cannot create logs directory: {e}"
+                )
 
         usage = shutil.disk_usage(logs_dir)
         free_mb = usage.free / (1024 * 1024)
@@ -139,12 +158,11 @@ class HealthChecker:
         if free_mb < min_mb:
             return ComponentStatus(
                 status=HealthStatus.FAILED,
-                message=f"Low disk space: {free_mb:.2f}MB free, required {min_mb}MB"
+                message=f"Low disk space: {free_mb:.2f}MB free, required {min_mb}MB",
             )
 
         return ComponentStatus(
-            status=HealthStatus.HEALTHY,
-            message=f"Disk space sufficient: {free_mb:.2f}MB free"
+            status=HealthStatus.HEALTHY, message=f"Disk space sufficient: {free_mb:.2f}MB free"
         )
 
     def get_full_report(self) -> HealthReport:
@@ -162,15 +180,21 @@ class HealthChecker:
         failed = any(c.status == HealthStatus.FAILED for c in components.values())
         degraded = any(c.status == HealthStatus.DEGRADED for c in components.values())
 
-        overall_status = HealthStatus.FAILED if failed else (HealthStatus.DEGRADED if degraded else HealthStatus.HEALTHY)
+        overall_status = (
+            HealthStatus.FAILED
+            if failed
+            else (HealthStatus.DEGRADED if degraded else HealthStatus.HEALTHY)
+        )
 
         return HealthReport(status=overall_status, components=components)
+
 
 # FastAPI Router implementation
 router = APIRouter(prefix="/health", tags=["health"])
 
 # Global health checker instance - to be configured at startup
 _health_checker: Optional[HealthChecker] = None
+
 
 def get_health_checker() -> HealthChecker:
     global _health_checker
@@ -179,20 +203,23 @@ def get_health_checker() -> HealthChecker:
         _health_checker = HealthChecker(get_config())
     return _health_checker
 
+
 def init_health_checker(
     config: TradingConfig,
     connector: MT5Connector,
     trade_logger: TradeLogger,
-    model: EnsembleModel,
+    model: "EnsembleModel",
 ) -> HealthChecker:
     global _health_checker
     _health_checker = HealthChecker(config, connector, trade_logger, model)
     return _health_checker
 
+
 @router.get("/liveness", response_model=ComponentStatus)
 async def liveness():
     checker = get_health_checker()
     return checker.check_liveness()
+
 
 @router.get("/readiness", response_model=HealthReport)
 async def readiness():
@@ -205,6 +232,7 @@ async def readiness():
             detail=jsonable_encoder(report),
         )
     return report
+
 
 @router.get("/full", response_model=HealthReport)
 async def full_report():

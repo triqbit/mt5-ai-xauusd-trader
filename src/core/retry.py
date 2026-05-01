@@ -13,6 +13,7 @@ from typing import Any, Callable, Tuple, Type, Union
 
 logger = logging.getLogger(__name__)
 
+
 def with_retry(
     exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception,
     max_retries: int = 3,
@@ -30,6 +31,7 @@ def with_retry(
         backoff_factor: Factor by which the delay increases after each attempt.
         jitter: Whether to add random jitter to the delay.
     """
+
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -44,18 +46,25 @@ def with_retry(
                     if attempt >= max_retries:
                         logger.error(
                             "Max retries (%d) reached for %s. Last error: %s",
-                            max_retries, func.__name__, e
+                            max_retries,
+                            func.__name__,
+                            e,
                         )
                         raise
 
                     wait_time = delay
                     if jitter:
                         import random
-                        wait_time *= (0.5 + random.random())
+
+                        wait_time *= 0.5 + random.random()
 
                     logger.warning(
                         "Retry attempt %d/%d for %s failed: %s. Retrying in %.2fs...",
-                        attempt + 1, max_retries, func.__name__, e, wait_time
+                        attempt + 1,
+                        max_retries,
+                        func.__name__,
+                        e,
+                        wait_time,
                     )
 
                     time.sleep(wait_time)
@@ -66,4 +75,5 @@ def with_retry(
                 raise last_exception
 
         return wrapper
+
     return decorator

@@ -5,10 +5,17 @@ Unit and integration tests for the health check system.
 """
 
 import pytest
+import sys
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
+
+# Mock torch and stable_baselines3 before any other imports to avoid ModuleNotFoundError
+sys.modules['torch'] = MagicMock()
+sys.modules['torch.nn'] = MagicMock()
+sys.modules['torch.optim'] = MagicMock()
+sys.modules['stable_baselines3'] = MagicMock()
 
 from src.core.health import HealthChecker, HealthStatus, router, init_health_checker, ComponentStatus, HealthReport
 from src.core.config import TradingConfig
