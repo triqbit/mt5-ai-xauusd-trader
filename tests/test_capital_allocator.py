@@ -3,7 +3,8 @@ Unit tests for the CapitalAllocator system.
 """
 
 import pytest
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig, AllocationResult
+
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 
 
 @pytest.fixture
