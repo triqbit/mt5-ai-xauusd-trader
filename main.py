@@ -28,6 +28,8 @@ from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.models.regime_detector import RegimeDetector
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -60,6 +62,7 @@ def run_live(
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
+    regime_detector: RegimeDetector,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -73,13 +76,17 @@ def run_live(
                 df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
                 tick = connector.get_tick(cfg.symbol)
 
+            # 1.1 Detect market regime
+            regime_info = regime_detector.detect(df)
+            log.info("Market Regime: %s (conf=%.2f)", regime_info.label, regime_info.confidence)
+
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             volatility = float(df["close"].rolling(20).std().iloc[-1])
 
             # 3. Get ensemble prediction
             with profile("inference"):
-                direction, confidence, _per_algo = model.predict(obs)
+                direction, confidence, _per_algo = model.predict(obs, regime=regime_info.label)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -235,9 +242,28 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
+
+    # Institutional Capital Allocator
+    allocator = CapitalAllocator(total_budget=max(balance, 1.0))
+    allocator.add_strategy(
+        StrategyConfig(
+            strategy_id=f"{cfg.algorithm}_{cfg.symbol}",
+            symbol=cfg.symbol,
+            model_family=cfg.algorithm,
+            capital_cap=max(balance * 0.5, 1.0),  # Max 50% for this primary strategy
+        )
+    )
+
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    risk = RiskManager(
+        cfg,
+        account_balance=balance,
+        logger_db=trade_logger,
+        monitor=monitor,
+        allocator=allocator,
+    )
     model = EnsembleModel(device="cpu")
+    regime_detector = RegimeDetector()
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
@@ -265,6 +291,7 @@ def main() -> int:
                 connector,
                 risk,
                 model,
+                regime_detector,
                 trade_logger=trade_logger,
                 monitor=monitor,
             )

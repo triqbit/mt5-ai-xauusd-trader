@@ -19,6 +19,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from src.models.dynamic_ensemble import DynamicEnsemble
+from src.models.regime_detector import MarketRegime
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,23 +76,24 @@ class LSTMAttentionModel(nn.Module):
 class EnsembleModel:
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
-    Weights are initialised equally and adapt based on a rolling window
-    of each algorithm's realised P&L Sharpe ratio.
+    Uses DynamicEnsemble for institutional-grade weight adaptation.
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
-        self.weights: Dict[str, float] = {
-            "ppo": 1 / 3,
-            "dreamer": 1 / 3,
-            "lstm": 1 / 3,
-        }
+        self.dynamic_weighting = DynamicEnsemble(self.ALGORITHMS)
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
         self.lstm_model: Optional[LSTMAttentionModel] = None
         self._performance: Dict[str, List[float]] = {k: [] for k in self.ALGORITHMS}
+        self._last_regime: Optional[MarketRegime] = None
+
+    @property
+    def weights(self) -> Dict[str, float]:
+        """Current ensemble weights from the dynamic weighting engine."""
+        return self.dynamic_weighting.get_weights()
 
     # ── Loading ────────────────────────────────────────────────────────────
     def load_ppo(self, path: Path) -> None:
@@ -116,11 +120,15 @@ class EnsembleModel:
         self,
         obs: np.ndarray,
         seq: Optional[torch.Tensor] = None,
+        regime: Optional[MarketRegime] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
         direction: +1 buy, -1 sell, 0 hold
         """
+        if regime:
+            self._last_regime = regime
+
         votes: Dict[str, np.ndarray] = {}
 
         # PPO prediction
@@ -142,8 +150,9 @@ class EnsembleModel:
             return 0, 0.0, {}
 
         # Weighted average across available models
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+        current_weights = self.weights
+        total_weight = sum(current_weights[k] for k in votes)
+        blended = sum(current_weights[k] / total_weight * votes[k] for k in votes)
         action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
         confidence = float(blended[action_idx])
         direction_map = {0: 1, 1: -1, 2: 0}
@@ -166,25 +175,26 @@ class EnsembleModel:
                 self._rebalance_weights()
 
     def _rebalance_weights(self, window: int = 50) -> None:
-        """Reweight by rolling Sharpe ratio (floor 5%)."""
-        sharpes: Dict[str, float] = {}
-        for algo, rets in self._performance.items():
-            tail = rets[-window:]
-            if len(tail) < 10:
-                sharpes[algo] = 1.0
-                continue
-            arr = np.array(tail)
-            mean = arr.mean()
-            std = arr.std() + 1e-9
-            sharpes[algo] = max(mean / std, 0.0)
-        total = sum(sharpes.values()) or 1.0
-        for algo, s in sharpes.items():
-            raw = s / total
-            self.weights[algo] = max(raw, 0.05)  # min 5%
-        # Re-normalise
-        total_w = sum(self.weights.values())
-        self.weights = {k: v / total_w for k, v in self.weights.items()}
-        logger.info("Weights rebalanced: %s", self.weights)
+        """Reweight by rolling Sharpe ratio using DynamicEnsemble engine."""
+        metrics = {}
+        for algo in self.ALGORITHMS:
+            rets = self._performance[algo][-window:]
+            if len(rets) < 10:
+                acc = 0.5
+            else:
+                # Use normalized Sharpe as a proxy for 'accuracy' metric in DynamicEnsemble
+                arr = np.array(rets)
+                sharpe = arr.mean() / (arr.std() + 1e-9)
+                acc = float(np.clip(0.5 + (sharpe * 0.1), 0.0, 1.0))
+
+            metrics[algo] = {
+                "accuracy": acc,
+                "calibration_error": 0.0,
+                "drift_score": 0.0,
+            }
+
+        self.dynamic_weighting.update_weights(metrics, regime=self._last_regime)
+        logger.info("Weights rebalanced via DynamicEnsemble: %s", self.weights)
 
 
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]

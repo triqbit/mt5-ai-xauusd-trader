@@ -19,6 +19,7 @@ from typing import Dict, Optional
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.trading.capital_allocator import CapitalAllocator
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        allocator: Optional[CapitalAllocator] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
@@ -80,12 +82,13 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.allocator = allocator
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -101,6 +104,8 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_institutional_allocation(signal):
+            rejection_reason = "Institutional allocation denied"
 
         passed = rejection_reason == ""
         if not passed:
@@ -227,6 +232,29 @@ class RiskManager:
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
             return False
+        return True
+
+    def _check_institutional_allocation(self, signal: TradeSignal) -> bool:
+        """Consult CapitalAllocator for institutional-grade budget check."""
+        if not self.allocator:
+            return True
+
+        # Use strategy_id = algorithm + symbol
+        strategy_id = f"{signal.algorithm}_{signal.symbol}"
+        result = self.allocator.request_allocation(
+            strategy_id=strategy_id,
+            risk_pct=self.cfg.risk_per_trade,
+        )
+
+        if not result.is_allowed:
+            logger.warning("Allocation DENIED | reason=%s", result.rejection_reason)
+            return False
+
+        logger.info(
+            "Allocation APPROVED | amount=%.2f risk=%.1f%%",
+            result.allocated_amount,
+            result.risk_pct * 100,
+        )
         return True
 
 
