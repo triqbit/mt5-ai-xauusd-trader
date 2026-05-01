@@ -44,7 +44,7 @@ jobs:
           # Allowed: MIT, Apache, BSD, PSF, ISC, MPL, LGPL, CC0, Unlicense
           # Disallowed: GPL, AGPL, SSPL
           # Note: We use --fail-on with specific strings to catch disallowed licenses.
-          pip-licenses --fail-on GPL AGPL SSPL > disallowed_found.txt 2>&1 || DISALLOWED=true
+          pip-licenses --fail-on GPL --fail-on AGPL --fail-on SSPL > disallowed_found.txt 2>&1 || DISALLOWED=true
 
           if [ "$DISALLOWED" = "true" ]; then
             echo "::error::Disallowed licenses detected!"
