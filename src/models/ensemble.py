@@ -9,15 +9,33 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+# Heavy AI dependencies are suppressed to allow CLI/Config functionality
+# in environments without torch/SB3 (e.g., some CI runners).
+try:
+    import torch
+    import torch.nn as nn
+
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
+    class nn:
+        class Module:
+            pass
+
+    class torch:
+        class Tensor:
+            pass
+
 
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.regime_detector import MarketRegime
@@ -41,6 +59,8 @@ class LSTMAttentionModel(nn.Module):
         n_heads: int = 8,
         dropout: float = 0.2,
     ) -> None:
+        if not HAS_TORCH:
+            raise ImportError("torch is required for LSTMAttentionModel")
         super().__init__()
         self.lstm = nn.LSTM(
             input_size=n_features,
@@ -82,7 +102,10 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device)
+        if HAS_TORCH:
+            self.device = torch.device(device)
+        else:
+            self.device = None
         self.dynamic_weighting = DynamicEnsemble(self.ALGORITHMS)
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
@@ -108,6 +131,9 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
+        if not HAS_TORCH:
+            logger.warning("torch not installed - cannot load LSTM")
+            return
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
         state = torch.load(str(path), map_location=self.device)
         model.load_state_dict(state)
@@ -119,7 +145,7 @@ class EnsembleModel:
     def predict(
         self,
         obs: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional[Any] = None,
         regime: Optional[MarketRegime] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
@@ -139,7 +165,7 @@ class EnsembleModel:
             votes["ppo"] = probs
 
         # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
+        if self.lstm_model is not None and seq is not None and HAS_TORCH:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]

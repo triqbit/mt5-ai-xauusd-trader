@@ -112,7 +112,9 @@ class NaiveDirectionalStrategy:
 class RiskFilteredBaseline:
     """EMA Crossover strategy with a simple volatility filter."""
 
-    def __init__(self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02):
+    def __init__(
+        self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02
+    ):
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.vol_threshold_pct = vol_threshold_pct
@@ -128,7 +130,7 @@ class RiskFilteredBaseline:
 
         signals = np.zeros(len(df))
         # Only trade if volatility is below threshold
-        mask = (volatility < self.vol_threshold_pct)
+        mask = volatility < self.vol_threshold_pct
         signals[mask & (fast_ema > slow_ema)] = 1
         signals[mask & (fast_ema < slow_ema)] = -1
         return signals
@@ -163,7 +165,9 @@ class MeanReversionStrategy:
 class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
-    def __init__(self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002):
+    def __init__(
+        self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002
+    ):
         self.df = df
         self.initial_balance = initial_balance
         self.commission = commission
@@ -201,12 +205,12 @@ class BenchmarkEvaluator:
             if target_pos != position:
                 # If closing an existing position
                 if position != 0:
-                    current_equity *= (1 - self.commission)
+                    current_equity *= 1 - self.commission
                     trade_pnls.append(current_equity - entry_equity)
 
                 # If opening a new position
                 if target_pos != 0:
-                    current_equity *= (1 - self.commission)
+                    current_equity *= 1 - self.commission
                     entry_equity = current_equity
 
                 position = target_pos
@@ -214,17 +218,19 @@ class BenchmarkEvaluator:
             # Update equity based on market movement
             if position == 1:
                 change = (current_price - prev_price) / prev_price
-                current_equity *= (1 + change)
+                current_equity *= 1 + change
             elif position == -1:
                 change = (prev_price - current_price) / prev_price
-                current_equity *= (1 + change)
+                current_equity *= 1 + change
 
             equity[i] = current_equity
-            daily_returns[i] = (equity[i] - equity[i - 1]) / equity[i - 1] if equity[i - 1] != 0 else 0
+            daily_returns[i] = (
+                (equity[i] - equity[i - 1]) / equity[i - 1] if equity[i - 1] != 0 else 0
+            )
 
         # Force close any remaining position at the last price
         if position != 0:
-            equity[-1] *= (1 - self.commission)
+            equity[-1] *= 1 - self.commission
             trade_pnls.append(equity[-1] - entry_equity)
 
         # Final aggregate metrics

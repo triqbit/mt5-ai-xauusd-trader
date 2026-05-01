@@ -67,9 +67,7 @@ class RegimeDetector:
         y = prices
         # Use simple linear regression formula
         n = len(x)
-        slope = (n * np.sum(x * y) - np.sum(x) * np.sum(y)) / (
-            n * np.sum(x**2) - (np.sum(x)) ** 2
-        )
+        slope = (n * np.sum(x * y) - np.sum(x) * np.sum(y)) / (n * np.sum(x**2) - (np.sum(x)) ** 2)
         # Normalize slope by price level
         return float(slope / prices[0])
 
