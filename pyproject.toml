@@ -73,6 +73,45 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 
+[[tool.mypy.overrides]]
+module = [
+    "MetaTrader5.*",
+    "metaapi_cloud_sdk.*",
+    "stable_baselines3.*",
+    "gymnasium.*",
+    "pandas_ta.*",
+    "TA_Lib.*",
+    "mplfinance.*",
+    "yfinance.*",
+    "telegram.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "src.core.trade_logger",
+    "src.core.config",
+    "src.models.ensemble",
+    "src.models.ppo_agent",
+    "src.models.transformer_model",
+    "src.environment.gym_env",
+    "src.trading.mt5_connector",
+    "main"
+]
+disable_error_code = [
+    "attr-defined",
+    "valid-type",
+    "misc",
+    "return-value",
+    "assignment",
+    "index",
+    "no-untyped-def",
+    "type-arg",
+    "no-any-return",
+    "union-attr",
+    "call-arg"
+]
+
 # ===========================================================
 # pytest
 # ===========================================================

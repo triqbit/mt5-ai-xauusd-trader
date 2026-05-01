@@ -157,7 +157,7 @@ def test_config_and_startup_integration():
         get_config.cache_clear()
         cfg = get_config()
         assert cfg.mode == "live"
-        assert cfg.mt5_password == "test"
+        assert cfg.mt5_password.get_secret_value() == "test"
 
         # Test validation
         with patch.dict(os.environ, {"RISK_PER_TRADE": "0.05"}):
@@ -179,7 +179,15 @@ def test_backtest_initialization():
         patch("sys.argv", ["main.py", "--mode", "backtest"]),
         patch("src.trading.mt5_connector.MT5Connector.connect", return_value=True),
         patch("src.trading.mt5_connector.MT5Connector.disconnect"),
-        patch.dict(os.environ, {"MT5_PASSWORD": "test", "MT5_SERVER": "test"}),
+        patch.dict(
+            os.environ,
+            {
+                "MT5_LOGIN": "123456",
+                "MT5_PASSWORD": "secure_password",
+                "MT5_SERVER": "secure_server",
+                "DATABASE_URL": "postgresql://user:pass@localhost/db",
+            },
+        ),
     ):
         # Should log info but not crash
         assert main() == 0
