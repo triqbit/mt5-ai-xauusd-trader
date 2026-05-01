@@ -1,6 +1,6 @@
 # Market Regime Detector
 
-The `RegimeDetector` classifies the market state of XAUUSD into one of the following regimes:
+The `RegimeDetector` classifies the market state of XAUUSD into one of the following regimes using statistical price features:
 
 - **Trending**: Strong efficiency ratio and consistent price slope.
 - **Ranging**: Low efficiency ratio and low price slope.
@@ -11,10 +11,10 @@ The `RegimeDetector` classifies the market state of XAUUSD into one of the follo
 
 ## Features Used
 
-- **ATR Ratio**: Short-term ATR divided by long-term ATR.
-- **Efficiency Ratio**: Net price change divided by sum of absolute price changes (Kaufman).
-- **Price Slope**: Linear regression slope of close prices.
-- **Z-score**: Current price distance from moving average in standard deviations.
+- **ATR Ratio**: Short-term ATR divided by long-term ATR (detects volatility expansion).
+- **Efficiency Ratio (Kaufman)**: Net price change divided by sum of absolute price changes (measures trend noise).
+- **Price Slope**: Linear regression slope of close prices (measures trend direction and strength).
+- **Z-score**: Current price distance from moving average in standard deviations (detects extremes).
 
 ## Usage
 

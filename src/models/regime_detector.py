@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -92,8 +91,8 @@ class RegimeDetector:
         low = data["low"].values
 
         # 1. Volatility (ATR Ratio)
-        def get_tr(h, l, c_prev):
-            return max(h - l, abs(h - c_prev), abs(l - c_prev))
+        def get_tr(h, low_val, c_prev):
+            return max(h - low_val, abs(h - c_prev), abs(low_val - c_prev))
 
         tr = np.zeros(len(data))
         for i in range(1, len(data)):

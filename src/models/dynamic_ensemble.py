@@ -41,7 +41,7 @@ class DynamicEnsemble:
 
         # Initialize equal weights
         n = len(model_names)
-        self.weights = {name: 1.0 / n for name in model_names}
+        self.weights = dict.fromkeys(model_names, 1.0 / n)
         self._target_weights = self.weights.copy()
         self._prev_target_weights = self.weights.copy()
 
@@ -120,7 +120,7 @@ class DynamicEnsemble:
                         deltas[name] *= ratio
         elif pos_sum > 1e-9 or neg_sum > 1e-9:
             # Unbalanced deltas (should be rare if current and target both sum to 1)
-            deltas = {name: 0.0 for name in deltas}
+            deltas = dict.fromkeys(deltas, 0.0)
 
         # Apply adjustments
         for name in self.model_names:
@@ -141,10 +141,10 @@ class DynamicEnsemble:
         """Normalize scores to sum to 1.0 while respecting a minimum floor."""
         n = len(scores)
         if n * floor >= 1.0:
-            return {name: 1.0 / n for name in scores}
+            return dict.fromkeys(scores, 1.0 / n)
 
         # Start all at floor
-        weights = {name: floor for name in scores}
+        weights = dict.fromkeys(scores, floor)
         remaining = 1.0 - (n * floor)
 
         # Distribute remaining proportionally to excess scores above a baseline
