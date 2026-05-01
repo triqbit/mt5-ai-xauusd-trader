@@ -17,17 +17,20 @@ import logging
 import os
 import sys
 import time
+import pandas as pd
 from pathlib import Path
 from typing import Optional
 
 import structlog
 
-from src.core import get_config, profile
+from src.core import FeatureEngineer, get_config, profile
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.backtester import BacktestEngine
+from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -60,6 +63,8 @@ def run_live(
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
+    execution_filter: ExecutionFilter,
+    feature_engineer: FeatureEngineer,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -70,12 +75,16 @@ def run_live(
         try:
             # 1. Fetch latest market data
             with profile("data_fetch"):
-                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=1000)
                 tick = connector.get_tick(cfg.symbol)
 
             # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
-            volatility = float(df["close"].rolling(20).std().iloc[-1])
+            with profile("feature_engineering"):
+                df_features = feature_engineer.generate_features(df)
+
+            row = df_features.iloc[-1]
+            obs = row[feature_engineer.get_feature_names()].values
+            volatility = float(row.get("atr_14", 0.0))
 
             # 3. Get ensemble prediction
             with profile("inference"):
@@ -120,9 +129,17 @@ def run_live(
                 algorithm=cfg.algorithm,
                 confidence=confidence,
             )
-            # 5. Risk approval gate
+            # 5. Execution Filter & Risk approval gate
             with profile("risk_check"):
-                approved = risk.approve(signal, signal_id=signal_id)
+                # Layer A: Technical Execution Filter
+                decision = execution_filter.validate(signal, df_features)
+
+                # Layer B: Portfolio Risk Manager
+                if decision.is_approved:
+                    approved = risk.approve(signal, signal_id=signal_id)
+                else:
+                    log.warning("Signal blocked by execution filter | reason=%s", decision.blocked_by)
+                    approved = False
 
             if approved:
                 with profile("execution"):
@@ -190,6 +207,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--symbol", default="XAUUSD")
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
+    p.add_argument("--start", help="Backtest start date YYYY-MM-DD")
+    p.add_argument("--end", help="Backtest end date YYYY-MM-DD")
     p.add_argument("--log-level", default="INFO")
     return p.parse_args()
 
@@ -228,15 +247,18 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
-        return 1
+    if cfg.mode != "backtest":
+        if not connector.connect():
+            log.critical("Cannot connect to MT5 terminal. Aborting.")
+            return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    execution_filter = ExecutionFilter()
+    feature_engineer = FeatureEngineer()
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -246,17 +268,18 @@ def main() -> int:
         model.load_lstm(lstm_path)
 
     # Enterprise Health Gate
-    health_checker = init_health_checker(cfg, connector, trade_logger, model)
-    health_report = health_checker.get_full_report()
+    if cfg.mode != "backtest":
+        health_checker = init_health_checker(cfg, connector, trade_logger, model)
+        health_report = health_checker.get_full_report()
 
-    if health_report.status == HealthStatus.FAILED:
-        log.critical("Startup HEALTH CHECK FAILED")
-        for name, comp in health_report.components.items():
-            if comp.status == HealthStatus.FAILED:
-                log.error(f"  [FAILED] {name}: {comp.message}")
-        return 1
+        if health_report.status == HealthStatus.FAILED:
+            log.critical("Startup HEALTH CHECK FAILED")
+            for name, comp in health_report.components.items():
+                if comp.status == HealthStatus.FAILED:
+                    log.error(f"  [FAILED] {name}: {comp.message}")
+            return 1
 
-    log.info("System HEALTH CHECK PASSED | status=%s", health_report.status)
+        log.info("System HEALTH CHECK PASSED | status=%s", health_report.status)
 
     try:
         if cfg.mode in ("demo", "live"):
@@ -265,11 +288,49 @@ def main() -> int:
                 connector,
                 risk,
                 model,
+                execution_filter,
+                feature_engineer,
                 trade_logger=trade_logger,
                 monitor=monitor,
             )
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            log.info("Starting Backtest Engine...")
+            start_date = args.start or "2023-01-01"
+            end_date = args.end or "2023-12-31"
+
+            # Fetch historical data for backtest
+            df = connector.get_ohlcv(
+                symbol=cfg.symbol,
+                timeframe=cfg.timeframe,
+                n_bars=10000 # Fetch enough for the range
+            )
+
+            if df.empty:
+                log.warning("No data from connector, generating synthetic data for backtest demonstration")
+                from src.utils.synthetic_data import ScenarioGenerator
+                gen = ScenarioGenerator()
+                df = gen.generate(n_steps=10000, regime="trending")
+                df.index = pd.date_range(start=start_date, periods=len(df), freq="5min")
+
+            # Filter by date range
+            df = df[(df.index >= start_date) & (df.index <= end_date)]
+            log.info("Backtest range: %s to %s | bars=%d", start_date, end_date, len(df))
+
+            engine = BacktestEngine()
+            report = engine.run_walk_forward(df, model)
+
+            print("\n" + "="*50)
+            print(" BACKTEST PERFORMANCE REPORT")
+            print("="*50)
+            print(f"Annualized Return: {report.annualized_return*100:.2f}%")
+            print(f"Sharpe Ratio:      {report.sharpe_ratio:.2f}")
+            print(f"Max Drawdown:      {report.max_drawdown*100:.2f}%")
+            print(f"Profit Factor:     {report.profit_factor:.2f}")
+            print(f"Total Trades:      {report.total_trades}")
+            print(f"Win Rate:          {report.win_rate*100:.2f}%")
+            print(f"Total Net PnL:     ${report.total_net_pnl:.2f}")
+            print("="*50 + "\n")
+
     finally:
         connector.disconnect()
     return 0
