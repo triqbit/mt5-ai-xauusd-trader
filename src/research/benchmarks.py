@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.core.constants import ModelAction, SignalDirection
+from src.core.constants import SignalDirection
 
 
 class BenchmarkStrategy(Protocol):

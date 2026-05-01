@@ -38,6 +38,7 @@ class Monitor:
         self.equity_history: List[Dict[str, Any]] = []
         self.bot: Optional[telegram.Bot] = None
         self._server_started = False
+        self._background_tasks: set[asyncio.Task] = set()
 
         if self.cfg.telegram_token:
             try:
@@ -85,7 +86,12 @@ class Monitor:
                 # A safer way to do this in a multi-threaded/async environment
                 # is to have a dedicated worker for Telegram messages.
                 # For now, adhering to the requested implementation.
-                asyncio.create_task(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
+                task = asyncio.create_task(
+                    self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
+                )
+                # Store task reference to prevent garbage collection (RUF006)
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
             else:
                 asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
 
