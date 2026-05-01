@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -25,8 +26,7 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -63,6 +63,11 @@ class ModelSignal(Base, AuditMixin):
     confidence = Column(Float)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_signal_entry_price_positive"),
+        CheckConstraint("confidence >= 0 AND confidence <= 1", name="check_signal_confidence_range"),
+    )
+
     # Relationship
     trade = relationship("Trade", back_populates="signal", uselist=False)
 
@@ -85,6 +90,11 @@ class Trade(Base, AuditMixin):
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
+
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_trade_entry_price_positive"),
+        CheckConstraint("lot_size > 0", name="check_trade_lot_size_positive"),
+    )
 
 
 class RiskEvent(Base, AuditMixin):
@@ -124,7 +134,7 @@ class TradeLogger:
 
     def log_signal(self, signal_data: Dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
-        with self.Session() as session:
+        with self.Session.begin() as session:
             signal = ModelSignal(
                 symbol=signal_data["symbol"],
                 direction=signal_data["direction"],
@@ -137,7 +147,7 @@ class TradeLogger:
                 timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
             )
             session.add(signal)
-            session.commit()
+            session.flush()
             return signal.id
 
     def log_trade(
@@ -151,7 +161,7 @@ class TradeLogger:
         status: str = "OPEN",
     ) -> int:
         """Log a trade execution."""
-        with self.Session() as session:
+        with self.Session.begin() as session:
             trade = Trade(
                 ticket=ticket,
                 symbol=symbol,
@@ -162,7 +172,7 @@ class TradeLogger:
                 status=status,
             )
             session.add(trade)
-            session.commit()
+            session.flush()
             return trade.id
 
     def update_trade(
@@ -171,14 +181,13 @@ class TradeLogger:
         exit_price: float,
         pnl: Optional[float] = None,
         drawdown_impact: float = 0.0,
-    ) -> None:
+    ) -> Optional[Trade]:
         """Update a trade when it is closed. Calculates P&L if not provided."""
-        with self.Session() as session:
-            trade = (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
+        with self.Session.begin() as session:
+            stmt = select(Trade).where(
+                Trade.ticket == ticket, Trade.is_deleted.is_(False)
             )
+            trade = session.execute(stmt).scalar_one_or_none()
             if trade:
                 trade.exit_price = exit_price
                 if pnl is not None:
@@ -195,18 +204,19 @@ class TradeLogger:
                     )
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
-                session.commit()
+                session.flush()
+                return trade
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
+                return None
 
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
-            return (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
+            stmt = select(Trade).where(
+                Trade.ticket == ticket, Trade.is_deleted.is_(False)
             )
+            return session.execute(stmt).scalar_one_or_none()
 
     def log_risk_event(
         self,
@@ -216,7 +226,7 @@ class TradeLogger:
         signal_id: Optional[int] = None,
     ) -> None:
         """Log a risk-related event."""
-        with self.Session() as session:
+        with self.Session.begin() as session:
             event = RiskEvent(
                 event_type=event_type,
                 description=description,
@@ -224,14 +234,13 @@ class TradeLogger:
                 signal_id=signal_id,
             )
             session.add(event)
-            session.commit()
 
     def read_performance_report(self) -> Dict[str, float]:
         """
         Calculate key performance metrics from closed trades.
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
         """
-        with self.Session() as session:
+        with self.Session.begin() as session:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
@@ -284,6 +293,5 @@ class TradeLogger:
                 win_rate=float(np.sum(pnls > 0) / len(pnls)),
             )
             session.add(metric_record)
-            session.commit()
 
             return metrics
