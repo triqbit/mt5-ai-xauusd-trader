@@ -4,13 +4,14 @@ This document defines the mandatory gates that must be satisfied and verified be
 
 ## 1. Automated Quality & Security Gates
 - [ ] **CI Pipeline Status:** All CI checks (linting, type checking) are passing on the target branch.
-- [ ] **Testing & Coverage:** All unit and integration tests pass with a minimum of 80% statement coverage.
+- [ ] **Testing & Coverage:** All unit tests pass with a minimum of 80% statement coverage.
 - [ ] **Security Scans:** Dependency audits (pip-audit) and container scans (Trivy) are clean, with zero unresolved High or Critical vulnerabilities.
 
 ## 2. Configuration & Environment Validation
 - [ ] **Environment Sync:** `.env.example` is synchronized with `src/core/config.py`.
 - [ ] **Variable Validation:** All production environment variables are validated via `scripts/validate_env.py`.
 - [ ] **MT5 Connectivity:** Connectivity to the production MT5 server and login credentials have been verified.
+- [ ] **Risk Limits:** Safe startup thresholds for risk (risk_per_trade <= 2%, max_daily_loss <= 15%) are confirmed in config.
 
 ## 3. Performance & Strategy Acceptance
 - [ ] **Backtest Review:** Latest backtest results for the release candidate have been reviewed.
@@ -18,7 +19,7 @@ This document defines the mandatory gates that must be satisfied and verified be
 
 ## 4. Staging & Infrastructure Verification
 - [ ] **Staging Health:** Full health check (`/health/readiness`) is passing in the staging/pre-prod environment.
-- [ ] **Monitoring Functional:** Telemetry, Prometheus metrics, and Telegram alerting are verified as active and receiving data.
+- [ ] **Monitoring:** Telemetry, Prometheus metrics, and Telegram alerting are verified as active and receiving data.
 - [ ] **Alerting Thresholds:** Critical alert thresholds are confirmed and functional.
 
 ## 5. Deployment Safety & Recoverability

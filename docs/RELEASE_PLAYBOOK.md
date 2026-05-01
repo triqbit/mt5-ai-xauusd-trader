@@ -44,17 +44,45 @@ Before triggering a production release, ensure the following:
 
 ## 5. Rollback Procedures
 
-### Automated Rollback (Redeploy Previous Version)
-If a new release causes issues in production:
-1. Identify the last known stable version (e.g., `v1.2.2`).
-2. Re-run the **Release Orchestration** workflow with the stable version number (if applicable) or manually trigger the deployment of the stable Docker image.
-3. If using Docker, update the production environment to point to the previous stable image tag.
+### Container Rollback
+If the new Docker image is unstable, revert to the previous version immediately:
+```bash
+# 1. Update the image tag in your deployment manifest or docker-compose.yml
+# From: triqbit/mt5-ai-xauusd-trader:v1.2.3
+# To:   triqbit/mt5-ai-xauusd-trader:v1.2.2
 
-### Manual Rollback (Git)
-1. Revert the problematic commits on the `main` branch.
-2. Create a new "fix" release (e.g., `v1.2.4`) following the standard process.
+# 2. Pull the stable image
+docker pull triqbit/mt5-ai-xauusd-trader:v1.2.2
 
-## 6. Incident Response
+# 3. Restart the service
+docker-compose up -d trading-bot
+```
+
+### Database Migration Rollback
+If a schema change causes issues, downgrade the database:
+```bash
+# 1. Enter the running container (or local environment)
+# 2. Run the alembic downgrade command (one step back)
+alembic downgrade -1
+
+# 3. Verify current version
+alembic current
+```
+
+### Emergency "Kill Switch"
+In case of catastrophic trading behavior:
+1. Log in to the MT5 Terminal or VPS.
+2. Manually close all open XAUUSD positions.
+3. Stop the Docker container: `docker stop trading-bot`.
+
+## 6. Post-Release Verification Checklist
+After a successful deployment, the operator MUST verify the following:
+- [ ] **Liveness:** `curl http://localhost:8000/health/liveness` returns `{"status": "ok"}`.
+- [ ] **MT5 Connection:** Logs show "Successfully connected to MT5 account XXXXXX".
+- [ ] **Audit Trail:** Check `trades.db` for the initial "System Startup" audit entry.
+- [ ] **Telegram:** Confirm the "Trading Bot Started (vX.Y.Z)" message was received.
+
+## 7. Incident Response
 - **Workflow Failure:** Check the GitHub Actions logs for the specific job that failed. Common issues include dependency conflicts, test failures, or expired secrets.
 - **Security Alert:** If Trivy or pip-audit fails, do not bypass. Fix the vulnerabilities before proceeding.
 - **Connectivity Issues:** Ensure the GitHub runner has access to required external resources (e.g., Docker Hub, if pushing).
