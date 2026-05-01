@@ -4,6 +4,8 @@ import pandas as pd
 from unittest.mock import MagicMock, patch
 from src.models.regime_detector import RegimeDetector, MarketRegime
 from src.models.dynamic_ensemble import DynamicEnsemble
+import pytest
+pytest.importorskip("torch")
 from src.models.ensemble import EnsembleModel
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.risk_manager import RiskManager, TradeSignal

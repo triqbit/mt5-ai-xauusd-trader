@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -24,9 +25,8 @@ from sqlalchemy import (
     Text,
     create_engine,
     select,
-    CheckConstraint,
 )
-from sqlalchemy.orm import relationship, sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -145,7 +145,7 @@ class TradeLogger:
                 entry_price=signal_data["entry_price"],
                 stop_loss=signal_data.get("stop_loss"),
                 take_profit=signal_data.get("take_profit"),
-                lot_size=signal_data.get("lot_size", 0.01), # Default min lot size if not provided
+                lot_size=signal_data.get("lot_size", 0.01),  # Default min lot size if not provided
                 algorithm=signal_data.get("algorithm"),
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
@@ -273,9 +273,7 @@ class TradeLogger:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
-                    select(Trade.pnl).where(
-                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
-                    )
+                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
                 )
                 .scalars()
                 .all()

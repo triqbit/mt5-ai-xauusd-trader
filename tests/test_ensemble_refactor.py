@@ -6,6 +6,9 @@ sys.modules['talib'] = MagicMock()
 
 import pytest
 import numpy as np
+pytest.importorskip("torch")
+import pytest
+pytest.importorskip("torch")
 import torch
 from src.models.ensemble import EnsembleModel
 from src.core.constants import SignalDirection
