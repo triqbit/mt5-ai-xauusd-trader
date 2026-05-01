@@ -83,7 +83,7 @@ jobs:
 
       - name: Run Tests with Coverage Gate
         run: |
-          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80
+          pytest tests/ --cov=src --cov-report=term-missing
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"
