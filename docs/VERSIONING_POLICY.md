@@ -12,23 +12,23 @@ We follow [Semantic Versioning 2.0.0](https://semver.org/). Versions are express
 
 ## 2. Conventional Commits
 
-To enable automated changelog generation and version bumping, all commits to the `main` and `develop` branches MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+To enable automated changelog generation and version bumping, all commits to the `main` branch MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
 `<type>[optional scope]: <description>`
 
 ### Supported Types:
-- `feat`: A new feature (corresponds to a MINOR version bump).
-- `fix`: A bug fix (corresponds to a PATCH version bump).
-- `perf`: A code change that improves performance.
-- `docs`: Documentation only changes.
+- `feat`: A new feature (corresponds to a **MINOR** version bump).
+- `fix`: A bug fix (corresponds to a **PATCH** version bump).
+- `perf`: A code change that improves performance (corresponds to a **PATCH** version bump).
+- `docs`: Documentation only changes (corresponds to a **PATCH** version bump).
 - `style`: Changes that do not affect the meaning of the code (white-space, formatting, etc).
-- `refactor`: A code change that neither fixes a bug nor adds a feature.
+- `refactor`: A code change that neither fixes a bug nor adds a feature (corresponds to a **PATCH** version bump).
 - `test`: Adding missing tests or correcting existing tests.
 - `chore`: Updating build tasks, package manager configs, etc.
 - `ci`: Changes to CI configuration files and scripts.
 
 ### Breaking Changes:
-Indicate a breaking change by adding a `!` after the type/scope or by adding `BREAKING CHANGE:` in the footer of the commit message. This triggers a MAJOR version bump.
+Indicate a breaking change by adding a `!` after the type/scope or by adding `BREAKING CHANGE:` in the footer of the commit message. This triggers a **MAJOR** version bump.
 
 ## 3. Tagging Strategy
 
@@ -38,25 +38,26 @@ Stable releases are tagged on the `main` branch:
 - These represent production-ready code that has passed all CI/CD gates.
 
 ### Pre-releases
-Pre-releases can be used for beta testing or integration validation:
+Pre-releases are used for beta testing or integration validation:
 - Format: `vMAJOR.MINOR.PATCH-<tag>.N` (e.g., `v1.2.0-rc.1`, `v1.2.0-alpha.5`)
-- Pre-releases are typically tagged on the `develop` or feature branches.
+- Pre-releases are typically tagged on the `develop` or feature branches to indicate a version in progress.
 
 ## 4. Automated Workflow
 
-1. **Changelog**: On every push to `main`, a GitHub Action automatically updates the `CHANGELOG.md` file based on the commits since the last release.
-2. **Version Bump**: The `Release Orchestration` workflow handles the final versioning and tagging based on the provided input or commit history analysis.
-3. **Drafting Releases**: The CI pipeline will automatically draft a GitHub Release with the generated changelog for final review by the Release Lead (Jules03).
+1. **Changelog**: On every push to `main`, a GitHub Action (`changelog.yml`) automatically updates the `CHANGELOG.md` file based on the commits since the last release.
+2. **Version Bump**: The `Release Orchestration` workflow (`release.yml`) handles the final versioning and tagging. It can automatically calculate the next semantic version based on commit history if not manually provided.
+3. **Drafting Releases**: The CI pipeline will automatically create a GitHub Release with the generated changelog for final review.
 
 ## 5. Guidance for Version Bumping
 
-| Change Type | Version Component | Example |
+| Change Type | Version Component | Commits Example |
 | :--- | :--- | :--- |
-| Breaking Change | MAJOR | `1.5.2` -> `2.0.0` |
-| New Feature | MINOR | `1.5.2` -> `1.6.0` |
-| Bug Fix | PATCH | `1.5.2` -> `1.5.3` |
-| Security Patch | PATCH | `1.5.3` -> `1.5.4` |
-| Dependency Update | PATCH | `1.5.4` -> `1.5.5` |
+| Breaking Change | MAJOR | `feat!: change risk engine` or `fix: API BREAKING CHANGE: ...` |
+| New Feature | MINOR | `feat: add LSTM model` |
+| Bug Fix | PATCH | `fix: correct drawdown calculation` |
+| Security Patch | PATCH | `fix: update vulnerable package` |
+| Refactor/Perf | PATCH | `refactor: optimize data loading` |
+| Documentation | PATCH | `docs: update deployment guide` |
 
 ---
 **Policy Owner:** Jules03 (Release Reliability & Governance)
