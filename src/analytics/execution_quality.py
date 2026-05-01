@@ -258,7 +258,7 @@ class ExecutionAnalyzer:
         lows = df["low"].values
 
         if signal.direction > 0:  # BUY
-            prices - signal.entry_price
+            # excursions = prices - signal.entry_price
             mfe = np.max(highs) - signal.entry_price
             mae = signal.entry_price - np.min(lows)
 
@@ -274,7 +274,7 @@ class ExecutionAnalyzer:
 
             opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * 100  # XAUUSD
         else:  # SELL
-            signal.entry_price - prices
+            # excursions = signal.entry_price - prices
             mfe = signal.entry_price - np.min(lows)
             mae = np.max(highs) - signal.entry_price
 
