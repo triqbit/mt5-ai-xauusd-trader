@@ -91,6 +91,9 @@ jobs:
       - name: Migration Reversibility Check
         run: python scripts/verify_migrations.py
 
+      - name: Validate Release Notes
+        run: python scripts/check_release_notes.py
+
       - name: Verify Pre-Prod Checklist
         run: |
           CHECKLIST="docs/PREPROD_CHECKLIST.md"
@@ -215,22 +218,20 @@ jobs:
           fi
 
       - name: Download Compliance Report
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: compliance-report
           path: docs/
 
-      - name: Generate Changelog
-        id: changelog
-        uses: Conventional-Changelog/github-action-generate-changelog@v1
-        with:
-          path-to-changelog: CHANGELOG.md
-
       - name: Package Release Artifacts
         run: |
-          mkdir -p release
-          zip -r release/mt5-ai-xauusd-trader-${{ steps.version.outputs.VERSION }}.zip . -x "*.git*" "tests/*" ".env" "*.db" "release/*"
-          sha256sum release/mt5-ai-xauusd-trader-${{ steps.version.outputs.VERSION }}.zip > release/checksums.txt
+          chmod +x scripts/package_release.sh
+          ./scripts/package_release.sh
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          cd releases
+          zip -r "mt5-ai-xauusd-trader-v${VERSION}.zip" "v${VERSION}"
+          sha256sum "mt5-ai-xauusd-trader-v${VERSION}.zip" > "checksums.txt"
+          cd ..
 
       - name: Create Git Tag (if manual)
         if: github.event_name == 'workflow_dispatch'
@@ -249,10 +250,10 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.TAG }}
           name: Release ${{ steps.version.outputs.VERSION }}
-          body_path: CHANGELOG.md
+          body_path: releases/v${{ steps.version.outputs.VERSION }}/RELEASE_NOTES.md
           files: |
-            release/mt5-ai-xauusd-trader-${{ steps.version.outputs.VERSION }}.zip
-            release/checksums.txt
+            releases/mt5-ai-xauusd-trader-v${{ steps.version.outputs.VERSION }}.zip
+            releases/checksums.txt
             docs/DEPENDENCY_LICENSES.md
           draft: false
           prerelease: ${{ github.event.inputs.prerelease || false }}
