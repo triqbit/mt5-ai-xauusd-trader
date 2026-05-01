@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
+from pydantic import BaseModel, Field, model_validator
+
 from src.core.config import TradingConfig
+from src.core.exceptions import RiskValidationError
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
@@ -35,19 +38,38 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
 }
 
 
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
+class TradeSignal(BaseModel):
+    """
+    Validated trading signal with strict schema enforcement.
+    Ensures logical price placement and valid trading parameters.
+    """
 
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    symbol: str = Field(..., min_length=1)
+    direction: int = Field(..., description="+1 for BUY, -1 for SELL")
+    entry_price: float = Field(..., gt=0)
+    stop_loss: float = Field(..., gt=0)
+    take_profit: float = Field(..., gt=0)
+    lot_size: float = Field(..., gt=0)
+    algorithm: str = Field(..., min_length=1)
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @model_validator(mode="after")
+    def validate_prices(self) -> "TradeSignal":
+        """Ensure SL and TP are logically placed relative to entry price."""
+        if self.direction == 1:  # BUY
+            if self.stop_loss >= self.entry_price:
+                raise RiskValidationError(f"Stop loss ({self.stop_loss}) must be below entry price ({self.entry_price}) for BUY")
+            if self.take_profit <= self.entry_price:
+                raise RiskValidationError(f"Take profit ({self.take_profit}) must be above entry price ({self.entry_price}) for BUY")
+        elif self.direction == -1:  # SELL
+            if self.stop_loss <= self.entry_price:
+                raise RiskValidationError(f"Stop loss ({self.stop_loss}) must be above entry price ({self.entry_price}) for SELL")
+            if self.take_profit >= self.entry_price:
+                raise RiskValidationError(f"Take profit ({self.take_profit}) must be below entry price ({self.entry_price}) for SELL")
+        else:
+            raise RiskValidationError(f"Invalid direction: {self.direction}. Must be 1 (BUY) or -1 (SELL).")
+        return self
 
 
 @dataclass
@@ -86,7 +108,21 @@ class RiskManager:
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
         Run the full 6-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+
+        Validation Layers:
+        1. Circuit Breaker: Global drawdown protection.
+        2. Daily Loss: Intraday PnL limit.
+        3. Max Positions: Limits concurrent exposure.
+        4. Portfolio Allocation: Approved symbols only.
+        5. Confidence Threshold: AI model certainty check.
+        6. Risk-Reward Ratio: Minimum edge verification.
+
+        Args:
+            signal: The TradeSignal to validate.
+            signal_id: Optional database ID for the signal.
+
+        Returns:
+            True if all filters pass, False otherwise.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
@@ -129,7 +165,19 @@ class RiskManager:
     ) -> float:
         """
         Fractional Kelly Criterion position sizing.
-        Returns lot size capped at max risk per trade.
+
+        Calculates optimal lot size based on historical performance metrics
+        and current account balance, capped at the configured risk per trade.
+
+        Args:
+            symbol: Trading symbol.
+            win_rate: Model win rate (0.0 - 1.0).
+            avg_win: Average win in price units.
+            avg_loss: Average loss in price units.
+            pip_value: Value of a single pip for the symbol.
+
+        Returns:
+            Calculated lot size, minimum 0.01.
         """
         if avg_loss == 0:
             return 0.01  # minimum lot

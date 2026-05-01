@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+
+if TYPE_CHECKING:
+    from src.trading.risk_manager import TradeSignal
 
 import numpy as np
 from sqlalchemy import (
@@ -119,19 +122,32 @@ class TradeLogger:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def log_signal(self, signal_data: Dict[str, Any]) -> int:
-        """Log a new model signal and return its ID."""
+    def log_signal(self, signal_data: Union[Dict[str, Any], "TradeSignal"]) -> int:
+        """
+        Log a new model signal and return its ID.
+        Supports both raw dictionaries and validated TradeSignal models.
+        """
+        # Import here to avoid circular dependency
+        from src.trading.risk_manager import TradeSignal
+
+        if isinstance(signal_data, dict):
+            # If it's a dict, we still try to validate it if possible,
+            # or at least extract fields safely.
+            data = signal_data
+        else:
+            data = signal_data.model_dump()
+
         with self.Session() as session:
             signal = ModelSignal(
-                symbol=signal_data["symbol"],
-                direction=signal_data["direction"],
-                entry_price=signal_data["entry_price"],
-                stop_loss=signal_data.get("stop_loss"),
-                take_profit=signal_data.get("take_profit"),
-                lot_size=signal_data.get("lot_size"),
-                algorithm=signal_data.get("algorithm"),
-                confidence=signal_data.get("confidence"),
-                timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
+                symbol=data["symbol"],
+                direction=data["direction"],
+                entry_price=data["entry_price"],
+                stop_loss=data.get("stop_loss"),
+                take_profit=data.get("take_profit"),
+                lot_size=data.get("lot_size"),
+                algorithm=data.get("algorithm"),
+                confidence=data.get("confidence"),
+                timestamp=data.get("timestamp") or datetime.now(timezone.utc),
             )
             session.add(signal)
             session.commit()
