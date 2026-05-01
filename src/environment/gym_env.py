@@ -63,6 +63,7 @@ class TradingEnv(gym.Env):
         self.entry_price = 0.0
         self.current_step = self.window_size
         self.total_pnl = 0.0
+        self.cumulative_commissions = 0.0
         return self._get_observation(), {}
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict]:
@@ -72,11 +73,15 @@ class TradingEnv(gym.Env):
         # Execute action
         if action == 1 and self.position == 0:  # Buy
             self.position = 1.0
-            self.entry_price = current_price * (1 + self.commission)
+            comm_cost = current_price * self.commission
+            self.entry_price = current_price + comm_cost
+            self.cumulative_commissions += comm_cost
         elif action == 2 and self.position == 1:  # Sell / Close Long
-            pnl = (current_price * (1 - self.commission)) - self.entry_price
+            comm_cost = current_price * self.commission
+            pnl = (current_price - comm_cost) - self.entry_price
             self.balance += pnl
             self.total_pnl += pnl
+            self.cumulative_commissions += comm_cost
             reward = pnl / self.initial_balance * 100  # Normalized reward
             self.position = 0.0
             self.entry_price = 0.0
@@ -94,7 +99,8 @@ class TradingEnv(gym.Env):
         info = {
             "balance": self.balance,
             "position": self.position,
-            "total_pnl": self.total_pnl
+            "total_pnl": self.total_pnl,
+            "cumulative_commissions": self.cumulative_commissions,
         }
         return self._get_observation(), reward, terminated, truncated, info
 
