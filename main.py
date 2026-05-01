@@ -22,7 +22,7 @@ from typing import Optional
 
 import structlog
 
-from src.core.config import get_config
+from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
@@ -69,12 +69,16 @@ def run_live(
     while True:
         try:
             # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-            tick = connector.get_tick(cfg.symbol)
+            with profile("data_fetch"):
+                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                tick = connector.get_tick(cfg.symbol)
+
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            with profile("inference"):
+                direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -115,20 +119,24 @@ def run_live(
                 confidence=confidence,
             )
             # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
-                ticket = connector.place_order(signal)
-                if ticket:
-                    risk.open_positions[cfg.symbol] = ticket
-                    log.info("Order placed | ticket=%d", ticket)
-                    if trade_logger:
-                        trade_logger.log_trade(
-                            ticket=ticket,
-                            symbol=cfg.symbol,
-                            direction=direction,
-                            entry_price=price,
-                            lot_size=lot_size,
-                            signal_id=signal_id,
-                        )
+            with profile("risk_check"):
+                approved = risk.approve(signal, signal_id=signal_id)
+
+            if approved:
+                with profile("execution"):
+                    ticket = connector.place_order(signal)
+                    if ticket:
+                        risk.open_positions[cfg.symbol] = ticket
+                        log.info("Order placed | ticket=%d", ticket)
+                        if trade_logger:
+                            trade_logger.log_trade(
+                                ticket=ticket,
+                                symbol=cfg.symbol,
+                                direction=direction,
+                                entry_price=price,
+                                lot_size=lot_size,
+                                signal_id=signal_id,
+                            )
             # 6. Check for closed positions to update logger
             current_positions = connector.get_positions(cfg.symbol)
             current_tickets = {p["ticket"] for p in current_positions}

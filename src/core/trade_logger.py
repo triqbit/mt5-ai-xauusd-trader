@@ -23,6 +23,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    select,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
@@ -34,14 +35,16 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False)
+    is_deleted = Column(Boolean, default=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -50,7 +53,7 @@ class ModelSignal(Base, AuditMixin):
     __tablename__ = "model_signals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
     entry_price = Column(Float, nullable=False)
     stop_loss = Column(Float)
@@ -71,14 +74,14 @@ class Trade(Base, AuditMixin):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticket = Column(Integer, unique=True, index=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)
     entry_price = Column(Float, nullable=False)
     exit_price = Column(Float)
     lot_size = Column(Float, nullable=False)
     pnl = Column(Float, default=0.0)
     drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
+    status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
@@ -171,7 +174,11 @@ class TradeLogger:
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session() as session:
-            trade = session.query(Trade).filter(Trade.ticket == ticket).first()
+            trade = (
+                session.query(Trade)
+                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+                .first()
+            )
             if trade:
                 trade.exit_price = exit_price
                 if pnl is not None:
@@ -195,7 +202,11 @@ class TradeLogger:
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
-            return session.query(Trade).filter(Trade.ticket == ticket).first()
+            return (
+                session.query(Trade)
+                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+                .first()
+            )
 
     def log_risk_event(
         self,
@@ -221,15 +232,23 @@ class TradeLogger:
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
         """
         with self.Session() as session:
-            trades = session.query(Trade).filter(Trade.status == "CLOSED").all()
-            if not trades:
+            # Optimized: only fetch pnl column for active closed trades
+            pnls = np.array(
+                session.execute(
+                    select(Trade.pnl).where(
+                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            if len(pnls) == 0:
                 return {
                     "sharpe_ratio": 0.0,
                     "profit_factor": 0.0,
                     "max_drawdown": 0.0,
                 }
-
-            pnls = np.array([t.pnl for t in trades])
 
             # Profit Factor
             gross_profit = np.sum(pnls[pnls > 0])
@@ -261,7 +280,7 @@ class TradeLogger:
                 sharpe_ratio=metrics["sharpe_ratio"],
                 profit_factor=metrics["profit_factor"],
                 max_drawdown=metrics["max_drawdown"],
-                total_trades=len(trades),
+                total_trades=len(pnls),
                 win_rate=float(np.sum(pnls > 0) / len(pnls)),
             )
             session.add(metric_record)
