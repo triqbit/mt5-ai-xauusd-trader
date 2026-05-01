@@ -52,7 +52,8 @@ def mock_monitor(mock_cfg):
 
 @pytest.fixture
 def mock_connector(mock_cfg):
-    with patch("src.trading.mt5_connector.mt5") as mock_mt5:
+    with patch("src.trading.mt5_connector.mt5") as mock_mt5, \
+         patch("src.trading.mt5_connector.MT5_AVAILABLE", True):
         mock_mt5.initialize.return_value = True
         mock_mt5.login.return_value = True
         mock_mt5.account_info.return_value._asdict.return_value = {"balance": 10000.0, "equity": 10000.0}

@@ -30,6 +30,8 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.exceptions import MT5ConnectionError, MT5DataError
+from src.core.retry import with_retry
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -71,13 +73,17 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
+    @with_retry(exceptions=MT5ConnectionError, max_retries=3, initial_delay=2.0)
     def initialize(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
 
         Returns:
-            True if connection established, False otherwise.
+            True if connection established.
+
+        Raises:
+            MT5ConnectionError: If all connection paths fail.
         """
         logger.info("Initializing MT5 connector | mode=%s", self.cfg.mode)
 
@@ -95,7 +101,8 @@ class MT5Connector:
                     self._is_initialized = True
                     return True
                 else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
+                    err_msg = f"Native mt5.initialize failed: {mt5.last_error()}"
+                    logger.warning(err_msg)
             except Exception as e:
                 logger.error("Native MT5 initialization error: %s", e)
         else:
@@ -114,7 +121,7 @@ class MT5Connector:
                 logger.error("MetaAPI initialization failed: %s", e)
 
         logger.error("All MT5 connection paths failed.")
-        return False
+        raise MT5ConnectionError("Could not connect to MT5 via any available path.")
 
     def connect(self) -> bool:
         """Alias for initialize() to support existing interfaces."""
@@ -152,25 +159,30 @@ class MT5Connector:
             n_bars: Number of bars to retrieve.
 
         Returns:
-            DataFrame containing OHLCV data or empty DataFrame on failure.
+            DataFrame containing OHLCV data.
+
+        Raises:
+            MT5ConnectionError: If connector is not initialized.
+            MT5DataError: If data retrieval fails.
         """
         if not self._is_initialized:
-            return pd.DataFrame()
+            raise MT5ConnectionError("MT5Connector is not initialized.")
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
-                logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
-                return pd.DataFrame()
+                err_msg = f"Failed to copy rates for {symbol}: {mt5.last_error()}"
+                logger.error(err_msg)
+                raise MT5DataError(err_msg)
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
-            return pd.DataFrame()
+            raise MT5DataError("MetaAPI get_rates not implemented.")
 
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Alias for get_rates() to match main.py expectations."""
