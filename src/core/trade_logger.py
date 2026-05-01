@@ -35,14 +35,16 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False)
+    is_deleted = Column(Boolean, default=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -51,7 +53,7 @@ class ModelSignal(Base, AuditMixin):
     __tablename__ = "model_signals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
     entry_price = Column(Float, nullable=False)
     stop_loss = Column(Float)
@@ -72,14 +74,14 @@ class Trade(Base, AuditMixin):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticket = Column(Integer, unique=True, index=True)
-    symbol = Column(String(20), nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)
     entry_price = Column(Float, nullable=False)
     exit_price = Column(Float)
     lot_size = Column(Float, nullable=False)
     pnl = Column(Float, default=0.0)
     drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
+    status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
@@ -174,7 +176,7 @@ class TradeLogger:
         with self.Session() as session:
             trade = (
                 session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted == False)
+                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
                 .first()
             )
             if trade:
@@ -202,7 +204,7 @@ class TradeLogger:
         with self.Session() as session:
             return (
                 session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted == False)
+                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
                 .first()
             )
 
@@ -234,7 +236,7 @@ class TradeLogger:
             pnls = np.array(
                 session.execute(
                     select(Trade.pnl).where(
-                        Trade.status == "CLOSED", Trade.is_deleted == False
+                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
                     )
                 )
                 .scalars()
