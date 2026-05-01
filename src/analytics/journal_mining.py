@@ -8,16 +8,15 @@ License: MIT
 
 from __future__ import annotations
 
-from datetime import datetime, time, timezone
-from typing import Dict, List, Optional
+from datetime import datetime, timezone
+from typing import List
 
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.core.trade_logger import ModelSignal, RiskEvent, Trade
+from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
 
 
 class SessionAnalysis(BaseModel):
@@ -76,6 +75,7 @@ class JournalMiner:
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
         self.engine = create_engine(db_url)
+        Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         self.sessions = {
             "Sydney": (22, 7),
@@ -109,7 +109,7 @@ class JournalMiner:
         results = []
         avg_trades_per_session = len(trades_df) / 4 # Rough heuristic
 
-        for name in self.sessions.keys():
+        for name in self.sessions:
             sess_data = exploded[exploded["sessions"] == name]
             if sess_data.empty:
                 results.append(SessionAnalysis(

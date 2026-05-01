@@ -84,3 +84,68 @@ def test_risk_blocks(miner, sample_signals):
     max_dd = next(b for b in blocks if b.reason == "MAX_DRAWDOWN")
     assert max_dd.count == 2
     assert "ensemble" in max_dd.impacted_algorithms
+
+def test_run_mining(miner):
+    # Setup database with some data
+    with miner.Session() as session:
+        from src.core.trade_logger import ModelSignal, Trade, RiskEvent
+
+        sig = ModelSignal(
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            algorithm="ensemble",
+            confidence=0.8,
+            volatility=0.1
+        )
+        session.add(sig)
+        session.commit()
+
+        trd = Trade(
+            ticket=123,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            lot_size=0.1,
+            pnl=100.0,
+            status="CLOSED",
+            signal_id=sig.id
+        )
+        session.add(trd)
+
+        evt = RiskEvent(
+            event_type="MAX_DRAWDOWN",
+            signal_id=sig.id
+        )
+        session.add(evt)
+        session.commit()
+
+    report = miner.run_mining()
+    assert isinstance(report.timestamp, datetime)
+    assert len(report.session_analysis) == 4
+    assert len(report.volatility_patterns) > 0
+    assert len(report.profitable_concentrations) > 0
+    assert len(report.risk_block_summary) == 1
+
+def test_empty_dataframe_guards(miner):
+    empty_df = pd.DataFrame()
+    assert miner.get_session_stats(empty_df) == []
+    assert miner.analyze_volatility_patterns(empty_df) == []
+    assert miner.detect_drawdown_clusters(empty_df) == []
+    assert miner.find_profitable_patterns(empty_df) == []
+    assert miner.analyze_risk_blocks(empty_df, empty_df) == []
+
+def test_volatility_patterns_no_volatility_col(miner):
+    df = pd.DataFrame([{"id": 1, "pnl": 100}])
+    assert miner.analyze_volatility_patterns(df) == []
+
+def test_volatility_patterns_all_nan(miner):
+    df = pd.DataFrame([{"id": 1, "volatility": None, "pnl": 100}])
+    assert miner.analyze_volatility_patterns(df) == []
+
+def test_drawdown_clusters_single_loss(miner):
+    # Should not form a cluster (need 3+)
+    df = pd.DataFrame([
+        {"id": 1, "pnl": -10.0, "created_at": datetime.now(timezone.utc)}
+    ])
+    assert miner.detect_drawdown_clusters(df) == []
