@@ -1,12 +1,13 @@
+import datetime
 import json
 import os
-import datetime
-import urllib.request
-import urllib.error
 import sys
+import urllib.error
+import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
+
 
 def api_call(url):
     req = urllib.request.Request(url)
@@ -24,6 +25,7 @@ def api_call(url):
         print(f"Error for {url}: {e}", file=sys.stderr)
         return None
 
+
 def get_all_prs():
     prs = []
     page = 1
@@ -38,26 +40,31 @@ def get_all_prs():
         page += 1
     return prs
 
+
 def get_all_pr_files(pr_number):
     files = []
     page = 1
     while True:
-        url = f"https://api.github.com/repos/{REPO}/pulls/{pr_number}/files?per_page=100&page={page}"
+        url = (
+            f"https://api.github.com/repos/{REPO}/pulls/{pr_number}/files?per_page=100&page={page}"
+        )
         data = api_call(url)
         if data is None or not isinstance(data, list):
             break
-        files.extend([f['filename'] for f in data if 'filename' in f])
+        files.extend([f["filename"] for f in data if "filename" in f])
         if len(data) < 100:
             break
         page += 1
     return files
 
+
 def get_ci_status(sha):
     url = f"https://api.github.com/repos/{REPO}/commits/{sha}/status"
     status_data = api_call(url)
-    if status_data and 'state' in status_data:
-        return status_data['state']
-    return 'unknown'
+    if status_data and "state" in status_data:
+        return status_data["state"]
+    return "unknown"
+
 
 def classify_risk(files):
     high_risk_patterns = [
@@ -67,14 +74,9 @@ def classify_risk(files):
         "migrations/",
         "main.py",
         "alembic.ini",
-        "pyproject.toml"
+        "pyproject.toml",
     ]
-    medium_risk_patterns = [
-        "src/research/",
-        "src/analytics/",
-        "src/core/",
-        "src/environment/"
-    ]
+    medium_risk_patterns = ["src/research/", "src/analytics/", "src/core/", "src/environment/"]
 
     risk = "Safe Surface"
     reason = "Only documentation, tests, or non-critical configurations."
@@ -92,6 +94,7 @@ def classify_risk(files):
                 reason = f"Touches core/research/analytics: {f}"
 
     return risk, reason
+
 
 def generate_report():
     print("Fetching PRs...")
@@ -114,14 +117,14 @@ def generate_report():
     classified_prs = []
 
     for i, pr in enumerate(prs):
-        num = pr['number']
-        title = pr['title']
-        user = pr['user']['login']
-        branch = pr['head']['ref']
-        labels = ", ".join([l['name'] for l in pr['labels']]) if pr['labels'] else "none"
-        sha = pr['head']['sha']
+        num = pr["number"]
+        title = pr["title"]
+        user = pr["user"]["login"]
+        branch = pr["head"]["ref"]
+        labels = ", ".join([l["name"] for l in pr["labels"]]) if pr["labels"] else "none"
+        sha = pr["head"]["sha"]
 
-        print(f"[{i+1}/{len(prs)}] Processing PR #{num}...")
+        print(f"[{i + 1}/{len(prs)}] Processing PR #{num}...")
 
         ci_status = get_ci_status(sha)
         files = get_all_pr_files(num)
@@ -129,21 +132,23 @@ def generate_report():
 
         report += f"| [{num}](https://github.com/{REPO}/pull/{num}) | {title} | {user} | `{branch}` | {labels} | {ci_status} | {risk} | {reason} |\n"
 
-        classified_prs.append({
-            'number': num,
-            'title': title,
-            'user': user,
-            'risk': risk,
-            'ci_status': ci_status,
-            'reason': reason
-        })
+        classified_prs.append(
+            {
+                "number": num,
+                "title": title,
+                "user": user,
+                "risk": risk,
+                "ci_status": ci_status,
+                "reason": reason,
+            }
+        )
 
     report += "\n## Good Candidates for Review Today\n\n"
-    safe_surface = [pr for pr in classified_prs if pr['risk'] == "Safe Surface"]
-    medium_risk = [pr for pr in classified_prs if pr['risk'] == "Medium Risk"]
+    safe_surface = [pr for pr in classified_prs if pr["risk"] == "Safe Surface"]
+    medium_risk = [pr for pr in classified_prs if pr["risk"] == "Medium Risk"]
 
-    safe_surface.sort(key=lambda x: 0 if x['ci_status'] == 'success' else 1)
-    medium_risk.sort(key=lambda x: 0 if x['ci_status'] == 'success' else 1)
+    safe_surface.sort(key=lambda x: 0 if x["ci_status"] == "success" else 1)
+    medium_risk.sort(key=lambda x: 0 if x["ci_status"] == "success" else 1)
 
     candidates = (safe_surface + medium_risk)[:4]
 
@@ -151,8 +156,10 @@ def generate_report():
         report += "No low/medium risk candidates identified today.\n"
     else:
         for c in candidates:
-            status_str = f" [CI: {c['ci_status']}]" if c['ci_status'] != 'unknown' else ""
-            report += f"- **PR #{c['number']}**: {c['title']} ({c['user']}){status_str} - *{c['risk']}*\n"
+            status_str = f" [CI: {c['ci_status']}]" if c["ci_status"] != "unknown" else ""
+            report += (
+                f"- **PR #{c['number']}**: {c['title']} ({c['user']}){status_str} - *{c['risk']}*\n"
+            )
 
     report += "\n---\n*Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths.*"
 
@@ -170,8 +177,8 @@ def generate_report():
         checklist += "No candidates found for merge-readiness checklist today.\n"
     else:
         for i, c in enumerate(top_3):
-            checklist += f"## {i+1}. PR #{c['number']}: {c['title']}\n"
-            checklist += f"- **Status**: Ready for detailed review\n"
+            checklist += f"## {i + 1}. PR #{c['number']}: {c['title']}\n"
+            checklist += "- **Status**: Ready for detailed review\n"
             checklist += f"- **Risk**: {c['risk']}\n"
             checklist += f"- **Why**: Low risk change improving {c['reason'].lower()}\n"
             checklist += "- **Verification**: See PR for CI status and tests.\n\n"
@@ -189,6 +196,7 @@ def generate_report():
             f.write(checklist)
 
     print("Reports generated successfully.")
+
 
 if __name__ == "__main__":
     generate_report()

@@ -112,7 +112,9 @@ class NaiveDirectionalStrategy:
 class RiskFilteredBaseline:
     """EMA Crossover strategy with a simple volatility filter."""
 
-    def __init__(self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02):
+    def __init__(
+        self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02
+    ):
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.vol_threshold_pct = vol_threshold_pct
@@ -128,7 +130,7 @@ class RiskFilteredBaseline:
 
         signals = np.zeros(len(df))
         # Only trade if volatility is below threshold
-        mask = (volatility < self.vol_threshold_pct)
+        mask = volatility < self.vol_threshold_pct
         signals[mask & (fast_ema > slow_ema)] = 1
         signals[mask & (fast_ema < slow_ema)] = -1
         return signals
@@ -137,7 +139,9 @@ class RiskFilteredBaseline:
 class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
-    def __init__(self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002):
+    def __init__(
+        self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002
+    ):
         self.df = df
         self.initial_balance = initial_balance
         self.commission = commission

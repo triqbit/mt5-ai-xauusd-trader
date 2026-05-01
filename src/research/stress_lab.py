@@ -142,10 +142,16 @@ class StressLab:
             degradation_summary=self._generate_summary(baseline_metrics, scenario_results),
         )
 
-    def _generate_summary(self, baseline: StressTestMetrics, results: Dict[str, StressTestMetrics]) -> str:
-        summary = f"Strategy '{self.strategy.name}' evaluated against {len(results)} stress scenarios.\n"
+    def _generate_summary(
+        self, baseline: StressTestMetrics, results: Dict[str, StressTestMetrics]
+    ) -> str:
+        summary = (
+            f"Strategy '{self.strategy.name}' evaluated against {len(results)} stress scenarios.\n"
+        )
         avg_return = np.mean([m.total_return for m in results.values()])
-        summary += f"Baseline Return: {baseline.total_return:.2%}, Avg Stressed Return: {avg_return:.2%}\n"
+        summary += (
+            f"Baseline Return: {baseline.total_return:.2%}, Avg Stressed Return: {avg_return:.2%}\n"
+        )
 
         if avg_return < 0:
             summary += "CRITICAL: Strategy is generally not robust to adverse conditions."
@@ -182,8 +188,8 @@ class StressLab:
                     df.at[i, "high"] += 5.0  # Spike
                     df.at[i, "close"] = df.at[i, "open"] + 0.5
                     # Immediate reversal
-                    df.at[i+1, "close"] = df.at[i, "open"] - 2.0
-                    df.at[i+1, "low"] = df.at[i+1, "close"] - 0.5
+                    df.at[i + 1, "close"] = df.at[i, "open"] - 2.0
+                    df.at[i + 1, "low"] = df.at[i + 1, "close"] - 0.5
 
         # 4. Regime transitions (Simulate sudden volatility spike/trend flip)
         if scenario.regime_flip_prob > 0:
@@ -193,15 +199,19 @@ class StressLab:
                     window = min(20, len(df) - i)
                     if window > 1:
                         # Simple trend flip by inverting close price changes
-                        returns = df["close"].iloc[i:i+window].pct_change().fillna(0)
-                        inverted_returns = -returns * 2.0 # Reversal + Volatility
+                        returns = df["close"].iloc[i : i + window].pct_change().fillna(0)
+                        inverted_returns = -returns * 2.0  # Reversal + Volatility
                         base_price = df.at[i, "close"]
                         new_prices = base_price * np.exp(np.cumsum(inverted_returns))
-                        df.loc[df.index[i:i+window], "close"] = new_prices.values
+                        df.loc[df.index[i : i + window], "close"] = new_prices.values
                         # Update high/low for the window to maintain consistency
-                        window_slice = df.iloc[i:i+window]
-                        df.loc[df.index[i:i+window], "high"] = window_slice[["open", "close", "high"]].max(axis=1)
-                        df.loc[df.index[i:i+window], "low"] = window_slice[["open", "close", "low"]].min(axis=1)
+                        window_slice = df.iloc[i : i + window]
+                        df.loc[df.index[i : i + window], "high"] = window_slice[
+                            ["open", "close", "high"]
+                        ].max(axis=1)
+                        df.loc[df.index[i : i + window], "low"] = window_slice[
+                            ["open", "close", "low"]
+                        ].min(axis=1)
 
         return df
 
@@ -222,7 +232,9 @@ class StressLab:
         # Apply execution delay
         if scenario.execution_delay_steps > 0:
             signals = np.zeros_like(raw_signals)
-            signals[scenario.execution_delay_steps:] = raw_signals[:-scenario.execution_delay_steps]
+            signals[scenario.execution_delay_steps :] = raw_signals[
+                : -scenario.execution_delay_steps
+            ]
         else:
             signals = raw_signals
 
@@ -231,7 +243,9 @@ class StressLab:
 
         # Base spread for XAUUSD if not present
         base_spread = 0.25
-        spreads = (df["spread"].values if "spread" in df.columns else np.ones(n) * base_spread) * scenario.spread_multiplier
+        spreads = (
+            df["spread"].values if "spread" in df.columns else np.ones(n) * base_spread
+        ) * scenario.spread_multiplier
 
         rng = np.random.default_rng(42)
         latency_hits = 0
@@ -244,7 +258,7 @@ class StressLab:
 
             # Service failure
             if scenario.service_failure_prob > 0 and rng.random() < scenario.service_failure_prob:
-                current_sig = 0 # Blocked
+                current_sig = 0  # Blocked
                 latency_hits += 1
 
             slippage = current_price * (scenario.slippage_bps / 10000.0)

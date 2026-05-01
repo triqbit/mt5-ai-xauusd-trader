@@ -77,14 +77,11 @@ def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
 
 def test_ensemble_model_with_gapping_data(mock_cfg):
     """Test EnsembleModel behavior when encountering gapping market data."""
-    # Ensure src.models is loaded so patch can traverse it
-    import src.models  # noqa: F401
-
     # We need to mock torch and SB3 if they are not installed
     with (
-        patch("src.models.ensemble.torch"),
-        patch("src.models.ensemble.LSTMAttentionModel"),
-        patch("stable_baselines3.PPO"),
+        patch("src.models.ensemble.torch", create=True),
+        patch("src.models.ensemble.LSTMAttentionModel", create=True),
+        patch("stable_baselines3.PPO", create=True),
     ):
         from src.models.ensemble import EnsembleModel
 

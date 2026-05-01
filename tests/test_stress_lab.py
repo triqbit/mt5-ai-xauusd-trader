@@ -5,8 +5,9 @@ Unit tests for StressLab resilience testing framework.
 import numpy as np
 import pandas as pd
 import pytest
-from src.research.stress_lab import StressLab, StressScenario, StressSeverity, StressTestMetrics
+
 from src.research.benchmarks import EMACrossoverStrategy
+from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 
 
 @pytest.fixture
@@ -15,14 +16,16 @@ def sample_data():
     np.random.seed(42)
     n = 100
     prices = 2300 + np.cumsum(np.random.normal(0, 1, n))
-    df = pd.DataFrame({
-        "open": prices - 0.5,
-        "high": prices + 1.0,
-        "low": prices - 1.0,
-        "close": prices,
-        "tick_volume": np.random.randint(100, 1000, n),
-        "spread": np.ones(n) * 0.2
-    })
+    df = pd.DataFrame(
+        {
+            "open": prices - 0.5,
+            "high": prices + 1.0,
+            "low": prices - 1.0,
+            "close": prices,
+            "tick_volume": np.random.randint(100, 1000, n),
+            "spread": np.ones(n) * 0.2,
+        }
+    )
     return df
 
 
@@ -37,9 +40,7 @@ def test_apply_perturbations_noise(sample_data):
     strategy = EMACrossoverStrategy()
     lab = StressLab(strategy, sample_data)
     scenario = StressScenario(
-        name="Noise Test",
-        description="Testing price noise",
-        price_noise_sigma=1.0
+        name="Noise Test", description="Testing price noise", price_noise_sigma=1.0
     )
 
     perturbed = lab._apply_perturbations(sample_data, scenario)
@@ -51,9 +52,7 @@ def test_apply_perturbations_missing_ticks(sample_data):
     strategy = EMACrossoverStrategy()
     lab = StressLab(strategy, sample_data)
     scenario = StressScenario(
-        name="Missing Ticks",
-        description="Testing missing data",
-        missing_tick_prob=0.2
+        name="Missing Ticks", description="Testing missing data", missing_tick_prob=0.2
     )
 
     perturbed = lab._apply_perturbations(sample_data, scenario)
@@ -70,15 +69,15 @@ def test_run_scenario_execution_delay(sample_data):
 
     # Delayed run
     delayed_scenario = StressScenario(
-        name="Delayed",
-        description="Execution delay",
-        execution_delay_steps=5
+        name="Delayed", description="Execution delay", execution_delay_steps=5
     )
     delayed_metrics = lab.run_scenario(delayed_scenario)
 
     # Metrics should likely differ
-    assert normal_metrics.num_trades != delayed_metrics.num_trades or \
-           normal_metrics.total_return != delayed_metrics.total_return
+    assert (
+        normal_metrics.num_trades != delayed_metrics.num_trades
+        or normal_metrics.total_return != delayed_metrics.total_return
+    )
 
 
 def test_generate_report(sample_data):
@@ -92,15 +91,11 @@ def test_generate_report(sample_data):
         win_rate=0.6,
         num_trades=10,
         execution_quality_score=1.0,
-        latency_impact=0.0
+        latency_impact=0.0,
     )
 
     # Run a failing scenario
-    fail_scenario = StressScenario(
-        name="Crash",
-        description="Heavy slippage",
-        slippage_bps=100.0
-    )
+    fail_scenario = StressScenario(name="Crash", description="Heavy slippage", slippage_bps=100.0)
     lab.run_scenario(fail_scenario)
 
     report = lab.generate_report(baseline)
@@ -118,7 +113,7 @@ def test_service_failure_impact(sample_data):
     fail_scenario = StressScenario(
         name="Service Outage",
         description="High service failure probability",
-        service_failure_prob=0.5
+        service_failure_prob=0.5,
     )
     metrics = lab.run_scenario(fail_scenario)
 
@@ -130,9 +125,7 @@ def test_choppy_breakout_perturbation(sample_data):
     strategy = EMACrossoverStrategy()
     lab = StressLab(strategy, sample_data)
     scenario = StressScenario(
-        name="Choppy",
-        description="Testing choppy breakouts",
-        choppy_breakout_prob=0.5
+        name="Choppy", description="Testing choppy breakouts", choppy_breakout_prob=0.5
     )
     perturbed = lab._apply_perturbations(sample_data, scenario)
     # Check if high/low or close were modified beyond original
@@ -142,11 +135,7 @@ def test_choppy_breakout_perturbation(sample_data):
 def test_regime_flip_perturbation(sample_data):
     strategy = EMACrossoverStrategy()
     lab = StressLab(strategy, sample_data)
-    scenario = StressScenario(
-        name="Flip",
-        description="Testing regime flip",
-        regime_flip_prob=0.5
-    )
+    scenario = StressScenario(name="Flip", description="Testing regime flip", regime_flip_prob=0.5)
     perturbed = lab._apply_perturbations(sample_data, scenario)
     assert not np.array_equal(sample_data["close"].values, perturbed["close"].values)
 
@@ -163,7 +152,7 @@ def test_generate_summary_critical(sample_data):
         win_rate=0.2,
         num_trades=10,
         execution_quality_score=1.0,
-        latency_impact=0.0
+        latency_impact=0.0,
     )
 
     baseline = StressTestMetrics(
@@ -173,7 +162,7 @@ def test_generate_summary_critical(sample_data):
         win_rate=0.6,
         num_trades=10,
         execution_quality_score=1.0,
-        latency_impact=0.0
+        latency_impact=0.0,
     )
 
     report = lab.generate_report(baseline)
