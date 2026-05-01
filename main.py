@@ -22,6 +22,7 @@ from typing import Optional
 
 import structlog
 
+from src.core.audit_log import AuditLogger
 from src.core.config import get_config
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
@@ -62,6 +63,7 @@ def run_live(
     model: EnsembleModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
@@ -74,8 +76,16 @@ def run_live(
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
-            direction, confidence, _per_algo = model.predict(obs)
+            direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+            if audit_logger:
+                audit_logger.log_model_prediction(
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    confidence=confidence,
+                    metadata={"per_algo": per_algo},
+                )
 
             signal_id = None
             if trade_logger:
@@ -160,6 +170,10 @@ def run_live(
             monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
+            if audit_logger:
+                audit_logger.log_operator_action(
+                    action="SHUTDOWN", details="Interrupted by user via KeyboardInterrupt"
+                )
             break
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
@@ -225,8 +239,30 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
+    audit_logger = AuditLogger(engine=trade_logger.engine)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    risk = RiskManager(
+        cfg,
+        account_balance=balance,
+        logger_db=trade_logger,
+        monitor=monitor,
+        audit_logger=audit_logger,
+    )
+
+    # Log deployment and config
+    from src import __version__
+
+    audit_logger.log_deployment_event(
+        version=__version__,
+        environment=cfg.mode,
+        details=f"System started with algorithm={cfg.algorithm}, symbol={cfg.symbol}",
+    )
+    audit_logger.log_config_change(
+        field="startup_configuration",
+        old_value="None",
+        new_value=str(cfg.model_dump()),
+        reason="Initial startup configuration state",
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -257,6 +293,7 @@ def main() -> int:
                 model,
                 trade_logger=trade_logger,
                 monitor=monitor,
+                audit_logger=audit_logger,
             )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
