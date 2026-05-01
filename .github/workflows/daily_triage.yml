@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: read
 
 jobs:
@@ -21,14 +21,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Generate PR Triage Report
+      - name: Generate PR Reports
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python generate_triage_report.py
-
-      - name: Commit and push report
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add docs/status/PR_TRIAGE_DAILY.md
-          git diff --quiet && git diff --staged --quiet || (git commit -m "DX: update daily PR triage dashboard" && git push)
