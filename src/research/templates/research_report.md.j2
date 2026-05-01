@@ -1,0 +1,119 @@
+# Research Report: {{ title }}
+**Date:** {{ timestamp }}
+**Author:** {{ author }}
+
+## Executive Summary
+{{ executive_summary }}
+
+---
+
+{% if regime_analysis %}
+## 1. Market Regime Analysis
+**Summary:** {{ regime_analysis.summary }}
+
+| Regime | Frequency | Avg Duration | Profitability |
+|--------|-----------|--------------|---------------|
+{% for r in regime_analysis.regimes %}
+| {{ r.label }} | {{ r.frequency_pct }}% | {{ r.avg_duration_bars }} bars | {{ r.profitability }} |
+{% endfor %}
+
+**Transition Insights:**
+{{ regime_analysis.transition_insights }}
+{% endif %}
+
+{% if stress_tests %}
+## 2. Stress Test Outcomes
+**Resilience Score:** {{ stress_tests.resilience_score }}/100
+
+| Scenario | Total Return | Max Drawdown | Sharpe | Outcome |
+|----------|--------------|--------------|--------|---------|
+| **Baseline** | {{ stress_tests.baseline.total_return }} | {{ stress_tests.baseline.max_drawdown }} | {{ stress_tests.baseline.sharpe }} | - |
+{% for s in stress_tests.scenarios %}
+| {{ s.name }} | {{ s.total_return }} | {{ s.max_drawdown }} | {{ s.sharpe }} | {{ s.outcome }} |
+{% endfor %}
+
+**Fragility Indicators:**
+{% for indicator in stress_tests.fragility_indicators %}
+- {{ indicator }}
+{% endfor %}
+
+**Failure Points:**
+{% for point in stress_tests.failure_points %}
+- {{ point }}
+{% endfor %}
+{% endif %}
+
+{% if hyperparameter_robustness %}
+## 3. Hyperparameter Robustness
+**Stability Score:** {{ hyperparameter_robustness.stability_score }}/100
+
+| Parameter | Range Tested | Optimal Value | Sensitivity |
+|-----------|--------------|---------------|-------------|
+{% for p in hyperparameter_robustness.parameters %}
+| {{ p.name }} | {{ p.range }} | {{ p.optimal }} | {{ p.sensitivity }} |
+{% endfor %}
+
+**Optimization Insights:**
+{{ hyperparameter_robustness.insights }}
+{% endif %}
+
+{% if trade_patterns %}
+## 4. Trade Pattern Findings (Journal Mining)
+**Key Insight:** {{ trade_patterns.primary_insight }}
+
+### Profitable Concentrations
+| Attribute | Value | Win Rate | Profit Factor |
+|-----------|-------|----------|---------------|
+{% for c in trade_patterns.concentrations %}
+| {{ c.attribute }} | {{ c.value }} | {{ c.win_rate }} | {{ c.profit_factor }} |
+{% endfor %}
+
+### Behavioral Risks
+{% for risk in trade_patterns.behavioral_risks %}
+- **{{ risk.type }}:** {{ risk.description }}
+{% endfor %}
+{% endif %}
+
+{% if model_drift %}
+## 5. Model Drift Observations
+| Metric | Baseline | Current | Drift | Status |
+|--------|----------|---------|-------|--------|
+{% for m in model_drift.metrics %}
+| {{ m.name }} | {{ m.baseline }} | {{ m.current }} | {{ m.drift_pct }}% | {{ m.status }} |
+{% endfor %}
+
+**Feature Importance Shifts:**
+{{ model_drift.feature_shifts }}
+{% endif %}
+
+{% if allocation_insights %}
+## 6. Capital Allocation Insights
+**Portfolio Heat:** {{ allocation_insights.total_heat_pct }}%
+
+| Symbol/Family | Allocated | Heat | Performance Multiplier |
+|---------------|-----------|------|------------------------|
+{% for a in allocation_insights.allocations %}
+| {{ a.name }} | {{ a.amount }} | {{ a.heat_pct }}% | {{ a.multiplier }} |
+{% endfor %}
+
+**Rejection Summary:**
+{% for reason, count in allocation_insights.rejection_summary.items() %}
+- {{ reason }}: {{ count }} occurrences
+{% endfor %}
+{% endif %}
+
+{% if benchmarks %}
+## 7. Benchmark Comparisons
+| Strategy | Total Return | Sharpe Ratio | Max Drawdown | P-Value (vs Baseline) |
+|----------|--------------|--------------|--------------|-----------------------|
+{% for b in benchmarks.comparisons %}
+| {{ b.name }} | {{ b.total_return }} | {{ b.sharpe }} | {{ b.max_drawdown }} | {{ b.p_value }} |
+{% endfor %}
+
+**Statistical Significance:**
+{{ benchmarks.statistical_summary }}
+{% endif %}
+
+---
+## Conclusion & Recommendations
+{{ conclusion }}

@@ -162,4 +162,4 @@ class CapitalAllocator:
         )
 
 
-__all__ = ["StrategyConfig", "AllocationResult", "CapitalAllocator"]
+__all__ = ["AllocationResult", "CapitalAllocator", "StrategyConfig"]
