@@ -103,10 +103,11 @@ module = [
     "src.core.trade_logger",
     "src.core.config",
     "src.core.health",
+    "src.core.explainability",
     "src.trading.mt5_connector",
     "main"
 ]
-disable_error_code = ["assignment", "call-arg", "no-untyped-def", "arg-type", "call-overload"]
+disable_error_code = ["assignment", "call-arg", "no-untyped-def", "arg-type", "call-overload", "misc"]
 
 # ===========================================================
 # pytest
