@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enterprise-grade health check system in `src/core/health.py`.
+- Mandatory startup health gate in `main.py` to prevent execution in invalid states.
+- FastAPI-compatible health endpoints for production monitoring.
+- Comprehensive unit and integration tests for the health check framework.
 - Semantic versioning policy (`docs/VERSIONING_POLICY.md`).
 - Automated changelog generation workflow (`.github/workflows/changelog.yml`).
 - Initial `CHANGELOG.md` template.
