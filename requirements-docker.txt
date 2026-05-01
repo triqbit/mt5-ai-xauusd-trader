@@ -53,7 +53,7 @@ plotly==5.22.0
 python-dotenv==1.2.2
 pydantic==2.13.3
 pydantic-settings==2.2.1
-tomli==2.0.1
+tomli==2.4.1
 
 # -- Utilities -----------------------------------------------------
 python-dateutil==2.9.0.post0
