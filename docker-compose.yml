@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: triqbit/mt5-ai-xauusd-trader:latest
+    container_name: mt5-trader
+    restart: unless-stopped
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+    ports:
+      - "8000:8000"  # Prometheus metrics
+      - "8050:8050"  # Dash dashboard
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODE=demo
+      - ALGO=ensemble
+    healthcheck:
+      test: ["CMD", "python", "-c", "import src.core.config; print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
