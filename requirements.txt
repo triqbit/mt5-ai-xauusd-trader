@@ -54,7 +54,7 @@ plotly==5.22.0
 
 # ── Configuration ───────────────────────────────────────────
 python-dotenv==1.2.2
-pydantic==2.7.1
+pydantic==2.13.3
 pydantic-settings==2.2.1
 tomli==2.0.1
 
