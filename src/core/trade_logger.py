@@ -171,7 +171,7 @@ class TradeLogger:
         exit_price: float,
         pnl: Optional[float] = None,
         drawdown_impact: float = 0.0,
-    ) -> None:
+    ) -> Optional[Trade]:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session() as session:
             trade = (
@@ -196,8 +196,11 @@ class TradeLogger:
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
                 session.commit()
+                session.refresh(trade)
+                return trade
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
+                return None
 
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""

@@ -78,7 +78,7 @@ def run_live(
 
             # 3. Get ensemble prediction
             with profile("inference"):
-                direction, confidence, _per_algo = model.predict(obs)
+                direction, confidence, per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -117,6 +117,7 @@ def run_live(
                 lot_size=lot_size,
                 algorithm=cfg.algorithm,
                 confidence=confidence,
+                algo_votes=per_algo,
             )
             # 5. Risk approval gate
             with profile("risk_check"):
@@ -153,10 +154,12 @@ def run_live(
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
                             exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
                             # P&L will be calculated automatically by update_trade
-                            trade_logger.update_trade(
+                            updated_trade = trade_logger.update_trade(
                                 ticket=ticket,
                                 exit_price=exit_price,
                             )
+                            if updated_trade and updated_trade.pnl is not None:
+                                risk.record_pnl(updated_trade.pnl)
                     closed_tickets.append(symbol)
 
             for sym in closed_tickets:

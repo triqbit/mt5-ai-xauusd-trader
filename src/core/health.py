@@ -12,7 +12,7 @@ import logging
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.encoders import jsonable_encoder
@@ -21,7 +21,6 @@ from pydantic import BaseModel, Field
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
 from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class HealthChecker:
         config: TradingConfig,
         connector: Optional[MT5Connector] = None,
         trade_logger: Optional[TradeLogger] = None,
-        model: Optional[EnsembleModel] = None,
+        model: Optional[Any] = None,
     ) -> None:
         self.cfg = config
         self.connector = connector
@@ -183,7 +182,7 @@ def init_health_checker(
     config: TradingConfig,
     connector: MT5Connector,
     trade_logger: TradeLogger,
-    model: EnsembleModel,
+    model: Any,
 ) -> HealthChecker:
     global _health_checker
     _health_checker = HealthChecker(config, connector, trade_logger, model)
