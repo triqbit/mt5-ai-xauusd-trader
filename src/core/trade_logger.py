@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
     )
@@ -44,6 +45,7 @@ class AuditMixin:
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    is_deleted = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False, index=True)
 
 
@@ -53,6 +55,7 @@ class ModelSignal(Base, AuditMixin):
     __tablename__ = "model_signals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    symbol = Column(String(20), nullable=False)
     symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
     entry_price = Column(Float, nullable=False)
@@ -61,7 +64,6 @@ class ModelSignal(Base, AuditMixin):
     lot_size = Column(Float)
     algorithm = Column(String(50))
     confidence = Column(Float)
-    volatility = Column(Float)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
@@ -75,6 +77,7 @@ class Trade(Base, AuditMixin):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticket = Column(Integer, unique=True, index=True)
+    symbol = Column(String(20), nullable=False)
     symbol = Column(String(20), nullable=False, index=True)
     direction = Column(Integer, nullable=False)
     entry_price = Column(Float, nullable=False)
@@ -82,6 +85,7 @@ class Trade(Base, AuditMixin):
     lot_size = Column(Float, nullable=False)
     pnl = Column(Float, default=0.0)
     drawdown_impact = Column(Float)  # impact on total drawdown
+    status = Column(String(20), default="OPEN")  # OPEN, CLOSED, CANCELLED
     status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
@@ -135,7 +139,6 @@ class TradeLogger:
                 lot_size=signal_data.get("lot_size"),
                 algorithm=signal_data.get("algorithm"),
                 confidence=signal_data.get("confidence"),
-                volatility=signal_data.get("volatility"),
                 timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
             )
             session.add(signal)
@@ -181,6 +184,7 @@ class TradeLogger:
                 .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
                 .first()
             )
+            trade = session.query(Trade).filter(Trade.ticket == ticket).first()
             if trade:
                 trade.exit_price = exit_price
                 if pnl is not None:
@@ -209,6 +213,7 @@ class TradeLogger:
                 .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
                 .first()
             )
+            return session.query(Trade).filter(Trade.ticket == ticket).first()
 
     def log_risk_event(
         self,
@@ -237,20 +242,22 @@ class TradeLogger:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
-                    select(Trade.pnl).where(
-                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
-                    )
+                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
                 )
                 .scalars()
                 .all()
             )
 
             if len(pnls) == 0:
+            trades = session.query(Trade).filter(Trade.status == "CLOSED").all()
+            if not trades:
                 return {
                     "sharpe_ratio": 0.0,
                     "profit_factor": 0.0,
                     "max_drawdown": 0.0,
                 }
+
+            pnls = np.array([t.pnl for t in trades])
 
             # Profit Factor
             gross_profit = np.sum(pnls[pnls > 0])
@@ -282,6 +289,7 @@ class TradeLogger:
                 sharpe_ratio=metrics["sharpe_ratio"],
                 profit_factor=metrics["profit_factor"],
                 max_drawdown=metrics["max_drawdown"],
+                total_trades=len(trades),
                 total_trades=len(pnls),
                 win_rate=float(np.sum(pnls > 0) / len(pnls)),
             )

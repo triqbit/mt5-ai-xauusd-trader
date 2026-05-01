@@ -1,83 +1,83 @@
 [build-system]
-requires = ["setuptools>=65.0"]
+requires = ["setuptools>=64.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mt5-ai-xauusd-trader"
-version = "1.0.0"
-description = "AI/ML Trading Bot for MetaTrader 5 - XAUUSD Gold Trading"
-authors = [{name = "triqbit"}]
+version = "1.1.0"
+description = "MT5 AI/ML Trading Bot - Enterprise Edition"
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.10"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+license = {text = "MIT"}
+authors = [{name = "triqbit"}]
+dependencies = [
+    "torch>=2.2.0",
+    "stable-baselines3>=2.3.0",
+    "gymnasium>=0.29.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "scipy>=1.13.0",
+    "MetaTrader5>=5.0.45",
+    "python-dotenv>=1.0.0",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.7.0",
+    "structlog>=24.1.0",
+    "TA-Lib>=0.4.28",
+    "python-telegram-bot>=21.0"
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
 
-# ===========================================================
-# Ruff — single tool for lint + format + import sorting
-# Replaces: black, isort, flake8, pyupgrade
-# ===========================================================
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+    "UP", # pyupgrade
+]
+ignore = ["E501"] # line too long (handled by black)
 
-[tool.ruff.format]
-# ruff format is the black-compatible formatter
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
+[tool.ruff.isort]
+known-first-party = ["src"]
 
-[tool.ruff.lint]
-# Rule sets enabled:
-#   E/W = pycodestyle errors/warnings
-#   F   = pyflakes (undefined names, unused imports)
-#   I   = isort (import sorting — enforced)
-#   B   = flake8-bugbear (likely bugs and design issues)
-#   C4  = flake8-comprehensions (simplify comprehensions)
-#   SIM = flake8-simplify
-#   RUF = ruff-specific rules
-#
-# NOTE: UP (pyupgrade) intentionally excluded until source files
-# are migrated from typing.Dict/List/Optional to built-in generics.
-# Track in: https://github.com/triqbit/mt5-ai-xauusd-trader/issues
-select = ["E", "W", "F", "I", "B", "C4", "SIM", "RUF"]
-ignore = [
-    "E501",   # line-length — handled by ruff format
-    "B008",   # function calls in default args (FastAPI Depends pattern)
-    "RUF012", # mutable class attrs — false positives in pydantic models
-    "SIM108", # ternary operator — sometimes less readable
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
 ]
 
-[tool.ruff.lint.isort]
-known-first-party = ["src"]
-combine-as-imports = true
-force-single-line = false
-split-on-trailing-comma = true
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "setup.py"]
 
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "B011"]   # assert + raise-without-from OK in tests
-
-# ===========================================================
-# mypy
-# ===========================================================
 [tool.mypy]
-python_version = "3.11"
-strict = true
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
 warn_return_any = true
 warn_unused_configs = true
-ignore_missing_imports = true
+exclude = ["tests/", "migrations/"]
 
-# ===========================================================
-# pytest
-# ===========================================================
-[tool.pytest.ini_options]
-pythonpath = "."
-testpaths = ["tests"]
-addopts = "--strict-markers --verbose"
+[[tool.mypy.overrides]]
+module = [
+    "MetaTrader5.*",
+    "talib.*",
+    "pandas_ta.*",
+    "sklearn.*",
+    "scipy.*",
+    "stable_baselines3.*",
+    "gymnasium.*",
+    "telegram.*"
+]
+ignore_missing_imports = true

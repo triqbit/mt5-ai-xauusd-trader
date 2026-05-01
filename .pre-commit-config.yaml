@@ -1,10 +1,8 @@
-# ===========================================================
 # Pre-commit hooks — self-enforcing formatting, imports, security
 #
 # Install locally:   pip install pre-commit && pre-commit install
 # Run manually:      pre-commit run --all-files
 # CI also runs:      pre-commit run --all-files  (in quality job)
-# ===========================================================
 
 default_language_version:
   python: python3.11

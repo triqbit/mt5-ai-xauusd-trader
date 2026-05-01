@@ -27,7 +27,10 @@ from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.features.pipeline import FeatureEngineer
+from src.data.event_intelligence import EventIntelligence
 from src.models.ensemble import EnsembleModel
+from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -52,9 +55,6 @@ def configure_logging(level: str = "INFO") -> None:
     )
 
 
-# -- Trading loop ----------------------------------------------------------
-
-
 def run_live(
     cfg,
     connector: MT5Connector,
@@ -65,17 +65,25 @@ def run_live(
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+
+    fe = FeatureEngineer()
+
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
             # 1. Fetch latest market data
             with profile("data_fetch"):
                 df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                if df.empty:
+                    time.sleep(10)
+                    continue
                 tick = connector.get_tick(cfg.symbol)
 
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
-            volatility = float(df["close"].rolling(20).std().iloc[-1])
+            # 2. Feature Engineering
+            with profile("feature_eng"):
+                df_features = fe.generate_features(df)
+                obs = df_features.iloc[-1].values
+                volatility = float(df["close"].rolling(20).std().iloc[-1])
 
             # 3. Get ensemble prediction
             with profile("inference"):
@@ -122,7 +130,12 @@ def run_live(
             )
             # 5. Risk approval gate
             with profile("risk_check"):
-                approved = risk.approve(signal, signal_id=signal_id)
+                approved = risk.approve(
+                    signal,
+                    signal_id=signal_id,
+                    market_data=df,
+                    current_spread=tick["ask"] - tick["bid"]
+                )
 
             if approved:
                 with profile("execution"):
@@ -168,6 +181,7 @@ def run_live(
             balance = connector.get_account_balance()
             risk.update_equity(balance)
             monitor.log_equity(balance)
+            time.sleep(poll_interval)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -236,7 +250,16 @@ def main() -> int:
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    exec_filter = ExecutionFilter()
+    event_intel = EventIntelligence(cfg)
+    risk = RiskManager(
+        cfg,
+        account_balance=balance,
+        logger_db=trade_logger,
+        monitor=monitor,
+        execution_filter=exec_filter,
+        event_intel=event_intel
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"

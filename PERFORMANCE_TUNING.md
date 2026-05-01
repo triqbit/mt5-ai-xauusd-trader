@@ -12,6 +12,9 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 - **Target**: Identify functions consuming >10% CPU time
 - **Analysis**: Continuous monitoring of main loop latency (data_fetch, inference, risk_check, execution)
 - **Output**: Structured logs with `duration_ms`
+- **Target**: Identify functions consuming >10% CPU time
+- **Analysis**: Profile under load (1000 ticks/second)
+- **Output**: Flame graphs for visualization
 - **Action**: Optimize top 3 CPU consumers
 
 ### 1.2 Memory Profiling
@@ -78,6 +81,7 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 
 ### 4.1 Query Optimization
 - **Analysis**: EXPLAIN ANALYZE for slow queries
+- **Indexing**: Add indexes to frequently queried columns
 - **Scalar Selects**: Use `scalars().all()` to fetch specific columns (e.g., P&L) instead of full ORM objects.
 - **Indexing**: Add indexes on `ticket`, `status`, and `is_deleted`.
 - **Denormalization**: Pre-aggregate time-series data

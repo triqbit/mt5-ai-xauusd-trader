@@ -22,7 +22,6 @@ Built on an architectural foundation that integrates 25+ top-tier quantitative f
 ### 🧠 Advanced Intelligence
 - **DRL Architectures:** PPO (Proximal Policy Optimization), Dreamer V3, and LSTM-based actors.
 - **Ensemble Engine:** Real-time signal consensus from multiple neural networks to minimize variance.
-- **Explainability System:** Structured attribution breakdowns for every trade signal, providing institutional-grade transparency into model and risk decisions.
 - **Dynamic Feature Engineering:** 140+ market indicators including multi-timeframe TA-Lib features and macro-sentiment integration.
 
 ### 🛡️ Institutional Risk Management

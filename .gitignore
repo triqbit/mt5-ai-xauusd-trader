@@ -62,6 +62,10 @@ data/cache/
 logs/
 *.log
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b360f52
 # Backups & Disaster Recovery
 backups/
 
@@ -69,6 +73,11 @@ backups/
 *.db
 !trades.db.example
 
+<<<<<<< HEAD
+=======
+>>>>>>> bc77de5
+=======
+>>>>>>> b360f52
 # IDE
 .vscode/
 .idea/
@@ -96,4 +105,11 @@ htmlcov/
 *.tfstate
 *.tfstate.backup
 .terraform/
+<<<<<<< HEAD
+<<<<<<< HEAD
 releases/
+=======
+>>>>>>> bc77de5
+=======
+releases/
+>>>>>>> b360f52

@@ -112,7 +112,9 @@ class NaiveDirectionalStrategy:
 class RiskFilteredBaseline:
     """EMA Crossover strategy with a simple volatility filter."""
 
-    def __init__(self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02):
+    def __init__(
+        self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02
+    ):
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.vol_threshold_pct = vol_threshold_pct
@@ -128,42 +130,18 @@ class RiskFilteredBaseline:
 
         signals = np.zeros(len(df))
         # Only trade if volatility is below threshold
-        mask = (volatility < self.vol_threshold_pct)
+        mask = volatility < self.vol_threshold_pct
         signals[mask & (fast_ema > slow_ema)] = 1
         signals[mask & (fast_ema < slow_ema)] = -1
-        return signals
-
-
-class MeanReversionStrategy:
-    """RSI-based Mean Reversion baseline."""
-
-    def __init__(self, window: int = 14, overbought: int = 70, oversold: int = 30):
-        self.window = window
-        self.overbought = overbought
-        self.oversold = oversold
-
-    @property
-    def name(self) -> str:
-        return f"Mean_Reversion_RSI_{self.window}"
-
-    def predict(self, df: pd.DataFrame) -> np.ndarray:
-        delta = df["close"].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=self.window).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=self.window).mean()
-
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-
-        signals = np.zeros(len(df))
-        signals[rsi < self.oversold] = 1
-        signals[rsi > self.overbought] = -1
         return signals
 
 
 class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
-    def __init__(self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002):
+    def __init__(
+        self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002
+    ):
         self.df = df
         self.initial_balance = initial_balance
         self.commission = commission
@@ -189,70 +167,57 @@ class BenchmarkEvaluator:
         trade_pnls = []
 
         position = 0
-        entry_equity = self.initial_balance
+        entry_price = 0.0
 
         for i in range(1, n):
-            target_pos = signals[i - 1]
-            prev_price = close[i - 1]
+            current_sig = signals[i - 1]
             current_price = close[i]
+            prev_price = close[i - 1]
             current_equity = equity[i - 1]
 
-            # Handle transitions (Closures / Reversals / Entries)
-            if target_pos != position:
-                # If closing an existing position
-                if position != 0:
-                    current_equity *= (1 - self.commission)
-                    trade_pnls.append(current_equity - entry_equity)
+            # Handle position transitions
+            if current_sig == 1 and position == 0:  # Enter Long
+                position = 1
+                entry_price = prev_price * (1 + self.commission)
+            elif current_sig == -1 and position == 1:  # Close Long
+                pnl = (current_price * (1 - self.commission)) - entry_price
+                trade_pnls.append(pnl)
+                position = 0
+            elif current_sig == -1 and position == 0:  # Enter Short
+                position = -1
+                entry_price = prev_price * (1 - self.commission)
+            elif current_sig == 1 and position == -1:  # Close Short
+                pnl = entry_price - (current_price * (1 + self.commission))
+                trade_pnls.append(pnl)
+                position = 0
 
-                # If opening a new position
-                if target_pos != 0:
-                    current_equity *= (1 - self.commission)
-                    entry_equity = current_equity
-
-                position = target_pos
-
-            # Update equity based on market movement
+            # Calculate daily change in equity
             if position == 1:
                 change = (current_price - prev_price) / prev_price
-                current_equity *= (1 + change)
+                equity[i] = current_equity * (1 + change)
             elif position == -1:
                 change = (prev_price - current_price) / prev_price
-                current_equity *= (1 + change)
+                equity[i] = current_equity * (1 + change)
+            else:
+                equity[i] = current_equity
 
-            equity[i] = current_equity
-            daily_returns[i] = (equity[i] - equity[i - 1]) / equity[i - 1] if equity[i - 1] != 0 else 0
-
-        # Force close any remaining position at the last price
-        if position != 0:
-            equity[-1] *= (1 - self.commission)
-            trade_pnls.append(equity[-1] - entry_equity)
+            daily_returns[i] = (equity[i] - equity[i - 1]) / equity[i - 1]
 
         # Final aggregate metrics
         total_return = (equity[-1] - self.initial_balance) / self.initial_balance
 
         sharpe = 0.0
-        sortino = 0.0
         if np.std(daily_returns) > 0:
             # Assuming 252 trading days for annualization
-            avg_return = np.mean(daily_returns)
-            sharpe = avg_return / np.std(daily_returns) * np.sqrt(252)
-
-            downside_returns = daily_returns[daily_returns < 0]
-            downside_std = np.std(downside_returns) if len(downside_returns) > 0 else 0
-            if downside_std > 0:
-                sortino = avg_return / downside_std * np.sqrt(252)
+            sharpe = np.mean(daily_returns) / np.std(daily_returns) * np.sqrt(252)
 
         peak = np.maximum.accumulate(equity)
         drawdown = (peak - equity) / peak
         max_drawdown = np.max(drawdown) if len(drawdown) > 0 else 0
 
         win_rate = 0.0
-        profit_factor = 0.0
         if len(trade_pnls) > 0:
             win_rate = len([p for p in trade_pnls if p > 0]) / len(trade_pnls)
-            gains = sum([p for p in trade_pnls if p > 0])
-            losses = abs(sum([p for p in trade_pnls if p < 0]))
-            profit_factor = gains / losses if losses > 0 else float("inf")
 
         # Store daily returns for statistical testing
         self.results[name + "_returns"] = daily_returns
@@ -260,10 +225,8 @@ class BenchmarkEvaluator:
         return {
             "Total Return": total_return,
             "Sharpe Ratio": sharpe,
-            "Sortino Ratio": sortino,
             "Max Drawdown": max_drawdown,
             "Win Rate": win_rate,
-            "Profit Factor": profit_factor,
             "Num Trades": len(trade_pnls),
         }
 
@@ -293,38 +256,6 @@ class BenchmarkEvaluator:
             "P-Value": float(p_value),
             "Significant": bool(p_value < 0.05) if not np.isnan(p_value) else False,
         }
-
-    def to_report_section(self, baseline_name: str) -> Any:
-        """
-        Convert results into a BenchmarkSection for the ResearchReporter.
-        Requires src.research.reporting models to be available.
-        """
-        from src.research.reporting import BenchmarkComparison, BenchmarkSection
-
-        comparisons = []
-        for name, metrics in self.results.items():
-            if name.endswith("_returns") or name == baseline_name:
-                continue
-
-            comp = self.compare_to_baseline(name, baseline_name)
-            comparisons.append(
-                BenchmarkComparison(
-                    name=name,
-                    total_return=f"{metrics['Total Return'] * 100:.2f}%",
-                    sharpe=f"{metrics['Sharpe Ratio']:.2f}",
-                    max_drawdown=f"{metrics['Max Drawdown'] * 100:.2f}%",
-                    p_value=f"{comp.get('P-Value', 1.0):.4f}",
-                )
-            )
-
-        # Statistical summary
-        significant_count = len([c for c in comparisons if float(c.p_value) < 0.05])
-        summary = (
-            f"Compared {len(comparisons)} strategies against {baseline_name}. "
-            f"{significant_count} strategies showed statistically significant outperformance."
-        )
-
-        return BenchmarkSection(comparisons=comparisons, statistical_summary=summary)
 
 
 class EnsembleAdapter:

@@ -6,13 +6,11 @@ on:
   pull_request:
     branches: [main]
 
-# ===========================================================
 # Self-enforcing CI:
 # quality  -> ruff lint, ruff format check, import sort check
 # security -> pip-audit vulnerability scan
 # test     -> pytest with coverage
 # docker   -> build image (main branch only)
-# ===========================================================
 
 jobs:
 

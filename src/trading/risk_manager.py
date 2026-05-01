@@ -5,7 +5,7 @@ Enterprise risk management engine implementing:
   - Kelly Criterion position sizing (fractional)
   - Ray Dalio All-Weather portfolio allocation
   - Dynamic drawdown protection & circuit breakers
-  - 6-layer entry filter cascade
+  - 8-layer entry filter cascade
 Author : triqbit
 License: MIT
 """
@@ -13,12 +13,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.trading.execution_filter import ExecutionFilter
+from src.data.event_intelligence import EventIntelligence
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +50,13 @@ class TradeSignal:
     take_profit: float
     lot_size: float
     algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    confidence: float
 
 
 @dataclass
 class DailyStats:
-    """Intraday PnL tracker reset each trading day."""
+    """Intraday performance tracking."""
 
-    date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
     peak_equity: float = 0.0
@@ -62,30 +64,38 @@ class DailyStats:
 
 class RiskManager:
     """
-    Central risk authority.
-    Every signal must be approved here before reaching the order router.
+    Orchestrates capital allocation, position sizing, and risk gates.
     """
 
     def __init__(
         self,
-        config: TradingConfig,
+        cfg: TradingConfig,
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        execution_filter: Optional[ExecutionFilter] = None,
+        event_intel: Optional[EventIntelligence] = None,
     ) -> None:
-        self.cfg = config
+        self.cfg = cfg
         self.balance = account_balance
         self.peak_equity = account_balance
-        self.daily = DailyStats(peak_equity=account_balance)
-        self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.execution_filter = execution_filter or ExecutionFilter()
+        self.event_intel = event_intel
+        self.daily = DailyStats(peak_equity=account_balance)
+        self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
-    # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        market_data: Optional[pd.DataFrame] = None,
+        current_spread: float = 0.0,
+    ) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full 8-layer risk and execution filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -101,6 +111,17 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_macro_events(signal.symbol):
+            rejection_reason = "Macro event risk"
+
+        # Technical Execution Filter Layer
+        if not rejection_reason and market_data is not None:
+            drawdown = (self.peak_equity - self.balance) / self.peak_equity
+            decision = self.execution_filter.validate(
+                signal, market_data, drawdown, current_spread
+            )
+            if not decision.is_approved:
+                rejection_reason = decision.blocked_by or "Technical Filter rejection"
 
         passed = rejection_reason == ""
         if not passed:
@@ -125,19 +146,28 @@ class RiskManager:
         win_rate: float,
         avg_win: float,
         avg_loss: float,
-        pip_value: float = 1.0,
     ) -> float:
         """
-        Fractional Kelly Criterion position sizing.
-        Returns lot size capped at max risk per trade.
+        Kelly Criterion sizing: f = p - (1-p) / (win/loss)
         """
         if avg_loss == 0:
-            return 0.01  # minimum lot
-        kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
-        kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
-        lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
-        lot_size = max(0.01, round(lot_size, 2))
+            return 0.01
+        p = win_rate
+        b = avg_win / avg_loss
+        kelly_fraction = p - (1 - p) / b
+
+        # Apply safety constraints
+        fraction = max(0, min(kelly_fraction, self.cfg.max_kelly_fraction))
+        risk_capital = self.balance * fraction * self.cfg.risk_per_trade
+
+        # Convert to lots (simple 100k unit assumption for demo)
+        lot_size = round(max(risk_capital / 100, 0.01), 2)
+
+        # Macro scaling
+        if self.event_intel:
+            scale = self.event_intel.get_risk_multiplier(symbol, datetime.now(timezone.utc))
+            lot_size = round(lot_size * scale, 2)
+
         logger.debug(
             "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
             kelly_fraction,
@@ -162,9 +192,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -208,13 +236,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 
@@ -226,6 +250,16 @@ class RiskManager:
         rr = reward / risk
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
+            return False
+        return True
+
+    def _check_macro_events(self, symbol: str) -> bool:
+        """Check if high-impact macro events block execution."""
+        if not self.event_intel or not self.cfg.enable_macro_filter:
+            return True
+
+        if self.event_intel.should_block_execution(symbol, datetime.now(timezone.utc)):
+            logger.warning("Macro event filter blocked signal for %s", symbol)
             return False
         return True
 
