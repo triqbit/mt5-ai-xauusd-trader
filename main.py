@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,6 +22,9 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
@@ -189,11 +193,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument("--check", action="store_true", help="Run pre-flight checks and exit")
+    p.add_argument("--verbose", action="store_true", help="Enable debug logging")
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.verbose:
+        args.log_level = "DEBUG"
     configure_logging(args.log_level)
     log = logging.getLogger("main")
     # Override config from CLI
@@ -206,17 +214,28 @@ def main() -> int:
     # Validate configuration
     validator = ConfigValidator(cfg)
     result = validator.validate()
-
-    if not result.success:
-        log.critical("Startup validation FAILED")
-        for err in result.errors:
-            level = "CRITICAL" if err.critical else "WARNING"
-            log.error(f"  [{level}] {err.field}: {err.message}")
-        return 1
+    console = Console()
 
     if result.errors:
+        table = Table(
+            title="Configuration Validation Results", show_header=True, header_style="bold magenta"
+        )
+        table.add_column("Field", style="dim")
+        table.add_column("Level")
+        table.add_column("Message")
+
         for err in result.errors:
-            log.warning(f"  [WARNING] {err.field}: {err.message}")
+            level = "CRITICAL" if err.critical else "WARNING"
+            level_style = "bold red" if err.critical else "yellow"
+            table.add_row(err.field, f"[{level_style}]{level}[/{level_style}]", err.message)
+
+        console.print(table)
+
+        if not result.success:
+            log.critical(
+                "Startup validation FAILED. Please fix critical errors in your .env file or environment."
+            )
+            return 1
 
     log.info(
         "Configuration loaded and validated | mode=%s algo=%s symbol=%s",
@@ -228,6 +247,19 @@ def main() -> int:
     connector = MT5Connector(cfg)
     if not connector.connect():
         log.critical("Cannot connect to MT5 terminal. Aborting.")
+
+        troubleshooting = Panel(
+            """[bold]Possible Solutions:[/bold]
+1. [cyan]Check MT5 Terminal:[/cyan] Ensure MetaTrader 5 is running on your machine.
+2. [cyan]Enable Algo Trading:[/cyan] Click the 'Algo Trading' button at the top of the MT5 terminal (it should be green).
+3. [cyan]Verify Credentials:[/cyan] Double-check [yellow]MT5_LOGIN[/yellow], [yellow]MT5_PASSWORD[/yellow], and [yellow]MT5_SERVER[/yellow] in your [bold].env[/bold].
+4. [cyan]Path Check:[/cyan] If on Windows, ensure [yellow]MT5_PATH[/yellow] is correct.
+5. [cyan]MetaAPI Fallback:[/cyan] If on Linux/Mac, ensure [yellow]METAAPI_TOKEN[/yellow] is set for cloud fallback.""",
+            title="[bold red]MT5 Connection Troubleshooting Guide[/bold red]",
+            expand=False,
+            border_style="red",
+        )
+        console.print(troubleshooting)
         return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
@@ -247,14 +279,36 @@ def main() -> int:
     health_checker = init_health_checker(cfg, connector, trade_logger, model)
     health_report = health_checker.get_full_report()
 
+    # Display Health Report Table
+    health_table = Table(
+        title=f"System Health Report (Overall: {health_report.status.value.upper()})",
+        show_header=True,
+    )
+    health_table.add_column("Component", style="cyan")
+    health_table.add_column("Status")
+    health_table.add_column("Message")
+
+    for name, comp in health_report.components.items():
+        status_style = (
+            "green"
+            if comp.status == HealthStatus.HEALTHY
+            else ("yellow" if comp.status == HealthStatus.DEGRADED else "red")
+        )
+        health_table.add_row(
+            name, f"[{status_style}]{comp.status.value.upper()}[/{status_style}]", comp.message
+        )
+
+    console.print(health_table)
+
     if health_report.status == HealthStatus.FAILED:
-        log.critical("Startup HEALTH CHECK FAILED")
-        for name, comp in health_report.components.items():
-            if comp.status == HealthStatus.FAILED:
-                log.error(f"  [FAILED] {name}: {comp.message}")
+        log.critical("Startup HEALTH CHECK FAILED. One or more critical components are offline.")
         return 1
 
-    log.info("System HEALTH CHECK PASSED | status=%s", health_report.status)
+    log.info("System HEALTH CHECK PASSED")
+
+    if args.check:
+        log.info("Pre-flight check complete. Exiting.")
+        return 0
 
     try:
         if cfg.mode in ("demo", "live"):

@@ -54,7 +54,7 @@ jobs:
 
       - name: Generate Full Report Artifact
         run: |
-          pip-licenses --format=markdown --with-authors --with-urls --with-license-files > LICENSE_REPORT.md
+          pip-licenses --format=markdown --with-authors --with-urls > LICENSE_REPORT.md
 
       - name: Upload License Report
         uses: actions/upload-artifact@v4
