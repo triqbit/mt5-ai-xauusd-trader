@@ -18,7 +18,7 @@ This document defines the mandatory gates that must be satisfied and verified be
 - [ ] **Benchmark Compliance:** Performance metrics (Sharpe ratio, Max Drawdown) meet the minimum established trading benchmarks.
 
 ## 4. Staging & Infrastructure Verification
-- [ ] **Staging Health:** Full health check (`/health/readiness`) is passing in the staging/pre-prod environment.
+- [ ] **Staging Health:** Full health check (`/health/readiness`) is passing in the staging/pre-prod environment and correctly reflects component status.
 - [ ] **Monitoring:** Telemetry, Prometheus metrics, and Telegram alerting are verified as active and receiving data.
 - [ ] **Alerting Thresholds:** Critical alert thresholds are confirmed and functional.
 

@@ -31,6 +31,11 @@ FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy TA-Lib shared libraries from builder
 COPY --from=builder /usr/lib/libta_lib* /usr/lib/
 COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
@@ -50,9 +55,9 @@ USER trader
 # Expose Prometheus metrics and dashboard ports
 EXPOSE 8000 8050
 
-# Health check
+# Health check using real-time API
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import src.core.config; print('healthy')" || exit 1
+    CMD curl -f http://localhost:8000/health/readiness || exit 1
 
 # Default: run in demo mode
 ENTRYPOINT ["python", "main.py"]
