@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+from src.trading.capital_allocator import AllocationResult, CapitalAllocator, StrategyConfig
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import DailyStats, RiskManager, TradeSignal
 
-__all__ = ["DailyStats", "MT5Connector", "RiskManager", "TradeSignal"]
+__all__ = [
+    "AllocationResult",
+    "CapitalAllocator",
+    "DailyStats",
+    "MT5Connector",
+    "RiskManager",
+    "StrategyConfig",
+    "TradeSignal",
+]
