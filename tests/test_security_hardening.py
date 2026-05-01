@@ -1,10 +1,10 @@
-
 import os
 import stat
 import pytest
 from pydantic import SecretStr
 from src.core.config import TradingConfig
 from src.core.trade_logger import TradeLogger
+
 
 def test_config_secret_masking():
     """Verify that sensitive fields are masked in TradingConfig."""
@@ -14,7 +14,7 @@ def test_config_secret_masking():
         metaapi_token="secret_token",
         telegram_token="secret_tg",
         database_url="postgresql://user:pass@host:5432/db",
-        redis_url="redis://:pass@host:6379/0"
+        redis_url="redis://:pass@host:6379/0",
     )
 
     config_str = str(config)
@@ -30,6 +30,7 @@ def test_config_secret_masking():
     assert isinstance(config.database_url, SecretStr)
     assert isinstance(config.redis_url, SecretStr)
 
+
 def test_db_permission_hardening(tmp_path):
     """Verify that TradeLogger sets 0o600 permissions on SQLite database."""
     db_file = tmp_path / "test_secure.db"
@@ -44,6 +45,7 @@ def test_db_permission_hardening(tmp_path):
     # 0o600 means -rw-------
     assert stat.S_IMODE(mode) == 0o600
 
+
 def test_secret_access_validation():
     """Verify that we can still access the actual values via get_secret_value()."""
     config = TradingConfig(
@@ -52,7 +54,7 @@ def test_secret_access_validation():
         metaapi_token="secret_token",
         telegram_token="secret_tg",
         database_url="postgresql://user:pass@host:5432/db",
-        redis_url="redis://:pass@host:6379/0"
+        redis_url="redis://:pass@host:6379/0",
     )
 
     assert config.mt5_password.get_secret_value() == "secret_password"
