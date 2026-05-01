@@ -1,7 +1,6 @@
-import re
 import sys
+import re
 from pathlib import Path
-
 
 def check_release_notes():
     changelog_path = Path("CHANGELOG.md")

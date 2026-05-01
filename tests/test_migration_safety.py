@@ -3,10 +3,9 @@ MT5 AI/ML Trading Bot - Migration Safety Test
 tests/test_migration_safety.py
 Verifies that the migration safety script correctly detects valid migrations.
 """
+import pytest
 import os
-
 from scripts.verify_migrations import verify_migrations
-
 
 def test_verify_migrations_logic():
     """

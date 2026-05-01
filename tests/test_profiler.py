@@ -2,10 +2,9 @@
 Unit tests for the high-resolution profiler.
 """
 import time
+import pytest
 from unittest.mock import patch
-
 from src.core.profiler import profile
-
 
 def test_profile_logging():
     """Verify that the profiler logs a performance metric with duration."""

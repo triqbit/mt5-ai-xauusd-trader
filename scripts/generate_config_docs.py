@@ -1,7 +1,6 @@
 import re
 from pathlib import Path
 
-
 def generate_config_docs(input_file: str, output_file: str, version: str):
     path = Path(input_file)
     if not path.exists():

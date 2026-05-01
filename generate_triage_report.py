@@ -1,9 +1,9 @@
-import datetime
 import json
 import os
-import sys
-import urllib.error
+import datetime
 import urllib.request
+import urllib.error
+import sys
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
@@ -171,7 +171,7 @@ def generate_report():
     else:
         for i, c in enumerate(top_3):
             checklist += f"## {i+1}. PR #{c['number']}: {c['title']}\n"
-            checklist += "- **Status**: Ready for detailed review\n"
+            checklist += f"- **Status**: Ready for detailed review\n"
             checklist += f"- **Risk**: {c['risk']}\n"
             checklist += f"- **Why**: Low risk change improving {c['reason'].lower()}\n"
             checklist += "- **Verification**: See PR for CI status and tests.\n\n"

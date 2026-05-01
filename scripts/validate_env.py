@@ -1,7 +1,6 @@
-import re
 import sys
+import re
 from pathlib import Path
-
 
 def get_required_vars_from_config():
     config_path = Path("src/core/config.py")
@@ -43,7 +42,7 @@ def validate():
             missing.append(req)
 
     if missing:
-        print("Error: The following required configuration fields are missing from .env.example:")
+        print(f"Error: The following required configuration fields are missing from .env.example:")
         for m in missing:
             print(f"  - {m}")
         return False

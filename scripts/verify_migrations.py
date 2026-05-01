@@ -5,10 +5,8 @@ an upgrade-downgrade-upgrade cycle on a temporary database.
 """
 import os
 import sys
-
-from alembic import command
 from alembic.config import Config
-
+from alembic import command
 
 def verify_migrations():
     temp_db = "test_migrations.db"
