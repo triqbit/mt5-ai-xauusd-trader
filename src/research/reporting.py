@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
-
+from rich.table import Table
 
 # --- Pydantic Models for Sections ---
 

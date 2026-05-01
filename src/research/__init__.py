@@ -5,13 +5,13 @@ Research and evaluation modules.
 """
 
 from src.research.benchmarks import BenchmarkEvaluator, BenchmarkStrategy
-from src.research.reporting import ResearchReporter, ResearchReport
+from src.research.reporting import ResearchReport, ResearchReporter
 from src.research.stress_lab import StressLab
 
 __all__ = [
     "BenchmarkEvaluator",
     "BenchmarkStrategy",
-    "ResearchReporter",
     "ResearchReport",
+    "ResearchReporter",
     "StressLab",
 ]
