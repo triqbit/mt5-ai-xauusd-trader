@@ -21,7 +21,6 @@ from pydantic import BaseModel, Field
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
 from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class HealthChecker:
         config: TradingConfig,
         connector: Optional[MT5Connector] = None,
         trade_logger: Optional[TradeLogger] = None,
-        model: Optional[EnsembleModel] = None,
+        model: Optional[object] = None,
     ) -> None:
         self.cfg = config
         self.connector = connector
@@ -89,20 +88,25 @@ class HealthChecker:
     def check_models(self) -> ComponentStatus:
         """Verify models are loaded in the ensemble."""
         if not self.model:
-            return ComponentStatus(status=HealthStatus.FAILED, message="EnsembleModel not initialized")
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message="EnsembleModel not initialized"
+            )
 
         loaded = []
-        if self.model._ppo_model is not None:
+        # Access attributes dynamically to avoid direct torch/ensemble dependency
+        # in the health checker core
+        if getattr(self.model, "_ppo_model", None) is not None:
             loaded.append("PPO")
-        if self.model.lstm_model is not None:
+        if getattr(self.model, "lstm_model", None) is not None:
             loaded.append("LSTM")
 
         if not loaded:
-            return ComponentStatus(status=HealthStatus.FAILED, message="No models loaded in ensemble")
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message="No models loaded in ensemble"
+            )
 
         return ComponentStatus(
-            status=HealthStatus.HEALTHY,
-            message=f"Models loaded: {', '.join(loaded)}"
+            status=HealthStatus.HEALTHY, message=f"Models loaded: {', '.join(loaded)}"
         )
 
     def check_config(self) -> ComponentStatus:
@@ -183,7 +187,7 @@ def init_health_checker(
     config: TradingConfig,
     connector: MT5Connector,
     trade_logger: TradeLogger,
-    model: EnsembleModel,
+    model: object,
 ) -> HealthChecker:
     global _health_checker
     _health_checker = HealthChecker(config, connector, trade_logger, model)
