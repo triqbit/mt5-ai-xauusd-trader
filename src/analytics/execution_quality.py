@@ -29,13 +29,17 @@ class TradeExecutionQuality(BaseModel):
     trade_id: int
     ticket: int
     symbol: str
-    slippage_pips: float = Field(..., description="Difference between signal price and execution price")
+    slippage_pips: float = Field(
+        ..., description="Difference between signal price and execution price"
+    )
     execution_latency_ms: float = Field(..., description="Time between signal and execution in ms")
     fill_quality_score: float = Field(..., description="Normalized score 0-1 of fill quality")
     edge_capture: float = Field(..., description="Realized edge vs. theoretical edge")
     post_entry_drift_5m: float = Field(..., description="Price drift 5 mins after entry")
     post_entry_drift_15m: float = Field(..., description="Price drift 15 mins after entry")
-    timing_efficiency: float = Field(..., description="Score indicating if entry was at optimal time")
+    timing_efficiency: float = Field(
+        ..., description="Score indicating if entry was at optimal time"
+    )
 
 
 class BlockedSignalQuality(BaseModel):
@@ -45,7 +49,9 @@ class BlockedSignalQuality(BaseModel):
     symbol: str
     rejection_reason: str
     opportunity_cost_pnl: float = Field(..., description="PnL missed by not executing this signal")
-    max_favorable_excursion: float = Field(..., description="Max favorable price movement after signal")
+    max_favorable_excursion: float = Field(
+        ..., description="Max favorable price movement after signal"
+    )
     max_adverse_excursion: float = Field(..., description="Max adverse price movement after signal")
     would_have_won: bool = Field(..., description="True if signal would have hit TP before SL")
 
@@ -214,7 +220,9 @@ class ExecutionAnalyzer:
             )
 
             for event in blocked_events:
-                signal = session.query(ModelSignal).filter(ModelSignal.id == event.signal_id).first()
+                signal = (
+                    session.query(ModelSignal).filter(ModelSignal.id == event.signal_id).first()
+                )
                 if not signal or signal.trade:
                     continue
 
@@ -250,33 +258,31 @@ class ExecutionAnalyzer:
         lows = df["low"].values
 
         if signal.direction > 0:  # BUY
-
-            mfe = (np.max(highs) - signal.entry_price)
-            mae = (signal.entry_price - np.min(lows))
+            mfe = np.max(highs) - signal.entry_price
+            mae = signal.entry_price - np.min(lows)
 
             # Check if TP or SL would hit first
             would_win = False
             for h_val, l_val in zip(highs, lows, strict=False):
-                if h_val >= (signal.take_profit or float('inf')):
+                if h_val >= (signal.take_profit or float("inf")):
                     would_win = True
                     break
-                if l_val <= (signal.stop_loss or float('-inf')):
+                if l_val <= (signal.stop_loss or float("-inf")):
                     would_win = False
                     break
 
-            opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * 100 # XAUUSD
+            opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * 100  # XAUUSD
         else:  # SELL
-
-            mfe = (signal.entry_price - np.min(lows))
-            mae = (np.max(highs) - signal.entry_price)
+            mfe = signal.entry_price - np.min(lows)
+            mae = np.max(highs) - signal.entry_price
 
             # Check if TP or SL would hit first
             would_win = False
             for h_val, l_val in zip(highs, lows, strict=False):
-                if l_val <= (signal.take_profit or float('-inf')):
+                if l_val <= (signal.take_profit or float("-inf")):
                     would_win = True
                     break
-                if h_val >= (signal.stop_loss or float('inf')):
+                if h_val >= (signal.stop_loss or float("inf")):
                     would_win = False
                     break
 
@@ -295,6 +301,7 @@ class ExecutionAnalyzer:
     def generate_summary_report(self, days: int = 7) -> ExecutionSummary:
         """Aggregate execution quality metrics into a summary report."""
         from datetime import timedelta
+
         start_time = datetime.now(timezone.utc) - timedelta(days=days)
 
         with self.Session() as session:
@@ -316,7 +323,7 @@ class ExecutionAnalyzer:
                     avg_fill_quality=0.0,
                     execution_efficiency_score=0.0,
                     rejected_signal_count=len(blocked),
-                    executed_trade_count=0
+                    executed_trade_count=0,
                 )
 
             avg_slippage = np.mean([q.slippage_pips for q in qualities])
@@ -333,5 +340,5 @@ class ExecutionAnalyzer:
                 avg_fill_quality=float(avg_fill),
                 execution_efficiency_score=float(eff_score),
                 rejected_signal_count=len(blocked),
-                executed_trade_count=len(qualities)
+                executed_trade_count=len(qualities),
             )
