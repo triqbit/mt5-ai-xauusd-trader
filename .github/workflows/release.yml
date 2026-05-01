@@ -74,7 +74,7 @@ jobs:
 
       - name: License Compliance Check
         run: |
-          pip-licenses --summary --fail-on GPL AGPL
+          pip-licenses --summary --fail-on GPL --fail-on AGPL
           pip-licenses --format=markdown --output-file=docs/DEPENDENCY_LICENSES.md
 
       - name: Run Tests

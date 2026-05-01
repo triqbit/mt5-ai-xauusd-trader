@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -173,9 +174,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -209,9 +208,7 @@ class RiskManager:
     def _check_consecutive_losses(self) -> bool:
         """Halt trading if 3 or more consecutive losses occur today."""
         if self.daily.consecutive_losses >= 3:
-            logger.warning(
-                "HALT: %d consecutive losses today", self.daily.consecutive_losses
-            )
+            logger.warning("HALT: %d consecutive losses today", self.daily.consecutive_losses)
             return False
         return True
 
@@ -264,13 +261,9 @@ class RiskManager:
 
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 
