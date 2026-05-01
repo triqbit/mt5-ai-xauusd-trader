@@ -5,14 +5,16 @@ Unit tests for the benchmarking framework.
 import numpy as np
 import pandas as pd
 import pytest
+
 from src.research.benchmarks import (
+    BenchmarkEvaluator,
     EMACrossoverStrategy,
     MomentumStrategy,
-    VolatilityBreakoutStrategy,
     NaiveDirectionalStrategy,
     RiskFilteredBaseline,
-    BenchmarkEvaluator
+    VolatilityBreakoutStrategy,
 )
+
 
 @pytest.fixture
 def sample_data():

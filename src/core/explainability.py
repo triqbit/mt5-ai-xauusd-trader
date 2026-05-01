@@ -52,7 +52,9 @@ class RiskAssessment(BaseModel):
     """Summary of risk management constraints and filters applied to the signal."""
 
     passed: bool = Field(..., description="Whether the signal passed all risk filters")
-    rejection_reasons: List[str] = Field(default_factory=list, description="Reasons for rejection if any")
+    rejection_reasons: List[str] = Field(
+        default_factory=list, description="Reasons for rejection if any"
+    )
     risk_reward_ratio: float = Field(..., description="Calculated R:R for the trade")
     drawdown_impact_pct: float = Field(..., description="Estimated impact on total drawdown")
     kelly_fraction: float = Field(0.0, description="Kelly Criterion suggested sizing")
@@ -64,7 +66,9 @@ class RegimeContext(BaseModel):
 
     regime_name: str = Field(..., description="Detected market regime (e.g., Trending, Ranging)")
     confidence: float = Field(..., description="Regime detection confidence")
-    volatility_state: str = Field(..., description="Current volatility level (Low, Normal, High, Extreme)")
+    volatility_state: str = Field(
+        ..., description="Current volatility level (Low, Normal, High, Extreme)"
+    )
     is_favorable: bool = Field(..., description="Whether the regime is favorable for the strategy")
     summary: str = Field(..., description="Contextual summary of the market state")
 
@@ -86,12 +90,16 @@ class SignalExplanation(BaseModel):
 
     # Components
     model_attributions: List[ModelAttribution] = Field(..., description="Breakdown per model")
-    feature_contributions: List[FeatureContribution] = Field(..., description="Breakdown per feature cluster")
+    feature_contributions: List[FeatureContribution] = Field(
+        ..., description="Breakdown per feature cluster"
+    )
     risk_assessment: RiskAssessment = Field(..., description="Risk management breakdown")
     regime_context: RegimeContext = Field(..., description="Market context breakdown")
 
     # Summaries
-    human_readable_summary: str = Field(..., description="Natural language explanation for operators")
+    human_readable_summary: str = Field(
+        ..., description="Natural language explanation for operators"
+    )
     machine_attribution: Dict[str, float] = Field(
         ..., description="Key-value pairs for automated post-trade analysis"
     )
@@ -132,7 +140,11 @@ class SignalExplainer:
             # Note: SignalDirection enum matches 1, -1, 0.
             # We need to map carefully.
             # EnsembleModel uses: direction_map = {0: 1, 1: -1, 2: 0}
-            direction_map = {0: SignalDirection.BUY, 1: SignalDirection.SELL, 2: SignalDirection.HOLD}
+            direction_map = {
+                0: SignalDirection.BUY,
+                1: SignalDirection.SELL,
+                2: SignalDirection.HOLD,
+            }
             vote_dir = direction_map.get(int(vote_idx), SignalDirection.HOLD)
 
             weight = model_weights.get(name, 0.0)
@@ -144,13 +156,15 @@ class SignalExplainer:
                 max_weighted_conf = weighted_conf
                 dominant_model = name
 
-            attributions.append(ModelAttribution(
-                model_name=name,
-                vote=vote_dir,
-                confidence=model_conf,
-                weight=weight,
-                is_dominant=False # Updated below
-            ))
+            attributions.append(
+                ModelAttribution(
+                    model_name=name,
+                    vote=vote_dir,
+                    confidence=model_conf,
+                    weight=weight,
+                    is_dominant=False,  # Updated below
+                )
+            )
 
         for attr in attributions:
             if attr.model_name == dominant_model:
@@ -163,7 +177,7 @@ class SignalExplainer:
             risk_reward_ratio=risk_data.get("risk_reward", 0.0),
             drawdown_impact_pct=risk_data.get("drawdown_impact", 0.0),
             kelly_fraction=risk_data.get("kelly_fraction", 0.0),
-            summary=risk_data.get("summary", "No risk data provided")
+            summary=risk_data.get("summary", "No risk data provided"),
         )
 
         # 3. Regime Context
@@ -172,14 +186,24 @@ class SignalExplainer:
             confidence=regime_info.get("confidence", 0.0),
             volatility_state=regime_info.get("volatility", "Normal"),
             is_favorable=regime_info.get("is_favorable", True),
-            summary=regime_info.get("summary", "Market state stable")
+            summary=regime_info.get("summary", "Market state stable"),
         )
 
         # 4. Feature Contributions (Mocked if not provided)
         if not feature_impacts:
             feature_impacts = [
-                {"cluster": "Trend", "score": 0.8, "impact": "High", "summary": "Strong bullish momentum detected"},
-                {"cluster": "Volatility", "score": -0.2, "impact": "Low", "summary": "Volatility is slightly compressing"},
+                {
+                    "cluster": "Trend",
+                    "score": 0.8,
+                    "impact": "High",
+                    "summary": "Strong bullish momentum detected",
+                },
+                {
+                    "cluster": "Volatility",
+                    "score": -0.2,
+                    "impact": "Low",
+                    "summary": "Volatility is slightly compressing",
+                },
             ]
 
         contributions = [
@@ -187,8 +211,9 @@ class SignalExplainer:
                 cluster_name=fi["cluster"],
                 contribution_score=fi["score"],
                 impact_level=fi["impact"],
-                summary=fi["summary"]
-            ) for fi in feature_impacts
+                summary=fi["summary"],
+            )
+            for fi in feature_impacts
         ]
 
         # 5. Generate Human Readable Summary
@@ -200,14 +225,16 @@ class SignalExplainer:
         if risk_assessment.passed:
             reasoning += f"Signal passed all risk filters with R:R of {risk_assessment.risk_reward_ratio:.2f}."
         else:
-            reasoning += f"Signal REJECTED by risk filters: {', '.join(risk_assessment.rejection_reasons)}."
+            reasoning += (
+                f"Signal REJECTED by risk filters: {', '.join(risk_assessment.rejection_reasons)}."
+            )
 
         # 6. Machine Attribution
         machine_attr = {
             "model_confidence": confidence,
             "risk_score": 1.0 if risk_assessment.passed else 0.0,
             "regime_confluence": regime_context.confidence,
-            "dominant_model_weight": model_weights.get(dominant_model, 0.0)
+            "dominant_model_weight": model_weights.get(dominant_model, 0.0),
         }
 
         return SignalExplanation(
@@ -219,7 +246,7 @@ class SignalExplainer:
             risk_assessment=risk_assessment,
             regime_context=regime_context,
             human_readable_summary=reasoning,
-            machine_attribution=machine_attr
+            machine_attribution=machine_attr,
         )
 
     def format_for_terminal(self, explanation: SignalExplanation) -> str:
@@ -228,22 +255,28 @@ class SignalExplainer:
         Uses 'rich' for pretty printing if available, otherwise returns plain text.
         """
         try:
+            from rich import box
             from rich.console import Console
             from rich.panel import Panel
             from rich.table import Table
-            from rich import box
 
             console = Console(force_terminal=True)
 
             # 1. Main Header Panel
-            status_color = "green" if explanation.direction == SignalDirection.BUY else "red" if explanation.direction == SignalDirection.SELL else "yellow"
+            status_color = (
+                "green"
+                if explanation.direction == SignalDirection.BUY
+                else "red"
+                if explanation.direction == SignalDirection.SELL
+                else "yellow"
+            )
             header = Panel(
                 f"[bold {status_color}]{explanation.direction.name}[/bold {status_color}] for [bold]{explanation.symbol}[/bold]\n"
                 f"Confidence: [bold]{explanation.total_confidence:.1%}[/bold]\n\n"
                 f"{explanation.human_readable_summary}",
                 title="Trade Signal Explanation",
                 subtitle=f"ID: {explanation.signal_id or 'N/A'} | {explanation.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
-                box=box.DOUBLE
+                box=box.DOUBLE,
             )
 
             # 2. Model Votes Table
@@ -255,17 +288,27 @@ class SignalExplainer:
             model_table.add_column("Dominant", justify="center")
 
             for attr in explanation.model_attributions:
-                vote_color = "green" if attr.vote == SignalDirection.BUY else "red" if attr.vote == SignalDirection.SELL else "white"
+                vote_color = (
+                    "green"
+                    if attr.vote == SignalDirection.BUY
+                    else "red"
+                    if attr.vote == SignalDirection.SELL
+                    else "white"
+                )
                 model_table.add_row(
                     attr.model_name,
                     f"[{vote_color}]{attr.vote.name}[/{vote_color}]",
                     f"{attr.weight:.1%}",
                     f"{attr.confidence:.1%}",
-                    "⭐" if attr.is_dominant else ""
+                    "⭐" if attr.is_dominant else "",
                 )
 
             # 3. Risk and Regime
-            risk_status = "[bold green]PASSED[/bold green]" if explanation.risk_assessment.passed else "[bold red]FAILED[/bold red]"
+            risk_status = (
+                "[bold green]PASSED[/bold green]"
+                if explanation.risk_assessment.passed
+                else "[bold red]FAILED[/bold red]"
+            )
             risk_info = (
                 f"Risk Gate: {risk_status}\n"
                 f"R:R Ratio: [bold]{explanation.risk_assessment.risk_reward_ratio:.2f}[/bold]\n"
@@ -291,7 +334,7 @@ class SignalExplainer:
 
         except ImportError:
             # Fallback to plain text
-            output = f"=== TRADE SIGNAL EXPLANATION ===\n"
+            output = "=== TRADE SIGNAL EXPLANATION ===\n"
             output += f"Symbol: {explanation.symbol} | Direction: {explanation.direction.name} | Conf: {explanation.total_confidence:.1%}\n"
             output += f"Summary: {explanation.human_readable_summary}\n\n"
             output += "Model Votes:\n"

@@ -2,14 +2,12 @@
 Unit tests for the explainability module.
 """
 
-import pytest
-from datetime import datetime, timezone
 from src.core.explainability import (
+    SignalDirection,
     SignalExplainer,
     SignalExplanation,
-    SignalDirection,
-    ModelAttribution,
 )
+
 
 def test_signal_explanation_pydantic_validation():
     """Test that SignalExplanation correctly validates its fields."""
@@ -18,37 +16,31 @@ def test_signal_explanation_pydantic_validation():
         "direction": 1,
         "total_confidence": 0.85,
         "model_attributions": [
-            {
-                "model_name": "PPO",
-                "vote": 1,
-                "confidence": 0.85,
-                "weight": 0.6,
-                "is_dominant": True
-            }
+            {"model_name": "PPO", "vote": 1, "confidence": 0.85, "weight": 0.6, "is_dominant": True}
         ],
         "feature_contributions": [
             {
                 "cluster_name": "Trend",
                 "contribution_score": 0.8,
                 "impact_level": "High",
-                "summary": "Strong trend"
+                "summary": "Strong trend",
             }
         ],
         "risk_assessment": {
             "passed": True,
             "risk_reward_ratio": 2.5,
             "drawdown_impact_pct": 0.05,
-            "summary": "Risk acceptable"
+            "summary": "Risk acceptable",
         },
         "regime_context": {
             "regime_name": "Trending",
             "confidence": 0.9,
             "volatility_state": "Normal",
             "is_favorable": True,
-            "summary": "Favorable trend"
+            "summary": "Favorable trend",
         },
         "human_readable_summary": "Buy signal due to trend.",
-        "machine_attribution": {"conf": 0.85}
+        "machine_attribution": {"conf": 0.85},
     }
 
     explanation = SignalExplanation(**data)
@@ -57,6 +49,7 @@ def test_signal_explanation_pydantic_validation():
     assert len(explanation.model_attributions) == 1
     assert explanation.model_attributions[0].is_dominant is True
 
+
 def test_signal_explainer_aggregation():
     """Test that SignalExplainer correctly aggregates data from various sources."""
     explainer = SignalExplainer()
@@ -64,21 +57,21 @@ def test_signal_explainer_aggregation():
     symbol = "XAUUSD"
     direction = 1
     confidence = 0.75
-    model_votes = {"ppo": 0, "lstm": 0} # 0=buy in ensemble.py mapping
+    model_votes = {"ppo": 0, "lstm": 0}  # 0=buy in ensemble.py mapping
     model_weights = {"ppo": 0.7, "lstm": 0.3}
     risk_data = {
         "passed": True,
         "risk_reward": 2.1,
         "drawdown_impact": 0.02,
         "kelly_fraction": 0.1,
-        "summary": "Risk clear"
+        "summary": "Risk clear",
     }
     regime_info = {
         "name": "Trending",
         "confidence": 0.88,
         "volatility": "Normal",
         "is_favorable": True,
-        "summary": "Strong momentum"
+        "summary": "Strong momentum",
     }
 
     explanation = explainer.explain(
@@ -88,7 +81,7 @@ def test_signal_explainer_aggregation():
         model_votes=model_votes,
         model_weights=model_weights,
         risk_data=risk_data,
-        regime_info=regime_info
+        regime_info=regime_info,
     )
 
     assert explanation.symbol == symbol
@@ -104,6 +97,7 @@ def test_signal_explainer_aggregation():
     assert explanation.regime_context.regime_name == "Trending"
     assert "Ensemble generated a BUY signal" in explanation.human_readable_summary
 
+
 def test_signal_explainer_rejection():
     """Test explanation generation for a rejected signal."""
     explainer = SignalExplainer()
@@ -113,23 +107,24 @@ def test_signal_explainer_rejection():
         "rejection_reasons": ["Daily loss limit reached"],
         "risk_reward": 1.2,
         "drawdown_impact": 0.0,
-        "summary": "Rejected by risk manager"
+        "summary": "Rejected by risk manager",
     }
 
     explanation = explainer.explain(
         symbol="XAUUSD",
         direction=-1,
         confidence=0.6,
-        model_votes={"ppo": 1}, # 1=sell
+        model_votes={"ppo": 1},  # 1=sell
         model_weights={"ppo": 1.0},
         risk_data=risk_data,
-        regime_info={"name": "Volatile"}
+        regime_info={"name": "Volatile"},
     )
 
     assert explanation.direction == SignalDirection.SELL
     assert explanation.risk_assessment.passed is False
     assert "Daily loss limit reached" in explanation.risk_assessment.rejection_reasons
     assert "Signal REJECTED by risk filters" in explanation.human_readable_summary
+
 
 def test_format_for_terminal_fallback():
     """Test terminal formatting (plain text fallback if rich is not used or available)."""
@@ -141,7 +136,7 @@ def test_format_for_terminal_fallback():
         model_votes={"ppo": 0},
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 3.0, "summary": "Ok"},
-        regime_info={"name": "Bullish"}
+        regime_info={"name": "Bullish"},
     )
 
     formatted = explainer.format_for_terminal(explanation)
