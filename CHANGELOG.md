@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Hardened configuration by transitioning sensitive fields (`mt5_password`, `metaapi_token`, `telegram_token`, `database_url`, `redis_url`) to `pydantic.SecretStr` to prevent accidental exposure in logs.
+
+### Changed
+- Aligned and pinned core dependencies (`pydantic`, `pydantic-settings`, `structlog`, `python-telegram-bot`) across all environments (local, Docker, CI) for better reproducibility.
+- Decoupled health check system from ML dependencies to allow verification in CPU-only environments.
+
 ### Added
 - Enterprise-grade health check system in `src/core/health.py`.
 - Mandatory startup health gate in `main.py` to prevent execution in invalid states.

@@ -10,7 +10,14 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 
-from src.core.health import HealthChecker, HealthStatus, router, init_health_checker, ComponentStatus, HealthReport
+from src.core.health import (
+    ComponentStatus,
+    HealthChecker,
+    HealthReport,
+    HealthStatus,
+    init_health_checker,
+    router,
+)
 from src.core.config import TradingConfig
 
 @pytest.fixture
