@@ -240,7 +240,6 @@ class RiskManager:
         votes = list(signal.algo_votes.values())
         buy_votes = sum(1 for v in votes if v == 1)
         sell_votes = sum(1 for v in votes if v == -1)
-        hold_votes = sum(1 for v in votes if v == 0)
         total = len(votes)
 
         # 1. Check for Strong Dissent

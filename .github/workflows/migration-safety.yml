@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install sqlalchemy==2.0.30 alembic==1.13.1 pydantic==2.11.1 pydantic-settings==2.8.1 numpy==1.26.4
+          pip install sqlalchemy==2.0.30 alembic==1.13.1 pydantic==2.11.1 pydantic-settings==2.8.1 numpy==1.26.4 structlog==24.1.0
 
       - name: Run Migration Reversibility Check
         run: python scripts/verify_migrations.py

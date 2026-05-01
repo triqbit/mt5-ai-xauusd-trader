@@ -39,3 +39,4 @@ python-telegram-bot
 fastapi>=0.115.0
 httpx==0.27.0
 structlog==24.1.0
+torch --index-url https://download.pytorch.org/whl/cpu
