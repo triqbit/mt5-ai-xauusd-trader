@@ -14,8 +14,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.encoders import jsonable_encoder
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
 
 from src.core.config import TradingConfig, get_config
@@ -210,3 +211,8 @@ async def readiness():
 async def full_report():
     checker = get_health_checker()
     return checker.get_full_report()
+
+@router.get("/metrics")
+async def metrics():
+    """Expose Prometheus metrics."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

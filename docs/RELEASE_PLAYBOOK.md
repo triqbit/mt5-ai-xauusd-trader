@@ -77,7 +77,9 @@ In case of catastrophic trading behavior:
 
 ## 6. Post-Release Verification Checklist
 After a successful deployment, the operator MUST verify the following:
-- [ ] **Liveness:** `curl http://localhost:8000/health/liveness` returns `{"status": "ok"}`.
+- [ ] **Liveness:** `curl http://localhost:8000/health/liveness` returns `{"status": "healthy", ...}`.
+- [ ] **Readiness:** `curl http://localhost:8000/health/readiness` returns a full health report with `status: "healthy"`.
+- [ ] **Metrics:** `curl http://localhost:8000/health/metrics` returns valid Prometheus metrics.
 - [ ] **MT5 Connection:** Logs show "Successfully connected to MT5 account XXXXXX".
 - [ ] **Audit Trail:** Check `trades.db` for the initial "System Startup" audit entry.
 - [ ] **Telegram:** Confirm the "Trading Bot Started (vX.Y.Z)" message was received.

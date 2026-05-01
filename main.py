@@ -16,15 +16,18 @@ import argparse
 import logging
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
 
 import structlog
+import uvicorn
+from fastapi import FastAPI
 
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
-from src.core.health import HealthStatus, init_health_checker
+from src.core.health import HealthStatus, init_health_checker, router as health_router
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -257,6 +260,18 @@ def main() -> int:
         return 1
 
     log.info("System HEALTH CHECK PASSED | status=%s", health_report.status)
+
+    # Start Health Server in background for real-time monitoring
+    app = FastAPI(title="MT5 AI Trading Bot Health")
+    app.include_router(health_router)
+
+    def run_health_server():
+        # Using a dedicated thread for the monitoring API
+        uvicorn.run(app, host="0.0.0.0", port=cfg.prometheus_port, log_level="error")
+
+    health_thread = threading.Thread(target=run_health_server, daemon=True)
+    health_thread.start()
+    log.info("Health server started in background | port=%d", cfg.prometheus_port)
 
     try:
         if cfg.mode in ("demo", "live"):
