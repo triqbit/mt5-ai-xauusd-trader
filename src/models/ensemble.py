@@ -19,7 +19,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from src.core.constants import ModelAction, SignalDirection
+from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
 
 logger = logging.getLogger(__name__)
