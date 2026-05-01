@@ -1,17 +1,27 @@
+
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 tests/test_health.py
 Unit and integration tests for the health check system.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 from pathlib import Path
-from fastapi.testclient import TestClient
-from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
-from src.core.health import HealthChecker, HealthStatus, router, init_health_checker, ComponentStatus, HealthReport
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
 from src.core.config import TradingConfig
+from src.core.health import (
+    ComponentStatus,
+    HealthChecker,
+    HealthReport,
+    HealthStatus,
+    init_health_checker,
+    router,
+)
+
 
 @pytest.fixture
 def mock_config():
@@ -151,7 +161,7 @@ def test_get_full_report(health_checker):
 
 # --- FastAPI Endpoint Tests ---
 
-from fastapi import FastAPI
+
 
 @pytest.fixture
 def client(mock_config, mock_connector, mock_trade_logger, mock_model):

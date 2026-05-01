@@ -1,6 +1,7 @@
 import unittest
+
 from src.models.dynamic_ensemble import DynamicEnsemble
-from src.models.regime_detector import MarketRegime
+
 
 class TestDynamicEnsemble(unittest.TestCase):
     def setUp(self):
@@ -51,13 +52,13 @@ class TestDynamicEnsemble(unittest.TestCase):
         metrics_b = {"ppo": {"accuracy": 0.0}, "lstm": {"accuracy": 1.0}, "transformer": {"accuracy": 0.0}}
 
         self.ensemble.update_weights(metrics_a) # Target ppo high
-        w1 = self.ensemble.weights["ppo"]
+        _ = self.ensemble.weights["ppo"]
 
         self.ensemble.update_weights(metrics_b) # Target ppo low
-        w2 = self.ensemble.weights["ppo"]
+        _ = self.ensemble.weights["ppo"]
 
         self.ensemble.update_weights(metrics_a) # Target ppo high again (reversal)
-        w3 = self.ensemble.weights["ppo"]
+        _ = self.ensemble.weights["ppo"]
 
         # The step from w2 to w3 should be smaller than initial steps if dampening works
         # though with high smoothing factor it might still move significantly.

@@ -1,7 +1,8 @@
 """Tests for src.core.config module."""
-import os
 import pytest
+
 from src.core.config import TradingConfig
+
 
 def test_config_from_env(monkeypatch):
     """Test TradingConfig loads from environment variables."""

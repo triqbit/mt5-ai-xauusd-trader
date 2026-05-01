@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -152,11 +152,10 @@ class DecisionSupport:
         Render the decision packet as a high-fidelity terminal dashboard.
         """
         try:
+            from rich import box
             from rich.console import Console
             from rich.panel import Panel
             from rich.table import Table
-            from rich import box
-            from rich.layout import Layout
 
             console = Console(force_terminal=True, width=100)
 
