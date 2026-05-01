@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
 
+from src.core.audit_log import AuditLogger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -72,6 +73,7 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        audit_logger: Optional[AuditLogger] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
@@ -80,6 +82,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.audit_logger = audit_logger
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
@@ -88,21 +91,40 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
+        decision_chain = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
+
         rejection_reason = ""
-        if not self._check_circuit_breaker():
+        if not decision_chain["circuit_breaker"]:
             rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
+        elif not decision_chain["daily_loss"]:
             rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
+        elif not decision_chain["max_positions"]:
             rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
+        elif not decision_chain["symbol_allocation"]:
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
+        elif not decision_chain["min_confidence"]:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
+        elif not decision_chain["risk_reward"]:
             rejection_reason = "Risk-Reward ratio too low"
 
         passed = rejection_reason == ""
+
+        if self.audit_logger:
+            self.audit_logger.log_risk_decision(
+                signal_id=signal_id, passed=passed, decision_chain=decision_chain
+            )
+            if not passed:
+                self.audit_logger.log_trade_blocked(
+                    signal_id=signal_id, reason=rejection_reason, decision_chain=decision_chain
+                )
+
         if not passed:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
