@@ -10,10 +10,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
-import pandas as pd
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -251,33 +250,33 @@ class ExecutionAnalyzer:
         lows = df["low"].values
 
         if signal.direction > 0:  # BUY
-            excursions = prices - signal.entry_price
+
             mfe = (np.max(highs) - signal.entry_price)
             mae = (signal.entry_price - np.min(lows))
 
             # Check if TP or SL would hit first
             would_win = False
-            for h, l in zip(highs, lows):
-                if h >= (signal.take_profit or float('inf')):
+            for h_val, l_val in zip(highs, lows, strict=False):
+                if h_val >= (signal.take_profit or float('inf')):
                     would_win = True
                     break
-                if l <= (signal.stop_loss or float('-inf')):
+                if l_val <= (signal.stop_loss or float('-inf')):
                     would_win = False
                     break
 
             opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * 100 # XAUUSD
         else:  # SELL
-            excursions = signal.entry_price - prices
+
             mfe = (signal.entry_price - np.min(lows))
             mae = (np.max(highs) - signal.entry_price)
 
             # Check if TP or SL would hit first
             would_win = False
-            for h, l in zip(highs, lows):
-                if l <= (signal.take_profit or float('-inf')):
+            for h_val, l_val in zip(highs, lows, strict=False):
+                if l_val <= (signal.take_profit or float('-inf')):
                     would_win = True
                     break
-                if h >= (signal.stop_loss or float('inf')):
+                if h_val >= (signal.stop_loss or float('inf')):
                     would_win = False
                     break
 
