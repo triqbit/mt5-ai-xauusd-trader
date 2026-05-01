@@ -1,0 +1,63 @@
+name: License Compliance Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 0 * * 1' # Weekly on Mondays
+
+jobs:
+  license-scan:
+    name: Scan Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Project Dependencies for Scan
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-licenses
+          # Install dependencies from requirements-ci.txt
+          # We use a modified requirements file for CI that avoids heavy ML packages
+          # but includes the metadata needed for license scanning.
+          # TA-Lib is removed or ignored here because it requires C headers that might not be present.
+          grep -v "TA-Lib" requirements-ci.txt > requirements-scan.txt
+          pip install -r requirements-scan.txt
+
+      - name: Execute License Scan
+        id: scan
+        run: |
+          echo "## Dependency License Report" >> $GITHUB_STEP_SUMMARY
+          pip-licenses --format=markdown >> $GITHUB_STEP_SUMMARY
+
+          # Check for disallowed licenses
+          # This will fail the job if any disallowed license is found
+          # Allowed: MIT, Apache, BSD, PSF, ISC, MPL, LGPL, CC0, Unlicense
+          # Disallowed: GPL, AGPL, SSPL
+          # Note: We use --fail-on with specific strings to catch disallowed licenses.
+          pip-licenses --fail-on GPL AGPL SSPL > disallowed_found.txt 2>&1 || DISALLOWED=true
+
+          if [ "$DISALLOWED" = "true" ]; then
+            echo "::error::Disallowed licenses detected!"
+            cat disallowed_found.txt
+            exit 1
+          fi
+
+      - name: Generate Full Report Artifact
+        run: |
+          pip-licenses --format=markdown --with-authors --with-urls --with-license-files > LICENSE_REPORT.md
+
+      - name: Upload License Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: LICENSE_REPORT.md
