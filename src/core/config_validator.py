@@ -2,9 +2,12 @@
 Startup Validation Layer for MT5 AI Trading Bot.
 src/core/config_validator.py
 """
+
 import os
 from typing import List, NamedTuple
+
 from src.core.config import TradingConfig
+
 
 class ValidationError(NamedTuple):
     field: str
