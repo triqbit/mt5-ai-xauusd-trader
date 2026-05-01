@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.data.event_intelligence import EventIntelligence
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        event_intel: Optional[EventIntelligence] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
@@ -80,6 +82,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.event_intel = event_intel
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
@@ -101,6 +104,8 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_macro_events(signal.symbol):
+            rejection_reason = "Macro event risk"
 
         passed = rejection_reason == ""
         if not passed:
@@ -135,7 +140,13 @@ class RiskManager:
             return 0.01  # minimum lot
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+
+        # Apply macro event risk multiplier
+        multiplier = 1.0
+        if self.event_intel:
+            multiplier = self.event_intel.get_risk_multiplier(symbol, datetime.now(timezone.utc))
+
+        risk_capital = self.balance * self.cfg.risk_per_trade * multiplier
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(
@@ -226,6 +237,16 @@ class RiskManager:
         rr = reward / risk
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
+            return False
+        return True
+
+    def _check_macro_events(self, symbol: str) -> bool:
+        """Check if high-impact macro events block execution."""
+        if not self.event_intel or not self.cfg.enable_macro_filter:
+            return True
+
+        if self.event_intel.should_block_execution(symbol, datetime.now(timezone.utc)):
+            logger.warning("Macro event filter blocked signal for %s", symbol)
             return False
         return True
 

@@ -49,6 +49,11 @@ class TradingConfig(BaseSettings):
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
 
+    # ── Macro Event Intelligence ──────────────────────────────────────────────
+    enable_macro_filter: bool = Field(default=True)
+    macro_event_high_pre: int = Field(default=30)
+    macro_event_high_post: int = Field(default=60)
+
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
     model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
