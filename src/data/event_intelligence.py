@@ -5,6 +5,7 @@ Ingest and normalize high-impact macroeconomic events relevant to XAUUSD.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -126,7 +127,9 @@ class EventIntelligence:
             current_time = datetime.now(timezone.utc)
 
         # Refresh events if none or stale (e.g., > 1 hour old)
-        if not self.events or (self._last_fetch and (current_time - self._last_fetch) > timedelta(hours=1)):
+        if not self.events or (
+            self._last_fetch and (current_time - self._last_fetch) > timedelta(hours=1)
+        ):
             self.fetch_events()
 
         return [e for e in self.events if e.is_active(current_time)]
@@ -141,13 +144,17 @@ class EventIntelligence:
 
         active_events = self.get_active_events(current_time)
         high_impact_active = [
-            e for e in active_events
-            if e.impact == EventImpact.HIGH and (e.symbol == symbol or e.symbol == "USD" or e.symbol == "ALL")
+            e
+            for e in active_events
+            if e.impact == EventImpact.HIGH
+            and (e.symbol == symbol or e.symbol == "USD" or e.symbol == "ALL")
         ]
 
         if high_impact_active:
             for e in high_impact_active:
-                logger.warning("Execution BLOCKED | Active HIGH impact event: %s (%s)", e.name, e.symbol)
+                logger.warning(
+                    "Execution BLOCKED | Active HIGH impact event: %s (%s)", e.name, e.symbol
+                )
             return True
 
         return False
@@ -162,8 +169,10 @@ class EventIntelligence:
 
         active_events = self.get_active_events(current_time)
         medium_impact_active = [
-            e for e in active_events
-            if e.impact == EventImpact.MEDIUM and (e.symbol == symbol or e.symbol == "USD" or e.symbol == "ALL")
+            e
+            for e in active_events
+            if e.impact == EventImpact.MEDIUM
+            and (e.symbol == symbol or e.symbol == "USD" or e.symbol == "ALL")
         ]
 
         if medium_impact_active:

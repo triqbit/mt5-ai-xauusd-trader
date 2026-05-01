@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -236,7 +237,13 @@ def main() -> int:
     )
     monitor = Monitor(cfg)
     event_intel = EventIntelligence(cfg)
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor, event_intel=event_intel)
+    risk = RiskManager(
+        cfg,
+        account_balance=balance,
+        logger_db=trade_logger,
+        monitor=monitor,
+        event_intel=event_intel,
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"

@@ -1,12 +1,13 @@
 """
 Unit and integration tests for Macro Event Intelligence.
 """
-import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
-from src.data.event_intelligence import EventIntelligence, MacroEvent, EventImpact
+import pytest
+
 from src.core.config import TradingConfig
+from src.data.event_intelligence import EventImpact, EventIntelligence, MacroEvent
 from src.trading.risk_manager import RiskManager, TradeSignal
 
 
@@ -143,7 +144,7 @@ def test_risk_manager_size_reduction(mock_config):
     # (risk_capital * kelly) / (loss * pip)
     # We want to verify risk_capital is reduced.
 
-    lot_normal = risk.size_position("XAUUSD", 0.5, 10, 10) # No events active in this call if we don't mock now()
+    risk.size_position("XAUUSD", 0.5, 10, 10) # No events active in this call if we don't mock now()
 
     # We need to ensure size_position uses the right time.
     # In the implementation it uses datetime.now(timezone.utc)
