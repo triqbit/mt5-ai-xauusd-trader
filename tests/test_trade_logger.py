@@ -62,3 +62,19 @@ def test_log_risk_event(logger):
         from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
+
+def test_update_trade_auto_pnl(logger):
+    logger.log_trade(123, "XAUUSD", 1, 2000.0, 0.1)
+    # exit 2010, direction 1, lot 0.1, contract 100 -> (2010-2000)*1*0.1*100 = 10*10 = 100
+    logger.update_trade(123, 2010.0)
+    trade = logger.get_trade_by_ticket(123)
+    assert trade.pnl == 100.0
+
+def test_read_performance_report_empty(logger):
+    report = logger.read_performance_report()
+    assert report["sharpe_ratio"] == 0.0
+    assert report["profit_factor"] == 0.0
+
+def test_update_trade_not_found(logger):
+    # Should just log a warning and not crash
+    logger.update_trade(999, 2100.0)

@@ -167,3 +167,78 @@ def test_generate_summary_critical(sample_data):
 
     report = lab.generate_report(baseline)
     assert "CRITICAL" in report.degradation_summary
+
+def test_generate_summary_warning(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+    lab.results["Warn"] = StressTestMetrics(
+        total_return=0.04, # < 0.1 * 0.5
+        max_drawdown=0.1,
+        sharpe_ratio=1.0,
+        win_rate=0.5,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+    report = lab.generate_report(baseline)
+    assert "WARNING" in report.degradation_summary
+
+def test_apply_perturbations_none(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+    scenario = StressScenario(name="None", description="No perturbations")
+    perturbed = lab._apply_perturbations(sample_data, scenario)
+    pd.testing.assert_frame_equal(sample_data, perturbed)
+
+def test_backtest_with_stress_short_selling(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+    # Strategy that alternates signals to ensure trades are opened and closed
+    class ShortStrategy:
+        @property
+        def name(self): return "Short"
+        def predict(self, df):
+            signals = np.zeros(len(df))
+            signals[0] = -1 # Open short
+            signals[10] = 1 # Close short
+            return signals
+
+    lab.strategy = ShortStrategy()
+    metrics = lab.run_scenario(StressScenario(name="ShortTest", description="Shorting"))
+    assert metrics.num_trades > 0
+
+def test_fragility_indicators(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    lab.results["Fragile"] = StressTestMetrics(
+        total_return=0.01,
+        max_drawdown=0.2, # > 0.05 * 2
+        sharpe_ratio=0.5, # < 2.0 * 0.5
+        win_rate=0.4,
+        num_trades=5,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    report = lab.generate_report(baseline)
+    assert len(report.fragility_indicators) > 0

@@ -55,3 +55,15 @@ def test_invalid_regime():
     gen = ScenarioGenerator()
     with pytest.raises(ValueError, match="Unknown regime"):
         gen.generate(regime="invalid")
+
+def test_volatile_regime():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate(n_steps=100, regime="volatile")
+    assert len(df) == 100
+    assert "close" in df.columns
+
+def test_gapping_regime():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate(n_steps=100, regime="gapping")
+    assert len(df) == 100
+    assert "close" in df.columns

@@ -6,12 +6,13 @@ Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Spread, ADX, Drawdown
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from datetime import datetime, time
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecutionDecision:
     """Result of the execution filter validation."""
+
     signal: TradeSignal
     is_approved: bool
     confidence_score: float
@@ -53,7 +55,7 @@ class ExecutionFilter:
         signal: TradeSignal,
         market_data: pd.DataFrame,
         current_drawdown: float,
-        current_spread: float = 0.0
+        current_spread: float = 0.0,
     ) -> ExecutionDecision:
         """
         Run all filter layers in a cascading sequence.
@@ -119,15 +121,13 @@ class ExecutionFilter:
         if len(df) < 44:  # 14 + 30
             return True
 
-        high = df['high']
-        low = df['low']
-        close_prev = df['close'].shift(1)
+        high = df["high"]
+        low = df["low"]
+        close_prev = df["close"].shift(1)
 
-        tr = pd.concat([
-            high - low,
-            (high - close_prev).abs(),
-            (low - close_prev).abs()
-        ], axis=1).max(axis=1)
+        tr = pd.concat(
+            [high - low, (high - close_prev).abs(), (low - close_prev).abs()], axis=1
+        ).max(axis=1)
 
         atr = tr.rolling(window=14).mean()
         atr_sma = atr.rolling(window=30).mean()
@@ -148,9 +148,9 @@ class ExecutionFilter:
         if len(df) < 200:
             return True
 
-        ema20 = df['close'].ewm(span=20, adjust=False).mean().iloc[-1]
-        ema50 = df['close'].ewm(span=50, adjust=False).mean().iloc[-1]
-        ema200 = df['close'].ewm(span=200, adjust=False).mean().iloc[-1]
+        ema20 = df["close"].ewm(span=20, adjust=False).mean().iloc[-1]
+        ema50 = df["close"].ewm(span=50, adjust=False).mean().iloc[-1]
+        ema200 = df["close"].ewm(span=200, adjust=False).mean().iloc[-1]
 
         if direction == 1:  # BUY
             return ema20 > ema50 > ema200
@@ -166,7 +166,7 @@ class ExecutionFilter:
         if len(df) < 30:
             return True
 
-        ema20 = df['close'].ewm(span=20, adjust=False).mean()
+        ema20 = df["close"].ewm(span=20, adjust=False).mean()
         recent_ema = ema20.iloc[-10:].values
         x = np.arange(len(recent_ema))
 
@@ -187,7 +187,7 @@ class ExecutionFilter:
         if len(df) < 15:
             return True
 
-        delta = df['close'].diff()
+        delta = df["close"].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
 
@@ -220,15 +220,13 @@ class ExecutionFilter:
             return True
 
         # Simplified ADX implementation
-        high = df['high']
-        low = df['low']
-        close_prev = df['close'].shift(1)
+        high = df["high"]
+        low = df["low"]
+        close_prev = df["close"].shift(1)
 
-        tr = pd.concat([
-            high - low,
-            (high - close_prev).abs(),
-            (low - close_prev).abs()
-        ], axis=1).max(axis=1)
+        tr = pd.concat(
+            [high - low, (high - close_prev).abs(), (low - close_prev).abs()], axis=1
+        ).max(axis=1)
 
         up_move = high - high.shift(1)
         down_move = low.shift(1) - low

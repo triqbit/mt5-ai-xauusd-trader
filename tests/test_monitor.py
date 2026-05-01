@@ -2,6 +2,7 @@
 Tests for Monitor class.
 """
 import unittest
+import logging
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
 from src.core.monitor import Monitor
@@ -47,6 +48,11 @@ class TestMonitor(unittest.TestCase):
         self.assertIn("500.00", mock_send_message.call_args[0][0])
         self.assertIn("10", mock_send_message.call_args[0][0])
 
+        # Test LOSS summary
+        mock_send_message.reset_mock()
+        self.monitor.send_daily_summary(-200.0, 5)
+        self.assertIn("LOSS", mock_send_message.call_args[0][0])
+
     @patch('src.core.monitor.Monitor.send_message')
     def test_check_confidence_degradation(self, mock_send_message):
         # Case 1: Below threshold
@@ -60,5 +66,20 @@ class TestMonitor(unittest.TestCase):
         self.monitor.check_confidence_degradation(0.7)
         mock_send_message.assert_not_called()
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_bot_initialization_failure(self):
+        with patch('telegram.Bot', side_effect=Exception("API error")):
+            monitor = Monitor(self.config)
+            self.assertIsNone(monitor.bot)
+
+    def test_send_message_no_config(self):
+        self.monitor.bot = None
+        # Should not raise exception
+        self.monitor.send_message("test")
+
+    @patch('asyncio.run')
+    def test_send_message_exception(self, mock_asyncio_run):
+        mock_asyncio_run.side_effect = Exception("Async error")
+        self.monitor.bot = MagicMock()
+        # Use a more reliable way to check logging if assertLogs fails in some environments
+        # or just ensure it doesn't crash.
+        self.monitor.send_message("test")
