@@ -29,3 +29,26 @@
 - **Impact**: Low. Minor bug potential if MetaAPI is used.
 - **Resolution**: Standardized on `metaapi_connection` by removing the conflicting stale callers (`OrderManager`, `PortfolioManager`). Direct modification of `MT5Connector` deferred to avoid CI high-risk gate triggers, as the removal of consumers already achieves coherence.
 - **Owner**: Jules05
+
+## [2026-05-01] - Institutional Component Harmonization
+
+### 1. Duplicated Ensemble Weighting Logic
+- **Conflict**: `EnsembleModel` (Jules01) implements a basic rebalancing logic, while `DynamicEnsemble` (Jules04) provides a more advanced, regime-aware weighting engine.
+- **Agents**: Jules01, Jules04
+- **Impact**: Medium. Redundant logic and missed opportunity for institutional-grade weighting.
+- **Resolution**: Harmonize `EnsembleModel` to use `DynamicEnsemble` for its internal weight management.
+- **Owner**: Jules05
+
+### 2. Orphaned Institutional Components (RegimeDetector, CapitalAllocator)
+- **Conflict**: High-value components `RegimeDetector` and `CapitalAllocator` (Jules04) exist in the codebase but are not integrated into the main trading loop or risk management flow.
+- **Agents**: Jules01, Jules04
+- **Impact**: High (Product Value). The system operates without its core "differentiating" features.
+- **Resolution**: Integrate `RegimeDetector` into `main.py` and `CapitalAllocator` into `RiskManager`.
+- **Owner**: Jules05
+
+### 3. Missing Regime-Awareness in Trading Loop
+- **Conflict**: The `run_live` loop in `main.py` performs inference without market regime context, even though `RegimeDetector` is available.
+- **Agents**: Jules01, Jules04
+- **Impact**: Medium. Suboptimal model performance in different market conditions.
+- **Resolution**: Pass detected market regime to the ensemble model and risk manager during the trading loop.
+- **Owner**: Jules05
