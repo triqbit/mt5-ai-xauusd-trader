@@ -11,20 +11,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.core.constants import SignalDirection
+
 logger = logging.getLogger(__name__)
-
-
-class SignalDirection(int, Enum):
-    """Trading signal direction."""
-
-    BUY = 1
-    SELL = -1
-    HOLD = 0
 
 
 class FeatureContribution(BaseModel):

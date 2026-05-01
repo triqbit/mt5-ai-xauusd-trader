@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from src.core.constants import ModelAction, SignalDirection
+
 
 class BenchmarkStrategy(Protocol):
     """Protocol for all strategies and baselines to ensure consistent evaluation."""
@@ -348,7 +350,7 @@ class EnsembleAdapter:
             obs = df.iloc[i][["open", "high", "low", "close", "tick_volume"]].values
             # EnsembleModel.predict returns (direction, confidence, per_algo)
             direction, _, _ = self.model.predict(obs)
-            signals[i] = direction
+            signals[i] = float(direction)
         return signals
 
 
@@ -374,9 +376,8 @@ class PPOAdapter:
             # Fallback to entire row if not pre-processed
             obs = df.iloc[i].values
             action = self.agent.predict(obs)
-            # Action space: 0=Hold, 1=Buy, 2=Sell
-            direction_map = {0: 0, 1: 1, 2: -1}
-            signals[i] = direction_map.get(int(action), 0)
+            # action is a ModelAction
+            signals[i] = float(action.to_direction())
         return signals
 
 
@@ -422,16 +423,17 @@ class TransformerAdapter:
             probs = self.model(data)
             actions = torch.argmax(probs, dim=-1).cpu().numpy()
 
-        # Logic: 0=Buy, 1=Sell, 2=Hold based on src/models/transformer_model.py
-        direction_map = {0: 1, 1: -1, 2: 0}
+        # Mapping logic: 0=Buy, 1=Sell, 2=Hold (based on legacy transformer logic)
+        # Note: Ideally transformer should also use ModelAction categories.
+        direction_map = {0: SignalDirection.BUY, 1: SignalDirection.SELL, 2: SignalDirection.HOLD}
 
         # If we get a single action back (batch size 1)
         if actions.ndim == 1 and len(actions) == 1:
-            signals[-1] = direction_map.get(int(actions[0]), 0)
+            signals[-1] = float(direction_map.get(int(actions[0]), SignalDirection.HOLD))
         else:
             # Map batch actions to signals
             for i, act in enumerate(actions):
                 if i < len(signals):
-                    signals[i] = direction_map.get(int(act), 0)
+                    signals[i] = float(direction_map.get(int(act), SignalDirection.HOLD))
 
         return signals

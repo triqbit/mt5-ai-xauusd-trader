@@ -125,4 +125,11 @@ class TradingEnv(gym.Env):
         return self.obs_buffer.copy()
 
     def render(self):
-        print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
+        """Render the environment state."""
+        # Use logging instead of print for enterprise compliance
+        logger.info(
+            "Step: %d | Balance: $%.2f | Position: %.1f",
+            self.current_step,
+            self.balance,
+            self.position
+        )
