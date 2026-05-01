@@ -1,0 +1,36 @@
+site_name: MT5 AI/ML Trading Bot Documentation
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: true
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - Troubleshooting: troubleshooting.md
+  - API Reference:
+      - Core: api/core.md
+      - Trading: api/trading.md
+      - Models: api/models.md
+      - Environment: api/environment.md

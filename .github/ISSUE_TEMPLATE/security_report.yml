@@ -1,0 +1,32 @@
+name: "🛡️ Security Report"
+description: "Report a security vulnerability. PLEASE DO NOT PUBLICLY DISCLOSE SECURITY ISSUES."
+labels: ["security", "critical"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Note:** If you have discovered a security vulnerability, please consider reporting it via a private channel if available, or use this template if you are comfortable.
+  - type: textarea
+    id: vulnerability
+    attributes:
+      label: "Description of the Vulnerability"
+      description: "Clearly describe the security flaw."
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: "Impact"
+      description: "What is the potential impact of this vulnerability? (e.g., credential theft, unauthorized trading)"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-security
+    attributes:
+      label: "Reproduction Steps"
+      description: "How can this vulnerability be reproduced?"
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: "Suggested Mitigation"
+      description: "Do you have a suggestion on how to fix this?"
