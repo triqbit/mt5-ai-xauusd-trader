@@ -54,4 +54,19 @@ mock_mt5.SYMBOL_FILLING_IOC = 1
 mock_mt5.ORDER_FILLING_IOC = 1
 mock_mt5.ORDER_TIME_GTC = 0
 
+# Mock torch and stable_baselines3 for restricted CI environments
+try:
+    import torch
+except ImportError:
+    mock_torch = MagicMock()
+    mock_torch.device.return_value = MagicMock()
+    mock_torch.nn.Module = type('Module', (), {})
+    sys.modules["torch"] = mock_torch
+    sys.modules["torch.nn"] = mock_torch.nn
+
+try:
+    import stable_baselines3
+except ImportError:
+    sys.modules["stable_baselines3"] = MagicMock()
+
 # Mock trade_logger to avoid real DB if needed, but integration tests usually want a real :memory: DB

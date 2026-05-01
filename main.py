@@ -27,8 +27,7 @@ from fastapi import FastAPI
 
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
-from src.core.health import HealthStatus, init_health_checker
-from src.core.health import router as health_router
+from src.core.health import HealthStatus, init_health_checker, router as health_router
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
