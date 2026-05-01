@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]  # repo root
@@ -30,7 +30,7 @@ class TradingConfig(BaseSettings):
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
     mt5_login: int = Field(default=0, description="MT5 account number")
-    mt5_password: str = Field(..., description="MT5 account password")
+    mt5_password: SecretStr = Field(..., description="MT5 account password")
     mt5_server: str = Field(..., description="Broker server name")
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
@@ -38,7 +38,7 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
-    metaapi_token: str = Field(default="", description="MetaAPI cloud token")
+    metaapi_token: SecretStr = Field(default=SecretStr(""), description="MetaAPI cloud token")
     metaapi_account_id: str = Field(default="", description="MetaAPI account ID")
 
     # ── Trading parameters ─────────────────────────────────────────────────────
@@ -56,14 +56,16 @@ class TradingConfig(BaseSettings):
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
-    redis_url: str = Field(default="redis://localhost:6379/0")
+    database_url: SecretStr = Field(
+        default=SecretStr("postgresql://trader:password@localhost:5432/mt5_trades")
+    )
+    redis_url: SecretStr = Field(default=SecretStr("redis://localhost:6379/0"))
 
     # ── Monitoring ──────────────────────────────────────────────────────────
     prometheus_port: int = Field(default=8000)
     dashboard_port: int = Field(default=8050)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
-    telegram_token: str = Field(default="", description="Telegram Bot API token")
+    telegram_token: SecretStr = Field(default=SecretStr(""), description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
     confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
