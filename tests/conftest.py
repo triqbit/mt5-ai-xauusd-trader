@@ -7,7 +7,6 @@ import numpy as np
 mock_talib = MagicMock()
 
 
-# Setup defaults for all technical indicators to return arrays of correct length
 def dummy_1_array(x, *args, **kwargs):
     return np.zeros(len(x))
 
@@ -21,16 +20,18 @@ def dummy_2_arrays(x, *args, **kwargs):
 
 
 mock_talib.RSI.side_effect = dummy_1_array
+mock_talib.MACD.side_effect = dummy_3_arrays
 mock_talib.SMA.side_effect = dummy_1_array
 mock_talib.EMA.side_effect = dummy_1_array
-mock_talib.ATR.side_effect = lambda hi, lo, cl, **kwargs: np.zeros(len(cl))
-mock_talib.MACD.side_effect = dummy_3_arrays
+mock_talib.ATR.side_effect = lambda high, low, close, **kwargs: np.zeros(len(close))
 mock_talib.BBANDS.side_effect = dummy_3_arrays
-mock_talib.ADX.side_effect = lambda hi, lo, cl, **kwargs: np.zeros(len(cl))
-mock_talib.STOCH.side_effect = lambda hi, lo, cl, **kwargs: (np.zeros(len(cl)), np.zeros(len(cl)))
-mock_talib.OBV.side_effect = lambda cl, vl: np.zeros(len(cl))
+mock_talib.ADX.side_effect = lambda high, low, close, **kwargs: np.zeros(len(close))
+mock_talib.STOCH.side_effect = lambda high, low, close, **kwargs: (
+    np.zeros(len(close)),
+    np.zeros(len(close)),
+)
+mock_talib.OBV.side_effect = lambda close, vol: np.zeros(len(close))
 
-# Setup common candle patterns
 pattern_list = [
     "CDL2CROWS",
     "CDL3BLACKCROWS",
@@ -99,10 +100,8 @@ mock_talib.get_function_groups.return_value = {"Pattern Recognition": pattern_li
 for pattern in pattern_list:
     setattr(mock_talib, pattern, lambda *args: np.zeros(len(args[0])))
 
-# Apply the mock to sys.modules
 sys.modules["talib"] = mock_talib
 
-# Mock MetaTrader5
 mock_mt5 = MagicMock()
 mock_mt5.TIMEFRAME_M1 = 1
 mock_mt5.TIMEFRAME_M5 = 5

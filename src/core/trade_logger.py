@@ -26,9 +26,15 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    """Base class for SQLAlchemy models."""
+
+    pass
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -145,7 +151,7 @@ class TradeLogger:
                 entry_price=signal_data["entry_price"],
                 stop_loss=signal_data.get("stop_loss"),
                 take_profit=signal_data.get("take_profit"),
-                lot_size=signal_data.get("lot_size", 0.01),  # Default min lot size if not provided
+                lot_size=signal_data.get("lot_size", 0.01),
                 algorithm=signal_data.get("algorithm"),
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
@@ -154,7 +160,7 @@ class TradeLogger:
             )
             session.add(signal)
             session.commit()
-            return signal.id
+            return int(signal.id)
 
     def log_trade(
         self,
@@ -181,7 +187,7 @@ class TradeLogger:
             )
             session.add(trade)
             session.commit()
-            return trade.id
+            return int(trade.id)
 
     def update_trade(
         self,
@@ -203,8 +209,6 @@ class TradeLogger:
                 if pnl is not None:
                     trade.pnl = pnl
                 else:
-                    # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
-                    # For XAUUSD, contract size is often 100.
                     contract_size = 100
                     trade.pnl = (
                         (exit_price - trade.entry_price)
@@ -270,7 +274,6 @@ class TradeLogger:
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
         """
         with self.Session() as session:
-            # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
                     select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
@@ -286,12 +289,10 @@ class TradeLogger:
                     "max_drawdown": 0.0,
                 }
 
-            # Profit Factor
             gross_profit = np.sum(pnls[pnls > 0])
             gross_loss = abs(np.sum(pnls[pnls < 0]))
             profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
-            # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
             if len(pnls) > 1:
                 avg_ret = np.mean(pnls)
                 std_ret = np.std(pnls)
@@ -299,7 +300,6 @@ class TradeLogger:
             else:
                 sharpe = 0.0
 
-            # Max Drawdown
             equity_curve = np.cumsum(pnls)
             peak = np.maximum.accumulate(equity_curve)
             drawdown = peak - equity_curve
@@ -311,7 +311,6 @@ class TradeLogger:
                 "max_drawdown": float(max_dd),
             }
 
-            # Optionally log these metrics to DB
             metric_record = PerformanceMetric(
                 sharpe_ratio=metrics["sharpe_ratio"],
                 profit_factor=metrics["profit_factor"],
