@@ -4,13 +4,14 @@ Tests for Monitor class.
 import unittest
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
+from pydantic import SecretStr
 from src.core.monitor import Monitor
 from src.core.config import TradingConfig
 
 class TestMonitor(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock(spec=TradingConfig)
-        self.config.telegram_token = "fake_token"
+        self.config.telegram_token = SecretStr("fake_token")
         self.config.telegram_chat_id = "fake_chat_id"
         self.config.confidence_threshold = 0.6
 

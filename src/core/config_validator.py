@@ -47,7 +47,8 @@ class ConfigValidator:
         if not self.config.mt5_server or self.config.mt5_server.lower() in ["", "server_name", "test"]:
             self.errors.append(ValidationError("MT5_SERVER", "MT5 server name is missing or using placeholder.", True))
 
-        if not self.config.mt5_password or self.config.mt5_password.lower() in ["", "password", "test"]:
+        pwd = self.config.mt5_password.get_secret_value()
+        if not pwd or pwd.lower() in ["", "password", "test"]:
             self.errors.append(ValidationError("MT5_PASSWORD", "MT5 password is missing or using placeholder.", True))
 
     def _check_live_mode_confirmation(self) -> None:
@@ -65,7 +66,7 @@ class ConfigValidator:
         """Detect default or placeholder values in secrets."""
         # Check database URL
         default_db = "postgresql://trader:password@localhost:5432/mt5_trades"
-        if self.config.database_url == default_db:
+        if self.config.database_url.get_secret_value() == default_db:
              self.errors.append(ValidationError(
                  "DATABASE_URL",
                  "Database URL is using default placeholder credentials.",
@@ -73,7 +74,8 @@ class ConfigValidator:
              ))
 
         # Check Telegram
-        if self.config.telegram_token and "YOUR_TOKEN" in self.config.telegram_token.upper():
+        tg_token = self.config.telegram_token.get_secret_value()
+        if tg_token and "YOUR_TOKEN" in tg_token.upper():
             self.errors.append(ValidationError("TELEGRAM_TOKEN", "Telegram token contains placeholder text.", True))
 
     def _check_risk_parameters(self) -> None:
@@ -96,7 +98,7 @@ class ConfigValidator:
             ))
 
         # Backtest mode doesn't need Telegram
-        if self.config.mode == "backtest" and self.config.telegram_token:
+        if self.config.mode == "backtest" and self.config.telegram_token.get_secret_value():
              self.errors.append(ValidationError(
                  "TELEGRAM_TOKEN",
                  "Telegram notifications should be disabled in backtest mode.",
