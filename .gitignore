@@ -96,3 +96,4 @@ htmlcov/
 *.tfstate
 *.tfstate.backup
 .terraform/
+releases/
