@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
@@ -47,7 +47,8 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    algo_votes: Dict[str, float] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -58,6 +59,7 @@ class DailyStats:
     realised_pnl: float = 0.0
     trade_count: int = 0
     peak_equity: float = 0.0
+    consecutive_losses: int = 0
 
 
 class RiskManager:
@@ -85,7 +87,7 @@ class RiskManager:
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -93,10 +95,14 @@ class RiskManager:
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
+        elif not self._check_consecutive_losses():
+            rejection_reason = "Too many consecutive losses"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
+        elif not self._check_ensemble_consensus(signal):
+            rejection_reason = "Lack of ensemble consensus or strong dissent"
         elif not self._check_minimum_confidence(signal.confidence):
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
@@ -155,9 +161,14 @@ class RiskManager:
             self.daily.peak_equity = current_equity
 
     def record_pnl(self, pnl: float) -> None:
-        """Accumulate intraday realised PnL."""
+        """Accumulate intraday realised PnL and track consecutive losses."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+
+        if pnl < 0:
+            self.daily.consecutive_losses += 1
+        elif pnl > 0:
+            self.daily.consecutive_losses = 0
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -195,6 +206,15 @@ class RiskManager:
             return False
         return True
 
+    def _check_consecutive_losses(self) -> bool:
+        """Halt trading if 3 or more consecutive losses occur today."""
+        if self.daily.consecutive_losses >= 3:
+            logger.warning(
+                "HALT: %d consecutive losses today", self.daily.consecutive_losses
+            )
+            return False
+        return True
+
     def _check_max_positions(self) -> bool:
         if len(self.open_positions) >= self.cfg.max_positions:
             logger.debug("Max positions reached (%d)", self.cfg.max_positions)
@@ -206,6 +226,43 @@ class RiskManager:
         if symbol not in ALLOCATION_WEIGHTS:
             logger.warning("Symbol %s not in approved portfolio", symbol)
             return False
+        return True
+
+    def _check_ensemble_consensus(self, signal: TradeSignal) -> bool:
+        """
+        Hardened Ensemble Safeguard:
+        1. Requires majority (>50%) agreement on direction.
+        2. Strictly blocks if any model predicts the opposite direction (Strong Dissent).
+        """
+        if not signal.algo_votes:
+            return True  # Bypass if no per-algo data (e.g. single model mode)
+
+        votes = list(signal.algo_votes.values())
+        buy_votes = sum(1 for v in votes if v == 1)
+        sell_votes = sum(1 for v in votes if v == -1)
+        hold_votes = sum(1 for v in votes if v == 0)
+        total = len(votes)
+
+        # 1. Check for Strong Dissent
+        if signal.direction == 1 and sell_votes > 0:
+            logger.warning("Ensemble DISSENT: Buy signal but %d models say Sell", sell_votes)
+            return False
+        if signal.direction == -1 and buy_votes > 0:
+            logger.warning("Ensemble DISSENT: Sell signal but %d models say Buy", buy_votes)
+            return False
+
+        # 2. Check for Majority Consensus
+        # direction is already +1 or -1 here because HOLD (0) is filtered in main loop
+        signal_votes = buy_votes if signal.direction == 1 else sell_votes
+        if signal_votes / total <= 0.5:
+            logger.warning(
+                "Ensemble CONSENSUS FAIL: %d/%d votes for direction %d",
+                signal_votes,
+                total,
+                signal.direction,
+            )
+            return False
+
         return True
 
     def _check_minimum_confidence(
