@@ -124,3 +124,57 @@ def test_service_failure_impact(sample_data):
 
     assert metrics.execution_quality_score < 1.0
     assert metrics.latency_impact > 0.0
+
+
+def test_choppy_breakout_perturbation(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+    scenario = StressScenario(
+        name="Choppy",
+        description="Testing choppy breakouts",
+        choppy_breakout_prob=0.5
+    )
+    perturbed = lab._apply_perturbations(sample_data, scenario)
+    # Check if high/low or close were modified beyond original
+    assert not np.array_equal(sample_data["high"].values, perturbed["high"].values)
+
+
+def test_regime_flip_perturbation(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+    scenario = StressScenario(
+        name="Flip",
+        description="Testing regime flip",
+        regime_flip_prob=0.5
+    )
+    perturbed = lab._apply_perturbations(sample_data, scenario)
+    assert not np.array_equal(sample_data["close"].values, perturbed["close"].values)
+
+
+def test_generate_summary_critical(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # Mock results to force a critical summary
+    lab.results["Bad"] = StressTestMetrics(
+        total_return=-0.5,
+        max_drawdown=0.6,
+        sharpe_ratio=-1.0,
+        win_rate=0.2,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0
+    )
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0
+    )
+
+    report = lab.generate_report(baseline)
+    assert "CRITICAL" in report.degradation_summary

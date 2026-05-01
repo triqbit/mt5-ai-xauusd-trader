@@ -7,10 +7,9 @@ Adversarial resilience testing framework for strategy stress testing.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -114,7 +113,7 @@ class StressLab:
         # Calculate resilience score (0-100)
         # Average performance retention across all scenarios
         scores = []
-        for name, metrics in scenario_results.items():
+        for metrics in scenario_results.values():
             retention = metrics.total_return / (baseline_metrics.total_return + 1e-9)
             # Clip between 0 and 1.2
             scores.append(np.clip(retention, 0, 1.2))
@@ -125,13 +124,13 @@ class StressLab:
         fragility = []
         failure_points = []
 
-        for name, metrics in scenario_results.items():
+        for scenario_name, metrics in scenario_results.items():
             if metrics.max_drawdown > baseline_metrics.max_drawdown * 2:
-                fragility.append(f"Drawdown explosion in {name}")
+                fragility.append(f"Drawdown explosion in {scenario_name}")
             if metrics.total_return < 0 and baseline_metrics.total_return > 0:
-                failure_points.append(f"Strategy becomes unprofitable under {name}")
+                failure_points.append(f"Strategy becomes unprofitable under {scenario_name}")
             if metrics.sharpe_ratio < baseline_metrics.sharpe_ratio * 0.5:
-                fragility.append(f"Sharpe ratio halved under {name}")
+                fragility.append(f"Sharpe ratio halved under {scenario_name}")
 
         return ResilienceReport(
             strategy_name=self.strategy.name,
