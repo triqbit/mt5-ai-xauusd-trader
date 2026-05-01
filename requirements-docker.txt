@@ -11,7 +11,7 @@
 
 # -- Core numeric / data -------------------------------------------
 # numpy>=2 required by TA-Lib 0.6.x
-numpy>=2.0.0,<3
+numpy>=2.2.6,<3
 scipy==1.13.0
 scikit-learn==1.5.0
 pandas==2.2.2
