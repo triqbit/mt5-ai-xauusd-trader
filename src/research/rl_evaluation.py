@@ -7,12 +7,13 @@ Institutional-grade RL agent evaluation framework.
 from __future__ import annotations
 
 import logging
+from typing import Any, List, Optional, Protocol
+
 import numpy as np
 import pandas as pd
-from typing import Any, Dict, List, Optional, Protocol, Tuple
 from pydantic import BaseModel, Field
-from src.models.regime_detector import MarketRegime, RegimeDetector
 
+from src.models.regime_detector import MarketRegime, RegimeDetector
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +115,10 @@ class RLEvaluator:
 
             # Detect market regime
             current_regime = MarketRegime.UNKNOWN
-            if hasattr(self.env, 'data') and hasattr(self.env, 'current_step'):
+            if hasattr(self.env, "data") and hasattr(self.env, "current_step"):
                 # Handle both raw numpy and potentially wrapped envs
-                data = getattr(self.env, 'data')
-                current_step = getattr(self.env, 'current_step')
+                data = self.env.data
+                current_step = self.env.current_step
 
                 if current_step >= 100:
                     df_slice = pd.DataFrame(
