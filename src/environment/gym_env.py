@@ -10,6 +10,7 @@ from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 
 
 class TradingEnv(gym.Env):
@@ -21,21 +22,33 @@ class TradingEnv(gym.Env):
     """
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, data: np.ndarray, initial_balance: float = 10000.0,
-                 window_size: int = 60, commission: float = 0.0002):
+    def __init__(
+        self,
+        data: np.ndarray,
+        initial_balance: float = 10000.0,
+        window_size: int = 60,
+        commission: float = 0.0002,
+    ):
         super().__init__()
-        self.data = data
+        self.data = data.astype(np.float32)
         self.initial_balance = initial_balance
         self.window_size = window_size
         self.commission = commission
 
         n_features = data.shape[1]
 
+        # Pre-calculate rolling statistics for faster observation normalization
+        df = pd.DataFrame(self.data)
+        self.means = df.rolling(window=window_size).mean().values
+        self.stds = df.rolling(window=window_size).std(ddof=0).values
+
+        # Pre-allocate observation buffer
+        self.obs_shape = (window_size * n_features + 2,)
+        self.obs_buffer = np.empty(self.obs_shape, dtype=np.float32)
+
         # Observation: window of market data + portfolio state [balance, position]
         self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf,
-            shape=(window_size * n_features + 2,),
-            dtype=np.float32
+            low=-np.inf, high=np.inf, shape=self.obs_shape, dtype=np.float32
         )
 
         # Actions: 0=Hold, 1=Buy, 2=Sell
@@ -86,11 +99,24 @@ class TradingEnv(gym.Env):
         return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
-        window = self.data[self.current_step - self.window_size:self.current_step]
-        # Normalize window
-        obs = (window - window.mean(axis=0)) / (window.std(axis=0) + 1e-8)
-        portfolio_state = np.array([self.balance / self.initial_balance, self.position], dtype=np.float32)
-        return np.concatenate([obs.flatten(), portfolio_state]).astype(np.float32)
+        """
+        Optimized observation generation.
+        Uses pre-calculated rolling stats and a pre-allocated buffer.
+        """
+        window = self.data[self.current_step - self.window_size : self.current_step]
+        mean = self.means[self.current_step - 1]
+        std = self.stds[self.current_step - 1]
+
+        # Vectorized normalization
+        obs_normalized = (window - mean) / (std + 1e-8)
+
+        # Populate pre-allocated buffer
+        flat_size = self.window_size * self.data.shape[1]
+        self.obs_buffer[:flat_size] = obs_normalized.ravel()
+        self.obs_buffer[flat_size] = self.balance / self.initial_balance
+        self.obs_buffer[flat_size + 1] = self.position
+
+        return self.obs_buffer.copy()
 
     def render(self):
         print(f"Step: {self.current_step} | Balance: ${self.balance:.2f} | Position: {self.position}")
