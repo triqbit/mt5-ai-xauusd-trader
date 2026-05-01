@@ -25,10 +25,13 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    """Base class for SQLAlchemy models."""
+
+    pass
 logger = logging.getLogger(__name__)
 
 
@@ -138,7 +141,7 @@ class TradeLogger:
             )
             session.add(signal)
             session.commit()
-            return signal.id
+            return int(signal.id)
 
     def log_trade(
         self,
@@ -163,7 +166,7 @@ class TradeLogger:
             )
             session.add(trade)
             session.commit()
-            return trade.id
+            return int(trade.id)
 
     def update_trade(
         self,
@@ -180,21 +183,21 @@ class TradeLogger:
                 .first()
             )
             if trade:
-                trade.exit_price = exit_price
+                trade.exit_price = float(exit_price)
                 if pnl is not None:
-                    trade.pnl = pnl
+                    trade.pnl = float(pnl)
                 else:
                     # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
                     # For XAUUSD, contract size is often 100.
                     contract_size = 100
-                    trade.pnl = (
+                    trade.pnl = float(
                         (exit_price - trade.entry_price)
                         * trade.direction
                         * trade.lot_size
                         * contract_size
                     )
-                trade.drawdown_impact = drawdown_impact
-                trade.status = "CLOSED"
+                trade.drawdown_impact = float(drawdown_impact)
+                trade.status = str("CLOSED")
                 session.commit()
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)

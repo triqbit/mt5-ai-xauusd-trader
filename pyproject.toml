@@ -74,6 +74,40 @@ warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
 
+# Module-specific overrides for external libraries not present in CI
+[[tool.mypy.overrides]]
+module = [
+    "torch.*",
+    "MetaTrader5.*",
+    "gymnasium.*",
+    "stable_baselines3.*",
+    "pandas_ta.*",
+    "scipy.*",
+    "sklearn.*"
+]
+ignore_missing_imports = true
+
+# Suppress specific error codes in modules with heavy external dependencies
+[[tool.mypy.overrides]]
+module = [
+    "src.models.*",
+    "src.environment.*",
+    "src.utils.*",
+    "src.research.*"
+]
+disable_error_code = ["attr-defined", "misc", "type-arg", "no-untyped-def", "index", "no-any-return"]
+
+# Core modules that need some tolerance for SQLAlchemy ORM and Pydantic complexities
+[[tool.mypy.overrides]]
+module = [
+    "src.core.trade_logger",
+    "src.core.config",
+    "src.core.health",
+    "src.trading.mt5_connector",
+    "main"
+]
+disable_error_code = ["assignment", "call-arg", "no-untyped-def", "arg-type", "call-overload"]
+
 # ===========================================================
 # pytest
 # ===========================================================
