@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -88,36 +88,61 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        reasons = self._get_rejection_reason(signal)
+        passed = len(reasons) == 0
 
-        passed = rejection_reason == ""
         if not passed:
+            rejection_reason = reasons[0]
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
                 signal.direction,
                 rejection_reason,
             )
+
+            # Critical alerts and logging
+            if "Circuit breaker" in rejection_reason:
+                drawdown = (self.peak_equity - self.balance) / self.peak_equity
+                if self.monitor:
+                    self.monitor.alert_circuit_breaker(drawdown)
+                if self.trade_logger:
+                    self.trade_logger.log_risk_event(
+                        event_type="CIRCUIT_BREAKER",
+                        description=rejection_reason,
+                        symbol=signal.symbol,
+                        signal_id=signal_id,
+                    )
+
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
+                    description="; ".join(reasons),
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
         return passed
+
+    def _get_rejection_reason(self, signal: TradeSignal) -> List[str]:
+        """
+        Evaluate all risk filters and return a list of rejection reasons.
+        Side-effect free (no logging or state changes).
+        """
+        reasons = []
+
+        checks = [
+            self._check_circuit_breaker(),
+            self._check_daily_loss(),
+            self._check_max_positions(),
+            self._check_symbol_allocation(signal.symbol),
+            self._check_minimum_confidence(signal.confidence),
+            self._check_risk_reward(signal),
+        ]
+
+        for reason in checks:
+            if reason:
+                reasons.append(reason)
+
+        return reasons
 
     def size_position(
         self,
@@ -168,66 +193,50 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
-    # -- Private filter layers ----------------------------------------------
-    def _check_circuit_breaker(self) -> bool:
+    # -- Private filter layers (Side-effect free) --------------------------
+    def _check_circuit_breaker(self) -> Optional[str]:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
-            logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
-                drawdown * 100,
-            )
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
-                )
-            if self.monitor:
-                self.monitor.alert_circuit_breaker(drawdown)
-            return False
-        return True
+            return f"Circuit breaker active (drawdown {drawdown:.1%})"
+        return None
 
-    def _check_daily_loss(self) -> bool:
-        if self.daily.peak_equity == 0:
-            return True
+    def _check_daily_loss(self) -> Optional[str]:
+        if self.daily.peak_equity <= 0:
+            return None
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
         if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
-            return False
-        return True
+            return f"Daily loss limit reached ({loss_pct:.1%})"
+        return None
 
-    def _check_max_positions(self) -> bool:
+    def _check_max_positions(self) -> Optional[str]:
         if len(self.open_positions) >= self.cfg.max_positions:
-            logger.debug("Max positions reached (%d)", self.cfg.max_positions)
-            return False
-        return True
+            return f"Max positions reached ({self.cfg.max_positions})"
+        return None
 
-    def _check_symbol_allocation(self, symbol: str) -> bool:
+    def _check_symbol_allocation(self, symbol: str) -> Optional[str]:
         """Block trading on symbols not in the All-Weather portfolio."""
         if symbol not in ALLOCATION_WEIGHTS:
-            logger.warning("Symbol %s not in approved portfolio", symbol)
-            return False
-        return True
+            return f"Symbol {symbol} not in approved portfolio"
+        return None
 
     def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+        self, confidence: float
+    ) -> Optional[str]:
+        threshold = getattr(self.cfg, "confidence_threshold", 0.55)
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
-            return False
-        return True
+            return f"Confidence {confidence:.2f} below threshold {threshold:.2f}"
+        return None
 
-    def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+    def _check_risk_reward(self, signal: TradeSignal) -> Optional[str]:
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
+        min_rr = 1.5
         if risk == 0:
-            return False
+            return "Invalid risk (SL=Entry)"
         rr = reward / risk
         if rr < min_rr:
-            logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
-            return False
-        return True
+            return f"Risk-Reward ratio {rr:.2f} below minimum {min_rr:.2f}"
+        return None
 
 
 __all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]

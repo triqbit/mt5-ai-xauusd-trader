@@ -5,7 +5,7 @@ Validates system behavior under specific market conditions using synthetic data.
 """
 
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -77,18 +77,20 @@ def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
 
 def test_ensemble_model_with_gapping_data(mock_cfg):
     """Test EnsembleModel behavior when encountering gapping market data."""
-    # Ensure src.models is loaded so patch can traverse it
-    import src.models  # noqa: F401
+    # We need to mock torch and SB3 before importing EnsembleModel
+    mock_torch = MagicMock()
+    mock_sb3 = MagicMock()
 
-    # We need to mock torch and SB3 if they are not installed
-    with (
-        patch("src.models.ensemble.torch"),
-        patch("src.models.ensemble.LSTMAttentionModel"),
-        patch("stable_baselines3.PPO"),
-    ):
+    with patch.dict("sys.modules", {
+        "torch": mock_torch,
+        "torch.nn": MagicMock(),
+        "stable_baselines3": mock_sb3
+    }):
         from src.models.ensemble import EnsembleModel
 
+        # Manually set weights to avoid division by zero in case of missing Dreamer
         model = EnsembleModel(device="cpu")
+        model.weights = {"ppo": 0.5, "lstm": 0.5}
 
         gen = ScenarioGenerator(seed=123)
         df = gen.generate(n_steps=10, regime="gapping")
