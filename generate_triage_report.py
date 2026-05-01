@@ -59,6 +59,15 @@ def get_ci_status(sha):
         return status_data['state']
     return 'unknown'
 
+def get_repo_info():
+    return api_call(f"https://api.github.com/repos/{REPO}")
+
+def get_last_commit_main():
+    data = api_call(f"https://api.github.com/repos/{REPO}/commits?sha=main&per_page=1")
+    if data and isinstance(data, list) and len(data) > 0:
+        return data[0]
+    return None
+
 def classify_risk(files):
     high_risk_patterns = [
         "src/trading/",
@@ -73,7 +82,8 @@ def classify_risk(files):
         "src/research/",
         "src/analytics/",
         "src/core/",
-        "src/environment/"
+        "src/environment/",
+        "src/risk/"
     ]
 
     risk = "Safe Surface"
@@ -89,31 +99,72 @@ def classify_risk(files):
         for p in medium_risk_patterns:
             if p in f:
                 risk = "Medium Risk"
-                reason = f"Touches core/research/analytics: {f}"
+                reason = f"Touches core/research/analytics/risk: {f}"
 
     return risk, reason
 
 def generate_report():
     print("Fetching PRs...")
     prs = get_all_prs()
-    if not prs:
-        print("No open PRs found or rate limited.")
-        if os.getenv("GITHUB_ACTIONS") and not GITHUB_TOKEN:
-            sys.exit(1)
-        if not prs:
-            prs = []
+    repo_info = get_repo_info()
+    last_commit = get_last_commit_main()
 
-    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    if not prs and prs is not None:
+        print("No open PRs found.")
+    elif prs is None:
+        print("Rate limited or error fetching PRs.")
+        prs = []
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    status_tag = "🟢 HEALTHY"
+    turbulence_reasons = []
+
+    if len(prs) > 20:
+        status_tag = "🟡 MODERATE TURBULENCE"
+        turbulence_reasons.append(f"High number of open PRs ({len(prs)})")
+    if len(prs) > 50:
+        status_tag = "🔴 HIGH TURBULENCE"
+
+    if last_commit:
+        last_commit_date = datetime.datetime.strptime(last_commit['commit']['committer']['date'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+        days_since_last_merge = (now - last_commit_date).days
+        if days_since_last_merge > 2:
+            if status_tag == "🟢 HEALTHY":
+                status_tag = "🟡 MODERATE TURBULENCE"
+            turbulence_reasons.append(f"Integration Stagnation: {days_since_last_merge} days since last commit to main")
 
     report = "# Daily PR Triage Dashboard\n\n"
-    report += f"Generated on: {now}\n\n"
-    report += "## Summary Table\n\n"
+    report += f"**Date:** {now_str}\n"
+    report += f"**Status:** {status_tag}\n\n"
+
+    if turbulence_reasons:
+        report += "### Turbulence Factors:\n"
+        for res in turbulence_reasons:
+            report += f"- {res}\n"
+        report += "\n"
+
+    report += "---\n\n"
+    report += "## 🔝 Top 3 Items That Matter Right Now\n\n"
+    # We will populate this after classifying PRs
+
+    report += "## 📋 Summary Table\n\n"
     report += "| PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Reason |\n"
     report += "|------|-------|--------|--------|--------|-----------|------------|--------|\n"
 
     classified_prs = []
 
+    # Limit processing if no token to avoid rate limits
+    max_prs_to_process = len(prs)
+    if not GITHUB_TOKEN and max_prs_to_process > 10:
+        print(f"Warning: No GITHUB_TOKEN, limiting detailed processing to first 10 PRs to avoid rate limit.")
+        max_prs_to_process = 10
+
     for i, pr in enumerate(prs):
+        if i >= max_prs_to_process:
+            report += f"| {pr['number']} | {pr['title']} | {pr['user']['login']} | ... | ... | ... | ... | (Skipped due to rate limit) |\n"
+            continue
         num = pr['number']
         title = pr['title']
         user = pr['user']['login']
@@ -138,13 +189,40 @@ def generate_report():
             'reason': reason
         })
 
-    report += "\n## Good Candidates for Review Today\n\n"
+    # Determine Top 3
+    top_3_items = []
+    if turbulence_reasons:
+        top_3_items.append(f"**Address Turbulence:** {turbulence_reasons[0]}")
+
     safe_surface = [pr for pr in classified_prs if pr['risk'] == "Safe Surface"]
     medium_risk = [pr for pr in classified_prs if pr['risk'] == "Medium Risk"]
+    high_risk = [pr for pr in classified_prs if pr['risk'] == "High Risk"]
 
     safe_surface.sort(key=lambda x: 0 if x['ci_status'] == 'success' else 1)
     medium_risk.sort(key=lambda x: 0 if x['ci_status'] == 'success' else 1)
 
+    if safe_surface:
+        top_3_items.append(f"**Quick Win:** Review Safe PR #{safe_surface[0]['number']} ({safe_surface[0]['title']})")
+    if medium_risk:
+        top_3_items.append(f"**Core Progress:** Review Medium Risk PR #{medium_risk[0]['number']} ({medium_risk[0]['title']})")
+    elif high_risk:
+        top_3_items.append(f"**Critical Path:** High Risk PR #{high_risk[0]['number']} needs expert review.")
+
+    top_3_section = ""
+    for idx, item in enumerate(top_3_items[:3]):
+        top_3_section += f"{idx+1}. {item}\n"
+
+    if not top_3_section:
+        top_3_section = "No urgent items identified today.\n"
+
+    report = report.replace("## 🔝 Top 3 Items That Matter Right Now\n\n", "## 🔝 Top 3 Items That Matter Right Now\n\n" + top_3_section + "\n")
+
+    report += "\n## 🛡️ Risk Classification Summary\n\n"
+    report += f"- **High Risk:** {len(high_risk)} PRs\n"
+    report += f"- **Medium Risk:** {len(medium_risk)} PRs\n"
+    report += f"- **Safe Surface:** {len(safe_surface)} PRs\n"
+
+    report += "\n## ✨ Good Candidates for Review Today\n\n"
     candidates = (safe_surface + medium_risk)[:4]
 
     if not candidates:
