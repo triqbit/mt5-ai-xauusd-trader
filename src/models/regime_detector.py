@@ -9,25 +9,14 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from enum import Enum
 
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from src.core.constants import MarketRegime
+
 logger = logging.getLogger(__name__)
-
-
-class MarketRegime(str, Enum):
-    """XAUUSD Market Regimes."""
-
-    TRENDING = "trending"
-    RANGING = "ranging"
-    VOLATILE_BREAKOUT = "volatile_breakout"
-    LOW_VOLATILITY_DRIFT = "low_volatility_drift"
-    NEWS_SHOCK = "news_shock"
-    MEAN_REVERSION = "mean_reversion"
-    UNKNOWN = "unknown"
 
 
 class RegimeInfo(BaseModel):

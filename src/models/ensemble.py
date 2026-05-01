@@ -19,6 +19,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from src.core.constants import ModelAction, SignalDirection
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,6 +118,7 @@ class EnsembleModel:
         self,
         obs: np.ndarray,
         seq: Optional[torch.Tensor] = None,
+        regime: Optional[str] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
@@ -141,13 +144,30 @@ class EnsembleModel:
             logger.warning("No models loaded - returning HOLD")
             return 0, 0.0, {}
 
+        # Adjust weights based on regime if provided
+        active_weights = self.weights.copy()
+        if regime == "news_shock":
+            # De-weight LSTM during news shocks as it can be overfit to historical patterns
+            if "lstm" in active_weights:
+                active_weights["lstm"] *= 0.5
+        elif regime == "trending":
+            # Favor PPO in trending markets
+            if "ppo" in active_weights:
+                active_weights["ppo"] *= 1.2
+
         # Weighted average across available models
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy,1=sell,2=hold
+        total_weight = sum(active_weights[k] for k in votes)
+        blended = sum(active_weights[k] / total_weight * votes[k] for k in votes)
+        action_idx = int(np.argmax(blended))  # ModelAction: 0=hold, 1=buy, 2=sell
         confidence = float(blended[action_idx])
-        direction_map = {0: 1, 1: -1, 2: 0}
-        direction = direction_map[action_idx]
+
+        direction_map = {
+            ModelAction.BUY: SignalDirection.BUY,
+            ModelAction.SELL: SignalDirection.SELL,
+            ModelAction.HOLD: SignalDirection.HOLD,
+        }
+        direction = direction_map[ModelAction(action_idx)]
+
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",

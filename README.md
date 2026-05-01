@@ -21,11 +21,13 @@ Built on an architectural foundation that integrates 25+ top-tier quantitative f
 
 ### 🧠 Advanced Intelligence
 - **DRL Architectures:** PPO (Proximal Policy Optimization), Dreamer V3, and LSTM-based actors.
-- **Ensemble Engine:** Real-time signal consensus from multiple neural networks to minimize variance.
+- **Regime-Aware Ensemble:** Dynamic weighting engine that adapts to market states (Trending, Ranging, News Shock) in real-time.
+- **Market Regime Detection:** Statistical detection of XAUUSD market regimes using efficiency ratios and volatility indices.
 - **Explainability System:** Structured attribution breakdowns for every trade signal, providing institutional-grade transparency into model and risk decisions.
 - **Dynamic Feature Engineering:** 140+ market indicators including multi-timeframe TA-Lib features and macro-sentiment integration.
 
 ### 🛡️ Institutional Risk Management
+- **Adaptive Capital Allocation:** Concentrated risk management using a dedicated `CapitalAllocator` with symbol and model family caps.
 - **Ray Dalio All-Weather Allocation:** Scenario-based risk parity across multi-currency pairs.
 - **6-Layer Execution Filter:** Cascade validation using ATR, Trend Angle, Momentum, and EMA sequencing.
 - **Circuit Breakers:** Automated drawdown protection, per-session loss limits, and daily profit targets.

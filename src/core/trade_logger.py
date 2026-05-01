@@ -28,6 +28,8 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
+from src.core.constants import SignalDirection, SymbolContractSize
+
 Base = declarative_base()
 logger = logging.getLogger(__name__)
 
@@ -187,8 +189,11 @@ class TradeLogger:
                     trade.pnl = pnl
                 else:
                     # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
-                    # For XAUUSD, contract size is often 100.
-                    contract_size = 100
+                    try:
+                        contract_size = SymbolContractSize[trade.symbol].value
+                    except KeyError:
+                        contract_size = 100  # Fallback
+
                     trade.pnl = (
                         (exit_price - trade.entry_price)
                         * trade.direction

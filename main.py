@@ -24,10 +24,13 @@ import structlog
 
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
+from src.core.constants import SignalDirection, SymbolContractSize
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.models.regime_detector import RegimeDetector
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -60,6 +63,8 @@ def run_live(
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
+    regime_detector: RegimeDetector,
+    capital_allocator: CapitalAllocator,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -73,13 +78,17 @@ def run_live(
                 df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
                 tick = connector.get_tick(cfg.symbol)
 
+            # 1.1 Detect market regime
+            regime_info = regime_detector.detect(df)
+            log.info("Regime detected | label=%s confidence=%.2f", regime_info.label, regime_info.confidence)
+
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             volatility = float(df["close"].rolling(20).std().iloc[-1])
 
             # 3. Get ensemble prediction
             with profile("inference"):
-                direction, confidence, _per_algo = model.predict(obs)
+                direction, confidence, _per_algo = model.predict(obs, regime=regime_info.label)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -95,21 +104,32 @@ def run_live(
                     }
                 )
 
-            if direction == 0:
+            if direction == SignalDirection.HOLD:
                 log.debug("HOLD signal - skipping")
                 time.sleep(poll_interval)
                 continue
-            # 4. Size position
-            price = tick["ask"] if direction == 1 else tick["bid"]
+            # 4. Size position using institutional CapitalAllocator
+            price = tick["ask"] if direction == SignalDirection.BUY else tick["bid"]
             atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
             stop_loss = price - direction * 2 * atr
             take_profit = price + direction * 4 * atr
-            lot_size = risk.size_position(
-                cfg.symbol,
-                win_rate=0.58,
-                avg_win=4 * atr,
-                avg_loss=2 * atr,
-            )
+
+            strategy_id = f"{cfg.algorithm}_{cfg.symbol}"
+            allocation = capital_allocator.request_allocation(strategy_id, risk_pct=cfg.risk_per_trade)
+
+            if not allocation.is_allowed:
+                log.warning("Allocation REJECTED | strategy=%s reason=%s", strategy_id, allocation.rejection_reason)
+                time.sleep(poll_interval)
+                continue
+
+            # Convert allocated capital to lot size
+            try:
+                contract_size = SymbolContractSize[cfg.symbol].value
+            except KeyError:
+                contract_size = 100
+
+            lot_size = allocation.allocated_amount / (2 * atr * contract_size)
+            lot_size = max(0.01, round(lot_size, 2))
             signal = TradeSignal(
                 symbol=cfg.symbol,
                 direction=direction,
@@ -130,6 +150,7 @@ def run_live(
                     if ticket:
                         risk.open_positions[cfg.symbol] = ticket
                         log.info("Order placed | ticket=%d", ticket)
+                        capital_allocator.update_allocation(strategy_id, lot_size * price)
                         if trade_logger:
                             trade_logger.log_trade(
                                 ticket=ticket,
@@ -153,7 +174,7 @@ def run_live(
                         trade_info = trade_logger.get_trade_by_ticket(ticket)
                         if trade_info:
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
-                            exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                            exit_price = tick["bid"] if trade_info.direction == SignalDirection.BUY else tick["ask"]
                             # P&L will be calculated automatically by update_trade
                             trade_logger.update_trade(
                                 ticket=ticket,
@@ -163,6 +184,7 @@ def run_live(
 
             for sym in closed_tickets:
                 risk.open_positions.pop(sym)
+                capital_allocator.update_allocation(strategy_id, 0.0)
 
             # 7. Update equity
             balance = connector.get_account_balance()
@@ -184,8 +206,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
     p.add_argument(
         "--algo",
+        "--algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
         default="ensemble",
+        dest="algorithm",
     )
     p.add_argument("--symbol", default="XAUUSD")
     p.add_argument("--timeframe", default="M5")
@@ -200,7 +224,7 @@ def main() -> int:
     log = logging.getLogger("main")
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
-    os.environ.setdefault("ALGORITHM", args.algo)
+    os.environ.setdefault("ALGORITHM", args.algorithm)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
@@ -238,6 +262,18 @@ def main() -> int:
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
+    regime_detector = RegimeDetector()
+    capital_allocator = CapitalAllocator(total_budget=balance)
+    # Ensure capital_cap is at least a small positive value if balance is 0 (e.g. in tests)
+    capital_cap = max(1000.0, balance * 0.2)
+    capital_allocator.add_strategy(
+        StrategyConfig(
+            strategy_id=f"{cfg.algorithm}_{cfg.symbol}",
+            symbol=cfg.symbol,
+            model_family=cfg.algorithm,
+            capital_cap=capital_cap,
+        )
+    )
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
@@ -261,10 +297,12 @@ def main() -> int:
     try:
         if cfg.mode in ("demo", "live"):
             run_live(
-                cfg,
-                connector,
-                risk,
-                model,
+            cfg=cfg,
+            connector=connector,
+            risk=risk,
+            model=model,
+            regime_detector=regime_detector,
+            capital_allocator=capital_allocator,
                 trade_logger=trade_logger,
                 monitor=monitor,
             )
