@@ -235,7 +235,9 @@ class TradeLogger:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
-                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    select(Trade.pnl).where(
+                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
+                    )
                 )
                 .scalars()
                 .all()

@@ -9,7 +9,6 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging

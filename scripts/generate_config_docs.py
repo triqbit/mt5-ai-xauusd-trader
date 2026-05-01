@@ -1,7 +1,6 @@
 import re
 from pathlib import Path
 
-
 def generate_config_docs(input_file: str, output_file: str, version: str):
     path = Path(input_file)
     if not path.exists():
@@ -12,9 +11,7 @@ def generate_config_docs(input_file: str, output_file: str, version: str):
         content = f.read()
 
     # Find TradingConfig class
-    class_match = re.search(
-        r"class TradingConfig\(BaseSettings\):(.*?)(?=\nclass|\Z)", content, re.DOTALL
-    )
+    class_match = re.search(r"class TradingConfig\(BaseSettings\):(.*?)(?=\nclass|\Z)", content, re.DOTALL)
     if not class_match:
         print("Error: TradingConfig class not found")
         return
@@ -27,9 +24,7 @@ def generate_config_docs(input_file: str, output_file: str, version: str):
 
     with open(output_file, "w") as f:
         f.write(f"# Configuration Reference (v{version})\n\n")
-        f.write(
-            "This document lists the available configuration fields, their types, and descriptions.\n\n"
-        )
+        f.write("This document lists the available configuration fields, their types, and descriptions.\n\n")
         f.write("| Field | Type | Description | Default |\n")
         f.write("| :--- | :--- | :--- | :--- |\n")
 
@@ -49,10 +44,8 @@ def generate_config_docs(input_file: str, output_file: str, version: str):
 
             f.write(f"| `{name}` | `{type_hint.strip()}` | {description} | `{default}` |\n")
 
-
 if __name__ == "__main__":
     import sys
-
     if len(sys.argv) < 4:
         print("Usage: python generate_config_docs.py <input> <output> <version>")
     else:
