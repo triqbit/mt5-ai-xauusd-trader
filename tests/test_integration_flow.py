@@ -156,7 +156,20 @@ def test_backtest_initialization():
     with patch("sys.argv", ["main.py", "--mode", "backtest"]), \
          patch("src.trading.mt5_connector.MT5Connector.connect", return_value=True), \
          patch("src.trading.mt5_connector.MT5Connector.disconnect"), \
-         patch.dict(os.environ, {"MT5_PASSWORD": "test", "MT5_SERVER": "test"}):
+         patch("src.core.health.HealthChecker.get_full_report") as mock_health, \
+         patch.dict(os.environ, {
+             "MT5_LOGIN": "123456",
+             "MT5_PASSWORD": "ValidPassword",
+             "MT5_SERVER": "ValidServer",
+             "DATABASE_URL": "sqlite:///test_trades.db"
+         }):
+
+        from src.core.health import HealthReport, HealthStatus
+        mock_health.return_value = HealthReport(
+            status=HealthStatus.HEALTHY,
+            timestamp=datetime.now(timezone.utc),
+            components={}
+        )
 
         # Should log info but not crash
         assert main() == 0
