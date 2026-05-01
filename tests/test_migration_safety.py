@@ -4,8 +4,8 @@ tests/test_migration_safety.py
 Verifies that the migration safety script correctly detects valid migrations.
 """
 
-import pytest
 import os
+
 from scripts.verify_migrations import verify_migrations
 
 

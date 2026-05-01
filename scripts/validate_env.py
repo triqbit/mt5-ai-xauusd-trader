@@ -1,5 +1,5 @@
-import sys
 import re
+import sys
 from pathlib import Path
 
 
@@ -26,10 +26,9 @@ def get_vars_from_example():
     with open(example_path, "r") as f:
         for line in f:
             line = line.strip()
-            if line and not line.startswith("#"):
-                if "=" in line:
-                    var = line.split("=")[0].strip()
-                    vars.add(var.lower())
+            if line and not line.startswith("#") and "=" in line:
+                var = line.split("=")[0].strip()
+                vars.add(var.lower())
     return vars
 
 
@@ -45,7 +44,7 @@ def validate():
             missing.append(req)
 
     if missing:
-        print(f"Error: The following required configuration fields are missing from .env.example:")
+        print("Error: The following required configuration fields are missing from .env.example:")
         for m in missing:
             print(f"  - {m}")
         return False

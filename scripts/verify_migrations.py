@@ -6,8 +6,9 @@ an upgrade-downgrade-upgrade cycle on a temporary database.
 
 import os
 import sys
-from alembic.config import Config
+
 from alembic import command
+from alembic.config import Config
 
 
 def verify_migrations():

@@ -3,10 +3,11 @@ Tests for Monitor class.
 """
 
 import unittest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime, timezone
-from src.core.monitor import Monitor
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+
 from src.core.config import TradingConfig
+from src.core.monitor import Monitor
 
 
 class TestMonitor(unittest.TestCase):

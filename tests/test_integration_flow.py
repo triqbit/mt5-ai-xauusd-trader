@@ -5,19 +5,20 @@ Verifies end-to-end integration across all system components.
 """
 
 import time
-import pytest
+
 import numpy as np
+import pytest
 
 try:
     import torch
 except ImportError:
     torch = None
 import os
-from unittest.mock import MagicMock, patch, Mock
-from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
 from pydantic import ValidationError
 
-from src.core.config import TradingConfig, get_config
+from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector
@@ -97,7 +98,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
     ):
         # 2. Inference
         obs = mock_ohlcv[-1]
-        direction, confidence, _ = model.predict(obs)
+        _direction, _confidence, _ = model.predict(obs)
 
         # 3. Log Signal
         signal_id = trade_logger.log_signal(
@@ -129,7 +130,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
         ticket = mock_connector.place_order(signal)
         assert ticket == 123456
 
-        trade_id = trade_logger.log_trade(
+        trade_logger.log_trade(
             ticket=ticket,
             symbol="XAUUSD",
             direction=1,
@@ -235,7 +236,7 @@ def test_intelligence_ensemble_adaptation():
     model._ppo_model = MagicMock()
     model._ppo_model.predict.return_value = (1, None)  # Buy
 
-    direction, confidence, per_algo = model.predict(obs)
+    _direction, _confidence, per_algo = model.predict(obs)
     assert "ppo" in per_algo
 
 
@@ -243,9 +244,7 @@ def test_intelligence_ensemble_adaptation():
 
 
 def test_performance_latency(mock_cfg, trade_logger, mock_monitor):
-    risk = RiskManager(
-        mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor
-    )
+    RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
     model = EnsembleModel(device="cpu")
 
     obs = np.random.rand(140)

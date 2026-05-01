@@ -1,7 +1,7 @@
 """Tests for src.core.config module."""
 
-import os
 import pytest
+
 from src.core.config import TradingConfig
 
 
