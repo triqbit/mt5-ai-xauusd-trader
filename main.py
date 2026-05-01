@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.config_validator import ConfigValidator
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -192,8 +193,24 @@ def main() -> int:
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
     cfg = get_config()
+
+    # Validate configuration
+    validator = ConfigValidator(cfg)
+    result = validator.validate()
+
+    if not result.success:
+        log.critical("Startup validation FAILED")
+        for err in result.errors:
+            level = "CRITICAL" if err.critical else "WARNING"
+            log.error(f"  [{level}] {err.field}: {err.message}")
+        return 1
+
+    if result.errors:
+        for err in result.errors:
+            log.warning(f"  [WARNING] {err.field}: {err.message}")
+
     log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
+        "Configuration loaded and validated | mode=%s algo=%s symbol=%s",
         cfg.mode,
         cfg.algorithm,
         cfg.symbol,
