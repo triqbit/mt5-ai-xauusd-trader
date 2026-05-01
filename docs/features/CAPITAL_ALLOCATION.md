@@ -1,0 +1,63 @@
+# Capital Allocation System
+
+The `CapitalAllocator` is an institutional-grade capital management system designed to handle allocation across multiple trading strategies or model families. It ensures that the portfolio maintains a healthy risk profile by tracking portfolio heat and enforcing concentration limits.
+
+## Key Features
+
+- **Portfolio Heat Tracking**: Monitors the total committed capital ratio to prevent overall portfolio overexposure.
+- **Per-Strategy Capital Caps**: Limits the maximum capital any single strategy can use, regardless of its performance or requested risk.
+- **Adaptive Budget Allocation**: Dynamically adjusts requested risk based on a strategy's `performance_multiplier`, rewarding profitable strategies and scaling down underperforming ones.
+- **Diversification-Aware Routing**: Groups strategies by symbol and model family to enforce concentration limits, ensuring the portfolio remains diversified.
+- **Safety Limits**: Implements configurable limits for total portfolio heat, symbol-level risk, and model-family-level risk.
+
+## Configuration
+
+The `CapitalAllocator` is initialized with the following parameters:
+
+- `total_budget`: The total capital available for allocation.
+- `max_symbol_risk`: Maximum percentage of total budget that can be allocated to a single symbol (default: 40%).
+- `max_family_risk`: Maximum percentage of total budget that can be allocated to a single model family (default: 40%).
+- `max_total_heat`: Maximum total percentage of budget that can be committed at once (default: 70%).
+
+### Strategy Configuration
+
+Each strategy is registered using a `StrategyConfig` model:
+
+- `strategy_id`: Unique identifier for the strategy.
+- `symbol`: The trading symbol (e.g., XAUUSD).
+- `model_family`: The family of the model (e.g., RL, LSTM, Ensemble).
+- `capital_cap`: Maximum absolute capital the strategy is allowed to use.
+- `performance_multiplier`: A multiplier (0.0 to 2.0) applied to the strategy's requested risk.
+
+## Usage Example
+
+```python
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+
+# Initialize allocator
+allocator = CapitalAllocator(total_budget=100000.0)
+
+# Register a strategy
+gold_ppo_config = StrategyConfig(
+    strategy_id="gold_ppo_v1",
+    symbol="XAUUSD",
+    model_family="RL",
+    capital_cap=20000.0,
+    performance_multiplier=1.2
+)
+allocator.add_strategy(gold_ppo_config)
+
+# Request allocation (1% risk)
+result = allocator.request_allocation("gold_ppo_v1", 0.01)
+
+if result.is_allowed:
+    print(f"Allocated {result.allocated_amount} ({result.risk_pct * 100}%)")
+    # Update current allocation after placing trade
+    allocator.update_allocation("gold_ppo_v1", result.allocated_amount)
+else:
+    print(f"Rejected: {result.rejection_reason}")
+```
+
+## Integration with Risk Engine
+
+The `CapitalAllocator` serves as a high-level capital router that works alongside the `RiskManager`. While the `RiskManager` handles per-trade validation (e.g., SL/TP, daily loss limits), the `CapitalAllocator` manages the broader distribution of capital across the entire trading system.
