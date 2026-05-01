@@ -17,6 +17,7 @@ class TradingEnv(gym.Env):
     Gymnasium-compatible environment for XAUUSD trading.
     Skeleton implementation for reinforcement learning agents.
     """
+
     metadata = {"render_modes": ["human"]}
 
     def __init__(
@@ -24,7 +25,7 @@ class TradingEnv(gym.Env):
         data: Optional[np.ndarray] = None,
         initial_balance: float = 10000.0,
         window_size: int = 60,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         super().__init__()
         self.data = data
@@ -70,7 +71,9 @@ class TradingEnv(gym.Env):
     def _get_observation(self) -> np.ndarray:
         """Construct the observation for the current step."""
         if self.data is not None:
-            return self.data[self.current_step - self.window_size : self.current_step].astype(np.float32)
+            return self.data[self.current_step - self.window_size : self.current_step].astype(
+                np.float32
+            )
         return np.zeros(self.observation_space.shape, dtype=np.float32)
 
     def render(self) -> None:

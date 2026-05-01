@@ -139,6 +139,7 @@ class PPOAgent(BaseModel):
             return {"mean_reward": 0.0, "std_reward": 0.0}
 
         from stable_baselines3.common.evaluation import evaluate_policy
+
         mean_reward, std_reward = evaluate_policy(
             self._ppo_model, self.env, n_eval_episodes=n_eval_episodes
         )

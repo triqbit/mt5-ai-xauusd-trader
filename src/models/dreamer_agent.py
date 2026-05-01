@@ -54,9 +54,7 @@ class DreamerAgent(BaseModel):
 
         # Placeholder logic: return HOLD with 0 confidence
         return Signal(
-            direction=0,
-            confidence=0.0,
-            metadata={"status": "placeholder", "model": "DreamerV3"}
+            direction=0, confidence=0.0, metadata={"status": "placeholder", "model": "DreamerV3"}
         )
 
     def update_context(self, observation: np.ndarray, action: int, reward: float) -> None:

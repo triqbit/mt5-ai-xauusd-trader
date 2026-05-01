@@ -23,6 +23,7 @@ class Signal:
         confidence: float (0.0 to 1.0)
         metadata: dict containing model-specific details (e.g., logits, attention weights)
     """
+
     direction: int
     confidence: float
     metadata: Dict[str, Any] = field(default_factory=dict)

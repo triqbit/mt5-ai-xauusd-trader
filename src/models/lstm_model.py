@@ -103,7 +103,5 @@ class LSTMModel(BaseModel):
         direction = direction_map.get(action_idx, 0)
 
         return Signal(
-            direction=direction,
-            confidence=confidence,
-            metadata={"probs": probs.tolist()}
+            direction=direction, confidence=confidence, metadata={"probs": probs.tolist()}
         )
