@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -231,9 +232,7 @@ def main() -> int:
         return 1
     balance = connector.get_account_balance()
     db_url = cfg.database_url.get_secret_value()
-    trade_logger = TradeLogger(
-        db_url=db_url if "sqlite" in db_url else "sqlite:///trades.db"
-    )
+    trade_logger = TradeLogger(db_url=db_url if "sqlite" in db_url else "sqlite:///trades.db")
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")

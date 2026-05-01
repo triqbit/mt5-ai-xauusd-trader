@@ -44,7 +44,7 @@ jobs:
           # Allowed: MIT, Apache, BSD, PSF, ISC, MPL, LGPL, CC0, Unlicense
           # Disallowed: GPL, AGPL, SSPL
           # Note: We use --fail-on with specific strings to catch disallowed licenses.
-          pip-licenses --fail-on GPL --fail-on AGPL --fail-on SSPL > disallowed_found.txt 2>&1 || DISALLOWED=true
+          pip-licenses --fail-on "GPL;AGPL;SSPL" > disallowed_found.txt 2>&1 || DISALLOWED=true
 
           if [ "$DISALLOWED" = "true" ]; then
             echo "::error::Disallowed licenses detected!"
@@ -54,7 +54,7 @@ jobs:
 
       - name: Generate Full Report Artifact
         run: |
-          pip-licenses --format=markdown --with-authors --with-urls --with-license-files > LICENSE_REPORT.md
+          pip-licenses --format=markdown --with-authors --with-urls --with-license-file > LICENSE_REPORT.md
 
       - name: Upload License Report
         uses: actions/upload-artifact@v4
