@@ -11,7 +11,7 @@ The institutional research reporting system automatically generates high-quality
     - **Trade Pattern Findings**: Behavioral insights from journal mining (e.g., overtrading, profitable concentrations).
     - **Model Drift Observations**: Tracking of feature importance shifts and metric decay.
     - **Capital Allocation Insights**: Portfolio heat tracking and allocation multipliers.
-    - **Benchmark Comparisons**: Statistical performance evaluation against baseline strategies.
+    - **Benchmark Comparisons**: Statistical performance evaluation against baseline strategies (EMA Crossover, Momentum, Volatility Breakout, Mean Reversion).
 
 - **Flexible Output Formats**:
     - **Markdown**: Beautiful, export-friendly reports generated via Jinja2 templates.
@@ -48,4 +48,4 @@ The system uses Jinja2 templates located in `src/research/templates/`. You can c
 
 ## Models
 
-All report sections are defined as structured Pydantic models in `src/research/reporting.py`, ensuring type safety and easy data aggregation from various modules like `RegimeDetector`, `StressLab`, and `JournalMiner`.
+All report sections are defined as structured Pydantic models in `src/research/reporting.py`, ensuring type safety and easy data aggregation from various modules like `RegimeDetector`, `StressLab`, `JournalMiner`, and `BenchmarkEvaluator`.

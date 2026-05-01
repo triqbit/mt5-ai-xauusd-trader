@@ -11,6 +11,7 @@ from src.research.benchmarks import (
     VolatilityBreakoutStrategy,
     NaiveDirectionalStrategy,
     RiskFilteredBaseline,
+    MeanReversionStrategy,
     BenchmarkEvaluator
 )
 
@@ -59,6 +60,12 @@ def test_risk_filtered_signals(sample_data):
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
 
+def test_mean_reversion_signals(sample_data):
+    strategy = MeanReversionStrategy(window=5)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+
 def test_evaluator_metrics(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
     strategies = [
@@ -70,6 +77,8 @@ def test_evaluator_metrics(sample_data):
     assert len(results) == 2
     assert "Total Return" in results.columns
     assert "Sharpe Ratio" in results.columns
+    assert "Sortino Ratio" in results.columns
+    assert "Profit Factor" in results.columns
 
 def test_comparison_logic(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
@@ -80,3 +89,28 @@ def test_comparison_logic(sample_data):
     comp = evaluator.compare_to_baseline(s1.name, s2.name)
     assert "Outperformance" in comp
     assert "Sharpe Improvement" in comp
+
+def test_to_report_section(sample_data):
+    evaluator = BenchmarkEvaluator(sample_data)
+    s1 = EMACrossoverStrategy(5, 10)
+    s2 = MomentumStrategy(5)
+    evaluator.evaluate_all([s1, s2])
+
+    section = evaluator.to_report_section(baseline_name=s2.name)
+    assert len(section.comparisons) == 1
+    assert section.comparisons[0].name == s1.name
+    assert "statistically significant" in section.statistical_summary
+
+def test_evaluator_reversals(sample_data):
+    """Test that immediate reversals are handled correctly."""
+    # Create signals that flip from 1 to -1
+    signals = np.zeros(len(sample_data))
+    signals[10] = 1
+    signals[11] = -1
+
+    evaluator = BenchmarkEvaluator(sample_data, commission=0.0)
+    metrics = evaluator._calculate_metrics(signals, "test")
+
+    # With 0 commission, reversal shouldn't crash and should result in 2 trades
+    # (One long from 10 to 11, one short from 11 onwards)
+    assert metrics["Num Trades"] == 2
