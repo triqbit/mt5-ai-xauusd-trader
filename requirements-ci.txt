@@ -15,7 +15,7 @@
 
 # -- Core numeric / data -------------------------------------------
 # numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
-numpy==2.2.4
+numpy==1.26.4
 scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
@@ -42,3 +42,6 @@ httpx==0.27.0
 structlog==24.1.0
 rich==13.7.1
 gymnasium==0.29.1
+prometheus_client==0.20.0
+aiohttp>=3.13.4
+requests>=2.32.0

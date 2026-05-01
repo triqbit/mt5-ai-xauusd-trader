@@ -9,10 +9,12 @@ LSTMAttentionModel = None
 DynamicEnsemble = None
 RegimeDetector = None
 MarketRegime = None
+PPOAgent = None
 
 with contextlib.suppress(ImportError):
     from src.models.dynamic_ensemble import DynamicEnsemble
     from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+    from src.models.ppo_agent import PPOAgent
     from src.models.regime_detector import MarketRegime, RegimeDetector
 
 __all__ = [
@@ -20,5 +22,6 @@ __all__ = [
     "EnsembleModel",
     "LSTMAttentionModel",
     "MarketRegime",
+    "PPOAgent",
     "RegimeDetector",
 ]

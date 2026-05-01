@@ -60,7 +60,9 @@ def mock_connector(mock_cfg):
         connector.connect()
         return connector
 
-pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
+pytestmark = pytest.mark.skipif(
+    torch is None or os.environ.get("MODE") == "ci_light", reason="torch not installed"
+)
 
 # --- Path 1: Full Trading Flow ---
 

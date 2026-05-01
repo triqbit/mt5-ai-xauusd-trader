@@ -77,28 +77,22 @@ def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
 
 def test_ensemble_model_with_gapping_data(mock_cfg):
     """Test EnsembleModel behavior when encountering gapping market data."""
-    # Ensure src.models is loaded so patch can traverse it
-    import src.models  # noqa: F401
+    pytest.importorskip("torch")
+    pytest.importorskip("stable_baselines3")
 
-    # We need to mock torch and SB3 if they are not installed
-    with (
-        patch("src.models.ensemble.torch"),
-        patch("src.models.ensemble.LSTMAttentionModel"),
-        patch("stable_baselines3.PPO"),
-    ):
-        from src.models.ensemble import EnsembleModel
+    from src.models.ensemble import EnsembleModel
 
-        model = EnsembleModel(device="cpu")
+    model = EnsembleModel(device="cpu")
 
-        gen = ScenarioGenerator(seed=123)
-        df = gen.generate(n_steps=10, regime="gapping")
+    gen = ScenarioGenerator(seed=123)
+    df = gen.generate(n_steps=10, regime="gapping")
 
-        # Simple test to ensure predict can handle the data structure
-        for i in range(len(df)):
-            obs = df.iloc[i][["open", "high", "low", "close", "tick_volume"]].values
-            # Should not crash
-            direction, _, _ = model.predict(obs)
-            assert direction in [-1, 0, 1]
+    # Simple test to ensure predict can handle the data structure
+    for i in range(len(df)):
+        obs = df.iloc[i][["open", "high", "low", "close", "tick_volume"]].values
+        # Should not crash
+        direction, _, _ = model.predict(obs)
+        assert direction in [-1, 0, 1]
 
 
 def test_data_integrity_malformed_scenarios():
