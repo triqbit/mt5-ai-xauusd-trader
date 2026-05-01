@@ -9,27 +9,30 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Dict, Optional, List
+from dataclasses import dataclass
+from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from src.trading.risk_manager import TradeSignal, DailyStats
+from src.trading.risk_manager import DailyStats, TradeSignal
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ExecutionDecision:
     """Detailed response from the RiskEngine about a signal."""
+
     signal: TradeSignal
     is_approved: bool
     confidence_score: float
     blocked_by: Optional[str] = None
+
 
 class RiskEngine:
     """
@@ -85,7 +88,7 @@ class RiskEngine:
             signal=signal,
             is_approved=is_approved,
             confidence_score=signal.confidence,
-            blocked_by=rejection_reason
+            blocked_by=rejection_reason,
         )
 
     def calculate_lot_size(
@@ -96,7 +99,7 @@ class RiskEngine:
         atr: float,
         account_equity: float,
         contract_size: float = 100.0,
-        risk_multiplier: float = 2.0
+        risk_multiplier: float = 2.0,
     ) -> float:
         """
         ATR-based position sizing with risk per trade limit.
@@ -170,23 +173,25 @@ class RiskEngine:
         if drawdown >= levels.get("5", 0.30):
             logger.critical("DRAWDOWN LEVEL 5: CRITICAL HALT")
             return False
-        elif drawdown >= levels.get("4", 0.25):
+        if drawdown >= levels.get("4", 0.25):
             logger.error("DRAWDOWN LEVEL 4: HALT NEW POSITIONS")
             return False
         return True
 
     def _check_daily_loss_breaker(self) -> bool:
         """Cascading Daily Loss levels."""
-        if self.daily.peak_equity <= 0: return True
+        if self.daily.peak_equity <= 0:
+            return True
 
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl >= 0: return True
+        if self.daily.realised_pnl >= 0:
+            return True
 
         levels = self.cfg.daily_loss_levels
         if loss_pct >= levels.get("hard", 0.06):
             logger.critical("DAILY LOSS HARD STOP: CRITICAL HALT")
             return False
-        elif loss_pct >= levels.get("4", 0.05):
+        if loss_pct >= levels.get("4", 0.05):
             logger.error("DAILY LOSS LEVEL 4: EMERGENCY HALT")
             return False
         return True
@@ -200,7 +205,9 @@ class RiskEngine:
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
-        if risk == 0: return False
+        if risk == 0:
+            return False
         return (reward / risk) >= min_rr
 
-__all__ = ["RiskEngine", "ExecutionDecision"]
+
+__all__ = ["ExecutionDecision", "RiskEngine"]

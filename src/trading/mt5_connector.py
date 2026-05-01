@@ -7,17 +7,22 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Callable, Awaitable, TypeVar
+from typing import Any, Awaitable, Dict, List, Optional, TypeVar
 
 import pandas as pd
 
+from src.core.config import TradingConfig
+from src.trading.risk_manager import TradeSignal
+
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -25,13 +30,11 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
     MetaApi = None
-
-from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,7 @@ META_TIMEFRAME_MAP: Dict[str, str] = {
     "H4": "4h",
     "D1": "1d",
 }
+
 
 class MT5Connector:
     """
@@ -130,7 +134,8 @@ class MT5Connector:
         return loop.run_until_complete(coro)
 
     async def _get_metaapi_connection(self):
-        if not self.metaapi: return None
+        if not self.metaapi:
+            return None
         if not self.metaapi_account:
             self.metaapi_account = await self.metaapi.metatrader_account_api.get_account(
                 self.cfg.metaapi_account_id
@@ -142,7 +147,8 @@ class MT5Connector:
         return self.metaapi_connection
 
     def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        if not self._is_initialized: return pd.DataFrame()
+        if not self._is_initialized:
+            return pd.DataFrame()
 
         if not self.use_metaapi:
             # We map strings to MT5 constants. Default to M5 if not found.
@@ -150,18 +156,21 @@ class MT5Connector:
             tf_map = {"M1": 1, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240, "D1": 1440}
             tf = tf_map.get(timeframe, 5)
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
-            if rates is None: return pd.DataFrame()
+            if rates is None:
+                return pd.DataFrame()
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
+
             async def _fetch():
                 conn = await self._get_metaapi_connection()
                 meta_tf = META_TIMEFRAME_MAP.get(timeframe, "5m")
                 return await conn.get_historical_candles(symbol, meta_tf, None, n_bars)
 
             candles = self._run_async(_fetch())
-            if not candles: return pd.DataFrame()
+            if not candles:
+                return pd.DataFrame()
             df = pd.DataFrame(candles)
             df.rename(columns={"tickVolume": "tick_volume"}, inplace=True)
             df["time"] = pd.to_datetime(df["time"])
@@ -171,20 +180,24 @@ class MT5Connector:
         return self.get_rates(symbol, timeframe, n_bars)
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
-        if not self._is_initialized: return {"bid": 0.0, "ask": 0.0}
+        if not self._is_initialized:
+            return {"bid": 0.0, "ask": 0.0}
 
         if not self.use_metaapi:
             tick = mt5.symbol_info_tick(symbol)
             return {"bid": tick.bid, "ask": tick.ask} if tick else {"bid": 0.0, "ask": 0.0}
         else:
+
             async def _fetch():
                 conn = await self._get_metaapi_connection()
                 return await conn.get_symbol_price(symbol)
+
             p = self._run_async(_fetch())
             return {"bid": p["bid"], "ask": p["ask"]}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
-        if not self._is_initialized or signal.direction == 0: return None
+        if not self._is_initialized or signal.direction == 0:
+            return None
 
         if not self.use_metaapi:
             order_type = mt5.ORDER_TYPE_BUY if signal.direction > 0 else mt5.ORDER_TYPE_SELL
@@ -209,45 +222,52 @@ class MT5Connector:
                 return int(result.order)
             return None
         else:
+
             async def _execute():
                 conn = await self._get_metaapi_connection()
                 # MetaAPI uses a generic create_market_order or specific helpers
                 # We'll use the documented generic method for safety
-                order_type = "ORDER_TYPE_BUY" if signal.direction > 0 else "ORDER_TYPE_SELL"
                 return await conn.create_market_order(
                     symbol=signal.symbol,
                     side="BUY" if signal.direction > 0 else "SELL",
                     volume=signal.lot_size,
                     stop_loss=signal.stop_loss,
                     take_profit=signal.take_profit,
-                    comment=f"AI:{signal.algorithm}"
+                    comment=f"AI:{signal.algorithm}",
                 )
+
             res = self._run_async(_execute())
             return int(res["orderId"]) if res and "orderId" in res else None
 
     def get_account_info(self) -> Dict[str, Any]:
-        if not self._is_initialized: return {}
+        if not self._is_initialized:
+            return {}
         if not self.use_metaapi:
             acc = mt5.account_info()
             return acc._asdict() if acc else {}
         else:
+
             async def _fetch():
                 conn = await self._get_metaapi_connection()
                 return await conn.get_account_information()
+
             return self._run_async(_fetch())
 
     def get_account_balance(self) -> float:
         return float(self.get_account_info().get("balance", 0.0))
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
-        if not self._is_initialized: return []
+        if not self._is_initialized:
+            return []
         if not self.use_metaapi:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
             return [p._asdict() for p in positions] if positions else []
         else:
+
             async def _fetch():
                 conn = await self._get_metaapi_connection()
                 return await conn.get_positions()
+
             p = self._run_async(_fetch())
             return [x for x in p if x["symbol"] == symbol] if symbol else p
 

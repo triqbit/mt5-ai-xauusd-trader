@@ -37,6 +37,7 @@ optuna==4.2.1
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot
+prometheus-client
 fastapi>=0.115.0
 httpx==0.27.0
 structlog==24.1.0
