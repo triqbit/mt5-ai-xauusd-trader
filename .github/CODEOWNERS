@@ -1,0 +1,16 @@
+# Code Owners for MT5 AI/ML Trading Bot
+
+# Global ownership for all files
+* @maintainer-quality
+
+# Core system, governance, and documentation
+/src/core/ @andonly1348
+/.github/ @andonly1348
+/docs/ @andonly1348
+/migrations/ @andonly1348
+
+# Trading logic and execution
+/src/trading/ @maintainer-trading
+
+# AI/ML Model architectures
+/src/models/ @maintainer-models

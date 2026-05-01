@@ -1,0 +1,23 @@
+name: 🛡️ Security Report
+description: Report a security vulnerability.
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **WARNING:** If you have discovered a security vulnerability, please do NOT report it via a public issue.
+        Email the maintainers directly at security@example.com (placeholder).
+  - type: textarea
+    id: vulnerability-details
+    attributes:
+      label: Vulnerability Details
+      description: Description of the security vulnerability.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is the potential impact of this vulnerability?
+    validations:
+      required: true
