@@ -65,7 +65,9 @@ class ModelSignal(Base, AuditMixin):
 
     __table_args__ = (
         CheckConstraint("entry_price > 0", name="check_signal_entry_price_positive"),
-        CheckConstraint("confidence >= 0 AND confidence <= 1", name="check_signal_confidence_range"),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1", name="check_signal_confidence_range"
+        ),
     )
 
     # Relationship
@@ -184,9 +186,7 @@ class TradeLogger:
     ) -> Optional[Trade]:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session.begin() as session:
-            stmt = select(Trade).where(
-                Trade.ticket == ticket, Trade.is_deleted.is_(False)
-            )
+            stmt = select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             trade = session.execute(stmt).scalar_one_or_none()
             if trade:
                 trade.exit_price = exit_price
@@ -213,9 +213,7 @@ class TradeLogger:
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
-            stmt = select(Trade).where(
-                Trade.ticket == ticket, Trade.is_deleted.is_(False)
-            )
+            stmt = select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             return session.execute(stmt).scalar_one_or_none()
 
     def log_risk_event(
@@ -244,9 +242,7 @@ class TradeLogger:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
-                    select(Trade.pnl).where(
-                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
-                    )
+                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
                 )
                 .scalars()
                 .all()
