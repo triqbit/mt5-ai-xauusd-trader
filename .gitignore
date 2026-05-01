@@ -62,6 +62,13 @@ data/cache/
 logs/
 *.log
 
+# Backups & Disaster Recovery
+backups/
+
+# Database
+*.db
+!trades.db.example
+
 # IDE
 .vscode/
 .idea/
