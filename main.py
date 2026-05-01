@@ -23,9 +23,11 @@ from typing import Optional
 import structlog
 
 from src.core.config import get_config
+from src.core.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -63,14 +65,24 @@ def run_live(
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+
+    fe = FeatureEngineer()
+
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
             # 1. Fetch latest market data
             df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+            if df.empty:
+                time.sleep(10)
+                continue
+
             tick = connector.get_tick(cfg.symbol)
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+
+            # 2. Feature Engineering
+            df_features = fe.generate_features(df)
+            obs = df_features.iloc[-1].values
+
             # 3. Get ensemble prediction
             direction, confidence, _per_algo = model.predict(obs)
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
@@ -112,8 +124,9 @@ def run_live(
                 algorithm=cfg.algorithm,
                 confidence=confidence,
             )
-            # 5. Risk approval gate
-            if risk.approve(signal, signal_id=signal_id):
+
+            # 6. Risk approval gate (includes ExecutionFilter)
+            if risk.approve(signal, df=df_features, signal_id=signal_id):
                 ticket = connector.place_order(signal)
                 if ticket:
                     risk.open_positions[cfg.symbol] = ticket
@@ -127,7 +140,7 @@ def run_live(
                             lot_size=lot_size,
                             signal_id=signal_id,
                         )
-            # 6. Check for closed positions to update logger
+            # 7. Check for closed positions to update logger
             current_positions = connector.get_positions(cfg.symbol)
             current_tickets = {p["ticket"] for p in current_positions}
 
@@ -152,10 +165,11 @@ def run_live(
             for sym in closed_tickets:
                 risk.open_positions.pop(sym)
 
-            # 7. Update equity
+            # 8. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -178,6 +192,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--symbol", default="XAUUSD")
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
+    p.add_argument("--start", help="Backtest start date (YYYY-MM-DD)", default="2023-01-01")
+    p.add_argument("--end", help="Backtest end date (YYYY-MM-DD)", default="2023-12-31")
     p.add_argument("--log-level", default="INFO")
     return p.parse_args()
 
@@ -207,9 +223,11 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger)
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, monitor=monitor)
+    ef = ExecutionFilter()
+    risk = RiskManager(
+        cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor, execution_filter=ef
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -219,10 +237,49 @@ def main() -> int:
         model.load_lstm(lstm_path)
     try:
         if cfg.mode in ("demo", "live"):
-            run_live(cfg, connector, risk, model, trade_logger=trade_logger)
-            run_live(cfg, connector, risk, model, monitor)
+            run_live(cfg, connector, risk, model, trade_logger=trade_logger, monitor=monitor)
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            from datetime import datetime
+            from src.trading.backtester import BacktestEngine
+
+            log.info("Starting backtest mode | range: %s to %s", args.start, args.end)
+
+            # Fetch historical data
+            # Calculate number of bars needed (rough approximation)
+            start_dt = datetime.strptime(args.start, "%Y-%m-%d")
+            end_dt = datetime.strptime(args.end, "%Y-%m-%d")
+            delta_days = (end_dt - start_dt).days
+            # Assume 288 M5 bars per day
+            n_bars = delta_days * 288
+
+            df = connector.get_ohlcv(args.symbol, args.timeframe, n_bars=n_bars)
+            if df.empty:
+                log.error("No historical data fetched for backtest.")
+                return 1
+
+            # Filter by exact dates
+            df = df[(df["time"] >= start_dt) & (df["time"] <= end_dt)]
+            df.set_index("time", inplace=True)
+
+            engine = BacktestEngine(symbol=args.symbol)
+            fe = FeatureEngineer()
+
+            report = engine.run(df, model, fe, ef)
+
+            print("\n" + "="*40)
+            print("      BACKTEST PERFORMANCE REPORT")
+            print("="*40)
+            print(f"Symbol:            {args.symbol}")
+            print(f"Period:            {args.start} to {args.end}")
+            print(f"Annualized Return: {report.annualized_return*100:.2f}%")
+            print(f"Sharpe Ratio:      {report.sharpe_ratio:.2f}")
+            print(f"Max Drawdown:      {report.max_drawdown*100:.2f}%")
+            print(f"Profit Factor:     {report.profit_factor:.2f}")
+            print(f"Total Trades:      {report.total_trades}")
+            print(f"Win Rate:          {report.win_rate*100:.2f}%")
+            print(f"Total PnL:         \${report.total_pnl:.2f}")
+            print("="*40 + "\n")
+
     finally:
         connector.disconnect()
     return 0
