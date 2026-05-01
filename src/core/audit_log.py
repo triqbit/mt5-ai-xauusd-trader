@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import Column, DateTime, Integer, JSON, String, Text
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import sessionmaker
 
 from src.core.trade_logger import AuditMixin, Base

@@ -16,14 +16,21 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+    nn = None
 
 logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel(nn.Module if TORCH_AVAILABLE else object):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
@@ -80,7 +87,10 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device)
+        if TORCH_AVAILABLE:
+            self.device = torch.device(device)
+        else:
+            self.device = device
         self.weights: Dict[str, float] = {
             "ppo": 1 / 3,
             "dreamer": 1 / 3,
@@ -104,6 +114,9 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
+        if not TORCH_AVAILABLE:
+            logger.warning("Torch not available - cannot load LSTM")
+            return
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
         state = torch.load(str(path), map_location=self.device)
         model.load_state_dict(state)
@@ -131,7 +144,7 @@ class EnsembleModel:
             votes["ppo"] = probs
 
         # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
+        if TORCH_AVAILABLE and self.lstm_model is not None and seq is not None:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
