@@ -7,6 +7,7 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,6 +18,7 @@ import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -24,6 +26,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -87,7 +90,7 @@ class MT5Connector:
                 if mt5.initialize(
                     path=self.cfg.mt5_path,
                     login=self.cfg.mt5_login,
-                    password=self.cfg.mt5_password,
+                    password=self.cfg.mt5_password.get_secret_value(),
                     server=self.cfg.mt5_server,
                 ):
                     logger.info("Native MT5 SDK initialized successfully.")
@@ -102,10 +105,11 @@ class MT5Connector:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
-        if METAAPI_AVAILABLE and self.cfg.metaapi_token:
+        metaapi_token = self.cfg.metaapi_token.get_secret_value()
+        if METAAPI_AVAILABLE and metaapi_token:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
-                self.metaapi = MetaApi(self.cfg.metaapi_token)
+                self.metaapi = MetaApi(metaapi_token)
                 self.use_metaapi = True
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured.")

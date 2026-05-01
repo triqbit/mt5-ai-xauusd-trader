@@ -9,6 +9,7 @@ Comprehensive security framework addressing data protection, API security, deplo
 ### 1.1 Encryption Standards
 - **In Transit**: TLS 1.3 for all network communications
 - **At Rest**: AES-256 encryption for sensitive data
+- **Local Database Security**: Enforce restrictive `0o600` (owner read/write only) file permissions on local SQLite database files to prevent unauthorized access to trade history.
 - **Key Management**: AWS KMS or Azure Key Vault for key rotation
 - **Database Encryption**: Encrypted columns for API keys, account credentials
 - **Backup Encryption**: All backups encrypted with separate encryption keys
@@ -52,6 +53,7 @@ Comprehensive security framework addressing data protection, API security, deplo
 
 ### 3.1 Credential Storage
 - **No Hardcoding**: All credentials stored in secure vault
+- **Type-Safe Masking**: Use `pydantic.SecretStr` for all sensitive configuration fields (`mt5_password`, `metaapi_token`, `telegram_token`, `database_url`, `redis_url`) to prevent accidental leakage in logs and string representations.
 - **Environment Variables**: Use .env with local .gitignore
 - **Secrets Rotation**: Automatic rotation every 30 days
 - **Audit Trail**: Track all credential access attempts

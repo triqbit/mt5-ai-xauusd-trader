@@ -5,6 +5,7 @@ Real-time monitoring, equity tracking, and Telegram alerting.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -30,9 +31,10 @@ class Monitor:
         self.equity_history: List[Dict[str, Any]] = []
         self.bot: Optional[telegram.Bot] = None
 
-        if self.cfg.telegram_token:
+        telegram_token = self.cfg.telegram_token.get_secret_value()
+        if telegram_token:
             try:
-                self.bot = telegram.Bot(token=self.cfg.telegram_token)
+                self.bot = telegram.Bot(token=telegram_token)
                 logger.info("Telegram bot initialized")
             except Exception as e:
                 logger.error("Failed to initialize Telegram bot: %s", e)
@@ -59,7 +61,7 @@ class Monitor:
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger."""
-        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
+        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown * 100:.2f}%\nTrading Halted."
         self.send_message(msg)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:
