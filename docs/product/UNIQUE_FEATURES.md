@@ -43,8 +43,42 @@ Generic bots execute blindly when a technical condition is met (e.g., EMA cross)
 
 ---
 
+## 2. Explainable Regime-Aware Decision Cockpit
+
+### What it is and why it matters
+The **Explainable Regime-Aware Decision Cockpit** is a high-fidelity Terminal User Interface (TUI) that provides real-time transparency into the system's decision-making process.
+
+For institutional operators, a "Black Box" is a liability. This cockpit transforms the system into a "Glass Box" by visualizing not just the trade signals, but the *logic* behind them—showing which models are leading the ensemble, the detected market regime, and why specific risk filters are active.
+
+### How it differentiates from generic trading bots
+Generic bots offer minimal visibility, often limited to basic logs. The MT5 AI Trader's Cockpit provides a structured, visual representation of the internal state. It allows an operator to see at a glance: *"The system is scaling down position sizes because it detected a transition to a high-volatility ranging regime, even though the LSTM is still bullish."*
+
+### Architecture Outline
+1.  **Explanation Engine**: Powered by `src/core/explainability.py`, it aggregates data from the ensemble and risk manager to create a `SignalExplanation`.
+2.  **TUI Component**: Uses the `rich` library to render a multi-panel dashboard directly in the terminal, including tables for model votes and panels for regime context.
+3.  **Asynchronous Observer**: A non-blocking telemetry thread in `main.py` that monitors the system state and updates the display without impacting trading latency.
+4.  **Audit Link**: Every visualization frame can be mapped back to a specific `trade_id` in the database for post-trade compliance reviews.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Live display of Market Regime, Volatility State, and Ensemble Consensus. |
+| **Functional** | Real-time visualization of "Dominant Model" and model-specific weights. |
+| **Technical** | Implementation must use the `rich` library for high-performance terminal rendering. |
+| **Operational** | UI updates must not exceed 5% CPU overhead on standard VPS instances. |
+| **Release Readiness** | Must include a "Demo Mode" using synthetic data for operator training. |
+
+### Implementation Lane
+*   **Jules02 (Observability)**: Lead on TUI layout, CLI integration, and performance optimization.
+*   **Jules04 (Adaptive Intelligence)**: Lead on exposing deep-model internals and regime confidence metrics.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires the `RegimeDetector` and `EnsembleModel` to expose their internal state via a standard interface.
+*   **Constraints**: Must remain a TUI (Terminal User Interface) to ensure it works over SSH on remote Linux servers without X11.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Explainable regime-aware decision cockpit** (Visualizing the "Why")
 - **What-if execution simulator** (Pre-execution sensitivity analysis)
 - **Capital-preservation operating modes** (Conservative/Event-Defensive)
 - **Gold-specific macro sensitivity overlays** (Real Yields, DXY, Central Bank demand)
