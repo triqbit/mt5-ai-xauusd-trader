@@ -88,36 +88,76 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        reasons = self._get_rejection_reason(signal)
+        passed = len(reasons) == 0
 
-        passed = rejection_reason == ""
         if not passed:
+            rejection_reason = reasons[0]
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
                 signal.direction,
                 rejection_reason,
             )
+
+            # Critical alerts and logging
+            if "Circuit breaker" in rejection_reason:
+                drawdown = (self.peak_equity - self.balance) / self.peak_equity
+                if self.monitor:
+                    self.monitor.alert_circuit_breaker(drawdown)
+
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
+                    description="; ".join(reasons),
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
         return passed
+
+    def _get_rejection_reason(self, signal: TradeSignal) -> List[str]:
+        """
+        Evaluate all risk filters and return a list of rejection reasons.
+        Side-effect free (no logging or state changes).
+        """
+        reasons = []
+
+        # 1. Circuit Breaker (15% fixed limit)
+        drawdown = (self.peak_equity - self.balance) / self.peak_equity
+        if drawdown >= 0.15:
+            reasons.append(f"Circuit breaker active (drawdown {drawdown:.1%})")
+
+        # 2. Daily Loss (Configurable)
+        if self.daily.peak_equity > 0:
+            loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
+            if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
+                reasons.append(f"Daily loss limit reached ({loss_pct:.1%})")
+
+        # 3. Max Positions (Configurable)
+        if len(self.open_positions) >= self.cfg.max_positions:
+            reasons.append(f"Max positions reached ({self.cfg.max_positions})")
+
+        # 4. Symbol Allocation (All-Weather Portfolio)
+        if signal.symbol not in ALLOCATION_WEIGHTS:
+            reasons.append(f"Symbol {signal.symbol} not in approved portfolio")
+
+        # 5. Minimum Confidence (Configurable)
+        threshold = getattr(self.cfg, "confidence_threshold", 0.55)
+        if signal.confidence < threshold:
+            reasons.append(f"Confidence {signal.confidence:.2f} below threshold {threshold:.2f}")
+
+        # 6. Risk-Reward (Fixed Enterprise Standard)
+        risk = abs(signal.entry_price - signal.stop_loss)
+        reward = abs(signal.take_profit - signal.entry_price)
+        min_rr = 1.5
+        if risk == 0:
+            reasons.append("Invalid risk (SL=Entry)")
+        else:
+            rr = reward / risk
+            if rr < min_rr:
+                reasons.append(f"Risk-Reward ratio {rr:.2f} below minimum {min_rr:.2f}")
+
+        return reasons
 
     def size_position(
         self,
