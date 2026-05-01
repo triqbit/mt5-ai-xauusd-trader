@@ -74,7 +74,7 @@ class HealthChecker:
             return ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
-            return ComponentStatus(status=HealthStatus.FAILED, message=f"Database unreachable: {str(e)}")
+            return ComponentStatus(status=HealthStatus.FAILED, message=f"Database unreachable: {e!s}")
 
     def check_mt5(self) -> ComponentStatus:
         """Verify MT5 connection status."""
