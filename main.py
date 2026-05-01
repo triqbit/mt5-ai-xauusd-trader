@@ -24,6 +24,7 @@ import structlog
 
 from src.core.config import get_config
 from src.core.config_validator import ConfigValidator
+from src.core.exceptions import MT5ConnectionError, MT5DataError
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -69,8 +70,23 @@ def run_live(
     while True:
         try:
             # 1. Fetch latest market data
-            df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-            tick = connector.get_tick(cfg.symbol)
+            try:
+                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                tick = connector.get_tick(cfg.symbol)
+            except MT5ConnectionError as exc:
+                log.warning("MT5 Connection lost in trading loop: %s. Attempting reconnection...", exc)
+                try:
+                    connector.initialize()
+                    continue # Re-attempt data fetch in next iteration immediately
+                except MT5ConnectionError:
+                    log.error("Reconnection failed. Waiting for next poll interval.")
+                    time.sleep(poll_interval)
+                    continue
+            except MT5DataError as exc:
+                log.error("Failed to fetch market data: %s. Skipping this cycle.", exc)
+                time.sleep(poll_interval)
+                continue
+
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             # 3. Get ensemble prediction
