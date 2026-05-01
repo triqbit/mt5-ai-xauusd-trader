@@ -8,8 +8,7 @@ Supports multi-timeframe analysis and ensures no look-ahead bias.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Union
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -65,7 +64,11 @@ class FeatureEngineer:
         df_combined = df_combined.replace([np.inf, -np.inf], np.nan)
         df_combined = df_combined.ffill().bfill()
 
-        self._feature_names = [c for c in df_combined.columns if c not in ["open", "high", "low", "close", "tick_volume", "spread"]]
+        self._feature_names = [
+            c
+            for c in df_combined.columns
+            if c not in ["open", "high", "low", "close", "tick_volume", "spread"]
+        ]
 
         logger.info("Generated %d features", len(self._feature_names))
         return df_combined
@@ -110,11 +113,14 @@ class FeatureEngineer:
     def _add_volatility_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         res = pd.DataFrame(index=df.index)
         # ATR
-        tr = pd.concat([
-            df["high"] - df["low"],
-            (df["high"] - df["close"].shift(1)).abs(),
-            (df["low"] - df["close"].shift(1)).abs()
-        ], axis=1).max(axis=1)
+        tr = pd.concat(
+            [
+                df["high"] - df["low"],
+                (df["high"] - df["close"].shift(1)).abs(),
+                (df["low"] - df["close"].shift(1)).abs(),
+            ],
+            axis=1,
+        ).max(axis=1)
 
         for w in [7, 14, 20, 50, 100]:
             res[f"atr_{w}"] = tr.rolling(w).mean()
@@ -186,10 +192,10 @@ class FeatureEngineer:
         res = pd.DataFrame(index=df.index)
         mtf_windows = {"mtf1": 12, "mtf2": 24, "mtf3": 48, "mtf4": 96, "mtf5": 288}
         for name, w in mtf_windows.items():
-            res[f"rsi_{name}"] = self._calculate_rsi(df["close"], min(len(df)-1, w * 14))
+            res[f"rsi_{name}"] = self._calculate_rsi(df["close"], min(len(df) - 1, w * 14))
             res[f"ema_{name}"] = df["close"].ewm(span=w * 20, adjust=False).mean()
             res[f"std_{name}"] = df["close"].rolling(min(len(df), w * 20)).std()
-            res[f"roc_{name}"] = df["close"].pct_change(min(len(df)-1, w * 10))
+            res[f"roc_{name}"] = df["close"].pct_change(min(len(df) - 1, w * 10))
 
         return res
 

@@ -79,8 +79,17 @@ def test_ensemble_model_with_gapping_data(mock_cfg):
     """Test EnsembleModel behavior when encountering gapping market data."""
     # We need to mock torch and SB3 before importing EnsembleModel
     # to avoid AttributeError in CI environments where these aren't fully loaded.
+    torch_mock = MagicMock()
+    torch_mock.__path__ = []
     with (
-        patch.dict("sys.modules", {"torch": MagicMock(), "stable_baselines3": MagicMock()}),
+        patch.dict(
+            "sys.modules",
+            {
+                "torch": torch_mock,
+                "torch.nn": MagicMock(),
+                "stable_baselines3": MagicMock(),
+            },
+        ),
         patch("src.models.ensemble.LSTMAttentionModel"),
     ):
         from src.models.ensemble import EnsembleModel

@@ -11,6 +11,11 @@ RegimeDetector = None
 MarketRegime = None
 
 with contextlib.suppress(ImportError):
+    from src.models import (
+        dynamic_ensemble as dynamic_ensemble,
+        ensemble as ensemble,
+        regime_detector as regime_detector,
+    )
     from src.models.dynamic_ensemble import DynamicEnsemble
     from src.models.ensemble import EnsembleModel, LSTMAttentionModel
     from src.models.regime_detector import MarketRegime, RegimeDetector

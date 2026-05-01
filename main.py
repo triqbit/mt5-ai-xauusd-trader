@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -17,10 +18,10 @@ import logging
 import os
 import sys
 import time
-import pandas as pd
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 import structlog
 
 from src.core import FeatureEngineer, get_config, profile
@@ -138,7 +139,9 @@ def run_live(
                 if decision.is_approved:
                     approved = risk.approve(signal, signal_id=signal_id)
                 else:
-                    log.warning("Signal blocked by execution filter | reason=%s", decision.blocked_by)
+                    log.warning(
+                        "Signal blocked by execution filter | reason=%s", decision.blocked_by
+                    )
                     approved = False
 
             if approved:
@@ -247,10 +250,9 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if cfg.mode != "backtest":
-        if not connector.connect():
-            log.critical("Cannot connect to MT5 terminal. Aborting.")
-            return 1
+    if cfg.mode != "backtest" and not connector.connect():
+        log.critical("Cannot connect to MT5 terminal. Aborting.")
+        return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
@@ -302,12 +304,15 @@ def main() -> int:
             df = connector.get_ohlcv(
                 symbol=cfg.symbol,
                 timeframe=cfg.timeframe,
-                n_bars=10000 # Fetch enough for the range
+                n_bars=10000,  # Fetch enough for the range
             )
 
             if df.empty:
-                log.warning("No data from connector, generating synthetic data for backtest demonstration")
+                log.warning(
+                    "No data from connector, generating synthetic data for backtest demonstration"
+                )
                 from src.utils.synthetic_data import ScenarioGenerator
+
                 gen = ScenarioGenerator()
                 df = gen.generate(n_steps=10000, regime="trending")
                 df.index = pd.date_range(start=start_date, periods=len(df), freq="5min")
@@ -319,17 +324,17 @@ def main() -> int:
             engine = BacktestEngine()
             report = engine.run_walk_forward(df, model)
 
-            print("\n" + "="*50)
+            print("\n" + "=" * 50)
             print(" BACKTEST PERFORMANCE REPORT")
-            print("="*50)
-            print(f"Annualized Return: {report.annualized_return*100:.2f}%")
+            print("=" * 50)
+            print(f"Annualized Return: {report.annualized_return * 100:.2f}%")
             print(f"Sharpe Ratio:      {report.sharpe_ratio:.2f}")
-            print(f"Max Drawdown:      {report.max_drawdown*100:.2f}%")
+            print(f"Max Drawdown:      {report.max_drawdown * 100:.2f}%")
             print(f"Profit Factor:     {report.profit_factor:.2f}")
             print(f"Total Trades:      {report.total_trades}")
-            print(f"Win Rate:          {report.win_rate*100:.2f}%")
+            print(f"Win Rate:          {report.win_rate * 100:.2f}%")
             print(f"Total Net PnL:     ${report.total_net_pnl:.2f}")
-            print("="*50 + "\n")
+            print("=" * 50 + "\n")
 
     finally:
         connector.disconnect()

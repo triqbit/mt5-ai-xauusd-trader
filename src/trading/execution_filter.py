@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ExecutionDecision:
     """Detailed result of the execution filtering process."""
+
     is_approved: bool
     confidence_score: float
     blocked_by: Optional[str] = None
@@ -51,7 +52,7 @@ class ExecutionFilter:
         signal: "TradeSignal",
         df: pd.DataFrame,
         current_drawdown: float = 0.0,
-        timestamp: Optional[datetime] = None
+        timestamp: Optional[datetime] = None,
     ) -> ExecutionDecision:
         """
         Execute the 8-layer cascade.
@@ -113,9 +114,7 @@ class ExecutionFilter:
 
         if direction == 1 and slope < 0:
             return False
-        if direction == -1 and slope > 0:
-            return False
-        return True
+        return not (direction == -1 and slope > 0)
 
     def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
         """Enforces EMA20 > EMA50 > EMA200 for BUY (vice versa for SELL)."""
@@ -150,13 +149,11 @@ class ExecutionFilter:
         weekday = dt.weekday()  # 0=Mon, 6=Sun
         hour = dt.hour
 
-        if weekday == 5: # Sat
+        if weekday == 5:  # Sat
             return False
-        if weekday == 6 and hour < 17: # Sun before 17:00
+        if weekday == 6 and hour < 17:  # Sun before 17:00
             return False
-        if weekday == 4 and hour >= 16: # Fri after 16:00
-            return False
-        return True
+        return not (weekday == 4 and hour >= 16)
 
     def _check_spread(self, df: pd.DataFrame) -> bool:
         """Blocks if spread > 3x the 100-period average."""

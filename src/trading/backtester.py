@@ -8,7 +8,7 @@ Supports transaction costs, MAE/MFE, and time-aware execution filtering.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PerformanceReport:
     """Institutional-grade performance summary matching README.md benchmarks."""
+
     annualized_return: float
     sharpe_ratio: float
     max_drawdown: float
@@ -74,7 +75,11 @@ class BacktestEngine:
         Execute a walk-forward backtest by sliding train/test windows.
         """
         if len(df) < train_bars + test_bars:
-            logger.warning("Data length %d shorter than WF window %d. Running single pass.", len(df), train_bars + test_bars)
+            logger.warning(
+                "Data length %d shorter than WF window %d. Running single pass.",
+                len(df),
+                train_bars + test_bars,
+            )
             return self.run(df, model)
 
         all_trades: List[Dict] = []
@@ -87,7 +92,7 @@ class BacktestEngine:
             test_end = min(test_start + test_bars, len(df))
 
             # In a full implementation, the model would be retrained on df.iloc[start_idx:test_start]
-            test_df = df.iloc[test_start : test_end]
+            test_df = df.iloc[test_start:test_end]
             if test_df.empty:
                 break
 
@@ -112,10 +117,7 @@ class BacktestEngine:
         return report
 
     def _simulate(
-        self,
-        df: pd.DataFrame,
-        model: Any,
-        initial_balance: float
+        self, df: pd.DataFrame, model: Any, initial_balance: float
     ) -> Tuple[PerformanceReport, List[Dict], List[float]]:
         """Core simulation engine."""
         if df.empty:
@@ -152,34 +154,34 @@ class BacktestEngine:
                     lot_size=0.1,
                     algorithm="ensemble",
                     confidence=confidence,
-                    timestamp=ts
+                    timestamp=ts,
                 )
 
                 # Execution Filter Gate
-                hist_slice = df_features.iloc[max(0, i-200):i+1]
+                hist_slice = df_features.iloc[max(0, i - 200) : i + 1]
                 decision = self.filter.validate(signal, hist_slice, timestamp=ts)
 
                 if decision.is_approved:
-                    # Transaction Cost: (Spread + Slippage) in points * multiplier + Commission
-                    # For XAUUSD, 0.1 lot, multiplier 10 (1 point = 0.01 USD, 0.1 lot = 1 USD per USD move)
-                    # So 1 point move (0.01) on 0.1 lot = 0.01 * 100 * 0.1 = 0.10 USD?
-                    # MT5 XAUUSD: 1 lot = 100oz. 0.01 price move = 1 USD profit.
-                    # So 0.1 lot = 0.10 USD profit per 0.01 move.
+                    # Transaction Cost
                     cost = (self.spread + self.slippage) * 10 + (self.commission * 0.1)
 
                     # Exit and Flip Logic
                     if current_pos and current_pos["dir"] != direction:
                         exit_price = row["open"]
-                        pnl = (exit_price - current_pos["entry"]) * current_pos["dir"] * 100 * 0.1 - cost
+                        pnl = (exit_price - current_pos["entry"]) * current_pos[
+                            "dir"
+                        ] * 100 * 0.1 - cost
                         balance += pnl
-                        trades.append({
-                            "entry": current_pos["entry"],
-                            "exit": exit_price,
-                            "pnl": pnl,
-                            "mae": current_pos["mae"],
-                            "mfe": current_pos["mfe"],
-                            "dir": current_pos["dir"]
-                        })
+                        trades.append(
+                            {
+                                "entry": current_pos["entry"],
+                                "exit": exit_price,
+                                "pnl": pnl,
+                                "mae": current_pos["mae"],
+                                "mfe": current_pos["mfe"],
+                                "dir": current_pos["dir"],
+                            }
+                        )
                         current_pos = None
 
                     # Open New Position
@@ -189,7 +191,7 @@ class BacktestEngine:
                             "dir": direction,
                             "mae": 0.0,
                             "mfe": 0.0,
-                            "ts": ts
+                            "ts": ts,
                         }
 
             # Track MAE/MFE while position is open
@@ -206,21 +208,23 @@ class BacktestEngine:
             cost = (self.spread + self.slippage) * 10 + (self.commission * 0.1)
             pnl = (exit_price - current_pos["entry"]) * current_pos["dir"] * 100 * 0.1 - cost
             balance += pnl
-            trades.append({
-                "entry": current_pos["entry"], "exit": exit_price, "pnl": pnl,
-                "mae": current_pos["mae"], "mfe": current_pos["mfe"], "dir": current_pos["dir"]
-            })
+            trades.append(
+                {
+                    "entry": current_pos["entry"],
+                    "exit": exit_price,
+                    "pnl": pnl,
+                    "mae": current_pos["mae"],
+                    "mfe": current_pos["mfe"],
+                    "dir": current_pos["dir"],
+                }
+            )
             equity_curve[-1] = balance
 
         report = self._calculate_metrics(trades, equity_curve, timestamps[0], timestamps[-1])
         return report, trades, equity_curve
 
     def _calculate_metrics(
-        self,
-        trades: List[dict],
-        equity: List[float],
-        start_time: datetime,
-        end_time: datetime
+        self, trades: List[dict], equity: List[float], start_time: datetime, end_time: datetime
     ) -> PerformanceReport:
         """Compute institutional metrics."""
         if not trades:
@@ -266,7 +270,7 @@ class BacktestEngine:
             avg_mae=np.mean([t["mae"] for t in trades]),
             avg_mfe=np.mean([t["mfe"] for t in trades]),
             period_start=start_time,
-            period_end=end_time
+            period_end=end_time,
         )
 
     def _empty_report(self, start=None, end=None) -> PerformanceReport:
