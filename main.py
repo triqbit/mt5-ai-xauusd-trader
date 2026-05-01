@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -216,7 +217,9 @@ def main() -> int:
     console = Console()
 
     if result.errors:
-        table = Table(title="Configuration Validation Results", show_header=True, header_style="bold magenta")
+        table = Table(
+            title="Configuration Validation Results", show_header=True, header_style="bold magenta"
+        )
         table.add_column("Field", style="dim")
         table.add_column("Level")
         table.add_column("Message")
@@ -229,7 +232,9 @@ def main() -> int:
         console.print(table)
 
         if not result.success:
-            log.critical("Startup validation FAILED. Please fix critical errors in your .env file or environment.")
+            log.critical(
+                "Startup validation FAILED. Please fix critical errors in your .env file or environment."
+            )
             return 1
 
     log.info(
@@ -275,14 +280,23 @@ def main() -> int:
     health_report = health_checker.get_full_report()
 
     # Display Health Report Table
-    health_table = Table(title=f"System Health Report (Overall: {health_report.status.value.upper()})", show_header=True)
+    health_table = Table(
+        title=f"System Health Report (Overall: {health_report.status.value.upper()})",
+        show_header=True,
+    )
     health_table.add_column("Component", style="cyan")
     health_table.add_column("Status")
     health_table.add_column("Message")
 
     for name, comp in health_report.components.items():
-        status_style = "green" if comp.status == HealthStatus.HEALTHY else ("yellow" if comp.status == HealthStatus.DEGRADED else "red")
-        health_table.add_row(name, f"[{status_style}]{comp.status.value.upper()}[/{status_style}]", comp.message)
+        status_style = (
+            "green"
+            if comp.status == HealthStatus.HEALTHY
+            else ("yellow" if comp.status == HealthStatus.DEGRADED else "red")
+        )
+        health_table.add_row(
+            name, f"[{status_style}]{comp.status.value.upper()}[/{status_style}]", comp.message
+        )
 
     console.print(health_table)
 

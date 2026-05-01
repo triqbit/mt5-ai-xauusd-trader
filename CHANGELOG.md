@@ -24,3 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial enterprise-grade trading engine.
 - MT5 integration and risk management framework.
 - CI/CD pipelines for validation and security.
+
+## [Unreleased] - 2026-05-01
+### Added
+- Pre-flight configuration and health validation via `--check` flag.
+- Detailed MT5 connection troubleshooting guide.
+- High-visibility reporting using `rich` tables and panels.
+- `--verbose` flag for debug logging.
