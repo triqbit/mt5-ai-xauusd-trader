@@ -6,8 +6,19 @@ import contextlib
 # in environments without torch/SB3 (e.g., some CI runners).
 EnsembleModel = None
 LSTMAttentionModel = None
+DynamicEnsemble = None
+RegimeDetector = None
+MarketRegime = None
 
 with contextlib.suppress(ImportError):
+    from src.models.dynamic_ensemble import DynamicEnsemble
     from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+    from src.models.regime_detector import MarketRegime, RegimeDetector
 
-__all__ = ["EnsembleModel", "LSTMAttentionModel"]
+__all__ = [
+    "DynamicEnsemble",
+    "EnsembleModel",
+    "LSTMAttentionModel",
+    "MarketRegime",
+    "RegimeDetector",
+]
