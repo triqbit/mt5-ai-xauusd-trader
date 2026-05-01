@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 if TYPE_CHECKING:
-    from src.trading.risk_manager import TradeSignal
+    from src.trading.risk_manager import TradeSignal  # noqa: F401
 
 import numpy as np
 from sqlalchemy import (
@@ -127,9 +127,6 @@ class TradeLogger:
         Log a new model signal and return its ID.
         Supports both raw dictionaries and validated TradeSignal models.
         """
-        # Import here to avoid circular dependency
-        from src.trading.risk_manager import TradeSignal
-
         if isinstance(signal_data, dict):
             # If it's a dict, we still try to validate it if possible,
             # or at least extract fields safely.

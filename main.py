@@ -24,6 +24,7 @@ import structlog
 
 from src.core.config import get_config
 from src.core.config_validator import ConfigValidator
+from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
@@ -233,6 +234,20 @@ def main() -> int:
         model.load_ppo(ppo_path)
     if lstm_path.exists():
         model.load_lstm(lstm_path)
+
+    # Enterprise Health Gate
+    health_checker = init_health_checker(cfg, connector, trade_logger, model)
+    health_report = health_checker.get_full_report()
+
+    if health_report.status == HealthStatus.FAILED:
+        log.critical("Startup HEALTH CHECK FAILED")
+        for name, comp in health_report.components.items():
+            if comp.status == HealthStatus.FAILED:
+                log.error(f"  [FAILED] {name}: {comp.message}")
+        return 1
+
+    log.info("System HEALTH CHECK PASSED | status=%s", health_report.status)
+
     try:
         if cfg.mode in ("demo", "live"):
             run_live(
