@@ -39,6 +39,8 @@ jobs:
         run: ruff format --check src/ main.py
       - name: Import sort check (isort via ruff I-rules)
         run: ruff check --select I src/ main.py
+      - name: Static type check (mypy)
+        run: mypy src/ main.py
 
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan

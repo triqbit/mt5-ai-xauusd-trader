@@ -246,7 +246,9 @@ class MT5Connector:
         """Retrieve account balance, equity, and margin information."""
         if self._is_initialized and not self.use_metaapi:
             acc = mt5.account_info()
-            return acc._asdict() if acc else {}
+            if acc:
+                res: Dict[str, Any] = acc._asdict()
+                return res
         return {}
 
     def get_account_balance(self) -> float:

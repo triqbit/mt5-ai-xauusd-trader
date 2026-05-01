@@ -90,7 +90,7 @@ class TradingConfig(BaseSettings):
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
     """Return singleton TradingConfig (cached after first call)."""
-    return TradingConfig()  # type: ignore[call-arg]
+    return TradingConfig()
 
 
 __all__ = ["TradingConfig", "get_config"]
