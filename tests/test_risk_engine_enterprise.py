@@ -3,15 +3,19 @@ from src.trading.risk_engine import RiskEngine
 from src.trading.risk_manager import TradeSignal
 from src.core.config import TradingConfig
 
+
 @pytest.fixture
 def risk_engine():
     cfg = TradingConfig(
-        mt5_login=1, mt5_password="p", mt5_server="s",
+        mt5_login=1,
+        mt5_password="p",
+        mt5_server="s",
         risk_per_trade=0.01,
         max_positions=3,
-        min_confidence=0.55
+        min_confidence=0.55,
     )
     return RiskEngine(cfg, account_balance=10000.0)
+
 
 def test_validate_signal_approved(risk_engine):
     signal = TradeSignal(
@@ -22,10 +26,11 @@ def test_validate_signal_approved(risk_engine):
         take_profit=2020.0,
         lot_size=0.1,
         algorithm="ppo",
-        confidence=0.7
+        confidence=0.7,
     )
     decision = risk_engine.validate_signal(signal)
     assert decision.is_approved is True
+
 
 def test_validate_signal_rejected_confidence(risk_engine):
     signal = TradeSignal(
@@ -36,21 +41,29 @@ def test_validate_signal_rejected_confidence(risk_engine):
         take_profit=2020.0,
         lot_size=0.1,
         algorithm="ppo",
-        confidence=0.5
+        confidence=0.5,
     )
     decision = risk_engine.validate_signal(signal)
     assert decision.is_approved is False
     assert "Confidence" in decision.blocked_by
 
+
 def test_drawdown_breaker(risk_engine):
-    risk_engine.update_performance(-3500, 6500) # 35% drawdown
+    risk_engine.update_performance(-3500, 6500)  # 35% drawdown
     signal = TradeSignal(
-        symbol="XAUUSD", direction=1, entry_price=2000, stop_loss=1990,
-        take_profit=2020, lot_size=0.1, algorithm="ppo", confidence=0.8
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000,
+        stop_loss=1990,
+        take_profit=2020,
+        lot_size=0.1,
+        algorithm="ppo",
+        confidence=0.8,
     )
     decision = risk_engine.validate_signal(signal)
     assert decision.is_approved is False
     assert "Drawdown" in decision.blocked_by
+
 
 def test_calculate_lot_size(risk_engine):
     # Balance 1M, risk 1% = $10,000.
@@ -61,6 +74,7 @@ def test_calculate_lot_size(risk_engine):
     # Recalculated lot = 100,000 / (2000 * 100) = 0.5 lot.
     lot = risk_engine.calculate_lot_size("XAUUSD", 2000.0, 1900.0, 50.0, 1000000.0)
     assert lot == 0.5
+
 
 def test_calculate_lot_size_small(risk_engine):
     # Balance 1M, risk 1% = $10,000.

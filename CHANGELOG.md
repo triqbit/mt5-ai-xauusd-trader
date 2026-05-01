@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enterprise-grade scaffold for core trading modules including Configuration, MT5 Connector, Risk Engine, and Ensemble Model.
+- Granular risk management in `src/trading/risk_engine.py` with Level 1-4 daily loss and Level 1-5 drawdown circuit breakers.
+- ATR-based position sizing and volatility-adjusted risk scaling.
+- Hybrid MT5 Connector with native Windows SDK support and MetaAPI cloud failover for cross-platform deployments.
+- Weighted signal aggregation and consensus voting in `src/models/ensemble.py`.
+- Comprehensive unit testing suite for new enterprise modules in `tests/`.
 - Enterprise-grade monitoring and alerting system in `src/core/monitor.py` with Prometheus integration and Telegram bot support.
 - Disciplined walk-forward optimization framework in `src/research/hyperopt_walkforward.py` with Optuna integration.
 - Robustness scoring logic (Sharpe consistency, MDD preservation, parameter stability).
