@@ -15,7 +15,7 @@ scikit-learn==1.4.2
 pandas==2.2.2
 
 # ── Deep Learning Extras ────────────────────────────────────
-transformers==4.40.1
+transformers==5.0.0rc3
 timm==0.9.16
 einops==0.7.0
 
