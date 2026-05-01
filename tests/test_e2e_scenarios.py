@@ -80,8 +80,11 @@ def test_ensemble_model_with_gapping_data(mock_cfg):
     # We need to mock torch and SB3 before importing EnsembleModel
     # to avoid AttributeError in CI environments where these aren't fully loaded.
     with (
-        patch.dict("sys.modules", {"torch": MagicMock(), "stable_baselines3": MagicMock()}),
-        patch("src.models.ensemble.LSTMAttentionModel"),
+        patch.dict(
+            "sys.modules",
+            {"torch": MagicMock(), "torch.nn": MagicMock(), "stable_baselines3": MagicMock()},
+        ),
+        patch("src.models.LSTMAttentionModel"),
     ):
         from src.models.ensemble import EnsembleModel
 
