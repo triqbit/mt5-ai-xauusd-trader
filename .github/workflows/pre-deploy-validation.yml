@@ -55,7 +55,7 @@ jobs:
 
       - name: Cache TA-Lib
         id: cache-talib
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /usr/lib/libta_lib.*
           key: ${{ runner.os }}-talib-v0.6.4
