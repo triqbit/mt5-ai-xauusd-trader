@@ -75,6 +75,7 @@ def run_live(
 
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+            volatility = float(df["close"].rolling(20).std().iloc[-1])
 
             # 3. Get ensemble prediction
             with profile("inference"):
@@ -90,6 +91,7 @@ def run_live(
                         "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
                         "algorithm": cfg.algorithm,
                         "confidence": confidence,
+                        "volatility": volatility,
                     }
                 )
 
