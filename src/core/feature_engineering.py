@@ -9,7 +9,7 @@ candle patterns, and volume profiles.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Union
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -75,7 +75,9 @@ class FeatureEngineer:
 
             # 1. Base Timeframe Features
             feature_blocks = []
-            feature_blocks.append(self._get_technical_indicators(df, prefix=f"base_{self.base_timeframe}"))
+            feature_blocks.append(
+                self._get_technical_indicators(df, prefix=f"base_{self.base_timeframe}")
+            )
             feature_blocks.append(self._get_candle_patterns(df))
             feature_blocks.append(self._get_price_action_features(df))
             feature_blocks.append(self._get_volume_features(df))
@@ -88,7 +90,7 @@ class FeatureEngineer:
                 feature_blocks.append(mtf_features)
 
             # Concatenate all blocks to avoid fragmentation
-            full_df = pd.concat([df] + feature_blocks, axis=1)
+            full_df = pd.concat([df, *feature_blocks], axis=1)
 
             # Drop rows with NaNs resulting from indicator windows
             full_df = full_df.dropna()
@@ -112,7 +114,6 @@ class FeatureEngineer:
         close = df["close"].values
         high = df["high"].values
         low = df["low"].values
-        volume = df["tick_volume"].values.astype(float)
 
         # Momentum
         indicators[f"{prefix}_rsi"] = talib.RSI(close, timeperiod=14)
@@ -134,13 +135,24 @@ class FeatureEngineer:
         for period in [8, 21, 50, 200]:
             indicators[f"{prefix}_ema_{period}"] = talib.EMA(close, timeperiod=period)
             # Distance from EMA
-            indicators[f"{prefix}_dist_ema_{period}"] = (close - indicators[f"{prefix}_ema_{period}"]) / (indicators[f"{prefix}_ema_{period}"] + 1e-8)
+            indicators[f"{prefix}_dist_ema_{period}"] = (
+                close - indicators[f"{prefix}_ema_{period}"]
+            ) / (indicators[f"{prefix}_ema_{period}"] + 1e-8)
 
         # ADX
         indicators[f"{prefix}_adx"] = talib.ADX(high, low, close, timeperiod=14)
 
         # Stochastic
-        slowk, slowd = talib.STOCH(high, low, close, fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
+        slowk, slowd = talib.STOCH(
+            high,
+            low,
+            close,
+            fastk_period=5,
+            slowk_period=3,
+            slowk_matype=0,
+            slowd_period=3,
+            slowd_matype=0,
+        )
         indicators[f"{prefix}_stoch_k"] = slowk
         indicators[f"{prefix}_stoch_d"] = slowd
 
@@ -174,7 +186,9 @@ class FeatureEngineer:
 
         # Range
         pa["day_range"] = (df["high"] - df["low"]) / df["close"].replace(0, 1e-8)
-        pa["body_size"] = (df["close"] - df["open"]).abs() / (df["high"] - df["low"]).replace(0, 1e-8)
+        pa["body_size"] = (df["close"] - df["open"]).abs() / (df["high"] - df["low"]).replace(
+            0, 1e-8
+        )
 
         # Slope (Linear Regression)
         def get_slope(series: pd.Series) -> float:
@@ -207,19 +221,32 @@ class FeatureEngineer:
         """
         # Map MT5-style timeframe strings to Pandas frequency strings
         tf_map = {
-            "M1": "1min", "M5": "5min", "M15": "15min", "M30": "30min",
-            "H1": "1h", "H4": "4h", "D1": "1D", "W1": "1W", "MN1": "1ME"
+            "M1": "1min",
+            "M5": "5min",
+            "M15": "15min",
+            "M30": "30min",
+            "H1": "1h",
+            "H4": "4h",
+            "D1": "1D",
+            "W1": "1W",
+            "MN1": "1ME",
         }
         freq = tf_map.get(tf, tf)
 
         # Resample
-        resampled = df.resample(freq).agg({
-            "open": "first",
-            "high": "max",
-            "low": "min",
-            "close": "last",
-            "tick_volume": "sum"
-        }).dropna()
+        resampled = (
+            df.resample(freq)
+            .agg(
+                {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "tick_volume": "sum",
+                }
+            )
+            .dropna()
+        )
 
         # Compute indicators on resampled data
         mtf_indicators = self._get_technical_indicators(resampled, prefix=f"mtf_{tf}")

@@ -7,6 +7,7 @@ Unit tests for the feature engineering pipeline.
 import numpy as np
 import pandas as pd
 import pytest
+
 from src.core.feature_engineering import FeatureEngineer
 from src.utils.synthetic_data import ScenarioGenerator
 
