@@ -13,12 +13,17 @@
 # and requires numpy>=2.0 (listed below).
 # ============================================================
 
+# -- Extra index for torch CPU -------------------------------------
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # -- Core numeric / data -------------------------------------------
 # numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
 numpy==2.2.6
 scipy==1.15.2
 scikit-learn==1.7.2
 pandas==2.2.3
+torch==2.7.1
+torchvision==0.18.0+cpu
 
 # -- Technical Analysis --------------------------------------------
 # Python wrapper; C library (0.6.4) built from source in ci.yml

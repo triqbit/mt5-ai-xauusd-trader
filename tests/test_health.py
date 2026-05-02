@@ -10,8 +10,17 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 
-from src.core.health import HealthChecker, HealthStatus, router, init_health_checker, ComponentStatus, HealthReport, HEALTH_GAUGES
+from src.core.health import (
+    HealthChecker,
+    HealthStatus,
+    router,
+    init_health_checker,
+    ComponentStatus,
+    HealthReport,
+    HEALTH_GAUGES,
+)
 from src.core.config import TradingConfig
+
 
 @pytest.fixture
 def mock_config():
@@ -29,11 +38,13 @@ def mock_config():
     cfg.max_positions = 3
     return cfg
 
+
 @pytest.fixture
 def mock_connector():
     connector = MagicMock()
     connector._is_initialized = True
     return connector
+
 
 @pytest.fixture
 def mock_trade_logger():
@@ -44,6 +55,7 @@ def mock_trade_logger():
     logger.engine.dialect.do_ping.return_value = True
     return logger
 
+
 @pytest.fixture
 def mock_model():
     model = MagicMock()
@@ -51,14 +63,17 @@ def mock_model():
     model.lstm_model = MagicMock()
     return model
 
+
 @pytest.fixture
 def health_checker(mock_config, mock_connector, mock_trade_logger, mock_model):
     return HealthChecker(mock_config, mock_connector, mock_trade_logger, mock_model)
+
 
 def test_check_liveness(health_checker):
     status = health_checker.check_liveness()
     assert status.status == HealthStatus.HEALTHY
     assert "running" in status.message
+
 
 def test_check_database_success(health_checker, mock_trade_logger):
     status = health_checker.check_database()
@@ -66,22 +81,26 @@ def test_check_database_success(health_checker, mock_trade_logger):
     assert "reachable" in status.message
     mock_trade_logger.engine.connect.assert_called_once()
 
+
 def test_check_database_failure(health_checker, mock_trade_logger):
     mock_trade_logger.engine.connect.side_effect = Exception("DB error")
     status = health_checker.check_database()
     assert status.status == HealthStatus.FAILED
     assert "DB error" in status.message
 
+
 def test_check_mt5_success(health_checker):
     status = health_checker.check_mt5()
     assert status.status == HealthStatus.HEALTHY
     assert "alive" in status.message
+
 
 def test_check_mt5_failure(health_checker, mock_connector):
     mock_connector._is_initialized = False
     status = health_checker.check_mt5()
     assert status.status == HealthStatus.FAILED
     assert "down" in status.message
+
 
 def test_check_models_success(health_checker, mock_model):
     mock_model._dreamer_model = MagicMock()
@@ -91,6 +110,7 @@ def test_check_models_success(health_checker, mock_model):
     assert "LSTM" in status.message
     assert "Dreamer" in status.message
 
+
 def test_check_models_partial(health_checker, mock_model):
     mock_model.lstm_model = None
     status = health_checker.check_models()
@@ -98,12 +118,14 @@ def test_check_models_partial(health_checker, mock_model):
     assert "PPO" in status.message
     assert "LSTM" not in status.message
 
+
 def test_check_models_failed(health_checker, mock_model):
     mock_model._ppo_model = None
     mock_model.lstm_model = None
     mock_model._dreamer_model = None
     status = health_checker.check_models()
     assert status.status == HealthStatus.FAILED
+
 
 @patch("src.core.health.ConfigValidator")
 def test_check_config_success(mock_validator_class, health_checker):
@@ -113,6 +135,7 @@ def test_check_config_success(mock_validator_class, health_checker):
     status = health_checker.check_config()
     assert status.status == HealthStatus.HEALTHY
     assert "valid" in status.message
+
 
 @patch("src.core.health.ConfigValidator")
 def test_check_config_failed(mock_validator_class, health_checker):
@@ -124,21 +147,24 @@ def test_check_config_failed(mock_validator_class, health_checker):
     assert status.status == HealthStatus.FAILED
     assert "Critical error" in status.message
 
+
 @patch("shutil.disk_usage")
 def test_check_disk_space_success(mock_disk_usage, health_checker, mock_config):
-    mock_disk_usage.return_value = MagicMock(free=500 * 1024 * 1024) # 500 MB
+    mock_disk_usage.return_value = MagicMock(free=500 * 1024 * 1024)  # 500 MB
 
     status = health_checker.check_disk_space()
     assert status.status == HealthStatus.HEALTHY
     assert "500.00MB" in status.message
 
+
 @patch("shutil.disk_usage")
 def test_check_disk_space_failure(mock_disk_usage, health_checker, mock_config):
-    mock_disk_usage.return_value = MagicMock(free=10 * 1024 * 1024) # 10 MB
+    mock_disk_usage.return_value = MagicMock(free=10 * 1024 * 1024)  # 10 MB
 
     status = health_checker.check_disk_space(min_mb=100)
     assert status.status == HealthStatus.FAILED
     assert "Low disk space" in status.message
+
 
 def test_check_redis_success(health_checker, mock_config):
     mock_config.redis_url = "redis://localhost:6379/0"
@@ -148,6 +174,7 @@ def test_check_redis_success(health_checker, mock_config):
         assert status.status == HealthStatus.HEALTHY
         assert "reachable" in status.message
 
+
 def test_check_redis_failure(health_checker, mock_config):
     mock_config.redis_url = "redis://localhost:6379/0"
     with patch("redis.from_url") as mock_redis:
@@ -156,18 +183,20 @@ def test_check_redis_failure(health_checker, mock_config):
         assert status.status == HealthStatus.FAILED
         assert "Redis connection error" in status.message
 
+
 def test_check_redis_not_installed(health_checker):
     with patch.dict("sys.modules", {"redis": None}):
         status = health_checker.check_redis()
         assert status.status == HealthStatus.DEGRADED
         assert "not installed" in status.message
 
+
 def test_get_full_report(health_checker):
-    with patch.object(HealthChecker, 'check_config') as mock_conf:
+    with patch.object(HealthChecker, "check_config") as mock_conf:
         mock_conf.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
-        with patch.object(HealthChecker, 'check_disk_space') as mock_disk:
+        with patch.object(HealthChecker, "check_disk_space") as mock_disk:
             mock_disk.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
-            with patch.object(HealthChecker, 'check_redis') as mock_redis:
+            with patch.object(HealthChecker, "check_redis") as mock_redis:
                 mock_redis.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
 
                 report = health_checker.get_full_report()
@@ -181,9 +210,11 @@ def test_get_full_report(health_checker):
                 assert HEALTH_GAUGES["overall"]._value.get() == 1.0
                 assert HEALTH_GAUGES["database"]._value.get() == 1.0
 
+
 # --- FastAPI Endpoint Tests ---
 
 from fastapi import FastAPI
+
 
 @pytest.fixture
 def client(mock_config, mock_connector, mock_trade_logger, mock_model):
@@ -192,10 +223,12 @@ def client(mock_config, mock_connector, mock_trade_logger, mock_model):
     init_health_checker(mock_config, mock_connector, mock_trade_logger, mock_model)
     return TestClient(app)
 
+
 def test_api_liveness(client):
     response = client.get("/health/liveness")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+
 
 def test_api_readiness_success(client):
     with patch("src.core.health.HealthChecker.check_config") as mock_conf:
@@ -208,6 +241,7 @@ def test_api_readiness_success(client):
                 response = client.get("/health/readiness")
             assert response.status_code == 200
             assert response.json()["status"] == "healthy"
+
 
 def test_api_readiness_failure(client):
     with patch("src.core.health.HealthChecker.check_mt5") as mock_mt5:

@@ -32,10 +32,14 @@ HEALTH_GAUGES = {
     "database": Gauge("health_database_status", "Database status (1=healthy, 0=failed)"),
     "mt5": Gauge("health_mt5_status", "MT5 connection status (1=healthy, 0=failed)"),
     "models": Gauge("health_models_status", "Models status (1=healthy, 0.5=degraded, 0=failed)"),
-    "config": Gauge("health_config_status", "Configuration status (1=healthy, 0.5=degraded, 0=failed)"),
+    "config": Gauge(
+        "health_config_status", "Configuration status (1=healthy, 0.5=degraded, 0=failed)"
+    ),
     "disk": Gauge("health_disk_status", "Disk space status (1=healthy, 0=failed)"),
     "redis": Gauge("health_redis_status", "Redis status (1=healthy, 0=failed)"),
-    "overall": Gauge("health_overall_status", "Overall system health (1=healthy, 0.5=degraded, 0=failed)"),
+    "overall": Gauge(
+        "health_overall_status", "Overall system health (1=healthy, 0.5=degraded, 0=failed)"
+    ),
 }
 
 
@@ -172,9 +176,7 @@ class HealthChecker:
             )
         except Exception as e:
             logger.error("Health check - Redis failure: %s", e)
-            return ComponentStatus(
-                status=HealthStatus.FAILED, message=f"Redis unreachable: {e!s}"
-            )
+            return ComponentStatus(status=HealthStatus.FAILED, message=f"Redis unreachable: {e!s}")
 
     def check_disk_space(self, min_mb: int = 100) -> ComponentStatus:
         """Check for sufficient disk space in log directory."""
@@ -223,7 +225,11 @@ class HealthChecker:
         )
 
         # Update Prometheus metrics
-        status_map = {HealthStatus.HEALTHY: 1.0, HealthStatus.DEGRADED: 0.5, HealthStatus.FAILED: 0.0}
+        status_map = {
+            HealthStatus.HEALTHY: 1.0,
+            HealthStatus.DEGRADED: 0.5,
+            HealthStatus.FAILED: 0.0,
+        }
 
         for name, gauge in HEALTH_GAUGES.items():
             if name == "overall":
