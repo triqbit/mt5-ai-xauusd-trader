@@ -5,19 +5,20 @@ Real-time monitoring, equity tracking, Prometheus metrics, and Telegram alerting
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import structlog
 import telegram
 from prometheus_client import Counter, Gauge, start_http_server
 
 from src.core.config import TradingConfig
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # --- Prometheus Metrics Definitions ---
 EQUITY_GAUGE = Gauge("trading_equity", "Current account equity")
@@ -54,16 +55,16 @@ class Monitor:
         try:
             start_http_server(self.cfg.prometheus_port)
             self._server_started = True
-            logger.info("Prometheus metrics server started on port %d", self.cfg.prometheus_port)
+            logger.info("Prometheus metrics server started", port=self.cfg.prometheus_port)
         except Exception as e:
-            logger.error("Failed to start Prometheus metrics server: %s", e)
+            logger.error("Failed to start Prometheus metrics server", error=str(e))
 
     def log_equity(self, equity: float) -> None:
         """Record current equity and update Prometheus metrics."""
         data = {"timestamp": datetime.now(timezone.utc), "equity": equity}
         self.equity_history.append(data)
         EQUITY_GAUGE.set(equity)
-        logger.debug("Equity logged: %.2f", equity)
+        logger.debug("Equity logged", equity=equity)
 
     def send_message(self, text: str) -> None:
         """Synchronous wrapper to send Telegram message."""
@@ -102,7 +103,7 @@ class Monitor:
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger and update metrics."""
         DRAWDOWN_GAUGE.set(drawdown * 100)
-        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
+        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown * 100:.2f}%\nTrading Halted."
         self.send_message(msg)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:

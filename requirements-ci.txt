@@ -30,7 +30,7 @@ alembic==1.13.1
 
 # -- Pydantic / settings -------------------------------------------
 pydantic==2.13.3
-pydantic-settings==2.8.1
+pydantic-settings==2.2.1
 
 # -- Testing -------------------------------------------------------
 optuna==4.2.1
