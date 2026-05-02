@@ -5,7 +5,6 @@ Real-time monitoring, equity tracking, Prometheus metrics, and Telegram alerting
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -103,7 +102,7 @@ class Monitor:
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger and update metrics."""
         DRAWDOWN_GAUGE.set(drawdown * 100)
-        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown * 100:.2f}%\nTrading Halted."
+        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
         self.send_message(msg)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:

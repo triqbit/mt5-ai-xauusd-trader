@@ -5,19 +5,26 @@ Unit tests for retry logic and hardened exception propagation.
 Author : triqbit
 License: MIT
 """
-import pytest
+
 from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.core.exceptions import MT5ConnectionError, MT5DataError
 from src.core.retry import with_retry
-from src.core.exceptions import MT5ConnectionError, MT5DataError, OrderExecutionError
 from src.trading.mt5_connector import MT5Connector
 
 # Mocking heavy dependencies to allow tests to run in light environments
-with patch.dict("sys.modules", {
-    "MetaTrader5": MagicMock(),
-    "metaapi_cloud_sdk": MagicMock(),
-    "torch": MagicMock(),
-    "stable_baselines3": MagicMock(),
-}):
+with patch.dict(
+    "sys.modules",
+    {
+        "MetaTrader5": MagicMock(),
+        "metaapi_cloud_sdk": MagicMock(),
+        "torch": MagicMock(),
+        "stable_baselines3": MagicMock(),
+    },
+):
+
     def test_with_retry_success():
         """Verify that with_retry succeeds if the function returns eventually."""
         mock_func = MagicMock(side_effect=[ValueError("Fail"), ValueError("Fail"), "Success"])
@@ -55,14 +62,15 @@ with patch.dict("sys.modules", {
 
         connector = MT5Connector(config)
 
-        with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), \
-             patch("src.trading.mt5_connector.mt5.initialize", return_value=False), \
-             patch("src.trading.mt5_connector.mt5.last_error", return_value=(1, "Connect error")):
-
-            with pytest.raises(MT5ConnectionError):
-                # We use a small max_retries in the test by patching the decorator or just letting it run
-                # Since initialize is decorated with max_retries=3, it will attempt 4 times
-                connector.initialize()
+        with (
+            patch("src.trading.mt5_connector.MT5_AVAILABLE", True),
+            patch("src.trading.mt5_connector.mt5.initialize", return_value=False),
+            patch("src.trading.mt5_connector.mt5.last_error", return_value=(1, "Connect error")),
+            pytest.raises(MT5ConnectionError),
+        ):
+            # We use a small max_retries in the test by patching the decorator or just letting it run
+            # Since initialize is decorated with max_retries=3, it will attempt 4 times
+            connector.initialize()
 
     def test_connector_get_rates_raises_on_failure():
         """Verify MT5Connector.get_rates raises MT5DataError."""
@@ -71,8 +79,9 @@ with patch.dict("sys.modules", {
         connector._is_initialized = True
         connector.use_metaapi = False
 
-        with patch("src.trading.mt5_connector.mt5.copy_rates_from_pos", return_value=None), \
-             patch("src.trading.mt5_connector.mt5.last_error", return_value=(-1, "No rates")):
-
-            with pytest.raises(MT5DataError):
-                connector.get_rates("XAUUSD", "M5", 100)
+        with (
+            patch("src.trading.mt5_connector.mt5.copy_rates_from_pos", return_value=None),
+            patch("src.trading.mt5_connector.mt5.last_error", return_value=(-1, "No rates")),
+            pytest.raises(MT5DataError),
+        ):
+            connector.get_rates("XAUUSD", "M5", 100)

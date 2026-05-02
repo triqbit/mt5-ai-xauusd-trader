@@ -19,9 +19,11 @@ class PPOAgent:
     PPO-based reinforcement learning agent.
     Uses Stable-Baselines3 PPO under the hood.
     """
-
     def __init__(
-        self, env: Any, model_path: Optional[Union[str, Path]] = None, device: str = "auto"
+        self,
+        env: Any,
+        model_path: Optional[Union[str, Path]] = None,
+        device: str = "auto"
     ) -> None:
         from stable_baselines3 import PPO
         from stable_baselines3.common.vec_env import DummyVecEnv
@@ -53,7 +55,9 @@ class PPOAgent:
             )
 
     def train(
-        self, total_timesteps: int = 1_000_000, save_path: Optional[Union[str, Path]] = None
+        self,
+        total_timesteps: int = 1_000_000,
+        save_path: Optional[Union[str, Path]] = None
     ) -> None:
         """Train the PPO agent."""
         self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
@@ -72,7 +76,6 @@ class PPOAgent:
     def evaluate(self, n_eval_episodes: int = 10) -> Dict[str, float]:
         """Evaluate agent performance over n episodes."""
         from stable_baselines3.common.evaluation import evaluate_policy
-
         mean_reward, std_reward = evaluate_policy(
             self.model, self.env, n_eval_episodes=n_eval_episodes
         )

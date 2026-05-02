@@ -21,7 +21,7 @@ def with_retry(
     max_delay: float = 30.0,
     exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception,
     jitter: bool = True,
-) -> Callable:
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator for retrying a function with exponential backoff and optional jitter.
 
@@ -33,7 +33,7 @@ def with_retry(
         jitter: Whether to add random jitter to the delay.
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             retries = 0
