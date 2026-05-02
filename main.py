@@ -270,7 +270,9 @@ def main() -> int:
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
     else:
-        log.warning(f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble")
+        log.warning(
+            f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble"
+        )
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
