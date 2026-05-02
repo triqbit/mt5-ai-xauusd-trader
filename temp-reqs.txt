@@ -1,0 +1,6 @@
+yfinance
+metaapi-cloud-sdk
+httpx
+aiohttp
+pytest
+pytest-asyncio
