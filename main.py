@@ -23,6 +23,7 @@ from typing import Optional
 
 import structlog
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from src.core import get_config, profile
@@ -37,7 +38,8 @@ from src.trading.risk_manager import RiskManager, TradeSignal
 # -- Logging setup ---------------------------------------------------------
 
 
-def configure_logging(level: str = "INFO") -> None:
+def configure_logging(level: str = "INFO", verbose: bool = False) -> None:
+    log_level = "DEBUG" if verbose else level.upper()
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
@@ -49,7 +51,7 @@ def configure_logging(level: str = "INFO") -> None:
         logger_factory=structlog.PrintLoggerFactory(),
     )
     logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
+        level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
@@ -184,28 +186,43 @@ def run_live(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
+    p.add_argument(
+        "--mode",
+        choices=["demo", "live", "backtest"],
+        help="Execution mode (default: demo)",
+    )
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
-        default="ensemble",
+        help="Trading algorithm (default: ensemble)",
     )
-    p.add_argument("--symbol", default="XAUUSD")
-    p.add_argument("--timeframe", default="M5")
+    p.add_argument("--symbol", help="Trading symbol (default: XAUUSD)")
+    p.add_argument("--timeframe", help="Chart timeframe (default: M5)")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
-    p.add_argument("--log-level", default="INFO")
+    p.add_argument("--log-level", default="INFO", help="Logging level")
+    p.add_argument("--verbose", action="store_true", help="Enable DEBUG logging")
+    p.add_argument(
+        "--check",
+        action="store_true",
+        help="Perform pre-flight validation and health check, then exit",
+    )
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    configure_logging(args.log_level)
+    configure_logging(args.log_level, args.verbose)
     log, console = logging.getLogger("main"), Console()
-    # Override config from CLI
-    os.environ.setdefault("MODE", args.mode)
-    os.environ.setdefault("ALGORITHM", args.algo)
-    os.environ.setdefault("SYMBOL", args.symbol)
-    os.environ.setdefault("TIMEFRAME", args.timeframe)
+
+    # CLI overrides for environment variables
+    if args.mode:
+        os.environ["MODE"] = args.mode
+    if args.algo:
+        os.environ["ALGORITHM"] = args.algo
+    if args.symbol:
+        os.environ["SYMBOL"] = args.symbol
+    if args.timeframe:
+        os.environ["TIMEFRAME"] = args.timeframe
 
     try:
         cfg = get_config()
@@ -217,16 +234,20 @@ def main() -> int:
     validator = ConfigValidator(cfg)
     result = validator.validate()
 
+    if result.errors:
+        val_table = Table(title="Configuration Validation", box=None)
+        val_table.add_column("Field", style="cyan")
+        val_table.add_column("Level", justify="center")
+        val_table.add_column("Message")
+        for err in result.errors:
+            level_str = "CRITICAL" if err.critical else "WARNING"
+            level_color = "red" if err.critical else "yellow"
+            val_table.add_row(err.field, f"[{level_color}]{level_str}[/]", err.message)
+        console.print(val_table)
+
     if not result.success:
         log.critical("Startup validation FAILED")
-        for err in result.errors:
-            level = "CRITICAL" if err.critical else "WARNING"
-            log.error(f"  [{level}] {err.field}: {err.message}")
         return 1
-
-    if result.errors:
-        for err in result.errors:
-            log.warning(f"  [WARNING] {err.field}: {err.message}")
 
     log.info(
         "Configuration loaded and validated | mode=%s algo=%s symbol=%s",
@@ -237,9 +258,21 @@ def main() -> int:
     # Initialise components
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
-        if not connector.connect():
-            log.critical("Cannot connect to MT5 terminal. Aborting.")
-            return 1
+        connected = connector.connect()
+
+    if not connected:
+        troubleshooting = (
+            "[bold red]Failed to connect to MetaTrader 5.[/bold red]\n\n"
+            "[bold cyan]Actionable Troubleshooting Steps:[/bold cyan]\n"
+            "1. [yellow]Terminal Status:[/yellow] Ensure MT5 terminal is actually running.\n"
+            "2. [yellow]Path:[/yellow] Check if MT5_PATH is correct: [dim]C:/Program Files/...[/dim]\n"
+            "3. [yellow]Algo Trading:[/yellow] In MT5, ensure 'Allow Algo Trading' is enabled (top toolbar).\n"
+            "4. [yellow]Credentials:[/yellow] Verify MT5_LOGIN, MT5_PASSWORD, and MT5_SERVER are exact.\n"
+            "5. [yellow]Cloud Fallback:[/yellow] If on Linux/Mac, ensure METAAPI_TOKEN is set for cloud access.\n"
+        )
+        console.print(Panel(troubleshooting, title="Connection Error", border_style="red"))
+        log.critical("Cannot connect to MT5 terminal. Aborting.")
+        return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
@@ -277,6 +310,10 @@ def main() -> int:
     if report.status == HealthStatus.FAILED:
         log.critical("Startup HEALTH CHECK FAILED")
         return 1
+
+    if args.check:
+        log.info("Check mode complete. System is healthy.")
+        return 0
 
     try:
         if cfg.mode in ("demo", "live"):

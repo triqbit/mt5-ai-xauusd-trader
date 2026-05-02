@@ -105,8 +105,14 @@ MODE=demo
 
 ### 3. Execution
 ```bash
-# Run validation and start in demo mode
+# Pre-flight check: validate config, connectivity, and health
+python main.py --check
+
+# Start in demo mode with verbose logging
 python main.py --mode demo --symbol XAUUSD --verbose
+
+# Run with specific algorithm
+python main.py --mode demo --algo ensemble --timeframe M5
 ```
 
 ---
