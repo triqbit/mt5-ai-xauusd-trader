@@ -70,7 +70,7 @@ class TradingConfig(BaseSettings):
 
     @field_validator("risk_per_trade")
     @classmethod
-    def risk_must_be_safe(cls, v: float) -> float:
+    def risk_must_be_safe(cls, v: float) -> float:  # type: ignore[misc]
         if v > 0.02:
             raise ValueError("risk_per_trade > 2% is not permitted in production.")
         return v
