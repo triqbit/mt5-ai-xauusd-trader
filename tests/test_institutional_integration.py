@@ -56,7 +56,7 @@ def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     }
 
     # Force update via dynamic_ensemble (underlying EnsembleModel's rebalance_weights uses Sharpe)
-    ensemble.dynamic_ensemble.update_weights(metrics, regime=regime_info.label)
+    ensemble.dynamic_ensemble.update_weights(metrics, regime_info=regime_info)
     new_weights = ensemble.weights
 
     # PPO should have gained weight due to higher accuracy and lower drift
