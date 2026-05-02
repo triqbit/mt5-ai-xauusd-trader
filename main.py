@@ -201,6 +201,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeframe", default="M5")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
     p.add_argument("--log-level", default="INFO")
+    p.add_argument("--start", help="Backtest start date (YYYY-MM-DD)")
+    p.add_argument("--end", help="Backtest end date (YYYY-MM-DD)")
     return p.parse_args()
 
 
@@ -308,7 +310,52 @@ def main() -> int:
                 monitor=monitor,
             )
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            from rich.table import Table
+            from src.core.feature_engineering import FeatureEngineer
+            from src.trading.backtester import BacktestEngine
+            from src.trading.execution_filter import ExecutionFilter
+
+            log.info("Initialising BacktestEngine...")
+            fe = FeatureEngineer(base_timeframe=args.timeframe)
+            ef = ExecutionFilter()
+            engine = BacktestEngine(cfg, fe, ef)
+
+            # 1. Fetch historical data
+            from datetime import datetime
+
+            start_dt = datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
+            end_dt = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
+
+            log.info(f"Fetching historical data for {cfg.symbol} from {start_dt} to {end_dt}")
+
+            # Fetch with date range support
+            data = connector.get_ohlcv(
+                cfg.symbol, args.timeframe, start_date=start_dt, end_date=end_dt
+            )
+
+            if data.empty:
+                log.error("No data fetched for backtest.")
+                return 1
+
+            # 2. Run walk-forward backtest
+            report = engine.run_walk_forward(data, model)
+
+            # 3. Display report
+            table = Table(title=f"Backtest Report: {cfg.symbol}", box=None)
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", style="magenta")
+            table.add_row("Annualized Return", f"{report.annualized_return:.2%}")
+            table.add_row("Sharpe Ratio", f"{report.sharpe_ratio:.2f}")
+            table.add_row("Max Drawdown", f"{report.max_drawdown:.2%}")
+            table.add_row("Profit Factor", f"{report.profit_factor:.2f}")
+            table.add_row("Total Trades", str(report.total_trades))
+            table.add_row("Win Rate", f"{report.win_rate:.2%}")
+            table.add_row("Mean MAE", f"{report.mae:.4f}")
+            table.add_row("Mean MFE", f"{report.mfe:.4f}")
+            table.add_row("Total PnL", f"{report.total_pnl:.2f}")
+            table.add_row("Ending Balance", f"{report.ending_balance:.2f}")
+            console.print(table)
+
     finally:
         connector.disconnect()
     return 0
