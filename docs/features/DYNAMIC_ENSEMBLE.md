@@ -12,20 +12,21 @@ The `DynamicEnsemble` class implements an adaptive weighting engine that adjusts
     - **EMA Smoothing**: Prevents erratic jumps in weights.
     - **Weight Swing Caps**: Limits the maximum change in any single update.
     - **Oscillation Dampening**: Detects and slows down adaptation when target weights flip-flop across the current mean.
-- **Regime Awareness**: Weights can be adjusted based on the current `MarketRegime` (e.g., penalizing drift during news shocks).
+- **Regime & Volatility Awareness**: Weights are adjusted based on the current `RegimeInfo`, including `MarketRegime` (e.g., penalizing drift during news shocks) and a `volatility_index` which modulates the adaptation speed.
 
 ## Implementation Details
 
 The weighting engine ensures that:
 1. Weights always sum to 1.0.
 2. No model weight falls below a configurable `min_weight` floor.
-3. Transitions are smooth and mathematically sound.
+3. Transitions are smooth and mathematically sound, with adaptation speed automatically slowing down during high volatility or target oscillations.
+4. Memory safety is maintained in the orchestrator via rolling window deques for performance metrics.
 
 ## Usage
 
 ```python
 from src.models.dynamic_ensemble import DynamicEnsemble
-from src.models.regime_detector import MarketRegime
+from src.models.regime_detector import MarketRegime, RegimeInfo
 
 ensemble = DynamicEnsemble(
     model_names=["ppo", "lstm", "transformer"],
@@ -33,10 +34,18 @@ ensemble = DynamicEnsemble(
     max_swing=0.05
 )
 
+# Mock regime info
+regime_info = RegimeInfo(
+    label=MarketRegime.TRENDING,
+    confidence=0.9,
+    transition_score=0.1,
+    volatility_index=1.2
+)
+
 # Update weights with current metrics
 metrics = {
     "ppo": {"accuracy": 0.85, "calibration_error": 0.05, "drift_score": 0.02},
     "lstm": {"accuracy": 0.70, "calibration_error": 0.15, "drift_score": 0.08},
 }
-new_weights = ensemble.update_weights(metrics, regime=MarketRegime.TRENDING)
+new_weights = ensemble.update_weights(metrics, regime_info=regime_info)
 ```

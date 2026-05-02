@@ -6,7 +6,6 @@ from src.core.explainability import (
     SignalDirection,
     SignalExplainer,
     SignalExplanation,
-    ExecutionSummary,
 )
 
 
