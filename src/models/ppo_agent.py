@@ -28,7 +28,8 @@ class PPOAgent(BaseModel):
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.device = device
-        self.model = None
+        self.model: Optional[Any] = None
+        self.env: Optional[Any] = None
 
         # Lazy loading of SB3 to avoid dependency issues in non-training environments
         try:
@@ -42,7 +43,7 @@ class PPOAgent(BaseModel):
 
             if model_path and Path(model_path).exists():
                 self.logger.info(f"Loading existing PPO model from {model_path}")
-                self.model = PPO.load(model_path, env=self.env, device=device)
+                self.model = PPO.load(str(model_path), env=self.env, device=device)
             elif self.env is not None:
                 self.logger.info("Creating new PPO model...")
                 self.model = PPO(

@@ -4,42 +4,49 @@ This document tracks technical debt introduced by multi-agent parallelism and ar
 
 ## Current Debt Items
 
-### Debt Item: Fragmented Model Weighting Logic
-**Category:** Fragmentation | Duplication
-**Impact:** High
-**Effort:** M
-**Resolution plan:** Refactor `EnsembleModel` in `src/models/ensemble.py` to use `DynamicEnsemble` from `src/models/dynamic_ensemble.py`. `EnsembleModel` currently implements its own simpler (and slightly different) version of rolling Sharpe rebalancing.
-**Owner:** immediate cleanup (Jules05)
-
-### Debt Item: Inconsistent Signal Direction Mapping
+### Debt Item: Signal Mapping Inconsistency (TimeSeriesTransformer)
 **Category:** Naming | Quality
 **Impact:** High
 **Effort:** S
-**Resolution plan:** Create a centralized `SignalDirection` or `TradeSignal` constants in `src/core/constants.py`.
-- `EnsembleModel`: `{0: 1, 1: -1, 2: 0}` (0=buy, 1=sell, 2=hold)
-- `PPOAgent` (via Adapter): `{0: 0, 1: 1, 2: -1}` (0=hold, 1=buy, 2=sell)
-- `TimeSeriesTransformer` (via Adapter): `{0: 1, 1: -1, 2: 0}` (0=buy, 1=sell, 2=hold)
-- `GymEnv`: `0=Hold, 1=Buy, 2=Sell`
-This inconsistency is a major source of potential bugs.
+**Resolution plan:** Standardize `TimeSeriesTransformer` output and `TransformerAdapter` to follow the `ModelAction` enum (`0=HOLD, 1=BUY, 2=SELL`). Currently uses legacy `0=BUY, 1=SELL, 2=HOLD`.
 **Owner:** immediate cleanup (Jules05)
 
-### Debt Item: Incomplete Type Hinting in PPOAgent
+### Debt Item: Duplicated LSTM Architectures
+**Category:** Duplication | Fragmentation
+**Impact:** Medium
+**Effort:** M
+**Resolution plan:** Unify `LSTMAttentionModel` (currently in `src/models/ensemble.py`) and `LSTMPricePredictor` (in `src/models/lstm_model.py`) into a single, high-performance LSTM module in `src/models/lstm_model.py`.
+**Owner:** immediate cleanup (Jules05)
+
+### Debt Item: Weak Model Confidence Implementations
 **Category:** Quality
 **Impact:** Medium
-**Effort:** S
-**Resolution plan:** Add proper type hints to `src/models/ppo_agent.py` methods and `__init__`.
-**Owner:** immediate cleanup (Jules05)
+**Effort:** M
+**Resolution plan:** Implement proper confidence calibration (e.g., using Platt scaling or Temperature scaling) for `PPOAgent` instead of using the hardcoded `0.85` placeholder.
+**Owner:** Jules04 or Jules02
 
 ### Debt Item: PR Residue and Debug Prints
 **Category:** Dead Code
 **Impact:** Low
 **Effort:** S
-**Resolution plan:** Remove `print()` in `src/environment/gym_env.py` and replace with proper logging or `rich` console if needed.
+**Resolution plan:** Remove `print()` in `src/research/hyperopt_walkforward.py` and replace with proper logging.
 **Owner:** immediate cleanup (Jules05)
 
-### Debt Item: Missing Standard Model Interface
+### Debt Item: Incomplete Type Hinting in Research Adapters
+**Category:** Quality
+**Impact:** Medium
+**Effort:** S
+**Resolution plan:** Replace `Any` types with proper Protocols or specific class types in `src/research/benchmarks.py` adapters.
+**Owner:** immediate cleanup (Jules05)
+
+### Debt Item: Missing Standard Model Interface (Harmonization)
 **Category:** Quality
 **Impact:** Medium
 **Effort:** M
-**Resolution plan:** Define a `TradingModel` Protocol or Abstract Base Class to ensure all models (`PPOAgent`, `TimeSeriesTransformer`, `EnsembleModel`) share a common `predict` signature and metadata properties. This would eliminate the need for many adapters in `src/research/benchmarks.py`.
-**Owner:** Jules02 or Jules05 (Future)
+**Resolution plan:** Ensure all models (`PPOAgent`, `TimeSeriesTransformer`, `EnsembleModel`) strictly adhere to the `BaseModel` abstract class and return standardized `Signal` objects.
+**Owner:** Jules05 (Verification)
+
+## Resolved / Partially Addressed
+- **Fragmented Model Weighting Logic**: Integrated `DynamicEnsemble` into `EnsembleModel`.
+- **Inconsistent Signal Direction Mapping**: Core models (PPO, LSTM) now use `ModelAction` mappings.
+- **Incomplete Type Hinting in PPOAgent**: Initial hints added.

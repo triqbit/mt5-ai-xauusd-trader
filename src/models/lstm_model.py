@@ -1,8 +1,10 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/models/lstm_model.py
-LSTM sequence model using PyTorch for short-term price prediction.
+LSTM sequence models using PyTorch for short-term price prediction.
 """
+
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -31,11 +33,58 @@ class LSTMPricePredictor(nn.Module if nn else object):
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 3)  # [hold, buy, sell]
 
-    def forward(self, x: Any) -> Any:
-        # Use Any for type hints to avoid AttributeError when torch is None
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         _, (hn, _) = self.lstm(x)
         out = self.fc(hn[-1])
         return out
+
+
+class LSTMAttentionModel(nn.Module if nn else object):
+    """
+    Bidirectional LSTM with multi-head self-attention.
+    Input : (batch, seq_len, n_features)
+    Output : (batch, 3) -> [hold_logit, buy_logit, sell_logit] (Standardized)
+    """
+
+    def __init__(
+        self,
+        n_features: int = 140,
+        hidden_size: int = 128,
+        num_layers: int = 2,
+        n_heads: int = 8,
+        dropout: float = 0.2,
+    ) -> None:
+        if not nn:
+            raise ImportError("PyTorch is required for LSTMAttentionModel")
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=n_features,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.attn = nn.MultiheadAttention(
+            embed_dim=hidden_size * 2,
+            num_heads=n_heads,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.norm = nn.LayerNorm(hidden_size * 2)
+        self.head = nn.Sequential(
+            nn.Linear(hidden_size * 2, 64),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(64, 3),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out, _ = self.lstm(x)  # (B, T, 2*H)
+        attn_out, _ = self.attn(out, out, out)
+        out = self.norm(out + attn_out)  # residual
+        pooled = out.mean(dim=1)  # global average pool
+        return self.head(pooled)  # (B, 3)
 
 
 class LSTMModel(BaseModel):

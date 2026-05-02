@@ -41,7 +41,7 @@ class TimeSeriesTransformer(nn.Module):
 
         # Input and Output Projections
         self.input_projection = nn.Linear(input_dim, model_dim)
-        self.decoder = nn.Linear(model_dim, 3)  # Output: [Long, Short, Neutral] probabilities
+        self.decoder = nn.Linear(model_dim, 3)  # Output: [Hold, Buy, Sell] probabilities (ModelAction)
 
     def forward(self, src: torch.Tensor) -> torch.Tensor:
         # src shape: [batch_size, seq_len, input_dim]

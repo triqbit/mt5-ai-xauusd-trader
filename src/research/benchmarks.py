@@ -348,13 +348,16 @@ class BenchmarkEvaluator:
         return BenchmarkSection(comparisons=comparisons, statistical_summary=summary)
 
 
+from src.models.ensemble import EnsembleModel
+from src.models.ppo_agent import PPOAgent
+
 class EnsembleAdapter:
     """
     Adapter for EnsembleModel to match BenchmarkStrategy interface.
     Handles windowing for LSTM-Attention component and per-step inference.
     """
 
-    def __init__(self, model: Any, window_size: int = 60, name: str = "Ensemble_Model"):
+    def __init__(self, model: EnsembleModel, window_size: int = 60, name: str = "Ensemble_Model"):
         """
         Initialize the adapter.
         Args:
@@ -406,7 +409,7 @@ class PPOAdapter:
     Supports basic feature alignment and ModelAction to SignalDirection mapping.
     """
 
-    def __init__(self, agent: Any, name: str = "PPO_Agent"):
+    def __init__(self, agent: PPOAgent, name: str = "PPO_Agent"):
         """
         Initialize the adapter.
         Args:
@@ -436,6 +439,8 @@ class PPOAdapter:
         return signals
 
 
+from src.models.transformer_model import TimeSeriesTransformer
+
 class TransformerAdapter:
     """
     Adapter for TimeSeriesTransformer to match BenchmarkStrategy interface.
@@ -444,7 +449,7 @@ class TransformerAdapter:
 
     def __init__(
         self,
-        model: Any,
+        model: TimeSeriesTransformer,
         window_size: int = 60,
         name: str = "Transformer_Model",
         device: str = "cpu",
@@ -476,8 +481,8 @@ class TransformerAdapter:
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
 
-        # Mapping logic: 0=Buy, 1=Sell, 2=Hold (based on legacy transformer logic)
-        direction_map = {0: SignalDirection.BUY, 1: SignalDirection.SELL, 2: SignalDirection.HOLD}
+        # Mapping logic: 0=Hold, 1=Buy, 2=Sell (ModelAction standard)
+        from src.core.constants import ModelAction
 
         with torch.no_grad():
             for i in range(self.window_size - 1, len(df)):
@@ -486,6 +491,6 @@ class TransformerAdapter:
 
                 probs = self.model(data)
                 action_idx = int(torch.argmax(probs, dim=-1).item())
-                signals[i] = float(direction_map.get(action_idx, SignalDirection.HOLD))
+                signals[i] = float(ModelAction(action_idx).to_direction())
 
         return signals
