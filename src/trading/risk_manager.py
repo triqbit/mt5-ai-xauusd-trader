@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Dict, Optional
+from datetime import date, datetime, timezone
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.core.config import TradingConfig
+from src.core.constants import SignalDirection
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
@@ -35,19 +38,56 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
 }
 
 
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
+class TradeSignal(BaseModel):
+    """
+    Enterprise-grade validated trading signal.
+    Enforces strict schema validation for all signal parameters before they reach execution.
+    """
 
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+
+    symbol: str = Field(..., min_length=3, max_length=20, description="Trading symbol (e.g., 'XAUUSD')")
+    direction: SignalDirection = Field(..., description="Trade direction (1 for BUY, -1 for SELL)")
+    entry_price: float = Field(..., gt=0, description="Expected entry price")
+    stop_loss: float = Field(..., gt=0, description="Hard stop loss price")
+    take_profit: float = Field(..., gt=0, description="Hard take profit price")
+    lot_size: float = Field(..., gt=0, description="Position size in lots")
+    algorithm: str = Field(..., description="ID of the algorithm that generated this signal")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Model confidence score (0.0 to 1.0)")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="UTC timestamp of signal generation",
+    )
+
+    @field_validator("direction")
+    @classmethod
+    def validate_direction(cls, v: SignalDirection) -> SignalDirection:
+        if v == SignalDirection.HOLD:
+            raise ValueError("TradeSignal cannot have HOLD direction. Filter signals before creation.")
+        return v
+
+    @field_validator("stop_loss", "take_profit")
+    @classmethod
+    def validate_levels(cls, v: float, info: Any) -> float:
+        # Cross-field validation for price consistency
+        if "entry_price" not in info.data:
+            return v
+
+        entry = info.data["entry_price"]
+        direction = info.data.get("direction")
+
+        if direction == SignalDirection.BUY:
+            if info.field_name == "stop_loss" and v >= entry:
+                raise ValueError("BUY stop_loss must be below entry_price")
+            if info.field_name == "take_profit" and v <= entry:
+                raise ValueError("BUY take_profit must be above entry_price")
+        elif direction == SignalDirection.SELL:
+            if info.field_name == "stop_loss" and v <= entry:
+                raise ValueError("SELL stop_loss must be above entry_price")
+            if info.field_name == "take_profit" and v >= entry:
+                raise ValueError("SELL take_profit must be below entry_price")
+
+        return v
 
 
 @dataclass
@@ -62,8 +102,9 @@ class DailyStats:
 
 class RiskManager:
     """
-    Central risk authority.
-    Every signal must be approved here before reaching the order router.
+    Enterprise risk authority.
+    Enforces a 6-layer safety cascade to protect capital and ensure adherence to
+    portfolio allocation standards. All signals must pass this gate before execution.
     """
 
     def __init__(
@@ -85,8 +126,22 @@ class RiskManager:
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Execute the 6-layer risk filter cascade.
+
+        Cascade layers:
+        1. Global Circuit Breaker (Drawdown limit)
+        2. Daily Loss Limit
+        3. Maximum Concurrent Positions
+        4. Portfolio Allocation (Symbol whitelist)
+        5. Minimum Confidence Threshold
+        6. Minimum Risk-to-Reward Ratio
+
+        Args:
+            signal: The validated TradeSignal to evaluate.
+            signal_id: Optional database ID of the signal for logging purposes.
+
+        Returns:
+            bool: True if the signal passes all risk layers, False otherwise.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
@@ -98,7 +153,7 @@ class RiskManager:
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
         elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
+            rejection_reason = f"Confidence {signal.confidence:.2f} below threshold {self.cfg.confidence_threshold:.2f}"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
 
@@ -208,13 +263,11 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float) -> bool:
+        """Verify that signal confidence meets the configured threshold."""
+        threshold = self.cfg.confidence_threshold
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 
