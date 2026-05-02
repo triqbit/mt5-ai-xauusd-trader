@@ -66,13 +66,14 @@ def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     # 3. Model Inference (Jules01)
     # Mock models to simulate votes
     ensemble._ppo_model = MagicMock()
-    ensemble._ppo_model.predict.return_value = (0, None) # Buy action index 0
+    # Mock PPO to return action index 1 (BUY in ModelAction/SignalDirection standard)
+    ensemble._ppo_model.predict.return_value = (1, None)
 
     obs = mock_ohlcv_data.iloc[-1][["open", "high", "low", "close", "tick_volume"]].values
-    direction, confidence, per_algo = ensemble.predict(obs)
+    signal_obj = ensemble.predict(obs)
 
-    assert direction == 1 # SignalDirection.BUY
-    assert confidence > 0.5
+    assert signal_obj.direction == 1 # SignalDirection.BUY
+    assert signal_obj.confidence > 0.5
 
 def test_capital_and_risk_integration(trade_logger):
     """
