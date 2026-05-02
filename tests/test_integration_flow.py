@@ -80,7 +80,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
 
         # 2. Inference
         obs = mock_ohlcv[-1]
-        direction, confidence, _ = model.predict(obs)
+        signal_out = model.predict(obs)
 
         # 3. Log Signal
         signal_id = trade_logger.log_signal({
@@ -218,8 +218,8 @@ def test_intelligence_ensemble_adaptation():
     model._ppo_model = MagicMock()
     model._ppo_model.predict.return_value = (1, None) # Buy
 
-    direction, confidence, per_algo = model.predict(obs)
-    assert "ppo" in per_algo
+    signal = model.predict(obs)
+    assert "ppo" in signal.metadata["per_algo_votes"]
 
 # --- Latency Measurement ---
 

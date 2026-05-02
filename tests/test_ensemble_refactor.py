@@ -35,11 +35,14 @@ def test_ensemble_model_standardized_direction():
     ensemble._ppo_model = mock_ppo
 
     obs = np.random.rand(5) # Mock observation
-    direction, confidence, per_algo = ensemble.predict(obs)
+    # Adjust ModelAction to ensure prediction is BUY
+    # ModelAction.BUY is 1. PPO returns action index.
+    mock_ppo.predict.return_value = (1, None)
+    signal = ensemble.predict(obs)
 
-    assert isinstance(direction, SignalDirection)
-    assert direction == SignalDirection.BUY
-    assert per_algo["ppo"] == 0.0
+    assert isinstance(signal.direction, SignalDirection)
+    assert signal.direction == SignalDirection.BUY
+    assert signal.metadata["per_algo_votes"]["ppo"] == 1.0
 
 def test_ensemble_record_return_rebalance():
     """Verify weight rebalancing logic triggers correctly."""

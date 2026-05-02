@@ -94,11 +94,11 @@ def test_data_to_model_inference_flow(data_generator, feature_engineer, mock_ens
     assert features.shape[1] > 20
 
     latest_obs = features.iloc[-1].values
-    direction, confidence, per_algo = mock_ensemble.predict(latest_obs)
+    signal = mock_ensemble.predict(latest_obs)
 
-    assert isinstance(direction, SignalDirection)
-    assert 0.0 <= confidence <= 1.0
-    assert "ppo" in per_algo
+    assert isinstance(signal.direction, SignalDirection)
+    assert 0.0 <= signal.confidence <= 1.0
+    assert "ppo" in signal.metadata["per_algo_votes"]
     mock_ensemble._ppo_model.predict.assert_called_once()
 
     called_obs = mock_ensemble._ppo_model.predict.call_args[0][0]
