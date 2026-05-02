@@ -29,57 +29,10 @@ except ImportError:
 from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
 from src.models.dynamic_ensemble import DynamicEnsemble
+from src.models.lstm_model import LSTMAttentionModel
 from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
-
-
-# ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module if nn else object):
-    """
-    Bidirectional LSTM with multi-head self-attention.
-    Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [hold_logit, buy_logit, sell_logit] (Standardized)
-    Note: Legacy checkpoints use [buy, sell, hold] and require permutation.
-    """
-
-    def __init__(
-        self,
-        n_features: int = 140,
-        hidden_size: int = 128,
-        num_layers: int = 2,
-        n_heads: int = 8,
-        dropout: float = 0.2,
-    ) -> None:
-        super().__init__()
-        self.lstm = nn.LSTM(
-            input_size=n_features,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=True,
-            dropout=dropout if num_layers > 1 else 0.0,
-        )
-        self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_size * 2,
-            num_heads=n_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
-        self.norm = nn.LayerNorm(hidden_size * 2)
-        self.head = nn.Sequential(
-            nn.Linear(hidden_size * 2, 64),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(64, 3),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out, _ = self.lstm(x)  # (B, T, 2*H)
-        attn_out, _ = self.attn(out, out, out)
-        out = self.norm(out + attn_out)  # residual
-        pooled = out.mean(dim=1)  # global average pool
-        return self.head(pooled)  # (B, 3)
 
 
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
@@ -158,9 +111,8 @@ class EnsembleModel(BaseModel):
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            # Permute from legacy [buy, sell, hold] to [hold, buy, sell]
-            # to align with ModelAction (0=HOLD, 1=BUY, 2=SELL)
-            votes["lstm"] = np.array([probs[2], probs[0], probs[1]])
+            # Standardized output is [hold, buy, sell]
+            votes["lstm"] = probs
 
         # Cache confidences for calibration tracking
         for k, v in votes.items():
