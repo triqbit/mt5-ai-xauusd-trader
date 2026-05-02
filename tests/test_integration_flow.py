@@ -100,7 +100,8 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
             take_profit=2380.0,
             lot_size=0.1,
             algorithm="ensemble",
-            confidence=0.85
+            confidence=0.85,
+            market_regime="trending"
         )
 
         approved = risk.approve(signal, signal_id=signal_id)

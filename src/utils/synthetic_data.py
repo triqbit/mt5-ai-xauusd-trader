@@ -6,10 +6,12 @@ Deterministic scenario generator for testing system robustness across market reg
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Dict, List, Literal, Optional
 
 import numpy as np
 import pandas as pd
+
+from src.trading.risk_manager import TradeSignal
 
 
 class ScenarioGenerator:
@@ -25,7 +27,9 @@ class ScenarioGenerator:
     def generate(
         self,
         n_steps: int = 100,
-        regime: Literal["trending", "ranging", "volatile", "gapping", "malformed"] = "ranging",
+        regime: Literal[
+            "trending", "ranging", "volatile", "gapping", "malformed", "whipsaw", "stale"
+        ] = "ranging",
         start_price: float = 2300.0,
         trend_strength: float = 0.001,
         volatility: float = 0.002,
@@ -43,6 +47,10 @@ class ScenarioGenerator:
             return self._generate_gapping(n_steps, start_price, volatility)
         elif regime == "malformed":
             return self._generate_malformed(n_steps, start_price)
+        elif regime == "whipsaw":
+            return self._generate_whipsaw(n_steps, start_price, volatility)
+        elif regime == "stale":
+            return self._generate_stale(n_steps, start_price)
         else:
             raise ValueError(f"Unknown regime: {regime}")
 
@@ -114,3 +122,71 @@ class ScenarioGenerator:
         df.loc[3, "tick_volume"] = 0
 
         return df
+
+    def _generate_whipsaw(
+        self, n_steps: int, start_price: float, volatility: float
+    ) -> pd.DataFrame:
+        """Simulates a breakout that immediately fails and reverses."""
+        returns = self.rng.normal(0, volatility, n_steps)
+        mid = n_steps // 2
+        # Breakout
+        returns[mid : mid + 5] = 0.01
+        # Violent reversal
+        returns[mid + 5 : mid + 10] = -0.02
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_stale(self, n_steps: int, start_price: float) -> pd.DataFrame:
+        """Simulates frozen market with zero movement and zero volume."""
+        df = pd.DataFrame(
+            {
+                "open": [start_price] * n_steps,
+                "high": [start_price] * n_steps,
+                "low": [start_price] * n_steps,
+                "close": [start_price] * n_steps,
+                "tick_volume": [0] * n_steps,
+            }
+        )
+        return df
+
+
+class RiskScenarioBuilder:
+    """
+    Utility to generate deterministic sequences of signals and data
+    to trigger specific risk engine logic.
+    """
+
+    @staticmethod
+    def generate_loss_streak(n: int, symbol: str = "XAUUSD") -> List[TradeSignal]:
+        """Returns n signals designed to be losses."""
+        signals = []
+        for i in range(n):
+            signals.append(
+                TradeSignal(
+                    symbol=symbol,
+                    direction=1,
+                    entry_price=2300.0,
+                    stop_loss=2290.0,
+                    take_profit=2350.0,
+                    lot_size=0.1,
+                    algorithm="test_streak",
+                    confidence=0.8,
+                )
+            )
+        return signals
+
+    @staticmethod
+    def generate_dissent_scenario(
+        symbol: str = "XAUUSD", direction: int = 1
+    ) -> TradeSignal:
+        """Returns a signal where one model strongly disagrees."""
+        return TradeSignal(
+            symbol=symbol,
+            direction=direction,
+            entry_price=2300.0,
+            stop_loss=2290.0,
+            take_profit=2350.0,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.6,
+            per_algo_votes={"ppo": float(direction), "lstm": float(direction), "dreamer": float(-direction)},
+        )

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
@@ -47,7 +47,9 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    per_algo_votes: Dict[str, float] = field(default_factory=dict)
+    market_regime: str = "unknown"
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -57,6 +59,7 @@ class DailyStats:
     date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
+    consecutive_losses: int = 0
     peak_equity: float = 0.0
 
 
@@ -85,7 +88,7 @@ class RiskManager:
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full 9-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -93,12 +96,18 @@ class RiskManager:
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
+        elif not self._check_consecutive_losses():
+            rejection_reason = "Consecutive loss limit reached"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
+        elif not self._check_regime_safety(signal):
+            rejection_reason = f"Unsafe market regime: {signal.market_regime}"
+        elif not self._check_ensemble_consensus(signal):
+            rejection_reason = "Ensemble consensus failure (dissent or low agreement)"
+        elif not self._check_minimum_confidence(signal.confidence, self.cfg.confidence_threshold):
+            rejection_reason = f"Confidence {signal.confidence:.2f} below threshold {self.cfg.confidence_threshold:.2f}"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
 
@@ -155,9 +164,13 @@ class RiskManager:
             self.daily.peak_equity = current_equity
 
     def record_pnl(self, pnl: float) -> None:
-        """Accumulate intraday realised PnL."""
+        """Accumulate intraday realised PnL and track streaks."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+        if pnl < 0:
+            self.daily.consecutive_losses += 1
+        else:
+            self.daily.consecutive_losses = 0
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -227,6 +240,46 @@ class RiskManager:
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
             return False
+        return True
+
+    def _check_consecutive_losses(self) -> bool:
+        """Prevent 'revenge trading' by halting after a loss streak."""
+        if self.daily.consecutive_losses >= self.cfg.consecutive_loss_limit:
+            logger.warning(
+                "Consecutive loss limit hit: %d", self.daily.consecutive_losses
+            )
+            return False
+        return True
+
+    def _check_regime_safety(self, signal: TradeSignal) -> bool:
+        """Block trading during high-risk regimes like news shocks."""
+        if signal.market_regime in self.cfg.unsafe_regimes:
+            logger.warning("Market regime %s is marked as unsafe", signal.market_regime)
+            return False
+        return True
+
+    def _check_ensemble_consensus(self, signal: TradeSignal) -> bool:
+        """
+        Enforce majority agreement and block 'Strong Dissent'.
+        If any model predicts the exact opposite of the ensemble direction, block the trade.
+        """
+        if not signal.per_algo_votes:
+            return True  # Skip if no per-algo data (legacy/single-model)
+
+        votes = list(signal.per_algo_votes.values())
+        agreement = votes.count(float(signal.direction)) / len(votes)
+
+        # 1. Majority requirement
+        if agreement <= 0.5:
+            logger.debug("Consensus too low: %.2f", agreement)
+            return False
+
+        # 2. Strong Dissent check: block if any model says 'BUY' while ensemble says 'SELL' (or vice-versa)
+        opposite = -1 * signal.direction
+        if float(opposite) in votes:
+            logger.warning("STRONG DISSENT detected: one or more models predict %d", opposite)
+            return False
+
         return True
 
 
