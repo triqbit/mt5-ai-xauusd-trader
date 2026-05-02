@@ -31,7 +31,7 @@ from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
-from src.models.regime_detector import MarketRegime, RegimeDetector
+from src.models.regime_detector import RegimeDetector
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 

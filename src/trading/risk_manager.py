@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.constants import SignalDirection
