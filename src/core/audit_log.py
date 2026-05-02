@@ -8,13 +8,12 @@ License: MIT
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from sqlalchemy import Column, DateTime, Integer, JSON, String, Text, create_engine
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
