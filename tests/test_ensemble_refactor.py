@@ -1,55 +1,59 @@
+try:
+    import torch
+except ImportError:
+    torch = None
+import pytest
+
+pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
+
 import sys
 from unittest.mock import MagicMock
-
-# Mock TA-Lib before any other imports
-sys.modules['talib'] = MagicMock()
-
-import pytest
+from pathlib import Path
 import numpy as np
-import torch
-from src.models.ensemble import EnsembleModel
+
+# Use the standardized SignalDirection from constants
 from src.core.constants import SignalDirection
+from src.models.ensemble import EnsembleModel, LSTMAttentionModel
 
-def test_ensemble_weight_delegation():
-    """Verify EnsembleModel delegates weighting to DynamicEnsemble."""
-    model = EnsembleModel(device="cpu")
 
-    # Check initial weights via property
-    assert "ppo" in model.weights
-    assert "dreamer" in model.weights
-    assert "lstm" in model.weights
-    assert abs(model.weights["ppo"] - 1/3) < 1e-5
+def test_lstm_attention_model_output_shape():
+    """Verify LSTM+Attention model produces correct logit shapes."""
+    n_features = 140
+    model = LSTMAttentionModel(n_features=n_features)
+    # Batch size 2, Sequence length 10, Features 140
+    x = torch.randn(2, 10, n_features)
+    output = model(x)
+    assert output.shape == (2, 3)  # [buy, sell, hold] logits
 
-def test_ensemble_record_return_triggers_rebalance():
-    """Verify record_return eventually updates weights via DynamicEnsemble."""
-    model = EnsembleModel(device="cpu")
 
-    # Mock update_weights to track calls
-    model.dynamic_ensemble.update_weights = MagicMock(side_effect=model.dynamic_ensemble.update_weights)
+def test_ensemble_model_standardized_direction():
+    """Verify EnsembleModel maps Action indices to standard SignalDirection."""
+    ensemble = EnsembleModel(device="cpu")
 
-    # Record 50 returns for PPO
-    for _ in range(50):
-        model.record_return("ppo", 0.01) # positive returns
+    # Mock the internal models
+    mock_ppo = MagicMock()
+    # PPO returns index 0 (BUY), 1 (SELL), 2 (HOLD) in legacy logic
+    mock_ppo.predict.return_value = (0, None)
+    ensemble._ppo_model = mock_ppo
 
-    assert model.dynamic_ensemble.update_weights.called
-    # PPO should have higher weight now
-    assert model.weights["ppo"] > 1/3
+    obs = np.random.rand(5)  # Mock observation
+    direction, confidence, per_algo = ensemble.predict(obs)
 
-def test_ensemble_predict_uses_weights():
-    """Verify predict uses the delegated weights."""
-    model = EnsembleModel(device="cpu")
-
-    # Manually set weights in dynamic_ensemble
-    model.dynamic_ensemble.weights = {"ppo": 1.0, "dreamer": 0.0, "lstm": 0.0}
-
-    # Mock PPO model
-    model._ppo_model = MagicMock()
-    # PPO predicts BUY (0 in legacy ensemble mapping)
-    model._ppo_model.predict.return_value = (0, None)
-
-    obs = np.random.rand(140)
-    direction, confidence, per_algo = model.predict(obs)
-
+    assert isinstance(direction, SignalDirection)
     assert direction == SignalDirection.BUY
-    assert confidence == 1.0
-    assert per_algo["ppo"] == 0
+    assert per_algo["ppo"] == 0.0
+
+
+def test_ensemble_record_return_rebalance():
+    """Verify weight rebalancing logic triggers correctly."""
+    ensemble = EnsembleModel(device="cpu")
+    initial_weights = ensemble.weights.copy()
+
+    # Record 50 returns to trigger _rebalance_weights
+    for _ in range(50):
+        ensemble.record_return("ppo", 0.01)  # Profitable
+        ensemble.record_return("lstm", -0.01)  # Losing
+
+    new_weights = ensemble.weights
+    assert new_weights["ppo"] > initial_weights["ppo"]
+    assert new_weights["lstm"] < initial_weights["lstm"]

@@ -11,13 +11,14 @@ from sqlalchemy.orm import sessionmaker
 from src.core.trade_logger import Base, ModelSignal, Trade, RiskEvent, PerformanceMetric
 from scripts.data_cleanup import cleanup_database, cleanup_logs
 
+
 class TestDataCleanup(unittest.TestCase):
     def setUp(self):
         # Setup temporary database
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
-        self.db_url = "sqlite:///:memory:" # Not used directly by cleanup_database in this test but good for reference
+        self.db_url = "sqlite:///:memory:"  # Not used directly by cleanup_database in this test but good for reference
 
         # Setup temporary logs directory
         self.test_dir = tempfile.mkdtemp()
@@ -52,36 +53,42 @@ class TestDataCleanup(unittest.TestCase):
         with self.Session() as session:
             # 1. Old unlinked signal (should be purged)
             old_unlinked = ModelSignal(
-                symbol="XAUUSD", direction=1, entry_price=2000.0,
-                created_at=now - timedelta(days=100)
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=2000.0,
+                created_at=now - timedelta(days=100),
             )
             # 2. New unlinked signal (should be kept)
             new_unlinked = ModelSignal(
-                symbol="XAUUSD", direction=1, entry_price=2001.0,
-                created_at=now - timedelta(days=10)
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=2001.0,
+                created_at=now - timedelta(days=10),
             )
             # 3. Old linked signal (should be kept because trade is new)
             old_linked = ModelSignal(
-                symbol="XAUUSD", direction=-1, entry_price=2002.0,
-                created_at=now - timedelta(days=100)
+                symbol="XAUUSD",
+                direction=-1,
+                entry_price=2002.0,
+                created_at=now - timedelta(days=100),
             )
             session.add_all([old_unlinked, new_unlinked, old_linked])
             session.flush()
 
             trade = Trade(
-                ticket=123, symbol="XAUUSD", direction=-1, entry_price=2002.0,
-                lot_size=0.1, signal_id=old_linked.id,
-                created_at=now - timedelta(days=10)
+                ticket=123,
+                symbol="XAUUSD",
+                direction=-1,
+                entry_price=2002.0,
+                lot_size=0.1,
+                signal_id=old_linked.id,
+                created_at=now - timedelta(days=10),
             )
 
             # 4. Old Risk Event (should be purged)
-            old_risk = RiskEvent(
-                event_type="CIRCUIT_BREAKER", created_at=now - timedelta(days=800)
-            )
+            old_risk = RiskEvent(event_type="CIRCUIT_BREAKER", created_at=now - timedelta(days=800))
             # 5. New Risk Event (should be kept)
-            new_risk = RiskEvent(
-                event_type="REJECTION", created_at=now - timedelta(days=10)
-            )
+            new_risk = RiskEvent(event_type="REJECTION", created_at=now - timedelta(days=10))
 
             # 6. Old Perf Metric (should be purged)
             old_perf = PerformanceMetric(
@@ -90,8 +97,12 @@ class TestDataCleanup(unittest.TestCase):
 
             # 7. Old Trade (older than 7 years, should be purged)
             very_old_trade = Trade(
-                ticket=999, symbol="XAUUSD", direction=1, entry_price=1000.0,
-                lot_size=0.1, created_at=now - timedelta(days=3000)
+                ticket=999,
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=1000.0,
+                lot_size=0.1,
+                created_at=now - timedelta(days=3000),
             )
 
             session.add_all([trade, old_risk, new_risk, old_perf, very_old_trade])
@@ -105,6 +116,7 @@ class TestDataCleanup(unittest.TestCase):
         # Run cleanup on the in-memory DB
         # We need to monkeypatch create_engine or pass the engine
         import scripts.data_cleanup
+
         original_create_engine = scripts.data_cleanup.create_engine
         scripts.data_cleanup.create_engine = lambda url: self.engine
 
@@ -113,10 +125,10 @@ class TestDataCleanup(unittest.TestCase):
         finally:
             scripts.data_cleanup.create_engine = original_create_engine
 
-        self.assertEqual(results["model_signals"], 1) # only old_unlinked
-        self.assertEqual(results["risk_events"], 1)    # only old_risk
+        self.assertEqual(results["model_signals"], 1)  # only old_unlinked
+        self.assertEqual(results["risk_events"], 1)  # only old_risk
         self.assertEqual(results["performance_metrics"], 1)
-        self.assertEqual(results["trades"], 1) # very_old_trade
+        self.assertEqual(results["trades"], 1)  # very_old_trade
 
         with self.Session() as session:
             signals = session.execute(select(ModelSignal)).scalars().all()
@@ -128,6 +140,7 @@ class TestDataCleanup(unittest.TestCase):
             trades = session.execute(select(Trade)).scalars().all()
             self.assertEqual(len(trades), 1)
             self.assertEqual(trades[0].ticket, 123)
+
 
 if __name__ == "__main__":
     unittest.main()

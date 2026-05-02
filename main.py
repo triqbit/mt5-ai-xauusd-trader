@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,6 +22,8 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from rich.console import Console
+from rich.table import Table
 
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
@@ -197,7 +200,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
-    log = logging.getLogger("main")
+    log, console = logging.getLogger("main"), Console()
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
     os.environ.setdefault("ALGORITHM", args.algo)
@@ -233,9 +236,10 @@ def main() -> int:
     )
     # Initialise components
     connector = MT5Connector(cfg)
-    if not connector.connect():
-        log.critical("Cannot connect to MT5 terminal. Aborting.")
-        return 1
+    with console.status("[bold green]Connecting to MT5 terminal..."):
+        if not connector.connect():
+            log.critical("Cannot connect to MT5 terminal. Aborting.")
+            return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
@@ -252,16 +256,27 @@ def main() -> int:
 
     # Enterprise Health Gate
     health_checker = init_health_checker(cfg, connector, trade_logger, model)
-    health_report = health_checker.get_full_report()
+    with console.status("[bold blue]Running health checks..."):
+        report = health_checker.get_full_report()
 
-    if health_report.status == HealthStatus.FAILED:
+    table = Table(title="System Health", box=None)
+    table.add_column("Component", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Message")
+    for name, comp in report.components.items():
+        color = (
+            "green"
+            if comp.status == HealthStatus.HEALTHY
+            else "yellow"
+            if comp.status == HealthStatus.DEGRADED
+            else "red"
+        )
+        table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message)
+    console.print(table)
+
+    if report.status == HealthStatus.FAILED:
         log.critical("Startup HEALTH CHECK FAILED")
-        for name, comp in health_report.components.items():
-            if comp.status == HealthStatus.FAILED:
-                log.error(f"  [FAILED] {name}: {comp.message}")
         return 1
-
-    log.info("System HEALTH CHECK PASSED | status=%s", health_report.status)
 
     try:
         if cfg.mode in ("demo", "live"):
