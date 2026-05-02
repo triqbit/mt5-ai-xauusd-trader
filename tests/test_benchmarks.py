@@ -5,6 +5,7 @@ Unit tests for the benchmarking framework.
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import MagicMock
 from src.research.benchmarks import (
     EMACrossoverStrategy,
     MomentumStrategy,
@@ -12,8 +13,13 @@ from src.research.benchmarks import (
     NaiveDirectionalStrategy,
     RiskFilteredBaseline,
     MeanReversionStrategy,
-    BenchmarkEvaluator
+    BenchmarkEvaluator,
+    EnsembleAdapter,
+    PPOAdapter,
+    TransformerAdapter
 )
+from src.core.constants import SignalDirection
+from src.models.base_model import Signal
 
 @pytest.fixture
 def sample_data():
@@ -79,6 +85,8 @@ def test_evaluator_metrics(sample_data):
     assert "Sharpe Ratio" in results.columns
     assert "Sortino Ratio" in results.columns
     assert "Profit Factor" in results.columns
+    assert "Calmar Ratio" in results.columns
+    assert "Expectancy" in results.columns
 
 def test_comparison_logic(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
@@ -114,3 +122,43 @@ def test_evaluator_reversals(sample_data):
     # With 0 commission, reversal shouldn't crash and should result in 2 trades
     # (One long from 10 to 11, one short from 11 onwards)
     assert metrics["Num Trades"] == 2
+
+def test_ppo_adapter(sample_data):
+    mock_agent = MagicMock()
+    mock_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.9)
+
+    adapter = PPOAdapter(mock_agent)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    assert np.all(signals == 1.0)
+    assert mock_agent.predict.call_count == len(sample_data)
+
+def test_ensemble_adapter(sample_data):
+    mock_model = MagicMock()
+    mock_model.predict.return_value = (SignalDirection.SELL, 0.8, {})
+
+    window_size = 10
+    adapter = EnsembleAdapter(mock_model, window_size=window_size)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    # First window_size-1 signals should be 0
+    assert np.all(signals[: window_size - 1] == 0)
+    # Remaining signals should be -1.0
+    assert np.all(signals[window_size - 1 :] == -1.0)
+    assert mock_model.predict.call_count == len(sample_data) - (window_size - 1)
+
+def test_transformer_adapter(sample_data):
+    import torch
+    mock_model = MagicMock()
+    # Mock return: a tensor of probabilities [batch, 3] where index 0 is BUY
+    mock_model.return_value = torch.tensor([[1.0, 0.0, 0.0]])
+
+    window_size = 5
+    adapter = TransformerAdapter(mock_model, window_size=window_size)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    assert np.all(signals[: window_size - 1] == 0)
+    assert np.all(signals[window_size - 1 :] == 1.0)
