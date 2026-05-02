@@ -73,3 +73,30 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Standardization:** Future integrations must strictly separate DX/Infra from Trading/Risk logic.
 
 **Status:** 🟡 AMBER (Invariants holding, but process drift detected in PR scope and labeling).
+
+## 2026-05-02 13:55 UTC
+
+**Summary:** Process drift intensifies. History grafting is now the default mode for 'main', with the entire repository state replaced by single commits.
+
+**Suspected Process Issues:**
+- **Destructive History Management:** The 'main' branch was reset to a single commit 'acea08b' (PR #469), destroying previous history (including the 'Big Bang' commit 455e655 reported yesterday).
+- **Extreme Labeling Drift:** Commit 'acea08b' is labeled "Implement enterprise-grade feature engineering module (#469)" but it actually contains the entire system, including core trading, risk management, and database migrations.
+- **Verification Bypass:** By using single grafted commits for the entire repo, the concept of a "Pull Request" for a specific feature is effectively bypassed, as every "feature" PR now carries the weight of the entire system.
+- **Lost Traceability:** It is impossible to track the evolution of specific logic (e.g. risk manager changes) across these grafted commits without manual file comparisons.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `acea08b` (replaces all previous history).
+- Multiple parallel grafted branches (e.g., `688f3b9`, `446afdd`, `37e9bfb`) each representing a "Big Bang" state.
+
+**Check Invariants:**
+- [ ] Changes go through PRs (Technically PR #469 used, but its content is the entire repo, not just feature engineering).
+- [ ] CI must pass before merge (Hard to verify when history is destroyed and re-grafted).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: Trading, Risk, and Security logic are being re-pushed as part of monolithic commits under misleading titles).
+
+**Recommended Follow-ups:**
+- **CRITICAL — Human/Jules05 Review:** Immediate intervention required to restore sane Git history and stop the use of grafted monolithic commits for feature integration.
+- **Audit:** A full manual audit of `src/trading/` and `src/core/risk_manager.py` in commit `acea08b` is necessary to ensure no malicious or unsafe logic was smuggled in during the grafting process.
+
+**Status:** 🔴 RED (Process Integrity Breakdown - History Destruction & Labeling Drift).
+
+- **Environment Instability:** `make bootstrap` and `make doctor` are currently failing on the latest `main` (commit `acea08b`) due to dependency conflicts in `requirements-linux.txt` (specifically `tqdm==4.66.4` vs `pandas-ta==0.4.71b0` requirements). This prevents new developers from onboarding or running tests.
