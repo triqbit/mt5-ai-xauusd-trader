@@ -1,12 +1,12 @@
 name: 🛡️ Security Report
 description: Report a security vulnerability.
-labels: ["security"]
+labels: ["security", "critical"]
 body:
   - type: markdown
     attributes:
       value: |
         **WARNING:** If you have discovered a security vulnerability, please do NOT report it via a public issue.
-        Email the maintainers directly at security@example.com (placeholder).
+        Please follow the private disclosure process described in our SECURITY policy.
   - type: textarea
     id: vulnerability-details
     attributes:
@@ -18,6 +18,21 @@ body:
     id: impact
     attributes:
       label: Impact
-      description: What is the potential impact of this vulnerability?
+      description: What is the potential impact of this vulnerability? (e.g., Data exposure, Fund risk, RCE)
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Proof of Concept / Reproduction
+      description: How can the vulnerability be reproduced?
+    validations:
+      required: true
+  - type: textarea
+    id: system-version
+    attributes:
+      label: Affected Versions
+      description: Which versions of the system are affected?
+      placeholder: e.g., v1.1.x, v1.2.0
     validations:
       required: true

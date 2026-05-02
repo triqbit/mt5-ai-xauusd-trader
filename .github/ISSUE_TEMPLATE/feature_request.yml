@@ -17,6 +17,13 @@ body:
     validations:
       required: true
   - type: textarea
+    id: use-cases
+    attributes:
+      label: Target Use Cases
+      description: Who will benefit from this feature and in what scenario?
+    validations:
+      required: true
+  - type: textarea
     id: alternatives
     attributes:
       label: Alternatives Considered
