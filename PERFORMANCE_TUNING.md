@@ -257,4 +257,4 @@ async def submit_orders_async(trades):
 
 ## Conclusion
 
-Performance is critical for trading bot success. Systematic profiling, optimization, and continuous monitoring ensure sub-100ms execution latency and 99.99% uptime.
+Performance is critical for trading bot success. Systematic profiling, optimization, and continuous monitoring ensure sub-100ms execution latency and 99.5% uptime.

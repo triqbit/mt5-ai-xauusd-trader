@@ -96,7 +96,7 @@ This document outlines the comprehensive blueprint for achieving operational exc
 - **Recovery Factor**: Target >3.0
 
 ### 5.2 System Performance
-- **Uptime**: Target 99.99% (4 hours downtime per year)
+- **Uptime**: Target 99.5% (~3.6 hours downtime per month)
 - **Order Execution Latency**: <100ms from signal to execution
 - **Model Inference Time**: <10ms per prediction
 - **Data Pipeline Latency**: <500ms from data feed to model input

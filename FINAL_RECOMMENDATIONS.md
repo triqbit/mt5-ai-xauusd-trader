@@ -75,7 +75,7 @@ This document synthesizes all recommendations into a prioritized action plan for
 - [ ] Configure P1-P4 alerts with auto-escalation
 - [ ] Set up on-call rotation with PagerDuty
 - [ ] Create runbooks for common incidents
-- [ ] Implement SLA tracking (99.99% uptime)
+- [ ] Implement SLA tracking (99.5% uptime)
 
 ### Compliance & Documentation
 - [ ] Achieve ISO 27001 certification
@@ -213,7 +213,7 @@ mt5-ai-xauusd-trader/
 - Risk-reward ratio
 
 ### System Metrics
-- Uptime percentage (target: 99.99%)
+- Uptime percentage (target: 99.5%)
 - Order execution latency (target: <100ms)
 - Model inference latency (target: <10ms)
 - Data pipeline latency (target: <500ms)

@@ -5,6 +5,7 @@
 # ============================================================
 
 # ── Core ML / RL ────────────────────────────────────────────
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.7.1+cpu
 torchvision==0.17.2
 stable-baselines3==2.3.2

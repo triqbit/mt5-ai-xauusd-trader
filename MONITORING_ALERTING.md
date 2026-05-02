@@ -323,17 +323,17 @@ latency_histogram.observe(45.2)
 ## 10. SLA and Response Times
 
 ### 10.1 Service Level Objectives
-- **Availability**: 99.99% uptime (4 hours/year downtime)
-- **Latency**: p95 <500ms, p99 <1s
-- **Error Rate**: <0.1%
+- **Availability**: 99.5% uptime (measured during market hours)
+- **Latency**: p95 <250ms (inference), p95 <1.5s (end-to-end)
+- **Error Rate**: <0.1% trade execution failure
 - **Data Freshness**: <5 minutes
-- **Alert Response**: <5 minutes for critical
+- **Alert Response**: <5 minutes for P0/Critical
 
 ### 10.2 Response Time SLAs
-- **Critical**: 5-minute response time
-- **High**: 30-minute response time
-- **Medium**: 2-hour response time
-- **Low**: 24-hour response time
+- **Critical (P0)**: 5-minute response time
+- **High (P1)**: 15-minute response time
+- **Medium (P2)**: 2-hour response time
+- **Low (P3)**: 24-hour response time
 
 ## Conclusion
 
