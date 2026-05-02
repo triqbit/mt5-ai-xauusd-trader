@@ -26,7 +26,7 @@ import structlog
 from rich.console import Console
 from rich.table import Table
 
-from src.core import get_config, profile
+from src.core import AuditLogger, get_config, profile
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
@@ -240,6 +240,9 @@ def main() -> int:
     except Exception as exc:
         log.critical("Failed to load configuration: %s", exc)
         return 1
+
+    # Initialise Audit Logger before any other logic
+    AuditLogger(db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db")
 
     # Validate configuration
     validator = ConfigValidator(cfg)

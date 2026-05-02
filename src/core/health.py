@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
 
+from src.core.audit_log import get_audit_logger
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
 from src.core.trade_logger import TradeLogger
@@ -118,6 +119,16 @@ class HealthChecker:
             status=HealthStatus.HEALTHY, message=f"Models loaded: {', '.join(loaded)}"
         )
 
+    def check_audit_log(self) -> ComponentStatus:
+        """Verify AuditLogger is initialized."""
+        audit = get_audit_logger()
+        if audit._initialized:
+            return ComponentStatus(status=HealthStatus.HEALTHY, message="AuditLogger initialized")
+        else:
+            return ComponentStatus(
+                status=HealthStatus.FAILED, message="AuditLogger NOT initialized"
+            )
+
     def check_config(self) -> ComponentStatus:
         """Validate current environment configuration."""
         validator = ConfigValidator(self.cfg)
@@ -166,6 +177,7 @@ class HealthChecker:
         components = {
             "liveness": self.check_liveness(),
             "database": self.check_database(),
+            "audit": self.check_audit_log(),
             "mt5": self.check_mt5(),
             "models": self.check_models(),
             "config": self.check_config(),

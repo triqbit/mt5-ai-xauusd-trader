@@ -1,6 +1,7 @@
 """
 Tests for Monitor class.
 """
+
 import unittest
 from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
@@ -27,11 +28,11 @@ class TestMonitor(unittest.TestCase):
         self.config.confidence_threshold = 0.6
         self.config.prometheus_port = 8000
 
-        with patch('telegram.Bot'):
+        with patch("telegram.Bot"):
             self.monitor = Monitor(self.config)
 
     def test_log_equity(self):
-        with patch.object(EQUITY_GAUGE, 'set') as mock_set:
+        with patch.object(EQUITY_GAUGE, "set") as mock_set:
             self.monitor.log_equity(10500.0)
             self.assertEqual(len(self.monitor.equity_history), 1)
             self.assertEqual(self.monitor.equity_history[0]["equity"], 10500.0)
@@ -59,18 +60,18 @@ class TestMonitor(unittest.TestCase):
         self.monitor.send_message("test message")
         mock_loop.create_task.assert_called_once()
 
-    @patch('src.core.monitor.Monitor.send_message')
+    @patch("src.core.monitor.Monitor.send_message")
     def test_alert_circuit_breaker(self, mock_send_message):
-        with patch.object(DRAWDOWN_GAUGE, 'set') as mock_set:
+        with patch.object(DRAWDOWN_GAUGE, "set") as mock_set:
             self.monitor.alert_circuit_breaker(0.15)
             mock_send_message.assert_called_once()
             self.assertIn("Circuit Breaker", mock_send_message.call_args[0][0])
             self.assertIn("15.00%", mock_send_message.call_args[0][0])
             mock_set.assert_called_once_with(15.0)
 
-    @patch('src.core.monitor.Monitor.send_message')
+    @patch("src.core.monitor.Monitor.send_message")
     def test_send_daily_summary(self, mock_send_message):
-        with patch.object(DAILY_PNL_GAUGE, 'set') as mock_set:
+        with patch.object(DAILY_PNL_GAUGE, "set") as mock_set:
             self.monitor.send_daily_summary(500.0, 10)
             mock_send_message.assert_called_once()
             self.assertIn("Daily Summary", mock_send_message.call_args[0][0])
@@ -78,9 +79,9 @@ class TestMonitor(unittest.TestCase):
             self.assertIn("10", mock_send_message.call_args[0][0])
             mock_set.assert_called_once_with(500.0)
 
-    @patch('src.core.monitor.Monitor.send_message')
+    @patch("src.core.monitor.Monitor.send_message")
     def test_check_confidence_degradation(self, mock_send_message):
-        with patch.object(CONFIDENCE_GAUGE, 'set') as mock_set:
+        with patch.object(CONFIDENCE_GAUGE, "set") as mock_set:
             # Case 1: Below threshold
             self.monitor.check_confidence_degradation(0.5)
             mock_send_message.assert_called_once()
@@ -115,9 +116,10 @@ class TestMonitor(unittest.TestCase):
             self.assertIn("Connection failed", mock_send_message.call_args[0][0])
 
     def test_update_performance_metrics(self):
-        with patch.object(WIN_RATE_GAUGE, "set") as mock_win_set, patch.object(
-            SHARPE_RATIO_GAUGE, "set"
-        ) as mock_sharpe_set:
+        with (
+            patch.object(WIN_RATE_GAUGE, "set") as mock_win_set,
+            patch.object(SHARPE_RATIO_GAUGE, "set") as mock_sharpe_set,
+        ):
             self.monitor.update_performance_metrics(0.65, 2.1)
             mock_win_set.assert_called_once_with(65.0)
             mock_sharpe_set.assert_called_once_with(2.1)
@@ -132,5 +134,6 @@ class TestMonitor(unittest.TestCase):
         self.monitor.start_metrics_server()
         mock_start_server.assert_called_once()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
