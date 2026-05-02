@@ -107,11 +107,16 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/build-push-action@v7
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Build and push (dry run to verify)
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
+          platforms: linux/amd64,linux/arm64
           tags: triqbit/mt5-ai-xauusd-trader:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
