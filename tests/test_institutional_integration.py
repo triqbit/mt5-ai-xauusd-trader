@@ -84,6 +84,9 @@ def test_capital_and_risk_integration(trade_logger):
         cfg.risk_per_trade = 0.02
         cfg.max_daily_loss = 0.05
         cfg.max_positions = 3
+        cfg.consecutive_loss_limit = 3
+        cfg.unsafe_regimes = ["news_shock", "unknown"]
+        cfg.confidence_threshold = 0.6
         mock_get_cfg.return_value = cfg
 
         # 1. Capital Allocation (Jules04)
@@ -111,7 +114,8 @@ def test_capital_and_risk_integration(trade_logger):
             take_profit=2380.0,
             lot_size=0.1,
             algorithm="ensemble",
-            confidence=0.85
+            confidence=0.85,
+            market_regime="trending"
         )
 
         # Signal approval
