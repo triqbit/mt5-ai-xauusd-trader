@@ -31,7 +31,8 @@ class LSTMPricePredictor(nn.Module if nn else object):
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 3)  # [hold, buy, sell]
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Any) -> Any:
+        # Use Any for type hints to avoid AttributeError when torch is None
         _, (hn, _) = self.lstm(x)
         out = self.fc(hn[-1])
         return out
