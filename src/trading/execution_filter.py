@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
@@ -53,7 +53,7 @@ class ExecutionFilter:
         """
         Run the full 6-layer filter cascade.
         """
-        timestamp = timestamp or signal.timestamp or datetime.utcnow()
+        timestamp = timestamp or signal.timestamp or datetime.now(timezone.utc)
 
         # Layer 1: ATR Volatility
         if not self._check_atr_volatility(market_data):
@@ -88,7 +88,9 @@ class ExecutionFilter:
             high = df["high"]
             low = df["low"]
             close = df["close"]
-            tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
+            tr = pd.concat(
+                [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+            ).max(axis=1)
             atr = tr.rolling(window=14).mean()
         else:
             atr = df["base_M5_atr"]

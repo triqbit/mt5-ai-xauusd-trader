@@ -17,7 +17,7 @@
 # numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
 numpy==2.2.6
 scipy==1.15.2
-scikit-learn==1.7.2
+scikit-learn==1.6.1
 pandas==2.2.3
 
 # -- Technical Analysis --------------------------------------------
@@ -29,8 +29,8 @@ sqlalchemy==2.0.30
 alembic==1.13.1
 
 # -- Pydantic / settings -------------------------------------------
-pydantic==2.13.3
-pydantic-settings==2.8.1
+pydantic==2.10.6
+pydantic-settings==2.2.1
 
 # -- Testing -------------------------------------------------------
 optuna==4.2.1
