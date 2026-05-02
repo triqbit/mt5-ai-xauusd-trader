@@ -15,9 +15,10 @@ from __future__ import annotations
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
+
 try:
     import torch
     import torch.nn as nn
