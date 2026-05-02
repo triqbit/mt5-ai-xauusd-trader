@@ -7,11 +7,12 @@ from datetime import datetime, timezone
 import asyncio
 from src.core.monitor import Monitor, EQUITY_GAUGE, DAILY_PNL_GAUGE, TRADE_COUNTER, DRAWDOWN_GAUGE, CONFIDENCE_GAUGE
 from src.core.config import TradingConfig
+from pydantic import SecretStr
 
 class TestMonitor(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock(spec=TradingConfig)
-        self.config.telegram_token = "fake_token"
+        self.config.telegram_token = SecretStr("fake_token")
         self.config.telegram_chat_id = "fake_chat_id"
         self.config.confidence_threshold = 0.6
         self.config.prometheus_port = 8000

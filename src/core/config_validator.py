@@ -57,10 +57,8 @@ class ConfigValidator:
             )
 
         password_placeholders = ["", "password", "test", "your_password_here"]
-        if (
-            not self.config.mt5_password
-            or self.config.mt5_password.lower() in password_placeholders
-        ):
+        mt5_pass = self.config.mt5_password.get_secret_value()
+        if not mt5_pass or mt5_pass.lower() in password_placeholders:
             self.errors.append(
                 ValidationError(
                     "MT5_PASSWORD", "MT5 password is missing or using placeholder.", True
@@ -84,7 +82,7 @@ class ConfigValidator:
         """Detect default or placeholder values in secrets."""
         # Check database URL
         default_db = "postgresql://trader:password@localhost:5432/mt5_trades"
-        if self.config.database_url == default_db:
+        if self.config.database_url.get_secret_value() == default_db:
             self.errors.append(
                 ValidationError(
                     "DATABASE_URL", "Database URL is using default placeholder credentials.", True
@@ -92,17 +90,15 @@ class ConfigValidator:
             )
 
         # Check Telegram
-        if self.config.telegram_token and any(
-            p in self.config.telegram_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]
-        ):
+        telegram_token = self.config.telegram_token.get_secret_value()
+        if telegram_token and any(p in telegram_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]):
             self.errors.append(
                 ValidationError("TELEGRAM_TOKEN", "Telegram token contains placeholder text.", True)
             )
 
         # Check MetaAPI
-        if self.config.metaapi_token and any(
-            p in self.config.metaapi_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]
-        ):
+        metaapi_token = self.config.metaapi_token.get_secret_value()
+        if metaapi_token and any(p in metaapi_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]):
             self.errors.append(
                 ValidationError("METAAPI_TOKEN", "MetaAPI token contains placeholder text.", True)
             )
@@ -161,7 +157,7 @@ class ConfigValidator:
             )
 
         # 2. MetaAPI Consistency
-        if self.config.metaapi_token and not self.config.metaapi_account_id:
+        if self.config.metaapi_token.get_secret_value() and not self.config.metaapi_account_id:
             self.errors.append(
                 ValidationError(
                     "METAAPI_ACCOUNT_ID",
@@ -170,7 +166,7 @@ class ConfigValidator:
                 )
             )
 
-        if self.config.metaapi_account_id and not self.config.metaapi_token:
+        if self.config.metaapi_account_id and not self.config.metaapi_token.get_secret_value():
             self.errors.append(
                 ValidationError(
                     "METAAPI_TOKEN",
@@ -180,7 +176,7 @@ class ConfigValidator:
             )
 
         # 3. Telegram Consistency
-        if self.config.telegram_token and not self.config.telegram_chat_id:
+        if self.config.telegram_token.get_secret_value() and not self.config.telegram_chat_id:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_CHAT_ID",
@@ -189,7 +185,7 @@ class ConfigValidator:
                 )
             )
 
-        if self.config.telegram_chat_id and not self.config.telegram_token:
+        if self.config.telegram_chat_id and not self.config.telegram_token.get_secret_value():
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",
@@ -199,7 +195,7 @@ class ConfigValidator:
             )
 
         # 4. Mode-specific warnings
-        if self.config.mode == "backtest" and self.config.telegram_token:
+        if self.config.mode == "backtest" and self.config.telegram_token.get_secret_value():
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",

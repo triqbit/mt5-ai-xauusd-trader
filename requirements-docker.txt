@@ -44,7 +44,7 @@ tqdm==4.66.4
 python-telegram-bot==22.7
 
 # -- Dashboard / API -----------------------------------------------
-fastapi==0.111.0
+fastapi==0.115.0
 uvicorn[standard]==0.29.0
 dash==4.1.0
 plotly==5.22.0
