@@ -23,7 +23,9 @@ from typing import Optional
 import structlog
 
 from src.core import get_config, profile
+from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
+from src.core.constants import SignalDirection
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -56,7 +58,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
@@ -112,7 +114,7 @@ def run_live(
             )
             signal = TradeSignal(
                 symbol=cfg.symbol,
-                direction=direction,
+                direction=SignalDirection(direction),
                 entry_price=price,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
@@ -167,7 +169,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break

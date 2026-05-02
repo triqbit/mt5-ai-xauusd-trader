@@ -7,6 +7,7 @@ from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.ensemble import EnsembleModel
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.risk_manager import RiskManager, TradeSignal
+from src.core.constants import SignalDirection
 from src.core.config import get_config
 from src.core.trade_logger import TradeLogger
 
@@ -77,6 +78,7 @@ def test_capital_and_risk_integration(trade_logger):
         cfg.risk_per_trade = 0.02
         cfg.max_daily_loss = 0.05
         cfg.max_positions = 3
+        cfg.confidence_threshold = 0.55
         mock_get_cfg.return_value = cfg
 
         # 1. Capital Allocation (Jules04)
@@ -98,7 +100,7 @@ def test_capital_and_risk_integration(trade_logger):
 
         signal = TradeSignal(
             symbol="XAUUSD",
-            direction=1,
+            direction=SignalDirection.BUY,
             entry_price=2350.0,
             stop_loss=2340.0,
             take_profit=2380.0,

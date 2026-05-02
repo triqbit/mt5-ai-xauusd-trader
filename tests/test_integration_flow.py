@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from src.core.config import TradingConfig, get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.constants import SignalDirection
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -94,7 +95,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
         # 4. Risk Engine
         signal = TradeSignal(
             symbol="XAUUSD",
-            direction=1,
+            direction=SignalDirection.BUY,
             entry_price=2351.0,
             stop_loss=2340.0,
             take_profit=2380.0,
@@ -185,7 +186,16 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.update_equity(8000.0)  # 20% drawdown
 
     with patch.object(mock_monitor, "alert_circuit_breaker") as mock_alert:
-        signal = TradeSignal("XAUUSD", 1, 2300, 2200, 2500, 0.1, "test", 0.9)
+        signal = TradeSignal(
+            symbol="XAUUSD",
+            direction=SignalDirection.BUY,
+            entry_price=2300,
+            stop_loss=2200,
+            take_profit=2500,
+            lot_size=0.1,
+            algorithm="test",
+            confidence=0.9,
+        )
         approved = risk.approve(signal)
         assert approved is False
         mock_alert.assert_called_once()
