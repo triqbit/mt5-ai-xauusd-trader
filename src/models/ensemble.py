@@ -99,9 +99,7 @@ class EnsembleModel:
         self.lstm_model: Optional[LSTMAttentionModel] = None
         # Internal cache for compatibility with existing record_return calls
         # Using deque for memory safety in long-running processes
-        self._performance: Dict[str, deque[float]] = {
-            k: deque(maxlen=200) for k in self.ALGORITHMS
-        }
+        self._performance: Dict[str, deque[float]] = {k: deque(maxlen=200) for k in self.ALGORITHMS}
         self._last_confidences: Dict[str, deque[float]] = {
             k: deque(maxlen=200) for k in self.ALGORITHMS
         }
@@ -196,7 +194,9 @@ class EnsembleModel:
             if len(self._performance[algorithm]) >= 50:
                 self._rebalance_weights(regime_info=regime_info)
 
-    def _rebalance_weights(self, regime_info: Optional[RegimeInfo] = None, window: int = 50) -> None:
+    def _rebalance_weights(
+        self, regime_info: Optional[RegimeInfo] = None, window: int = 50
+    ) -> None:
         """Delegate rebalancing to DynamicEnsemble."""
         metrics: Dict[str, Dict[str, float]] = {}
         for algo, rets in self._performance.items():
@@ -215,7 +215,9 @@ class EnsembleModel:
             # Calculate basic drift as recent performance degradation
             recent_mean = np.mean(tail[-10:])
             overall_mean = np.mean(tail)
-            drift = float(np.clip((overall_mean - recent_mean) / (abs(overall_mean) + 1e-9), 0.0, 1.0))
+            drift = float(
+                np.clip((overall_mean - recent_mean) / (abs(overall_mean) + 1e-9), 0.0, 1.0)
+            )
 
             # Calibration: Difference between avg confidence and actual success rate
             # Success is approximated as positive return
