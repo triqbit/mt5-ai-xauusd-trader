@@ -7,6 +7,8 @@ on:
     paths-ignore:
       - 'CHANGELOG.md'
       - 'docs/**'
+      - '*.md'
+      - '.github/workflows/changelog.yml'
 
 permissions:
   contents: write

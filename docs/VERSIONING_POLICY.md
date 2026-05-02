@@ -1,12 +1,12 @@
 # Versioning Policy
 
-This document defines the semantic versioning policy and automated changelog standards for the MT5 AI/ML Trading Bot project.
+This document defines the semantic versioning policy, automated changelog standards, and release tagging strategies for the MT5 AI/ML Trading Bot project.
 
 ## 1. Semantic Versioning (SemVer)
 
-We follow [Semantic Versioning 2.0.0](https://semver.org/). Versions are expressed as `MAJOR.MINOR.PATCH`.
+We strictly follow [Semantic Versioning 2.0.0](https://semver.org/). Versions are expressed as `MAJOR.MINOR.PATCH`.
 
-- **MAJOR**: Incompatible API changes, or fundamental shifts in trading logic/risk architecture that require manual intervention or migration.
+- **MAJOR**: Incompatible API changes, fundamental shifts in trading logic, or major risk architecture modifications that require manual intervention or data migration.
 - **MINOR**: New features added in a backwards-compatible manner (e.g., a new technical indicator, a new model architecture, or a new monitoring dashboard).
 - **PATCH**: Backwards-compatible bug fixes, security patches, or documentation updates.
 
@@ -21,45 +21,45 @@ To enable automated changelog generation and version bumping, all commits to the
 - `fix`: A bug fix (corresponds to a **PATCH** version bump).
 - `perf`: A code change that improves performance (corresponds to a **PATCH** version bump).
 - `docs`: Documentation only changes (corresponds to a **PATCH** version bump).
-- `style`: Changes that do not affect the meaning of the code (white-space, formatting, etc).
 - `refactor`: A code change that neither fixes a bug nor adds a feature (corresponds to a **PATCH** version bump).
-- `test`: Adding missing tests or correcting existing tests.
-- `chore`: Updating build tasks, package manager configs, etc.
-- `ci`: Changes to CI configuration files and scripts.
+- `style`, `test`, `chore`, `ci`: Internal changes that usually do not trigger a version bump unless they are part of a larger release.
 
 ### Breaking Changes:
 Indicate a breaking change by adding a `!` after the type/scope or by adding `BREAKING CHANGE:` in the footer of the commit message. This triggers a **MAJOR** version bump.
 
-## 3. Tagging Strategy
+## 3. Tagging & Release Strategy
 
 ### Stable Releases
-Stable releases are tagged on the `main` branch:
-- Format: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.0`)
-- These represent production-ready code that has passed all CI/CD gates.
+- **Branch**: `main`
+- **Tag Format**: `vMAJOR.MINOR.PATCH` (e.g., `v1.2.0`)
+- **Requirement**: Must pass all CI/CD gates, including security scans and pre-production checklists.
 
 ### Pre-releases
-Pre-releases are used for beta testing or integration validation:
-- Format: `vMAJOR.MINOR.PATCH-<tag>.N` (e.g., `v1.2.0-rc.1`, `v1.2.0-alpha.5`)
-- Pre-releases are typically tagged on the `develop` or feature branches to indicate a version in progress.
+- **Tag Format**: `vMAJOR.MINOR.PATCH-<tag>.N` (e.g., `v1.2.0-rc.1`, `v1.2.0-alpha.5`)
+- **Use Case**: Beta testing, integration validation, or release candidates.
+- **Automation**: Pre-releases can be triggered manually via the `Release Orchestration` workflow.
 
 ## 4. Automated Workflow
 
-1. **Changelog**: On every push to `main`, a GitHub Action (`changelog.yml`) automatically updates the `CHANGELOG.md` file based on the commits since the last release.
-2. **Version Bump**: The `Release Orchestration` workflow (`release.yml`) handles the final versioning and tagging. It can automatically calculate the next semantic version based on commit history if not manually provided.
-3. **Drafting Releases**: The CI pipeline will automatically create a GitHub Release with the generated changelog for final review.
+1. **Automated Changelog**: Every push to `main` triggers the `changelog.yml` workflow, which appends new conventional commits to the `CHANGELOG.md` file under the `[Unreleased]` section.
+2. **Version Bump Automation**: The `Release Orchestration` (`release.yml`) workflow:
+   - Calculates the next version based on commit history (using `github-tag-action`).
+   - Updates `pyproject.toml` and `src/__init__.py`.
+   - Creates a new Git tag and GitHub Release.
+3. **Manual Override**: The release version can be manually specified during workflow dispatch if needed.
 
 ## 5. Guidance for Version Bumping
 
-| Change Type | Version Component | Commits Example |
+| Change Type | Version Component | Example Commit |
 | :--- | :--- | :--- |
-| Breaking Change | MAJOR | `feat!: change risk engine` or `fix: API BREAKING CHANGE: ...` |
-| New Feature | MINOR | `feat: add LSTM model` |
-| Bug Fix | PATCH | `fix: correct drawdown calculation` |
-| Security Patch | PATCH | `fix: update vulnerable package` |
-| Refactor/Perf | PATCH | `refactor: optimize data loading` |
-| Documentation | PATCH | `docs: update deployment guide` |
+| **Breaking Change** | MAJOR | `feat!: overhaul execution engine` |
+| **Breaking Change** | MAJOR | `fix: API BREAKING CHANGE: ...` |
+| **New Feature** | MINOR | `feat: add PPO reinforcement learning agent` |
+| **Bug Fix** | PATCH | `fix: resolve race condition in order execution` |
+| **Performance** | PATCH | `perf: optimize vectorized feature extraction` |
+| **Security** | PATCH | `fix: update vulnerable dependency` |
+| **Documentation** | PATCH | `docs: update disaster recovery runbook` |
 
 ---
 **Policy Owner:** Jules03 (Release Reliability & Governance)
 **Status:** Active
-**Last Updated:** May 2024
