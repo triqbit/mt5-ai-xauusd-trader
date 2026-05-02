@@ -1,6 +1,7 @@
 import ast
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
+
 
 def clean_value(val_str: str) -> str:
     """Clean up AST unparsed values for Markdown display."""
@@ -9,18 +10,20 @@ def clean_value(val_str: str) -> str:
 
     # Handle the weird case for model_path where it might have a trailing quote
     if val_str.startswith("'") and not val_str.endswith("'") and " / " in val_str:
-         val_str = val_str[1:]
+        val_str = val_str[1:]
     if val_str.endswith("'") and not val_str.startswith("'") and " / " in val_str:
-         val_str = val_str[:-1]
+        val_str = val_str[:-1]
 
     # Remove excessive quotes if fully quoted
-    if (val_str.startswith("'") and val_str.endswith("'")) or \
-       (val_str.startswith('"') and val_str.endswith('"')):
+    if (val_str.startswith("'") and val_str.endswith("'")) or (
+        val_str.startswith('"') and val_str.endswith('"')
+    ):
         val_str = val_str[1:-1]
 
     if not val_str or val_str == "''" or val_str == '""':
         return "None"
     return val_str
+
 
 def get_field_info(node: ast.AnnAssign) -> Dict[str, Any]:
     """Extract information from a Pydantic-style field assignment."""
@@ -61,8 +64,9 @@ def get_field_info(node: ast.AnnAssign) -> Dict[str, Any]:
         "name": field_name,
         "type": type_hint,
         "description": description,
-        "default": clean_value(default)
+        "default": clean_value(default),
     }
+
 
 def generate_config_docs(input_file: str, output_file: str, version: str):
     path = Path(input_file)
@@ -85,7 +89,9 @@ def generate_config_docs(input_file: str, output_file: str, version: str):
 
     with open(output_file, "w") as f:
         f.write(f"# Configuration Reference (v{version})\n\n")
-        f.write("This document lists the available configuration fields, their types, and descriptions.\n\n")
+        f.write(
+            "This document lists the available configuration fields, their types, and descriptions.\n\n"
+        )
         f.write("| Field | Type | Description | Default |\n")
         f.write("| :--- | :--- | :--- | :--- |\n")
 
@@ -93,8 +99,10 @@ def generate_config_docs(input_file: str, output_file: str, version: str):
             desc = field["description"] if field["description"] else "No description provided."
             f.write(f"| `{field['name']}` | `{field['type']}` | {desc} | `{field['default']}` |\n")
 
+
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) < 4:
         print("Usage: python generate_config_docs.py <input> <output> <version>")
     else:
