@@ -203,7 +203,12 @@ def main() -> int:
     os.environ.setdefault("ALGORITHM", args.algo)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
-    cfg = get_config()
+
+    try:
+        cfg = get_config()
+    except Exception as exc:
+        log.critical("Failed to load configuration: %s", exc)
+        return 1
 
     # Validate configuration
     validator = ConfigValidator(cfg)
