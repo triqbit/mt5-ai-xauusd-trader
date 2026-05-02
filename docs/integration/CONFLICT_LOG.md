@@ -29,3 +29,26 @@
 - **Impact**: Low. Minor bug potential if MetaAPI is used.
 - **Resolution**: Standardized on `metaapi_connection` by removing the conflicting stale callers (`OrderManager`, `PortfolioManager`). Direct modification of `MT5Connector` deferred to avoid CI high-risk gate triggers, as the removal of consumers already achieves coherence.
 - **Owner**: Jules05
+
+## [2026-05-02] - Model Interface & Signal Mapping Inconsistency
+
+### 1. SignalDirection Mapping Mismatch
+- **Conflict**: `EnsembleModel` (triqbit/Jules01) uses `0=buy, 1=sell, 2=hold`. `ModelAction` (xnessom/Jules02) uses `0=HOLD, 1=BUY, 2=SELL`.
+- **Agents**: Jules01, Jules02
+- **Impact**: High. Direct cause of inverted or incorrect trades if models are swapped or used interchangeably.
+- **Resolution**: Harmonize all models to use `ModelAction` indexing (0=HOLD, 1=BUY, 2=SELL) and return standardized `Signal` objects.
+- **Owner**: Jules05
+
+### 2. Interface Mismatch (BaseModel vs EnsembleModel)
+- **Conflict**: `EnsembleModel` does not implement the `BaseModel` interface. Its `predict` method returns a `Tuple[int, float, Dict]` instead of a `Signal` object, and its signature differs.
+- **Agents**: Jules01, Jules02
+- **Impact**: Medium. Prevents polymorphic usage of models in `main.py` and research scripts.
+- **Resolution**: Refactor `EnsembleModel` to inherit from `BaseModel` and return `Signal`.
+- **Owner**: Jules05
+
+### 3. Logic Fragmentation in `main.py`
+- **Conflict**: `main.py` hardcodes `EnsembleModel` initialization and ignores the `--algo` flag for individual model selection (PPO, LSTM, etc.), forcing them through the ensemble.
+- **Agents**: Jules01, Jules05
+- **Impact**: Medium. Restricts user flexibility and complicates testing of individual models in the live environment.
+- **Resolution**: Update `main.py` to use a factory-style initialization based on the `--algo` flag, utilizing the standardized `BaseModel` interface.
+- **Owner**: Jules05

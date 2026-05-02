@@ -30,7 +30,10 @@ from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
+from src.models.lstm_model import LSTMModel
+from src.models.ppo_agent import PPOAgent
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -62,7 +65,7 @@ def run_live(
     cfg,
     connector: MT5Connector,
     risk: RiskManager,
-    model: EnsembleModel,
+    model: BaseModel,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -80,9 +83,13 @@ def run_live(
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             volatility = float(df["close"].rolling(20).std().iloc[-1])
 
-            # 3. Get ensemble prediction
+            # 3. Get model prediction
             with profile("inference"):
-                direction, confidence, _per_algo = model.predict(obs)
+                # All models now implement BaseModel and return a Signal object
+                signal_obj = model.predict(obs)
+                direction = signal_obj.direction
+                confidence = signal_obj.confidence
+
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
             signal_id = None
@@ -246,13 +253,25 @@ def main() -> int:
     )
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
-    model = EnsembleModel(device="cpu")
-    ppo_path = args.model_dir / "ppo_xauusd.zip"
-    lstm_path = args.model_dir / "lstm_xauusd.pt"
-    if ppo_path.exists():
-        model.load_ppo(ppo_path)
-    if lstm_path.exists():
-        model.load_lstm(lstm_path)
+
+    # Model Factory based on --algo flag
+    if args.algo == "ensemble":
+        model = EnsembleModel(device="cpu")
+        ppo_path = args.model_dir / "ppo_xauusd.zip"
+        lstm_path = args.model_dir / "lstm_xauusd.pt"
+        if ppo_path.exists():
+            model.load_ppo(ppo_path)
+        if lstm_path.exists():
+            model.load_lstm(lstm_path)
+    elif args.algo == "ppo":
+        ppo_path = args.model_dir / "ppo_xauusd.zip"
+        model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
+    elif args.algo == "lstm":
+        lstm_path = args.model_dir / "lstm_xauusd.pt"
+        model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
+    else:
+        log.warning(f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble")
+        model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
     health_checker = init_health_checker(cfg, connector, trade_logger, model)
