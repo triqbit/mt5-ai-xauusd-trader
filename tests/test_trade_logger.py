@@ -3,6 +3,7 @@ Integration tests for TradeLogger.
 """
 import os
 import pytest
+from sqlalchemy.exc import IntegrityError
 from src.core.trade_logger import TradeLogger
 
 @pytest.fixture
@@ -62,3 +63,33 @@ def test_log_risk_event(logger):
         from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
+
+def test_integrity_constraints_signal(logger):
+    """Verify CheckConstraints on ModelSignal."""
+    # Negative price
+    with pytest.raises(IntegrityError):
+        logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 1,
+            "entry_price": -10.0
+        })
+
+    # Invalid direction
+    with pytest.raises(IntegrityError):
+        logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 5,
+            "entry_price": 2000.0
+        })
+
+def test_integrity_constraints_trade(logger):
+    """Verify CheckConstraints on Trade."""
+    # Zero lot size
+    with pytest.raises(IntegrityError):
+        logger.log_trade(
+            ticket=999,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            lot_size=0.0
+        )

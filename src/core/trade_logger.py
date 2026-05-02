@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -24,11 +25,14 @@ from sqlalchemy import (
     Text,
     create_engine,
     select,
+    text,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    """Modern SQLAlchemy DeclarativeBase."""
+    pass
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +40,10 @@ class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
     created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
     )
     updated_at = Column(
         DateTime,
@@ -44,7 +51,13 @@ class AuditMixin:
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False, index=True)
+    is_deleted = Column(
+        Boolean,
+        default=False,
+        nullable=False,
+        index=True,
+        server_default=text("0"),
+    )
 
 
 class ModelSignal(Base, AuditMixin):
@@ -63,6 +76,12 @@ class ModelSignal(Base, AuditMixin):
     confidence = Column(Float)
     volatility = Column(Float)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        CheckConstraint("direction IN (-1, 0, 1)", name="ck_model_signals_direction"),
+        CheckConstraint("entry_price > 0", name="ck_model_signals_entry_price"),
+        CheckConstraint("lot_size > 0", name="ck_model_signals_lot_size"),
+    )
 
     # Relationship
     trade = relationship("Trade", back_populates="signal", uselist=False)
@@ -83,6 +102,12 @@ class Trade(Base, AuditMixin):
     pnl = Column(Float, default=0.0)
     drawdown_impact = Column(Float)  # impact on total drawdown
     status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
+
+    __table_args__ = (
+        CheckConstraint("direction IN (-1, 0, 1)", name="ck_trades_direction"),
+        CheckConstraint("entry_price > 0", name="ck_trades_entry_price"),
+        CheckConstraint("lot_size > 0", name="ck_trades_lot_size"),
+    )
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
