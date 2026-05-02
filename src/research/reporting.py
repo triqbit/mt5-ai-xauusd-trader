@@ -176,7 +176,7 @@ class ResearchReporter:
     def generate_markdown(self, report: ResearchReport) -> str:
         """Render the report as a Markdown string."""
         template = self.jinja_env.get_template("research_report.md.j2")
-        return template.render(report.model_dump())
+        return str(template.render(report.model_dump()))
 
     def save_markdown(self, report: ResearchReport, filepath: str) -> None:
         """Save the report to a Markdown file."""
@@ -187,7 +187,7 @@ class ResearchReporter:
     def generate_html(self, report: ResearchReport) -> str:
         """Render the report as an HTML string."""
         template = self.jinja_env.get_template("research_report.html.j2")
-        return template.render(report.model_dump())
+        return str(template.render(report.model_dump()))
 
     def save_html(self, report: ResearchReport, filepath: str) -> None:
         """Save the report to an HTML file."""

@@ -211,7 +211,7 @@ class RareEventSimulator:
         shock_idx = n // 4
 
         for i in range(1, n):
-            shock = 0
+            shock = 0.0
             if i == shock_idx:
                 shock = 0.04 * config.event_magnitude
 

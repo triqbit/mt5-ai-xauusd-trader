@@ -44,7 +44,7 @@ class Monitor:
         self.equity_history: List[Dict[str, Any]] = []
         self.bot: Optional[telegram.Bot] = None
         self._server_started = False
-        self._background_tasks: set[asyncio.Task] = set()
+        self._background_tasks: set[asyncio.Task[Any]] = set()
 
         if self.cfg.telegram_token:
             try:
