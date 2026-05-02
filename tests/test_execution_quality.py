@@ -20,9 +20,11 @@ from src.core.trade_logger import Trade, ModelSignal, RiskEvent
 def mock_connector():
     connector = MagicMock()
     # Mock M1 rates for drift and timing efficiency
-    connector.get_rates.return_value = pd.DataFrame([
-        {"time": datetime.now(timezone.utc), "open": 2300.0, "high": 2305.0, "low": 2295.0, "close": 2302.0}
+    rates_df = pd.DataFrame([
+        {"time": datetime.now(timezone.utc), "open": 2300.0, "high": 2305.0, "low": 2295.0, "close": 2302.0, "spread": 20}
     ])
+    connector.get_rates.return_value = rates_df
+    connector.get_rates_range.return_value = rates_df
     return connector
 
 @pytest.fixture
@@ -42,11 +44,15 @@ def test_trade_execution_quality_model():
         "edge_capture": 0.8,
         "post_entry_drift_5m": 2.0,
         "post_entry_drift_15m": 5.0,
-        "timing_efficiency": 0.7
+        "timing_efficiency": 0.7,
+        "spread_at_execution": 2.0,
+        "slippage_to_spread_ratio": 0.75,
+        "alpha_decay_pips": 0.5
     }
     model = TradeExecutionQuality(**data)
     assert model.trade_id == 1
     assert model.slippage_pips == 1.5
+    assert model.spread_at_execution == 2.0
 
 def test_analyze_trade_logic(analyzer, mock_connector):
     """Test the core slippage and latency calculation logic."""
@@ -121,7 +127,8 @@ def test_generate_summary_report(analyzer):
             trade_id=1, ticket=1, symbol="XAUUSD", slippage_pips=1.0,
             execution_latency_ms=100.0, fill_quality_score=0.9,
             edge_capture=0.5, post_entry_drift_5m=1.0, post_entry_drift_15m=2.0,
-            timing_efficiency=0.8
+            timing_efficiency=0.8, spread_at_execution=2.0,
+            slippage_to_spread_ratio=0.5, alpha_decay_pips=0.1
         )
 
         mock_abs.return_value = [

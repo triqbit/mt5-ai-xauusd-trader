@@ -9,8 +9,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -40,6 +40,13 @@ class TradeExecutionQuality(BaseModel):
     timing_efficiency: float = Field(
         ..., description="Score indicating if entry was at optimal time"
     )
+    spread_at_execution: float = Field(..., description="Spread in pips at time of execution")
+    slippage_to_spread_ratio: float = Field(
+        ..., description="Slippage relative to spread (lower is better)"
+    )
+    alpha_decay_pips: float = Field(
+        ..., description="Alpha lost between signal and execution (pips)"
+    )
 
 
 class BlockedSignalQuality(BaseModel):
@@ -64,6 +71,9 @@ class ExecutionSummary(BaseModel):
     avg_latency_ms: float
     total_opportunity_cost: float
     avg_fill_quality: float
+    avg_edge_capture: float
+    avg_timing_efficiency: float
+    avg_alpha_decay: float
     execution_efficiency_score: float
     rejected_signal_count: int
     executed_trade_count: int
@@ -85,6 +95,14 @@ class ExecutionAnalyzer:
         self.Session = sessionmaker(bind=self.engine)
         self.connector = connector
 
+    def _get_pip_size(self, symbol: str) -> float:
+        """Utility to get pip size for a symbol."""
+        if any(x in symbol for x in ["XAUUSD", "GOLD"]):
+            return 0.1
+        if any(x in symbol for x in ["JPY", "HUF"]):
+            return 0.01
+        return 0.0001
+
     def analyze_trade(self, trade_id: int) -> Optional[TradeExecutionQuality]:
         """
         Analyze execution quality for a specific trade.
@@ -100,8 +118,7 @@ class ExecutionAnalyzer:
             symbol = trade.symbol
 
             # 1. Slippage calculation (in pips)
-            # For XAUUSD, 1 pip = 0.1 price units
-            pip_size = 0.1 if "XAUUSD" in symbol else 0.0001
+            pip_size = self._get_pip_size(symbol)
             slippage_price = (trade.entry_price - signal.entry_price) * signal.direction
             slippage_pips = slippage_price / pip_size
 
@@ -121,6 +138,15 @@ class ExecutionAnalyzer:
             # 5. Timing Efficiency
             timing_eff = self._calculate_timing_efficiency(trade)
 
+            # 6. Alpha Decay and Spread Metrics
+            alpha_decay = self.calculate_alpha_decay(trade, signal)
+            spread_info = self._get_execution_spread(trade)
+            spread_pips = spread_info["spread_pips"]
+
+            slippage_ratio = (
+                abs(slippage_pips) / spread_pips if spread_pips > 0 else abs(slippage_pips)
+            )
+
             return TradeExecutionQuality(
                 trade_id=trade.id,
                 ticket=trade.ticket,
@@ -132,6 +158,9 @@ class ExecutionAnalyzer:
                 post_entry_drift_5m=float(drift_5m),
                 post_entry_drift_15m=float(drift_15m),
                 timing_efficiency=float(timing_eff),
+                spread_at_execution=float(spread_pips),
+                slippage_to_spread_ratio=float(slippage_ratio),
+                alpha_decay_pips=float(alpha_decay),
             )
 
     def calculate_drift(
@@ -141,21 +170,37 @@ class ExecutionAnalyzer:
         if not self.connector:
             return 0.0
 
-        # Fetch 1-minute bars to get granular drift
-        # Note: start_time is UTC, MT5 might need conversion depending on broker
-        # We assume MT5Connector handles timeframes correctly.
-        df = self.connector.get_rates(symbol, "M1", minutes + 1)
-        if df.empty or len(df) < minutes:
+        pip_size = self._get_pip_size(symbol)
+        end_time = start_time + timedelta(minutes=minutes + 1)
+
+        df = self.connector.get_rates_range(symbol, "M1", start_time, end_time)
+        if df.empty:
             return 0.0
 
-        # Calculate drift from entry candle to N candles later
-        # This is a simplified version; real drift should use trade entry time exactly
         entry_price = df.iloc[0]["close"]
         later_price = df.iloc[-1]["close"]
 
         drift = (later_price - entry_price) * direction
-        pip_size = 0.1 if "XAUUSD" in symbol else 0.0001
         return float(drift / pip_size)
+
+    def calculate_alpha_decay(self, trade: Trade, signal: ModelSignal) -> float:
+        """
+        Measure how much price moved against the signal direction between
+        signal timestamp and trade creation time.
+        """
+        if not self.connector:
+            return 0.0
+
+        pip_size = self._get_pip_size(trade.symbol)
+        # Movement between signal price and execution price that is NOT slippage
+        # In this context, let's define it as the price movement in the market
+        # during the latency period.
+        df = self.connector.get_rates_range(trade.symbol, "M1", signal.timestamp, trade.created_at)
+        if df.empty or len(df) < 2:
+            return 0.0
+
+        market_move = (df.iloc[-1]["close"] - df.iloc[0]["open"]) * signal.direction
+        return float(market_move / pip_size)
 
     def calculate_edge_capture(self, trade: Trade, signal: ModelSignal) -> float:
         """
@@ -165,6 +210,7 @@ class ExecutionAnalyzer:
         if not trade.exit_price or not signal.volatility or signal.volatility == 0:
             return 0.0
 
+        # Adjust for spread if possible
         theoretical_edge = (signal.take_profit - signal.entry_price) * signal.direction
         realized_edge = (trade.exit_price - trade.entry_price) * signal.direction
 
@@ -172,6 +218,27 @@ class ExecutionAnalyzer:
             return 0.0
 
         return float(realized_edge / theoretical_edge)
+
+    def _get_execution_spread(self, trade: Trade) -> Dict[str, float]:
+        """Estimate spread at the time of execution."""
+        if not self.connector:
+            return {"spread_pips": 0.0}
+
+        pip_size = self._get_pip_size(trade.symbol)
+        # Fetch data around execution time
+        df = self.connector.get_rates_range(
+            trade.symbol, "M1", trade.created_at - timedelta(minutes=1), trade.created_at
+        )
+
+        if df.empty:
+            return {"spread_pips": 2.0}  # Default for XAUUSD
+
+        # MT5 'spread' in rates is in points
+        point_size = 0.01 if "XAUUSD" in trade.symbol else 0.00001
+        avg_spread_points = df["spread"].mean()
+        spread_pips = (avg_spread_points * point_size) / pip_size
+
+        return {"spread_pips": float(spread_pips)}
 
     def _calculate_timing_efficiency(self, trade: Trade) -> float:
         """
@@ -181,7 +248,10 @@ class ExecutionAnalyzer:
         if not self.connector:
             return 0.5
 
-        df = self.connector.get_rates(trade.symbol, "M1", 1)
+        # Fetch exactly the candle where the trade was created
+        df = self.connector.get_rates_range(
+            trade.symbol, "M1", trade.created_at, trade.created_at + timedelta(seconds=59)
+        )
         if df.empty:
             return 0.5
 
@@ -321,6 +391,9 @@ class ExecutionAnalyzer:
                     avg_latency_ms=0.0,
                     total_opportunity_cost=sum(b.opportunity_cost_pnl for b in blocked),
                     avg_fill_quality=0.0,
+                    avg_edge_capture=0.0,
+                    avg_timing_efficiency=0.0,
+                    avg_alpha_decay=0.0,
                     execution_efficiency_score=0.0,
                     rejected_signal_count=len(blocked),
                     executed_trade_count=0,
@@ -329,6 +402,9 @@ class ExecutionAnalyzer:
             avg_slippage = np.mean([q.slippage_pips for q in qualities])
             avg_latency = np.mean([q.execution_latency_ms for q in qualities])
             avg_fill = np.mean([q.fill_quality_score for q in qualities])
+            avg_edge = np.mean([q.edge_capture for q in qualities])
+            avg_timing = np.mean([q.timing_efficiency for q in qualities])
+            avg_alpha = np.mean([q.alpha_decay_pips for q in qualities])
 
             # Execution efficiency score is a weighted blend
             eff_score = (avg_fill * 0.7) + (max(0.0, 1.0 - (avg_latency / 5000.0)) * 0.3)
@@ -338,6 +414,9 @@ class ExecutionAnalyzer:
                 avg_latency_ms=float(avg_latency),
                 total_opportunity_cost=float(sum(b.opportunity_cost_pnl for b in blocked)),
                 avg_fill_quality=float(avg_fill),
+                avg_edge_capture=float(avg_edge),
+                avg_timing_efficiency=float(avg_timing),
+                avg_alpha_decay=float(avg_alpha),
                 execution_efficiency_score=float(eff_score),
                 rejected_signal_count=len(blocked),
                 executed_trade_count=len(qualities),

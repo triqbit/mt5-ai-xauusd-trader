@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -176,6 +177,38 @@ class MT5Connector:
         """Alias for get_rates() to match main.py expectations."""
         return self.get_rates(symbol, timeframe, n_bars)
 
+    def get_rates_range(
+        self, symbol: str, timeframe: str, date_from: datetime, date_to: datetime
+    ) -> pd.DataFrame:
+        """
+        Fetch historical OHLCV data for a specific time range.
+
+        Args:
+            symbol: Trading symbol.
+            timeframe: Chart timeframe string.
+            date_from: Start of the range.
+            date_to: End of the range.
+
+        Returns:
+            DataFrame containing OHLCV data.
+        """
+        if not self._is_initialized:
+            return pd.DataFrame()
+
+        tf = TIMEFRAME_MAP.get(timeframe, 5)
+
+        if not self.use_metaapi:
+            rates = mt5.copy_rates_range(symbol, tf, date_from, date_to)
+            if rates is None:
+                logger.error("Failed to copy rates range for %s: %s", symbol, mt5.last_error())
+                return pd.DataFrame()
+            df = pd.DataFrame(rates)
+            df["time"] = pd.to_datetime(df["time"], unit="s")
+            return df
+        else:
+            logger.warning("MetaAPI get_rates_range not implemented.")
+            return pd.DataFrame()
+
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
         Retrieve latest symbol tick (bid/ask).
@@ -187,14 +220,17 @@ class MT5Connector:
             Dictionary with 'bid' and 'ask' prices.
         """
         if not self._is_initialized or self.use_metaapi:
-            return {"bid": 0.0, "ask": 0.0}
+            return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
 
         tick = mt5.symbol_info_tick(symbol)
         if tick is None:
             logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
-            return {"bid": 0.0, "ask": 0.0}
+            return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
 
-        return {"bid": tick.bid, "ask": tick.ask}
+        # Calculate spread in price units
+        spread = tick.ask - tick.bid
+
+        return {"bid": tick.bid, "ask": tick.ask, "spread": spread}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
