@@ -11,11 +11,11 @@ stable-baselines3==2.3.2
 gymnasium==0.29.1
 numpy==2.2.6
 scipy==1.13.0
-scikit-learn==1.7.2
-pandas==2.3.2
+scikit-learn==1.6.1
+pandas==3.0.2
 
 # ── Deep Learning Extras ────────────────────────────────────
-transformers==5.7.0
+transformers==4.49.0
 timm==0.9.16
 einops==0.7.0
 
@@ -54,7 +54,7 @@ plotly==5.22.0
 
 # ── Configuration ───────────────────────────────────────────
 python-dotenv==1.2.2
-pydantic==2.13.3
+pydantic==2.10.6
 pydantic-settings==2.2.1
 tomli==2.4.1
 

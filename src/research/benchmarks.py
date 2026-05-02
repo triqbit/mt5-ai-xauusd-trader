@@ -6,13 +6,16 @@ Benchmarking framework to compare advanced models against baseline strategies.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Protocol
+from typing import TYPE_CHECKING, Any, Dict, List, Protocol
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.core.constants import SignalDirection
+if TYPE_CHECKING:
+    from src.models.ensemble import EnsembleModel
+    from src.models.ppo_agent import PPOAgent
+    from src.models.transformer_model import TimeSeriesTransformer
 
 
 class BenchmarkStrategy(Protocol):
@@ -348,9 +351,6 @@ class BenchmarkEvaluator:
         return BenchmarkSection(comparisons=comparisons, statistical_summary=summary)
 
 
-from src.models.ensemble import EnsembleModel
-from src.models.ppo_agent import PPOAgent
-
 class EnsembleAdapter:
     """
     Adapter for EnsembleModel to match BenchmarkStrategy interface.
@@ -438,8 +438,6 @@ class PPOAdapter:
 
         return signals
 
-
-from src.models.transformer_model import TimeSeriesTransformer
 
 class TransformerAdapter:
     """
