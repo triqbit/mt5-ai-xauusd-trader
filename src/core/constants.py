@@ -9,6 +9,7 @@ from enum import IntEnum
 
 class SignalDirection(IntEnum):
     """Standardized signal directions across all models and environments."""
+
     BUY = 1
     SELL = -1
     HOLD = 0
@@ -19,6 +20,7 @@ class ModelAction(IntEnum):
     Standardized categorical actions used by RL environments and model outputs.
     Mapped to SignalDirection in adapters or the execution loop.
     """
+
     HOLD = 0
     BUY = 1
     SELL = 2

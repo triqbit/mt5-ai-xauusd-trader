@@ -6,11 +6,26 @@ Transformer-based architecture for time-series forecasting and signal generation
 
 import math
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+except ImportError:
+    torch = None  # type: ignore
+    nn = None  # type: ignore
+
+# Prevent AttributeError when torch is None during type hint evaluation
+if torch is None:
+
+    class MockTensor:
+        pass
+
+    class MockTorch:
+        Tensor = MockTensor
+
+    torch = MockTorch()  # type: ignore
 
 
-class TimeSeriesTransformer(nn.Module):
+class TimeSeriesTransformer(nn.Module if nn else object):
     """
     Advanced Transformer model for price action forecasting.
     Input: [batch_size, seq_len, features]
@@ -54,7 +69,7 @@ class TimeSeriesTransformer(nn.Module):
         return torch.softmax(output, dim=-1)
 
 
-class PositionalEncoding(nn.Module):
+class PositionalEncoding(nn.Module if nn else object):
     """Injects positional information into the sequence."""
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):

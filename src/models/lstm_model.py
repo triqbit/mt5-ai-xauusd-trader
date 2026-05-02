@@ -4,9 +4,11 @@ src/models/lstm_model.py
 LSTM sequence model using PyTorch for short-term price prediction.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 
@@ -14,8 +16,22 @@ try:
     import torch
     import torch.nn as nn
 except ImportError:
-    torch = None
-    nn = None
+    torch = None  # type: ignore
+    nn = None  # type: ignore
+
+# Prevent AttributeError when torch is None during type hint evaluation
+if torch is None:
+
+    class MockTensor:
+        pass
+
+    class MockTorch:
+        Tensor = MockTensor
+
+    torch = MockTorch()  # type: ignore
+
+if TYPE_CHECKING:
+    import torch
 
 from src.core.constants import SignalDirection
 from src.models.base_model import BaseModel, Signal
@@ -32,6 +48,8 @@ class LSTMPricePredictor(nn.Module if nn else object):
         self.fc = nn.Linear(hidden_dim, 3)  # [hold, buy, sell]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not hasattr(torch, "from_numpy"):  # Real torch check
+            raise ImportError("PyTorch is required for forward pass")
         _, (hn, _) = self.lstm(x)
         out = self.fc(hn[-1])
         return out

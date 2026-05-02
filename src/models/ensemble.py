@@ -26,6 +26,17 @@ except ImportError:
     torch = None  # type: ignore
     nn = None  # type: ignore
 
+# Prevent AttributeError when torch is None during type hint evaluation
+if torch is None:
+
+    class MockTensor:
+        pass
+
+    class MockTorch:
+        Tensor = MockTensor
+
+    torch = MockTorch()  # type: ignore
+
 from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.regime_detector import RegimeInfo

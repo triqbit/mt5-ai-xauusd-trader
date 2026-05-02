@@ -12,7 +12,9 @@ else:
     def __getattr__(name):
         if name == "FeatureEngineer":
             from src.core.feature_engineering import FeatureEngineer
+
             return FeatureEngineer
         raise AttributeError(f"module {__name__} has no attribute {name}")
+
 
 __all__ = ["FeatureEngineer", "TradingConfig", "get_config", "profile"]
