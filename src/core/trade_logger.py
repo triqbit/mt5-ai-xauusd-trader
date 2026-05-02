@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Float,
@@ -25,8 +26,7 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -44,6 +44,9 @@ class AuditMixin:
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+    created_by = Column(String(100))
+    updated_by = Column(String(100))
+    deleted_at = Column(DateTime)
     is_deleted = Column(Boolean, default=False, index=True)
 
 
@@ -67,6 +70,11 @@ class ModelSignal(Base, AuditMixin):
     # Relationship
     trade = relationship("Trade", back_populates="signal", uselist=False)
 
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_signal_entry_price"),
+        CheckConstraint("lot_size > 0", name="check_signal_lot_size"),
+    )
+
 
 class Trade(Base, AuditMixin):
     """Logs every executed trade."""
@@ -86,6 +94,11 @@ class Trade(Base, AuditMixin):
 
     signal_id = Column(Integer, ForeignKey("model_signals.id"))
     signal = relationship("ModelSignal", back_populates="trade")
+
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_trade_entry_price"),
+        CheckConstraint("lot_size > 0", name="check_trade_lot_size"),
+    )
 
 
 class RiskEvent(Base, AuditMixin):
@@ -123,7 +136,7 @@ class TradeLogger:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def log_signal(self, signal_data: Dict[str, Any]) -> int:
+    def log_signal(self, signal_data: Dict[str, Any], created_by: Optional[str] = None) -> int:
         """Log a new model signal and return its ID."""
         with self.Session() as session:
             signal = ModelSignal(
@@ -137,6 +150,7 @@ class TradeLogger:
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
                 timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
+                created_by=created_by,
             )
             session.add(signal)
             session.commit()
@@ -151,6 +165,7 @@ class TradeLogger:
         lot_size: float,
         signal_id: Optional[int] = None,
         status: str = "OPEN",
+        created_by: Optional[str] = None,
     ) -> int:
         """Log a trade execution."""
         with self.Session() as session:
@@ -162,6 +177,7 @@ class TradeLogger:
                 lot_size=lot_size,
                 signal_id=signal_id,
                 status=status,
+                created_by=created_by,
             )
             session.add(trade)
             session.commit()
@@ -173,6 +189,7 @@ class TradeLogger:
         exit_price: float,
         pnl: Optional[float] = None,
         drawdown_impact: float = 0.0,
+        updated_by: Optional[str] = None,
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session() as session:
@@ -183,6 +200,7 @@ class TradeLogger:
             )
             if trade:
                 trade.exit_price = exit_price
+                trade.updated_by = updated_by
                 if pnl is not None:
                     trade.pnl = pnl
                 else:
@@ -216,6 +234,7 @@ class TradeLogger:
         description: str,
         symbol: Optional[str] = None,
         signal_id: Optional[int] = None,
+        created_by: Optional[str] = None,
     ) -> None:
         """Log a risk-related event."""
         with self.Session() as session:
@@ -224,9 +243,26 @@ class TradeLogger:
                 description=description,
                 symbol=symbol,
                 signal_id=signal_id,
+                created_by=created_by,
             )
             session.add(event)
             session.commit()
+
+    def delete_trade(self, ticket: int, updated_by: Optional[str] = None) -> bool:
+        """Soft-delete a trade by ticket."""
+        with self.Session() as session:
+            trade = (
+                session.query(Trade)
+                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+                .first()
+            )
+            if trade:
+                trade.is_deleted = True
+                trade.deleted_at = datetime.now(timezone.utc)
+                trade.updated_by = updated_by
+                session.commit()
+                return True
+            return False
 
     def read_performance_report(self) -> Dict[str, float]:
         """
