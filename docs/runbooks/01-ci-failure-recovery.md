@@ -54,9 +54,16 @@ This runbook provides procedures for recovering from failures in GitHub Actions 
 2. Check if `CHANGELOG.md` has an `[Unreleased]` section.
 3. Verify that the commit message follows Conventional Commits.
 
-## Verification
-- Monitor the GitHub Actions tab for the specific PR or branch.
-- Ensure all status checks are green before merging.
+## Expected Outcomes
+- All GitHub Actions workflows (`ci.yml`, `release.yml`, etc.) show a green "Success" status.
+- The "Checks" section of the Pull Request is cleared of all blocking failures.
+- Code changes meet project standards for linting, testing, and security.
+
+## Verification Commands
+- **Linting:** `ruff check .`
+- **Formatting:** `ruff format --check .`
+- **Tests:** `pytest tests/ --cov=src`
+- **Security:** `pip-audit`
 
 ## Escalation Path
 1. **Level 1:** DevOps / Release Engineer (Jules03).

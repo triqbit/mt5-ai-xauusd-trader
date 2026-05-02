@@ -37,16 +37,15 @@ If no backup exists and repair fails:
    alembic upgrade head
    ```
 
-## Verification
-1. Run a database integrity check:
-   ```bash
-   sqlite3 trades.db "PRAGMA integrity_check;"
-   ```
-2. Check logs for successful trade logging.
-3. Verify migration status:
-   ```bash
-   alembic current
-   ```
+## Expected Outcomes
+- `trades.db` is a valid, readable SQLite file.
+- The application can successfully connect to the database and perform CRUD operations.
+- Historical trade data is preserved (if recovery or backup was successful).
+
+## Verification Commands
+- **Integrity Check:** `sqlite3 trades.db "PRAGMA integrity_check;"`
+- **Migration Check:** `alembic current`
+- **Audit Check:** `sqlite3 trades.db "SELECT count(*) FROM audit_logs;"`
 
 ## Prevention
 - Ensure the disk is not full (`df -h`).
