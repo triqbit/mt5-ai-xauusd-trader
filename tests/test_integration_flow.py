@@ -260,9 +260,7 @@ def test_intelligence_ensemble_adaptation():
 
 
 def test_performance_latency(mock_cfg, trade_logger, mock_monitor):
-    RiskManager(
-        mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor
-    )
+    RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
     model = EnsembleModel(device="cpu")
 
     obs = np.random.rand(140)

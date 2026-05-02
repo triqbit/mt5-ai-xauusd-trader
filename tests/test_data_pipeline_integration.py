@@ -31,15 +31,15 @@ mock_talib.MACD.side_effect = lambda d, *a, **k: (
     np.random.rand(len(d)),
     np.random.rand(len(d)),
 )
-mock_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.ATR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
 mock_talib.BBANDS.side_effect = lambda c, *a, **k: (
     np.random.rand(len(c)),
     np.random.rand(len(c)),
     np.random.rand(len(c)),
 )
 mock_talib.EMA.side_effect = default_talib_effect
-mock_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (
+mock_talib.ADX.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+mock_talib.STOCH.side_effect = lambda h, low, c, *a, **k: (
     np.random.rand(len(c)),
     np.random.rand(len(c)),
 )
@@ -95,15 +95,15 @@ def setup_mock_talib(m_talib):
         np.random.rand(len(data)),
         np.random.rand(len(data)),
     )
-    m_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.ATR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
     m_talib.BBANDS.side_effect = lambda c, *a, **k: (
         np.random.rand(len(c)),
         np.random.rand(len(c)),
         np.random.rand(len(c)),
     )
     m_talib.EMA.side_effect = lambda data, *a, **k: np.random.rand(len(data))
-    m_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-    m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (
+    m_talib.ADX.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+    m_talib.STOCH.side_effect = lambda h, low, c, *a, **k: (
         np.random.rand(len(c)),
         np.random.rand(len(c)),
     )

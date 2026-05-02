@@ -15,14 +15,14 @@ mock_talib.MACD.side_effect = lambda x, *args, **kwargs: (
 )
 mock_talib.SMA.side_effect = lambda x, **kwargs: np.zeros(len(x))
 mock_talib.EMA.side_effect = lambda x, **kwargs: np.zeros(len(x))
-mock_talib.ATR.side_effect = lambda h, l, c, **kwargs: np.zeros(len(c))
+mock_talib.ATR.side_effect = lambda h, low, c, **kwargs: np.zeros(len(c))
 mock_talib.BBANDS.side_effect = lambda x, **kwargs: (
     np.zeros(len(x)),
     np.zeros(len(x)),
     np.zeros(len(x)),
 )
-mock_talib.ADX.side_effect = lambda h, l, c, **kwargs: np.zeros(len(c))
-mock_talib.STOCH.side_effect = lambda h, l, c, **kwargs: (np.zeros(len(c)), np.zeros(len(c)))
+mock_talib.ADX.side_effect = lambda h, low, c, **kwargs: np.zeros(len(c))
+mock_talib.STOCH.side_effect = lambda h, low, c, **kwargs: (np.zeros(len(c)), np.zeros(len(c)))
 mock_talib.OBV.side_effect = lambda c, v: np.zeros(len(c))
 
 # Mock candle patterns
