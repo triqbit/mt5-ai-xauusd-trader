@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
+from typing import Dict, Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -57,26 +58,44 @@ class RegimeDetector:
         net_change = abs(prices[-1] - prices[0])
         abs_changes = np.abs(np.diff(prices))
         sum_abs_changes = np.sum(abs_changes)
-        return float(net_change / sum_abs_changes) if sum_abs_changes > 0 else 0.0
+        return float(net_change / (sum_abs_changes + 1e-9))
 
     def _calculate_slope(self, prices: np.ndarray) -> float:
         """Normalized linear regression slope."""
-        if len(prices) < 2:
+        n = len(prices)
+        if n < 2:
             return 0.0
-        x = np.arange(len(prices))
+        x = np.arange(n)
         y = prices
-        # Use simple linear regression formula
-        n = len(x)
-        slope = (n * np.sum(x * y) - np.sum(x) * np.sum(y)) / (
-            n * np.sum(x**2) - (np.sum(x)) ** 2
-        )
-        # Normalize slope by price level
-        return float(slope / prices[0])
+        denom = (n * np.sum(x**2) - (np.sum(x)) ** 2)
+        if abs(denom) < 1e-9:
+            return 0.0
+        slope = (n * np.sum(x * y) - np.sum(x) * np.sum(y)) / denom
+        return float(slope / (prices[0] + 1e-9))
+
+    def _calculate_volatility_clustering(self, returns: np.ndarray) -> float:
+        """
+        Calculates volatility clustering via autocorrelation of absolute returns.
+        """
+        if len(returns) < 10:
+            return 0.0
+        abs_rets = np.abs(returns)
+
+        x = abs_rets[1:]
+        y = abs_rets[:-1]
+
+        if np.std(x) < 1e-9 or np.std(y) < 1e-9:
+            return 0.0
+
+        correlation_matrix = np.corrcoef(x, y)
+        if correlation_matrix.shape == (2, 2):
+            corr = correlation_matrix[0, 1]
+            return float(corr) if not np.isnan(corr) else 0.0
+        return 0.0
 
     def detect(self, data: pd.DataFrame) -> RegimeInfo:
         """
         Detect current market regime from OHLCV data.
-        Requires at least 'long_window' bars.
         """
         if len(data) < self.long_window:
             return RegimeInfo(
@@ -86,22 +105,26 @@ class RegimeDetector:
                 volatility_index=0.0,
             )
 
-        close = data["close"].values
-        high = data["high"].values
-        low = data["low"].values
+        lookback = self.long_window + 1
+        subset = data.iloc[-lookback:]
+        close = subset["close"].values
+        high = subset["high"].values
+        low = subset["low"].values
 
         # 1. Volatility (ATR Ratio)
-        def get_tr(h, low_val, c_prev):
-            return max(h - low_val, abs(h - c_prev), abs(low_val - c_prev))
-
-        tr = np.zeros(len(data))
-        for i in range(1, len(data)):
-            tr[i] = get_tr(high[i], low[i], close[i - 1])
-        tr[0] = high[0] - low[0]
+        tr = np.maximum(
+            high[1:] - low[1:],
+            np.maximum(
+                np.abs(high[1:] - close[:-1]),
+                np.abs(low[1:] - close[:-1])
+            )
+        )
+        if len(subset) <= self.long_window:
+            tr = np.insert(tr, 0, high[0] - low[0])
 
         atr_short = np.mean(tr[-self.window :])
         atr_long = np.mean(tr[-self.long_window :])
-        atr_ratio = atr_short / atr_long if atr_long > 0 else 1.0
+        atr_ratio = atr_short / (atr_long + 1e-9)
 
         # 2. Efficiency Ratio
         er = self._calculate_efficiency_ratio(close[-self.window :])
@@ -109,36 +132,18 @@ class RegimeDetector:
         # 3. Price Slope
         slope = self._calculate_slope(close[-self.window :])
 
-        # 4. Z-Score (Distance from Mean)
+        # 4. Z-Score
         ma = np.mean(close[-self.window :])
         std = np.std(close[-self.window :]) + 1e-9
-        z_score = abs(close[-1] - ma) / std
+        z_score = (close[-1] - ma) / std
 
-        # --- Regime Logic ---
-        label = MarketRegime.RANGING
-        confidence = 0.5
+        # 5. Volatility Clustering
+        returns = np.diff(close) / (close[:-1] + 1e-9)
+        vc = self._calculate_volatility_clustering(returns[-self.window :])
 
-        if atr_ratio > 2.5 or (z_score > 3.0 and er > 0.8):
-            label = MarketRegime.NEWS_SHOCK
-            confidence = min(atr_ratio / 4.0, 1.0)
-        elif er > 0.6 and abs(slope) > 0.0001:
-            if atr_ratio > 1.5:
-                label = MarketRegime.VOLATILE_BREAKOUT
-            else:
-                label = MarketRegime.TRENDING
-            confidence = er
-        elif z_score > 2.5 and er < 0.3:
-            label = MarketRegime.MEAN_REVERSION
-            confidence = min(z_score / 4.0, 1.0)
-        elif abs(slope) > 0.00005 and atr_ratio < 0.8:
-            label = MarketRegime.LOW_VOLATILITY_DRIFT
-            confidence = 0.7
-        else:
-            label = MarketRegime.RANGING
-            confidence = 1.0 - er
-
-        # Transition score (change in ER or ATR ratio)
-        transition_score = abs(atr_ratio - 1.0) * 0.5 + abs(er - 0.5)
+        label, confidence, transition_score = self._apply_regime_logic(
+            atr_ratio, er, slope, z_score, vc
+        )
 
         regime_info = RegimeInfo(
             label=label,
@@ -148,27 +153,59 @@ class RegimeDetector:
         )
 
         if label != self._last_regime:
-            logger.info("Regime transition: %s -> %s", self._last_regime, label)
+            logger.debug("Regime transition: %s -> %s", self._last_regime, label)
             self._last_regime = label
 
         return regime_info
 
-    def label_history(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Adds regime columns to historical DataFrame."""
-        df = data.copy()
-        regimes = []
-        confidences = []
+    def _apply_regime_logic(
+        self, atr_ratio: float, er: float, slope: float, z_score: float, vc: float
+    ) -> Tuple[MarketRegime, float, float]:
+        """Heuristic logic to classify market regime."""
+        label = MarketRegime.RANGING
+        confidence = 0.5
 
-        # This is slow but robust for research
-        for i in range(len(df)):
-            if i < self.long_window:
-                regimes.append(MarketRegime.UNKNOWN.value)
-                confidences.append(0.0)
-            else:
-                info = self.detect(df.iloc[i - self.long_window + 1 : i + 1])
-                regimes.append(info.label.value)
-                confidences.append(info.confidence)
+        if atr_ratio > 2.5 and er > 0.7:
+            label = MarketRegime.NEWS_SHOCK
+            confidence = min(atr_ratio / 5.0, 1.0)
+        elif atr_ratio > 1.25 and er > 0.5:
+            label = MarketRegime.VOLATILE_BREAKOUT
+            confidence = er
+        elif er > 0.4 and abs(slope) > 0.00006:
+            label = MarketRegime.TRENDING
+            confidence = er
+        elif abs(z_score) > 1.8 and er < 0.4:
+            label = MarketRegime.MEAN_REVERSION
+            confidence = min(abs(z_score) / 4.0, 1.0)
+        elif atr_ratio < 0.9 and abs(slope) > 0.00003:
+            label = MarketRegime.LOW_VOLATILITY_DRIFT
+            confidence = 0.7
+        else:
+            label = MarketRegime.RANGING
+            confidence = 1.0 - er
+
+        transition_score = abs(atr_ratio - 1.0) * 0.4 + abs(er - 0.5) * 0.4 + abs(vc) * 0.2
+        return label, confidence, transition_score
+
+    def label_history(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Adds regime columns to historical DataFrame.
+        """
+        df = data.copy()
+        regimes = [MarketRegime.UNKNOWN.value] * len(df)
+        confidences = [0.0] * len(df)
+        transition_scores = [0.0] * len(df)
+        volatility_indices = [0.0] * len(df)
+
+        for i in range(self.long_window - 1, len(df)):
+            info = self.detect(df.iloc[: i + 1])
+            regimes[i] = info.label.value
+            confidences[i] = info.confidence
+            transition_scores[i] = info.transition_score
+            volatility_indices[i] = info.volatility_index
 
         df["regime"] = regimes
         df["regime_confidence"] = confidences
+        df["regime_transition_score"] = transition_scores
+        df["volatility_index"] = volatility_indices
         return df
