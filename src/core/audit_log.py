@@ -14,10 +14,11 @@ from enum import Enum
 from typing import Any, Dict, Optional
 
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,8 +53,9 @@ class AuditLogger:
     """
 
     _instance: Optional[AuditLogger] = None
+    _initialized: bool = False
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> AuditLogger:
         if not cls._instance:
             cls._instance = super(AuditLogger, cls).__new__(cls)
             cls._instance._initialized = False

@@ -224,13 +224,13 @@ def init_health_checker(
 
 
 @router.get("/liveness", response_model=ComponentStatus)
-async def liveness():
+async def liveness() -> ComponentStatus:
     checker = get_health_checker()
     return checker.check_liveness()
 
 
 @router.get("/readiness", response_model=HealthReport)
-async def readiness():
+async def readiness() -> HealthReport:
     checker = get_health_checker()
     report = checker.get_full_report()
 
@@ -243,6 +243,6 @@ async def readiness():
 
 
 @router.get("/full", response_model=HealthReport)
-async def full_report():
+async def full_report() -> HealthReport:
     checker = get_health_checker()
     return checker.get_full_report()

@@ -25,10 +25,11 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
+
 logger = logging.getLogger(__name__)
 
 
