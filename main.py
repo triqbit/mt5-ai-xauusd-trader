@@ -26,7 +26,7 @@ import structlog
 from rich.console import Console
 from rich.table import Table
 
-from src.core import get_config, profile
+from src.core import TradingConfig, get_config, profile
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
