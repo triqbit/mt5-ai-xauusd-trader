@@ -16,22 +16,22 @@ LSTMModel = None
 DreamerAgent = None
 
 with contextlib.suppress(ImportError):
+    from src.models.dreamer_agent import DreamerAgent
     from src.models.dynamic_ensemble import DynamicEnsemble
     from src.models.ensemble import EnsembleModel, LSTMAttentionModel
-    from src.models.regime_detector import MarketRegime, RegimeDetector
-    from src.models.ppo_agent import PPOAgent
     from src.models.lstm_model import LSTMModel
-    from src.models.dreamer_agent import DreamerAgent
+    from src.models.ppo_agent import PPOAgent
+    from src.models.regime_detector import MarketRegime, RegimeDetector
 
 __all__ = [
     "BaseModel",
-    "Signal",
+    "DreamerAgent",
     "DynamicEnsemble",
     "EnsembleModel",
     "LSTMAttentionModel",
-    "MarketRegime",
-    "RegimeDetector",
-    "PPOAgent",
     "LSTMModel",
-    "DreamerAgent",
+    "MarketRegime",
+    "PPOAgent",
+    "RegimeDetector",
+    "Signal",
 ]

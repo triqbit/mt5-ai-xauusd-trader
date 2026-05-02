@@ -14,6 +14,7 @@ from src.core.constants import SignalDirection
 
 class Signal(NamedTuple):
     """Standardized model output."""
+
     direction: SignalDirection
     confidence: float
     metadata: Optional[Dict[str, Any]] = None

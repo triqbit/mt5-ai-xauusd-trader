@@ -9,8 +9,8 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
-from src.models.base_model import BaseModel, Signal
 from src.core.constants import SignalDirection
+from src.models.base_model import BaseModel, Signal
 
 
 class DreamerAgent(BaseModel):
@@ -18,6 +18,7 @@ class DreamerAgent(BaseModel):
     DreamerV3 wrapper (placeholder).
     DreamerV3 is a world model-based reinforcement learning algorithm.
     """
+
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         self.logger = logging.getLogger(__name__)
         self.config = config or {}
@@ -31,12 +32,12 @@ class DreamerAgent(BaseModel):
         """
         # Placeholder logic: return neutral signal
         return Signal(
-            direction=SignalDirection.HOLD,
-            confidence=0.0,
-            metadata={"status": "placeholder"}
+            direction=SignalDirection.HOLD, confidence=0.0, metadata={"status": "placeholder"}
         )
 
-    def update_state(self, features: np.ndarray, action: int, reward: float, terminal: bool) -> None:
+    def update_state(
+        self, features: np.ndarray, action: int, reward: float, terminal: bool
+    ) -> None:
         """
         Dreamer-specific state update for the recurrent world model.
         """

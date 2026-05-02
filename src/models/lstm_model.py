@@ -6,9 +6,10 @@ LSTM sequence model using PyTorch for short-term price prediction.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
+
 try:
     import torch
     import torch.nn as nn
@@ -16,12 +17,13 @@ except ImportError:
     torch = None
     nn = None
 
-from src.models.base_model import BaseModel, Signal
 from src.core.constants import SignalDirection
+from src.models.base_model import BaseModel, Signal
 
 
 class LSTMPricePredictor(nn.Module if nn else object):
     """Simple LSTM for price direction prediction."""
+
     def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2):
         if not nn:
             raise ImportError("PyTorch is required for LSTMPricePredictor")
@@ -39,14 +41,21 @@ class LSTMModel(BaseModel):
     """
     Wrapper for LSTMPricePredictor implementing BaseModel interface.
     """
+
     def __init__(
         self,
         input_dim: int = 140,
         model_path: Optional[Union[str, Path]] = None,
-        device: str = "cpu"
+        device: str = "cpu",
     ) -> None:
         self.logger = logging.getLogger(__name__)
-        self.device = torch.device(device) if torch and device != "auto" else torch.device("cpu") if torch else None
+        self.device = (
+            torch.device(device)
+            if torch and device != "auto"
+            else torch.device("cpu")
+            if torch
+            else None
+        )
         self.model = None
 
         if torch:
@@ -60,7 +69,11 @@ class LSTMModel(BaseModel):
         Predict price direction using LSTM.
         """
         if self.model is None or not torch:
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0, metadata={"error": "Model not loaded"})
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": "Model not loaded"},
+            )
 
         # features expected as (seq_len, n_features) or (batch, seq_len, n_features)
         x = torch.from_numpy(features).float().to(self.device)
@@ -80,5 +93,5 @@ class LSTMModel(BaseModel):
         return Signal(
             direction=direction_map.get(action_idx, SignalDirection.HOLD),
             confidence=confidence,
-            metadata={"probs": probs.tolist()}
+            metadata={"probs": probs.tolist()},
         )

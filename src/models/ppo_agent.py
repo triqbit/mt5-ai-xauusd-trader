@@ -6,12 +6,12 @@ Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 
+from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
-from src.core.constants import ModelAction
 
 
 class PPOAgent(BaseModel):
@@ -19,11 +19,12 @@ class PPOAgent(BaseModel):
     PPO-based reinforcement learning agent.
     Uses Stable-Baselines3 PPO under the hood.
     """
+
     def __init__(
         self,
         env: Optional[Any] = None,
         model_path: Optional[Union[str, Path]] = None,
-        device: str = "auto"
+        device: str = "auto",
     ) -> None:
         self.logger = logging.getLogger(__name__)
         self.device = device
@@ -58,7 +59,11 @@ class PPOAgent(BaseModel):
         Generate a trading signal from the current observation.
         """
         if self.model is None:
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0, metadata={"error": "Model not loaded"})
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": "Model not loaded"},
+            )
 
         # SB3 predict returns (action, states)
         action, _states = self.model.predict(features, deterministic=True)
@@ -70,5 +75,5 @@ class PPOAgent(BaseModel):
         return Signal(
             direction=model_action.to_direction(),
             confidence=0.85,  # Placeholder
-            metadata={"raw_action": int(action)}
+            metadata={"raw_action": int(action)},
         )
