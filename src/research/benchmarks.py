@@ -114,7 +114,9 @@ class NaiveDirectionalStrategy:
 class RiskFilteredBaseline:
     """EMA Crossover strategy with a simple volatility filter."""
 
-    def __init__(self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02):
+    def __init__(
+        self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02
+    ):
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.vol_threshold_pct = vol_threshold_pct
@@ -130,7 +132,7 @@ class RiskFilteredBaseline:
 
         signals = np.zeros(len(df))
         # Only trade if volatility is below threshold
-        mask = (volatility < self.vol_threshold_pct)
+        mask = volatility < self.vol_threshold_pct
         signals[mask & (fast_ema > slow_ema)] = 1
         signals[mask & (fast_ema < slow_ema)] = -1
         return signals
@@ -165,7 +167,9 @@ class MeanReversionStrategy:
 class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
-    def __init__(self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002):
+    def __init__(
+        self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002
+    ):
         self.df = df
         self.initial_balance = initial_balance
         self.commission = commission
@@ -203,12 +207,12 @@ class BenchmarkEvaluator:
             if target_pos != position:
                 # If closing an existing position
                 if position != 0:
-                    current_equity *= (1 - self.commission)
+                    current_equity *= 1 - self.commission
                     trade_pnls.append(current_equity - entry_equity)
 
                 # If opening a new position
                 if target_pos != 0:
-                    current_equity *= (1 - self.commission)
+                    current_equity *= 1 - self.commission
                     entry_equity = current_equity
 
                 position = target_pos
@@ -216,17 +220,19 @@ class BenchmarkEvaluator:
             # Update equity based on market movement
             if position == 1:
                 change = (current_price - prev_price) / prev_price
-                current_equity *= (1 + change)
+                current_equity *= 1 + change
             elif position == -1:
                 change = (prev_price - current_price) / prev_price
-                current_equity *= (1 + change)
+                current_equity *= 1 + change
 
             equity[i] = current_equity
-            daily_returns[i] = (equity[i] - equity[i - 1]) / equity[i - 1] if equity[i - 1] != 0 else 0
+            daily_returns[i] = (
+                (equity[i] - equity[i - 1]) / equity[i - 1] if equity[i - 1] != 0 else 0
+            )
 
         # Force close any remaining position at the last price
         if position != 0:
-            equity[-1] *= (1 - self.commission)
+            equity[-1] *= 1 - self.commission
             trade_pnls.append(equity[-1] - entry_equity)
 
         # Final aggregate metrics
@@ -250,11 +256,22 @@ class BenchmarkEvaluator:
 
         win_rate = 0.0
         profit_factor = 0.0
+        expectancy = 0.0
         if len(trade_pnls) > 0:
-            win_rate = len([p for p in trade_pnls if p > 0]) / len(trade_pnls)
-            gains = sum([p for p in trade_pnls if p > 0])
-            losses = abs(sum([p for p in trade_pnls if p < 0]))
-            profit_factor = gains / losses if losses > 0 else float("inf")
+            wins = [p for p in trade_pnls if p > 0]
+            losses = [p for p in trade_pnls if p < 0]
+            win_rate = len(wins) / len(trade_pnls)
+
+            gains_sum = sum(wins)
+            losses_sum = abs(sum(losses))
+            profit_factor = gains_sum / losses_sum if losses_sum > 0 else float("inf")
+
+            avg_win = np.mean(wins) if wins else 0
+            avg_loss = abs(np.mean(losses)) if losses else 0
+            loss_rate = len(losses) / len(trade_pnls)
+            expectancy = (avg_win * win_rate) - (avg_loss * loss_rate)
+
+        calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
 
         # Store daily returns for statistical testing
         self.results[name + "_returns"] = daily_returns
@@ -263,9 +280,11 @@ class BenchmarkEvaluator:
             "Total Return": total_return,
             "Sharpe Ratio": sharpe,
             "Sortino Ratio": sortino,
+            "Calmar Ratio": calmar,
             "Max Drawdown": max_drawdown,
             "Win Rate": win_rate,
             "Profit Factor": profit_factor,
+            "Expectancy": expectancy,
             "Num Trades": len(trade_pnls),
         }
 
@@ -330,10 +349,21 @@ class BenchmarkEvaluator:
 
 
 class EnsembleAdapter:
-    """Adapter for EnsembleModel to match BenchmarkStrategy interface."""
+    """
+    Adapter for EnsembleModel to match BenchmarkStrategy interface.
+    Handles windowing for LSTM-Attention component and per-step inference.
+    """
 
-    def __init__(self, model: Any, name: str = "Ensemble_Model"):
+    def __init__(self, model: Any, window_size: int = 60, name: str = "Ensemble_Model"):
+        """
+        Initialize the adapter.
+        Args:
+            model: An instance of EnsembleModel.
+            window_size: Lookback window size for the LSTM component.
+            name: Label for the strategy.
+        """
         self.model = model
+        self.window_size = window_size
         self._name = name
 
     @property
@@ -342,22 +372,47 @@ class EnsembleAdapter:
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         """
-        EnsembleModel expected 'obs' as [open, high, low, close, tick_volume].
-        This adapter iterates through the DataFrame to provide per-step predictions.
+        Generate signals using rolling windows.
+        Args:
+            df: DataFrame containing OHLCV and technical indicators.
+        Returns:
+            np.ndarray: Array of signals.
         """
+        import torch
+
         signals = np.zeros(len(df))
-        for i in range(len(df)):
-            obs = df.iloc[i][["open", "high", "low", "close", "tick_volume"]].values
+        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+
+        for i in range(self.window_size - 1, len(df)):
+            # Current observation for PPO
+            obs = df.iloc[i][feature_cols].values.astype(np.float32)
+
+            # Sequence for LSTM
+            seq_data = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values.astype(
+                np.float32
+            )
+            seq = torch.from_numpy(seq_data).float()
+
             # EnsembleModel.predict returns (direction, confidence, per_algo)
-            direction, _, _ = self.model.predict(obs)
+            direction, _, _ = self.model.predict(obs, seq=seq)
             signals[i] = float(direction)
+
         return signals
 
 
 class PPOAdapter:
-    """Adapter for PPOAgent to match BenchmarkStrategy interface."""
+    """
+    Adapter for PPOAgent to match BenchmarkStrategy interface.
+    Supports basic feature alignment and ModelAction to SignalDirection mapping.
+    """
 
     def __init__(self, agent: Any, name: str = "PPO_Agent"):
+        """
+        Initialize the adapter.
+        Args:
+            agent: An instance of PPOAgent.
+            name: Label for the strategy.
+        """
         self.agent = agent
         self._name = name
 
@@ -367,25 +422,43 @@ class PPOAdapter:
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         """
-        PPOAgent.predict expects the final observation vector.
-        Note: The input 'df' should ideally be pre-processed to match
-        the environment's observation space (windowing + normalization).
+        Generate signals for the given dataset.
         """
         signals = np.zeros(len(df))
+        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+
         for i in range(len(df)):
-            # Fallback to entire row if not pre-processed
-            obs = df.iloc[i].values
-            action = self.agent.predict(obs)
-            # action is a ModelAction
-            signals[i] = float(action.to_direction())
+            obs = df.iloc[i][feature_cols].values.astype(np.float32)
+            # PPOAgent.predict returns a Signal NamedTuple
+            signal = self.agent.predict(obs)
+            signals[i] = float(signal.direction)
+
         return signals
 
 
 class TransformerAdapter:
-    """Adapter for TimeSeriesTransformer to match BenchmarkStrategy interface."""
+    """
+    Adapter for TimeSeriesTransformer to match BenchmarkStrategy interface.
+    Handles sliding window extraction and device placement.
+    """
 
-    def __init__(self, model: Any, name: str = "Transformer_Model", device: str = "cpu"):
+    def __init__(
+        self,
+        model: Any,
+        window_size: int = 60,
+        name: str = "Transformer_Model",
+        device: str = "cpu",
+    ):
+        """
+        Initialize the adapter.
+        Args:
+            model: An instance of TimeSeriesTransformer.
+            window_size: Lookback window required by the model.
+            name: Label for the strategy.
+            device: Computing device ('cpu' or 'cuda').
+        """
         self.model = model
+        self.window_size = window_size
         self._name = name
         self.device = device
 
@@ -395,45 +468,24 @@ class TransformerAdapter:
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         """
-        Transformer expects input shape: [batch, seq_len, features].
-        This adapter handles a single sequence or a batch of sequences.
+        Generate signals using a sliding window approach.
         """
         import torch
 
         self.model.eval()
         signals = np.zeros(len(df))
-
-        # Determine if we should treat the whole DF as one sequence or per-row.
-        # Most transformers in this repo use a window_size (e.g., 60).
-        # For evaluation, we typically want per-step prediction using the lookback.
-
-        data = torch.FloatTensor(df.values).to(self.device)
-
-        # If data is 2D [n_steps, features], and the model expects [batch, seq, feat]
-        # we might need to create sliding windows.
-        # Here we assume the model can take the 2D input if unsqueezed or handled internally.
-
-        if data.dim() == 2:
-            # Simple case: treat the whole DF as one sequence for a single prediction at the end
-            # or treat as a batch of independent rows (less likely for transformer).
-            # For this adapter, we provide a basic pass-through.
-            data = data.unsqueeze(0)  # [1, n_steps, features]
-
-        with torch.no_grad():
-            probs = self.model(data)
-            actions = torch.argmax(probs, dim=-1).cpu().numpy()
+        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
 
         # Mapping logic: 0=Buy, 1=Sell, 2=Hold (based on legacy transformer logic)
-        # Note: Ideally transformer should also use ModelAction categories.
         direction_map = {0: SignalDirection.BUY, 1: SignalDirection.SELL, 2: SignalDirection.HOLD}
 
-        # If we get a single action back (batch size 1)
-        if actions.ndim == 1 and len(actions) == 1:
-            signals[-1] = float(direction_map.get(int(actions[0]), SignalDirection.HOLD))
-        else:
-            # Map batch actions to signals
-            for i, act in enumerate(actions):
-                if i < len(signals):
-                    signals[i] = float(direction_map.get(int(act), SignalDirection.HOLD))
+        with torch.no_grad():
+            for i in range(self.window_size - 1, len(df)):
+                window = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values
+                data = torch.FloatTensor(window).unsqueeze(0).to(self.device)
+
+                probs = self.model(data)
+                action_idx = int(torch.argmax(probs, dim=-1).item())
+                signals[i] = float(direction_map.get(action_idx, SignalDirection.HOLD))
 
         return signals

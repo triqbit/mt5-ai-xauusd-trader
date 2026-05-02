@@ -5,6 +5,7 @@ Unit tests for the benchmarking framework.
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import MagicMock
 from src.research.benchmarks import (
     EMACrossoverStrategy,
     MomentumStrategy,
@@ -12,8 +13,14 @@ from src.research.benchmarks import (
     NaiveDirectionalStrategy,
     RiskFilteredBaseline,
     MeanReversionStrategy,
-    BenchmarkEvaluator
+    BenchmarkEvaluator,
+    EnsembleAdapter,
+    PPOAdapter,
+    TransformerAdapter,
 )
+from src.core.constants import SignalDirection
+from src.models.base_model import Signal
+
 
 @pytest.fixture
 def sample_data():
@@ -21,14 +28,17 @@ def sample_data():
     np.random.seed(42)
     n = 100
     close = 100 + np.cumsum(np.random.randn(n))
-    df = pd.DataFrame({
-        "open": close - np.random.randn(n),
-        "high": close + np.abs(np.random.randn(n)),
-        "low": close - np.abs(np.random.randn(n)),
-        "close": close,
-        "tick_volume": np.random.randint(100, 1000, n)
-    })
+    df = pd.DataFrame(
+        {
+            "open": close - np.random.randn(n),
+            "high": close + np.abs(np.random.randn(n)),
+            "low": close - np.abs(np.random.randn(n)),
+            "close": close,
+            "tick_volume": np.random.randint(100, 1000, n),
+        }
+    )
     return df
+
 
 def test_ema_crossover_signals(sample_data):
     strategy = EMACrossoverStrategy(fast_window=5, slow_window=10)
@@ -36,11 +46,13 @@ def test_ema_crossover_signals(sample_data):
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
 
+
 def test_momentum_signals(sample_data):
     strategy = MomentumStrategy(window=5)
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
+
 
 def test_volatility_breakout_signals(sample_data):
     strategy = VolatilityBreakoutStrategy(window=10)
@@ -48,11 +60,13 @@ def test_volatility_breakout_signals(sample_data):
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
 
+
 def test_naive_directional_signals(sample_data):
     strategy = NaiveDirectionalStrategy()
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
+
 
 def test_risk_filtered_signals(sample_data):
     strategy = RiskFilteredBaseline(vol_threshold_pct=0.01)
@@ -60,18 +74,17 @@ def test_risk_filtered_signals(sample_data):
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
 
+
 def test_mean_reversion_signals(sample_data):
     strategy = MeanReversionStrategy(window=5)
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
 
+
 def test_evaluator_metrics(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
-    strategies = [
-        EMACrossoverStrategy(5, 10),
-        MomentumStrategy(5)
-    ]
+    strategies = [EMACrossoverStrategy(5, 10), MomentumStrategy(5)]
     results = evaluator.evaluate_all(strategies)
     assert isinstance(results, pd.DataFrame)
     assert len(results) == 2
@@ -79,6 +92,9 @@ def test_evaluator_metrics(sample_data):
     assert "Sharpe Ratio" in results.columns
     assert "Sortino Ratio" in results.columns
     assert "Profit Factor" in results.columns
+    assert "Calmar Ratio" in results.columns
+    assert "Expectancy" in results.columns
+
 
 def test_comparison_logic(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
@@ -90,6 +106,7 @@ def test_comparison_logic(sample_data):
     assert "Outperformance" in comp
     assert "Sharpe Improvement" in comp
 
+
 def test_to_report_section(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
     s1 = EMACrossoverStrategy(5, 10)
@@ -100,6 +117,7 @@ def test_to_report_section(sample_data):
     assert len(section.comparisons) == 1
     assert section.comparisons[0].name == s1.name
     assert "statistically significant" in section.statistical_summary
+
 
 def test_evaluator_reversals(sample_data):
     """Test that immediate reversals are handled correctly."""
@@ -114,3 +132,47 @@ def test_evaluator_reversals(sample_data):
     # With 0 commission, reversal shouldn't crash and should result in 2 trades
     # (One long from 10 to 11, one short from 11 onwards)
     assert metrics["Num Trades"] == 2
+
+
+def test_ppo_adapter(sample_data):
+    mock_agent = MagicMock()
+    mock_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.9)
+
+    adapter = PPOAdapter(mock_agent)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    assert np.all(signals == 1.0)
+    assert mock_agent.predict.call_count == len(sample_data)
+
+
+def test_ensemble_adapter(sample_data):
+    mock_model = MagicMock()
+    mock_model.predict.return_value = (SignalDirection.SELL, 0.8, {})
+
+    window_size = 10
+    adapter = EnsembleAdapter(mock_model, window_size=window_size)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    # First window_size-1 signals should be 0
+    assert np.all(signals[: window_size - 1] == 0)
+    # Remaining signals should be -1.0
+    assert np.all(signals[window_size - 1 :] == -1.0)
+    assert mock_model.predict.call_count == len(sample_data) - (window_size - 1)
+
+
+def test_transformer_adapter(sample_data):
+    import torch
+
+    mock_model = MagicMock()
+    # Mock return: a tensor of probabilities [batch, 3] where index 0 is BUY
+    mock_model.return_value = torch.tensor([[1.0, 0.0, 0.0]])
+
+    window_size = 5
+    adapter = TransformerAdapter(mock_model, window_size=window_size)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    assert np.all(signals[: window_size - 1] == 0)
+    assert np.all(signals[window_size - 1 :] == 1.0)
