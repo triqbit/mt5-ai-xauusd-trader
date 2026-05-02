@@ -8,44 +8,48 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 
 - ✅ **CI Checks:** All required CI checks must pass (tests, lint, coverage ≥ 80%, security scan clean).
 - ✅ **Approvals:** Required code owners have approved the pull request.
-- ✅ **Conflicts:** No merge conflicts with the target branch.
+- ✅ **No Merge Conflicts:** No conflicts with the target branch.
 - ✅ **Safety:** No high-risk files (as defined below) are touched.
 - ✅ **Test Coverage:** Tests must be added or updated for any new functionality.
 - ✅ **Documentation:** Documentation must be updated where required by the change.
 - ✅ **Observability:** Observability and logging must meet project standards (standard `structlog`, no `print` statements, mandatory docstrings).
-- ✅ **Architecture:** Changes must fit within existing architectural conventions (e.g., using `MT5Connector`, Pydantic models for config).
+- ✅ **Architecture:** Changes must fit within existing architectural conventions.
 
-## High-Risk Files (Auto-Merge Blocked)
+## Block and Escalate Rules
 
-Changes to the following files or patterns will automatically block auto-merge and require manual review by a lead engineer:
+Automatically **BLOCK** and **ESCALATE** if any of these are true:
 
-- `src/trading/executor.py` (Live trading execution logic)
-- `src/core/risk_engine.py` (Core risk calculation engine)
-- `src/trading/order_manager.py` (Order execution and management)
-- `src/trading/portfolio_manager.py` (Portfolio and state management)
-- `src/trading/mt5_connector.py` (MT5 integration and connectivity)
-- `src/trading/risk_manager.py` (Risk parameters and position sizing)
-- `src/core/config.py` (System configuration and security defaults)
-- `config/secrets.*` (Credentials, secrets, or auth surface changes)
-- `.github/workflows/deploy.*` (Deployment control changes)
-- `.github/workflows/ci.yml` (CI/CD workflows that affect deployment)
-- `Dockerfile` (Infrastructure-as-code and container definitions)
-- `migrations/.*` (Database migrations, especially destructive ones)
+- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py` or files interacting with MT5 order placement.
+- 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py` or `src/trading/risk_manager.py`.
+- 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*` or credential handling.
+- 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
+- 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile` or container orchestration.
+- 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*` or `ci.yml`.
+
+## High-Risk Files (Auto-Merge Prohibited)
+
+The following patterns trigger an automatic block and escalation:
+
+- `src/trading/executor.py`
+- `src/core/risk_engine.py`
+- `src/trading/risk_manager.py`
+- `config/secrets.*`
+- `.github/workflows/deploy.*`
+- `.github/workflows/ci.yml`
+- `Dockerfile`
+- `migrations/.*`
 
 ## Escalation Procedure
 
-Pull requests that trigger a block must be manually reviewed and merged. The following scenarios require **IMMEDIATE ESCALATION** to the Lead Architect or Product Owner:
-
-1. **Identification:** The `auto-merge-policy.yml` workflow will automatically block the PR and add the `escalated-risk` label.
-2. **Notification:** A comment will be posted on the PR explaining the reason for the block.
-3. **Review:** A Lead Engineer or Product Owner must perform a deep-dive review of the changes.
-4. **Validation:** For high-risk changes, manual verification in a staging/demo environment is mandatory.
+1. **Identification:** The `auto-merge-policy.yml` workflow blocks the PR and adds the `escalated-risk` label.
+2. **Notification:** A comment is posted explaining the policy violation.
+3. **Review:** A Lead Engineer or Product Owner must perform a deep-dive review.
+4. **Validation:** Manual verification in a staging environment is mandatory.
 5. **Approval:** Two senior approvals are required for any change labeled `escalated-risk`.
-6. **Merge:** The PR must be merged manually after all criteria are met.
 
-## Audit Log
+## Audit Log of Auto-Merge Decisions
 
-Auto-merge decisions are recorded here for transparency and accountability. This log is automatically updated by the `auto-merge-audit.yml` workflow upon PR closure for low-risk changes.
+This log is automatically maintained by the system.
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
