@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Dict, Any, Tuple
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -67,7 +67,7 @@ class RegimeDetector:
             return 0.0
         x = np.arange(n)
         y = prices
-        denom = (n * np.sum(x**2) - (np.sum(x)) ** 2)
+        denom = n * np.sum(x**2) - (np.sum(x)) ** 2
         if abs(denom) < 1e-9:
             return 0.0
         slope = (n * np.sum(x * y) - np.sum(x) * np.sum(y)) / denom
@@ -114,10 +114,7 @@ class RegimeDetector:
         # 1. Volatility (ATR Ratio)
         tr = np.maximum(
             high[1:] - low[1:],
-            np.maximum(
-                np.abs(high[1:] - close[:-1]),
-                np.abs(low[1:] - close[:-1])
-            )
+            np.maximum(np.abs(high[1:] - close[:-1]), np.abs(low[1:] - close[:-1])),
         )
         if len(subset) <= self.long_window:
             tr = np.insert(tr, 0, high[0] - low[0])
