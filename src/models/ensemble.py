@@ -9,13 +9,14 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
-import structlog
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import structlog
 import torch
 import torch.nn as nn
 
@@ -84,10 +85,7 @@ class EnsembleModel:
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
         self.dynamic_ensemble = DynamicEnsemble(
-            model_names=self.ALGORITHMS,
-            smoothing_factor=0.1,
-            max_swing=0.05,
-            min_weight=0.05
+            model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
         )
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily

@@ -17,8 +17,8 @@ import argparse
 import logging
 import os
 import sys
-import uuid
 import time
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -135,7 +135,8 @@ def run_live(
                 approved = risk_result["passed"]
 
             # 6. Generate Explanation & Log Decision Record
-            regime_info = {"name": "Unknown", "confidence": 0.0, "volatility": "Normal"}
+            # Mock regime and execution info for now (can be expanded)
+            regime_info = {"name": "Ranging", "confidence": 0.8, "volatility": "Normal"}
             execution_data = {"passed": True, "filters": [], "summary": "Direct execution"}
 
             explanation = explainer.explain(
@@ -146,7 +147,7 @@ def run_live(
                 model_weights=model.weights,
                 risk_data=risk_result,
                 regime_info=regime_info,
-                execution_data=execution_data
+                execution_data=execution_data,
             )
             explanation.signal_id = signal_id
 
@@ -154,11 +155,11 @@ def run_live(
                 "decision_record",
                 symbol=cfg.symbol,
                 direction=direction,
-                confidence=round(float(confidence), 4),
+                confidence=f"{confidence:.3f}",
                 approved=approved,
                 reasons=risk_result["rejection_reasons"],
                 summary=explanation.human_readable_summary,
-                machine_attribution=explanation.machine_attribution
+                machine_attribution=explanation.machine_attribution,
             )
 
             if approved:

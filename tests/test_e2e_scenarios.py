@@ -51,6 +51,8 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
     # Should be rejected due to circuit breaker
     result = risk.approve(signal)
     assert result["passed"] is False
+    result = risk.approve(signal)
+    assert result["passed"] is False
 
 
 def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
