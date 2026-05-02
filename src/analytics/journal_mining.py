@@ -21,7 +21,6 @@ from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
 
 class SessionAnalysis(BaseModel):
     """Overtrading and performance metrics per trading session."""
-
     session_name: str
     trade_count: int
     win_rate: float
@@ -31,7 +30,6 @@ class SessionAnalysis(BaseModel):
 
 class VolatilityPattern(BaseModel):
     """Pattern of false positives under specific volatility regimes."""
-
     volatility_bucket: str
     signal_count: int
     false_positive_rate: float
@@ -40,7 +38,6 @@ class VolatilityPattern(BaseModel):
 
 class DrawdownCluster(BaseModel):
     """A cluster of consecutive losing trades."""
-
     start_time: datetime
     end_time: datetime
     trade_count: int
@@ -49,7 +46,6 @@ class DrawdownCluster(BaseModel):
 
 class PatternConcentration(BaseModel):
     """Concentration of profitable or losing patterns."""
-
     attribute: str
     value: str
     win_rate: float
@@ -59,7 +55,6 @@ class PatternConcentration(BaseModel):
 
 class BlockReasonSummary(BaseModel):
     """Summary of repeated signal block reasons."""
-
     reason: str
     count: int
     impacted_algorithms: List[str]
@@ -67,7 +62,6 @@ class BlockReasonSummary(BaseModel):
 
 class JournalReport(BaseModel):
     """Final analytical report from journal mining."""
-
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     session_analysis: List[SessionAnalysis]
     volatility_patterns: List[VolatilityPattern]
@@ -113,20 +107,18 @@ class JournalMiner:
         exploded = trades_df.explode("sessions")
 
         results = []
-        avg_trades_per_session = len(trades_df) / 4  # Rough heuristic
+        avg_trades_per_session = len(trades_df) / 4 # Rough heuristic
 
         for name in self.sessions:
             sess_data = exploded[exploded["sessions"] == name]
             if sess_data.empty:
-                results.append(
-                    SessionAnalysis(
-                        session_name=name,
-                        trade_count=0,
-                        win_rate=0.0,
-                        profit_factor=0.0,
-                        is_overtrading=False,
-                    )
-                )
+                results.append(SessionAnalysis(
+                    session_name=name,
+                    trade_count=0,
+                    win_rate=0.0,
+                    profit_factor=0.0,
+                    is_overtrading=False
+                ))
                 continue
 
             trade_count = len(sess_data)
@@ -136,21 +128,15 @@ class JournalMiner:
 
             gross_profit = wins["pnl"].sum()
             gross_loss = abs(losses["pnl"].sum())
-            profit_factor = (
-                gross_profit / gross_loss
-                if gross_loss > 0
-                else (float("inf") if gross_profit > 0 else 0.0)
-            )
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else (float("inf") if gross_profit > 0 else 0.0)
 
-            results.append(
-                SessionAnalysis(
-                    session_name=name,
-                    trade_count=trade_count,
-                    win_rate=win_rate,
-                    profit_factor=profit_factor,
-                    is_overtrading=trade_count > (avg_trades_per_session * 1.5),
-                )
-            )
+            results.append(SessionAnalysis(
+                session_name=name,
+                trade_count=trade_count,
+                win_rate=win_rate,
+                profit_factor=profit_factor,
+                is_overtrading=trade_count > (avg_trades_per_session * 1.5)
+            ))
 
         return results
 
@@ -165,12 +151,7 @@ class JournalMiner:
 
         # Create buckets for volatility
         try:
-            df["bucket"] = pd.qcut(
-                df["volatility"],
-                q=4,
-                labels=["Low", "Normal", "High", "Extreme"],
-                duplicates="drop",
-            )
+            df["bucket"] = pd.qcut(df["volatility"], q=4, labels=["Low", "Normal", "High", "Extreme"], duplicates="drop")
         except ValueError:
             # Fallback if not enough data for qcut
             df["bucket"] = "Standard"
@@ -189,16 +170,12 @@ class JournalMiner:
             else:
                 fp_rate = 0.0
 
-            results.append(
-                VolatilityPattern(
-                    volatility_bucket=str(bucket),
-                    signal_count=signal_count,
-                    false_positive_rate=fp_rate,
-                    avg_confidence=float(group["confidence"].mean())
-                    if "confidence" in group.columns
-                    else 0.0,
-                )
-            )
+            results.append(VolatilityPattern(
+                volatility_bucket=str(bucket),
+                signal_count=signal_count,
+                false_positive_rate=fp_rate,
+                avg_confidence=float(group["confidence"].mean()) if "confidence" in group.columns else 0.0
+            ))
 
         return results
 
@@ -216,26 +193,22 @@ class JournalMiner:
                 current_cluster.append(trade)
             else:
                 if len(current_cluster) >= 3:
-                    clusters.append(
-                        DrawdownCluster(
-                            start_time=current_cluster[0]["created_at"],
-                            end_time=current_cluster[-1]["created_at"],
-                            trade_count=len(current_cluster),
-                            total_loss=sum(t["pnl"] for t in current_cluster),
-                        )
-                    )
+                    clusters.append(DrawdownCluster(
+                        start_time=current_cluster[0]["created_at"],
+                        end_time=current_cluster[-1]["created_at"],
+                        trade_count=len(current_cluster),
+                        total_loss=sum(t["pnl"] for t in current_cluster)
+                    ))
                 current_cluster = []
 
         # Check last cluster
         if len(current_cluster) >= 3:
-            clusters.append(
-                DrawdownCluster(
-                    start_time=current_cluster[0]["created_at"],
-                    end_time=current_cluster[-1]["created_at"],
-                    trade_count=len(current_cluster),
-                    total_loss=sum(t["pnl"] for t in current_cluster),
-                )
-            )
+            clusters.append(DrawdownCluster(
+                start_time=current_cluster[0]["created_at"],
+                end_time=current_cluster[-1]["created_at"],
+                trade_count=len(current_cluster),
+                total_loss=sum(t["pnl"] for t in current_cluster)
+            ))
 
         return clusters
 
@@ -256,21 +229,15 @@ class JournalMiner:
                 win_rate = len(wins) / trade_count
                 gross_profit = wins["pnl"].sum()
                 gross_loss = abs(losses["pnl"].sum())
-                profit_factor = (
-                    gross_profit / gross_loss
-                    if gross_loss > 0
-                    else (float("inf") if gross_profit > 0 else 0.0)
-                )
+                profit_factor = gross_profit / gross_loss if gross_loss > 0 else (float("inf") if gross_profit > 0 else 0.0)
 
-                results.append(
-                    PatternConcentration(
-                        attribute="algorithm",
-                        value=str(algo),
-                        win_rate=win_rate,
-                        profit_factor=profit_factor,
-                        total_trades=trade_count,
-                    )
-                )
+                results.append(PatternConcentration(
+                    attribute="algorithm",
+                    value=str(algo),
+                    win_rate=win_rate,
+                    profit_factor=profit_factor,
+                    total_trades=trade_count
+                ))
 
         # By Hour
         trades_df["hour"] = trades_df["created_at"].apply(lambda x: x.hour)
@@ -285,27 +252,19 @@ class JournalMiner:
             win_rate = len(wins) / trade_count
             gross_profit = wins["pnl"].sum()
             gross_loss = abs(losses["pnl"].sum())
-            profit_factor = (
-                gross_profit / gross_loss
-                if gross_loss > 0
-                else (float("inf") if gross_profit > 0 else 0.0)
-            )
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else (float("inf") if gross_profit > 0 else 0.0)
 
-            results.append(
-                PatternConcentration(
-                    attribute="hour",
-                    value=f"{hour:02d}:00",
-                    win_rate=win_rate,
-                    profit_factor=profit_factor,
-                    total_trades=trade_count,
-                )
-            )
+            results.append(PatternConcentration(
+                attribute="hour",
+                value=f"{hour:02d}:00",
+                win_rate=win_rate,
+                profit_factor=profit_factor,
+                total_trades=trade_count
+            ))
 
         return sorted(results, key=lambda x: x.profit_factor, reverse=True)
 
-    def analyze_risk_blocks(
-        self, risk_events_df: pd.DataFrame, signals_df: pd.DataFrame
-    ) -> List[BlockReasonSummary]:
+    def analyze_risk_blocks(self, risk_events_df: pd.DataFrame, signals_df: pd.DataFrame) -> List[BlockReasonSummary]:
         """Summarize recurring risk block reasons."""
         if risk_events_df.empty:
             return []
@@ -322,11 +281,11 @@ class JournalMiner:
                 if "algorithm" in relevant_signals.columns:
                     impacted_algos = list(relevant_signals["algorithm"].unique())
 
-            results.append(
-                BlockReasonSummary(
-                    reason=str(reason), count=int(count), impacted_algorithms=impacted_algos
-                )
-            )
+            results.append(BlockReasonSummary(
+                reason=str(reason),
+                count=int(count),
+                impacted_algorithms=impacted_algos
+            ))
 
         return results
 
@@ -339,40 +298,37 @@ class JournalMiner:
             risk_raw = session.query(RiskEvent).filter(RiskEvent.is_deleted.is_(False)).all()
 
             # Convert to DataFrames
-            trades_df = pd.DataFrame(
-                [
-                    {
-                        "id": t.id,
-                        "pnl": t.pnl,
-                        "created_at": t.created_at,
-                        "algorithm": t.signal.algorithm if t.signal else "Unknown",
-                    }
-                    for t in trades_raw
-                ]
-            )
+            trades_df = pd.DataFrame([
+                {
+                    "id": t.id,
+                    "pnl": t.pnl,
+                    "created_at": t.created_at,
+                    "algorithm": t.signal.algorithm if t.signal else "Unknown"
+                } for t in trades_raw
+            ])
 
-            signals_df = pd.DataFrame(
-                [
-                    {
-                        "id": s.id,
-                        "algorithm": s.algorithm,
-                        "confidence": s.confidence,
-                        "volatility": s.volatility,
-                        "pnl": s.trade.pnl if s.trade else None,
-                        "created_at": s.created_at,
-                    }
-                    for s in signals_raw
-                ]
-            )
+            signals_df = pd.DataFrame([
+                {
+                    "id": s.id,
+                    "algorithm": s.algorithm,
+                    "confidence": s.confidence,
+                    "volatility": s.volatility,
+                    "pnl": s.trade.pnl if s.trade else None,
+                    "created_at": s.created_at
+                } for s in signals_raw
+            ])
 
-            risk_df = pd.DataFrame(
-                [{"event_type": r.event_type, "signal_id": r.signal_id} for r in risk_raw]
-            )
+            risk_df = pd.DataFrame([
+                {
+                    "event_type": r.event_type,
+                    "signal_id": r.signal_id
+                } for r in risk_raw
+            ])
 
             return JournalReport(
                 session_analysis=self.get_session_stats(trades_df),
                 volatility_patterns=self.analyze_volatility_patterns(signals_df),
                 drawdown_clusters=self.detect_drawdown_clusters(trades_df),
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
-                risk_block_summary=self.analyze_risk_blocks(risk_df, signals_df),
+                risk_block_summary=self.analyze_risk_blocks(risk_df, signals_df)
             )

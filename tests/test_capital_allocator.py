@@ -3,7 +3,12 @@ Unit tests for the CapitalAllocator system.
 """
 
 import pytest
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig, AllocationResult, RejectionCode
+from src.trading.capital_allocator import (
+    CapitalAllocator,
+    StrategyConfig,
+    AllocationResult,
+    RejectionCode,
+)
 
 
 @pytest.fixture
@@ -14,7 +19,7 @@ def allocator():
         max_family_risk=0.4,
         max_total_heat=0.7,
         performance_step=0.1,
-        decay_rate=0.01
+        decay_rate=0.01,
     )
 
 
@@ -205,14 +210,14 @@ def test_decay_performance_multipliers(allocator):
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=50000.0,
-        performance_multiplier=1.5
+        performance_multiplier=1.5,
     )
     config_low = StrategyConfig(
         strategy_id="low",
         symbol="EURUSD",
         model_family="LSTM",
         capital_cap=50000.0,
-        performance_multiplier=0.5
+        performance_multiplier=0.5,
     )
     allocator.add_strategy(config_high)
     allocator.add_strategy(config_low)
@@ -249,7 +254,7 @@ def test_request_allocation_zero_cap(allocator):
     # This shouldn't happen with Pydantic validation (gt=0), but let's test logic if cap was 0
     # Actually Pydantic will raise error on StrategyConfig creation.
     with pytest.raises(Exception):
-         StrategyConfig(
+        StrategyConfig(
             strategy_id="s1",
             symbol="XAUUSD",
             model_family="RL",
@@ -264,7 +269,7 @@ def test_complex_scaling_and_capping(allocator):
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=20000.0,  # 20% cap
-        performance_multiplier=2.0
+        performance_multiplier=2.0,
     )
     allocator.add_strategy(config)
 
@@ -284,13 +289,10 @@ def test_complex_scaling_and_capping(allocator):
     allocator.max_symbol_risk = 0.25
 
     other_config = StrategyConfig(
-        strategy_id="other",
-        symbol="XAUUSD",
-        model_family="Other",
-        capital_cap=100000.0
+        strategy_id="other", symbol="XAUUSD", model_family="Other", capital_cap=100000.0
     )
     allocator.add_strategy(other_config)
-    allocator.update_allocation("other", 10000.0) # other uses 10%
+    allocator.update_allocation("other", 10000.0)  # other uses 10%
 
     # s1 requests 15% -> scaled to 30% -> capped to 20%.
     # Total symbol risk = 10% (other) + 20% (s1) = 30%.
