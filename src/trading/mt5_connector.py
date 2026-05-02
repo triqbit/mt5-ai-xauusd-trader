@@ -9,7 +9,7 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
@@ -32,7 +32,7 @@ except ImportError:
 from src.core.config import TradingConfig
 from src.trading.risk_manager import TradeSignal
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # MT5 constants (replicated so the module loads on Mac/Linux)
 ORDER_TYPE_BUY = 0
@@ -79,7 +79,7 @@ class MT5Connector:
         Returns:
             True if connection established, False otherwise.
         """
-        logger.info("Initializing MT5 connector | mode=%s", self.cfg.mode)
+        logger.info("Initializing MT5 connector", mode=self.cfg.mode)
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
@@ -95,9 +95,9 @@ class MT5Connector:
                     self._is_initialized = True
                     return True
                 else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
+                    logger.warning("Native mt5.initialize failed", error=mt5.last_error())
             except Exception as e:
-                logger.error("Native MT5 initialization error: %s", e)
+                logger.error("Native MT5 initialization error", error=str(e))
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
@@ -111,7 +111,7 @@ class MT5Connector:
                 logger.info("MetaAPI fallback configured.")
                 return True
             except Exception as e:
-                logger.error("MetaAPI initialization failed: %s", e)
+                logger.error("MetaAPI initialization failed", error=str(e))
 
         logger.error("All MT5 connection paths failed.")
         return False
@@ -234,10 +234,10 @@ class MT5Connector:
 
             result = mt5.order_send(request)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                logger.error("Order rejected: %s (code: %d)", result.comment, result.retcode)
+                logger.error("Order rejected", comment=result.comment, code=result.retcode)
                 return None
 
-            logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
+            logger.info("Order PLACED", ticket=result.order, symbol=signal.symbol)
             return int(result.order)
 
         return None

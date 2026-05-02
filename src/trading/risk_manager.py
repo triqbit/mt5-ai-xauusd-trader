@@ -11,16 +11,16 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Ray Dalio All-Weather allocation weights
 ALLOCATION_WEIGHTS: Dict[str, float] = {
@@ -80,44 +80,81 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
-        logger.info("RiskManager initialised | balance=%.2f", account_balance)
+        logger.info("RiskManager initialised", balance=account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Run the full 6-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns a dictionary with:
+            - passed (bool): True if ALL layers pass.
+            - rejection_reasons (list): List of rejection reasons.
+            - risk_reward (float): Calculated R:R ratio.
+            - drawdown_impact (float): Calculated impact on drawdown (placeholder).
+            - kelly_fraction (float): Suggested sizing from Kelly.
+            - summary (str): Human-readable summary.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        rejection_reasons = []
+        rr = self._calculate_risk_reward(signal)
 
-        passed = rejection_reason == ""
+        # 1. Circuit Breaker
+        if not self._check_circuit_breaker():
+            rejection_reasons.append("Circuit breaker active")
+
+        # 2. Daily Loss
+        if not self._check_daily_loss():
+            rejection_reasons.append("Daily loss limit reached")
+
+        # 3. Max Positions
+        if not self._check_max_positions():
+            rejection_reasons.append("Max positions reached")
+
+        # 4. Symbol Allocation
+        if not self._check_symbol_allocation(signal.symbol):
+            rejection_reasons.append(f"Symbol {signal.symbol} not in portfolio")
+
+        # 5. Confidence
+        if not self._check_minimum_confidence(signal.confidence):
+            rejection_reasons.append(f"Confidence {signal.confidence:.2f} too low")
+
+        # 6. Risk-Reward
+        if rr < 1.5:  # Default min_rr
+            rejection_reasons.append(f"Risk-Reward ratio {rr:.2f} too low")
+
+        passed = len(rejection_reasons) == 0
+        summary = "All risk filters PASSED" if passed else f"REJECTED: {', '.join(rejection_reasons)}"
+
+        result = {
+            "passed": passed,
+            "rejection_reasons": rejection_reasons,
+            "risk_reward": rr,
+            "drawdown_impact": 0.0,  # Placeholder for more complex calculation
+            "kelly_fraction": 0.0,   # Placeholder or pass from size_position
+            "summary": summary
+        }
+
         if not passed:
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
+                "Signal REJECTED",
+                symbol=signal.symbol,
+                direction=signal.direction,
+                reasons=rejection_reasons,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
+                    description=summary,
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+        return result
+
+    def _calculate_risk_reward(self, signal: TradeSignal) -> float:
+        risk = abs(signal.entry_price - signal.stop_loss)
+        reward = abs(signal.take_profit - signal.entry_price)
+        if risk == 0:
+            return 0.0
+        return reward / risk
 
     def size_position(
         self,
@@ -173,8 +210,8 @@ class RiskManager:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
-                drawdown * 100,
+                "CIRCUIT BREAKER - trading halted",
+                drawdown=f"{drawdown * 100:.1f}%",
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
@@ -218,16 +255,6 @@ class RiskManager:
             return False
         return True
 
-    def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
-        risk = abs(signal.entry_price - signal.stop_loss)
-        reward = abs(signal.take_profit - signal.entry_price)
-        if risk == 0:
-            return False
-        rr = reward / risk
-        if rr < min_rr:
-            logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
-            return False
-        return True
 
 
 __all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]

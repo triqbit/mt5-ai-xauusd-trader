@@ -115,10 +115,10 @@ def test_capital_and_risk_integration(trade_logger):
         )
 
         # Signal approval
-        approved = risk.approve(signal)
-        assert approved is True
+        result = risk.approve(signal)
+        assert result["passed"] is True
 
         # Test rejection (high drawdown simulation)
         risk.update_equity(80000.0) # 20% drawdown
-        approved_after_crash = risk.approve(signal)
-        assert approved_after_crash is False
+        result_after_crash = risk.approve(signal)
+        assert result_after_crash["passed"] is False

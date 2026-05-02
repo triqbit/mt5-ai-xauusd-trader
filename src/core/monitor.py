@@ -8,7 +8,7 @@ License: MIT
 from __future__ import annotations
 
 import asyncio
-import logging
+import structlog
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -17,7 +17,7 @@ from prometheus_client import Counter, Gauge, start_http_server
 
 from src.core.config import TradingConfig
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # --- Prometheus Metrics Definitions ---
 EQUITY_GAUGE = Gauge("trading_equity", "Current account equity")
@@ -54,16 +54,16 @@ class Monitor:
         try:
             start_http_server(self.cfg.prometheus_port)
             self._server_started = True
-            logger.info("Prometheus metrics server started on port %d", self.cfg.prometheus_port)
+            logger.info("Prometheus metrics server started", port=self.cfg.prometheus_port)
         except Exception as e:
-            logger.error("Failed to start Prometheus metrics server: %s", e)
+            logger.error("Failed to start Prometheus metrics server", error=str(e))
 
     def log_equity(self, equity: float) -> None:
         """Record current equity and update Prometheus metrics."""
         data = {"timestamp": datetime.now(timezone.utc), "equity": equity}
         self.equity_history.append(data)
         EQUITY_GAUGE.set(equity)
-        logger.debug("Equity logged: %.2f", equity)
+        logger.debug("Equity logged", equity=equity)
 
     def send_message(self, text: str) -> None:
         """Synchronous wrapper to send Telegram message."""

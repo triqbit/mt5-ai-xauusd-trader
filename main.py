@@ -17,6 +17,7 @@ import argparse
 import logging
 import os
 import sys
+import uuid
 import time
 from pathlib import Path
 from typing import Optional
@@ -27,6 +28,7 @@ from rich.table import Table
 
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
+from src.core.explainability import SignalExplainer
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -40,6 +42,7 @@ from src.trading.risk_manager import RiskManager, TradeSignal
 def configure_logging(level: str = "INFO") -> None:
     structlog.configure(
         processors=[
+            structlog.contextvars.merge_contextvars,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
             structlog.dev.ConsoleRenderer(),
@@ -66,10 +69,13 @@ def run_live(
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
-    log = logging.getLogger("main.live")
-    log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+    log = structlog.get_logger("main.live")
+    explainer = SignalExplainer()
+    log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
+        trace_id = str(uuid.uuid4())
+        structlog.contextvars.bind_contextvars(trace_id=trace_id)
         try:
             # 1. Fetch latest market data
             with profile("data_fetch"):
@@ -82,8 +88,8 @@ def run_live(
 
             # 3. Get ensemble prediction
             with profile("inference"):
-                direction, confidence, _per_algo = model.predict(obs)
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+                direction, confidence, per_algo = model.predict(obs)
+            log.debug("Signal generated", direction=direction, confidence=confidence)
 
             signal_id = None
             if trade_logger:
@@ -125,7 +131,35 @@ def run_live(
             )
             # 5. Risk approval gate
             with profile("risk_check"):
-                approved = risk.approve(signal, signal_id=signal_id)
+                risk_result = risk.approve(signal, signal_id=signal_id)
+                approved = risk_result["passed"]
+
+            # 6. Generate Explanation & Log Decision Record
+            regime_info = {"name": "Unknown", "confidence": 0.0, "volatility": "Normal"}
+            execution_data = {"passed": True, "filters": [], "summary": "Direct execution"}
+
+            explanation = explainer.explain(
+                symbol=cfg.symbol,
+                direction=direction,
+                confidence=confidence,
+                model_votes=per_algo,
+                model_weights=model.weights,
+                risk_data=risk_result,
+                regime_info=regime_info,
+                execution_data=execution_data
+            )
+            explanation.signal_id = signal_id
+
+            log.info(
+                "decision_record",
+                symbol=cfg.symbol,
+                direction=direction,
+                confidence=round(float(confidence), 4),
+                approved=approved,
+                reasons=risk_result["rejection_reasons"],
+                summary=explanation.human_readable_summary,
+                machine_attribution=explanation.machine_attribution
+            )
 
             if approved:
                 with profile("execution"):
@@ -142,7 +176,7 @@ def run_live(
                                 lot_size=lot_size,
                                 signal_id=signal_id,
                             )
-            # 6. Check for closed positions to update logger
+            # 7. Check for closed positions to update logger
             current_positions = connector.get_positions(cfg.symbol)
             current_tickets = {p["ticket"] for p in current_positions}
 
@@ -167,7 +201,7 @@ def run_live(
             for sym in closed_tickets:
                 risk.open_positions.pop(sym)
 
-            # 7. Update equity
+            # 8. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
             monitor.log_equity(balance)
@@ -175,8 +209,10 @@ def run_live(
             log.info("Interrupted by user - shutting down")
             break
         except Exception as exc:
-            log.exception("Unhandled error in trading loop: %s", exc)
+            log.exception("Unhandled error in trading loop", error=str(exc))
             time.sleep(poll_interval)
+        finally:
+            structlog.contextvars.unbind_contextvars("trace_id")
 
 
 # -- CLI -------------------------------------------------------------------
