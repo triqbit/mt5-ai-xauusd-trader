@@ -26,6 +26,7 @@ from rich.console import Console
 from rich.table import Table
 
 from src.core import get_config, profile
+from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
@@ -63,7 +64,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: BaseModel,
@@ -203,7 +204,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -284,14 +286,16 @@ def main() -> int:
     execution_filter = ExecutionFilter(max_drawdown=cfg.max_daily_loss)
 
     # Model Factory based on --algorithm flag
+    model: BaseModel
     if args.algorithm == "ensemble":
-        model = EnsembleModel(device="cpu")
+        ens_model = EnsembleModel(device="cpu")
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         if ppo_path.exists():
-            model.load_ppo(ppo_path)
+            ens_model.load_ppo(ppo_path)
         if lstm_path.exists():
-            model.load_lstm(lstm_path)
+            ens_model.load_lstm(lstm_path)
+        model = ens_model
     elif args.algorithm == "ppo":
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
