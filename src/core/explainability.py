@@ -80,9 +80,7 @@ class ExecutionSummary(BaseModel):
     """Summary of execution-level filters applied before signal generation."""
 
     passed: bool = Field(..., description="Whether all execution filters passed")
-    filters: List[FilterResult] = Field(
-        default_factory=list, description="Detailed filter results"
-    )
+    filters: List[FilterResult] = Field(default_factory=list, description="Detailed filter results")
     summary: str = Field(..., description="Human-readable execution summary")
 
 
@@ -102,9 +100,7 @@ class SignalExplanation(BaseModel):
     total_confidence: float = Field(..., description="Aggregated ensemble confidence score")
 
     # Components
-    execution_summary: ExecutionSummary = Field(
-        ..., description="Execution-level filter breakdown"
-    )
+    execution_summary: ExecutionSummary = Field(..., description="Execution-level filter breakdown")
     model_attributions: List[ModelAttribution] = Field(..., description="Breakdown per model")
     feature_contributions: List[FeatureContribution] = Field(
         ..., description="Breakdown per feature cluster"
@@ -254,13 +250,9 @@ class SignalExplainer:
         if not execution_summary.passed:
             reasoning += f"EXECUTION BLOCKED: {execution_summary.summary}. "
         elif not risk_assessment.passed:
-            reasoning += (
-                f"Risk REJECTED: {', '.join(risk_assessment.rejection_reasons)}. "
-            )
+            reasoning += f"Risk REJECTED: {', '.join(risk_assessment.rejection_reasons)}. "
         else:
-            reasoning += (
-                f"Passed all filters with R:R of {risk_assessment.risk_reward_ratio:.2f}."
-            )
+            reasoning += f"Passed all filters with R:R of {risk_assessment.risk_reward_ratio:.2f}."
 
         # 7. Machine Attribution
         machine_attr = {
