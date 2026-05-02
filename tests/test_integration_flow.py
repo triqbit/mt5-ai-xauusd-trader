@@ -60,10 +60,10 @@ def mock_connector(mock_cfg):
         connector.connect()
         return connector
 
-pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
 # --- Path 1: Full Trading Flow ---
 
+@pytest.mark.skipif(torch is None, reason="torch not installed")
 def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, mock_connector):
     """Data ingestion -> feature engineering -> model inference -> execution filter -> risk engine -> logging"""
 
@@ -198,6 +198,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
 
 # --- Path 5: Intelligence & Adaptive Weighting ---
 
+@pytest.mark.skipif(torch is None, reason="torch not installed")
 def test_intelligence_ensemble_adaptation():
     """Model ensemble -> regime detection -> dynamic weighting -> trade decision"""
     model = EnsembleModel(device="cpu")

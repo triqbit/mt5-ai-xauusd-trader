@@ -25,8 +25,7 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
@@ -237,9 +236,7 @@ class TradeLogger:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
-                    select(Trade.pnl).where(
-                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
-                    )
+                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
                 )
                 .scalars()
                 .all()

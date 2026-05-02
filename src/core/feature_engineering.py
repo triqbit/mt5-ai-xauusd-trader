@@ -13,7 +13,11 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-import talib
+
+try:
+    import talib
+except ImportError:
+    talib = None
 
 from src.core.profiler import profile as profile_context
 
@@ -110,6 +114,10 @@ class FeatureEngineer:
     def _get_technical_indicators(self, df: pd.DataFrame, prefix: str) -> pd.DataFrame:
         """Compute standard technical indicators."""
         indicators = {}
+        if talib is None:
+            logger.warning("TA-Lib not installed, skipping technical indicators for %s", prefix)
+            return pd.DataFrame(index=df.index)
+
         close = df["close"].values
         high = df["high"].values
         low = df["low"].values
@@ -159,6 +167,10 @@ class FeatureEngineer:
 
     def _get_candle_patterns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute all TA-Lib candle patterns."""
+        if talib is None:
+            logger.warning("TA-Lib not installed, skipping candle patterns")
+            return pd.DataFrame(index=df.index)
+
         op = df["open"].values
         hi = df["high"].values
         lo = df["low"].values
@@ -224,7 +236,8 @@ class FeatureEngineer:
         volume = df["tick_volume"]
 
         vol["vol_sma_20"] = volume / volume.rolling(window=20).mean().replace(0, 1e-8)
-        vol["obv"] = talib.OBV(df["close"].values, volume.values.astype(float))
+        if talib is not None:
+            vol["obv"] = talib.OBV(df["close"].values, volume.values.astype(float))
 
         return pd.DataFrame(vol, index=df.index)
 
