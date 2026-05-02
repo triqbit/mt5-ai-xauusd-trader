@@ -31,6 +31,7 @@ from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.models.regime_detector import RegimeDetector
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -63,6 +64,7 @@ def run_live(
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
+    regime_detector: RegimeDetector,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -76,9 +78,10 @@ def run_live(
                 df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
                 tick = connector.get_tick(cfg.symbol)
 
-            # 2. Build observation vector
+            # 2. Build observation vector & Detect Regime
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
             volatility = float(df["close"].rolling(20).std().iloc[-1])
+            regime = regime_detector.detect(df)
 
             # 3. Get ensemble prediction
             with profile("inference"):
@@ -122,6 +125,8 @@ def run_live(
                 lot_size=lot_size,
                 algorithm=cfg.algorithm,
                 confidence=confidence,
+                per_algo_votes=_per_algo,
+                market_regime=regime.label.value,
             )
             # 5. Risk approval gate
             with profile("risk_check"):
@@ -158,10 +163,12 @@ def run_live(
                             # For a BUY, exit at BID. For a SELL, exit at ASK.
                             exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
                             # P&L will be calculated automatically by update_trade
-                            trade_logger.update_trade(
+                            updated_trade = trade_logger.update_trade(
                                 ticket=ticket,
                                 exit_price=exit_price,
                             )
+                            if updated_trade:
+                                risk.record_pnl(updated_trade.pnl)
                     closed_tickets.append(symbol)
 
             for sym in closed_tickets:
@@ -247,6 +254,7 @@ def main() -> int:
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     model = EnsembleModel(device="cpu")
+    regime_detector = RegimeDetector()
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
     if ppo_path.exists():
@@ -285,6 +293,7 @@ def main() -> int:
                 connector,
                 risk,
                 model,
+                regime_detector,
                 trade_logger=trade_logger,
                 monitor=monitor,
             )

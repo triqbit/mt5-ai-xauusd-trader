@@ -16,8 +16,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+except ImportError:
+    torch = None  # type: ignore
+    nn = None  # type: ignore
 
 from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
@@ -26,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel(nn.Module if nn is not None else object):  # type: ignore
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)

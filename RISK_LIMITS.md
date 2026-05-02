@@ -46,8 +46,8 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 ### 2.3 Daily Trade Limits
 - **Max Trades**: 20 trades per day
 - **Max Winning Streaks**: Alert after 5 consecutive wins
-- **Max Losing Streaks**: Halt trading after 3 consecutive losses
-- **Consecutive Losses**: Reset at daily close (00:00 UTC)
+- **Max Losing Streaks**: Halt trading after 3 consecutive losses (Enforced by `RiskManager`)
+- **Consecutive Losses**: Reset at daily close (00:00 UTC) or upon a winning trade.
 
 ## 3. Weekly/Monthly Limits
 
@@ -80,7 +80,7 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 
 ### 4.3 Prediction Diversity
 - **Ensemble Diversity**: Require 3+ models agreeing
-- **Model Dissent**: If 2 models strongly disagree, skip trade
+- **Model Dissent**: If any model predicts the opposite direction (Strong Dissent), skip trade.
 - **Consensus Threshold**: Need 60%+ agreement across ensemble
 - **Veto Power**: Any model with <40% confidence forces skip
 
