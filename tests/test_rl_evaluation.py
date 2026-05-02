@@ -4,13 +4,14 @@ tests/test_rl_evaluation.py
 Tests for institutional RL evaluation framework.
 """
 
-import pytest
+from unittest.mock import MagicMock
+
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock
-from src.research.rl_evaluation import RLEvaluator, MomentumBaseline, RLReport
+import pytest
+
 from src.environment.gym_env import TradingEnv
-from src.models.regime_detector import MarketRegime
+from src.research.rl_evaluation import MomentumBaseline, RLEvaluator, RLReport
 
 
 @pytest.fixture
@@ -95,8 +96,8 @@ def test_compare_agents(trading_env):
 
 
 def test_signal_adapter_compatibility(trading_env):
-    from src.models.base_model import Signal
     from src.core.constants import SignalDirection
+    from src.models.base_model import Signal
     evaluator = RLEvaluator(env=trading_env)
 
     class SignalAgent:

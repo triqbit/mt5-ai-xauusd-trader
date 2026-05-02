@@ -206,7 +206,7 @@ class RLEvaluator:
     ) -> RLComparison:
         """Compare multiple agents against a baseline."""
         reports = []
-        for agent, name in zip(agents, agent_names):
+        for agent, name in zip(agents, agent_names, strict=True):
             reports.append(self.evaluate(agent, name))
 
         # Find baseline report

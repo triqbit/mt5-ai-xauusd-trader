@@ -7,6 +7,9 @@ The RL Evaluation Framework provides institutional-grade metrics to assess reinf
 ### 1. Stability Analysis
 - **Annualized Sharpe Ratio**: Risk-adjusted return consistency.
 - **Annualized Sortino Ratio**: Focuses on downside risk.
+- **Calmar Ratio**: Total return relative to maximum drawdown.
+- **Expectancy**: Expected profit per trade based on historical performance.
+- **Profit Factor**: Ratio of gross profit to gross loss.
 - **Stability Score (R-squared)**: Measures the linearity of the equity curve, indicating consistency of returns.
 
 ### 2. Turnover Analysis
@@ -47,4 +50,4 @@ The framework includes wrappers to compare RL agents against institutional basel
 - **SupervisedBaseline**: Wraps standard supervised learning models.
 
 ## Integration
-The evaluator uses the `RLModel` protocol, ensuring compatibility with any agent that implements a `predict(observation: np.ndarray) -> int` method.
+The evaluator uses the `RLModel` protocol, ensuring compatibility with any agent that implements a `predict(observation: np.ndarray) -> Any` method. It natively supports both raw integer actions (0=Hold, 1=Buy, 2=Sell) and the bot's standardized `Signal` objects.
