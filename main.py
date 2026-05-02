@@ -34,6 +34,7 @@ from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
+from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -66,6 +67,7 @@ def run_live(
     connector: MT5Connector,
     risk: RiskManager,
     model: BaseModel,
+    execution_filter: Optional[ExecutionFilter] = None,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -134,6 +136,29 @@ def run_live(
             with profile("risk_check"):
                 approved = risk.approve(signal, signal_id=signal_id)
 
+            # 5b. Execution filter cascade (6-layer institutional check)
+            if approved and execution_filter:
+                with profile("execution_filter"):
+                    current_drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity if risk.peak_equity > 0 else 0
+                    decision = execution_filter.validate(
+                        signal=signal,
+                        market_data=df,
+                        current_drawdown=current_drawdown
+                    )
+                    if not decision.is_approved:
+                        log.warning(
+                            "Signal BLOCKED by execution filter | reason=%s",
+                            decision.blocked_by
+                        )
+                        approved = False
+                        if trade_logger:
+                            trade_logger.log_risk_event(
+                                event_type="EXECUTION_FILTER_BLOCKED",
+                                description=f"Blocked by {decision.blocked_by}",
+                                symbol=cfg.symbol,
+                                signal_id=signal_id,
+                            )
+
             if approved:
                 with profile("execution"):
                     ticket = connector.place_order(signal)
@@ -194,6 +219,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
     p.add_argument(
         "--algo",
+        "--algorithm",
+        dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
         default="ensemble",
     )
@@ -210,7 +237,7 @@ def main() -> int:
     log, console = logging.getLogger("main"), Console()
     # Override config from CLI
     os.environ.setdefault("MODE", args.mode)
-    os.environ.setdefault("ALGORITHM", args.algo)
+    os.environ.setdefault("ALGORITHM", args.algorithm)
     os.environ.setdefault("SYMBOL", args.symbol)
     os.environ.setdefault("TIMEFRAME", args.timeframe)
 
@@ -253,9 +280,10 @@ def main() -> int:
     )
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    execution_filter = ExecutionFilter(max_drawdown=cfg.max_daily_loss)
 
-    # Model Factory based on --algo flag
-    if args.algo == "ensemble":
+    # Model Factory based on --algorithm flag
+    if args.algorithm == "ensemble":
         model = EnsembleModel(device="cpu")
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -263,14 +291,14 @@ def main() -> int:
             model.load_ppo(ppo_path)
         if lstm_path.exists():
             model.load_lstm(lstm_path)
-    elif args.algo == "ppo":
+    elif args.algorithm == "ppo":
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
-    elif args.algo == "lstm":
+    elif args.algorithm == "lstm":
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
     else:
-        log.warning(f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble")
+        log.warning(f"Algorithm {args.algorithm} not fully supported in main.py, falling back to Ensemble")
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
@@ -304,6 +332,7 @@ def main() -> int:
                 connector,
                 risk,
                 model,
+                execution_filter=execution_filter,
                 trade_logger=trade_logger,
                 monitor=monitor,
             )

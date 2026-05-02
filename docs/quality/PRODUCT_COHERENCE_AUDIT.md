@@ -1,44 +1,54 @@
-# Product Coherence Audit - April 2026
+# 💎 Product Coherence Audit - May 2026
 
-## 1. Product Capability
-**Status: 🟢 Foundational**
-- **Current:** Single-symbol (XAUUSD) live trading loop, MetaTrader 5 integration, basic order execution, and trade logging.
-- **Gaps:**
-    - Lack of multi-symbol portfolio management despite "All-Weather" references in `RiskManager`.
-    - No news/event filtering logic implemented in the main loop.
-    - Limited order management (simple TP/SL based on ATR, no trailing stops or partial closes in `main.py`).
+**Status:** 🟡 Minor Fragmentation Detected
+**Steward:** Jules05 (Autonomous Product Steward)
 
-## 2. Usability
-**Status: 🟡 Minimal**
-- **Current:** CLI-driven entrypoint (`main.py`) with basic configuration via Pydantic.
-- **Gaps:**
-    - No real-time dashboard for non-technical users (Prometheus/Grafana mentioned but not fully integrated into `main.py`).
-    - Deployment requires manual environment setup or basic Docker usage; lacks "one-click" cloud deployment.
-    - Logging is standard but lacks a consolidated "intelligence briefing" for the operator.
+## 🎯 Executive Summary
+The system has reached a high level of technical capability, but several "last-mile" coherence issues weaken the institutional feel. Key findings include a disconnected "6-layer filter" logic and CLI/Documentation friction.
 
-## 3. Safety
-**Status: 🟢 Robust (Theoretical) / 🟡 Basic (Implemented)**
-- **Current:** `RiskManager` with circuit breakers and Kelly sizing.
-- **Gaps:**
-    - Health gate in `main.py` is currently missing or not explicitly blocking.
-    - Lack of automated failover between MT5 and MetaAPI cloud in the implementation.
-    - No explicit handling of extreme slippage or broker-specific execution anomalies.
+---
 
-## 4. Intelligence
-**Status: 🟡 Developing**
-- **Current:** Ensemble model structure (PPO + LSTM).
-- **Gaps:**
-    - Dreamer V3 is referenced but not implemented (lazy loading fails).
-    - Model "drift" detection is purely confidence-based; lacks performance-based trigger for retraining.
-    - Explainability (XAI) is missing; the system doesn't explain *why* it took a trade beyond "direction and confidence".
+## 🏗️ 1. Naming Consistency
+| Area | Status | Finding | Remediation |
+| :--- | :--- | :--- | :--- |
+| **CLI Arguments** | 🟡 | CLI uses `--algo`, while `TradingConfig` and environment variables use `ALGORITHM`. | Add `--algorithm` alias to `main.py`. |
+| **Temporal Markers** | 🔴 | Legacy `datetime.utcnow()` persists in `risk_manager.py` and `execution_filter.py` despite enterprise shift to `timezone.utc`. | Immediate replacement with `datetime.now(timezone.utc)`. |
+| **Signal Mappings** | 🟢 | Consistent use of `SignalDirection` and `ModelAction` across modules. | None required. |
 
-## 5. Market Differentiation
-**Status: 🔴 Weak**
-- **Current:** Standard technical indicators + RL.
-- **Gaps:**
-    - No gold-specific macro sensitivity (e.g., real yields, inflation expectations, central bank gold demand).
-    - Lacks institutional-grade "What-If" simulation for XAUUSD volatility spikes.
-    - Decision cockpit doesn't highlight regime changes (e.g., "Trending" vs "Mean-Reverting" gold markets).
+## 🕹️ 2. UX Consistency
+| Area | Status | Finding | Remediation |
+| :--- | :--- | :--- | :--- |
+| **Operator Workflow** | 🔴 | `main.py --mode backtest` directs users to a non-existent `scripts/backtest.py`. | Create `scripts/backtest.py` entry point stub. |
+| **Startup Feedback** | 🟢 | Health check table and config validation provide excellent operator clarity. | None required. |
+| **Error Handling** | 🟢 | Graceful connection failovers (Native -> MetaAPI) are well-implemented. | None required. |
 
-## Overall Maturity Score: 6.2/10
-The system is a solid technical skeleton but lacks the "Institutional Product" polish and gold-specific intelligence that would make it a market leader.
+## 📚 3. Documentation Coherence
+| Area | Status | Finding | Remediation |
+| :--- | :--- | :--- | :--- |
+| **Feature Accuracy** | 🔴 | `README.md` and `ARCHITECTURE_QUICK.md` highlight a "6-layer Execution Filter", but `main.py` does not currently invoke the `ExecutionFilter` module. | Integrate `ExecutionFilter` into the `main.py` live loop. |
+| **Quick Start** | 🟢 | `Makefile` targets (`doctor`, `test`) align with documentation. | None required. |
+
+## 🧱 4. Module Boundaries
+| Area | Status | Finding | Remediation |
+| :--- | :--- | :--- | :--- |
+| **Logic Overlap** | 🟡 | `RiskManager` and `ExecutionFilter` both perform "validation", but one focus on capital risk while the other focuses on market setup. | Harmonize `main.py` to use both in sequence. |
+
+---
+
+## 🛠️ Remediation Plan
+
+### Immediate Fixes (PR ✨ Jules05: Product coherence improvements)
+1. **Temporal Correction:** Purge `utcnow()` in favor of `timezone.utc`.
+2. **CLI Alignment:** Add `--algorithm` alias.
+3. **Execution Logic:** Inject `ExecutionFilter` into `main.py` to fulfill documented promises.
+4. **UX Friction:** Add `scripts/backtest.py` stub.
+
+### Escalated to Jules04 (Quant Research)
+- **Regime-Aware Filtering:** Request optimization of `ExecutionFilter` thresholds based on `RegimeDetector` output.
+
+### Escalated to Jules02 (Security & Quality)
+- **Verification:** Ensure `scripts/backtest.py` integrates with the synthetic data pipeline.
+
+---
+
+**Audit Conclusion:** The product is 90% coherent. Addressing the disconnected execution filter and missing scripts will elevate it to true "Institutional" status.
