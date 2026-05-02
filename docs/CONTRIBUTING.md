@@ -25,7 +25,10 @@ pip install -r requirements.txt
 pip install -r requirements-ci.txt
 ```
 
-### 3. Branching Strategy
+### 3. Find Your Path
+Before you start coding, consult the [**Contribution Map**](./CONTRIBUTION_MAP.md) to identify the **Safe Zones** (low risk, fast review) vs. **Sensitive Zones** (high risk, mandatory lead review). This will help you choose a task that matches your expertise and current project needs.
+
+### 4. Branching Strategy
 - `main`: Production-ready stable code.
 - `develop`: Integration branch for new features.
 - `feature/*`: New features.
@@ -65,6 +68,7 @@ Every Pull Request must pass the following mandatory gates:
   ```
 
 ## ⚖️ Pull Request Process
+0. **Check the Map:** Ensure your PR aligns with the [Contribution Map](./CONTRIBUTION_MAP.md) for its respective zone.
 1. Ensure your branch is up to date with `develop`.
 2. Fill out the [PR Template](.github/PULL_REQUEST_TEMPLATE.md) completely.
 3. PRs require at least one approval from a designated [CODEOWNER](.github/CODEOWNERS).
