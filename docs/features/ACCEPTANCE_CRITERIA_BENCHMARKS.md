@@ -13,7 +13,7 @@ This document outlines the acceptance criteria and usage for the benchmarking fr
     - `RiskFilteredBaseline`: EMA crossover with a volatility threshold filter.
 - **Quantitative Evaluator**:
     - Equity-curve-based backtesting.
-    - Metrics: Total Return, Sharpe Ratio, Max Drawdown, Win Rate, Trade Count.
+    - Metrics: Total Return, Sharpe Ratio, Sortino Ratio, Calmar Ratio, Max Drawdown, Win Rate, Profit Factor, Expectancy, Trade Count.
 - **Statistical Comparison**:
     - Support for comparing strategy return distributions using Welch's t-test.
 - **Model Adapters**:
@@ -24,6 +24,8 @@ This document outlines the acceptance criteria and usage for the benchmarking fr
 ## Acceptance Criteria
 - [x] All baseline strategies produce signals in the set {-1, 0, 1}.
 - [x] Evaluator correctly calculates metrics from synthetic OHLCV data.
+- [x] Model adapters support rolling window lookbacks for sequence-dependent models.
 - [x] Comparison logic provides t-statistic and p-value for significance testing.
+- [x] Documentation includes all advanced risk-adjusted metrics.
 - [x] Linting passes (Ruff).
 - [x] Unit tests in `tests/test_benchmarks.py` pass.
