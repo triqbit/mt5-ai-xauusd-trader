@@ -1,22 +1,25 @@
 #!/bin/bash
 # MT5 AI/ML Trading Bot - Disaster Recovery Backup & Verification Script
-# This script performs a backup of the SQLite database, generates checksums,
-# and verifies the backup with a restoration dry-run.
+# This script performs a backup of the SQLite database, archives logs and reports,
+# generates SHA256 checksums, and verifies backup integrity.
 
 set -e
 
 # Configuration
 DB_FILE="trades.db"
 LOGS_DIR="logs"
+REPORTS_DIR="reports"
 BACKUP_ROOT="backups"
 DB_BACKUP_DIR="${BACKUP_ROOT}/db"
 LOGS_BACKUP_DIR="${BACKUP_ROOT}/logs"
+REPORTS_BACKUP_DIR="${BACKUP_ROOT}/reports"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RETENTION_DAYS=30
 
 # Create backup directories
 mkdir -p "${DB_BACKUP_DIR}"
 mkdir -p "${LOGS_BACKUP_DIR}"
+mkdir -p "${REPORTS_BACKUP_DIR}"
 
 echo "[$(date)] Starting Disaster Recovery Backup Process..."
 
@@ -25,21 +28,12 @@ if [ -f "${DB_FILE}" ]; then
     BACKUP_FILE="${DB_BACKUP_DIR}/trades_${TIMESTAMP}.db"
     echo "Backing up database to ${BACKUP_FILE}..."
 
-    # Use sqlite3 .backup command for a safe online backup if possible,
-    # otherwise fallback to cp.
+    # Use sqlite3 .backup command for a safe online/hot backup
     if command -v sqlite3 >/dev/null 2>&1; then
         sqlite3 "${DB_FILE}" ".backup '${BACKUP_FILE}'"
-    else
-        cp "${DB_FILE}" "${BACKUP_FILE}"
-    fi
 
-    # 2. Checksum Generation
-    echo "Generating SHA256 checksum..."
-    (cd "${DB_BACKUP_DIR}" && sha256sum "$(basename "${BACKUP_FILE}")" > "$(basename "${BACKUP_FILE}").sha256")
-
-    # 3. Automated Verification (Restoration Dry-run)
-    echo "Verifying backup integrity (SQLite dry-run)..."
-    if command -v sqlite3 >/dev/null 2>&1; then
+        # 2. Automated Verification (Restoration Dry-run)
+        echo "Verifying backup integrity (SQLite dry-run)..."
         INTEGRITY=$(sqlite3 "${BACKUP_FILE}" "PRAGMA integrity_check;")
         if [ "${INTEGRITY}" == "ok" ]; then
             echo "SUCCESS: Database integrity verified."
@@ -48,8 +42,13 @@ if [ -f "${DB_FILE}" ]; then
             exit 1
         fi
     else
-        echo "WARNING: sqlite3 not found, skipping integrity check."
+        echo "WARNING: sqlite3 not found, falling back to cp. Hot backup not guaranteed."
+        cp "${DB_FILE}" "${BACKUP_FILE}"
     fi
+
+    # 3. Checksum Generation
+    echo "Generating SHA256 checksum..."
+    (cd "${DB_BACKUP_DIR}" && sha256sum "$(basename "${BACKUP_FILE}")" > "$(basename "${BACKUP_FILE}").sha256")
 else
     echo "WARNING: ${DB_FILE} not found. Skipping database backup."
 fi
@@ -64,9 +63,18 @@ else
     echo "INFO: Logs directory empty or not found. Skipping log archival."
 fi
 
-# 5. Retention Policy Enforcement
+# 5. Reports Archival
+if [ -d "${REPORTS_DIR}" ] && [ "$(ls -A ${REPORTS_DIR})" ]; then
+    REPORTS_ARCHIVE="${REPORTS_BACKUP_DIR}/reports_${TIMESTAMP}.tar.gz"
+    echo "Archiving reports to ${REPORTS_ARCHIVE}..."
+    tar -czf "${REPORTS_ARCHIVE}" -C "${REPORTS_DIR}" .
+    (cd "${REPORTS_BACKUP_DIR}" && sha256sum "$(basename "${REPORTS_ARCHIVE}")" > "$(basename "${REPORTS_ARCHIVE}").sha256")
+else
+    echo "INFO: Reports directory empty or not found. Skipping report archival."
+fi
+
+# 6. Retention Policy Enforcement
 echo "Enforcing retention policy (Pruning files older than ${RETENTION_DAYS} days)..."
-find "${BACKUP_ROOT}" -type f -mtime +${RETENTION_DAYS} -name "trades_*" -delete
-find "${BACKUP_ROOT}" -type f -mtime +${RETENTION_DAYS} -name "logs_*" -delete
+find "${BACKUP_ROOT}" -type f -mtime +${RETENTION_DAYS} -delete
 
 echo "[$(date)] Disaster Recovery Backup Process Completed Successfully."
