@@ -44,10 +44,12 @@ class ConfigValidator:
         if self.config.mt5_login <= 0:
             self.errors.append(ValidationError("MT5_LOGIN", "MT5 login must be a positive integer.", True))
 
-        if not self.config.mt5_server or self.config.mt5_server.lower() in ["", "server_name", "test"]:
+        placeholders = ["", "server_name", "test", "your_server_here"]
+        if not self.config.mt5_server or self.config.mt5_server.lower() in placeholders:
             self.errors.append(ValidationError("MT5_SERVER", "MT5 server name is missing or using placeholder.", True))
 
-        if not self.config.mt5_password or self.config.mt5_password.lower() in ["", "password", "test"]:
+        password_placeholders = ["", "password", "test", "your_password_here"]
+        if not self.config.mt5_password or self.config.mt5_password.lower() in password_placeholders:
             self.errors.append(ValidationError("MT5_PASSWORD", "MT5 password is missing or using placeholder.", True))
 
     def _check_live_mode_confirmation(self) -> None:
@@ -73,29 +75,87 @@ class ConfigValidator:
              ))
 
         # Check Telegram
-        if self.config.telegram_token and "YOUR_TOKEN" in self.config.telegram_token.upper():
-            self.errors.append(ValidationError("TELEGRAM_TOKEN", "Telegram token contains placeholder text.", True))
+        if self.config.telegram_token:
+            if any(p in self.config.telegram_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]):
+                self.errors.append(ValidationError("TELEGRAM_TOKEN", "Telegram token contains placeholder text.", True))
+
+        # Check MetaAPI
+        if self.config.metaapi_token:
+            if any(p in self.config.metaapi_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]):
+                self.errors.append(ValidationError("METAAPI_TOKEN", "MetaAPI token contains placeholder text.", True))
+
+        if self.config.metaapi_account_id:
+            if any(p in self.config.metaapi_account_id.upper() for p in ["YOUR_ACCOUNT_ID", "CHANGE_ME"]):
+                self.errors.append(ValidationError("METAAPI_ACCOUNT_ID", "MetaAPI account ID contains placeholder text.", True))
 
     def _check_risk_parameters(self) -> None:
         """Verify risk parameters are within safe enterprise bounds."""
-        # secondary check as pydantic also handles this
+        # 1. Per-trade risk limits (RISK_LIMITS.md 1.3)
         if self.config.risk_per_trade > 0.02:
-            self.errors.append(ValidationError("RISK_PER_TRADE", "Risk per trade > 2% is strictly prohibited.", True))
-
-        if self.config.max_daily_loss > 0.15:
-            self.errors.append(ValidationError("MAX_DAILY_LOSS", "Max daily loss > 15% is outside safe range.", True))
-
-    def _check_incompatible_settings(self) -> None:
-        """Detect incompatible configuration combinations."""
-        # Example: LIVE mode with very high max positions
-        if self.config.mode == "live" and self.config.max_positions > 5:
             self.errors.append(ValidationError(
-                "MAX_POSITIONS",
-                "Maximum positions > 5 is not allowed in LIVE mode for safety.",
+                "RISK_PER_TRADE",
+                "Risk per trade > 2% is strictly prohibited (Enterprise Limit: 1%).",
                 True
             ))
 
-        # Backtest mode doesn't need Telegram
+        # 2. Daily loss limits (RISK_LIMITS.md 2.1)
+        if self.config.max_daily_loss > 0.15:
+            self.errors.append(ValidationError(
+                "MAX_DAILY_LOSS",
+                "Max daily loss > 15% is outside safe range (Emergency Stop: 5%).",
+                True
+            ))
+
+        # 3. Position limits (RISK_LIMITS.md 1.1)
+        if self.config.max_positions > 10:
+             self.errors.append(ValidationError(
+                "MAX_POSITIONS",
+                "Maximum positions > 10 is strictly prohibited for capital safety.",
+                True
+            ))
+
+    def _check_incompatible_settings(self) -> None:
+        """Detect incompatible configuration combinations."""
+        # 1. LIVE mode restrictions
+        if self.config.mode == "live":
+            if self.config.max_positions > 5:
+                self.errors.append(ValidationError(
+                    "MAX_POSITIONS",
+                    "Maximum positions > 5 is not allowed in LIVE mode for safety.",
+                    True
+                ))
+
+        # 2. MetaAPI Consistency
+        if self.config.metaapi_token and not self.config.metaapi_account_id:
+            self.errors.append(ValidationError(
+                "METAAPI_ACCOUNT_ID",
+                "MetaAPI account ID is required when MetaAPI token is provided.",
+                True
+            ))
+
+        if self.config.metaapi_account_id and not self.config.metaapi_token:
+            self.errors.append(ValidationError(
+                "METAAPI_TOKEN",
+                "MetaAPI token is required when MetaAPI account ID is provided.",
+                True
+            ))
+
+        # 3. Telegram Consistency
+        if self.config.telegram_token and not self.config.telegram_chat_id:
+            self.errors.append(ValidationError(
+                "TELEGRAM_CHAT_ID",
+                "Telegram chat ID is required when Telegram token is provided.",
+                True
+            ))
+
+        if self.config.telegram_chat_id and not self.config.telegram_token:
+            self.errors.append(ValidationError(
+                "TELEGRAM_TOKEN",
+                "Telegram token is required when Telegram chat ID is provided.",
+                True
+            ))
+
+        # 4. Mode-specific warnings
         if self.config.mode == "backtest" and self.config.telegram_token:
              self.errors.append(ValidationError(
                  "TELEGRAM_TOKEN",
