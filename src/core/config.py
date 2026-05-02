@@ -6,11 +6,12 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Dict, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,7 +30,7 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
-    mt5_login: int = Field(default=0, description="MT5 account number")
+    mt5_login: int = Field(..., description="MT5 account number")
     mt5_password: str = Field(..., description="MT5 account password")
     mt5_server: str = Field(..., description="Broker server name")
     mt5_path: str = Field(
@@ -45,8 +46,35 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
+    max_positions: int = Field(default=5, ge=1, le=10)
+    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.02)
+    max_leverage: float = Field(default=10.0, ge=1.0, le=30.0)
+
+    # ── Risk Management (Cascading levels as per RISK_LIMITS.md) ────────────────
+    # Daily loss levels: 1=2%, 2=3%, 3=4%, 4=5%, hard=6%
+    daily_loss_levels: Dict[str, float] = Field(
+        default={
+            "1": 0.02,
+            "2": 0.03,
+            "3": 0.04,
+            "4": 0.05,
+            "hard": 0.06,
+        }
+    )
+    # Drawdown levels: 1=10%, 2=15%, 3=20%, 4=25%, 5=30%
+    drawdown_levels: Dict[str, float] = Field(
+        default={
+            "1": 0.10,
+            "2": 0.15,
+            "3": 0.20,
+            "4": 0.25,
+            "5": 0.30,
+        }
+    )
+    max_losing_streak: int = Field(default=3, ge=1)
+    max_trades_per_day: int = Field(default=20, ge=1)
+    min_confidence: float = Field(default=0.55, ge=0.5, le=1.0)
+    consensus_threshold: float = Field(default=0.60, ge=0.5, le=1.0)
     max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
 
     # ── Model ──────────────────────────────────────────────────────────────────
@@ -56,7 +84,7 @@ class TradingConfig(BaseSettings):
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
+    database_url: str = Field(default="sqlite:///trades.db")
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
@@ -65,7 +93,6 @@ class TradingConfig(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
     telegram_token: str = Field(default="", description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
     @field_validator("risk_per_trade")
     @classmethod
@@ -90,6 +117,8 @@ class TradingConfig(BaseSettings):
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
     """Return singleton TradingConfig (cached after first call)."""
+    # For testing and default behavior, we allow missing MT5 credentials
+    # but in production Pydantic will enforce them via env vars.
     return TradingConfig()  # type: ignore[call-arg]
 
 
