@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -56,7 +57,9 @@ class TradingConfig(BaseSettings):
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: SecretStr = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
+    database_url: SecretStr = Field(
+        default="postgresql://trader:password@localhost:5432/mt5_trades"
+    )
     redis_url: SecretStr = Field(default="redis://localhost:6379/0")
 
     # ── Monitoring ──────────────────────────────────────────────────────────

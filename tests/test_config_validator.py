@@ -1,8 +1,10 @@
 """Tests for src.core.config_validator module."""
+
 import os
 import pytest
-from src.core.config import TradingConfig
+from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
+
 
 @pytest.fixture
 def base_config(monkeypatch):
@@ -13,6 +15,7 @@ def base_config(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
     return TradingConfig()
 
+
 def test_validator_success(base_config):
     """Test validator succeeds with valid configuration."""
     validator = ConfigValidator(base_config)
@@ -20,8 +23,10 @@ def test_validator_success(base_config):
     assert result.success is True
     assert len(result.errors) == 0
 
+
 def test_validator_mt5_login_invalid(monkeypatch):
     """Test validator fails with invalid MT5 login."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "0")
     monkeypatch.setenv("MT5_PASSWORD", "pass")
     monkeypatch.setenv("MT5_SERVER", "server")
@@ -31,8 +36,10 @@ def test_validator_mt5_login_invalid(monkeypatch):
     assert result.success is False
     assert any(e.field == "MT5_LOGIN" for e in result.errors)
 
+
 def test_validator_mt5_placeholders(monkeypatch):
     """Test validator fails with placeholder MT5 server/password."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "your_password_here")
     monkeypatch.setenv("MT5_SERVER", "your_server_here")
@@ -43,8 +50,10 @@ def test_validator_mt5_placeholders(monkeypatch):
     assert any(e.field == "MT5_SERVER" for e in result.errors)
     assert any(e.field == "MT5_PASSWORD" for e in result.errors)
 
+
 def test_validator_live_mode_no_confirmation(monkeypatch):
     """Test validator fails in LIVE mode without CONFIRM_LIVE_TRADING=YES."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker-Live")
@@ -57,8 +66,10 @@ def test_validator_live_mode_no_confirmation(monkeypatch):
     assert result.success is False
     assert any(e.field == "MODE" and "CONFIRM_LIVE_TRADING" in e.message for e in result.errors)
 
+
 def test_validator_live_mode_with_confirmation(monkeypatch):
     """Test validator succeeds in LIVE mode with confirmation."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker-Live")
@@ -71,8 +82,10 @@ def test_validator_live_mode_with_confirmation(monkeypatch):
     result = validator.validate()
     assert result.success is True
 
+
 def test_validator_placeholder_secrets(monkeypatch):
     """Test validator detects placeholder database URL, Telegram, and MetaAPI."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
@@ -88,13 +101,15 @@ def test_validator_placeholder_secrets(monkeypatch):
     assert any(e.field == "TELEGRAM_TOKEN" for e in result.errors)
     assert any(e.field == "METAAPI_TOKEN" for e in result.errors)
 
+
 def test_validator_risk_parameters(monkeypatch):
     """Test validator detects unsafe risk parameters."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("MAX_DAILY_LOSS", "0.16") # 16% is > 15% limit in validator
+    monkeypatch.setenv("MAX_DAILY_LOSS", "0.16")  # 16% is > 15% limit in validator
 
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
@@ -102,8 +117,10 @@ def test_validator_risk_parameters(monkeypatch):
     assert result.success is False
     assert any(e.field == "MAX_DAILY_LOSS" for e in result.errors)
 
+
 def test_validator_incompatible_live_positions(monkeypatch):
     """Test validator detects too many positions in LIVE mode."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker-Live")
@@ -118,8 +135,10 @@ def test_validator_incompatible_live_positions(monkeypatch):
     assert result.success is False
     assert any(e.field == "MAX_POSITIONS" for e in result.errors)
 
+
 def test_validator_backtest_warning(monkeypatch):
     """Test validator gives a non-critical warning for Telegram in backtest."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
@@ -135,8 +154,10 @@ def test_validator_backtest_warning(monkeypatch):
     assert result.success is True
     assert any(e.field == "TELEGRAM_TOKEN" and e.critical is False for e in result.errors)
 
+
 def test_validator_metaapi_consistency(monkeypatch):
     """Test validator detects inconsistent MetaAPI configuration."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
@@ -161,8 +182,10 @@ def test_validator_metaapi_consistency(monkeypatch):
     assert result.success is False
     assert any(e.field == "METAAPI_TOKEN" for e in result.errors)
 
+
 def test_validator_telegram_consistency(monkeypatch):
     """Test validator detects inconsistent Telegram configuration."""
+    get_config.cache_clear()
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")

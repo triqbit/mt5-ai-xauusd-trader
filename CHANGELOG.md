@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Security hardening for configuration secrets using `pydantic.SecretStr` to prevent accidental exposure.
+- Safe model deserialization in `EnsembleModel` using `weights_only=True` in `torch.load`.
+- Mandatory `0o600` file permissions for local SQLite database files to protect trade data.
+- Dedicated security verification test suite in `tests/test_security_hardening.py`.
 - Enterprise-grade monitoring and alerting system in `src/core/monitor.py` with Prometheus integration and Telegram bot support.
 - Disciplined walk-forward optimization framework in `src/research/hyperopt_walkforward.py` with Optuna integration.
 - Robustness scoring logic (Sharpe consistency, MDD preservation, parameter stability).

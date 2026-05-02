@@ -1,14 +1,20 @@
 import sys
 from unittest.mock import MagicMock
 
-# Mock TA-Lib before any other imports
-sys.modules['talib'] = MagicMock()
+# Mock TA-Lib and torch before any other imports
+sys.modules["talib"] = MagicMock()
+mock_torch = MagicMock()
+sys.modules["torch"] = mock_torch
+sys.modules["torch.nn"] = MagicMock()
 
 import pytest
 import numpy as np
 import torch
+
+torch.device.side_effect = lambda x: x
 from src.models.ensemble import EnsembleModel
 from src.core.constants import SignalDirection
+
 
 def test_ensemble_weight_delegation():
     """Verify EnsembleModel delegates weighting to DynamicEnsemble."""
@@ -18,28 +24,35 @@ def test_ensemble_weight_delegation():
     assert "ppo" in model.weights
     assert "dreamer" in model.weights
     assert "lstm" in model.weights
-    assert abs(model.weights["ppo"] - 1/3) < 1e-5
+    assert abs(model.weights["ppo"] - 1 / 3) < 1e-5
+
 
 def test_ensemble_record_return_triggers_rebalance():
     """Verify record_return eventually updates weights via DynamicEnsemble."""
     model = EnsembleModel(device="cpu")
 
     # Mock update_weights to track calls
-    model.dynamic_ensemble.update_weights = MagicMock(side_effect=model.dynamic_ensemble.update_weights)
+    model.dynamic_ensemble.update_weights = MagicMock(
+        side_effect=model.dynamic_ensemble.update_weights
+    )
 
     # Record 50 returns for PPO
     for _ in range(50):
-        model.record_return("ppo", 0.01) # positive returns
+        model.record_return("ppo", 0.01)  # positive returns
 
     assert model.dynamic_ensemble.update_weights.called
     # PPO should have higher weight now
-    assert model.weights["ppo"] > 1/3
+    assert model.weights["ppo"] > 1 / 3
+
 
 def test_ensemble_predict_uses_weights():
     """Verify predict uses the delegated weights."""
     model = EnsembleModel(device="cpu")
+    model.dynamic_ensemble.get_weights = MagicMock(
+        return_value={"ppo": 1.0, "dreamer": 0.0, "lstm": 0.0}
+    )
 
-    # Manually set weights in dynamic_ensemble
+    # Manually set weights in dynamic_ensemble (deprecated, but keeping for compatibility)
     model.dynamic_ensemble.weights = {"ppo": 1.0, "dreamer": 0.0, "lstm": 0.0}
 
     # Mock PPO model

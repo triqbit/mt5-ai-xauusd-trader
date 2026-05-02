@@ -8,7 +8,7 @@ Comprehensive security framework addressing data protection, API security, deplo
 
 ### 1.1 Encryption Standards
 - **In Transit**: TLS 1.3 for all network communications
-- **At Rest**: AES-256 encryption for sensitive data
+- **At Rest**: AES-256 encryption for sensitive data, including `SecretStr` runtime masking for credentials and `0o600` local file permissions.
 - **Key Management**: AWS KMS or Azure Key Vault for key rotation
 - **Database Encryption**: Encrypted columns for API keys, account credentials
 - **Backup Encryption**: All backups encrypted with separate encryption keys
