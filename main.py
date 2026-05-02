@@ -23,10 +23,12 @@ from typing import Optional
 
 import structlog
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
+from src.core.exceptions import MT5ConnectionError, MT5DataError, OrderExecutionError
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -73,8 +75,13 @@ def run_live(
         try:
             # 1. Fetch latest market data
             with profile("data_fetch"):
-                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-                tick = connector.get_tick(cfg.symbol)
+                try:
+                    df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                    tick = connector.get_tick(cfg.symbol)
+                except (MT5ConnectionError, MT5DataError) as e:
+                    log.error("Market data unavailable: %s", e)
+                    time.sleep(poll_interval)
+                    continue
 
             # 2. Build observation vector
             obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
@@ -129,9 +136,10 @@ def run_live(
 
             if approved:
                 with profile("execution"):
-                    ticket = connector.place_order(signal)
-                    if ticket:
-                        risk.open_positions[cfg.symbol] = ticket
+                    try:
+                        ticket = connector.place_order(signal)
+                        if ticket:
+                            risk.open_positions[cfg.symbol] = ticket
                         log.info("Order placed | ticket=%d", ticket)
                         if trade_logger:
                             trade_logger.log_trade(
@@ -142,6 +150,16 @@ def run_live(
                                 lot_size=lot_size,
                                 signal_id=signal_id,
                             )
+                    except OrderExecutionError as e:
+                        log.error("Order execution failed: %s", e)
+                        if trade_logger:
+                            trade_logger.log_risk_event(
+                                event_type="EXECUTION_FAILED",
+                                description=str(e),
+                                symbol=cfg.symbol,
+                                signal_id=signal_id,
+                            )
+
             # 6. Check for closed positions to update logger
             current_positions = connector.get_positions(cfg.symbol)
             current_tickets = {p["ticket"] for p in current_positions}
@@ -174,6 +192,13 @@ def run_live(
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
+        except MT5ConnectionError as exc:
+            log.error("MT5 Connection lost in loop: %s. Attempting reconnection...", exc)
+            try:
+                connector.connect()
+            except Exception as re_exc:
+                log.error("Reconnection failed: %s", re_exc)
+            time.sleep(poll_interval)
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
             time.sleep(poll_interval)
@@ -237,8 +262,22 @@ def main() -> int:
     # Initialise components
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
-        if not connector.connect():
-            log.critical("Cannot connect to MT5 terminal. Aborting.")
+        try:
+            connector.connect()
+        except MT5ConnectionError as exc:
+            console.print(
+                Panel(
+                    "[bold red]CRITICAL: MT5 Connection Failure[/]\n\n"
+                    f"Error: {exc}\n\n"
+                    "[bold]Troubleshooting Steps:[/]\n"
+                    "1. Ensure MetaTrader 5 terminal is open.\n"
+                    "2. Verify 'Algo Trading' is enabled in MT5 (Tools -> Options -> Expert Advisors).\n"
+                    "3. Check if MT5 login credentials and server in .env are correct.\n"
+                    "4. If using Linux/Mac, ensure MetaAPI token is valid.",
+                    title="Connectivity Diagnostic",
+                    expand=False,
+                )
+            )
             return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
