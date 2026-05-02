@@ -26,34 +26,63 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pip-licenses
-          # Install dependencies from requirements-ci.txt
-          # We use a modified requirements file for CI that avoids heavy ML packages
-          # but includes the metadata needed for license scanning.
-          # TA-Lib is removed or ignored here because it requires C headers that might not be present.
-          grep -v "TA-Lib" requirements-ci.txt > requirements-scan.txt
-          pip install -r requirements-scan.txt
+          # We must scan ALL dependencies. However, to avoid build failures in CI,
+          # we install with --no-deps if possible or use the full requirements file
+          # but skip the C-library dependent TA-Lib.
+          grep -v "TA-Lib" requirements.txt > requirements-scan.txt
+          # We use --extra-index-url for torch to ensure it finds the CPU version easily
+          pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-scan.txt
 
       - name: Execute License Scan
         id: scan
         run: |
           echo "## Dependency License Report" >> $GITHUB_STEP_SUMMARY
-          pip-licenses --format=markdown >> $GITHUB_STEP_SUMMARY
+          # Generate report with authors and URLs for the summary
+          pip-licenses --format=markdown --with-authors --with-urls >> $GITHUB_STEP_SUMMARY
 
-          # Check for disallowed licenses
-          # This will fail the job if any disallowed license is found
-          # Allowed: MIT, Apache, BSD, PSF, ISC, MPL, LGPL, CC0, Unlicense
-          # Disallowed: GPL, AGPL, SSPL
-          # Note: We use --fail-on with specific strings to catch disallowed licenses.
-          pip-licenses --fail-on GPL --fail-on AGPL --fail-on SSPL > disallowed_found.txt 2>&1 || DISALLOWED=true
+          # Check for disallowed licenses (Red List)
+          # We use a explicit semicolon-separated list to avoid partial match issues with LGPL
+          # Disallowed: GPL (but not LGPL), AGPL, SSPL
+          pip-licenses --format=json > licenses.json
 
-          if [ "$DISALLOWED" = "true" ]; then
-            echo "::error::Disallowed licenses detected!"
-            cat disallowed_found.txt
-            exit 1
-          fi
+          # Custom check to allow LGPL while failing on GPL
+          # We use python to parse the JSON for more precision
+          python - <<EOF
+          import json
+          import sys
+
+          DISALLOWED = ['GPL', 'AGPL', 'SSPL']
+          ALLOWED_WITH_EXCEPTIONS = ['LGPL', 'MPL', 'EPL'] # Risky but permitted
+
+          with open('licenses.json', 'r') as f:
+              data = json.load(f)
+
+          failures = []
+          for pkg in data:
+              license = pkg.get('License', '').upper()
+              name = pkg.get('Name')
+
+              # Logic: If 'GPL' is in license but 'LGPL' is NOT, it's a failure
+              # OR if 'AGPL' or 'SSPL' is in license
+              is_gpl = 'GPL' in license and 'LGPL' not in license
+              is_agpl = 'AGPL' in license
+              is_sspl = 'SSPL' in license
+
+              if is_gpl or is_agpl or is_sspl:
+                  failures.append(f"{name}: {license}")
+
+          if failures:
+              print("Disallowed licenses detected (Red List):")
+              for f in failures:
+                  print(f"  - {f}")
+              sys.exit(1)
+          else:
+              print("No disallowed licenses detected.")
+          EOF
 
       - name: Generate Full Report Artifact
         run: |
+          # Full report including authors and URLs
           pip-licenses --format=markdown --with-authors --with-urls > LICENSE_REPORT.md
 
       - name: Upload License Report
