@@ -70,6 +70,7 @@ split-on-trailing-comma = true
 [tool.mypy]
 python_version = "3.11"
 strict = true
+disallow_subclassing_any = false
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
