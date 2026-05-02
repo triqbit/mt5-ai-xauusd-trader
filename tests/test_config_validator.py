@@ -34,8 +34,8 @@ def test_validator_mt5_login_invalid(monkeypatch):
 def test_validator_mt5_placeholders(monkeypatch):
     """Test validator fails with placeholder MT5 server/password."""
     monkeypatch.setenv("MT5_LOGIN", "12345")
-    monkeypatch.setenv("MT5_PASSWORD", "password")
-    monkeypatch.setenv("MT5_SERVER", "server_name")
+    monkeypatch.setenv("MT5_PASSWORD", "your_password_here")
+    monkeypatch.setenv("MT5_SERVER", "your_server_here")
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
     result = validator.validate()
@@ -72,17 +72,21 @@ def test_validator_live_mode_with_confirmation(monkeypatch):
     assert result.success is True
 
 def test_validator_placeholder_secrets(monkeypatch):
-    """Test validator detects placeholder database URL."""
+    """Test validator detects placeholder database URL, Telegram, and MetaAPI."""
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://trader:password@localhost:5432/mt5_trades")
+    monkeypatch.setenv("TELEGRAM_TOKEN", "YOUR_TOKEN_HERE")
+    monkeypatch.setenv("METAAPI_TOKEN", "CHANGE_ME")
 
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
     result = validator.validate()
     assert result.success is False
     assert any(e.field == "DATABASE_URL" for e in result.errors)
+    assert any(e.field == "TELEGRAM_TOKEN" for e in result.errors)
+    assert any(e.field == "METAAPI_TOKEN" for e in result.errors)
 
 def test_validator_risk_parameters(monkeypatch):
     """Test validator detects unsafe risk parameters."""
@@ -122,6 +126,7 @@ def test_validator_backtest_warning(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
     monkeypatch.setenv("MODE", "backtest")
     monkeypatch.setenv("TELEGRAM_TOKEN", "123:ABC")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
 
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
@@ -129,3 +134,51 @@ def test_validator_backtest_warning(monkeypatch):
     # It should still be successful because it's non-critical
     assert result.success is True
     assert any(e.field == "TELEGRAM_TOKEN" and e.critical is False for e in result.errors)
+
+def test_validator_metaapi_consistency(monkeypatch):
+    """Test validator detects inconsistent MetaAPI configuration."""
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+
+    # Token but no account ID
+    monkeypatch.setenv("METAAPI_TOKEN", "real_token")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "METAAPI_ACCOUNT_ID" for e in result.errors)
+
+    # Account ID but no token
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.delenv("METAAPI_TOKEN", raising=False)
+    monkeypatch.setenv("METAAPI_ACCOUNT_ID", "real_id")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "METAAPI_TOKEN" for e in result.errors)
+
+def test_validator_telegram_consistency(monkeypatch):
+    """Test validator detects inconsistent Telegram configuration."""
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+
+    # Token but no chat ID
+    monkeypatch.setenv("TELEGRAM_TOKEN", "real_token")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "TELEGRAM_CHAT_ID" for e in result.errors)
+
+    # Chat ID but no token
+    monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "TELEGRAM_TOKEN" for e in result.errors)
