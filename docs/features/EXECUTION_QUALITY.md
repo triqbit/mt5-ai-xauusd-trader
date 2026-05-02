@@ -9,7 +9,9 @@ The `ExecutionAnalyzer` module provides institutional-grade analytics to measure
 - **Opportunity Cost Analysis**: Evaluates signals rejected by the Risk Manager by calculating their potential PnL, Maximum Favorable Excursion (MFE), and Maximum Adverse Excursion (MAE).
 - **Timing Efficiency**: Measures how close the entry price was to the optimal price within the entry candle.
 - **Edge Capture**: Compares realized profit against the theoretical potential of the signal.
-- **Post-Entry Drift**: Tracks price movement 5 and 15 minutes after entry to monitor alpha decay.
+- **Post-Entry Drift**: Tracks price movement 5 and 15 minutes after entry.
+- **Alpha Decay Tracking**: Measures price movement between signal generation and actual execution to quantify information loss.
+- **Spread-Aware Metrics**: Tracks spread at execution and calculates slippage-to-spread ratios.
 
 ## Implementation Details
 
@@ -26,6 +28,8 @@ The system correlates records from three database tables:
 | Latency (ms) | `Execution Time - Signal Time` |
 | Edge Capture | `(Exit - Entry) / (TakeProfit - SignalEntry)` |
 | Drift | Price movement N minutes after entry in the direction of the trade. |
+| Alpha Decay | Price movement between signal and execution. |
+| Slippage/Spread Ratio | Slippage relative to the prevailing spread. |
 
 ## Usage
 
