@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Semantic versioning policy (`docs/VERSIONING_POLICY.md`).
 - Automated changelog generation workflow (`.github/workflows/changelog.yml`).
 - Initial `CHANGELOG.md` template.
+- Enterprise-grade monitoring and alerting system in `src/core/monitor.py` with Prometheus integration and Telegram bot support.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
