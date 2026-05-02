@@ -17,6 +17,17 @@ Built on an architectural foundation that integrates 25+ top-tier quantitative f
 
 ---
 
+## 🏛️ Technical Credibility & Trust
+
+The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prioritize transparency, evidence-based development, and clear system boundaries.
+
+- **[Architecture Quick-Start](./docs/ARCHITECTURE_QUICK.md):** 5-minute overview of system components, data flow, and maturity levels.
+- **[System Maturity Map](./docs/ARCHITECTURE_QUICK.md#🚦-system-maturity-map):** Transparent status of production vs. experimental subsystems.
+- **[Project Health Dashboard](./docs/status/EXECUTIVE_SUMMARY.md):** Real-time visibility into CI status, stability KPIs, and strategic risks.
+- **[Audit Evidence](./docs/audits/README.md):** Direct routing to ADRs, performance reports, and security scorecards.
+
+---
+
 ## 🚀 Core Features
 
 ### 🧠 Advanced Intelligence
@@ -104,6 +115,7 @@ python main.py --mode demo --symbol XAUUSD --verbose
 
 | Guide | Description |
 | :--- | :--- |
+| [**Architecture Quick-Start**](./docs/ARCHITECTURE_QUICK.md) | **Primary technical overview and system maturity map.** |
 | [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
 | [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
