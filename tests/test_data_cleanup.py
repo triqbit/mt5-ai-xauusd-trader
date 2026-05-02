@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.core.trade_logger import Base, ModelSignal, Trade, RiskEvent, PerformanceMetric
-from scripts.data_cleanup import cleanup_database, cleanup_logs
+from scripts.data_cleanup import cleanup_database, cleanup_logs, cleanup_backtests
 
 class TestDataCleanup(unittest.TestCase):
     def setUp(self):
@@ -26,6 +26,33 @@ class TestDataCleanup(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.test_dir)
+
+    def test_backtest_cleanup(self):
+        # Setup backtest dir
+        backtest_dir = Path(self.test_dir) / "backtests"
+        backtest_dir.mkdir()
+
+        old_subdir = backtest_dir / "old_run"
+        old_subdir.mkdir()
+
+        old_file = old_subdir / "report.pdf"
+        old_file.touch()
+
+        new_file = backtest_dir / "recent_run.json"
+        new_file.touch()
+
+        # Set old times
+        old_time = (datetime.now() - timedelta(days=400)).timestamp()
+        os.utime(old_file, (old_time, old_time))
+        os.utime(old_subdir, (old_time, old_time))
+
+        # Run cleanup
+        count = cleanup_backtests(backtest_dir, dry_run=False)
+
+        self.assertEqual(count, 1)
+        self.assertFalse(old_file.exists())
+        self.assertFalse(old_subdir.exists()) # Should be removed as empty
+        self.assertTrue(new_file.exists())
 
     def test_log_cleanup(self):
         # Create some log files
