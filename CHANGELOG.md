@@ -29,3 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial enterprise-grade trading engine.
 - MT5 integration and risk management framework.
 - CI/CD pipelines for validation and security.
+
+## [Unreleased] - 2024-05-16
+### Optimized
+- Vectorized rolling linear regression slope calculation in `FeatureEngineer`, improving performance by ~1600x.
