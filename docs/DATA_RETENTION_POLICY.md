@@ -31,12 +31,18 @@ The following data can be purged more frequently to manage storage:
 
 ## 4. Archival and Purging Rules
 
+### 4.0 Archival Procedures
+Prior to purging, certain data categories may be archived for long-term historical analysis:
+- **Trade Records & Linked Signals**: After 7 years, these records are exported to compressed CSV/Parquet format and stored in the enterprise cold-storage (e.g., AWS S3 Glacier) before being purged from the production database.
+- **Backtest Results**: High-value backtest reports (PDFs, key metrics) should be archived in the project's research repository or shared drive before the 1-year automated deletion of temporary artifacts.
+
 ### 4.1 Automated Purging
 An automated cleanup script (`scripts/data_cleanup.py`) runs periodically to:
 1. Delete application logs older than 90 days.
 2. Delete unlinked `model_signals` older than 90 days.
 3. Delete `risk_events` older than 2 years.
 4. Delete `performance_metrics` records older than 2 years.
+5. Delete temporary backtest artifacts older than 1 year.
 
 ### 4.2 Safe Deletion Logic
 - **Foreign Key Integrity**: The cleanup script must ensure that `model_signals` linked to `trades` are NOT deleted if the trade record is still within its 7-year retention window.

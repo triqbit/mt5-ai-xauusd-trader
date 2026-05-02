@@ -1,6 +1,7 @@
 import sys
 import os
 from unittest.mock import MagicMock
+
 # Mock talib before any imports
 sys.modules["talib"] = MagicMock()
 sys.modules["MetaTrader5"] = MagicMock()
@@ -8,6 +9,7 @@ sys.modules["MetaTrader5"] = MagicMock()
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from src.core.trade_logger import Base, ModelSignal, Trade, RiskEvent
+
 
 def verify_db(db_url="sqlite:///trades.db"):
     if not os.path.exists(db_url.replace("sqlite:///", "")):
@@ -39,6 +41,7 @@ def verify_db(db_url="sqlite:///trades.db"):
             return False
 
     return True
+
 
 if __name__ == "__main__":
     # Test with a temporary DB to ensure script works
