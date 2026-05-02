@@ -78,8 +78,42 @@ Generic bots offer minimal visibility, often limited to basic logs. The MT5 AI T
 
 ---
 
+## 3. Institutional What-If Execution Simulator
+
+### What it is and why it matters
+The **Institutional What-If Execution Simulator** is a pre-execution sensitivity analysis tool that allows operators to visualize the potential outcomes of a trade signal under various market stress scenarios before the trade is committed. It provides a "rehearsal" of the trade's life cycle.
+
+Institutional traders must understand not just the "base case," but the "edge cases." This tool allows the system to evaluate the robustness of a signal against adverse execution conditions (slippage, liquidity gaps) and extreme market moves before a single dollar is risked.
+
+### How it differentiates from generic trading bots
+Generic bots execute blindly based on the current price. The MT5 AI Trader, with this simulator, allows the operator to ask: *"What if the spread widens by 3x during the fill? What if a 50-pip flash crash occurs immediately after entry? How sensitive is this specific position size to our global drawdown limit if it hits its Stop Loss?"*
+
+### Architecture Outline
+1.  **Scenario Engine**: Integrates with `src/research/rare_event_simulator.py` to generate "micro-scenarios" based on historical volatility and rare-event distributions.
+2.  **Impact Calculator**: A module that evaluates the `TradeSignal` against these scenarios to compute "Scenario PnL," "Margin Impact," and "Probability of Stop-out."
+3.  **Sensitivity Visualizer**: Integrated into the **Decision Cockpit**, it renders a "Risk-of-Ruin" heatmap and a scenario distribution chart.
+4.  **Safety Interlock**: A gate in `src/trading/risk_manager.py` that can automatically reject trades if the "Worst-Case Scenario" exceeds a configurable percentage of the remaining daily loss limit.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Must simulate at least 3 scenarios (Normal, High Slippage, Flash Crash) within 300ms of signal generation. |
+| **Functional** | Must calculate the impact of the trade on total portfolio "heat" and drawdown. |
+| **Technical** | Scenario generation must be deterministic given a specific seed for auditability. |
+| **Operational** | Results must be visible as a dedicated "Stress Rehearsal" panel in the Decision Cockpit. |
+| **Release Readiness** | Must be able to run in "Silent Mode" (logging only) for 48 hours to validate simulation accuracy. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on scenario generation logic, impact mathematics, and rare-event distributions.
+*   **Jules02 (Observability)**: Lead on visualizing the sensitivity analysis and stress results in the TUI/Cockpit.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires the `RareEventSimulator` research module and `RiskManager` to be operational.
+*   **Constraints**: Total simulation time must not exceed 300ms to avoid price staleness in fast-moving XAUUSD markets.
+
+---
+
 ## Future Differentiators (Candidates)
-- **What-if execution simulator** (Pre-execution sensitivity analysis)
 - **Capital-preservation operating modes** (Conservative/Event-Defensive)
 - **Gold-specific macro sensitivity overlays** (Real Yields, DXY, Central Bank demand)
 - **Trade narrative memory** (Self-correcting memory of historical trades)
