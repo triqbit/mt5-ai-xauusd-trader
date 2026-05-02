@@ -47,9 +47,7 @@ def run_benchmark(n_trades=5000):
     # Benchmark 1: ORM Objects (Original slow approach)
     start = time.perf_counter()
     with Session() as session:
-        trades = (
-            session.query(Trade).filter(Trade.status == "CLOSED", not Trade.is_deleted).all()
-        )
+        trades = session.query(Trade).filter(Trade.status == "CLOSED", not Trade.is_deleted).all()
         pnls = np.array([t.pnl for t in trades])
         # Simulate some processing
         np.mean(pnls)
@@ -61,9 +59,7 @@ def run_benchmark(n_trades=5000):
     start = time.perf_counter()
     with Session() as session:
         pnls = np.array(
-            session.execute(
-                select(Trade.pnl).where(Trade.status == "CLOSED", not Trade.is_deleted)
-            )
+            session.execute(select(Trade.pnl).where(Trade.status == "CLOSED", not Trade.is_deleted))
             .scalars()
             .all()
         )
