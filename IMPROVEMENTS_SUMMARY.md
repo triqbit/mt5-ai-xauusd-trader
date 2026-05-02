@@ -91,7 +91,7 @@
 - **Real-Time Metrics**: P50/P95/P99 latency tracking
 - **Alert Automation**: P1-P4 severity levels with escalation
 - **On-Call**: PagerDuty integration with rotation
-- **SLA Tracking**: 99.99% uptime target (4 hours/year max)
+- **SLA Tracking**: 99.5% uptime target (~3.6 hours/month max)
 - **Incident Response**: <5-minute response time for critical
 
 ### 7. Infrastructure & Deployment
@@ -176,7 +176,7 @@
 - ✓ Code coverage >85%
 - ✓ Execution latency <100ms
 - ✓ Model inference <10ms
-- ✓ Uptime >99.99%
+- ✓ Uptime >99.5%
 - ✓ Error rate <0.1%
 
 ### Business KPIs
