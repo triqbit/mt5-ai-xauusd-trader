@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -26,7 +26,8 @@ except ImportError:
     torch = None  # type: ignore
     nn = None  # type: ignore
 
-from src.core.constants import SignalDirection
+from src.core.constants import ModelAction, SignalDirection
+from src.models.base_model import BaseModel, Signal
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.regime_detector import RegimeInfo
 
@@ -38,7 +39,8 @@ class LSTMAttentionModel(nn.Module if nn else object):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+    Output : (batch, 3) -> [hold_logit, buy_logit, sell_logit] (Standardized)
+    Note: Legacy checkpoints use [buy, sell, hold] and require permutation.
     """
 
     def __init__(
@@ -81,7 +83,7 @@ class LSTMAttentionModel(nn.Module if nn else object):
 
 
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
-class EnsembleModel:
+class EnsembleModel(BaseModel):
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
     Delegates weight adaptation to DynamicEnsemble for robust rebalancing.
@@ -90,6 +92,7 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
+        super().__init__()
         self.device = torch.device(device) if torch else None
         self.dynamic_ensemble = DynamicEnsemble(
             model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
@@ -132,19 +135,20 @@ class EnsembleModel:
     # ── Inference ───────────────────────────────────────────────────────────
     def predict(
         self,
-        obs: np.ndarray,
+        features: np.ndarray,
         seq: Optional[torch.Tensor] = None,
         regime_info: Optional[RegimeInfo] = None,
-    ) -> Tuple[int, float, Dict[str, float]]:
+    ) -> Signal:
         """
-        Return (direction, confidence, per_algo_probs).
-        direction: +1 buy, -1 sell, 0 hold
+        Generate a trading signal from input features.
+        Returns a Signal object (direction, confidence, metadata).
         """
         votes: Dict[str, np.ndarray] = {}
 
         # PPO prediction
         if self._ppo_model is not None:
-            action, _ = self._ppo_model.predict(obs, deterministic=True)
+            action, _ = self._ppo_model.predict(features, deterministic=True)
+            # action index should be aligned with ModelAction (0=HOLD, 1=BUY, 2=SELL)
             probs = np.zeros(3)
             probs[int(action)] = 1.0
             votes["ppo"] = probs
@@ -154,7 +158,9 @@ class EnsembleModel:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            votes["lstm"] = probs
+            # Permute from legacy [buy, sell, hold] to [hold, buy, sell]
+            # to align with ModelAction (0=HOLD, 1=BUY, 2=SELL)
+            votes["lstm"] = np.array([probs[2], probs[0], probs[1]])
 
         # Cache confidences for calibration tracking
         for k, v in votes.items():
@@ -162,18 +168,18 @@ class EnsembleModel:
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
-            return 0, 0.0, {}
+            return Signal(direction=SignalDirection.HOLD, confidence=0.0, metadata={})
 
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))  # 0=buy, 1=sell, 2=hold (historic)
+        action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
 
-        # Map to standardized SignalDirection
-        # Ensemble legacy used: 0=buy, 1=sell, 2=hold
-        direction_map = {0: SignalDirection.BUY, 1: SignalDirection.SELL, 2: SignalDirection.HOLD}
-        direction = direction_map[action_idx]
+        # Map to standardized SignalDirection using ModelAction
+        # ModelAction: 0=HOLD, 1=BUY, 2=SELL
+        model_action = ModelAction(action_idx)
+        direction = model_action.to_direction()
 
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
         logger.debug(
@@ -182,7 +188,11 @@ class EnsembleModel:
             confidence,
             per_algo,
         )
-        return direction, confidence, per_algo
+        return Signal(
+            direction=direction,
+            confidence=confidence,
+            metadata={"per_algo_votes": per_algo, "weights": self.weights},
+        )
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(
