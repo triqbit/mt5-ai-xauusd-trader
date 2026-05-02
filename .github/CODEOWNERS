@@ -3,14 +3,22 @@
 # Global ownership for all files
 * @maintainer-quality
 
-# Core system, governance, and documentation
+# Core system, governance, and infrastructure
 /src/core/ @andonly1348
 /.github/ @andonly1348
+/.github/workflows/ @andonly1348
 /docs/ @andonly1348
 /migrations/ @andonly1348
+/scripts/ @andonly1348
 
-# Trading logic and execution
+# Trading logic, execution, and analytics
 /src/trading/ @maintainer-trading
+/src/analytics/ @maintainer-trading
 
-# AI/ML Model architectures
+# AI/ML Model architectures and research
 /src/models/ @maintainer-models
+/src/research/ @maintainer-models
+/src/environment/ @maintainer-models
+
+# Utilities and shared components
+/src/utils/ @maintainer-quality
