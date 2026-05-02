@@ -1,6 +1,7 @@
-import sys
 import ast
+import sys
 from pathlib import Path
+
 
 def get_required_vars_from_config():
     config_path = Path("src/core/config.py")
@@ -21,8 +22,9 @@ def get_required_vars_from_config():
                 if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
                     var_name = item.target.id
                     if var_name != "model_config":
-                         required_vars.add(var_name.lower())
+                        required_vars.add(var_name.lower())
     return required_vars
+
 
 def get_vars_from_example():
     example_path = Path(".env.example")
@@ -40,6 +42,7 @@ def get_vars_from_example():
                     vars.add(var.lower())
     return vars
 
+
 def validate():
     print("Validating environment configuration template...")
 
@@ -56,13 +59,14 @@ def validate():
             missing.append(req)
 
     if missing:
-        print(f"Error: The following required configuration fields are missing from .env.example:")
+        print("Error: The following required configuration fields are missing from .env.example:")
         for m in missing:
             print(f"  - {m.upper()}")
         return False
 
     print(f"Environment validation passed: .env.example contains all {len(required)} fields.")
     return True
+
 
 if __name__ == "__main__":
     if not validate():
