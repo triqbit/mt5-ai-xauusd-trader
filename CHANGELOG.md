@@ -20,9 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Semantic versioning policy (`docs/VERSIONING_POLICY.md`).
 - Automated changelog generation workflow (`.github/workflows/changelog.yml`).
 - Initial `CHANGELOG.md` template.
+- SQL-level `CheckConstraint`s and performance indexes for `model_signals` and `trades` tables to ensure data integrity and query efficiency.
+- Database integrity tests in `tests/test_trade_logger.py`.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
+- Hardened `TradeLogger` with SQLAlchemy 2.0 `DeclarativeBase` and explicit schema constraints.
 
 ## [1.0.0] - 2024-05-24
 ### Added

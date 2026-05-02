@@ -9,12 +9,7 @@ pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 import numpy as np
 import pandas as pd
 from unittest.mock import MagicMock, patch
-from src.models.regime_detector import RegimeDetector, MarketRegime
-from src.models.dynamic_ensemble import DynamicEnsemble
-from src.models.ensemble import EnsembleModel
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.trading.risk_manager import RiskManager, TradeSignal
-from src.core.config import get_config
+from src.models.regime_detector import MarketRegime
 from src.core.trade_logger import TradeLogger
 
 @pytest.fixture
@@ -39,6 +34,9 @@ def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     Test: Model ensemble -> regime detection -> dynamic weighting -> trade decision
     Covers work from Jules01, Jules04.
     """
+    from src.models.regime_detector import RegimeDetector
+    from src.models.ensemble import EnsembleModel
+
     # 1. Regime Detection (Jules04)
     detector = RegimeDetector(window=20, long_window=50)
     regime_info = detector.detect(mock_ohlcv_data)
@@ -79,6 +77,9 @@ def test_capital_and_risk_integration(trade_logger):
     Test: Capital Allocator -> Risk Manager -> Trade Approval
     Covers work from Jules04, Jules01, Jules02.
     """
+    from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+    from src.trading.risk_manager import RiskManager, TradeSignal
+
     with patch("src.core.config.get_config") as mock_get_cfg:
         cfg = MagicMock()
         cfg.risk_per_trade = 0.02
