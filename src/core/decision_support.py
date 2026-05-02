@@ -11,14 +11,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.analytics.journal_mining import SessionAnalysis
 from src.core.constants import SignalDirection
 from src.core.explainability import SignalExplanation
 from src.trading.capital_allocator import AllocationResult
-from src.analytics.journal_mining import SessionAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -105,10 +105,10 @@ class DecisionSupport:
         Formats the decision packet for high-impact terminal display.
         """
         try:
+            from rich import box
             from rich.console import Console
             from rich.panel import Panel
             from rich.table import Table
-            from rich import box
 
             console = Console(force_terminal=True)
 

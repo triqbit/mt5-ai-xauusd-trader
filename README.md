@@ -34,6 +34,7 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 - **DRL Architectures:** PPO (Proximal Policy Optimization), Dreamer V3, and LSTM-based actors.
 - **Ensemble Engine:** Real-time signal consensus from multiple neural networks to minimize variance.
 - **Explainability System:** Structured attribution breakdowns for every trade signal, providing institutional-grade transparency into model and risk decisions.
+- **Decision Support:** Operator-facing decision packets that aggregate signal intelligence, risk state, and performance context for institutional oversight.
 - **Dynamic Feature Engineering:** 140+ market indicators including multi-timeframe TA-Lib features and macro-sentiment integration.
 
 ### 🛡️ Institutional Risk Management
@@ -116,6 +117,7 @@ python main.py --mode demo --symbol XAUUSD --verbose
 | Guide | Description |
 | :--- | :--- |
 | [**Architecture Quick-Start**](./docs/ARCHITECTURE_QUICK.md) | **Primary technical overview and system maturity map.** |
+| [Decision Support System](./docs/features/DECISION_SUPPORT.md) | Detailed overview of operator-facing decision augmentation. |
 | [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
 | [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
