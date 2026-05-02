@@ -1,13 +1,16 @@
 import pytest
 import numpy as np
 import pandas as pd
+try:
+    import torch
+except ImportError:
+    torch = None
 from unittest.mock import MagicMock, patch
 from src.models.regime_detector import RegimeDetector, MarketRegime
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.ensemble import EnsembleModel
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.risk_manager import RiskManager, TradeSignal
-from src.core.constants import SignalDirection
 from src.core.config import get_config
 from src.core.trade_logger import TradeLogger
 
@@ -27,6 +30,8 @@ def mock_ohlcv_data():
 @pytest.fixture
 def trade_logger():
     return TradeLogger(db_url="sqlite:///:memory:")
+
+pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
 def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     """
@@ -78,7 +83,6 @@ def test_capital_and_risk_integration(trade_logger):
         cfg.risk_per_trade = 0.02
         cfg.max_daily_loss = 0.05
         cfg.max_positions = 3
-        cfg.confidence_threshold = 0.55
         mock_get_cfg.return_value = cfg
 
         # 1. Capital Allocation (Jules04)
@@ -100,7 +104,7 @@ def test_capital_and_risk_integration(trade_logger):
 
         signal = TradeSignal(
             symbol="XAUUSD",
-            direction=SignalDirection.BUY,
+            direction=1,
             entry_price=2350.0,
             stop_loss=2340.0,
             take_profit=2380.0,

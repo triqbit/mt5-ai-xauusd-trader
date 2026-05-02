@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -153,7 +154,10 @@ class RiskManager:
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
         elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} below threshold {self.cfg.confidence_threshold:.2f}"
+            rejection_reason = (
+                f"Confidence {signal.confidence:.2f} below threshold "
+                f"{self.cfg.confidence_threshold:.2f}"
+            )
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
 
@@ -217,9 +221,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 

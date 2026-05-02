@@ -5,6 +5,7 @@ High-resolution performance profiling utilities.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import time
@@ -14,6 +15,7 @@ from typing import Generator
 import structlog
 
 logger = structlog.get_logger(__name__)
+
 
 @contextmanager
 def profile(label: str) -> Generator[None, None, None]:
@@ -29,8 +31,4 @@ def profile(label: str) -> Generator[None, None, None]:
     finally:
         duration = time.perf_counter() - start_time
         duration_ms = round(duration * 1000, 3)
-        logger.info(
-            "performance_metric",
-            label=label,
-            duration_ms=duration_ms
-        )
+        logger.info("performance_metric", label=label, duration_ms=duration_ms)

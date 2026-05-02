@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.core.config import get_config
-from src.core.constants import SignalDirection
 from src.core.trade_logger import TradeLogger
 from src.trading.risk_manager import RiskManager, TradeSignal
 from src.utils.synthetic_data import ScenarioGenerator
@@ -40,7 +39,7 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
 
     signal = TradeSignal(
         symbol="XAUUSD",
-        direction=SignalDirection.BUY,
+        direction=1,
         entry_price=2300.0,
         stop_loss=2290.0,
         take_profit=2320.0,
@@ -64,7 +63,7 @@ def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
 
     signal = TradeSignal(
         symbol="XAUUSD",
-        direction=SignalDirection.BUY,
+        direction=1,
         entry_price=2300.0,
         stop_loss=2290.0,
         take_profit=2320.0,
