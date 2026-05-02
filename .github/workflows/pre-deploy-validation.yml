@@ -6,8 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  quality-and-security:
-    name: Quality & Security Scan
+  # -----------------------------------------------------------
+  # STAGE 1: Fast Fail - Quality, Secrets, Config, Release Notes
+  # -----------------------------------------------------------
+  fast-validation:
+    name: Fast Validation (Quality, Secrets, Config)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,40 +18,58 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
 
-      - name: Install Linting & Security Tools
+      - name: Install Validation Tools
         run: |
           pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3
 
-      - name: Ruff Check
-        run: ruff check src/ main.py
+      - name: Ruff Lint & Format Check
+        run: |
+          echo "Running Ruff checks..."
+          ruff check src/ main.py
+          ruff format --check src/ main.py
 
-      - name: Ruff Format Check
-        run: ruff format --check src/ main.py
+      - name: Mypy Type Check
+        run: |
+          echo "Running Mypy static analysis..."
+          mypy src/ main.py --ignore-missing-imports
 
-      - name: Mypy Check
-        run: mypy src/ main.py --ignore-missing-imports
-
-      - name: Dependency Security Audit
-        run: pip-audit --requirement requirements-ci.txt
-
-      - name: Secrets Scan (Gitleaks)
+      - name: Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  tests-and-migrations:
-    name: Tests, Migrations & Config
+      - name: Validate Environment Config Template
+        run: |
+          echo "Verifying .env.example matches src/core/config.py..."
+          python scripts/validate_env.py
+
+      - name: Validate Release Notes
+        run: |
+          echo "Checking CHANGELOG.md for [Unreleased] content..."
+          python scripts/check_release_notes.py
+
+      - name: Dependency Security Audit
+        run: |
+          echo "Scanning dependencies for vulnerabilities..."
+          pip-audit --requirement requirements-ci.txt
+
+  # -----------------------------------------------------------
+  # STAGE 2: Functional - Migrations, Tests & Coverage
+  # -----------------------------------------------------------
+  functional-validation:
+    name: Functional Validation (Tests & Migrations)
     runs-on: ubuntu-latest
+    needs: fast-validation
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
@@ -81,8 +102,14 @@ jobs:
           pip install pytest pytest-cov
           pip install -r requirements-ci.txt
 
+      - name: Database Migration Reversibility Check
+        run: |
+          echo "Verifying database migrations (up/down/up cycle)..."
+          python scripts/verify_migrations.py
+
       - name: Run Tests with Coverage Gate
         run: |
+          echo "Running unit and integration tests..."
           pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80
         env:
           MT5_LOGIN: "0"
@@ -90,19 +117,13 @@ jobs:
           MT5_SERVER: "test"
           MODE: "demo"
 
-      - name: Validate Environment Config Template
-        run: python scripts/validate_env.py
-
-      - name: Database Migration Reversibility Check
-        run: python scripts/verify_migrations.py
-
-      - name: Check Release Notes Existence
-        run: python scripts/check_release_notes.py
-
-  docker-validation:
-    name: Docker Build & Vulnerability Scan
+  # -----------------------------------------------------------
+  # STAGE 3: Artifact - Docker Build & Vulnerability Scan
+  # -----------------------------------------------------------
+  artifact-validation:
+    name: Artifact Validation (Docker & Security)
     runs-on: ubuntu-latest
-    needs: [quality-and-security, tests-and-migrations]
+    needs: functional-validation
     steps:
       - uses: actions/checkout@v4
 
@@ -110,7 +131,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           load: true
