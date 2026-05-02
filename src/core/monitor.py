@@ -5,6 +5,7 @@ Real-time monitoring, equity tracking, Prometheus metrics, and Telegram alerting
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio

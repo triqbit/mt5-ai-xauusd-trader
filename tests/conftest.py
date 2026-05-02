@@ -44,6 +44,84 @@ sys.modules["talib"] = mock_talib
 mock_mt5 = MagicMock()
 sys.modules["MetaTrader5"] = mock_mt5
 
+# Mock torch (heavy dependency)
+mock_torch = MagicMock()
+mock_torch.from_numpy.side_effect = lambda x: MagicMock()
+mock_torch.FloatTensor.side_effect = lambda x: MagicMock()
+mock_torch.tensor.side_effect = lambda x: MagicMock()
+
+
+# Helper to mock argmax(...).item()
+def mock_argmax(*args, **kwargs):
+    m = MagicMock()
+    m.item.return_value = 0  # Default to index 0 (BUY in transformer map)
+    return m
+
+
+mock_torch.argmax.side_effect = mock_argmax
+sys.modules["torch"] = mock_torch
+
+# Mock torch.nn
+mock_nn = MagicMock()
+
+
+class MockModule:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
+
+    def forward(self, *args, **kwargs):
+        # Default mock output for LSTMAttentionModel forward
+        m = MagicMock()
+        m.shape = (2, 3)
+        return m
+
+    def to(self, *args, **kwargs):
+        return self
+
+    def eval(self, *args, **kwargs):
+        return self
+
+    def load_state_dict(self, *args, **kwargs):
+        pass
+
+    def cpu(self, *args, **kwargs):
+        return self
+
+    def numpy(self, *args, **kwargs):
+        return np.zeros((2, 3))
+
+
+mock_nn.Module = MockModule
+sys.modules["torch.nn"] = mock_nn
+mock_torch.nn = mock_nn
+
+# Mock other torch.nn components used in ensemble.py
+for name in ["LSTM", "MultiheadAttention", "LayerNorm", "Sequential", "Linear", "GELU", "Dropout"]:
+    mock_component_class = MagicMock()
+    mock_instance = MagicMock()
+    if name == "LSTM":
+        # LSTM should return (output, (h_n, c_n))
+        res = MagicMock()
+        res.mean.return_value = MagicMock()
+        mock_instance.return_value = (res, (MagicMock(), MagicMock()))
+    elif name == "MultiheadAttention":
+        # MultiheadAttention should return (output, weights)
+        mock_instance.return_value = (MagicMock(), MagicMock())
+    elif name == "Sequential":
+        res = MagicMock()
+        res.shape = (2, 3)
+        mock_instance.return_value = res
+    mock_component_class.return_value = mock_instance
+    setattr(mock_nn, name, mock_component_class)
+
+# Mock torch.softmax and other functions
+mock_torch.softmax.side_effect = lambda x, dim=-1: x
+mock_torch.randn.side_effect = lambda *args: MagicMock()
+mock_torch.device.side_effect = lambda x: MagicMock()
+
 # Add specific MT5 constants that might be used
 mock_mt5.TIMEFRAME_M5 = 5
 mock_mt5.TIMEFRAME_M15 = 15
