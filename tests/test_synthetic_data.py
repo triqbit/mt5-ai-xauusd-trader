@@ -1,10 +1,12 @@
 """
 Unit tests for the ScenarioGenerator.
 """
+
 import pytest
 import numpy as np
 import pandas as pd
 from src.utils.synthetic_data import ScenarioGenerator
+
 
 def test_determinism():
     gen1 = ScenarioGenerator(seed=42)
@@ -14,6 +16,7 @@ def test_determinism():
     df2 = gen2.generate(n_steps=50, regime="trending")
 
     pd.testing.assert_frame_equal(df1, df2)
+
 
 def test_trending_regime():
     gen = ScenarioGenerator(seed=42)
@@ -25,6 +28,7 @@ def test_trending_regime():
     df_bear = gen.generate(n_steps=100, regime="trending", trend_strength=-0.01)
     assert df_bear["close"].iloc[-1] < df_bear["close"].iloc[0]
 
+
 def test_ohlc_validity():
     gen = ScenarioGenerator(seed=42)
     df = gen.generate(n_steps=100, regime="ranging")
@@ -34,6 +38,7 @@ def test_ohlc_validity():
     assert (df["high"] >= df["close"]).all()
     assert (df["low"] <= df["open"]).all()
     assert (df["low"] <= df["close"]).all()
+
 
 def test_malformed_regime():
     gen = ScenarioGenerator(seed=42)
@@ -50,6 +55,7 @@ def test_malformed_regime():
 
     # Zero volume at index 3
     assert df.loc[3, "tick_volume"] == 0
+
 
 def test_invalid_regime():
     gen = ScenarioGenerator()

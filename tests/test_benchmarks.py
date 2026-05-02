@@ -21,6 +21,11 @@ from src.research.benchmarks import (
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
 
+try:
+    import torch
+except ImportError:
+    torch = None
+
 
 @pytest.fixture
 def sample_data():
@@ -146,6 +151,7 @@ def test_ppo_adapter(sample_data):
     assert mock_agent.predict.call_count == len(sample_data)
 
 
+@pytest.mark.skipif(torch is None, reason="torch not installed")
 def test_ensemble_adapter(sample_data):
     mock_model = MagicMock()
     mock_model.predict.return_value = (SignalDirection.SELL, 0.8, {})
@@ -162,9 +168,8 @@ def test_ensemble_adapter(sample_data):
     assert mock_model.predict.call_count == len(sample_data) - (window_size - 1)
 
 
+@pytest.mark.skipif(torch is None, reason="torch not installed")
 def test_transformer_adapter(sample_data):
-    import torch
-
     mock_model = MagicMock()
     # Mock return: a tensor of probabilities [batch, 3] where index 0 is BUY
     mock_model.return_value = torch.tensor([[1.0, 0.0, 0.0]])
