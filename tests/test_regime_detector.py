@@ -1,7 +1,10 @@
 import unittest
-import pandas as pd
+
 import numpy as np
-from src.models.regime_detector import RegimeDetector, MarketRegime
+import pandas as pd
+
+from src.models.regime_detector import MarketRegime, RegimeDetector
+
 
 class TestRegimeDetector(unittest.TestCase):
     def setUp(self):
@@ -9,21 +12,19 @@ class TestRegimeDetector(unittest.TestCase):
 
     def test_ranging_regime(self):
         np.random.seed(42)
-        data = pd.DataFrame({
-            'close': 2000.0 + np.random.randn(50) * 0.1,
-            'high': 2000.2 + np.random.randn(50) * 0.1,
-            'low': 1999.8 + np.random.randn(50) * 0.1
-        })
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.random.randn(50) * 0.1,
+                "high": 2000.2 + np.random.randn(50) * 0.1,
+                "low": 1999.8 + np.random.randn(50) * 0.1,
+            }
+        )
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.RANGING)
 
     def test_trending_regime(self):
         close = np.linspace(2000, 2010, 50)
-        data = pd.DataFrame({
-            'close': close,
-            'high': close + 0.1,
-            'low': close - 0.1
-        })
+        data = pd.DataFrame({"close": close, "high": close + 0.1, "low": close - 0.1})
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.TRENDING)
 
@@ -35,11 +36,7 @@ class TestRegimeDetector(unittest.TestCase):
         high[-1] = 2200.0
         low = np.full(100, 2000.0)
         low[-1] = 2000.0
-        data = pd.DataFrame({
-            'close': close,
-            'high': high,
-            'low': low
-        })
+        data = pd.DataFrame({"close": close, "high": high, "low": low})
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.NEWS_SHOCK)
 
@@ -49,11 +46,7 @@ class TestRegimeDetector(unittest.TestCase):
 
         high = close + 0.1
         low = close - 0.1
-        data = pd.DataFrame({
-            'close': close,
-            'high': high,
-            'low': low
-        })
+        data = pd.DataFrame({"close": close, "high": high, "low": low})
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.MEAN_REVERSION)
 
@@ -66,36 +59,42 @@ class TestRegimeDetector(unittest.TestCase):
         high = close + np.concatenate([np.full(50, 10.0), np.full(20, 0.1)])
         low = close - np.concatenate([np.full(50, 10.0), np.full(20, 0.1)])
 
-        data = pd.DataFrame({
-            'close': close,
-            'high': high,
-            'low': low
-        })
+        data = pd.DataFrame({"close": close, "high": high, "low": low})
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.LOW_VOLATILITY_DRIFT)
 
     def test_label_history(self):
         np.random.seed(42)
-        data = pd.DataFrame({
-            'close': 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
-            'high': 2000.5 + np.cumsum(np.random.randn(100) * 0.1),
-            'low': 1999.5 + np.cumsum(np.random.randn(100) * 0.1)
-        })
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "high": 2000.5 + np.cumsum(np.random.randn(100) * 0.1),
+                "low": 1999.5 + np.cumsum(np.random.randn(100) * 0.1),
+            }
+        )
 
         df_history = self.detector.label_history(data)
-        self.assertIn('regime', df_history.columns)
-        self.assertTrue((df_history['regime'].iloc[:self.detector.long_window-1] == MarketRegime.UNKNOWN.value).all())
-        self.assertNotEqual(df_history['regime'].iloc[self.detector.long_window-1], MarketRegime.UNKNOWN.value)
+        self.assertIn("regime", df_history.columns)
+        self.assertTrue(
+            (
+                df_history["regime"].iloc[: self.detector.long_window - 1]
+                == MarketRegime.UNKNOWN.value
+            ).all()
+        )
+        self.assertNotEqual(
+            df_history["regime"].iloc[self.detector.long_window - 1], MarketRegime.UNKNOWN.value
+        )
 
         idx = 50
-        info_detect = self.detector.detect(data.iloc[:idx+1])
-        self.assertEqual(df_history['regime'].iloc[idx], info_detect.label.value)
-        self.assertAlmostEqual(df_history['regime_confidence'].iloc[idx], info_detect.confidence)
+        info_detect = self.detector.detect(data.iloc[: idx + 1])
+        self.assertEqual(df_history["regime"].iloc[idx], info_detect.label.value)
+        self.assertAlmostEqual(df_history["regime_confidence"].iloc[idx], info_detect.confidence)
 
     def test_insufficient_data(self):
-        data = pd.DataFrame({'close': [1.0, 2.0], 'high': [1.1, 2.1], 'low': [0.9, 1.9]})
+        data = pd.DataFrame({"close": [1.0, 2.0], "high": [1.1, 2.1], "low": [0.9, 1.9]})
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.UNKNOWN)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

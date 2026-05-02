@@ -1,7 +1,6 @@
-import pytest
-from unittest.mock import MagicMock
 from rich.table import Table
-from src.core.health import HealthStatus, ComponentStatus, HealthReport
+
+from src.core.health import ComponentStatus, HealthReport, HealthStatus
 
 
 def test_health_report_table_display():

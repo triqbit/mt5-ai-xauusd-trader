@@ -30,3 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial enterprise-grade trading engine.
 - MT5 integration and risk management framework.
 - CI/CD pipelines for validation and security.
+
+## [Unreleased] - 2026-05-02
+### Added
+- Standardized `BaseModel` interface and `Signal` output format in `src/models/base_model.py`.
+- Production-ready stubs for `PPOAgent`, `LSTMModel`, and `DreamerAgent` in `src/models/`.
+- Gymnasium-compatible `TradingEnv` skeleton for XAUUSD in `src/trading/trading_env.py`.
+- Comprehensive unit tests for model stubs and environment interface in `tests/test_models_stubs.py`.
+### Fixed
+- Dependency conflict in CI by updating `gymnasium` version constraint.
