@@ -14,10 +14,23 @@ The institutional research reporting system automatically generates high-quality
     - **Benchmark Comparisons**: Statistical performance evaluation against baseline strategies (EMA Crossover, Momentum, Volatility Breakout, Mean Reversion).
 
 - **Flexible Output Formats**:
-    - **Markdown**: Beautiful, export-friendly reports generated via Jinja2 templates.
+    - **HTML**: Professional browser-viewable reports with CSS styling.
+    - **Markdown**: Structured, documentation-friendly reports generated via Jinja2 templates.
     - **Terminal**: Scannable, interactive dashboards using the `rich` library.
 
 ## Usage
+
+### Integration Pattern
+
+Most research and analytics modules implement a `to_report_section()` method that converts their results into a reporting section model.
+
+```python
+# Aggregate components
+regime_section = regime_detector.generate_summary(data_df)
+stress_section = stress_lab.run_scenario(scenario).to_report_section()
+pattern_section = journal_miner.run_mining().to_report_section()
+drift_section = drift_analyzer.calculate_drift(b_df, c_df).to_report_section()
+```
 
 ### Generating a Report
 
@@ -27,13 +40,20 @@ from src.research.reporting import ResearchReporter, ResearchReport
 # Initialize reporter
 reporter = ResearchReporter()
 
-# Create a report object (usually aggregated from other research modules)
+# Create a report object
 report = ResearchReport(
     title="Strategy Audit - XAUUSD PPO",
     executive_summary="The strategy remains robust despite increased volatility...",
-    # ... populate other sections ...
+    regime_analysis=regime_section,
+    stress_tests=stress_section,
+    trade_patterns=pattern_section,
+    model_drift=drift_section,
+    # ... other sections ...
     conclusion="Ready for production deployment with news-event filters."
 )
+
+# Export to HTML
+reporter.save_html(report, "report.html")
 
 # Export to Markdown
 reporter.save_markdown(report, "research_audit_report.md")

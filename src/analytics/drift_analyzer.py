@@ -8,15 +8,15 @@ License: MIT
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 
 
 class DriftMetric(BaseModel):
     """Detection results for a single feature or metric."""
+
     name: str
     baseline_value: float
     current_value: float
@@ -26,14 +26,14 @@ class DriftMetric(BaseModel):
 
 class DriftAnalysisReport(BaseModel):
     """Aggregate model drift report."""
+
     metrics: List[DriftMetric]
     feature_importance_shifts: Dict[str, float]
     overall_drift_status: str
 
     def to_report_section(self) -> Any:
         """Convert results to ModelDriftSection for ResearchReporter."""
-        from src.research.reporting import DriftMetric as ReportingDriftMetric
-        from src.research.reporting import ModelDriftSection
+        from src.research.reporting import DriftMetric as ReportingDriftMetric, ModelDriftSection
 
         reporting_metrics = []
         for m in self.metrics:
@@ -54,12 +54,18 @@ class DriftAnalysisReport(BaseModel):
             )
 
         # Summarize feature shifts
-        sorted_shifts = sorted(self.feature_importance_shifts.items(), key=lambda x: abs(x[1]), reverse=True)
-        shift_desc = "Significant shifts in: " + ", ".join([f"{k} ({v:+.2f})" for k, v in sorted_shifts[:3]])
+        sorted_shifts = sorted(
+            self.feature_importance_shifts.items(), key=lambda x: abs(x[1]), reverse=True
+        )
+        shift_desc = "Significant shifts in: " + ", ".join(
+            [f"{k} ({v:+.2f})" for k, v in sorted_shifts[:3]]
+        )
 
         return ModelDriftSection(
             metrics=reporting_metrics,
-            feature_shifts=shift_desc if sorted_shifts else "No significant feature shifts detected.",
+            feature_shifts=shift_desc
+            if sorted_shifts
+            else "No significant feature shifts detected.",
         )
 
 
@@ -83,29 +89,33 @@ class DriftAnalyzer:
 
         # 1. Target distribution drift
         ks_stat, p_val = stats.ks_2samp(baseline_df[target_col], current_df[target_col])
-        metrics.append(DriftMetric(
-            name=f"Distribution: {target_col}",
-            baseline_value=float(baseline_df[target_col].mean()),
-            current_value=float(current_df[target_col].mean()),
-            drift_score=float(ks_stat),
-            is_significant=p_val < 0.05
-        ))
+        metrics.append(
+            DriftMetric(
+                name=f"Distribution: {target_col}",
+                baseline_value=float(baseline_df[target_col].mean()),
+                current_value=float(current_df[target_col].mean()),
+                drift_score=float(ks_stat),
+                is_significant=p_val < 0.05,
+            )
+        )
 
         # 2. Return volatility drift
         if "returns" in baseline_df.columns and "returns" in current_df.columns:
             b_vol = baseline_df["returns"].std()
             c_vol = current_df["returns"].std()
             drift = abs(c_vol - b_vol) / (b_vol + 1e-9)
-            metrics.append(DriftMetric(
-                name="Return Volatility",
-                baseline_value=float(b_vol),
-                current_value=float(c_vol),
-                drift_score=float(min(drift, 1.0)),
-                is_significant=drift > 0.2
-            ))
+            metrics.append(
+                DriftMetric(
+                    name="Return Volatility",
+                    baseline_value=float(b_vol),
+                    current_value=float(c_vol),
+                    drift_score=float(min(drift, 1.0)),
+                    is_significant=drift > 0.2,
+                )
+            )
 
         return DriftAnalysisReport(
             metrics=metrics,
-            feature_importance_shifts={}, # Placeholder
-            overall_drift_status="WARNING" if any(m.is_significant for m in metrics) else "STABLE"
+            feature_importance_shifts={},  # Placeholder
+            overall_drift_status="WARNING" if any(m.is_significant for m in metrics) else "STABLE",
         )
