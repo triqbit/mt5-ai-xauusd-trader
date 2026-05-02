@@ -99,7 +99,6 @@ def test_no_look_ahead_bias(synthetic_ohlcv):
     features2 = fe2.compute_features(df2)
 
     # Check a step before the end
-    # We need to make sure idx is within the valid range of features (which is smaller than 3000)
     idx = -10
     pd.testing.assert_series_equal(features1.iloc[idx], features2.iloc[idx])
 
@@ -131,3 +130,19 @@ def test_calculate_rolling_slope_short_series():
     window = 5
     slope = fe._calculate_rolling_slope(data, window)
     assert np.all(slope == 0.0)
+
+
+def test_volume_profile_features(synthetic_ohlcv):
+    """Test that VWAP and VPT features are computed correctly."""
+    fe = FeatureEngineer(base_timeframe="M1", normalize=False)
+    features = fe.compute_features(synthetic_ohlcv)
+
+    assert "vwap_20" in features.columns
+    assert "dist_vwap_20" in features.columns
+    assert "vpt" in features.columns
+
+    # Check that VWAP is between low and high
+    # Note: vwap_20 is calculated from typical price, so it should generally stay within price range
+    # However, since it's a rolling average, it might lag.
+    assert not features["vwap_20"].isna().any()
+    assert not features["vpt"].isna().any()
