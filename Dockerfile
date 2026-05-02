@@ -4,7 +4,7 @@
 # ============================================================
 
 # --- Stage 1: builder ------------------------------------------
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ COPY --from=builder /usr/lib/libta_lib* /usr/lib/
 COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
 
 # Copy installed Python packages
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application source

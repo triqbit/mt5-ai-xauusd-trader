@@ -21,8 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automated changelog generation workflow (`.github/workflows/changelog.yml`).
 - Initial `CHANGELOG.md` template.
 
+### Security
+- **Hardened Configuration:** Sensitive fields (MT5 password, API tokens, database URLs) in `TradingConfig` migrated to `pydantic.SecretStr` to prevent accidental exposure.
+- **Dependency Hardening:** Bumped `fastapi` to `0.115.8` and aligned `starlette` to resolve security vulnerabilities (GHSA-f96h-pmfr-66vw, GHSA-2c2j-9gv5-cj73).
+
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
+- **Environment Standardization:** Standardized full project stack on Python 3.12 across CI pipelines, Docker builds, and metadata.
+- **Dependency Hygiene:** Normalized version pins for `fastapi` and `python-telegram-bot` across all requirement files.
+- **Cross-Platform Compatibility:** Added environment markers to `MetaTrader5` to fix dependency resolution on Linux systems.
 
 ## [1.0.0] - 2024-05-24
 ### Added

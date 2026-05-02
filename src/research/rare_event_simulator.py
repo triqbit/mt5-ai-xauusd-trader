@@ -87,13 +87,15 @@ class RareEventSimulator:
         # Generate some noise for OHLC
         noise = self.rng.normal(0, base_vol * 0.5, (n, 3))
 
-        df = pd.DataFrame({
-            "open": prices * (1 + noise[:, 0]),
-            "high": prices * (1 + np.abs(noise[:, 1])),
-            "low": prices * (1 - np.abs(noise[:, 2])),
-            "close": prices,
-            "tick_volume": self.rng.integers(100, 1000, n),
-        })
+        df = pd.DataFrame(
+            {
+                "open": prices * (1 + noise[:, 0]),
+                "high": prices * (1 + np.abs(noise[:, 1])),
+                "low": prices * (1 - np.abs(noise[:, 2])),
+                "close": prices,
+                "tick_volume": self.rng.integers(100, 1000, n),
+            }
+        )
 
         # Ensure consistency
         df["high"] = df[["open", "close", "high"]].max(axis=1)
@@ -172,7 +174,9 @@ class RareEventSimulator:
         returns[start_idx:reversal_start] += 0.002 * config.event_magnitude
 
         # Violent reversal
-        returns[reversal_start : reversal_start + reversal_duration] -= 0.005 * config.event_magnitude
+        returns[reversal_start : reversal_start + reversal_duration] -= (
+            0.005 * config.event_magnitude
+        )
 
         prices = config.start_price * np.exp(np.cumsum(returns))
         return self._generate_base_ohlc(prices, config.base_volatility)
@@ -184,7 +188,9 @@ class RareEventSimulator:
 
         dislocation_idx = n // 3
         # Permanent shift in mean and volatility
-        returns[dislocation_idx:] += self.rng.normal(-0.0005 * config.event_magnitude, config.base_volatility * 2, n - dislocation_idx)
+        returns[dislocation_idx:] += self.rng.normal(
+            -0.0005 * config.event_magnitude, config.base_volatility * 2, n - dislocation_idx
+        )
 
         prices = config.start_price * np.exp(np.cumsum(returns))
         return self._generate_base_ohlc(prices, config.base_volatility)
@@ -209,7 +215,9 @@ class RareEventSimulator:
             if i == shock_idx:
                 shock = 0.04 * config.event_magnitude
 
-            vols[i] = np.sqrt(omega + alpha * (vols[i-1]**2 + shock**2) + beta * vols[i-1]**2)
+            vols[i] = np.sqrt(
+                omega + alpha * (vols[i - 1] ** 2 + shock**2) + beta * vols[i - 1] ** 2
+            )
 
         returns = self.rng.normal(0, vols, n)
         prices = config.start_price * np.exp(np.cumsum(returns))

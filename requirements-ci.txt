@@ -6,7 +6,7 @@
 #   - MetaTrader5 (Windows-only, no Linux wheel)
 #   - torch/torchvision/transformers/timm (too heavy for unit tests)
 #   - stable-baselines3/gymnasium (pulls torch transitively)
-#   - pandas-ta (requires Python <3.11; runtime-only)
+#   - pandas-ta (runtime-only)
 #
 # TA-Lib C library is built from source in ci.yml (GitHub releases,
 # ta-lib 0.6.4). The Python wrapper TA-Lib>=0.6.4 is listed here
@@ -37,7 +37,7 @@ optuna==4.2.1
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot==22.7
-fastapi==0.115.0
+fastapi==0.115.8
 httpx==0.27.0
 structlog==24.1.0
 rich==15.0.0

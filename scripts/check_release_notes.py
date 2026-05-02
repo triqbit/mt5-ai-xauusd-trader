@@ -1,6 +1,7 @@
-import sys
 import re
+import sys
 from pathlib import Path
+
 
 def check_release_notes():
     changelog_path = Path("CHANGELOG.md")
@@ -28,11 +29,15 @@ def check_release_notes():
     has_content = False
     for line in lines:
         stripped = line.strip()
-        if stripped and not stripped.startswith("###") and not stripped.startswith("##"):
-             # If it's not a header and not empty, it's likely content
-             if any(c.isalnum() for c in stripped):
-                 has_content = True
-                 break
+        if (
+            stripped
+            and not stripped.startswith("###")
+            and not stripped.startswith("##")
+            and any(c.isalnum() for c in stripped)
+        ):
+            # If it's not a header and not empty, it's likely content
+            has_content = True
+            break
 
     if not has_content:
         print("Error: [Unreleased] section in CHANGELOG.md is empty.")
@@ -41,6 +46,7 @@ def check_release_notes():
 
     print("Success: [Unreleased] section has content.")
     return True
+
 
 if __name__ == "__main__":
     if not check_release_notes():

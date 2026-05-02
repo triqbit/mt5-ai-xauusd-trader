@@ -5,7 +5,7 @@
 # Excludes:
 #   - MetaTrader5 (Windows-only, no Linux wheel)
 #   - metaapi-cloud-sdk (Windows-only dependency chain)
-#   - pandas-ta (requires Python <3.11; runtime-only)
+#   - pandas-ta (runtime-only)
 #   - transformers/timm/einops (too heavy for base image)
 # ============================================================
 
@@ -44,7 +44,7 @@ tqdm==4.66.4
 python-telegram-bot==22.7
 
 # -- Dashboard / API -----------------------------------------------
-fastapi==0.115.0
+fastapi==0.115.8
 uvicorn[standard]==0.29.0
 dash==4.1.0
 plotly==5.22.0

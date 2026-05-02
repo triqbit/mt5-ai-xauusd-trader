@@ -20,7 +20,7 @@ timm==0.9.16
 einops==0.7.0
 
 # ── Technical Analysis ──────────────────────────────────────
-TA-Lib==0.4.28
+TA-Lib==0.6.4
 pandas-ta==0.4.71b0
 mplfinance==0.12.10b0
 
@@ -31,7 +31,7 @@ aiohttp==3.13.5
 httpx==0.27.0
 
 # ── MetaTrader 5 ────────────────────────────────────────────
-MetaTrader5==5.0.45
+MetaTrader5==5.0.45; sys_platform == 'win32'
 metaapi-cloud-sdk==27.0.3
 
 # ── Database ────────────────────────────────────────────────
@@ -47,7 +47,7 @@ rich==15.0.0
 tqdm==4.66.4
 
 # ── Dashboard / API ─────────────────────────────────────────
-fastapi==0.115.0
+fastapi==0.115.8
 uvicorn[standard]==0.29.0
 dash==4.1.0
 plotly==5.22.0

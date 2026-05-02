@@ -62,13 +62,13 @@ force-single-line = false
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "B011"]   # assert + raise-without-from OK in tests
+"tests/**" = ["S101", "B011", "E402"]   # assert + raise-without-from + late imports OK in tests
 
 # ===========================================================
 # mypy
 # ===========================================================
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
