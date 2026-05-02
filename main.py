@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +35,7 @@ from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
+from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
 
@@ -66,6 +68,7 @@ def run_live(
     connector: MT5Connector,
     risk: RiskManager,
     model: BaseModel,
+    execution_filter: ExecutionFilter,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
@@ -133,6 +136,25 @@ def run_live(
             # 5. Risk approval gate
             with profile("risk_check"):
                 approved = risk.approve(signal, signal_id=signal_id)
+
+            # 5b. Execution Filter Cascade
+            if approved:
+                with profile("execution_filter"):
+                    # Calculate current drawdown for the filter
+                    drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
+                    decision = execution_filter.validate(
+                        signal,
+                        df,
+                        current_drawdown=drawdown,
+                        timestamp=datetime.now(timezone.utc)
+                    )
+                    if not decision.is_approved:
+                        log.warning(
+                            "Signal BLOCKED by ExecutionFilter | %s | Reason: %s",
+                            cfg.symbol,
+                            decision.blocked_by
+                        )
+                        approved = False
 
             if approved:
                 with profile("execution"):
@@ -253,6 +275,7 @@ def main() -> int:
     )
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    execution_filter = ExecutionFilter(max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15)
 
     # Model Factory based on --algo flag
     if args.algo == "ensemble":
@@ -304,6 +327,7 @@ def main() -> int:
                 connector,
                 risk,
                 model,
+                execution_filter,
                 trade_logger=trade_logger,
                 monitor=monitor,
             )
