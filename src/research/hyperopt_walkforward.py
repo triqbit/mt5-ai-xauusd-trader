@@ -54,6 +54,33 @@ class WalkForwardResult(BaseModel):
     window_results: List[Dict[str, Any]]
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
+    def to_report_section(self) -> Any:
+        """Convert result to HyperparameterSection for ResearchReporter."""
+        from src.research.reporting import HyperparameterSection, ParameterRobustness
+
+        params = []
+        for name, value in self.best_params.items():
+            params.append(
+                ParameterRobustness(
+                    name=name,
+                    range="Optimized",  # Range not explicitly stored in result
+                    optimal=str(value),
+                    sensitivity="Tracked via stability penalty",
+                )
+            )
+
+        insights = (
+            f"OOS Sharpe Mean: {self.metrics.oos_sharpe_mean:.2f}, "
+            f"IS-OOS Gap: {self.metrics.is_oos_gap:.2f}, "
+            f"Regime Consistency: {self.metrics.regime_consistency:.2f}"
+        )
+
+        return HyperparameterSection(
+            stability_score=float(np.clip(self.metrics.robustness_score * 100, 0, 100)),
+            parameters=params,
+            insights=insights,
+        )
+
 class WalkForwardOptimizer:
     """
     Implements disciplined walk-forward optimization with robustness scoring.

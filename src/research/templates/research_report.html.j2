@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Research Report</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+        header { background: #2c3e50; color: #fff; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { margin: 0; font-size: 2.5rem; }
+        .metadata { margin-top: 1rem; font-size: 0.9rem; opacity: 0.8; }
+        .executive-summary { background: #fff; padding: 1.5rem; border-left: 5px solid #3498db; border-radius: 4px; margin-bottom: 2rem; }
+        section { background: #fff; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        h2 { border-bottom: 2px solid #ecf0f1; padding-bottom: 0.5rem; color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; color: #2c3e50; }
+        tr:hover { background-color: #fdfdfd; }
+        .score { font-size: 1.5rem; font-weight: bold; color: #27ae60; }
+        .fail { color: #e74c3c; font-weight: bold; }
+        .pass { color: #27ae60; font-weight: bold; }
+        .insight-box { background: #e8f4fd; padding: 1rem; border-radius: 4px; border: 1px solid #3498db; }
+        footer { text-align: center; margin-top: 3rem; font-size: 0.8rem; color: #7f8c8d; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; background: #eee; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>{{ title }}</h1>
+        <div class="metadata">
+            Date: {{ timestamp }} | Author: {{ author }}
+        </div>
+    </header>
+
+    <div class="executive-summary">
+        <h2>Executive Summary</h2>
+        <p>{{ executive_summary }}</p>
+    </div>
+
+    {% if regime_analysis %}
+    <section>
+        <h2>1. Market Regime Analysis</h2>
+        <p>{{ regime_analysis.summary }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Regime</th>
+                    <th>Frequency</th>
+                    <th>Avg Duration</th>
+                    <th>Profitability</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in regime_analysis.regimes %}
+                <tr>
+                    <td><strong>{{ r.label }}</strong></td>
+                    <td>{{ r.frequency_pct }}%</td>
+                    <td>{{ r.avg_duration_bars }} bars</td>
+                    <td>{{ r.profitability }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="insight-box">
+            <strong>Transition Insights:</strong><br>
+            {{ regime_analysis.transition_insights }}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if stress_tests %}
+    <section>
+        <h2>2. Stress Test Outcomes</h2>
+        <p>Resilience Score: <span class="score">{{ stress_tests.resilience_score }}/100</span></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Scenario</th>
+                    <th>Total Return</th>
+                    <th>Max Drawdown</th>
+                    <th>Sharpe</th>
+                    <th>Outcome</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="background-color: #f8f9fa;">
+                    <td><strong>Baseline</strong></td>
+                    <td>{{ stress_tests.baseline.total_return }}</td>
+                    <td>{{ stress_tests.baseline.max_drawdown }}</td>
+                    <td>{{ stress_tests.baseline.sharpe }}</td>
+                    <td>-</td>
+                </tr>
+                {% for s in stress_tests.scenarios %}
+                <tr>
+                    <td>{{ s.name }}</td>
+                    <td>{{ s.total_return }}</td>
+                    <td>{{ s.max_drawdown }}</td>
+                    <td>{{ s.sharpe }}</td>
+                    <td class="{{ s.outcome.lower() }}">{{ s.outcome }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <h3>Fragility Indicators</h3>
+                <ul>
+                    {% for indicator in stress_tests.fragility_indicators %}
+                    <li>{{ indicator }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div style="flex: 1;">
+                <h3>Failure Points</h3>
+                <ul>
+                    {% for point in stress_tests.failure_points %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if hyperparameter_robustness %}
+    <section>
+        <h2>3. Hyperparameter Robustness</h2>
+        <p>Stability Score: <span class="score">{{ hyperparameter_robustness.stability_score }}/100</span></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Range Tested</th>
+                    <th>Optimal Value</th>
+                    <th>Sensitivity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in hyperparameter_robustness.parameters %}
+                <tr>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.range }}</td>
+                    <td><code>{{ p.optimal }}</code></td>
+                    <td>{{ p.sensitivity }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="insight-box">
+            <strong>Optimization Insights:</strong><br>
+            {{ hyperparameter_robustness.insights }}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if trade_patterns %}
+    <section>
+        <h2>4. Trade Pattern Findings</h2>
+        <p><strong>Key Insight:</strong> {{ trade_patterns.primary_insight }}</p>
+
+        <h3>Profitable Concentrations</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Attribute</th>
+                    <th>Value</th>
+                    <th>Win Rate</th>
+                    <th>Profit Factor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in trade_patterns.concentrations %}
+                <tr>
+                    <td>{{ c.attribute }}</td>
+                    <td>{{ c.value }}</td>
+                    <td>{{ (c.win_rate * 100)|round(1) }}%</td>
+                    <td>{{ c.profit_factor|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h3>Behavioral Risks</h3>
+        <ul>
+            {% for risk in trade_patterns.behavioral_risks %}
+            <li><strong>{{ risk.type }}:</strong> {{ risk.description }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {% if model_drift %}
+    <section>
+        <h2>5. Model Drift Observations</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Baseline</th>
+                    <th>Current</th>
+                    <th>Drift</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in model_drift.metrics %}
+                <tr>
+                    <td>{{ m.name }}</td>
+                    <td>{{ m.baseline }}</td>
+                    <td>{{ m.current }}</td>
+                    <td>{{ m.drift_pct }}%</td>
+                    <td><span class="badge">{{ m.status }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p><strong>Feature Importance Shifts:</strong><br>{{ model_drift.feature_shifts }}</p>
+    </section>
+    {% endif %}
+
+    {% if allocation_insights %}
+    <section>
+        <h2>6. Capital Allocation Insights</h2>
+        <p>Portfolio Heat: <strong>{{ allocation_insights.total_heat_pct }}%</strong></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol/Family</th>
+                    <th>Allocated</th>
+                    <th>Heat</th>
+                    <th>Multiplier</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in allocation_insights.allocations %}
+                <tr>
+                    <td>{{ a.name }}</td>
+                    <td>{{ a.amount }}</td>
+                    <td>{{ a.heat_pct }}%</td>
+                    <td>{{ a.multiplier }}x</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if allocation_insights.rejection_summary %}
+        <h3>Rejection Summary</h3>
+        <ul>
+            {% for reason, count in allocation_insights.rejection_summary.items() %}
+            <li>{{ reason }}: {{ count }} occurrences</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if benchmarks %}
+    <section>
+    <h2>7. Benchmark Comparisons</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Strategy</th>
+                <th>Total Return</th>
+                <th>Sharpe Ratio</th>
+                <th>Max Drawdown</th>
+                <th>P-Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in benchmarks.comparisons %}
+            <tr>
+                <td>{{ b.name }}</td>
+                <td>{{ b.total_return }}</td>
+                <td>{{ b.sharpe }}</td>
+                <td>{{ b.max_drawdown }}</td>
+                <td>{{ b.p_value }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p>{{ benchmarks.statistical_summary }}</p>
+    </section>
+    {% endif %}
+
+    <section>
+        <h2>Conclusion & Recommendations</h2>
+        <p>{{ conclusion }}</p>
+    </section>
+
+    <footer>
+        &copy; 2024-2025 Triqbit MT5 Research. All rights reserved. Generated by ResearchReporter.
+    </footer>
+</body>
+</html>

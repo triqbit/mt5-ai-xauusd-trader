@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Tuple
+from typing import Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -183,6 +183,45 @@ class RegimeDetector:
 
         transition_score = abs(atr_ratio - 1.0) * 0.4 + abs(er - 0.5) * 0.4 + abs(vc) * 0.2
         return label, confidence, transition_score
+
+    def generate_summary(self, df: pd.DataFrame) -> Any:
+        """
+        Analyze a historical DataFrame and generate a RegimeSection for ResearchReporter.
+        """
+        from src.research.reporting import RegimeSection, RegimeSummary
+
+        if "regime" not in df.columns:
+            df = self.label_history(df)
+
+        counts = df["regime"].value_counts(normalize=True) * 100
+
+        # Calculate avg duration (rough estimate from changes)
+        df["regime_change"] = df["regime"] != df["regime"].shift(1)
+        regime_switches = df["regime_change"].sum()
+        avg_duration = len(df) / regime_switches if regime_switches > 0 else len(df)
+
+        regime_list = []
+        for label, freq in counts.items():
+            # Determine profitability if 'returns' column exists
+            profitability = "N/A"
+            if "returns" in df.columns:
+                pnl = df[df["regime"] == label]["returns"].mean()
+                profitability = "High" if pnl > 0.0001 else ("Low" if pnl < -0.0001 else "Neutral")
+
+            regime_list.append(
+                RegimeSummary(
+                    label=str(label),
+                    frequency_pct=float(freq),
+                    avg_duration_bars=int(avg_duration),  # Simplified
+                    profitability=profitability,
+                )
+            )
+
+        return RegimeSection(
+            summary=f"Detected {len(counts)} distinct market regimes.",
+            regimes=regime_list,
+            transition_insights=f"Average regime stability: {avg_duration:.1f} bars.",
+        )
 
     def label_history(self, data: pd.DataFrame) -> pd.DataFrame:
         """
