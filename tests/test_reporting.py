@@ -3,20 +3,18 @@ Tests for the research reporting system.
 """
 
 import os
-
 import pytest
-
+from datetime import datetime, timezone
 from src.research.reporting import (
-    AllocationEntry,
-    AllocationSection,
-    RegimeSection,
-    RegimeSummary,
     ResearchReport,
     ResearchReporter,
-    StressedMetric,
+    RegimeSection,
+    RegimeSummary,
     StressTestSection,
+    StressedMetric,
+    AllocationSection,
+    AllocationEntry
 )
-
 
 @pytest.fixture
 def sample_report():
@@ -26,53 +24,30 @@ def sample_report():
         regime_analysis=RegimeSection(
             summary="Market was primarily trending with low volatility.",
             regimes=[
-                RegimeSummary(
-                    label="Trending", frequency_pct=65.0, avg_duration_bars=45, profitability="High"
-                ),
-                RegimeSummary(
-                    label="Ranging", frequency_pct=25.0, avg_duration_bars=12, profitability="Low"
-                ),
+                RegimeSummary(label="Trending", frequency_pct=65.0, avg_duration_bars=45, profitability="High"),
+                RegimeSummary(label="Ranging", frequency_pct=25.0, avg_duration_bars=12, profitability="Low"),
             ],
-            transition_insights="Slow transitions between trending and ranging regimes.",
+            transition_insights="Slow transitions between trending and ranging regimes."
         ),
         stress_tests=StressTestSection(
             resilience_score=85.5,
-            baseline=StressedMetric(
-                name="Baseline",
-                total_return="12.5%",
-                max_drawdown="4.2%",
-                sharpe="2.1",
-                outcome="PASS",
-            ),
+            baseline=StressedMetric(name="Baseline", total_return="12.5%", max_drawdown="4.2%", sharpe="2.1", outcome="PASS"),
             scenarios=[
-                StressedMetric(
-                    name="Spread Widening",
-                    total_return="10.1%",
-                    max_drawdown="5.8%",
-                    sharpe="1.8",
-                    outcome="PASS",
-                ),
-                StressedMetric(
-                    name="News Shock",
-                    total_return="-2.5%",
-                    max_drawdown="15.2%",
-                    sharpe="-0.5",
-                    outcome="FAIL",
-                ),
+                StressedMetric(name="Spread Widening", total_return="10.1%", max_drawdown="5.8%", sharpe="1.8", outcome="PASS"),
+                StressedMetric(name="News Shock", total_return="-2.5%", max_drawdown="15.2%", sharpe="-0.5", outcome="FAIL"),
             ],
             fragility_indicators=["High drawdown during volatility spikes"],
-            failure_points=["Sudden 50bp price jumps"],
+            failure_points=["Sudden 50bp price jumps"]
         ),
         allocation_insights=AllocationSection(
             total_heat_pct=45.0,
             allocations=[
                 AllocationEntry(name="XAUUSD_PPO", amount="$45,000", heat_pct=45.0, multiplier=1.2)
             ],
-            rejection_summary={"Symbol concentration": 5},
+            rejection_summary={"Symbol concentration": 5}
         ),
-        conclusion="Recommend deploying with reduced size during high-impact news.",
+        conclusion="Recommend deploying with reduced size during high-impact news."
     )
-
 
 def test_markdown_generation(sample_report):
     reporter = ResearchReporter()
@@ -92,7 +67,6 @@ def test_markdown_generation(sample_report):
     assert "$45,000" in markdown
     assert "Recommend deploying" in markdown
 
-
 def test_terminal_formatting(sample_report, capsys):
     reporter = ResearchReporter()
     reporter.format_for_terminal(sample_report)
@@ -103,7 +77,6 @@ def test_terminal_formatting(sample_report, capsys):
     assert "Stress Test Outcomes" in captured.out
     assert "Resilience Score: 85.5/100" in captured.out
     assert "Capital Allocation" in captured.out
-
 
 def test_save_markdown(sample_report, tmp_path):
     reporter = ResearchReporter()

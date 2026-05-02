@@ -1,13 +1,9 @@
 """
 Integration tests for TradeLogger.
 """
-
 import os
-
 import pytest
-
 from src.core.trade_logger import TradeLogger
-
 
 @pytest.fixture
 def logger():
@@ -19,31 +15,32 @@ def logger():
     if os.path.exists(db_path):
         os.remove(db_path)
 
-
 def test_log_signal(logger):
     signal_data = {
         "symbol": "XAUUSD",
         "direction": 1,
         "entry_price": 2000.0,
         "algorithm": "ppo",
-        "confidence": 0.8,
+        "confidence": 0.8
     }
     signal_id = logger.log_signal(signal_data)
     assert signal_id > 0
 
-
 def test_log_trade(logger):
-    signal_id = logger.log_signal({"symbol": "XAUUSD", "direction": 1, "entry_price": 2000.0})
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    })
     trade_id = logger.log_trade(
         ticket=12345,
         symbol="XAUUSD",
         direction=1,
         entry_price=2000.0,
         lot_size=0.1,
-        signal_id=signal_id,
+        signal_id=signal_id
     )
     assert trade_id > 0
-
 
 def test_performance_report(logger):
     # Log some closed trades
@@ -58,12 +55,10 @@ def test_performance_report(logger):
     assert report["sharpe_ratio"] != 0
     assert report["max_drawdown"] == 50.0
 
-
 def test_log_risk_event(logger):
     logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")
     # No exception means success, we could query DB to be sure
     with logger.Session() as session:
         from src.core.trade_logger import RiskEvent
-
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"

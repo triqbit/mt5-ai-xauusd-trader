@@ -20,19 +20,16 @@ from rich.table import Table
 
 # --- Pydantic Models for Sections ---
 
-
 class RegimeSummary(BaseModel):
     label: str
     frequency_pct: float
     avg_duration_bars: int
     profitability: str
 
-
 class RegimeSection(BaseModel):
     summary: str
     regimes: List[RegimeSummary]
     transition_insights: str
-
 
 class StressedMetric(BaseModel):
     name: str
@@ -41,7 +38,6 @@ class StressedMetric(BaseModel):
     sharpe: str
     outcome: str
 
-
 class StressTestSection(BaseModel):
     resilience_score: float
     baseline: StressedMetric
@@ -49,19 +45,16 @@ class StressTestSection(BaseModel):
     fragility_indicators: List[str]
     failure_points: List[str]
 
-
 class ParameterRobustness(BaseModel):
     name: str
     range: str
     optimal: str
     sensitivity: str
 
-
 class HyperparameterSection(BaseModel):
     stability_score: float
     parameters: List[ParameterRobustness]
     insights: str
-
 
 class PatternConcentration(BaseModel):
     attribute: str
@@ -69,17 +62,14 @@ class PatternConcentration(BaseModel):
     win_rate: float
     profit_factor: float
 
-
 class BehavioralRisk(BaseModel):
     type: str
     description: str
-
 
 class TradePatternSection(BaseModel):
     primary_insight: str
     concentrations: List[PatternConcentration]
     behavioral_risks: List[BehavioralRisk]
-
 
 class DriftMetric(BaseModel):
     name: str
@@ -88,11 +78,9 @@ class DriftMetric(BaseModel):
     drift_pct: float
     status: str
 
-
 class ModelDriftSection(BaseModel):
     metrics: List[DriftMetric]
     feature_shifts: str
-
 
 class AllocationEntry(BaseModel):
     name: str
@@ -100,12 +88,10 @@ class AllocationEntry(BaseModel):
     heat_pct: float
     multiplier: float
 
-
 class AllocationSection(BaseModel):
     total_heat_pct: float
     allocations: List[AllocationEntry]
     rejection_summary: Dict[str, int]
-
 
 class BenchmarkComparison(BaseModel):
     name: str
@@ -114,18 +100,14 @@ class BenchmarkComparison(BaseModel):
     max_drawdown: str
     p_value: str
 
-
 class BenchmarkSection(BaseModel):
     comparisons: List[BenchmarkComparison]
     statistical_summary: str
 
-
 # --- Full Report Model ---
-
 
 class ResearchReport(BaseModel):
     """Structured research report container."""
-
     title: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     author: str = "Jules Research"
@@ -170,11 +152,7 @@ class ResearchReporter:
 
     def format_for_terminal(self, report: ResearchReport) -> None:
         """Print a scannable version of the report to the terminal."""
-        self.console.print(
-            Panel(
-                f"[bold blue]{report.title}[/]\n[dim]Date: {report.timestamp} | Author: {report.author}[/]"
-            )
-        )
+        self.console.print(Panel(f"[bold blue]{report.title}[/]\n[dim]Date: {report.timestamp} | Author: {report.author}[/]"))
 
         self.console.print("\n[bold]Executive Summary[/]")
         self.console.print(report.executive_summary)
@@ -191,29 +169,20 @@ class ResearchReporter:
 
         if report.stress_tests:
             self.console.print("\n[bold red]2. Stress Test Outcomes[/]")
-            self.console.print(
-                f"Resilience Score: [bold]{report.stress_tests.resilience_score}/100[/]"
-            )
+            self.console.print(f"Resilience Score: [bold]{report.stress_tests.resilience_score}/100[/]")
             table = Table(box=None)
             table.add_column("Scenario")
             table.add_column("Return")
             table.add_column("MaxDD")
             table.add_column("Outcome")
-            table.add_row(
-                "Baseline",
-                report.stress_tests.baseline.total_return,
-                report.stress_tests.baseline.max_drawdown,
-                "N/A",
-            )
+            table.add_row("Baseline", report.stress_tests.baseline.total_return, report.stress_tests.baseline.max_drawdown, "N/A")
             for s in report.stress_tests.scenarios:
                 table.add_row(s.name, s.total_return, s.max_drawdown, s.outcome)
             self.console.print(table)
 
         if report.hyperparameter_robustness:
             self.console.print("\n[bold magenta]3. Hyperparameter Robustness[/]")
-            self.console.print(
-                f"Stability Score: [bold]{report.hyperparameter_robustness.stability_score}/100[/]"
-            )
+            self.console.print(f"Stability Score: [bold]{report.hyperparameter_robustness.stability_score}/100[/]")
             table = Table(box=None)
             table.add_column("Parameter")
             table.add_column("Optimal")
@@ -267,4 +236,4 @@ class ResearchReporter:
 
         self.console.print("\n[bold]Conclusion[/]")
         self.console.print(report.conclusion)
-        self.console.print("\n" + "=" * 50 + "\n")
+        self.console.print("\n" + "="*50 + "\n")

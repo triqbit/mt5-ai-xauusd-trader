@@ -5,11 +5,12 @@ Automates the purging of old operational data based on the Data Retention Policy
 
 import argparse
 import logging
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import sessionmaker
 
 # Add src to path to import models
@@ -51,9 +52,7 @@ def cleanup_logs(logs_dir: Path, dry_run: bool = False) -> int:
         try:
             mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
             if mtime < cutoff:
-                logger.info(
-                    f"{'[DRY RUN] ' if dry_run else ''}Deleting old log file: {log_file.name} (mtime: {mtime})"
-                )
+                logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting old log file: {log_file.name} (mtime: {mtime})")
                 if not dry_run:
                     log_file.unlink()
                 count += 1
@@ -80,9 +79,7 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
             try:
                 mtime = datetime.fromtimestamp(item.stat().st_mtime)
                 if mtime < cutoff:
-                    logger.info(
-                        f"{'[DRY RUN] ' if dry_run else ''}Deleting old backtest file: {item.relative_to(backtest_dir)} (mtime: {mtime})"
-                    )
+                    logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting old backtest file: {item.relative_to(backtest_dir)} (mtime: {mtime})")
                     if not dry_run:
                         item.unlink()
                     count += 1
@@ -93,9 +90,7 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
     for item in sorted(backtest_dir.rglob("*"), reverse=True):
         if item.is_dir() and item != backtest_dir and not any(item.iterdir()):
             try:
-                logger.info(
-                    f"{'[DRY RUN] ' if dry_run else ''}Deleting empty backtest directory: {item.relative_to(backtest_dir)}"
-                )
+                logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting empty backtest directory: {item.relative_to(backtest_dir)}")
                 if not dry_run:
                     item.rmdir()
             except Exception as e:
@@ -130,9 +125,7 @@ def cleanup_database(db_url: str, dry_run: bool = False) -> dict:
         results["model_signals"] = len(unlinked_ids)
 
         if unlinked_ids:
-            logger.info(
-                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_ids)} unlinked signals older than {signal_cutoff.date()}"
-            )
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_ids)} unlinked signals older than {signal_cutoff.date()}")
             if not dry_run:
                 session.execute(delete(ModelSignal).where(ModelSignal.id.in_(unlinked_ids)))
 
@@ -143,9 +136,7 @@ def cleanup_database(db_url: str, dry_run: bool = False) -> dict:
         results["risk_events"] = len(risk_ids)
 
         if risk_ids:
-            logger.info(
-                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_ids)} risk events older than {risk_cutoff.date()}"
-            )
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_ids)} risk events older than {risk_cutoff.date()}")
             if not dry_run:
                 session.execute(delete(RiskEvent).where(RiskEvent.id.in_(risk_ids)))
 
@@ -156,9 +147,7 @@ def cleanup_database(db_url: str, dry_run: bool = False) -> dict:
         results["performance_metrics"] = len(perf_ids)
 
         if perf_ids:
-            logger.info(
-                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_ids)} performance metrics older than {perf_cutoff.date()}"
-            )
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_ids)} performance metrics older than {perf_cutoff.date()}")
             if not dry_run:
                 session.execute(delete(PerformanceMetric).where(PerformanceMetric.id.in_(perf_ids)))
 
@@ -170,9 +159,7 @@ def cleanup_database(db_url: str, dry_run: bool = False) -> dict:
         results["trades"] = len(trade_ids)
 
         if trade_ids:
-            logger.info(
-                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_ids)} trade records older than {trade_cutoff.date()}"
-            )
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_ids)} trade records older than {trade_cutoff.date()}")
             if not dry_run:
                 session.execute(delete(Trade).where(Trade.id.in_(trade_ids)))
 
@@ -184,9 +171,7 @@ def cleanup_database(db_url: str, dry_run: bool = False) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Data Cleanup Utility")
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Perform a dry run without deleting any data."
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without deleting any data.")
     parser.add_argument("--db-url", help="Override the database URL from config.")
     parser.add_argument("--logs-dir", help="Override the logs directory from config.")
     parser.add_argument("--backtest-dir", help="Override the backtest results directory.")
@@ -200,11 +185,7 @@ def main():
         logger.warning(f"Using production-like DB URL: {db_url}")
 
     logs_dir = Path(args.logs_dir) if args.logs_dir else cfg.logs_dir
-    backtest_dir = (
-        Path(args.backtest_dir)
-        if args.backtest_dir
-        else Path(__file__).resolve().parents[1] / "backtest_results"
-    )
+    backtest_dir = Path(args.backtest_dir) if args.backtest_dir else Path(__file__).resolve().parents[1] / "backtest_results"
 
     logger.info(f"Starting data cleanup (dry_run={args.dry_run})")
 

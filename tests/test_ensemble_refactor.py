@@ -1,14 +1,14 @@
+from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
+
 try:
     import torch
 except ImportError:
     torch = None
-import pytest
 
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
-
-from unittest.mock import MagicMock
-
-import numpy as np
 
 # Use the standardized SignalDirection from constants
 from src.core.constants import SignalDirection
