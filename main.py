@@ -139,16 +139,17 @@ def run_live(
             # 5b. Execution filter cascade (6-layer institutional check)
             if approved and execution_filter:
                 with profile("execution_filter"):
-                    current_drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity if risk.peak_equity > 0 else 0
+                    current_drawdown = (
+                        (risk.peak_equity - risk.balance) / risk.peak_equity
+                        if risk.peak_equity > 0
+                        else 0
+                    )
                     decision = execution_filter.validate(
-                        signal=signal,
-                        market_data=df,
-                        current_drawdown=current_drawdown
+                        signal=signal, market_data=df, current_drawdown=current_drawdown
                     )
                     if not decision.is_approved:
                         log.warning(
-                            "Signal BLOCKED by execution filter | reason=%s",
-                            decision.blocked_by
+                            "Signal BLOCKED by execution filter | reason=%s", decision.blocked_by
                         )
                         approved = False
                         if trade_logger:
@@ -298,7 +299,9 @@ def main() -> int:
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
     else:
-        log.warning(f"Algorithm {args.algorithm} not fully supported in main.py, falling back to Ensemble")
+        log.warning(
+            f"Algorithm {args.algorithm} not fully supported in main.py, falling back to Ensemble"
+        )
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate

@@ -88,7 +88,9 @@ class ExecutionFilter:
             high = df["high"]
             low = df["low"]
             close = df["close"]
-            tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
+            tr = pd.concat(
+                [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+            ).max(axis=1)
             atr = tr.rolling(window=14).mean()
         else:
             atr = df["base_M5_atr"]
