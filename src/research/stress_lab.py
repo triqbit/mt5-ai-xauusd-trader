@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
@@ -37,6 +37,8 @@ class StressScenario(BaseModel):
     # Execution stress
     spread_multiplier: float = 1.0  # 1.0 = normal
     slippage_bps: float = 0.0  # Basis points
+    slippage_spike_prob: float = 0.0  # Probability of an extreme slippage event
+    slippage_spike_magnitude_bps: float = 0.0  # Magnitude of the spike in bps
     execution_delay_steps: int = 0  # Number of steps to delay execution
 
     # Data stress
@@ -61,6 +63,7 @@ class StressTestMetrics(BaseModel):
     num_trades: int
     execution_quality_score: float  # 0.0 to 1.0
     latency_impact: float  # Percentage impact of delays
+    max_slippage_experienced: float = 0.0  # Max bps of slippage seen
 
 
 class ResilienceReport(BaseModel):
@@ -75,11 +78,41 @@ class ResilienceReport(BaseModel):
     failure_points: List[str]
     degradation_summary: str
 
+    def to_report_section(self) -> Any:
+        """Convert to StressTestSection for ResearchReporter."""
+        from src.research.reporting import StressedMetric, StressTestSection
+
+        def _map_metric(name: str, m: StressTestMetrics) -> StressedMetric:
+            return StressedMetric(
+                name=name,
+                total_return=f"{m.total_return:.2%}",
+                max_drawdown=f"{m.max_drawdown:.2%}",
+                sharpe=f"{m.sharpe_ratio:.2f}",
+                outcome="FAIL" if m.total_return < 0 else "PASS",
+            )
+
+        return StressTestSection(
+            resilience_score=self.resilience_score,
+            baseline=_map_metric("Baseline", self.baseline_metrics),
+            scenarios=[_map_metric(name, res) for name, res in self.scenario_results.items()],
+            fragility_indicators=self.fragility_indicators,
+            failure_points=self.failure_points,
+        )
+
 
 class StressLab:
     """
-    Stress testing laboratory for XAUUSD trading strategies.
-    Replays adverse conditions to evaluate strategy robustness.
+    Institutional-grade stress testing laboratory for XAUUSD trading strategies.
+
+    This module implements an adversarial simulation framework that goes beyond
+    standard historical backtesting. It evaluates strategy resilience by:
+    1. Replaying historical data with synthetic execution friction (slippage spikes, spread widening).
+    2. Perturbing price action using ATR-relative shocks to simulate 'fake breakouts'.
+    3. Inducing sudden regime transitions and trend exhaustion to test adaptive logic.
+    4. Simulating infrastructure instability via service failure injection and execution delays.
+
+    Goal: Quantify 'strategy fragility' and identify the exact market conditions under
+    which a system's risk-adjusted performance degrades non-linearly.
     """
 
     def __init__(
@@ -93,8 +126,61 @@ class StressLab:
         self.initial_balance = initial_balance
         self.results: Dict[str, StressTestMetrics] = {}
 
+    @staticmethod
+    def create_execution_hell_scenario() -> StressScenario:
+        """Create a scenario with high slippage, wide spreads, and delays."""
+        return StressScenario(
+            name="Execution Hell",
+            description="Extreme execution friction: wide spreads, slippage spikes, and delays.",
+            severity=StressSeverity.CRITICAL,
+            spread_multiplier=3.0,
+            slippage_bps=5.0,
+            slippage_spike_prob=0.1,
+            slippage_spike_magnitude_bps=50.0,
+            execution_delay_steps=3,
+            service_failure_prob=0.05,
+        )
+
+    @staticmethod
+    def create_liquidity_crisis_scenario() -> StressScenario:
+        """Create a scenario with missing data and extreme choppy price action."""
+        return StressScenario(
+            name="Liquidity Crisis",
+            description="Fragmented liquidity: missing ticks, price noise, and choppy breakouts.",
+            severity=StressSeverity.HIGH,
+            missing_tick_prob=0.2,
+            price_noise_sigma=1.0,
+            choppy_breakout_prob=0.15,
+            spread_multiplier=2.5,
+        )
+
+    @staticmethod
+    def create_regime_shock_scenario() -> StressScenario:
+        """Create a scenario with frequent and violent regime transitions."""
+        return StressScenario(
+            name="Regime Shock",
+            description="Market structural instability: frequent regime flips and trend reversals.",
+            severity=StressSeverity.HIGH,
+            regime_flip_prob=0.1,
+            choppy_breakout_prob=0.05,
+        )
+
     def run_scenario(self, scenario: StressScenario) -> StressTestMetrics:
-        """Execute a specific stress scenario."""
+        """
+        Executes a specific stress scenario against the loaded strategy and data.
+
+        The process involves:
+        1. Injecting data-level perturbations (noise, gaps, regime flips).
+        2. Simulating the strategy's signals on this 'hostile' data.
+        3. Running a high-fidelity execution loop that applies slippage spikes,
+           latency, and external service outages.
+
+        Args:
+            scenario: The StressScenario configuration to apply.
+
+        Returns:
+            StressTestMetrics: Performance metrics captured under the specified stress.
+        """
         logger.info(f"Running stress scenario: {scenario.name} for {self.strategy.name}")
 
         # 1. Perturb data based on scenario
@@ -163,14 +249,23 @@ class StressLab:
         return summary
 
     def _apply_perturbations(self, df: pd.DataFrame, scenario: StressScenario) -> pd.DataFrame:
-        """Apply data-level perturbations."""
+        """Apply data-level perturbations using adversarial logic."""
         df = df.copy()
         rng = np.random.default_rng(42)
+
+        # Calculate a rolling ATR for relative perturbations
+        high_low = df["high"] - df["low"]
+        high_cp = np.abs(df["high"] - df["close"].shift(1))
+        low_cp = np.abs(df["low"] - df["close"].shift(1))
+        tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
+        atr = tr.rolling(window=14).mean().fillna(tr.mean())
 
         # 1. Missing ticks
         if scenario.missing_tick_prob > 0:
             mask = rng.random(len(df)) > scenario.missing_tick_prob
             df = df[mask].reset_index(drop=True)
+            # Re-index ATR to match new dataframe size if needed, but we use it pointwise below
+            atr = atr[mask].reset_index(drop=True)
 
         # 2. Price noise
         if scenario.price_noise_sigma > 0:
@@ -180,38 +275,52 @@ class StressLab:
             df["high"] = df[["open", "close", "high"]].max(axis=1)
             df["low"] = df[["open", "close", "low"]].min(axis=1)
 
-        # 3. Choppy fake breakouts
+        # 3. Choppy fake breakouts (Adversarial spikes)
         if scenario.choppy_breakout_prob > 0:
             for i in range(2, len(df) - 2):
                 if rng.random() < scenario.choppy_breakout_prob:
-                    # Inject a fake breakout upwards
-                    df.at[i, "high"] += 5.0  # Spike
-                    df.at[i, "close"] = df.at[i, "open"] + 0.5
-                    # Immediate reversal
-                    df.at[i + 1, "close"] = df.at[i, "open"] - 2.0
-                    df.at[i + 1, "low"] = df.at[i + 1, "close"] - 0.5
+                    # Inject a fake breakout relative to ATR
+                    spike_size = atr.iloc[i] * 3.0
+                    direction = rng.choice([1, -1])
 
-        # 4. Regime transitions (Simulate sudden volatility spike/trend flip)
+                    if direction == 1:
+                        df.at[i, "high"] += spike_size
+                        df.at[i, "close"] = df.at[i, "open"] + (spike_size * 0.1)
+                        # Immediate reversal in next candle
+                        df.at[i + 1, "close"] = df.at[i, "open"] - (spike_size * 0.5)
+                        df.at[i + 1, "low"] = df.at[i + 1, "close"] - (spike_size * 0.1)
+                    else:
+                        df.at[i, "low"] -= spike_size
+                        df.at[i, "close"] = df.at[i, "open"] - (spike_size * 0.1)
+                        # Immediate reversal
+                        df.at[i + 1, "close"] = df.at[i, "open"] + (spike_size * 0.5)
+                        df.at[i + 1, "high"] = df.at[i + 1, "close"] + (spike_size * 0.1)
+
+        # 4. Regime transitions (Simulate sudden volatility expansion or trend exhaustion)
         if scenario.regime_flip_prob > 0:
             for i in range(len(df)):
                 if rng.random() < scenario.regime_flip_prob:
-                    # Flip future returns for a window
-                    window = min(20, len(df) - i)
-                    if window > 1:
-                        # Simple trend flip by inverting close price changes
+                    window = min(30, len(df) - i)
+                    if window > 5:
+                        # Trend exhaustion: slow down then flip
                         returns = df["close"].iloc[i : i + window].pct_change().fillna(0)
-                        inverted_returns = -returns * 2.0  # Reversal + Volatility
+                        # Flip and amplify volatility
+                        inverted_returns = -returns * 2.5
                         base_price = df.at[i, "close"]
                         new_prices = base_price * np.exp(np.cumsum(inverted_returns))
                         df.loc[df.index[i : i + window], "close"] = new_prices.values
-                        # Update high/low for the window to maintain consistency
-                        window_slice = df.iloc[i : i + window]
-                        df.loc[df.index[i : i + window], "high"] = window_slice[
-                            ["open", "close", "high"]
-                        ].max(axis=1)
-                        df.loc[df.index[i : i + window], "low"] = window_slice[
-                            ["open", "close", "low"]
-                        ].min(axis=1)
+
+                        # Re-calculate high/low to be consistent and 'messy'
+                        for idx in range(i, i + window):
+                            local_vol = atr.iloc[idx] * 0.5
+                            df.at[df.index[idx], "high"] = (
+                                max(df.at[df.index[idx], "open"], df.at[df.index[idx], "close"])
+                                + local_vol
+                            )
+                            df.at[df.index[idx], "low"] = (
+                                min(df.at[df.index[idx], "open"], df.at[df.index[idx], "close"])
+                                - local_vol
+                            )
 
         return df
 
@@ -249,6 +358,7 @@ class StressLab:
 
         rng = np.random.default_rng(42)
         latency_hits = 0
+        max_slippage = 0.0
 
         for i in range(1, n):
             current_sig = signals[i - 1]
@@ -261,7 +371,13 @@ class StressLab:
                 current_sig = 0  # Blocked
                 latency_hits += 1
 
-            slippage = current_price * (scenario.slippage_bps / 10000.0)
+            # Calculate slippage
+            current_slippage_bps = scenario.slippage_bps
+            if scenario.slippage_spike_prob > 0 and rng.random() < scenario.slippage_spike_prob:
+                current_slippage_bps += scenario.slippage_spike_magnitude_bps
+
+            max_slippage = max(max_slippage, current_slippage_bps)
+            slippage = current_price * (current_slippage_bps / 10000.0)
 
             # Execution Logic
             if current_sig == 1 and position == 0:  # Buy
@@ -311,4 +427,5 @@ class StressLab:
             num_trades=len(trade_pnls),
             execution_quality_score=1.0 - (latency_hits / n),
             latency_impact=latency_hits / n,
+            max_slippage_experienced=max_slippage,
         )

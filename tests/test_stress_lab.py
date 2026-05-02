@@ -167,3 +167,59 @@ def test_generate_summary_critical(sample_data):
 
     report = lab.generate_report(baseline)
     assert "CRITICAL" in report.degradation_summary
+
+
+def test_slippage_spike_logic(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    scenario = StressScenario(
+        name="Spike",
+        description="Testing slippage spikes",
+        slippage_bps=5.0,
+        slippage_spike_prob=1.0,  # Force spike every step
+        slippage_spike_magnitude_bps=100.0,
+    )
+
+    metrics = lab.run_scenario(scenario)
+    assert metrics.max_slippage_experienced == 105.0
+
+
+def test_factory_methods():
+    hell = StressLab.create_execution_hell_scenario()
+    assert hell.name == "Execution Hell"
+    assert hell.slippage_spike_prob > 0
+
+    crisis = StressLab.create_liquidity_crisis_scenario()
+    assert crisis.name == "Liquidity Crisis"
+    assert crisis.missing_tick_prob > 0
+
+    shock = StressLab.create_regime_shock_scenario()
+    assert shock.name == "Regime Shock"
+    assert shock.regime_flip_prob > 0
+
+
+def test_to_report_section(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    lab.run_scenario(StressScenario(name="Test", description="test"))
+    report = lab.generate_report(baseline)
+
+    section = report.to_report_section()
+    from src.research.reporting import StressTestSection
+
+    assert isinstance(section, StressTestSection)
+    assert section.resilience_score == report.resilience_score
+    assert len(section.scenarios) == 1
+    assert section.scenarios[0].name == "Test"
