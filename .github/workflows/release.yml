@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g. 1.0.0)'
-        required: true
+        description: 'Version to release (e.g. 1.0.0). If empty, will be calculated from commits.'
+        required: false
       prerelease:
         description: 'Is this a pre-release?'
         type: boolean
@@ -187,12 +187,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Calculate Next Version
+        id: tag_action
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version == ''
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          dry_run: true
+
       - name: Determine Version
         id: version
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-            echo "TAG=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            if [[ "${{ github.event.inputs.version }}" != "" ]]; then
+              echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+              echo "TAG=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            else
+              echo "VERSION=${{ steps.tag_action.outputs.new_version }}" >> $GITHUB_OUTPUT
+              echo "TAG=${{ steps.tag_action.outputs.new_tag }}" >> $GITHUB_OUTPUT
+            fi
           else
             echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
