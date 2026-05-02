@@ -2,24 +2,44 @@
 Unit tests for the benchmarking framework.
 """
 
+import sys
+from unittest.mock import MagicMock
+
+# Mock torch for environments where it is not installed
+try:
+    import torch
+except ImportError:
+    mock_torch = MagicMock()
+    mock_torch.from_numpy = MagicMock(return_value=MagicMock())
+    mock_torch.no_grad = MagicMock()
+    # Support context manager
+    mock_torch.no_grad.return_value.__enter__ = MagicMock()
+    mock_torch.no_grad.return_value.__exit__ = MagicMock()
+    mock_torch.FloatTensor = MagicMock(return_value=MagicMock())
+    mock_torch.argmax = MagicMock(return_value=MagicMock())
+    mock_torch.tensor = MagicMock(return_value=MagicMock())
+    sys.modules["torch"] = mock_torch
+
+from unittest.mock import MagicMock
+
 import numpy as np
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock
-from src.research.benchmarks import (
-    EMACrossoverStrategy,
-    MomentumStrategy,
-    VolatilityBreakoutStrategy,
-    NaiveDirectionalStrategy,
-    RiskFilteredBaseline,
-    MeanReversionStrategy,
-    BenchmarkEvaluator,
-    EnsembleAdapter,
-    PPOAdapter,
-    TransformerAdapter,
-)
+
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
+from src.research.benchmarks import (
+    BenchmarkEvaluator,
+    EMACrossoverStrategy,
+    EnsembleAdapter,
+    MeanReversionStrategy,
+    MomentumStrategy,
+    NaiveDirectionalStrategy,
+    PPOAdapter,
+    RiskFilteredBaseline,
+    TransformerAdapter,
+    VolatilityBreakoutStrategy,
+)
 
 
 @pytest.fixture

@@ -1,10 +1,10 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-05-02 13:47:19 UTC
+**Date:** 2026-05-02 14:35:30 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (333)
+- High number of open PRs (334)
 - Baseline Regression: `tests/test_institutional_integration.py` failing due to 'regime' kwarg mismatch
 - Lint Debt: 158 linting errors detected in `main` branch
 
@@ -12,16 +12,17 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Address Turbulence:** High number of open PRs (333)
+1. **Address Turbulence:** High number of open PRs (334)
 2. **Quick Win:** Review Safe PR #385 (chore(docker)(deps): bump python from 3.11-slim to 3.14-slim)
-3. **Core Progress:** Review Medium Risk PR #471 (Institutional Decision Support System)
+3. **Critical Path:** High Risk PR #473 needs expert review.
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Reason |
 |------|-------|--------|--------|--------|-----------|------------|--------|
+| [473](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/473) | DX: Daily PR Triage and Risk Dashboard [2026-05-02] | triqbit | `daily-triage-2026-05-02-qufuwan-842844950627264046` | none | pending | High Risk | Touches high-risk area: src/models/lstm_model.py |
 | [472](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/472) | Implement Enterprise Trade Logging System | triqbit | `feature/trade-logging-system-631829965669591348` | none | pending | High Risk | Touches high-risk area: migrations/versions/a249de266d90_add_audit_columns_and_constraints.py |
-| [471](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/471) | Institutional Decision Support System | saysgrok | `feat/decision-support-system-5901454689429807923` | none | pending | Medium Risk | Touches core/research/analytics/risk: src/core/decision_support.py |
+| [471](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/471) | Institutional Decision Support System | saysgrok | `feat/decision-support-system-5901454689429807923` | none | pending | High Risk | Touches high-risk area: src/models/lstm_model.py |
 | [467](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/467) | ⚙️ Jules02: Performance and runtime analysis — Enhanced loop instrumentation and latency tracking | xnessom | `jules02-perf-instrumentation-14831930970369851416` | none | pending | High Risk | Touches high-risk area: migrations/env.py |
 | [462](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/462) | 💡 Jules02: CLI and operator UX improvement — Pre-flight checks and rich troubleshooting | xnessom | `jules02-cli-ux-improvements-11023368233139370224` | none | pending | High Risk | Touches high-risk area: main.py |
 | [460](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/460) | Fix CI failures, linting, and import errors | triqbit | `fix/ci-failures-and-imports-16824997876327001351` | none | pending | High Risk | Touches high-risk area: src/core/config.py |
@@ -39,7 +40,7 @@
 | [434](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/434) | 🔐 Jules02: Security hardening — Secrets, Deserialization, and Permissions | xnessom | `security-hardening-secrets-deserialization-permissions-17663357979134648569` | none | pending | High Risk | Touches high-risk area: main.py |
 | [428](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/428) | 🗺️ Atlas: [release-readiness improvement] Real-time health monitoring server | andonly1348 | `atlas-health-monitoring-17401198327809272915` | none | pending | High Risk | Touches high-risk area: main.py |
 | [427](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/427) | Scaffold Enterprise Core Trading Modules | triqbit | `feat/enterprise-scaffold-jules01-5553934513351101756` | none | pending | High Risk | Touches high-risk area: main.py |
-| [426](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/426) | Implement Enterprise Trade Logging System | triqbit | `feat/enterprise-trade-logger-15170970128380013645` | none | pending | High Risk | Touches high-risk area: main.py |
+| 426 | Implement Enterprise Trade Logging System | triqbit | ... | ... | ... | Unknown | (Skipped due to rate limit) |
 | 420 | ✨ Jules05: Product coherence improvements | yxynoty | ... | ... | ... | Unknown | (Skipped due to rate limit) |
 | 415 | Refactor Docker to Multi-Stage and Multi-Arch Build | triqbit | ... | ... | ... | Unknown | (Skipped due to rate limit) |
 | 412 | Integrate multi-PR sequence (#370, #372, #368, #360) | candiansource | ... | ... | ... | Unknown | (Skipped due to rate limit) |
@@ -356,8 +357,8 @@
 
 ## 🛡️ Risk Classification Summary
 
-- **High Risk:** 19 PRs
-- **Medium Risk:** 1 PRs
+- **High Risk:** 20 PRs
+- **Medium Risk:** 0 PRs
 - **Safe Surface:** 11 PRs
 
 ## ✨ Good Candidates for Review Today
