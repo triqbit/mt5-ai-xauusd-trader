@@ -1,5 +1,68 @@
-import re
+import ast
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+def clean_value(val_str: str) -> str:
+    """Clean up AST unparsed values for Markdown display."""
+    # Remove ROOT / prefix
+    val_str = val_str.replace("ROOT / ", "")
+
+    # Handle the weird case for model_path where it might have a trailing quote
+    if val_str.startswith("'") and not val_str.endswith("'") and " / " in val_str:
+         val_str = val_str[1:]
+    if val_str.endswith("'") and not val_str.startswith("'") and " / " in val_str:
+         val_str = val_str[:-1]
+
+    # Remove excessive quotes if fully quoted
+    if (val_str.startswith("'") and val_str.endswith("'")) or \
+       (val_str.startswith('"') and val_str.endswith('"')):
+        val_str = val_str[1:-1]
+
+    if not val_str or val_str == "''" or val_str == '""':
+        return "None"
+    return val_str
+
+def get_field_info(node: ast.AnnAssign) -> Dict[str, Any]:
+    """Extract information from a Pydantic-style field assignment."""
+    field_name = node.target.id if isinstance(node.target, ast.Name) else "unknown"
+
+    # Extract type hint as string
+    type_hint = ast.unparse(node.annotation)
+
+    description = ""
+    default = "Required"
+
+    # Check for = Field(...)
+    if node.value and isinstance(node.value, ast.Call):
+        if isinstance(node.value.func, ast.Name) and node.value.func.id == "Field":
+            # Process arguments of Field()
+            # Positional arguments (often just default)
+            if node.value.args:
+                arg0 = node.value.args[0]
+                if isinstance(arg0, ast.Constant) and arg0.value is Ellipsis:
+                    default = "Required"
+                else:
+                    default = ast.unparse(arg0)
+
+            # Keyword arguments (description, default, etc.)
+            for kw in node.value.keywords:
+                if kw.arg == "description" and isinstance(kw.value, ast.Constant):
+                    description = kw.value.value
+                elif kw.arg == "default":
+                    if isinstance(kw.value, ast.Constant) and kw.value.value is Ellipsis:
+                        default = "Required"
+                    else:
+                        default = ast.unparse(kw.value)
+    # Check for simple assignment: field: type = value
+    elif node.value:
+        default = ast.unparse(node.value)
+
+    return {
+        "name": field_name,
+        "type": type_hint,
+        "description": description,
+        "default": clean_value(default)
+    }
 
 def generate_config_docs(input_file: str, output_file: str, version: str):
     path = Path(input_file)
@@ -8,19 +71,17 @@ def generate_config_docs(input_file: str, output_file: str, version: str):
         return
 
     with open(path, "r") as f:
-        content = f.read()
+        tree = ast.parse(f.read())
 
-    # Find TradingConfig class
-    class_match = re.search(r"class TradingConfig\(BaseSettings\):(.*?)(?=\nclass|\Z)", content, re.DOTALL)
-    if not class_match:
-        print("Error: TradingConfig class not found")
-        return
-
-    class_content = class_match.group(1)
-
-    # Match fields like: mt5_login: int = Field(default=0, description="MT5 account number")
-    field_pattern = r"([a-z0-9_]+):\s+([a-zA-Z\[\],\s]+)\s+=\s+Field\((.*?)\)"
-    matches = re.findall(field_pattern, class_content)
+    fields = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "TradingConfig":
+            for item in node.body:
+                if isinstance(item, ast.AnnAssign):
+                    # Skip model_config
+                    if isinstance(item.target, ast.Name) and item.target.id == "model_config":
+                        continue
+                    fields.append(get_field_info(item))
 
     with open(output_file, "w") as f:
         f.write(f"# Configuration Reference (v{version})\n\n")
@@ -28,21 +89,9 @@ def generate_config_docs(input_file: str, output_file: str, version: str):
         f.write("| Field | Type | Description | Default |\n")
         f.write("| :--- | :--- | :--- | :--- |\n")
 
-        for name, type_hint, field_args in matches:
-            description = ""
-            default = "Required"
-
-            desc_match = re.search(r"description=[\"'](.*?)[\"']", field_args)
-            if desc_match:
-                description = desc_match.group(1)
-
-            def_match = re.search(r"default=(.*?)(?:,|$)", field_args)
-            if def_match:
-                default = def_match.group(1).strip().strip("\"'")
-                if not default:
-                    default = "None"
-
-            f.write(f"| `{name}` | `{type_hint.strip()}` | {description} | `{default}` |\n")
+        for field in fields:
+            desc = field["description"] if field["description"] else "No description provided."
+            f.write(f"| `{field['name']}` | `{field['type']}` | {desc} | `{field['default']}` |\n")
 
 if __name__ == "__main__":
     import sys

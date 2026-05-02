@@ -45,27 +45,49 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    max_positions: int = Field(
+        default=3, ge=1, le=10, description="Maximum number of simultaneous open positions"
+    )
+    risk_per_trade: float = Field(
+        default=0.01, ge=0.001, le=0.05, description="Risk percentage per trade (0.01 = 1%)"
+    )
+    max_daily_loss: float = Field(
+        default=0.05, ge=0.01, le=0.20, description="Maximum daily loss threshold (0.05 = 5%)"
+    )
 
     # ── Model ──────────────────────────────────────────────────────────────────
-    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
-    model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
-    train_steps: int = Field(default=1_000_000, ge=100_000)
-    device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
+    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
+        default="ensemble", description="Machine learning algorithm for signal generation"
+    )
+    model_path: Path = Field(
+        default=ROOT / "models" / "trained" / "ensemble_latest.pt",
+        description="Path to the trained model file",
+    )
+    train_steps: int = Field(
+        default=1_000_000, ge=100_000, description="Number of training steps for the model"
+    )
+    device: Literal["cpu", "cuda", "mps", "auto"] = Field(
+        default="auto", description="Compute device for model inference"
+    )
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
-    redis_url: str = Field(default="redis://localhost:6379/0")
+    database_url: str = Field(
+        default="postgresql://trader:password@localhost:5432/mt5_trades",
+        description="PostgreSQL connection URL",
+    )
+    redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
 
     # ── Monitoring ──────────────────────────────────────────────────────────
-    prometheus_port: int = Field(default=8000)
-    dashboard_port: int = Field(default=8050)
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
+    prometheus_port: int = Field(default=8000, description="Port for Prometheus metrics exporter")
+    dashboard_port: int = Field(default=8050, description="Port for the operational dashboard")
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO", description="Logging verbosity level"
+    )
     telegram_token: str = Field(default="", description="Telegram Bot API token")
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    confidence_threshold: float = Field(
+        default=0.6, ge=0.0, le=1.0, description="Minimum model confidence to execute a trade"
+    )
 
     @field_validator("risk_per_trade")
     @classmethod

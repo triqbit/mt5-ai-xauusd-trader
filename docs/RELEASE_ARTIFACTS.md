@@ -38,21 +38,20 @@ releases/v<VERSION>/
 The `scripts/package_release.sh` script enforces the following validation rules before marking an artifact as valid:
 
 1.  **Completeness**: All mandatory files listed in Section 1 must exist.
-2.  **Integrity**: The `checksums.sha256` file must match the actual file contents.
+2.  **Integrity**: A `checksums.sha256` file must be generated for all files in the package.
 3.  **Non-Empty**: All generated text and JSON files must contain valid data (non-zero size).
 4.  **Version Consistency**: The version in the artifact path must match the version in `pyproject.toml`.
+5.  **Metadata Accuracy**: `docker_info.json` must contain a valid (or placeholder for CI) image digest and tag.
 
 ## 4. Consumption and Deployment
 
 To deploy a release artifact:
 
 1.  Download the specific versioned directory from the artifact repository.
-2.  Verify the checksums: `sha256sum -c checksums.sha256` (or `shasum -a 256`).
-3.  Apply the Docker image tag specified in `docker_info.json` to the target environment.
+2.  Verify the checksums: `sha256sum -c checksums.sha256` (or `shasum -a 256 -c checksums.sha256`).
+3.  Apply the Docker image tag/digest specified in `docker_info.json` to the target environment.
 4.  Update the environment variables based on `.env.example`.
-5.  Run migrations:
-    - In a containerized environment: The migrations are usually included in the Docker image. Run `docker run --rm <image> alembic upgrade head`.
-    - In a local environment: Ensure the `src/` directory is present in your `PYTHONPATH` before running `alembic upgrade head`.
+5.  Run migrations: `alembic upgrade head`.
 
 ---
 **Standard Owner:** Jules03 (Release Reliability & Governance)
