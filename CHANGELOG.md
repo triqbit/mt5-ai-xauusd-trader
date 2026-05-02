@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enterprise trade logging system in `src/core/trade_logger.py` using SQLAlchemy and SQLite.
+- Standardized audit trail (`created_by`, `updated_by`, `deleted_at`) for all trading records.
+- Soft-deletion logic for trade records to maintain database integrity.
+- Automated performance reporting (Sharpe Ratio, Profit Factor, Max Drawdown).
+- Alembic migration support for enterprise-grade database schema management.
 - Cascading 6-layer execution filter in `src/trading/execution_filter.py` validating ATR, Trend Angle, EMA sequence, Momentum, Session time, and Drawdown.
 - Enterprise-grade monitoring and alerting system in `src/core/monitor.py` with Prometheus integration and Telegram bot support.
 - Disciplined walk-forward optimization framework in `src/research/hyperopt_walkforward.py` with Optuna integration.

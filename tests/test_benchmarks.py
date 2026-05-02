@@ -163,7 +163,10 @@ def test_ensemble_adapter(sample_data):
 
 
 def test_transformer_adapter(sample_data):
-    import torch
+    try:
+        import torch
+    except ImportError:
+        pytest.skip("torch not installed")
 
     mock_model = MagicMock()
     # Mock return: a tensor of probabilities [batch, 3] where index 0 is BUY
