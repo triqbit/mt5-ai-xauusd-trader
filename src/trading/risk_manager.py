@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,6 +20,7 @@ from typing import Dict, Optional
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.data.event_intelligence import EventIntelligence
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +74,7 @@ class RiskManager:
         account_balance: float,
         logger_db: Optional[TradeLogger] = None,
         monitor: Optional[Monitor] = None,
+        event_intel: Optional[EventIntelligence] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
@@ -80,6 +83,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.event_intel = event_intel
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
@@ -101,6 +105,8 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_macro_events():
+            rejection_reason = "High-impact macro event active"
 
         passed = rejection_reason == ""
         if not passed:
@@ -135,7 +141,18 @@ class RiskManager:
             return 0.01  # minimum lot
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+
+        # Apply macro event risk multiplier
+        multiplier = 1.0
+        if self.event_intel and self.cfg.enable_macro_filter:
+            multiplier = self.event_intel.get_risk_multiplier(
+                high_impact_pre=self.cfg.macro_event_high_pre,
+                high_impact_post=self.cfg.macro_event_high_post,
+                med_impact_pre=self.cfg.macro_event_medium_pre,
+                med_impact_post=self.cfg.macro_event_medium_post,
+            )
+
+        risk_capital = self.balance * self.cfg.risk_per_trade * multiplier
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(
@@ -162,9 +179,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -208,13 +223,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 
@@ -226,6 +237,19 @@ class RiskManager:
         rr = reward / risk
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
+            return False
+        return True
+
+    def _check_macro_events(self) -> bool:
+        """Block trades during high-impact macro windows."""
+        if not self.cfg.enable_macro_filter or not self.event_intel:
+            return True
+
+        if self.event_intel.is_execution_blocked(
+            high_impact_pre=self.cfg.macro_event_high_pre,
+            high_impact_post=self.cfg.macro_event_high_post,
+        ):
+            logger.warning("Trade BLOCKED: High-impact macro event window active")
             return False
         return True
 
