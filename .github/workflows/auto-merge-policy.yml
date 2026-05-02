@@ -25,7 +25,7 @@ jobs:
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
       coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -133,7 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     if: success()
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
       - name: Enable Auto-Merge
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
