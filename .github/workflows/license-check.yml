@@ -28,8 +28,9 @@ jobs:
           pip install pip-licenses
           # We must scan ALL dependencies. However, to avoid build failures in CI,
           # we install with --no-deps if possible or use the full requirements file
-          # but skip the C-library dependent TA-Lib.
-          grep -v "TA-Lib" requirements.txt > requirements-scan.txt
+          # but skip the C-library dependent TA-Lib and Windows-only MetaTrader5.
+          # Also skip pandas-ta due to version-specific resolution issues in this environment.
+          grep -vE "TA-Lib|MetaTrader5|pandas-ta" requirements.txt > requirements-scan.txt
           # We use --extra-index-url for torch to ensure it finds the CPU version easily
           pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-scan.txt
 

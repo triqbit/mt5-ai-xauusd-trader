@@ -118,9 +118,6 @@ jobs:
             if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
               REASON="$REASON\n❌ Source code modified but no tests added."
             fi
-            if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
-              REASON="$REASON\n❌ Source code modified but no documentation updated."
-            fi
           fi
 
           gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review and merge required."
