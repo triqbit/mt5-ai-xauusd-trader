@@ -118,10 +118,18 @@ class FeatureEngineer:
         # Momentum
         indicators[f"{prefix}_rsi"] = talib.RSI(close, timeperiod=14)
 
-        macd, macdsignal, macdhist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-        indicators[f"{prefix}_macd"] = macd
-        indicators[f"{prefix}_macd_signal"] = macdsignal
-        indicators[f"{prefix}_macd_hist"] = macdhist
+        # Defensive check for MACD: requires enough data points
+        if len(close) >= 33:
+            macd, macdsignal, macdhist = talib.MACD(
+                close, fastperiod=12, slowperiod=26, signalperiod=9
+            )
+            indicators[f"{prefix}_macd"] = macd
+            indicators[f"{prefix}_macd_signal"] = macdsignal
+            indicators[f"{prefix}_macd_hist"] = macdhist
+        else:
+            indicators[f"{prefix}_macd"] = np.full(len(close), np.nan)
+            indicators[f"{prefix}_macd_signal"] = np.full(len(close), np.nan)
+            indicators[f"{prefix}_macd_hist"] = np.full(len(close), np.nan)
 
         # Volatility
         indicators[f"{prefix}_atr"] = talib.ATR(high, low, close, timeperiod=14)

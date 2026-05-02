@@ -14,29 +14,33 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
 
-logger = logging.getLogger(__name__)
-
-# Defensive imports for heavy AI dependencies
-try:
+if TYPE_CHECKING:
     import torch
     import torch.nn as nn
+else:
+    # Defensive imports for heavy AI dependencies at runtime
+    try:
+        import torch
+        import torch.nn as nn
 
-    TORCH_AVAILABLE = True
-except ImportError:
-    torch = None
-    nn = None
-    TORCH_AVAILABLE = False
+        TORCH_AVAILABLE = True
+    except ImportError:
+        torch = None
+        nn = None
+        TORCH_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-if TORCH_AVAILABLE:
+if not TYPE_CHECKING and TORCH_AVAILABLE:
 
     class LSTMAttentionModel(nn.Module):
         """
@@ -82,9 +86,14 @@ if TORCH_AVAILABLE:
             out = self.norm(out + attn_out)  # residual
             pooled = out.mean(dim=1)  # global average pool
             return self.head(pooled)  # (B, 3)
+elif TYPE_CHECKING:
+    import torch.nn as nn
+
+    class LSTMAttentionModel(nn.Module):
+        def forward(self, x: torch.Tensor) -> torch.Tensor: ...
 else:
 
-    class LSTMAttentionModel:
+    class LSTMAttentionModel:  # type: ignore
         def __init__(self, *args, **kwargs):
             pass
 
@@ -100,14 +109,15 @@ class EnsembleModel:
 
     def __init__(self, device: str = "cpu", consensus_threshold: float = 0.60) -> None:
         self.device_str = device
-        if TORCH_AVAILABLE:
+        self.TORCH_AVAILABLE = not TYPE_CHECKING and TORCH_AVAILABLE
+        if self.TORCH_AVAILABLE:
             self.device = torch.device(device)
         self.consensus_threshold = consensus_threshold
         self.dynamic_ensemble = DynamicEnsemble(
             model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
         )
-        self._ppo_model = None  # loaded lazily
-        self._dreamer_model = None  # loaded lazily
+        self._ppo_model: Optional[Any] = None  # loaded lazily
+        self._dreamer_model: Optional[Any] = None  # loaded lazily
         self.lstm_model: Optional[LSTMAttentionModel] = None
         # Internal cache for compatibility with existing record_return calls
         self._performance: Dict[str, List[float]] = {k: [] for k in self.ALGORITHMS}
@@ -124,7 +134,7 @@ class EnsembleModel:
             from stable_baselines3 import PPO
 
             self._ppo_model = PPO.load(
-                str(path), device=self.device_str if not TORCH_AVAILABLE else self.device
+                str(path), device=self.device_str if not self.TORCH_AVAILABLE else self.device
             )
             logger.info("PPO model loaded from %s", path)
         except Exception as exc:
@@ -132,7 +142,7 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
-        if not TORCH_AVAILABLE:
+        if not self.TORCH_AVAILABLE:
             logger.warning("PyTorch not available - cannot load LSTM.")
             return
         try:
@@ -166,7 +176,7 @@ class EnsembleModel:
             votes["ppo"] = probs
 
         # LSTM-Attention prediction
-        if TORCH_AVAILABLE and self.lstm_model is not None and seq is not None:
+        if self.TORCH_AVAILABLE and self.lstm_model is not None and seq is not None:
             with torch.no_grad():
                 if seq.ndim == 2:
                     seq = seq.unsqueeze(0)

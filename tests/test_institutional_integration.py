@@ -65,7 +65,8 @@ def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     # 3. Model Inference (Jules01)
     # Mock models to simulate votes
     ensemble._ppo_model = MagicMock()
-    ensemble._ppo_model.predict.return_value = (0, None)  # Buy action index 0
+    # ModelAction mapping: 0=HOLD, 1=BUY, 2=SELL
+    ensemble._ppo_model.predict.return_value = (1, None)  # Buy action index 1
 
     obs = mock_ohlcv_data.iloc[-1][["open", "high", "low", "close", "tick_volume"]].values
     direction, confidence, per_algo = ensemble.predict(obs)

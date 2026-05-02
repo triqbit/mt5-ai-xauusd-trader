@@ -31,6 +31,9 @@ def test_connector_metaapi_fallback(mock_config):
     ):
         # Fail native MT5
         mock_mt5.initialize.return_value = False
+        # Setup MetaAPI mock
+        mock_meta_instance = MagicMock()
+        mock_meta.return_value = mock_meta_instance
 
         connector = MT5Connector(mock_config)
         assert connector.initialize() is True

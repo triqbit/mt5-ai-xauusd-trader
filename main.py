@@ -19,7 +19,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 
@@ -57,7 +57,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: Any,
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
@@ -88,7 +88,7 @@ def run_live(
                 signal_id = trade_logger.log_signal(
                     {
                         "symbol": cfg.symbol,
-                        "direction": direction,
+                        "direction": int(direction),
                         "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
                         "algorithm": cfg.algorithm,
                         "confidence": confidence,
@@ -103,8 +103,8 @@ def run_live(
             # 4. Size position
             price = tick["ask"] if direction == 1 else tick["bid"]
             atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
-            stop_loss = price - direction * 2 * atr
-            take_profit = price + direction * 4 * atr
+            stop_loss = price - int(direction) * 2 * atr
+            take_profit = price + int(direction) * 4 * atr
             lot_size = risk.size_position(
                 cfg.symbol,
                 win_rate=0.58,
@@ -113,7 +113,7 @@ def run_live(
             )
             signal = TradeSignal(
                 symbol=cfg.symbol,
-                direction=direction,
+                direction=int(direction),
                 entry_price=price,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
@@ -135,7 +135,7 @@ def run_live(
                             trade_logger.log_trade(
                                 ticket=ticket,
                                 symbol=cfg.symbol,
-                                direction=direction,
+                                direction=int(direction),
                                 entry_price=price,
                                 lot_size=lot_size,
                                 signal_id=signal_id,
@@ -168,7 +168,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break

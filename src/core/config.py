@@ -75,6 +75,7 @@ class TradingConfig(BaseSettings):
     max_trades_per_day: int = Field(default=20, ge=1)
     min_confidence: float = Field(default=0.55, ge=0.5, le=1.0)
     consensus_threshold: float = Field(default=0.60, ge=0.5, le=1.0)
+    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
