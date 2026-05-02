@@ -16,7 +16,9 @@ from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from prometheus_client import Gauge
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
@@ -24,6 +26,22 @@ from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
+
+# Prometheus metrics for health components
+HEALTH_GAUGES = {
+    "liveness": Gauge("health_liveness_status", "Liveness status (1=healthy, 0=failed)"),
+    "database": Gauge("health_database_status", "Database status (1=healthy, 0=failed)"),
+    "mt5": Gauge("health_mt5_status", "MT5 connection status (1=healthy, 0=failed)"),
+    "models": Gauge("health_models_status", "Models status (1=healthy, 0.5=degraded, 0=failed)"),
+    "config": Gauge(
+        "health_config_status", "Configuration status (1=healthy, 0.5=degraded, 0=failed)"
+    ),
+    "disk": Gauge("health_disk_status", "Disk space status (1=healthy, 0=failed)"),
+    "redis": Gauge("health_redis_status", "Redis status (1=healthy, 0=failed)"),
+    "overall": Gauge(
+        "health_overall_status", "Overall system health (1=healthy, 0.5=degraded, 0=failed)"
+    ),
+}
 
 
 class HealthStatus(str, Enum):
@@ -75,7 +93,7 @@ class HealthChecker:
         try:
             # Simple connectivity check using SQLAlchemy engine
             with self.trade_logger.engine.connect() as conn:
-                conn.execute(self.trade_logger.engine.dialect.do_ping(conn.connection))
+                conn.execute(text("SELECT 1"))
             return ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
@@ -108,10 +126,18 @@ class HealthChecker:
             loaded.append("PPO")
         if getattr(self.model, "lstm_model", None) is not None:
             loaded.append("LSTM")
+        if getattr(self.model, "_dreamer_model", None) is not None:
+            loaded.append("Dreamer")
 
         if not loaded:
             return ComponentStatus(
                 status=HealthStatus.FAILED, message="No models loaded in ensemble"
+            )
+
+        if len(loaded) < 3:
+            return ComponentStatus(
+                status=HealthStatus.DEGRADED,
+                message=f"Partial models loaded: {', '.join(loaded)} (expected 3)",
             )
 
         return ComponentStatus(
@@ -136,6 +162,22 @@ class HealthChecker:
                 status=HealthStatus.FAILED,
                 message=f"Configuration invalid: {'; '.join(critical_errors)}",
             )
+
+    def check_redis(self) -> ComponentStatus:
+        """Verify Redis connectivity."""
+        try:
+            import redis
+
+            r = redis.from_url(self.cfg.redis_url)
+            r.ping()
+            return ComponentStatus(status=HealthStatus.HEALTHY, message="Redis reachable")
+        except ImportError:
+            return ComponentStatus(
+                status=HealthStatus.DEGRADED, message="Redis client not installed"
+            )
+        except Exception as e:
+            logger.error("Health check - Redis failure: %s", e)
+            return ComponentStatus(status=HealthStatus.FAILED, message=f"Redis unreachable: {e!s}")
 
     def check_disk_space(self, min_mb: int = 100) -> ComponentStatus:
         """Check for sufficient disk space in log directory."""
@@ -162,7 +204,7 @@ class HealthChecker:
         )
 
     def get_full_report(self) -> HealthReport:
-        """Aggregate all checks into a comprehensive report."""
+        """Aggregate all checks into a comprehensive report and update Prometheus metrics."""
         components = {
             "liveness": self.check_liveness(),
             "database": self.check_database(),
@@ -170,6 +212,7 @@ class HealthChecker:
             "models": self.check_models(),
             "config": self.check_config(),
             "disk": self.check_disk_space(),
+            "redis": self.check_redis(),
         }
 
         # Determine overall status
@@ -181,6 +224,19 @@ class HealthChecker:
             if failed
             else (HealthStatus.DEGRADED if degraded else HealthStatus.HEALTHY)
         )
+
+        # Update Prometheus metrics
+        status_map = {
+            HealthStatus.HEALTHY: 1.0,
+            HealthStatus.DEGRADED: 0.5,
+            HealthStatus.FAILED: 0.0,
+        }
+
+        for name, gauge in HEALTH_GAUGES.items():
+            if name == "overall":
+                gauge.set(status_map[overall_status])
+            elif name in components:
+                gauge.set(status_map[components[name].status])
 
         return HealthReport(status=overall_status, components=components)
 

@@ -59,7 +59,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: EnsembleModel,
@@ -170,7 +170,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -276,7 +277,18 @@ def main() -> int:
 
     if report.status == HealthStatus.FAILED:
         log.critical("Startup HEALTH CHECK FAILED")
+        for name, comp in report.components.items():
+            if comp.status == HealthStatus.FAILED:
+                log.critical(f"  [FAILED] {name}: {comp.message}")
+            elif comp.status == HealthStatus.DEGRADED:
+                log.warning(f"  [DEGRADED] {name}: {comp.message}")
         return 1
+
+    if report.status == HealthStatus.DEGRADED:
+        log.warning("System is running in DEGRADED state")
+        for name, comp in report.components.items():
+            if comp.status == HealthStatus.DEGRADED:
+                log.warning(f"  [DEGRADED] {name}: {comp.message}")
 
     try:
         if cfg.mode in ("demo", "live"):

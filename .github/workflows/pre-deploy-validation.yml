@@ -26,6 +26,8 @@ jobs:
       - name: Install Validation Tools
         run: |
           pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3
+          # Install all CI dependencies to provide full type information for Mypy
+          pip install -r requirements-ci.txt
 
       - name: Ruff Lint & Format Check
         run: |
