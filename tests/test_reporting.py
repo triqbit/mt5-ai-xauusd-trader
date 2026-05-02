@@ -53,7 +53,7 @@ def test_markdown_generation(sample_report):
     reporter = ResearchReporter()
     markdown = reporter.generate_markdown(sample_report)
 
-    assert "# Research Report: Q1 2024 Strategy Robustness Audit" in markdown
+    assert "# Q1 2024 Strategy Robustness Audit" in markdown
     assert "## 1. Market Regime Analysis" in markdown
     assert "Trending" in markdown
     assert "65.0%" in markdown

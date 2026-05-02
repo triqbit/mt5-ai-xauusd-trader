@@ -1,6 +1,24 @@
-# Research Report: {{ title }}
-**Date:** {{ timestamp }}
-**Author:** {{ author }}
+# {{ title }}
+
+---
+**Report Metadata**
+- **Date:** {{ timestamp }}
+- **Author:** {{ author }}
+- **Scope:** Research and Strategy Audit
+---
+
+## Table of Contents
+1. [Executive Summary](#executive-summary)
+{% if regime_analysis %}2. [Market Regime Analysis](#1-market-regime-analysis){% endif %}
+{% if stress_tests %}3. [Stress Test Outcomes](#2-stress-test-outcomes){% endif %}
+{% if hyperparameter_robustness %}4. [Hyperparameter Robustness](#3-hyperparameter-robustness){% endif %}
+{% if trade_patterns %}5. [Trade Pattern Findings](#4-trade-pattern-findings-journal-mining){% endif %}
+{% if model_drift %}6. [Model Drift Observations](#5-model-drift-observations){% endif %}
+{% if allocation_insights %}7. [Capital Allocation Insights](#6-capital-allocation-insights){% endif %}
+{% if benchmarks %}8. [Benchmark Comparisons](#7-benchmark-comparisons){% endif %}
+9. [Conclusion & Recommendations](#conclusion--recommendations)
+
+---
 
 ## Executive Summary
 {{ executive_summary }}
@@ -65,7 +83,7 @@
 | Attribute | Value | Win Rate | Profit Factor |
 |-----------|-------|----------|---------------|
 {% for c in trade_patterns.concentrations %}
-| {{ c.attribute }} | {{ c.value }} | {{ c.win_rate }} | {{ c.profit_factor }} |
+| {{ c.attribute }} | {{ c.value }} | {{ (c.win_rate * 100)|round(1) }}% | {{ c.profit_factor|round(2) }} |
 {% endfor %}
 
 ### Behavioral Risks

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -162,6 +162,28 @@ class CapitalAllocator:
         allocated = self.current_allocations.get(strategy_id, 0.0)
         cap = self.strategies[strategy_id].capital_cap
         return allocated / cap if cap > 0 else 1.0
+
+    def to_report_section(self, rejection_history: Optional[Dict[str, int]] = None) -> Any:
+        """Convert current state to AllocationSection for ResearchReporter."""
+        from src.research.reporting import AllocationEntry, AllocationSection
+
+        allocations = []
+        for sid, config in self.strategies.items():
+            current_amt = self.current_allocations.get(sid, 0.0)
+            allocations.append(
+                AllocationEntry(
+                    name=sid,
+                    amount=f"${current_amt:,.2f}",
+                    heat_pct=float((current_amt / self.total_budget) * 100) if self.total_budget > 0 else 0.0,
+                    multiplier=config.performance_multiplier,
+                )
+            )
+
+        return AllocationSection(
+            total_heat_pct=float(self.get_total_heat() * 100),
+            allocations=allocations,
+            rejection_summary=rejection_history or {},
+        )
 
     def request_allocation(self, strategy_id: str, risk_pct: float) -> AllocationResult:
         """

@@ -69,6 +69,56 @@ class JournalReport(BaseModel):
     profitable_concentrations: List[PatternConcentration]
     risk_block_summary: List[BlockReasonSummary]
 
+    def to_report_section(self) -> Any:
+        """Convert results to TradePatternSection for ResearchReporter."""
+        from src.research.reporting import (
+            BehavioralRisk,
+            PatternConcentration as ReportingPattern,
+        )
+        from src.research.reporting import TradePatternSection
+
+        # Map profitable concentrations
+        concentrations = []
+        for c in self.profitable_concentrations:
+            concentrations.append(
+                ReportingPattern(
+                    attribute=c.attribute,
+                    value=c.value,
+                    win_rate=c.win_rate,
+                    profit_factor=c.profit_factor,
+                )
+            )
+
+        # Identify behavioral risks from drawdown clusters and overtrading
+        risks = []
+        overtrading_sessions = [s.session_name for s in self.session_analysis if s.is_overtrading]
+        if overtrading_sessions:
+            risks.append(
+                BehavioralRisk(
+                    type="Overtrading",
+                    description=f"High trade frequency detected in sessions: {', '.join(overtrading_sessions)}",
+                )
+            )
+
+        if len(self.drawdown_clusters) > 0:
+            total_loss = sum(c.total_loss for c in self.drawdown_clusters)
+            risks.append(
+                BehavioralRisk(
+                    type="Loss Clustering",
+                    description=f"Detected {len(self.drawdown_clusters)} significant drawdown clusters with total loss of {total_loss:.2f}",
+                )
+            )
+
+        primary_insight = "Strategy shows consistent performance across most sessions."
+        if risks:
+            primary_insight = f"Behavioral risks identified: {risks[0].type}."
+
+        return TradePatternSection(
+            primary_insight=primary_insight,
+            concentrations=concentrations[:5],  # Top 5 for clarity
+            behavioral_risks=risks,
+        )
+
 
 class JournalMiner:
     """Enterprise pattern recognition engine for trade journals."""

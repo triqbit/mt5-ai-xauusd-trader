@@ -150,6 +150,17 @@ class ResearchReporter:
         with open(filepath, "w") as f:
             f.write(content)
 
+    def generate_html(self, report: ResearchReport) -> str:
+        """Render the report as an HTML string."""
+        template = self.jinja_env.get_template("research_report.html.j2")
+        return template.render(report.model_dump())
+
+    def save_html(self, report: ResearchReport, filepath: str) -> None:
+        """Save the report to an HTML file."""
+        content = self.generate_html(report)
+        with open(filepath, "w") as f:
+            f.write(content)
+
     def format_for_terminal(self, report: ResearchReport) -> None:
         """Print a scannable version of the report to the terminal."""
         self.console.print(Panel(f"[bold blue]{report.title}[/]\n[dim]Date: {report.timestamp} | Author: {report.author}[/]"))
