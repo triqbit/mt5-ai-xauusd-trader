@@ -67,6 +67,13 @@ class TradingConfig(BaseSettings):
     telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
     confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
 
+    # ── Macro Event Intelligence ──────────────────────────────────────────────
+    enable_macro_filter: bool = Field(default=True)
+    macro_event_high_pre: int = Field(default=30, description="Minutes before HIGH impact event")
+    macro_event_high_post: int = Field(default=30, description="Minutes after HIGH impact event")
+    macro_event_medium_pre: int = Field(default=15, description="Minutes before MEDIUM impact event")
+    macro_event_medium_post: int = Field(default=15, description="Minutes after MEDIUM impact event")
+
     @field_validator("risk_per_trade")
     @classmethod
     def risk_must_be_safe(cls, v: float) -> float:

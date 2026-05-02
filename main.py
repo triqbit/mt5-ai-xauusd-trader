@@ -30,6 +30,7 @@ from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.data.event_intelligence import EventIntelligence
 from src.models.ensemble import EnsembleModel
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -69,8 +70,16 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    last_event_fetch = 0.0
     while True:
         try:
+            # 0. Refresh macro events every 6 hours
+            if time.time() - last_event_fetch > 6 * 3600:
+                if risk.event_intel:
+                    risk.event_intel.fetch_events()
+                    last_event_fetch = time.time()
+                    log.info("Macro events refreshed")
+
             # 1. Fetch latest market data
             with profile("data_fetch"):
                 df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
@@ -245,7 +254,15 @@ def main() -> int:
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    event_intel = EventIntelligence()
+    event_intel.fetch_events()
+    risk = RiskManager(
+        cfg,
+        account_balance=balance,
+        logger_db=trade_logger,
+        monitor=monitor,
+        event_intel=event_intel,
+    )
     model = EnsembleModel(device="cpu")
     ppo_path = args.model_dir / "ppo_xauusd.zip"
     lstm_path = args.model_dir / "lstm_xauusd.pt"
