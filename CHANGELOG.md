@@ -20,14 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Semantic versioning policy (`docs/VERSIONING_POLICY.md`).
 - Automated changelog generation workflow (`.github/workflows/changelog.yml`).
 - Initial `CHANGELOG.md` template.
+- SQL-level `CheckConstraint`s and performance indexes for `model_signals` and `trades` tables to ensure data integrity and query efficiency.
+- Database integrity tests in `tests/test_trade_logger.py`.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
-
-### Hardened
-- Database reliability and integrity: Added SQL-level `CheckConstraint`s for trade directions, prices, and lot sizes.
-- Performance optimization: Added missing indexes for `symbol`, `status`, `created_at`, and `is_deleted` columns across core tables.
-- Modernized `TradeLogger` to adopt SQLAlchemy 2.0 `DeclarativeBase` and improved transaction safety.
+- Hardened `TradeLogger` with SQLAlchemy 2.0 `DeclarativeBase` and explicit schema constraints.
 
 ## [1.0.0] - 2024-05-24
 ### Added

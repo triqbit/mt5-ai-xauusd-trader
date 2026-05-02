@@ -13,10 +13,10 @@ import numpy as np
 
 # Use the standardized SignalDirection from constants
 from src.core.constants import SignalDirection
-from src.models.ensemble import EnsembleModel, LSTMAttentionModel
 
 def test_lstm_attention_model_output_shape():
     """Verify LSTM+Attention model produces correct logit shapes."""
+    from src.models.ensemble import LSTMAttentionModel
     n_features = 140
     model = LSTMAttentionModel(n_features=n_features)
     # Batch size 2, Sequence length 10, Features 140
@@ -26,6 +26,7 @@ def test_lstm_attention_model_output_shape():
 
 def test_ensemble_model_standardized_direction():
     """Verify EnsembleModel maps Action indices to standard SignalDirection."""
+    from src.models.ensemble import EnsembleModel
     ensemble = EnsembleModel(device="cpu")
 
     # Mock the internal models
@@ -43,6 +44,7 @@ def test_ensemble_model_standardized_direction():
 
 def test_ensemble_record_return_rebalance():
     """Verify weight rebalancing logic triggers correctly."""
+    from src.models.ensemble import EnsembleModel
     ensemble = EnsembleModel(device="cpu")
     initial_weights = ensemble.weights.copy()
 
