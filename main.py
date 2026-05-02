@@ -237,8 +237,9 @@ def main() -> int:
         log.critical("Cannot connect to MT5 terminal. Aborting.")
         return 1
     balance = connector.get_account_balance()
+    database_url = cfg.database_url.get_secret_value()
     trade_logger = TradeLogger(
-        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+        db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
