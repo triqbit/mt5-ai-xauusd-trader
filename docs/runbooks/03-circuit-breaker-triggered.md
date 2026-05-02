@@ -49,9 +49,15 @@ If the peak equity is persisted in the database:
 1. Update the `peak_equity` value in the database to the current equity.
 2. Restart the bot.
 
-## Verification
-1. Check logs for: `RiskManager initialised`.
-2. Monitor first few trades in `demo` mode if possible before resuming `live` trading.
+## Expected Outcomes
+- Circuit breaker state is cleared and the bot is ready to accept new signals.
+- Peak equity is reset to the current account level.
+- Audit trail contains a record of the circuit breaker event and the manual reset action.
+
+## Verification Commands
+- **Check Readiness:** `curl http://localhost:8000/health/readiness`
+- **Verify Audit Logs:** `sqlite3 trades.db "SELECT * FROM audit_logs WHERE event_type='CIRCUIT_BREAKER_RESET' ORDER BY timestamp DESC LIMIT 1;"`
+- **Check Bot Logs:** `grep "RiskManager initialised" trading_bot.log`
 
 ## Escalation Path
 1. **Level 1:** Risk Manager / Quantitative Lead.

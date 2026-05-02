@@ -45,9 +45,15 @@ If the release was tagged on `main`, revert the PR or commit that introduced the
 2. Communicate the rollback to stakeholders.
 3. Perform a Root Cause Analysis (RCA) before attempting to re-deploy.
 
-## Verification
-- Run health check: `curl http://localhost:8000/health` (if implemented).
-- Check logs for: `Application started - Version: v1.2.2`.
+## Expected Outcomes
+- System is restored to the previous stable version (Docker image and DB schema).
+- Critical functionality is restored, and error rates return to baseline.
+- No further capital is at risk due to new release bugs.
+
+## Verification Commands
+- **Check Version:** `docker inspect triqbit/mt5-trader --format '{{.Config.Labels.version}}'` (or check startup logs).
+- **Check Health:** `curl http://localhost:8000/health/liveness`
+- **Check DB Revision:** `alembic current`
 
 ## Escalation Path
 1. **Level 1:** Release Engineer (Jules03).
