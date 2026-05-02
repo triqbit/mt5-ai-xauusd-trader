@@ -174,7 +174,9 @@ class CapitalAllocator:
                 AllocationEntry(
                     name=sid,
                     amount=f"${current_amt:,.2f}",
-                    heat_pct=float((current_amt / self.total_budget) * 100) if self.total_budget > 0 else 0.0,
+                    heat_pct=float((current_amt / self.total_budget) * 100)
+                    if self.total_budget > 0
+                    else 0.0,
                     multiplier=config.performance_multiplier,
                 )
             )
