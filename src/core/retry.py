@@ -14,6 +14,7 @@ from typing import Any, Callable, Tuple, Type, Union
 
 logger = logging.getLogger(__name__)
 
+
 def with_retry(
     max_retries: int = 3,
     base_delay: float = 1.0,
@@ -31,6 +32,7 @@ def with_retry(
         exceptions: Exception type(s) that should trigger a retry.
         jitter: Whether to add random jitter to the delay.
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -51,7 +53,7 @@ def with_retry(
 
                     delay = min(base_delay * (2 ** (retries - 1)), max_delay)
                     if jitter:
-                        delay *= (0.5 + random.random())
+                        delay *= 0.5 + random.random()
 
                     logger.warning(
                         "Retry %d/%d for %s after %.2fs due to: %s",
@@ -62,5 +64,7 @@ def with_retry(
                         e,
                     )
                     time.sleep(delay)
+
         return wrapper
+
     return decorator

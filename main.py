@@ -27,8 +27,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.core import get_config, profile
-from src.core.exceptions import MT5ConnectionError, MT5DataError, OrderExecutionError
 from src.core.config_validator import ConfigValidator
+from src.core.exceptions import MT5ConnectionError, MT5DataError, OrderExecutionError
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -157,7 +157,7 @@ def run_live(
                                 event_type="EXECUTION_FAILED",
                                 description=str(e),
                                 symbol=cfg.symbol,
-                                signal_id=signal_id
+                                signal_id=signal_id,
                             )
 
             # 6. Check for closed positions to update logger
@@ -265,17 +265,19 @@ def main() -> int:
         try:
             connector.connect()
         except MT5ConnectionError as exc:
-            console.print(Panel(
-                "[bold red]CRITICAL: MT5 Connection Failure[/]\n\n"
-                f"Error: {exc}\n\n"
-                "[bold]Troubleshooting Steps:[/]\n"
-                "1. Ensure MetaTrader 5 terminal is open.\n"
-                "2. Verify 'Algo Trading' is enabled in MT5 (Tools -> Options -> Expert Advisors).\n"
-                "3. Check if MT5 login credentials and server in .env are correct.\n"
-                "4. If using Linux/Mac, ensure MetaAPI token is valid.",
-                title="Connectivity Diagnostic",
-                expand=False
-            ))
+            console.print(
+                Panel(
+                    "[bold red]CRITICAL: MT5 Connection Failure[/]\n\n"
+                    f"Error: {exc}\n\n"
+                    "[bold]Troubleshooting Steps:[/]\n"
+                    "1. Ensure MetaTrader 5 terminal is open.\n"
+                    "2. Verify 'Algo Trading' is enabled in MT5 (Tools -> Options -> Expert Advisors).\n"
+                    "3. Check if MT5 login credentials and server in .env are correct.\n"
+                    "4. If using Linux/Mac, ensure MetaAPI token is valid.",
+                    title="Connectivity Diagnostic",
+                    expand=False,
+                )
+            )
             return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(

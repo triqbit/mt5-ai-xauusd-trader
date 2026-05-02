@@ -7,6 +7,7 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,6 +18,7 @@ import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -24,6 +26,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -173,7 +176,9 @@ class MT5Connector:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
                 err_code, err_msg = mt5.last_error()
-                raise MT5DataError(f"Failed to copy rates for {symbol}: {err_msg} (code: {err_code})")
+                raise MT5DataError(
+                    f"Failed to copy rates for {symbol}: {err_msg} (code: {err_code})"
+                )
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
@@ -234,7 +239,7 @@ class MT5Connector:
             try:
                 tick = self.get_tick(signal.symbol)
             except MT5DataError as e:
-                raise OrderExecutionError(f"Failed to get price for order: {e}")
+                raise OrderExecutionError(f"Failed to get price for order: {e}") from e
 
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
@@ -259,7 +264,7 @@ class MT5Connector:
             if result.retcode != mt5.TRADE_RETCODE_DONE:
                 raise OrderExecutionError(
                     f"Order rejected: {result.comment} (code: {result.retcode})",
-                    details={"retcode": result.retcode, "comment": result.comment}
+                    details={"retcode": result.retcode, "comment": result.comment},
                 )
 
             logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
