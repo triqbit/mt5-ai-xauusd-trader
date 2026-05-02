@@ -276,7 +276,18 @@ def main() -> int:
 
     if report.status == HealthStatus.FAILED:
         log.critical("Startup HEALTH CHECK FAILED")
+        for name, comp in report.components.items():
+            if comp.status == HealthStatus.FAILED:
+                log.critical(f"  [FAILED] {name}: {comp.message}")
+            elif comp.status == HealthStatus.DEGRADED:
+                log.warning(f"  [DEGRADED] {name}: {comp.message}")
         return 1
+
+    if report.status == HealthStatus.DEGRADED:
+        log.warning("System is running in DEGRADED state")
+        for name, comp in report.components.items():
+            if comp.status == HealthStatus.DEGRADED:
+                log.warning(f"  [DEGRADED] {name}: {comp.message}")
 
     try:
         if cfg.mode in ("demo", "live"):

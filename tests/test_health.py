@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 
-from src.core.health import HealthChecker, HealthStatus, router, init_health_checker, ComponentStatus, HealthReport
+from src.core.health import HealthChecker, HealthStatus, router, init_health_checker, ComponentStatus, HealthReport, HEALTH_GAUGES
 from src.core.config import TradingConfig
 
 @pytest.fixture
@@ -83,22 +83,25 @@ def test_check_mt5_failure(health_checker, mock_connector):
     assert status.status == HealthStatus.FAILED
     assert "down" in status.message
 
-def test_check_models_success(health_checker):
+def test_check_models_success(health_checker, mock_model):
+    mock_model._dreamer_model = MagicMock()
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
     assert "PPO" in status.message
     assert "LSTM" in status.message
+    assert "Dreamer" in status.message
 
 def test_check_models_partial(health_checker, mock_model):
     mock_model.lstm_model = None
     status = health_checker.check_models()
-    assert status.status == HealthStatus.HEALTHY
+    assert status.status == HealthStatus.DEGRADED
     assert "PPO" in status.message
     assert "LSTM" not in status.message
 
 def test_check_models_failed(health_checker, mock_model):
     mock_model._ppo_model = None
     mock_model.lstm_model = None
+    mock_model._dreamer_model = None
     status = health_checker.check_models()
     assert status.status == HealthStatus.FAILED
 
@@ -137,17 +140,46 @@ def test_check_disk_space_failure(mock_disk_usage, health_checker, mock_config):
     assert status.status == HealthStatus.FAILED
     assert "Low disk space" in status.message
 
+def test_check_redis_success(health_checker, mock_config):
+    mock_config.redis_url = "redis://localhost:6379/0"
+    with patch("redis.from_url") as mock_redis:
+        mock_redis.return_value.ping.return_value = True
+        status = health_checker.check_redis()
+        assert status.status == HealthStatus.HEALTHY
+        assert "reachable" in status.message
+
+def test_check_redis_failure(health_checker, mock_config):
+    mock_config.redis_url = "redis://localhost:6379/0"
+    with patch("redis.from_url") as mock_redis:
+        mock_redis.return_value.ping.side_effect = Exception("Redis connection error")
+        status = health_checker.check_redis()
+        assert status.status == HealthStatus.FAILED
+        assert "Redis connection error" in status.message
+
+def test_check_redis_not_installed(health_checker):
+    with patch.dict("sys.modules", {"redis": None}):
+        status = health_checker.check_redis()
+        assert status.status == HealthStatus.DEGRADED
+        assert "not installed" in status.message
+
 def test_get_full_report(health_checker):
     with patch.object(HealthChecker, 'check_config') as mock_conf:
         mock_conf.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
         with patch.object(HealthChecker, 'check_disk_space') as mock_disk:
             mock_disk.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+            with patch.object(HealthChecker, 'check_redis') as mock_redis:
+                mock_redis.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
 
-            report = health_checker.get_full_report()
-            assert isinstance(report, HealthReport)
-            assert report.status == HealthStatus.HEALTHY
-            assert "liveness" in report.components
-            assert "database" in report.components
+                report = health_checker.get_full_report()
+                assert isinstance(report, HealthReport)
+                assert report.status == HealthStatus.HEALTHY
+                assert "liveness" in report.components
+                assert "database" in report.components
+                assert "redis" in report.components
+
+                # Verify Prometheus gauges
+                assert HEALTH_GAUGES["overall"]._value.get() == 1.0
+                assert HEALTH_GAUGES["database"]._value.get() == 1.0
 
 # --- FastAPI Endpoint Tests ---
 
@@ -170,8 +202,10 @@ def test_api_readiness_success(client):
         mock_conf.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
         with patch("src.core.health.HealthChecker.check_disk_space") as mock_disk:
             mock_disk.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+            with patch("src.core.health.HealthChecker.check_redis") as mock_redis:
+                mock_redis.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
 
-            response = client.get("/health/readiness")
+                response = client.get("/health/readiness")
             assert response.status_code == 200
             assert response.json()["status"] == "healthy"
 
