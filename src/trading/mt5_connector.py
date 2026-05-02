@@ -172,9 +172,42 @@ class MT5Connector:
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
             return pd.DataFrame()
 
-    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        """Alias for get_rates() to match main.py expectations."""
-        return self.get_rates(symbol, timeframe, n_bars)
+    def get_ohlcv(
+        self,
+        symbol: str,
+        timeframe: str,
+        n_bars: Optional[int] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """
+        Retrieve OHLCV data by count or date range.
+        """
+        if not self._is_initialized:
+            return pd.DataFrame()
+
+        tf = TIMEFRAME_MAP.get(timeframe, 5)
+
+        if not self.use_metaapi:
+            if start_date and end_date:
+                # Use range-based fetch
+                rates = mt5.copy_rates_range(symbol, tf, start_date, end_date)
+            else:
+                # Use count-based fetch
+                n_bars = n_bars or 100
+                rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+
+            if rates is None or len(rates) == 0:
+                logger.error("Failed to copy rates for %s", symbol)
+                return pd.DataFrame()
+
+            df = pd.DataFrame(rates)
+            df["time"] = pd.to_datetime(df["time"], unit="s")
+            df.set_index("time", inplace=True)
+            return df
+        else:
+            # Placeholder for MetaAPI
+            return pd.DataFrame()
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
