@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -71,8 +72,12 @@ class TradingConfig(BaseSettings):
     enable_macro_filter: bool = Field(default=True)
     macro_event_high_pre: int = Field(default=30, description="Minutes before HIGH impact event")
     macro_event_high_post: int = Field(default=30, description="Minutes after HIGH impact event")
-    macro_event_medium_pre: int = Field(default=15, description="Minutes before MEDIUM impact event")
-    macro_event_medium_post: int = Field(default=15, description="Minutes after MEDIUM impact event")
+    macro_event_medium_pre: int = Field(
+        default=15, description="Minutes before MEDIUM impact event"
+    )
+    macro_event_medium_post: int = Field(
+        default=15, description="Minutes after MEDIUM impact event"
+    )
 
     @field_validator("risk_per_trade")
     @classmethod

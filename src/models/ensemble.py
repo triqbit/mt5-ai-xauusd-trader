@@ -9,6 +9,7 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,8 +17,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
 
 from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
@@ -26,50 +25,59 @@ logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel:
     """
-    Bidirectional LSTM with multi-head self-attention.
-    Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [buy_logit, sell_logit, hold_logit]
+    Placeholder class that will be dynamically replaced if torch is available.
     """
 
-    def __init__(
-        self,
-        n_features: int = 140,
-        hidden_size: int = 128,
-        num_layers: int = 2,
-        n_heads: int = 8,
-        dropout: float = 0.2,
-    ) -> None:
-        super().__init__()
-        self.lstm = nn.LSTM(
-            input_size=n_features,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=True,
-            dropout=dropout if num_layers > 1 else 0.0,
-        )
-        self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_size * 2,
-            num_heads=n_heads,
-            dropout=dropout,
-            batch_first=True,
-        )
-        self.norm = nn.LayerNorm(hidden_size * 2)
-        self.head = nn.Sequential(
-            nn.Linear(hidden_size * 2, 64),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(64, 3),
-        )
+    def __new__(cls, *args, **kwargs):
+        try:
+            import torch.nn as nn
+        except ImportError:
+            logger.warning("torch not found - LSTMAttentionModel will not be functional")
+            return object.__new__(cls)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out, _ = self.lstm(x)  # (B, T, 2*H)
-        attn_out, _ = self.attn(out, out, out)
-        out = self.norm(out + attn_out)  # residual
-        pooled = out.mean(dim=1)  # global average pool
-        return self.head(pooled)  # (B, 3)
+        class RealLSTMAttentionModel(nn.Module):
+            def __init__(
+                self,
+                n_features: int = 140,
+                hidden_size: int = 128,
+                num_layers: int = 2,
+                n_heads: int = 8,
+                dropout: float = 0.2,
+            ) -> None:
+                super().__init__()
+                self.lstm = nn.LSTM(
+                    input_size=n_features,
+                    hidden_size=hidden_size,
+                    num_layers=num_layers,
+                    batch_first=True,
+                    bidirectional=True,
+                    dropout=dropout if num_layers > 1 else 0.0,
+                )
+                self.attn = nn.MultiheadAttention(
+                    embed_dim=hidden_size * 2,
+                    num_heads=n_heads,
+                    dropout=dropout,
+                    batch_first=True,
+                )
+                self.norm = nn.LayerNorm(hidden_size * 2)
+                self.head = nn.Sequential(
+                    nn.Linear(hidden_size * 2, 64),
+                    nn.GELU(),
+                    nn.Dropout(dropout),
+                    nn.Linear(64, 3),
+                )
+
+            def forward(self, x):
+
+                out, _ = self.lstm(x)  # (B, T, 2*H)
+                attn_out, _ = self.attn(out, out, out)
+                out = self.norm(out + attn_out)  # residual
+                pooled = out.mean(dim=1)  # global average pool
+                return self.head(pooled)  # (B, 3)
+
+        return RealLSTMAttentionModel(*args, **kwargs)
 
 
 # ── Ensemble orchestrator ─────────────────────────────────────────────────
@@ -82,12 +90,16 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
-        self.device = torch.device(device)
+        try:
+            import torch
+
+            self.device = torch.device(device)
+        except ImportError:
+            self.device = None
+            logger.warning("Torch not available - ensemble will run in degraded mode")
+
         self.dynamic_ensemble = DynamicEnsemble(
-            model_names=self.ALGORITHMS,
-            smoothing_factor=0.1,
-            max_swing=0.05,
-            min_weight=0.05
+            model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
         )
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
@@ -113,6 +125,8 @@ class EnsembleModel:
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
+        import torch
+
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
         state = torch.load(str(path), map_location=self.device)
         model.load_state_dict(state)
@@ -124,12 +138,14 @@ class EnsembleModel:
     def predict(
         self,
         obs: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional[any] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
         direction: +1 buy, -1 sell, 0 hold
         """
+        import torch
+
         votes: Dict[str, np.ndarray] = {}
 
         # PPO prediction
