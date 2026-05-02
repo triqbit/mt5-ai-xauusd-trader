@@ -4,13 +4,14 @@ tests/test_rl_evaluation.py
 Tests for institutional RL evaluation framework.
 """
 
-import pytest
+from unittest.mock import MagicMock
+
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock
-from src.research.rl_evaluation import RLEvaluator, MomentumBaseline, RLReport
+import pytest
+
 from src.environment.gym_env import TradingEnv
-from src.models.regime_detector import MarketRegime
+from src.research.rl_evaluation import MomentumBaseline, RLEvaluator, RLReport
 
 
 @pytest.fixture
@@ -63,10 +64,65 @@ def test_evaluate_runs_to_completion(trading_env):
     assert report.agent_name == "Test_Agent"
     assert report.total_steps > 0
     assert hasattr(report.stability, "sharpe_ratio")
+    assert hasattr(report.stability, "profit_factor")
+    assert hasattr(report.stability, "expectancy")
+    assert hasattr(report.stability, "calmar_ratio")
     assert hasattr(report.turnover, "total_trades")
     assert hasattr(report.drawdown, "max_drawdown")
     assert isinstance(report.regime_sensitivity, list)
     assert report.reward_decomposition.total_commissions >= 0
+
+
+def test_compare_agents(trading_env):
+    evaluator = RLEvaluator(env=trading_env)
+
+    class BuyAgent:
+        def predict(self, observation):
+            return 1
+
+    class SellAgent:
+        def predict(self, observation):
+            return 2
+
+    comparison = evaluator.compare(
+        agents=[BuyAgent(), SellAgent()],
+        agent_names=["Buyer", "Seller"],
+        baseline_name="Buyer"
+    )
+
+    assert comparison.baseline_name == "Buyer"
+    assert len(comparison.agent_reports) == 2
+    assert comparison.best_agent in ["Buyer", "Seller"]
+
+
+def test_signal_adapter_compatibility(trading_env):
+    from src.core.constants import SignalDirection
+    from src.models.base_model import Signal
+    evaluator = RLEvaluator(env=trading_env)
+
+    class SignalAgent:
+        def predict(self, observation):
+            return Signal(direction=SignalDirection.BUY, confidence=0.9)
+
+    # _get_prediction should return 1 for SignalDirection.BUY
+    prediction = evaluator._get_prediction(SignalAgent(), np.zeros(52))
+    assert prediction == 1
+
+
+def test_to_report_section(trading_env):
+    from src.research.reporting import RLSection
+    evaluator = RLEvaluator(env=trading_env)
+
+    class SimpleAgent:
+        def predict(self, observation):
+            return 0
+
+    comparison = evaluator.compare([SimpleAgent()], ["Simple"], "Simple")
+    section = evaluator.to_report_section(comparison)
+
+    assert isinstance(section, RLSection)
+    assert section.best_agent == "Simple"
+    assert len(section.metrics) == 1
 
 
 def test_extract_trades():
