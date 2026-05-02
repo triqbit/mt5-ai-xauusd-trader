@@ -147,6 +147,7 @@ def test_ppo_adapter(sample_data):
 
 
 def test_ensemble_adapter(sample_data):
+    pytest.importorskip("torch")
     mock_model = MagicMock()
     mock_model.predict.return_value = (SignalDirection.SELL, 0.8, {})
 
@@ -163,7 +164,7 @@ def test_ensemble_adapter(sample_data):
 
 
 def test_transformer_adapter(sample_data):
-    import torch
+    pytest.importorskip("torch")
 
     mock_model = MagicMock()
     # Mock return: a tensor of probabilities [batch, 3] where index 0 is BUY

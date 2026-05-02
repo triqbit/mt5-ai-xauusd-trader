@@ -378,7 +378,10 @@ class EnsembleAdapter:
         Returns:
             np.ndarray: Array of signals.
         """
-        import torch
+        try:
+            import torch
+        except ImportError:
+            torch = None
 
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
@@ -391,7 +394,7 @@ class EnsembleAdapter:
             seq_data = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values.astype(
                 np.float32
             )
-            seq = torch.from_numpy(seq_data).float()
+            seq = torch.from_numpy(seq_data).float() if torch is not None else None
 
             # EnsembleModel.predict returns (direction, confidence, per_algo)
             direction, _, _ = self.model.predict(obs, seq=seq)
@@ -470,7 +473,13 @@ class TransformerAdapter:
         """
         Generate signals using a sliding window approach.
         """
-        import torch
+        try:
+            import torch
+        except ImportError:
+            torch = None
+
+        if torch is None:
+            return np.zeros(len(df))
 
         self.model.eval()
         signals = np.zeros(len(df))
