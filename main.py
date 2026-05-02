@@ -244,6 +244,7 @@ def main() -> int:
         cfg.symbol,
     )
     # Initialise components
+    console = Console()
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
         if not connector.connect():
@@ -272,13 +273,16 @@ def main() -> int:
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
     else:
-        log.warning(f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble")
+        log.warning(
+            f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble"
+        )
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
     health_checker = init_health_checker(cfg, connector, trade_logger, model)
     with console.status("[bold blue]Running health checks..."):
         report = health_checker.get_full_report()
+
 
     table = Table(title="System Health", box=None)
     table.add_column("Component", style="cyan")
@@ -310,7 +314,6 @@ def main() -> int:
                 monitor=monitor,
             )
         elif cfg.mode == "backtest":
-            from rich.table import Table
             from src.core.feature_engineering import FeatureEngineer
             from src.trading.backtester import BacktestEngine
             from src.trading.execution_filter import ExecutionFilter
@@ -323,7 +326,9 @@ def main() -> int:
             # 1. Fetch historical data
             from datetime import datetime
 
-            start_dt = datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
+            start_dt = (
+                datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
+            )
             end_dt = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
 
             log.info(f"Fetching historical data for {cfg.symbol} from {start_dt} to {end_dt}")

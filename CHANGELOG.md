@@ -47,3 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Volume profile features (Rolling VWAP, VPT, OBV).
 - Vectorized rolling slope calculation for high-performance feature extraction.
 - Comprehensive unit tests in `tests/test_feature_engineering.py` using synthetic XAUUSD data.
+
+## [Unreleased] - 2026-05-02
+### Added
+- Vectorized walk-forward backtesting engine in `src/trading/backtester.py`.
+- Support for transaction cost simulation (spread + commission) and per-trade metrics (MAE, MFE).
+- Institutional PerformanceReport matching README.md benchmarks.
+- CLI support for backtesting with `--mode backtest --start YYYY-MM-DD --end YYYY-MM-DD`.
+- Comprehensive unit tests for backtesting in `tests/test_backtester.py`.
+### Changed
+- Enhanced `MT5Connector` to support historical data retrieval by date range.
+- Updated `main.py` to integrate the backtesting engine.

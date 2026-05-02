@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -19,8 +18,8 @@ import pandas as pd
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.feature_engineering import FeatureEngineer
-    from src.trading.execution_filter import ExecutionFilter
     from src.models.base_model import BaseModel
+    from src.trading.execution_filter import ExecutionFilter
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +83,9 @@ class BacktestEngine:
         all_trades_dfs = []
         total_bars = len(data)
 
-        for start_idx in range(0, total_bars - train_window_bars - test_window_bars, test_window_bars):
+        for start_idx in range(
+            0, total_bars - train_window_bars - test_window_bars, test_window_bars
+        ):
             test_start = start_idx + train_window_bars
             test_end = test_start + test_window_bars
 
@@ -104,7 +105,9 @@ class BacktestEngine:
             predictions = preds_conf.apply(lambda x: x.direction)
             confidences = preds_conf.apply(lambda x: x.confidence)
 
-            approved_signals = self._vectorized_execution_filter(test_data, predictions, confidences)
+            approved_signals = self._vectorized_execution_filter(
+                test_data, predictions, confidences
+            )
 
             if approved_signals.any():
                 segment_trades = self._vectorized_simulation(test_data, approved_signals)
@@ -122,22 +125,22 @@ class BacktestEngine:
         """
         Apply execution filter rules using vectorized operations.
         """
-        signals = (predictions != 0)
-        signals &= (confidences >= self.cfg.confidence_threshold)
+        signals = predictions != 0
+        signals &= confidences >= self.cfg.confidence_threshold
 
         times = test_data.index
         weekdays = times.weekday
         hours = times.hour
 
         # Sun 17:00 - Fri 16:00 GMT
-        is_weekend = (weekdays == 5) | ((weekdays == 6) & (hours < 17)) | ((weekdays == 4) & (hours >= 16))
+        is_weekend = (
+            (weekdays == 5) | ((weekdays == 6) & (hours < 17)) | ((weekdays == 4) & (hours >= 16))
+        )
         signals &= ~is_weekend
 
         return predictions.where(signals, 0)
 
-    def _vectorized_simulation(
-        self, test_data: pd.DataFrame, signals: pd.Series
-    ) -> pd.DataFrame:
+    def _vectorized_simulation(self, test_data: pd.DataFrame, signals: pd.Series) -> pd.DataFrame:
         trades_indices = signals[signals != 0].index
         if trades_indices.empty:
             return pd.DataFrame()
@@ -165,14 +168,16 @@ class BacktestEngine:
                 mfe = entry_price - window["low"].min()
                 mae = window["high"].max() - entry_price
 
-            trade_data.append({
-                "entry_time": entry_time,
-                "exit_time": window.index[-1],
-                "direction": direction,
-                "pnl": net_pnl,
-                "mae": mae,
-                "mfe": mfe
-            })
+            trade_data.append(
+                {
+                    "entry_time": entry_time,
+                    "exit_time": window.index[-1],
+                    "direction": direction,
+                    "pnl": net_pnl,
+                    "mae": mae,
+                    "mfe": mfe,
+                }
+            )
 
         return pd.DataFrame(trade_data)
 
@@ -220,8 +225,10 @@ class BacktestEngine:
             mfe=float(trades_df["mfe"].mean()),
             total_pnl=float(total_pnl),
             starting_balance=self.starting_balance,
-            ending_balance=ending_balance
+            ending_balance=ending_balance,
         )
 
     def _empty_report(self) -> PerformanceReport:
-        return PerformanceReport(0, 0, 0, 0, 0, 0, 0, 0, 0, self.starting_balance, self.starting_balance)
+        return PerformanceReport(
+            0, 0, 0, 0, 0, 0, 0, 0, 0, self.starting_balance, self.starting_balance
+        )

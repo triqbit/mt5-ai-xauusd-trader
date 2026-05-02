@@ -7,16 +7,19 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -24,6 +27,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
