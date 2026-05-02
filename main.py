@@ -10,6 +10,7 @@ Usage:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import argparse
@@ -263,7 +264,13 @@ def main() -> int:
     table.add_column("Status", justify="center")
     table.add_column("Message")
     for name, comp in report.components.items():
-        color = "green" if comp.status == HealthStatus.HEALTHY else "yellow" if comp.status == HealthStatus.DEGRADED else "red"
+        color = (
+            "green"
+            if comp.status == HealthStatus.HEALTHY
+            else "yellow"
+            if comp.status == HealthStatus.DEGRADED
+            else "red"
+        )
         table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message)
     console.print(table)
 
