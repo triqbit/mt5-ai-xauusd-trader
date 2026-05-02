@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
 
+### Hardened
+- Database reliability and integrity: Added SQL-level `CheckConstraint`s for trade directions, prices, and lot sizes.
+- Performance optimization: Added missing indexes for `symbol`, `status`, `created_at`, and `is_deleted` columns across core tables.
+- Modernized `TradeLogger` to adopt SQLAlchemy 2.0 `DeclarativeBase` and improved transaction safety.
+
 ## [1.0.0] - 2024-05-24
 ### Added
 - Initial enterprise-grade trading engine.
