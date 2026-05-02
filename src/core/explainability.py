@@ -66,10 +66,28 @@ class RegimeContext(BaseModel):
     summary: str = Field(..., description="Contextual summary of the market state")
 
 
+class FilterResult(BaseModel):
+    """Result of a specific execution filter (e.g., Spread, Timing, Connectivity)."""
+
+    filter_name: str = Field(..., description="Name of the filter")
+    passed: bool = Field(..., description="Whether the filter passed")
+    value: Any = Field(None, description="Actual value observed")
+    threshold: Any = Field(None, description="Threshold value for the filter")
+    message: Optional[str] = Field(None, description="Details about the filter result")
+
+
+class ExecutionSummary(BaseModel):
+    """Summary of execution-level filters applied before signal generation."""
+
+    passed: bool = Field(..., description="Whether all execution filters passed")
+    filters: List[FilterResult] = Field(default_factory=list, description="Detailed filter results")
+    summary: str = Field(..., description="Human-readable execution summary")
+
+
 class SignalExplanation(BaseModel):
     """
     Root explanation object for a trade signal.
-    Aggregates model, feature, risk, and regime data into a structured format.
+    Aggregates execution, model, feature, risk, and regime data into a structured format.
     """
 
     signal_id: Optional[int] = Field(None, description="Database ID of the signal")
@@ -82,6 +100,7 @@ class SignalExplanation(BaseModel):
     total_confidence: float = Field(..., description="Aggregated ensemble confidence score")
 
     # Components
+    execution_summary: ExecutionSummary = Field(..., description="Execution-level filter breakdown")
     model_attributions: List[ModelAttribution] = Field(..., description="Breakdown per model")
     feature_contributions: List[FeatureContribution] = Field(
         ..., description="Breakdown per feature cluster"
@@ -93,7 +112,7 @@ class SignalExplanation(BaseModel):
     human_readable_summary: str = Field(
         ..., description="Natural language explanation for operators"
     )
-    machine_attribution: Dict[str, float] = Field(
+    machine_attribution: Dict[str, Any] = Field(
         ..., description="Key-value pairs for automated post-trade analysis"
     )
 
@@ -118,30 +137,55 @@ class SignalExplainer:
         model_weights: Dict[str, float],
         risk_data: Dict[str, Any],
         regime_info: Dict[str, Any],
+        execution_data: Optional[Dict[str, Any]] = None,
         feature_impacts: Optional[List[Dict[str, Any]]] = None,
     ) -> SignalExplanation:
         """
         Generate a comprehensive explanation for a trade signal.
         """
-        # 1. Model Attribution
+        # 1. Execution Summary
+        if not execution_data:
+            execution_data = {
+                "passed": True,
+                "filters": [],
+                "summary": "Execution filters bypassed",
+            }
+
+        execution_filters = [
+            FilterResult(
+                filter_name=f["name"],
+                passed=f["passed"],
+                value=f.get("value"),
+                threshold=f.get("threshold"),
+                message=f.get("message"),
+            )
+            for f in execution_data.get("filters", [])
+        ]
+
+        execution_summary = ExecutionSummary(
+            passed=execution_data.get("passed", False),
+            filters=execution_filters,
+            summary=execution_data.get("summary", "No execution data"),
+        )
+
+        # 2. Model Attribution
         attributions = []
         dominant_model = ""
         max_weighted_conf = -1.0
 
-        for name, vote_idx in model_votes.items():
-            # In ensemble.py: 0=buy, 1=sell, 2=hold.
-            # Note: SignalDirection enum matches 1, -1, 0.
-            # We need to map carefully.
-            # EnsembleModel uses: direction_map = {0: 1, 1: -1, 2: 0}
-            direction_map = {
-                0: SignalDirection.BUY,
-                1: SignalDirection.SELL,
-                2: SignalDirection.HOLD,
-            }
-            vote_dir = direction_map.get(int(vote_idx), SignalDirection.HOLD)
+        # Mapping: 0=buy, 1=sell, 2=hold (from ensemble.py logic)
+        direction_map = {
+            0: SignalDirection.BUY,
+            1: SignalDirection.SELL,
+            2: SignalDirection.HOLD,
+        }
 
+        for name, vote_idx in model_votes.items():
+            vote_dir = direction_map.get(int(vote_idx), SignalDirection.HOLD)
             weight = model_weights.get(name, 0.0)
-            # Simplified confidence for individual models if not provided
+
+            # Individual model confidence is either the ensemble confidence (if aligned)
+            # or a neutral 0.5 (if not aligned).
             model_conf = confidence if vote_dir.value == direction else 0.5
 
             weighted_conf = weight * model_conf
@@ -155,15 +199,16 @@ class SignalExplainer:
                     vote=vote_dir,
                     confidence=model_conf,
                     weight=weight,
-                    is_dominant=False,  # Updated below
+                    is_dominant=False,  # Set in second pass
                 )
             )
 
+        # Finalize dominant model
         for attr in attributions:
             if attr.model_name == dominant_model:
                 attr.is_dominant = True
 
-        # 2. Risk Assessment
+        # 3. Risk Assessment
         risk_assessment = RiskAssessment(
             passed=risk_data.get("passed", False),
             rejection_reasons=risk_data.get("rejection_reasons", []),
@@ -173,7 +218,7 @@ class SignalExplainer:
             summary=risk_data.get("summary", "No risk data provided"),
         )
 
-        # 3. Regime Context
+        # 4. Regime Context
         regime_context = RegimeContext(
             regime_name=regime_info.get("name", "Unknown"),
             confidence=regime_info.get("confidence", 0.0),
@@ -182,22 +227,9 @@ class SignalExplainer:
             summary=regime_info.get("summary", "Market state stable"),
         )
 
-        # 4. Feature Contributions (Mocked if not provided)
+        # 5. Feature Contributions
         if not feature_impacts:
-            feature_impacts = [
-                {
-                    "cluster": "Trend",
-                    "score": 0.8,
-                    "impact": "High",
-                    "summary": "Strong bullish momentum detected",
-                },
-                {
-                    "cluster": "Volatility",
-                    "score": -0.2,
-                    "impact": "Low",
-                    "summary": "Volatility is slightly compressing",
-                },
-            ]
+            feature_impacts = []
 
         contributions = [
             FeatureContribution(
@@ -209,31 +241,34 @@ class SignalExplainer:
             for fi in feature_impacts
         ]
 
-        # 5. Generate Human Readable Summary
+        # 6. Generate Human Readable Summary
         dir_str = "BUY" if direction == 1 else "SELL" if direction == -1 else "HOLD"
         reasoning = f"Ensemble generated a {dir_str} signal with {confidence:.1%} confidence. "
         reasoning += f"Primary driver was the {dominant_model} model. "
         reasoning += f"Market is currently in a {regime_context.regime_name} regime. "
 
-        if risk_assessment.passed:
-            reasoning += f"Signal passed all risk filters with R:R of {risk_assessment.risk_reward_ratio:.2f}."
+        if not execution_summary.passed:
+            reasoning += f"EXECUTION BLOCKED: {execution_summary.summary}. "
+        elif not risk_assessment.passed:
+            reasoning += f"Risk REJECTED: {', '.join(risk_assessment.rejection_reasons)}. "
         else:
-            reasoning += (
-                f"Signal REJECTED by risk filters: {', '.join(risk_assessment.rejection_reasons)}."
-            )
+            reasoning += f"Passed all filters with R:R of {risk_assessment.risk_reward_ratio:.2f}."
 
-        # 6. Machine Attribution
+        # 7. Machine Attribution
         machine_attr = {
             "model_confidence": confidence,
-            "risk_score": 1.0 if risk_assessment.passed else 0.0,
+            "risk_passed": risk_assessment.passed,
+            "execution_passed": execution_summary.passed,
             "regime_confluence": regime_context.confidence,
             "dominant_model_weight": model_weights.get(dominant_model, 0.0),
+            "dominant_model_name": dominant_model,
         }
 
         return SignalExplanation(
             symbol=symbol,
             direction=SignalDirection(direction),
             total_confidence=confidence,
+            execution_summary=execution_summary,
             model_attributions=attributions,
             feature_contributions=contributions,
             risk_assessment=risk_assessment,
@@ -296,11 +331,21 @@ class SignalExplainer:
                     "⭐" if attr.is_dominant else "",
                 )
 
-            # 3. Risk and Regime
+            # 3. Execution and Risk
+            exec_table = Table(title="Execution Filters", box=box.SIMPLE, expand=True)
+            exec_table.add_column("Filter")
+            exec_table.add_column("Status", justify="center")
+            exec_table.add_column("Details")
+
+            for f in explanation.execution_summary.filters:
+                status = "[green]OK[/green]" if f.passed else "[red]FAIL[/red]"
+                details = f.message or f"Value: {f.value} (Thr: {f.threshold})"
+                exec_table.add_row(f.filter_name, status, details)
+
             risk_status = (
                 "[bold green]PASSED[/bold green]"
                 if explanation.risk_assessment.passed
-                else "[bold red]FAILED[/bold red]"
+                else "[bold red]REJECTED[/bold red]"
             )
             risk_info = (
                 f"Risk Gate: {risk_status}\n"
@@ -320,6 +365,8 @@ class SignalExplainer:
             with console.capture() as capture:
                 console.print(header)
                 console.print(model_table)
+                if explanation.execution_summary.filters:
+                    console.print(exec_table)
                 console.print(Panel(risk_info, title="Risk Assessment"))
                 console.print(Panel(regime_info, title="Market Context"))
 
@@ -333,6 +380,12 @@ class SignalExplainer:
             output += "Model Votes:\n"
             for attr in explanation.model_attributions:
                 output += f"  - {attr.model_name}: {attr.vote.name} (W={attr.weight:.1%}, C={attr.confidence:.1%}) {'[DOMINANT]' if attr.is_dominant else ''}\n"
-            output += f"\nRisk Assessment: {'PASSED' if explanation.risk_assessment.passed else 'FAILED'}\n"
+
+            if explanation.execution_summary.filters:
+                output += f"\nExecution: {'PASSED' if explanation.execution_summary.passed else 'BLOCKED'}\n"
+                for f in explanation.execution_summary.filters:
+                    output += f"  - {f.filter_name}: {'OK' if f.passed else 'FAIL'} ({f.message or f.value})\n"
+
+            output += f"\nRisk Assessment: {'PASSED' if explanation.risk_assessment.passed else 'REJECTED'}\n"
             output += f"Regime: {explanation.regime_context.regime_name} ({explanation.regime_context.volatility_state})\n"
             return output

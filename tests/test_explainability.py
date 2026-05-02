@@ -15,6 +15,11 @@ def test_signal_explanation_pydantic_validation():
         "symbol": "XAUUSD",
         "direction": 1,
         "total_confidence": 0.85,
+        "execution_summary": {
+            "passed": True,
+            "filters": [{"filter_name": "Spread", "passed": True, "value": 0.5}],
+            "summary": "Execution OK",
+        },
         "model_attributions": [
             {"model_name": "PPO", "vote": 1, "confidence": 0.85, "weight": 0.6, "is_dominant": True}
         ],
@@ -46,6 +51,7 @@ def test_signal_explanation_pydantic_validation():
     explanation = SignalExplanation(**data)
     assert explanation.symbol == "XAUUSD"
     assert explanation.direction == SignalDirection.BUY
+    assert explanation.execution_summary.passed is True
     assert len(explanation.model_attributions) == 1
     assert explanation.model_attributions[0].is_dominant is True
 
@@ -73,6 +79,11 @@ def test_signal_explainer_aggregation():
         "is_favorable": True,
         "summary": "Strong momentum",
     }
+    execution_data = {
+        "passed": True,
+        "filters": [{"name": "Spread", "passed": True, "value": 0.2, "threshold": 1.0}],
+        "summary": "Spread tight",
+    }
 
     explanation = explainer.explain(
         symbol=symbol,
@@ -82,11 +93,13 @@ def test_signal_explainer_aggregation():
         model_weights=model_weights,
         risk_data=risk_data,
         regime_info=regime_info,
+        execution_data=execution_data,
     )
 
     assert explanation.symbol == symbol
     assert explanation.direction == SignalDirection.BUY
     assert explanation.total_confidence == confidence
+    assert explanation.execution_summary.passed is True
     assert len(explanation.model_attributions) == 2
 
     # Check dominant model (ppo has higher weight)
@@ -98,8 +111,33 @@ def test_signal_explainer_aggregation():
     assert "Ensemble generated a BUY signal" in explanation.human_readable_summary
 
 
-def test_signal_explainer_rejection():
-    """Test explanation generation for a rejected signal."""
+def test_signal_explainer_execution_blocked():
+    """Test explanation generation for a signal blocked by execution filters."""
+    explainer = SignalExplainer()
+
+    execution_data = {
+        "passed": False,
+        "filters": [{"name": "Spread", "passed": False, "value": 3.0, "threshold": 2.0}],
+        "summary": "High spread",
+    }
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 0},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True, "risk_reward": 2.0, "summary": "Risk OK"},
+        regime_info={"name": "Bullish"},
+        execution_data=execution_data,
+    )
+
+    assert explanation.execution_summary.passed is False
+    assert "EXECUTION BLOCKED: High spread" in explanation.human_readable_summary
+
+
+def test_signal_explainer_risk_rejection():
+    """Test explanation generation for a signal rejected by risk filters."""
     explainer = SignalExplainer()
 
     risk_data = {
@@ -123,7 +161,7 @@ def test_signal_explainer_rejection():
     assert explanation.direction == SignalDirection.SELL
     assert explanation.risk_assessment.passed is False
     assert "Daily loss limit reached" in explanation.risk_assessment.rejection_reasons
-    assert "Signal REJECTED by risk filters" in explanation.human_readable_summary
+    assert "Risk REJECTED" in explanation.human_readable_summary
 
 
 def test_format_for_terminal_fallback():
@@ -137,6 +175,11 @@ def test_format_for_terminal_fallback():
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 3.0, "summary": "Ok"},
         regime_info={"name": "Bullish"},
+        execution_data={
+            "passed": True,
+            "filters": [{"name": "Spread", "passed": True, "value": 0.5}],
+            "summary": "OK",
+        },
     )
 
     formatted = explainer.format_for_terminal(explanation)
@@ -144,4 +187,5 @@ def test_format_for_terminal_fallback():
     assert "XAUUSD" in formatted
     assert "BUY" in formatted
     assert "ppo" in formatted
+    assert "Execution" in formatted or "EXECUTION" in formatted.upper()
     assert "Risk Assessment" in formatted or "RISK" in formatted.upper()

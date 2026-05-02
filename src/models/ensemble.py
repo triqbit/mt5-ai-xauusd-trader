@@ -9,6 +9,7 @@ Weighted confidence voting with dynamic weight adaptation.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,8 +17,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+try:
+    import torch
+    import torch.nn as nn
+except ImportError:
+    torch = None
+    nn = None
 
 from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
@@ -26,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── LSTM + Attention sub-model ──────────────────────────────────────────────
-class LSTMAttentionModel(nn.Module):
+class LSTMAttentionModel(nn.Module if nn is not None else object):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
@@ -82,12 +88,11 @@ class EnsembleModel:
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
     def __init__(self, device: str = "cpu") -> None:
+        if torch is None:
+            raise ImportError("torch is required for EnsembleModel")
         self.device = torch.device(device)
         self.dynamic_ensemble = DynamicEnsemble(
-            model_names=self.ALGORITHMS,
-            smoothing_factor=0.1,
-            max_swing=0.05,
-            min_weight=0.05
+            model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
         )
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
