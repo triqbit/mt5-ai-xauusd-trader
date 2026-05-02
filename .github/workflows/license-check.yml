@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install Project Dependencies for Scan
@@ -28,8 +28,8 @@ jobs:
           pip install pip-licenses
           # We must scan ALL dependencies. However, to avoid build failures in CI,
           # we install with --no-deps if possible or use the full requirements file
-          # but skip the C-library dependent TA-Lib.
-          grep -v "TA-Lib" requirements.txt > requirements-scan.txt
+          # but skip the C-library dependent TA-Lib and MetaTrader5.
+          grep -vE "TA-Lib|MetaTrader5|pandas-ta" requirements.txt > requirements-scan.txt
           # We use --extra-index-url for torch to ensure it finds the CPU version easily
           pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-scan.txt
 

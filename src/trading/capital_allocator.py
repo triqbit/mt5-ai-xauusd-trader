@@ -66,7 +66,7 @@ class CapitalAllocator:
         max_family_risk: float = 0.4,  # Max 40% of budget per model family
         max_total_heat: float = 0.7,  # Max 70% of budget committed at once
         performance_step: float = 0.05,  # Adjustment step for performance multiplier
-        decay_rate: float = 0.001,      # Rate at which multiplier returns to 1.0
+        decay_rate: float = 0.001,  # Rate at which multiplier returns to 1.0
     ):
         self.total_budget = total_budget
         self.max_symbol_risk = max_symbol_risk
@@ -102,13 +102,19 @@ class CapitalAllocator:
         config.historical_pnl += pnl
 
         if pnl > 0:
-            config.performance_multiplier = min(2.0, config.performance_multiplier + self.performance_step)
+            config.performance_multiplier = min(
+                2.0, config.performance_multiplier + self.performance_step
+            )
         elif pnl < 0:
-            config.performance_multiplier = max(0.0, config.performance_multiplier - self.performance_step)
+            config.performance_multiplier = max(
+                0.0, config.performance_multiplier - self.performance_step
+            )
 
         logger.debug(
             "Strategy %s multiplier updated to %.2f | PnL: %.2f",
-            strategy_id, config.performance_multiplier, pnl
+            strategy_id,
+            config.performance_multiplier,
+            pnl,
         )
 
     def decay_performance_multipliers(self) -> None:
@@ -118,9 +124,13 @@ class CapitalAllocator:
         """
         for config in self.strategies.values():
             if config.performance_multiplier > 1.0:
-                config.performance_multiplier = max(1.0, config.performance_multiplier - self.decay_rate)
+                config.performance_multiplier = max(
+                    1.0, config.performance_multiplier - self.decay_rate
+                )
             elif config.performance_multiplier < 1.0:
-                config.performance_multiplier = min(1.0, config.performance_multiplier + self.decay_rate)
+                config.performance_multiplier = min(
+                    1.0, config.performance_multiplier + self.decay_rate
+                )
 
     def get_total_heat(self) -> float:
         """Calculate current portfolio heat (total committed capital ratio)."""
@@ -179,7 +189,12 @@ class CapitalAllocator:
         # 2. Check Strategy-Level Capital Cap
         # Ensure we don't exceed the absolute capital limit for this strategy.
         if target_amount > config.capital_cap:
-            logger.debug("Strategy %s target amount %.2f exceeds cap %.2f", strategy_id, target_amount, config.capital_cap)
+            logger.debug(
+                "Strategy %s target amount %.2f exceeds cap %.2f",
+                strategy_id,
+                target_amount,
+                config.capital_cap,
+            )
             target_amount = config.capital_cap
             target_risk_pct = target_amount / self.total_budget
 

@@ -9,6 +9,8 @@ The `CapitalAllocator` is an institutional-grade capital management system desig
 - **Adaptive Budget Allocation**: Dynamically adjusts requested risk based on a strategy's `performance_multiplier`, rewarding profitable strategies and scaling down underperforming ones.
 - **Diversification-Aware Routing**: Groups strategies by symbol and model family to enforce concentration limits, ensuring the portfolio remains diversified.
 - **Safety Limits**: Implements configurable limits for total portfolio heat, symbol-level risk, and model-family-level risk.
+- **Programmatic Rejection Codes**: Returns specific `RejectionCode` values (e.g., `TOTAL_HEAT_LIMIT`, `SYMBOL_CONCENTRATION_LIMIT`) for automated handling of allocation failures.
+- **Dynamic Risk Adaptation**: Automatically updates strategy multipliers based on PnL outcomes and decays them back to baseline (1.0) over time.
 
 ## Configuration
 
@@ -18,6 +20,8 @@ The `CapitalAllocator` is initialized with the following parameters:
 - `max_symbol_risk`: Maximum percentage of total budget that can be allocated to a single symbol (default: 40%).
 - `max_family_risk`: Maximum percentage of total budget that can be allocated to a single model family (default: 40%).
 - `max_total_heat`: Maximum total percentage of budget that can be committed at once (default: 70%).
+- `performance_step`: The increment/decrement applied to the performance multiplier after each trade (default: 0.05).
+- `decay_rate`: The rate at which the multiplier returns to 1.0 periodically (default: 0.001).
 
 ### Strategy Configuration
 
@@ -28,6 +32,7 @@ Each strategy is registered using a `StrategyConfig` model:
 - `model_family`: The family of the model (e.g., RL, LSTM, Ensemble).
 - `capital_cap`: Maximum absolute capital the strategy is allowed to use.
 - `performance_multiplier`: A multiplier (0.0 to 2.0) applied to the strategy's requested risk.
+- `historical_pnl`: Accumulated PnL for tracking long-term strategy health.
 
 ## Usage Example
 
@@ -51,11 +56,15 @@ allocator.add_strategy(gold_ppo_config)
 result = allocator.request_allocation("gold_ppo_v1", 0.01)
 
 if result.is_allowed:
-    print(f"Allocated {result.allocated_amount} ({result.risk_pct * 100}%)")
+    print(f"Allocated {result.allocated_amount} ({result.allocated_risk_pct * 100}%)")
     # Update current allocation after placing trade
     allocator.update_allocation("gold_ppo_v1", result.allocated_amount)
 else:
-    print(f"Rejected: {result.rejection_reason}")
+    print(f"Rejected: {result.rejection_reason} (Code: {result.rejection_code})")
+
+# After trade closes
+allocator.update_strategy_performance("gold_ppo_v1", 500.0) # Profitable trade
+allocator.update_allocation("gold_ppo_v1", 0.0) # Reset allocation
 ```
 
 ## Integration with Risk Engine
