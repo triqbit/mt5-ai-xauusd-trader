@@ -5,6 +5,7 @@ Real-time monitoring, equity tracking, Prometheus metrics, and Telegram alerting
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,6 +26,11 @@ DAILY_PNL_GAUGE = Gauge("trading_pnl_daily", "Realized P&L for the current day")
 TRADE_COUNTER = Counter("trading_trades_total", "Total number of trades executed")
 DRAWDOWN_GAUGE = Gauge("trading_drawdown_percent", "Current account drawdown percentage")
 CONFIDENCE_GAUGE = Gauge("trading_model_confidence", "Latest model prediction confidence")
+SHARPE_RATIO_GAUGE = Gauge("trading_sharpe_ratio", "Annualized Sharpe Ratio")
+WIN_RATE_GAUGE = Gauge("trading_win_rate", "Trading win rate percentage")
+SYSTEM_ERROR_COUNTER = Counter(
+    "trading_system_errors", "Total count of system errors", ["component"]
+)
 
 
 class Monitor:
@@ -66,33 +72,25 @@ class Monitor:
         logger.debug("Equity logged: %.2f", equity)
 
     def send_message(self, text: str) -> None:
-        """Synchronous wrapper to send Telegram message."""
+        """
+        Synchronous wrapper to send Telegram message.
+        Handles both synchronous and asynchronous contexts safely.
+        """
         if not self.bot or not self.cfg.telegram_chat_id:
             logger.debug("Telegram bot not configured, message not sent: %s", text)
             return
 
         try:
-            # python-telegram-bot v20+ is async.
-            # We use asyncio.run as the main loop is synchronous.
-            # Note: In production, we should handle if there's already a running loop.
             try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = None
-
-            if loop and loop.is_running():
-                # If we are in an async context, we shouldn't use asyncio.run
-                # But main.py is mostly synchronous.
-                # A safer way to do this in a multi-threaded/async environment
-                # is to have a dedicated worker for Telegram messages.
-                # For now, adhering to the requested implementation.
-                task = asyncio.create_task(
+                loop = asyncio.get_running_loop()
+                # We are inside a running event loop, schedule task
+                task = loop.create_task(
                     self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
                 )
-                # Store task reference to prevent garbage collection (RUF006)
                 self._background_tasks.add(task)
                 task.add_done_callback(self._background_tasks.discard)
-            else:
+            except RuntimeError:
+                # No event loop is running, use asyncio.run (blocking)
                 asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
 
             logger.info("Telegram message sent")
@@ -102,7 +100,7 @@ class Monitor:
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger and update metrics."""
         DRAWDOWN_GAUGE.set(drawdown * 100)
-        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown*100:.2f}%\nTrading Halted."
+        msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown * 100:.2f}%\nTrading Halted."
         self.send_message(msg)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:
@@ -133,6 +131,23 @@ class Monitor:
     def record_trade(self) -> None:
         """Increment the total trade counter."""
         TRADE_COUNTER.inc()
+
+    def log_system_error(self, component: str, error_message: str) -> None:
+        """Log system errors to Prometheus and send a Telegram alert."""
+        SYSTEM_ERROR_COUNTER.labels(component=component).inc()
+        msg = f"❌ SYSTEM ERROR: {component}\nError: {error_message}"
+        self.send_message(msg)
+        logger.error("System error logged | component=%s, error=%s", component, error_message)
+
+    def update_performance_metrics(self, win_rate: float, sharpe_ratio: float) -> None:
+        """Update Sharpe Ratio and Win Rate Prometheus metrics."""
+        WIN_RATE_GAUGE.set(win_rate * 100)
+        SHARPE_RATIO_GAUGE.set(sharpe_ratio)
+        logger.debug(
+            "Performance metrics updated | Win Rate: %.2f%%, Sharpe: %.2f",
+            win_rate * 100,
+            sharpe_ratio,
+        )
 
 
 __all__ = ["Monitor"]

@@ -92,6 +92,8 @@ def run_live(
                 signal_obj = model.predict(obs)
                 direction = signal_obj.direction
                 confidence = signal_obj.confidence
+                if monitor:
+                    monitor.check_confidence_degradation(confidence)
 
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
@@ -143,16 +145,13 @@ def run_live(
                     # Calculate current drawdown for the filter
                     drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
                     decision = execution_filter.validate(
-                        signal,
-                        df,
-                        current_drawdown=drawdown,
-                        timestamp=datetime.now(timezone.utc)
+                        signal, df, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
                     )
                     if not decision.is_approved:
                         log.warning(
                             "Signal BLOCKED by ExecutionFilter | %s | Reason: %s",
                             cfg.symbol,
-                            decision.blocked_by
+                            decision.blocked_by,
                         )
                         approved = False
 
@@ -274,8 +273,11 @@ def main() -> int:
         db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
+    monitor.start_metrics_server()
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
-    execution_filter = ExecutionFilter(max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15)
+    execution_filter = ExecutionFilter(
+        max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15
+    )
 
     # Model Factory based on --algo flag
     if args.algo == "ensemble":
@@ -293,7 +295,9 @@ def main() -> int:
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
     else:
-        log.warning(f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble")
+        log.warning(
+            f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble"
+        )
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
