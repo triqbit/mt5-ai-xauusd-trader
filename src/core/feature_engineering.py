@@ -219,12 +219,25 @@ class FeatureEngineer:
         return slope
 
     def _get_volume_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute volume-based features."""
+        """Compute volume-based features including rolling VWAP and VPT."""
         vol = {}
+        close = df["close"]
+        high = df["high"]
+        low = df["low"]
         volume = df["tick_volume"]
 
         vol["vol_sma_20"] = volume / volume.rolling(window=20).mean().replace(0, 1e-8)
-        vol["obv"] = talib.OBV(df["close"].values, volume.values.astype(float))
+        vol["obv"] = talib.OBV(close.values, volume.values.astype(float))
+
+        # VWAP Approximation (Rolling)
+        typical_price = (high + low + close) / 3
+        vol["vwap_20"] = (typical_price * volume).rolling(window=20).sum() / volume.rolling(
+            window=20
+        ).sum().replace(0, 1e-8)
+        vol["dist_vwap_20"] = (close - vol["vwap_20"]) / vol["vwap_20"].replace(0, 1e-8)
+
+        # Volume Price Trend (VPT)
+        vol["vpt"] = (volume * close.pct_change().fillna(0)).cumsum()
 
         return pd.DataFrame(vol, index=df.index)
 
