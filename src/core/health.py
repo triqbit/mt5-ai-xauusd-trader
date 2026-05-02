@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from prometheus_client import Gauge
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
@@ -92,7 +93,7 @@ class HealthChecker:
         try:
             # Simple connectivity check using SQLAlchemy engine
             with self.trade_logger.engine.connect() as conn:
-                conn.execute(self.trade_logger.engine.dialect.do_ping(conn.connection))
+                conn.execute(text("SELECT 1"))
             return ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)

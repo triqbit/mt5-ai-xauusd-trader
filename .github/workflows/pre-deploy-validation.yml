@@ -26,8 +26,8 @@ jobs:
       - name: Install Validation Tools
         run: |
           pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3
-          # Core dependencies for type information
-          pip install pydantic pydantic-settings sqlalchemy structlog
+          # Install all CI dependencies to provide full type information for Mypy
+          pip install -r requirements-ci.txt
 
       - name: Ruff Lint & Format Check
         run: |

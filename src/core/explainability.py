@@ -231,6 +231,7 @@ class SignalExplainer:
         }
 
         return SignalExplanation(
+            signal_id=None,
             symbol=symbol,
             direction=SignalDirection(direction),
             total_confidence=confidence,
