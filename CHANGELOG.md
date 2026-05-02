@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Cascading 6-layer execution filter in `src/trading/execution_filter.py` validating ATR, Trend Angle, EMA sequence, Momentum, Session time, and Drawdown.
 - Enterprise-grade monitoring and alerting system in `src/core/monitor.py` with Prometheus integration and Telegram bot support.
 - Disciplined walk-forward optimization framework in `src/research/hyperopt_walkforward.py` with Optuna integration.
 - Robustness scoring logic (Sharpe consistency, MDD preservation, parameter stability).
