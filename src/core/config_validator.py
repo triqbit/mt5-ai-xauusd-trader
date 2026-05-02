@@ -6,6 +6,7 @@ src/core/config_validator.py
 import os
 from typing import List, NamedTuple
 
+from src.core.audit_log import get_audit_logger
 from src.core.config import TradingConfig
 
 
@@ -39,6 +40,22 @@ class ConfigValidator:
 
         # Application is valid only if there are no critical errors
         success = not any(e.critical for e in self.errors)
+
+        # Log validation results to Audit Trail
+        audit = get_audit_logger(self.config.database_url)
+        audit.log_risk_decision(
+            decision="VALIDATION_PASSED" if success else "VALIDATION_FAILED",
+            reason="Configuration validation result" if success else "Critical validation errors",
+            metadata={
+                "success": success,
+                "error_count": len(self.errors),
+                "errors": [
+                    {"field": e.field, "message": e.message, "critical": e.critical}
+                    for e in self.errors
+                ],
+            },
+        )
+
         return ValidationResult(success=success, errors=self.errors)
 
     def _check_mt5_credentials(self) -> None:

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
 
+from src.core.audit_log import get_audit_logger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -86,29 +87,44 @@ class RiskManager:
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
         Run the full 6-layer risk filter cascade.
+        Logs the full decision chain for compliance audit.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        audit = get_audit_logger()
 
-        passed = rejection_reason == ""
+        results = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
+
+        passed = all(results.values())
+        rejection_reason = next((k for k, v in results.items() if not v), "") if not passed else ""
+
+        # Log to Audit Trail
+        audit.log_risk_decision(
+            decision="APPROVED" if passed else "REJECTED",
+            reason=rejection_reason,
+            metadata={
+                "signal_id": signal_id,
+                "symbol": signal.symbol,
+                "direction": signal.direction,
+                "filters": results,
+                "confidence": signal.confidence,
+                "lot_size": signal.lot_size
+            }
+        )
+
         if not passed:
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
+                "Signal REJECTED | %s %s | Reason: %s | Chain: %s",
                 signal.symbol,
                 signal.direction,
                 rejection_reason,
+                results
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
@@ -117,6 +133,9 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+        else:
+            logger.info("Signal APPROVED | %s %s", signal.symbol, signal.direction)
+
         return passed
 
     def size_position(

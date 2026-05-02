@@ -19,6 +19,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from src.core.audit_log import get_audit_logger
 from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
 
@@ -130,6 +131,7 @@ class EnsembleModel:
         Return (direction, confidence, per_algo_probs).
         direction: +1 buy, -1 sell, 0 hold
         """
+        audit = get_audit_logger()
         votes: Dict[str, np.ndarray] = {}
 
         # PPO prediction
@@ -162,6 +164,19 @@ class EnsembleModel:
         direction = direction_map[action_idx]
 
         per_algo = {k: float(np.argmax(votes[k])) for k in votes}
+
+        # Log to Audit Trail
+        audit.log_model_prediction(
+            model_name="ensemble",
+            outcome=int(direction),
+            confidence=confidence,
+            metadata={
+                "votes": per_algo,
+                "weights": self.weights,
+                "blended_probs": blended.tolist()
+            }
+        )
+
         logger.debug(
             "Ensemble | dir=%d conf=%.3f votes=%s",
             direction,

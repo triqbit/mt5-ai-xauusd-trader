@@ -23,6 +23,7 @@ from typing import Optional
 import structlog
 
 from src.core import get_config, profile
+from src.core.audit_log import get_audit_logger
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
@@ -63,6 +64,7 @@ def run_live(
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
+    audit = get_audit_logger()
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
@@ -170,6 +172,11 @@ def run_live(
             monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
+            audit.log_operator_action(
+                action="SHUTDOWN",
+                description="Manual shutdown via KeyboardInterrupt",
+                actor="operator"
+            )
             break
         except Exception as exc:
             log.exception("Unhandled error in trading loop: %s", exc)
@@ -262,6 +269,30 @@ def main() -> int:
         return 1
 
     log.info("System HEALTH CHECK PASSED | status=%s", health_report.status)
+
+    # Initialize Audit Logger with full database URL
+    audit = get_audit_logger(cfg.database_url)
+    # Log release and configuration
+    try:
+        import tomllib
+        with open("pyproject.toml", "rb") as f:
+            py_data = tomllib.load(f)
+            # Check both [project] and [tool.pointer] or similar.
+            # In PEP 621 it is [project].version
+            version = py_data.get("project", {}).get("version") or py_data.get("tool", {}).get("poetry", {}).get("version", "1.0.0")
+    except Exception:
+        version = "1.0.0"
+
+    audit.log_release_event(
+        version=version,
+        event="STARTUP",
+        metadata={
+            "mode": cfg.mode,
+            "algo": cfg.algorithm,
+            "symbol": cfg.symbol,
+            "risk_per_trade": cfg.risk_per_trade
+        }
+    )
 
     try:
         if cfg.mode in ("demo", "live"):
