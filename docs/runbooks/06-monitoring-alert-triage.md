@@ -40,9 +40,15 @@ This runbook defines the triage process for alerts received via Telegram or othe
 5. **Communicate:** Update stakeholders if P0 or P1.
 6. **Resolve:** Once the issue is fixed, verify via dashboards and close the alert.
 
-## Verification
-- Dashboard metrics return to normal ranges.
-- Telegram alert: `RESOLVED: [Alert Name]`.
+## Expected Outcomes
+- Every critical alert (P0/P1) is acknowledged within its defined response time.
+- The root cause of the alert is identified and mitigated using the appropriate runbook.
+- Communication is maintained with stakeholders throughout the incident lifecycle.
+
+## Verification Commands
+- **Check Recent Alerts:** Review Telegram bot chat history for `RESOLVED` messages.
+- **Check System Health:** `curl http://localhost:8000/metrics | grep health` (if Prometheus metrics are enabled).
+- **Check Audit Trail:** `sqlite3 trades.db "SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 10;"`
 
 ## Escalation Path
 - **P0/P1:** Notify on-call engineer and team lead.

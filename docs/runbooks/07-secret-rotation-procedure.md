@@ -52,10 +52,15 @@ This runbook describes the procedure for rotating critical secrets and API keys 
    - `DOCKERHUB_TOKEN`
 3. Trigger a new `dry_run` release to verify the secrets work.
 
-## Verification
-1. Check logs for successful startup: `Application started`.
-2. Verify MT5 connection: `Broker Connected`.
-3. Send a test Telegram message: `System Health: Secret rotation verified`.
+## Expected Outcomes
+- New secrets are successfully applied to the production environment.
+- Application restarts and establishes connections with all external services using new credentials.
+- Old secrets are revoked and no longer functional, minimizing the window of exposure.
+
+## Verification Commands
+- **Check Logs:** `grep -E "MT5|Telegram|MetaAPI" trading_bot.log | grep "Connected"`
+- **Test Telegram:** `curl -X POST https://api.telegram.org/bot<TOKEN>/sendMessage -d "chat_id=<ID>&text=Secret rotation test"`
+- **Verify Config:** `python scripts/validate_env.py` (if available)
 
 ## Safety Guidelines
 - **Never** commit secrets to the repository.

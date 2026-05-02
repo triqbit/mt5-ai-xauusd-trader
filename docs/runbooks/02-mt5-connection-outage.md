@@ -52,9 +52,15 @@ If MT5 remains unreachable for >15 minutes:
 1. **Manual Intervention:** Use a mobile MT5 app to monitor and manage open positions.
 2. **Emergency Stop:** Set `MODE=backtest` or shut down the bot to prevent unintended trades once connection is restored.
 
-## Verification
-- Check logs for: `RiskManager initialised | balance=...`
-- Verify Telegram P3 alert: `System Health: Broker Connected`.
+## Expected Outcomes
+- Bot successfully initializes and connects to the MT5 terminal or MetaAPI.
+- Trading activity resumes (if market is open and signals are valid).
+- Real-time price data starts flowing into the application.
+
+## Verification Commands
+- **Check Health API:** `curl http://localhost:8000/health/readiness`
+- **Tail Logs:** `tail -n 50 trading_bot.log | grep -E "MT5|MetaAPI"`
+- **Docker Status:** `docker ps | grep mt5-trader`
 
 ## Escalation Path
 1. **Level 1:** Trading Operations.

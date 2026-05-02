@@ -8,7 +8,7 @@ mock_talib = MagicMock()
 
 # Setup common TA-Lib functions to return expected types matching input length
 mock_talib.RSI.side_effect = lambda x, **kwargs: np.zeros(len(x))
-mock_talib.MACD.side_effect = lambda x, **kwargs: (np.zeros(len(x)), np.zeros(len(x)), np.zeros(len(x)))
+mock_talib.MACD.side_effect = lambda x, *args, **kwargs: (np.zeros(len(x)), np.zeros(len(x)), np.zeros(len(x)))
 mock_talib.SMA.side_effect = lambda x, **kwargs: np.zeros(len(x))
 mock_talib.EMA.side_effect = lambda x, **kwargs: np.zeros(len(x))
 mock_talib.ATR.side_effect = lambda h, l, c, **kwargs: np.zeros(len(c))
