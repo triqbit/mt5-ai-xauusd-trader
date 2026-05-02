@@ -1,4 +1,11 @@
+try:
+    import torch
+except ImportError:
+    torch = None
 import pytest
+
+pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
+
 import numpy as np
 import pandas as pd
 from unittest.mock import MagicMock, patch
