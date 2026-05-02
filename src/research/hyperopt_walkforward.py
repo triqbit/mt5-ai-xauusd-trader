@@ -7,18 +7,17 @@ Disciplined Walk-Forward Optimization with Robustness Scoring.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
-import pandas as pd
 import optuna
+import pandas as pd
 from pydantic import BaseModel, Field
 
+from src.models.regime_detector import RegimeDetector
 from src.research.benchmarks import BenchmarkEvaluator, BenchmarkStrategy
-from src.models.regime_detector import RegimeDetector, MarketRegime
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +106,7 @@ class WalkForwardOptimizer:
         Calculates a penalty for parameter instability by perturbing continuous parameters.
         """
         base_metrics = self._evaluate_strategy(data, params)
-        base_sharpe = base_metrics.get("Sharpe Ratio", 0.0)
+        base_metrics.get("Sharpe Ratio", 0.0)
 
         perturbations = []
         for key, value in params.items():
@@ -166,7 +165,6 @@ class WalkForwardOptimizer:
         if len(windows) < self.config.min_windows:
             raise ValueError(f"Insufficient data for {self.config.min_windows} windows.")
 
-        window_results = []
 
         # 1. Optimize on the entire historical period to find globally robust params
         # This is a simplification; a true walk-forward would optimize window by window.
