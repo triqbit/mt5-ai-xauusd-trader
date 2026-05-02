@@ -1,6 +1,6 @@
 #!/bin/bash
 # MT5 AI/ML Trading Bot - Release Packaging Script
-# This script standardizes the creation of a deployable release artifact.
+# Standardizes the creation of a deployable release artifact.
 # Author: Jules03 (Release Reliability & Governance)
 
 set -e
@@ -52,10 +52,20 @@ mkdir -p "$RELEASE_PATH"
 
 # A. Docker Info
 echo "Collecting Docker Information..."
+# Try to get real digest if image exists locally
+DIGEST="sha256:0000000000000000000000000000000000000000000000000000000000000000"
+if command -v docker >/dev/null 2>&1; then
+    LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_NAME}:v${VERSION}" 2>/dev/null | cut -d '@' -f 2 || true)
+    if [ -n "$LOCAL_DIGEST" ]; then
+        DIGEST="$LOCAL_DIGEST"
+    fi
+fi
+
 cat <<EOF > "${RELEASE_PATH}/docker_info.json"
 {
   "image": "${IMAGE_NAME}",
   "tag": "v${VERSION}",
+  "digest": "${DIGEST}",
   "build_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "vcs_ref": "$(git rev-parse HEAD 2>/dev/null || echo "unknown")"
 }
@@ -81,15 +91,27 @@ fi
 
 # D. Configuration Documentation
 echo "Generating Configuration Reference..."
-python3 scripts/generate_config_docs.py src/core/config.py "${RELEASE_PATH}/CONFIG_REFERENCE.md" "$VERSION"
+if [ -f "scripts/generate_config_docs.py" ]; then
+    python3 scripts/generate_config_docs.py src/core/config.py "${RELEASE_PATH}/CONFIG_REFERENCE.md" "$VERSION"
+else
+    echo "Error: scripts/generate_config_docs.py not found."
+    exit 1
+fi
 
 # E. Release Notes
-echo "Extracting Release Notes..."
+echo "Extracting Release Notes for v${VERSION}..."
 if [ -f "CHANGELOG.md" ]; then
-    # Improved extraction logic: find [Unreleased] section and stop at the next version header
-    sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+    ESCAPED_VERSION=$(echo "$VERSION" | sed 's/\./\\./g')
+    if grep -q "## \[$ESCAPED_VERSION\]" CHANGELOG.md; then
+        echo "Found section for v${VERSION} in CHANGELOG.md"
+        sed -n "/## \[$ESCAPED_VERSION\]/,/## \[/p" CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+    else
+        echo "Warning: Version v${VERSION} not found in CHANGELOG.md, falling back to [Unreleased]"
+        sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+    fi
+
     if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ]; then
-         echo "Warning: RELEASE_NOTES.md is empty. Ensure [Unreleased] section in CHANGELOG.md is populated."
+         echo "Warning: RELEASE_NOTES.md is empty."
          echo "Development Build - No specific release notes." > "${RELEASE_PATH}/RELEASE_NOTES.md"
     fi
 else
@@ -100,7 +122,14 @@ fi
 # --- 4. Validation & Checksums ---
 
 echo "Validating Artifact Completeness..."
-MANDATORY_FILES=("docker_info.json" ".env.example" "CONFIG_REFERENCE.md" "RELEASE_NOTES.md" "migrations/env.py")
+MANDATORY_FILES=(
+    "docker_info.json"
+    ".env.example"
+    "CONFIG_REFERENCE.md"
+    "RELEASE_NOTES.md"
+    "migrations/env.py"
+    "migrations/script.py.mako"
+)
 
 for file in "${MANDATORY_FILES[@]}"; do
     if [ ! -f "${RELEASE_PATH}/${file}" ]; then
@@ -114,9 +143,15 @@ for file in "${MANDATORY_FILES[@]}"; do
 done
 
 echo "Generating Checksum Manifest..."
-(cd "${RELEASE_PATH}" && find . -type f ! -name "checksums.sha256" | while read -r f; do
-    sha256_cmd "$f" >> "checksums.sha256"
+(cd "${RELEASE_PATH}" && find . -type f ! -name "checksums.sha256" | sort | while read -r f; do
+    # Remove leading ./
+    clean_f=$(echo "$f" | sed 's|^\./||')
+    sha256_cmd "$clean_f" >> "checksums.sha256"
 done)
+
+# Final verification of manifest
+echo "Verifying Checksum Manifest..."
+(cd "${RELEASE_PATH}" && sha256_cmd -c "checksums.sha256" > /dev/null)
 
 echo "--------------------------------------------------------"
 echo "SUCCESS: Release v${VERSION} packaged successfully."
