@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
 
+from src.core.constants import SignalDirection
 from src.models.regime_detector import MarketRegime, RegimeDetector
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 class RLModel(Protocol):
     """Protocol for RL agents to ensure consistent evaluation."""
-    def predict(self, observation: np.ndarray) -> int:
+
+    def predict(self, observation: np.ndarray) -> Any:
         ...
 
 
@@ -29,7 +31,10 @@ class StabilityMetrics(BaseModel):
     sharpe_ratio: float = Field(..., description="Annualized Sharpe Ratio")
     sortino_ratio: float = Field(..., description="Annualized Sortino Ratio")
     volatility: float = Field(..., description="Annualized volatility")
-    stability_score: float = Field(..., description="Metric for consistency of returns")
+    calmar_ratio: float = Field(..., description="Return / Max Drawdown")
+    expectancy: float = Field(..., description="Expected profit per trade")
+    profit_factor: float = Field(..., description="Gross Profit / Gross Loss")
+    stability_score: float = Field(..., description="Metric for consistency of returns (R-squared)")
 
 
 class TurnoverMetrics(BaseModel):
@@ -76,6 +81,59 @@ class RLReport(BaseModel):
     overall_win_rate: float
 
 
+class RLComparison(BaseModel):
+    """Comparative report across multiple agents."""
+    baseline_name: str
+    agent_reports: List[RLReport]
+    performance_gap_pct: float = Field(..., description="Gap between best RL agent and baseline")
+    best_agent: str
+
+
+class MomentumBaseline:
+    """Rule-based momentum baseline for RL comparison."""
+
+    def __init__(self, window: int = 14):
+        self.window = window
+
+    def predict(self, observation: np.ndarray) -> int:
+        """
+        Simple momentum: if current price > price N steps ago, buy.
+        Note: This expects the observation to contain historical prices.
+        In TradingEnv, observations are normalized windows.
+        We'll use a simplified version: if the latest normalized value is positive, buy.
+        """
+        # Observation format from TradingEnv: [window_normalized, balance, position]
+        # Close price is at index 3 in each step's features.
+        # But here they are flattened.
+        # Let's assume a simplified logic for the baseline that can work on the obs.
+        # For a true baseline, it might be better to have access to raw data,
+        # but for this wrapper we'll look at the last feature of the window.
+
+        # Roughly, the last element before balance/position is the last feature of the last step.
+        last_val = observation[-3]
+        if last_val > 0.5:
+            return 1  # Buy
+        elif last_val < -0.5:
+            return 2  # Sell
+        return 0  # Hold
+
+
+class SupervisedBaseline:
+    """Wrapper for supervised models to compare against RL agents."""
+
+    def __init__(self, model: Any):
+        self.model = model
+
+    def predict(self, observation: np.ndarray) -> int:
+        # Assuming supervised model returns 0, 1, 2
+        # We might need to reshape observation for the model
+        obs_reshaped = observation.reshape(1, -1)
+        action = self.model.predict(obs_reshaped)
+        if isinstance(action, np.ndarray):
+            return int(action[0])
+        return int(action)
+
+
 class RLEvaluator:
     """
     Evaluator for RL agents with institutional metrics.
@@ -110,7 +168,7 @@ class RLEvaluator:
 
         step_idx = 0
         while not done:
-            action = agent.predict(obs)
+            action = self._get_prediction(agent, obs)
             next_obs, reward, terminated, truncated, info = self.env.step(action)
 
             # Detect market regime
@@ -143,15 +201,91 @@ class RLEvaluator:
 
         return self._generate_report(agent_name, df_history)
 
+    def compare(
+        self, agents: List[Any], agent_names: List[str], baseline_name: str = "Momentum"
+    ) -> RLComparison:
+        """Compare multiple agents against a baseline."""
+        reports = []
+        for agent, name in zip(agents, agent_names):
+            reports.append(self.evaluate(agent, name))
+
+        # Find baseline report
+        baseline_report = next((r for r in reports if r.agent_name == baseline_name), None)
+        if not baseline_report:
+            # If baseline not in list, run it separately
+            baseline_agent = MomentumBaseline()
+            baseline_report = self.evaluate(baseline_agent, baseline_name)
+            reports.append(baseline_report)
+
+        # Calculate performance gap and best agent
+        best_report = max(reports, key=lambda r: r.stability.sharpe_ratio)
+        baseline_sharpe = baseline_report.stability.sharpe_ratio
+        best_sharpe = best_report.stability.sharpe_ratio
+
+        gap = ((best_sharpe - baseline_sharpe) / abs(baseline_sharpe) * 100) if baseline_sharpe != 0 else 0.0
+
+        return RLComparison(
+            baseline_name=baseline_name,
+            agent_reports=reports,
+            performance_gap_pct=float(gap),
+            best_agent=best_report.agent_name,
+        )
+
+    def to_report_section(self, comparison: RLComparison) -> Any:
+        """
+        Convert RLComparison into an RLSection for the ResearchReporter.
+        """
+        from src.research.reporting import RLMetric, RLSection
+
+        metrics = []
+        for report in comparison.agent_reports:
+            metrics.append(
+                RLMetric(
+                    agent_name=report.agent_name,
+                    sharpe=report.stability.sharpe_ratio,
+                    profit_factor=report.stability.profit_factor,
+                    max_dd=report.drawdown.max_drawdown,
+                    win_rate=report.overall_win_rate,
+                )
+            )
+
+        summary = (
+            f"Evaluated {len(comparison.agent_reports)} agents against {comparison.baseline_name} baseline. "
+            f"Best performer: {comparison.best_agent} with a {comparison.performance_gap_pct:.2f}% "
+            "improvement in Sharpe ratio over baseline."
+        )
+
+        return RLSection(
+            comparison_summary=summary,
+            best_agent=comparison.best_agent,
+            performance_gap=comparison.performance_gap_pct,
+            metrics=metrics,
+        )
+
+    def _get_prediction(self, agent: Any, obs: np.ndarray) -> int:
+        """Translate agent prediction (int or Signal) into environment action."""
+        prediction = agent.predict(obs)
+
+        # Handle Signal objects (standardized model output)
+        if hasattr(prediction, "direction"):
+            if prediction.direction == SignalDirection.BUY:
+                return 1
+            if prediction.direction == SignalDirection.SELL:
+                return 2
+            return 0
+
+        # Handle raw integer actions
+        return int(prediction)
+
     def _generate_report(self, agent_name: str, df: pd.DataFrame) -> RLReport:
         """Calculate all metrics and return an RLReport."""
-        stability = self._calculate_stability(df)
-        turnover = self._calculate_turnover(df)
+        trades = self._extract_trades(df)
         drawdown = self._calculate_drawdown(df)
+        stability = self._calculate_stability(df, trades, drawdown.max_drawdown)
+        turnover = self._calculate_turnover(df)
         regime_sensitivity = self._calculate_regime_sensitivity(df)
         reward_decomp = self._calculate_reward_decomposition(df)
 
-        trades = self._extract_trades(df)
         win_rate = len([t for t in trades if t > 0]) / len(trades) if trades else 0.0
 
         return RLReport(
@@ -177,35 +311,78 @@ class RLEvaluator:
                 trade_pnls.append(pnl)
         return trade_pnls
 
-    def _calculate_stability(self, df: pd.DataFrame) -> StabilityMetrics:
+    def _calculate_stability(
+        self, df: pd.DataFrame, trades: List[float], max_dd: float
+    ) -> StabilityMetrics:
         """Assess the consistency and risk-adjusted returns."""
         returns = df["balances"].pct_change().dropna()
         if len(returns) < 2:
-            return StabilityMetrics(sharpe_ratio=0.0, sortino_ratio=0.0, volatility=0.0, stability_score=0.0)
+            return StabilityMetrics(
+                sharpe_ratio=0.0,
+                sortino_ratio=0.0,
+                volatility=0.0,
+                calmar_ratio=0.0,
+                expectancy=0.0,
+                profit_factor=0.0,
+                stability_score=0.0,
+            )
 
         mean_ret = returns.mean()
         std_ret = returns.std()
 
-        sharpe = (mean_ret / std_ret * np.sqrt(self.annualization_factor)) if std_ret > 0 else 0.0
+        sharpe = (
+            (mean_ret / std_ret * np.sqrt(self.annualization_factor)) if std_ret > 0 else 0.0
+        )
 
         downside_ret = returns[returns < 0]
         downside_std = downside_ret.std()
-        sortino = (mean_ret / downside_std * np.sqrt(self.annualization_factor)) if downside_std > 0 else 0.0
+        sortino = (
+            (mean_ret / downside_std * np.sqrt(self.annualization_factor))
+            if downside_std > 0
+            else 0.0
+        )
 
         vol = std_ret * np.sqrt(self.annualization_factor)
+
+        # Calmar Ratio
+        total_return = (
+            (df["balances"].iloc[-1] - df["balances"].iloc[0]) / df["balances"].iloc[0]
+            if len(df) > 0 and df["balances"].iloc[0] != 0
+            else 0.0
+        )
+        calmar = total_return / max_dd if max_dd > 0 else 0.0
+
+        # Expectancy and Profit Factor
+        wins = [t for t in trades if t > 0]
+        losses = [abs(t) for t in trades if t < 0]
+
+        profit_factor = (
+            sum(wins) / sum(losses)
+            if sum(losses) > 0
+            else (float("inf") if sum(wins) > 0 else 1.0)
+        )
+
+        win_rate = len(wins) / len(trades) if trades else 0.0
+        avg_win = np.mean(wins) if wins else 0.0
+        avg_loss = np.mean(losses) if losses else 0.0
+        expectancy = (avg_win * win_rate) - (avg_loss * (1 - win_rate))
 
         # Stability score: consistency of equity curve (R-squared of linear fit)
         x = np.arange(len(df))
         y = df["balances"].values
         slope, intercept = np.polyfit(x, y, 1)
         line = slope * x + intercept
-        r_squared = 1 - (np.sum((y - line)**2) / np.sum((y - y.mean())**2))
+        y_var = np.sum((y - y.mean()) ** 2)
+        r_squared = 1 - (np.sum((y - line) ** 2) / y_var) if y_var > 0 else 0.0
 
         return StabilityMetrics(
             sharpe_ratio=float(sharpe),
             sortino_ratio=float(sortino),
             volatility=float(vol),
-            stability_score=float(r_squared)
+            calmar_ratio=float(calmar),
+            expectancy=float(expectancy),
+            profit_factor=float(profit_factor),
+            stability_score=float(r_squared),
         )
 
     def _calculate_turnover(self, df: pd.DataFrame) -> TurnoverMetrics:
@@ -332,44 +509,3 @@ class RLEvaluator:
         )
 
 
-class MomentumBaseline:
-    """Rule-based momentum baseline for RL comparison."""
-    def __init__(self, window: int = 14):
-        self.window = window
-
-    def predict(self, observation: np.ndarray) -> int:
-        """
-        Simple momentum: if current price > price N steps ago, buy.
-        Note: This expects the observation to contain historical prices.
-        In TradingEnv, observations are normalized windows.
-        We'll use a simplified version: if the latest normalized value is positive, buy.
-        """
-        # Observation format from TradingEnv: [window_normalized, balance, position]
-        # Close price is at index 3 in each step's features.
-        # But here they are flattened.
-        # Let's assume a simplified logic for the baseline that can work on the obs.
-        # For a true baseline, it might be better to have access to raw data,
-        # but for this wrapper we'll look at the last feature of the window.
-
-        # Roughly, the last element before balance/position is the last feature of the last step.
-        last_val = observation[-3]
-        if last_val > 0.5:
-            return 1 # Buy
-        elif last_val < -0.5:
-            return 2 # Sell
-        return 0 # Hold
-
-
-class SupervisedBaseline:
-    """Wrapper for supervised models to compare against RL agents."""
-    def __init__(self, model: Any):
-        self.model = model
-
-    def predict(self, observation: np.ndarray) -> int:
-        # Assuming supervised model returns 0, 1, 2
-        # We might need to reshape observation for the model
-        obs_reshaped = observation.reshape(1, -1)
-        action = self.model.predict(obs_reshaped)
-        if isinstance(action, np.ndarray):
-            return int(action[0])
-        return int(action)

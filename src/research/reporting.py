@@ -104,6 +104,19 @@ class BenchmarkSection(BaseModel):
     comparisons: List[BenchmarkComparison]
     statistical_summary: str
 
+class RLMetric(BaseModel):
+    agent_name: str
+    sharpe: float
+    profit_factor: float
+    max_dd: float
+    win_rate: float
+
+class RLSection(BaseModel):
+    comparison_summary: str
+    best_agent: str
+    performance_gap: float
+    metrics: List[RLMetric]
+
 # --- Full Report Model ---
 
 class ResearchReport(BaseModel):
@@ -120,6 +133,7 @@ class ResearchReport(BaseModel):
     model_drift: Optional[ModelDriftSection] = None
     allocation_insights: Optional[AllocationSection] = None
     benchmarks: Optional[BenchmarkSection] = None
+    rl_evaluation: Optional[RLSection] = None
 
     conclusion: str
 
@@ -243,6 +257,25 @@ class ResearchReporter:
             table.add_column("P-Value")
             for b in report.benchmarks.comparisons:
                 table.add_row(b.name, b.total_return, b.sharpe, b.p_value)
+            self.console.print(table)
+
+        if report.rl_evaluation:
+            self.console.print("\n[bold magenta]8. RL Agent Evaluation[/]")
+            self.console.print(f"Summary: {report.rl_evaluation.comparison_summary}")
+            table = Table(box=None)
+            table.add_column("Agent")
+            table.add_column("Sharpe")
+            table.add_column("PF")
+            table.add_column("MaxDD")
+            table.add_column("Win Rate")
+            for m in report.rl_evaluation.metrics:
+                table.add_row(
+                    m.agent_name,
+                    f"{m.sharpe:.2f}",
+                    f"{m.profit_factor:.2f}",
+                    f"{m.max_dd:.2%}",
+                    f"{m.win_rate:.2%}",
+                )
             self.console.print(table)
 
         self.console.print("\n[bold]Conclusion[/]")
