@@ -102,3 +102,32 @@ def test_no_look_ahead_bias(synthetic_ohlcv):
     # We need to make sure idx is within the valid range of features (which is smaller than 3000)
     idx = -10
     pd.testing.assert_series_equal(features1.iloc[idx], features2.iloc[idx])
+
+
+def test_calculate_rolling_slope_correctness():
+    """Test mathematical correctness and NaN handling of rolling slope."""
+    fe = FeatureEngineer()
+    # Simple linear trend: y = 2x + 1
+    # indices: 0, 1, 2, 3, 4
+    # values:  1, 3, 5, 7, 9
+    # slope should be 2.0
+    data = pd.Series([1.0, 3.0, 5.0, 7.0, 9.0])
+    window = 3
+
+    slope = fe._calculate_rolling_slope(data, window)
+
+    # First window-1 (2) should be NaN
+    assert np.isnan(slope.iloc[0])
+    assert np.isnan(slope.iloc[1])
+
+    # Subsequent values should be 2.0
+    assert np.allclose(slope.iloc[2:], 2.0)
+
+
+def test_calculate_rolling_slope_short_series():
+    """Test handling of series shorter than the window."""
+    fe = FeatureEngineer()
+    data = pd.Series([1.0, 2.0])
+    window = 5
+    slope = fe._calculate_rolling_slope(data, window)
+    assert np.all(slope == 0.0)
