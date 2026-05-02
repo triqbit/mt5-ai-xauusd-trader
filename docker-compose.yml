@@ -1,0 +1,17 @@
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: triqbit/mt5-ai-xauusd-trader:latest
+    container_name: xauusd-trader
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs
+    environment:
+      - MODE=${MODE:-demo}
+      - ALGO=${ALGO:-ensemble}
+    ports:
+      - "8000:8000"
+      - "8050:8050"
+    restart: unless-stopped

@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -90,7 +91,7 @@ class TradingConfig(BaseSettings):
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
     """Return singleton TradingConfig (cached after first call)."""
-    return TradingConfig()  # type: ignore[call-arg]
+    return TradingConfig()  # type: ignore
 
 
 __all__ = ["TradingConfig", "get_config"]

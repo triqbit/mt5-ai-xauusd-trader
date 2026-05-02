@@ -4,8 +4,11 @@ src/trading/trading_env.py
 Custom Gymnasium-compatible environment for XAUUSD trading.
 """
 
+from typing import Any, Dict, Optional, Tuple
+
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 from gymnasium import spaces
 
 
@@ -14,9 +17,10 @@ class TradingEnv(gym.Env):
     Custom environment for trading XAUUSD.
     Follows Gymnasium API.
     """
+
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, df=None, window_size=20):
+    def __init__(self, df: Optional[pd.DataFrame] = None, window_size: int = 20) -> None:
         super().__init__()
         self.df = df
         self.window_size = window_size
@@ -34,13 +38,15 @@ class TradingEnv(gym.Env):
         self.current_step = window_size
         self.reset()
 
-    def reset(self, seed=None, options=None):
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
         super().reset(seed=seed)
         self.current_step = self.window_size
         obs = self._get_observation()
         return obs, {}
 
-    def step(self, action):
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         self.current_step += 1
 
         # Simple placeholder reward: return of the next period if bought, etc.
@@ -55,9 +61,9 @@ class TradingEnv(gym.Env):
 
         return obs, reward, done, truncated, {}
 
-    def _get_observation(self):
+    def _get_observation(self) -> np.ndarray:
         if self.df is None:
             return np.zeros(self.observation_space.shape, dtype=np.float32)
 
-        obs = self.df.iloc[self.current_step - self.window_size:self.current_step].values
+        obs = self.df.iloc[self.current_step - self.window_size : self.current_step].values
         return obs.astype(np.float32)

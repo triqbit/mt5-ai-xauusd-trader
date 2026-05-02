@@ -64,7 +64,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: BaseModel,
@@ -198,7 +198,8 @@ def run_live(
             # 7. Update equity
             balance = connector.get_account_balance()
             risk.update_equity(balance)
-            monitor.log_equity(balance)
+            if monitor:
+                monitor.log_equity(balance)
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
@@ -281,7 +282,7 @@ def main() -> int:
 
     # Model Factory based on --algo flag
     if args.algo == "ensemble":
-        model = EnsembleModel(device="cpu")
+        model: BaseModel = EnsembleModel(device="cpu")
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         if ppo_path.exists():
@@ -290,15 +291,15 @@ def main() -> int:
             model.load_lstm(lstm_path)
     elif args.algo == "ppo":
         ppo_path = args.model_dir / "ppo_xauusd.zip"
-        model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
+        model: BaseModel = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
     elif args.algo == "lstm":
         lstm_path = args.model_dir / "lstm_xauusd.pt"
-        model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
+        model: BaseModel = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
     else:
         log.warning(
             f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble"
         )
-        model = EnsembleModel(device="cpu")
+        model: BaseModel = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
     health_checker = init_health_checker(cfg, connector, trade_logger, model)
