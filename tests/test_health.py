@@ -6,6 +6,7 @@ Unit and integration tests for the health check system.
 
 import pytest
 from unittest.mock import MagicMock, patch
+from pydantic import SecretStr
 from pathlib import Path
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
@@ -20,10 +21,10 @@ def mock_config():
     cfg.logs_dir.exists.return_value = True
     cfg.mt5_login = 12345
     cfg.mt5_server = "TestServer"
-    cfg.mt5_password = "TestPassword"
+    cfg.mt5_password = SecretStr("TestPassword")
     cfg.mode = "demo"
-    cfg.database_url = "sqlite:///:memory:"
-    cfg.telegram_token = ""
+    cfg.database_url = SecretStr("sqlite:///:memory:")
+    cfg.telegram_token = SecretStr("")
     cfg.risk_per_trade = 0.01
     cfg.max_daily_loss = 0.05
     cfg.max_positions = 3
@@ -142,7 +143,7 @@ def test_get_full_report(health_checker):
         mock_conf.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
         with patch.object(HealthChecker, 'check_disk_space') as mock_disk:
             mock_disk.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
-
+            # ConfigValidator uses cfg.mt5_password etc.
             report = health_checker.get_full_report()
             assert isinstance(report, HealthReport)
             assert report.status == HealthStatus.HEALTHY

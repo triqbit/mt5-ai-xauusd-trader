@@ -17,6 +17,10 @@ def test_validator_success(base_config):
     """Test validator succeeds with valid configuration."""
     validator = ConfigValidator(base_config)
     result = validator.validate()
+    # Debug info if failure
+    if not result.success:
+        for err in result.errors:
+            print(f"Validation Error: {err.field} - {err.message}")
     assert result.success is True
     assert len(result.errors) == 0
 
