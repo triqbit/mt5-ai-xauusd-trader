@@ -70,15 +70,14 @@ def run_live(
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
-    last_event_fetch = 0.0
+    last_event_fetch = time.time()  # Initialize to current time since we just fetched
     while True:
         try:
             # 0. Refresh macro events every 6 hours
-            if time.time() - last_event_fetch > 6 * 3600:
-                if risk.event_intel:
-                    risk.event_intel.fetch_events()
-                    last_event_fetch = time.time()
-                    log.info("Macro events refreshed")
+            if (time.time() - last_event_fetch > 6 * 3600) and risk.event_intel:
+                risk.event_intel.fetch_events()
+                last_event_fetch = time.time()
+                log.info("Macro events refreshed")
 
             # 1. Fetch latest market data
             with profile("data_fetch"):
@@ -255,6 +254,7 @@ def main() -> int:
     )
     monitor = Monitor(cfg)
     event_intel = EventIntelligence()
+    # Fetch events once before loop start
     event_intel.fetch_events()
     risk = RiskManager(
         cfg,
