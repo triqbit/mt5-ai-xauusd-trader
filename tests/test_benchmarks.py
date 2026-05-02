@@ -2,24 +2,26 @@
 Unit tests for the benchmarking framework.
 """
 
+from unittest.mock import MagicMock
+
 import numpy as np
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock
-from src.research.benchmarks import (
-    EMACrossoverStrategy,
-    MomentumStrategy,
-    VolatilityBreakoutStrategy,
-    NaiveDirectionalStrategy,
-    RiskFilteredBaseline,
-    MeanReversionStrategy,
-    BenchmarkEvaluator,
-    EnsembleAdapter,
-    PPOAdapter,
-    TransformerAdapter,
-)
+
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
+from src.research.benchmarks import (
+    BenchmarkEvaluator,
+    EMACrossoverStrategy,
+    EnsembleAdapter,
+    MeanReversionStrategy,
+    MomentumStrategy,
+    NaiveDirectionalStrategy,
+    PPOAdapter,
+    RiskFilteredBaseline,
+    TransformerAdapter,
+    VolatilityBreakoutStrategy,
+)
 
 
 @pytest.fixture
