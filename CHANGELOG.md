@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Refactored Docker infrastructure to a proper multi-stage build supporting `linux/amd64` and `linux/arm64`.
+- Added `docker-compose.yml` for simplified local development with volume mounts for `.env` and `logs/`.
+- Enhanced Docker security with a non-root `trader` user and explicit directory permissions.
 - Cascading 6-layer execution filter in `src/trading/execution_filter.py` validating ATR, Trend Angle, EMA sequence, Momentum, Session time, and Drawdown.
 - Enterprise-grade monitoring and alerting system in `src/core/monitor.py` with Prometheus integration and Telegram bot support.
 - Disciplined walk-forward optimization framework in `src/research/hyperopt_walkforward.py` with Optuna integration.
