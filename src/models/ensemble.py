@@ -13,8 +13,9 @@ License: MIT
 from __future__ import annotations
 
 import logging
+from collections import deque
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 
@@ -27,6 +28,7 @@ except ImportError:
 
 from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
+from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +98,13 @@ class EnsembleModel:
         self._dreamer_model = None  # loaded lazily
         self.lstm_model: Optional[LSTMAttentionModel] = None
         # Internal cache for compatibility with existing record_return calls
-        self._performance: Dict[str, List[float]] = {k: [] for k in self.ALGORITHMS}
+        # Using deque for memory safety in long-running processes
+        self._performance: Dict[str, deque[float]] = {
+            k: deque(maxlen=200) for k in self.ALGORITHMS
+        }
+        self._last_confidences: Dict[str, deque[float]] = {
+            k: deque(maxlen=200) for k in self.ALGORITHMS
+        }
 
     @property
     def weights(self) -> Dict[str, float]:
@@ -128,6 +136,7 @@ class EnsembleModel:
         self,
         obs: np.ndarray,
         seq: Optional[torch.Tensor] = None,
+        regime_info: Optional[RegimeInfo] = None,
     ) -> Tuple[int, float, Dict[str, float]]:
         """
         Return (direction, confidence, per_algo_probs).
@@ -148,6 +157,10 @@ class EnsembleModel:
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
             votes["lstm"] = probs
+
+        # Cache confidences for calibration tracking
+        for k, v in votes.items():
+            self._last_confidences[k].append(float(np.max(v)))
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
@@ -174,20 +187,22 @@ class EnsembleModel:
         return direction, confidence, per_algo
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
-    def record_return(self, algorithm: str, ret: float) -> None:
+    def record_return(
+        self, algorithm: str, ret: float, regime_info: Optional[RegimeInfo] = None
+    ) -> None:
         """Track per-algorithm returns for weight rebalancing."""
         if algorithm in self._performance:
             self._performance[algorithm].append(ret)
             if len(self._performance[algorithm]) >= 50:
-                self._rebalance_weights()
+                self._rebalance_weights(regime_info=regime_info)
 
-    def _rebalance_weights(self, window: int = 50) -> None:
+    def _rebalance_weights(self, regime_info: Optional[RegimeInfo] = None, window: int = 50) -> None:
         """Delegate rebalancing to DynamicEnsemble."""
         metrics: Dict[str, Dict[str, float]] = {}
         for algo, rets in self._performance.items():
-            tail = rets[-window:]
+            tail = list(rets)[-window:]
             if len(tail) < 10:
-                metrics[algo] = {"accuracy": 0.5}
+                metrics[algo] = {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 0.0}
                 continue
             arr = np.array(tail)
             # Use Sharpe ratio as a proxy for 'accuracy' (0.5 baseline)
@@ -196,9 +211,29 @@ class EnsembleModel:
             sharpe = mean / std
             # Map Sharpe [-1, 1] to [0, 1] for accuracy input
             norm_accuracy = float(np.clip(0.5 + (sharpe * 0.2), 0.0, 1.0))
-            metrics[algo] = {"accuracy": norm_accuracy}
 
-        self.dynamic_ensemble.update_weights(metrics)
+            # Calculate basic drift as recent performance degradation
+            recent_mean = np.mean(tail[-10:])
+            overall_mean = np.mean(tail)
+            drift = float(np.clip((overall_mean - recent_mean) / (abs(overall_mean) + 1e-9), 0.0, 1.0))
+
+            # Calibration: Difference between avg confidence and actual success rate
+            # Success is approximated as positive return
+            success_rate = np.mean(arr > 0)
+            conf_tail = list(self._last_confidences[algo])[-len(tail) :]
+            if conf_tail:
+                avg_conf = np.mean(conf_tail)
+                cal_error = float(np.clip(abs(avg_conf - success_rate), 0.0, 1.0))
+            else:
+                cal_error = 0.0
+
+            metrics[algo] = {
+                "accuracy": norm_accuracy,
+                "calibration_error": cal_error,
+                "drift_score": drift,
+            }
+
+        self.dynamic_ensemble.update_weights(metrics, regime_info=regime_info)
         logger.info("Weights rebalanced: %s", self.weights)
 
 

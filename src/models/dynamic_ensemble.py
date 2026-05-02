@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from src.models.regime_detector import MarketRegime
+from src.models.regime_detector import MarketRegime, RegimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class DynamicEnsemble:
     def update_weights(
         self,
         metrics: Dict[str, Dict[str, float]],
-        regime: Optional[MarketRegime] = None,
+        regime_info: Optional[RegimeInfo] = None,
     ) -> Dict[str, float]:
         """
         Update weights based on performance and market context.
@@ -62,6 +62,9 @@ class DynamicEnsemble:
         """
         raw_scores: Dict[str, float] = {}
 
+        regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
+        volatility = regime_info.volatility_index if regime_info else 1.0
+
         for name in self.model_names:
             m = metrics.get(name, {})
             acc = m.get("accuracy", 0.5)
@@ -69,7 +72,8 @@ class DynamicEnsemble:
             drift = m.get("drift_score", 0.0)
 
             # Core scoring formula
-            score = acc - (0.5 * cal) - (0.5 * drift)
+            # Penalty for drift and calibration error
+            score = acc - (0.3 * cal) - (0.4 * drift)
 
             # Regime-based adjustments (XAUUSD heuristics)
             if regime == MarketRegime.NEWS_SHOCK:
@@ -77,6 +81,10 @@ class DynamicEnsemble:
                     score -= 0.2
             elif regime == MarketRegime.RANGING:
                 score -= 0.2 * cal
+
+            # Volatility context (penalize uncalibrated models in high volatility)
+            if volatility > 2.0:
+                score -= 0.3 * cal
 
             raw_scores[name] = max(score, 0.01)
 
@@ -90,12 +98,17 @@ class DynamicEnsemble:
             current = self.weights[name]
             prev_target = self._prev_target_weights[name]
 
-            # 1. Oscillation dampening:
-            # If target and prev_target are on opposite sides of current, slow down
-            if (target > current and prev_target < current) or (target < current and prev_target > current):
-                alpha = self.smoothing_factor * 0.5
-            else:
-                alpha = self.smoothing_factor
+            # 1. Dynamic smoothing and oscillation dampening:
+            # If target and prev_target are on opposite sides of current, it indicates oscillation
+            is_oscillating = (target > current and prev_target < current) or (
+                target < current and prev_target > current
+            )
+
+            # Reduce alpha in high volatility or when oscillating to preserve stability
+            vol_factor = float(np.clip(2.0 / (volatility + 1.0), 0.2, 1.0))
+            alpha = self.smoothing_factor * vol_factor
+            if is_oscillating:
+                alpha *= 0.3  # Aggressive dampening on flip-flops
 
             # 2. EMA adaptation with swing cap
             diff = target - current

@@ -47,9 +47,16 @@ def test_ensemble_record_return_rebalance():
     initial_weights = ensemble.weights.copy()
 
     # Record 50 returns to trigger _rebalance_weights
+    # Also mock confidences to avoid calibration penalty
     for _ in range(50):
-        ensemble.record_return("ppo", 0.01) # Profitable
-        ensemble.record_return("lstm", -0.01) # Losing
+        # We need to fill _last_confidences to avoid NaN/Zero calibration errors
+        ensemble._last_confidences["ppo"].append(0.6)
+        ensemble._last_confidences["lstm"].append(0.6)
+        ensemble._last_confidences["dreamer"].append(0.6)
+
+        ensemble.record_return("ppo", 0.01)  # Profitable
+        ensemble.record_return("lstm", -0.01)  # Losing
+        ensemble.record_return("dreamer", 0.0)
 
     new_weights = ensemble.weights
     assert new_weights["ppo"] > initial_weights["ppo"]
