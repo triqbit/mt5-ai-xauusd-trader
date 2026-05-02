@@ -298,7 +298,8 @@ class StressLab:
 
         # 4. Regime transitions (Simulate sudden volatility expansion or trend exhaustion)
         if scenario.regime_flip_prob > 0:
-            for i in range(len(df)):
+            i = 0
+            while i < len(df):
                 if rng.random() < scenario.regime_flip_prob:
                     window = min(30, len(df) - i)
                     if window > 5:
@@ -321,6 +322,11 @@ class StressLab:
                                 min(df.at[df.index[idx], "open"], df.at[df.index[idx], "close"])
                                 - local_vol
                             )
+                        i += window  # Skip the modified window
+                    else:
+                        i += 1
+                else:
+                    i += 1
 
         return df
 
@@ -332,6 +338,7 @@ class StressLab:
         n = len(df)
         initial_balance = self.initial_balance
         equity = np.ones(n) * initial_balance
+        cash = initial_balance
         daily_returns = np.zeros(n)
         trade_pnls = []
 
@@ -363,8 +370,6 @@ class StressLab:
         for i in range(1, n):
             current_sig = signals[i - 1]
             current_price = close[i]
-            prev_price = close[i - 1]
-            current_equity = equity[i - 1]
 
             # Service failure
             if scenario.service_failure_prob > 0 and rng.random() < scenario.service_failure_prob:
@@ -383,27 +388,31 @@ class StressLab:
             if current_sig == 1 and position == 0:  # Buy
                 position = 1
                 entry_price = current_price + (spreads[i] / 2) + slippage
+                cash -= (spreads[i] / 2) + slippage  # Cost of entry
             elif current_sig == -1 and position == 1:  # Close Long
                 exit_price = current_price - (spreads[i] / 2) - slippage
                 trade_pnls.append(exit_price - entry_price)
+                cash += (exit_price - entry_price) - ((spreads[i] / 2) + slippage)  # Realized
                 position = 0
             elif current_sig == -1 and position == 0:  # Short
                 position = -1
                 entry_price = current_price - (spreads[i] / 2) - slippage
+                cash -= (spreads[i] / 2) + slippage
             elif current_sig == 1 and position == -1:  # Close Short
                 exit_price = current_price + (spreads[i] / 2) + slippage
                 trade_pnls.append(entry_price - exit_price)
+                cash += (entry_price - exit_price) - ((spreads[i] / 2) + slippage)
                 position = 0
 
             # Update Equity
             if position == 1:
-                change = (current_price - prev_price) / prev_price
-                equity[i] = current_equity * (1 + change)
+                unrealized = current_price - entry_price
+                equity[i] = cash + unrealized
             elif position == -1:
-                change = (prev_price - current_price) / prev_price
-                equity[i] = current_equity * (1 + change)
+                unrealized = entry_price - current_price
+                equity[i] = cash + unrealized
             else:
-                equity[i] = current_equity
+                equity[i] = cash
 
             daily_returns[i] = (equity[i] - equity[i - 1]) / (equity[i - 1] + 1e-9)
 

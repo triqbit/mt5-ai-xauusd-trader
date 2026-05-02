@@ -223,3 +223,20 @@ def test_to_report_section(sample_data):
     assert section.resilience_score == report.resilience_score
     assert len(section.scenarios) == 1
     assert section.scenarios[0].name == "Test"
+
+
+def test_spread_multiplier_impact(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # Normal spread
+    normal_scenario = StressScenario(name="Normal", description="test", spread_multiplier=1.0)
+    normal_metrics = lab.run_scenario(normal_scenario)
+
+    # Wider spread
+    wide_scenario = StressScenario(name="Wide", description="test", spread_multiplier=10.0)
+    wide_metrics = lab.run_scenario(wide_scenario)
+
+    # Returns should be lower with wider spread if trades were made
+    if normal_metrics.num_trades > 0:
+        assert wide_metrics.total_return < normal_metrics.total_return

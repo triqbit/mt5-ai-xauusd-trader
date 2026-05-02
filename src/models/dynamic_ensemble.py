@@ -92,9 +92,7 @@ class DynamicEnsemble:
 
             # 1. Oscillation dampening:
             # If target and prev_target are on opposite sides of current, slow down
-            if (target > current and prev_target < current) or (
-                target < current and prev_target > current
-            ):
+            if (target > current and prev_target < current) or (target < current and prev_target > current):
                 alpha = self.smoothing_factor * 0.5
             else:
                 alpha = self.smoothing_factor
