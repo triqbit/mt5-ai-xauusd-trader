@@ -9,7 +9,9 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -119,6 +121,18 @@ class TradeLogger:
     """Enterprise trade logging interface."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
+        # Enforce secure file permissions for SQLite
+        if db_url.startswith("sqlite:///"):
+            db_path = Path(db_url.replace("sqlite:///", ""))
+            if not db_path.exists():
+                # Ensure the directory exists
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+                # Create the file with 0o600 permissions
+                db_path.touch(mode=0o600)
+            else:
+                # File exists, ensure it has 0o600 permissions
+                os.chmod(db_path, 0o600)
+
         self.engine = create_engine(db_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)

@@ -140,7 +140,7 @@ def main():
     args = parser.parse_args()
     cfg = get_config()
 
-    db_url = args.db_url or cfg.database_url
+    db_url = args.db_url or cfg.database_url.get_secret_value()
     # Ensure we don't accidentally wipe a production PG DB unless intended
     if "sqlite" not in db_url and not args.db_url:
         logger.warning(f"Using production-like DB URL: {db_url}")

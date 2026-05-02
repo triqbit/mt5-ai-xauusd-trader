@@ -87,7 +87,7 @@ class MT5Connector:
                 if mt5.initialize(
                     path=self.cfg.mt5_path,
                     login=self.cfg.mt5_login,
-                    password=self.cfg.mt5_password,
+                    password=self.cfg.mt5_password.get_secret_value(),
                     server=self.cfg.mt5_server,
                 ):
                     logger.info("Native MT5 SDK initialized successfully.")
@@ -102,10 +102,10 @@ class MT5Connector:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
-        if METAAPI_AVAILABLE and self.cfg.metaapi_token:
+        if METAAPI_AVAILABLE and self.cfg.metaapi_token.get_secret_value():
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
-                self.metaapi = MetaApi(self.cfg.metaapi_token)
+                self.metaapi = MetaApi(self.cfg.metaapi_token.get_secret_value())
                 self.use_metaapi = True
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured.")
