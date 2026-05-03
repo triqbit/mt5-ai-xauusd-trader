@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker
 # Add src to path to import models
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+from src.core.audit_log import AuditEntry
 from src.core.config import get_config
 from src.core.trade_logger import ModelSignal, PerformanceMetric, RiskEvent, Trade
 
@@ -33,6 +34,7 @@ RETENTION_UNLINKED_SIGNALS = 90
 RETENTION_RISK_EVENTS = 2 * 365
 RETENTION_PERFORMANCE_METRICS = 2 * 365
 RETENTION_TRADES = 7 * 365
+RETENTION_AUDIT_LOG = 7 * 365
 RETENTION_BACKTESTS = 365
 
 
@@ -98,11 +100,17 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
     return count
 
 
-def cleanup_database(db_url: str, dry_run: bool = False) -> dict:
+def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = False) -> dict:
     """Purge old records from the database according to the retention policy."""
     engine = create_engine(db_url)
     Session = sessionmaker(bind=engine)
-    results = {"model_signals": 0, "risk_events": 0, "performance_metrics": 0, "trades": 0}
+    results = {
+        "model_signals": 0,
+        "risk_events": 0,
+        "performance_metrics": 0,
+        "trades": 0,
+        "audit_log": 0,
+    }
 
     now = datetime.now(timezone.utc)
 
@@ -165,23 +173,56 @@ def cleanup_database(db_url: str, dry_run: bool = False) -> dict:
         if not dry_run:
             session.commit()
 
+    # 5. Cleanup Audit Log (older than 7 years)
+    # Handle potentially separate audit database
+    audit_engine = create_engine(audit_db_url) if audit_db_url and audit_db_url != db_url else engine
+    AuditSession = sessionmaker(bind=audit_engine)
+
+    with AuditSession() as session:
+        audit_cutoff = now - timedelta(days=RETENTION_AUDIT_LOG)
+        audit_query = select(AuditEntry.id).where(AuditEntry.created_at < audit_cutoff)
+        audit_ids = session.execute(audit_query).scalars().all()
+        results["audit_log"] = len(audit_ids)
+
+        if audit_ids:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(audit_ids)} audit log entries older than {audit_cutoff.date()}")
+            if not dry_run:
+                session.execute(delete(AuditEntry).where(AuditEntry.id.in_(audit_ids)))
+
+        if not dry_run:
+            session.commit()
+
     return results
 
 
 def main():
     parser = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Data Cleanup Utility")
     parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without deleting any data.")
-    parser.add_argument("--db-url", help="Override the database URL from config.")
+    parser.add_argument("--db-url", help="Override the primary database URL from config.")
+    parser.add_argument("--audit-db-url", help="Override the audit database URL.")
     parser.add_argument("--logs-dir", help="Override the logs directory from config.")
     parser.add_argument("--backtest-dir", help="Override the backtest results directory.")
 
     args = parser.parse_args()
     cfg = get_config()
 
-    db_url = args.db_url or cfg.database_url
+    # Determine DB URLs mirroring main.py logic
+    if args.db_url:
+        db_url = args.db_url
+    else:
+        db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+
+    if args.audit_db_url:
+        audit_db_url = args.audit_db_url
+    else:
+        audit_db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///audit.db"
+
     # Ensure we don't accidentally wipe a production PG DB unless intended
-    if "sqlite" not in db_url and not args.db_url:
-        logger.warning(f"Using production-like DB URL: {db_url}")
+    if "sqlite" not in db_url:
+        logger.warning(f"Using production-like primary DB URL: {db_url}")
+
+    if "sqlite" not in audit_db_url:
+        logger.warning(f"Using production-like audit DB URL: {audit_db_url}")
 
     logs_dir = Path(args.logs_dir) if args.logs_dir else cfg.logs_dir
     backtest_dir = Path(args.backtest_dir) if args.backtest_dir else Path(__file__).resolve().parents[1] / "backtest_results"
@@ -197,7 +238,7 @@ def main():
     logger.info(f"Backtest cleanup complete. Total files processed: {backtest_count}")
 
     # Database cleanup
-    db_results = cleanup_database(db_url, dry_run=args.dry_run)
+    db_results = cleanup_database(db_url, audit_db_url=audit_db_url, dry_run=args.dry_run)
     logger.info("Database cleanup complete.")
     for table, count in db_results.items():
         logger.info(f"  - {table}: {count} records {'identified' if args.dry_run else 'purged'}")
