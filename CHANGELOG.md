@@ -67,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Dependency conflict in CI by updating `gymnasium` version constraint.
+- Unused `Dict` imports in `src/models/lstm_model.py` and `src/models/ppo_agent.py`.
 
 ## [1.0.0] - 2024-05-24
 ### Added
