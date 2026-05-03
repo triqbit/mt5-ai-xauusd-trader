@@ -155,6 +155,13 @@ def run_live(
                             decision.blocked_by,
                         )
                         approved = False
+                        if trade_logger:
+                            trade_logger.log_risk_event(
+                                event_type="SIGNAL_REJECTED",
+                                description=f"ExecutionFilter: {decision.blocked_by}",
+                                symbol=cfg.symbol,
+                                signal_id=signal_id,
+                            )
 
             if approved:
                 with profile("execution"):
