@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added symbol-based concentration analysis to `find_profitable_patterns`.
 - Integrated `cluster_frequency` tracking into `SignalMotif` to identify toxic signal combinations.
 - Comprehensive unit tests for new journal mining capabilities in `tests/test_journal_mining.py`.
+- Institutional-grade research reporting system in `src/research/reporting.py`.
+- Automated report aggregation via `ResearchOrchestrator` integrating regimes, stress tests, benchmarks, and rare events.
+- High-quality Jinja2 templates for Markdown and HTML research summaries.
+- Enhanced journal mining with signal motif reporting and behavioral risk identification.
+- Integrated rare event simulation metadata into standardized research reports.
 - Enterprise-grade trade signal explainability and attribution system in `src/core/explainability.py`.
 - Decomposition of signals into execution, model, regime, risk, and feature cluster contributions.
 - Standardized signal direction mapping (0=HOLD, 1=BUY, 2=SELL) across the explainer.
