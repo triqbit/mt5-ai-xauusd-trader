@@ -114,6 +114,31 @@ python main.py --mode demo --symbol XAUUSD --algo ensemble
 
 ---
 
+## 🐳 Docker Deployment
+
+The bot is containerized using a high-performance multi-stage build optimized for both `linux/amd64` and `linux/arm64` architectures.
+
+### Local Development with Docker Compose
+
+For local development, use the provided `docker-compose.yml` which handles volume mounts for logs and environment variables.
+
+```bash
+# Start the trader in demo mode
+docker-compose up -d
+
+# Check logs
+tail -f logs/trader.log
+```
+
+### Manual Build
+
+```bash
+docker build -t mt5-trader .
+docker run --env-file .env -v $(pwd)/logs:/app/logs mt5-trader
+```
+
+---
+
 ## 📜 Documentation Index
 
 | Guide | Description |
