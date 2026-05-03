@@ -299,8 +299,26 @@ class BenchmarkEvaluator:
         s_returns = self.results.get(strategy_name + "_returns", np.array([]))
         b_returns = self.results.get(baseline_name + "_returns", np.array([]))
 
-        # Welch's t-test on return distributions
-        t_stat, p_value = stats.ttest_ind(s_returns, b_returns, equal_var=False)
+        # Align lengths and handle warmup periods (trim leading zeros)
+        def trim_warmup(arr: np.ndarray) -> np.ndarray:
+            # Find the first non-zero element to identify end of warmup
+            non_zeros = np.nonzero(arr)[0]
+            return arr[non_zeros[0] :] if len(non_zeros) > 0 else arr
+
+        s_active = trim_warmup(s_returns)
+        b_active = trim_warmup(b_returns)
+
+        # Ensure we compare the same number of data points from the end
+        # to align the trading periods correctly if warmup lengths differ.
+        min_len = min(len(s_active), len(b_active))
+        if min_len < 2:
+            return {"error": "Insufficient active returns for statistical comparison."}
+
+        s_final = s_active[-min_len:]
+        b_final = b_active[-min_len:]
+
+        # Paired t-test on return distributions for identical market conditions
+        t_stat, p_value = stats.ttest_rel(s_final, b_final)
 
         # Simple relative performance
         outperformance = s_metrics["Total Return"] - b_metrics["Total Return"]
@@ -487,5 +505,113 @@ class TransformerAdapter:
                 probs = self.model(data)
                 action_idx = int(torch.argmax(probs, dim=-1).item())
                 signals[i] = float(direction_map.get(action_idx, SignalDirection.HOLD))
+
+        return signals
+
+
+class LSTMAdapter:
+    """
+    Adapter for LSTMPricePredictor to match BenchmarkStrategy interface.
+    Handles sliding window extraction for sequence processing.
+    """
+
+    def __init__(
+        self,
+        model: Any,
+        window_size: int = 60,
+        name: str = "LSTM_Model",
+        device: str = "cpu",
+    ):
+        """
+        Initialize the adapter.
+        Args:
+            model: An instance of LSTMPricePredictor.
+            window_size: Lookback window required by the model.
+            name: Label for the strategy.
+            device: Computing device ('cpu' or 'cuda').
+        """
+        self.model = model
+        self.window_size = window_size
+        self._name = name
+        self.device = device
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate signals using a sliding window approach.
+        """
+        import torch
+
+        self.model.eval()
+        signals = np.zeros(len(df))
+        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+
+        # Mapping: 0 -> HOLD, 1 -> BUY, 2 -> SELL (from LSTMPricePredictor)
+        direction_map = {
+            0: SignalDirection.HOLD,
+            1: SignalDirection.BUY,
+            2: SignalDirection.SELL,
+        }
+
+        with torch.no_grad():
+            for i in range(self.window_size - 1, len(df)):
+                window = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values
+                data = torch.FloatTensor(window).unsqueeze(0).to(self.device)
+
+                logits = self.model(data)
+                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                action_idx = int(np.argmax(probs))
+                signals[i] = float(direction_map.get(action_idx, SignalDirection.HOLD))
+
+        return signals
+
+
+class DreamerAdapter:
+    """
+    Adapter for DreamerAgent to match BenchmarkStrategy interface.
+    Supports state-aware inference if implemented in the agent.
+    """
+
+    def __init__(self, agent: Any, name: str = "Dreamer_Agent"):
+        """
+        Initialize the adapter.
+        Args:
+            agent: An instance of DreamerAgent.
+            name: Label for the strategy.
+        """
+        self.agent = agent
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate signals for the given dataset.
+        """
+        signals = np.zeros(len(df))
+        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+
+        # Reset state at start of sequence if agent supports it
+        if hasattr(self.agent, "reset_state"):
+            self.agent.reset_state()
+
+        for i in range(len(df)):
+            obs = df.iloc[i][feature_cols].values.astype(np.float32)
+            # DreamerAgent.predict returns a Signal NamedTuple
+            signal = self.agent.predict(obs)
+            direction = float(signal.direction)
+            signals[i] = direction
+
+            # Update latent state if supported by the agent (for recurrent models)
+            if hasattr(self.agent, "update_state"):
+                # We use placeholder reward=0.0 and is_terminal=False for pure inference
+                self.agent.update_state(
+                    obs, action=int(direction), reward=0.0, is_terminal=False
+                )
 
         return signals

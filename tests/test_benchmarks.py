@@ -4,16 +4,22 @@ Unit tests for the benchmarking framework.
 
 from unittest.mock import MagicMock
 
+import importlib.util
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from src.core.constants import SignalDirection
+
+HAS_TORCH = importlib.util.find_spec("torch") is not None
 from src.models.base_model import Signal
 from src.research.benchmarks import (
     BenchmarkEvaluator,
+    DreamerAdapter,
     EMACrossoverStrategy,
     EnsembleAdapter,
+    LSTMAdapter,
     MeanReversionStrategy,
     MomentumStrategy,
     NaiveDirectionalStrategy,
@@ -86,10 +92,15 @@ def test_mean_reversion_signals(sample_data):
 
 def test_evaluator_metrics(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
-    strategies = [EMACrossoverStrategy(5, 10), MomentumStrategy(5)]
+    strategies = [
+        EMACrossoverStrategy(5, 10),
+        MomentumStrategy(5),
+        VolatilityBreakoutStrategy(10),
+        RiskFilteredBaseline(5, 10, 0.02),
+    ]
     results = evaluator.evaluate_all(strategies)
     assert isinstance(results, pd.DataFrame)
-    assert len(results) == 2
+    assert len(results) == 4
     assert "Total Return" in results.columns
     assert "Sharpe Ratio" in results.columns
     assert "Sortino Ratio" in results.columns
@@ -148,9 +159,7 @@ def test_ppo_adapter(sample_data):
     assert mock_agent.predict.call_count == len(sample_data)
 
 
-@pytest.mark.skipif(
-    True, reason="torch not installed"
-)  # Simplified skip logic as torch is known missing in this environment
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
 def test_ensemble_adapter(sample_data):
     mock_model = MagicMock()
     mock_model.predict.return_value = (SignalDirection.SELL, 0.8, {})
@@ -167,9 +176,7 @@ def test_ensemble_adapter(sample_data):
     assert mock_model.predict.call_count == len(sample_data) - (window_size - 1)
 
 
-@pytest.mark.skipif(
-    True, reason="torch not installed"
-)  # Simplified skip logic as torch is known missing in this environment
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
 def test_transformer_adapter(sample_data):
     import torch
 
@@ -184,3 +191,34 @@ def test_transformer_adapter(sample_data):
     assert len(signals) == len(sample_data)
     assert np.all(signals[: window_size - 1] == 0)
     assert np.all(signals[window_size - 1 :] == 1.0)
+
+
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+def test_lstm_adapter(sample_data):
+    import torch
+
+    mock_model = MagicMock()
+    # Mock return: logits for [hold, buy, sell]
+    mock_model.return_value = torch.tensor([[0.0, 10.0, 0.0]])  # High logit for BUY
+
+    window_size = 5
+    adapter = LSTMAdapter(mock_model, window_size=window_size)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    assert np.all(signals[: window_size - 1] == 0)
+    assert np.all(signals[window_size - 1 :] == 1.0)
+    assert mock_model.call_count == len(sample_data) - (window_size - 1)
+
+
+def test_dreamer_adapter(sample_data):
+    mock_agent = MagicMock()
+    mock_agent.predict.return_value = Signal(direction=SignalDirection.SELL, confidence=0.7)
+
+    adapter = DreamerAdapter(mock_agent)
+    signals = adapter.predict(sample_data)
+
+    assert len(signals) == len(sample_data)
+    assert np.all(signals == -1.0)
+    assert mock_agent.predict.call_count == len(sample_data)
+    assert mock_agent.reset_state.called
