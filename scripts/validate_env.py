@@ -56,12 +56,17 @@ def validate():
             missing.append(req)
 
     if missing:
+        print("="*60)
+        print("  DEPLOYMENT BLOCKED: ENVIRONMENT TEMPLATE INCOMPLETE")
+        print("="*60)
         print(f"Error: The following required configuration fields are missing from .env.example:")
         for m in missing:
-            print(f"  - {m.upper()}")
+            print(f"  [MISSING] -> {m.upper()}")
+        print("\nREMEDIATION: Add these fields to .env.example to ensure production deployment safety.")
+        print("="*60)
         return False
 
-    print(f"Environment validation passed: .env.example contains all {len(required)} fields.")
+    print(f"SUCCESS: Environment validation passed. .env.example contains all {len(required)} fields.")
     return True
 
 if __name__ == "__main__":
