@@ -122,14 +122,45 @@ class EnsembleModel(BaseModel):
             logger.warning("No models loaded - returning HOLD")
             return Signal(direction=SignalDirection.HOLD, confidence=0.0, metadata={})
 
-        # Weighted average across available models
+        # ── Institutional Consensus Rules (RISK_LIMITS.md) ──────────────────
+
+        # 1. Veto Power: Any model with < 40% confidence forces skip
+        for k, v in votes.items():
+            max_conf = float(np.max(v))
+            if max_conf < 0.40:
+                logger.info("Ensemble VETO | %s confidence %.2f < 0.40", k, max_conf)
+                return Signal(
+                    direction=SignalDirection.HOLD,
+                    confidence=max_conf,
+                    metadata={"veto": k, "reason": "low_confidence"},
+                )
+
+        # 2. Model Dissent: If one model says BUY and another says SELL, skip
+        actions = {k: int(np.argmax(v)) for k, v in votes.items()}
+        if ModelAction.BUY in actions.values() and ModelAction.SELL in actions.values():
+            logger.info("Ensemble DISSENT | Conflicting BUY/SELL votes")
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"dissent": True, "votes": actions},
+            )
+
+        # 3. Consensus Threshold: Need 60%+ weighted agreement
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
         action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
 
+        # Only enforce threshold for BUY/SELL actions
+        if action_idx != ModelAction.HOLD and confidence < 0.60:
+            logger.info("Ensemble CONSENSUS FAIL | Weighted confidence %.2f < 0.60", confidence)
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=confidence,
+                metadata={"consensus_fail": True, "blended": blended.tolist()},
+            )
+
         # Map to standardized SignalDirection using ModelAction
-        # ModelAction: 0=HOLD, 1=BUY, 2=SELL
         model_action = ModelAction(action_idx)
         direction = model_action.to_direction()
 
