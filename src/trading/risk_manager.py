@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -48,7 +48,6 @@ class TradeSignal:
     algorithm: str
     confidence: float  # 0.0 - 1.0
     timestamp: datetime = field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

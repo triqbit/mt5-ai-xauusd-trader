@@ -188,7 +188,6 @@ class RiskScenarioBuilder:
                 lot_size=0.1,
                 algorithm="ppo",
                 confidence=0.9,
-                metadata={"reason": "strong trend"},
             ),
             TradeSignal(
                 symbol=symbol,
@@ -199,6 +198,5 @@ class RiskScenarioBuilder:
                 lot_size=0.1,
                 algorithm="lstm",
                 confidence=0.8,
-                metadata={"reason": "overbought"},
             ),
         ]

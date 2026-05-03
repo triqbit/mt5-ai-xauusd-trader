@@ -32,7 +32,6 @@ Located in `src/utils/synthetic_data.py`, the `RiskScenarioBuilder` generates de
   Generates a list of signals representing conflicting model votes (e.g., PPO BUY vs. LSTM SELL). This tests:
   - Ensemble voting logic
   - Signal validation gate behavior under high uncertainty
-  - Decision logging and explainability
 
 ## Usage in Tests
 

@@ -22,8 +22,5 @@ def test_ensemble_dissent(risk_builder):
     # Check conflicting directions
     assert signals[0].direction == 1
     assert signals[1].direction == -1
-    # Check metadata existence
-    assert "reason" in signals[0].metadata
-    assert "reason" in signals[1].metadata
     assert signals[0].algorithm == "ppo"
     assert signals[1].algorithm == "lstm"
