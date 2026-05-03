@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Institutional-grade decision support system in `src/core/decision_support.py`.
+- Aggregation of signal explainability, market regime, macro-risk status, and recent performance into a unified `DecisionPacket`.
+- High-fidelity terminal reporting with `rich` dashboarding for operator oversight.
+- Go/No-Go logic integrating execution filters, risk management, and macro event blocks.
+- Comprehensive unit tests for decision support in `tests/test_decision_support.py`.
 - Enhanced `JournalMiner` in `src/analytics/journal_mining.py` with multi-dimensional motif detection (volatility, confidence).
 - Implemented `detect_pre_drawdown_motifs` for early warning pattern recognition.
 - Added symbol-based concentration analysis to `find_profitable_patterns`.
