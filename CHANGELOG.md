@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Institutional Capital Allocation:** Implemented a multi-strategy budget management system with concentration limits and performance-based scaling in `src/trading/capital_allocator.py`.
+- **Vectorized Backtesting v2:** Enhanced the walk-forward backtesting engine with vectorized trade execution and performance metrics in `src/research/hyperopt_walkforward.py`.
+- **Market Regime Detection:** Statistical market state classifier for XAUUSD (Trending, Ranging, News Shock, etc.) in `src/models/regime_detector.py`.
+- **Institutional Feature Engineering:** Scalable pipeline for 190+ technical indicators with multi-timeframe support in `src/core/feature_engineering.py`.
+- **CI Quality Gates:** Mandatory Mypy type enforcement and Docker dependency harmonization for enterprise stability.
+
+### Changed
+- Rebalanced the 6-layer execution filter in `src/trading/execution_filter.py` with refined trend angle thresholds.
+- Standardized `BaseModel` and `Signal` interfaces across all institutional models.
+
+### Fixed
+- Resolved critical import errors and synchronized CI dependencies across 18 files.
+- Optimized rolling slope calculations and row access in benchmark adapters (2000x speedup).
+
+## [1.1.0-rc1] - 2024-05-02
+### Added
 - Refined the 6-layer execution filter in `src/trading/execution_filter.py` with EMA20 trend angle logic.
 - Comprehensive unit test suite for execution filters in `tests/test_execution_filter.py`.
 - Institutional-grade decision support system in `src/core/decision_support.py`.
