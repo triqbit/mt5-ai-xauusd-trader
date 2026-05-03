@@ -4,6 +4,16 @@ from typing import TYPE_CHECKING
 
 from src.core.config import TradingConfig, get_config
 from src.core.profiler import profile
+from src.core.exceptions import (
+    BotError,
+    MT5Error,
+    MT5ConnectionError,
+    MT5DataError,
+    OrderExecutionError,
+    RiskValidationError,
+    ConfigurationError,
+)
+from src.core.retry import with_retry
 
 if TYPE_CHECKING:
     from src.core.feature_engineering import FeatureEngineer
@@ -15,4 +25,17 @@ else:
             return FeatureEngineer
         raise AttributeError(f"module {__name__} has no attribute {name}")
 
-__all__ = ["FeatureEngineer", "TradingConfig", "get_config", "profile"]
+__all__ = [
+    "FeatureEngineer",
+    "TradingConfig",
+    "get_config",
+    "profile",
+    "with_retry",
+    "BotError",
+    "MT5Error",
+    "MT5ConnectionError",
+    "MT5DataError",
+    "OrderExecutionError",
+    "RiskValidationError",
+    "ConfigurationError",
+]

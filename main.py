@@ -26,7 +26,14 @@ import structlog
 from rich.console import Console
 from rich.table import Table
 
-from src.core import get_config, profile
+from src.core import (
+    get_config,
+    profile,
+    MT5ConnectionError,
+    MT5DataError,
+    OrderExecutionError,
+    BotError,
+)
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
@@ -203,8 +210,25 @@ def run_live(
         except KeyboardInterrupt:
             log.info("Interrupted by user - shutting down")
             break
+        except MT5ConnectionError as exc:
+            log.error("MT5 Connection lost: %s. Attempting to reconnect in %ds...", exc, poll_interval)
+            try:
+                connector.initialize()
+            except Exception as re_exc:
+                log.error("Reconnection attempt failed: %s", re_exc)
+            time.sleep(poll_interval)
+        except MT5DataError as exc:
+            log.warning("MT5 Data error: %s. Skipping iteration...", exc)
+            time.sleep(poll_interval)
+        except OrderExecutionError as exc:
+            log.error("Order execution failed: %s", exc)
+            # Potentially notify via alert system here
+            time.sleep(poll_interval)
+        except BotError as exc:
+            log.error("Core bot error: %s", exc)
+            time.sleep(poll_interval)
         except Exception as exc:
-            log.exception("Unhandled error in trading loop: %s", exc)
+            log.exception("Unhandled unexpected error in trading loop: %s", exc)
             time.sleep(poll_interval)
 
 
