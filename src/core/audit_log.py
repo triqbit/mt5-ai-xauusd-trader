@@ -13,9 +13,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import (
-    Column,
+    JSON,
     DateTime,
-    Integer,
     String,
     Text,
     create_engine,
@@ -27,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """SQLAlchemy 2.0 DeclarativeBase."""
+
     pass
 
 
@@ -35,6 +35,7 @@ class AuditEntry(Base):
     Audit log entry for recording system actions and events.
     Aligned with enterprise traceability requirements.
     """
+
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -49,12 +50,14 @@ class AuditEntry(Base):
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
 
 class AuditLogger:
     """
     Singleton AuditLogger for managing system audit traces.
     """
+
     _instance: Optional[AuditLogger] = None
     _initialized: bool = False
 
@@ -76,7 +79,13 @@ class AuditLogger:
         self._initialized = True
         logger.info("AuditLogger initialized with database: %s", db_url)
 
-    def log(self, actor: str, action: str, details: Optional[str] = None) -> int:
+    def log(
+        self,
+        actor: str,
+        action: str,
+        details: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> int:
         """
         Record a new audit entry.
         """
@@ -85,10 +94,86 @@ class AuditLogger:
                 actor=actor,
                 action=action,
                 details=details,
+                metadata_json=metadata,
             )
             session.add(entry)
             session.commit()
             return entry.id
+
+    def log_config_change(
+        self, old_config: Dict[str, Any], new_config: Dict[str, Any], reason: str
+    ) -> int:
+        """Log changes in trading parameters."""
+        return self.log(
+            actor="system",
+            action="config_change",
+            details=reason,
+            metadata={"old": old_config, "new": new_config},
+        )
+
+    def log_trade_blocked(self, symbol: str, reason: str, decision_chain: Dict[str, Any]) -> int:
+        """Detail why a trade was rejected by risk or execution filters."""
+        return self.log(
+            actor="risk_engine",
+            action="trade_blocked",
+            details=f"Trade blocked for {symbol}: {reason}",
+            metadata={"symbol": symbol, "reason": reason, "decision_chain": decision_chain},
+        )
+
+    def log_model_prediction(
+        self,
+        symbol: str,
+        direction: int,
+        confidence: float,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Record prediction outcomes and confidence."""
+        pred_meta = {"symbol": symbol, "direction": direction, "confidence": confidence}
+        if metadata:
+            pred_meta.update(metadata)
+        return self.log(
+            actor="ai_model",
+            action="prediction",
+            details=f"Prediction for {symbol}: dir={direction}, conf={confidence:.4f}",
+            metadata=pred_meta,
+        )
+
+    def log_risk_decision(self, symbol: str, passed: bool, decision_chain: Dict[str, Any]) -> int:
+        """Log the full risk engine decision chain."""
+        return self.log(
+            actor="risk_engine",
+            action="risk_decision",
+            details=f"Risk decision for {symbol}: {'PASSED' if passed else 'FAILED'}",
+            metadata={"symbol": symbol, "passed": passed, "decision_chain": decision_chain},
+        )
+
+    def log_operator_action(
+        self,
+        actor: str,
+        action: str,
+        reason: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Track manual overrides or emergency halts."""
+        return self.log(actor=actor, action=action, details=reason, metadata=metadata)
+
+    def log_deployment_event(
+        self,
+        version: str,
+        environment: str,
+        status: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Record release and deployment details."""
+        deploy_meta = {"version": version, "environment": environment, "status": status}
+        if metadata:
+            deploy_meta.update(metadata)
+        return self.log(
+            actor="deployer",
+            action="deployment",
+            details=f"Deployment {version} in {environment}: {status}",
+            metadata=deploy_meta,
+        )
 
     @classmethod
     def get_instance(cls) -> AuditLogger:

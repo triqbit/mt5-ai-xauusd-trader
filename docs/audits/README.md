@@ -11,6 +11,7 @@ This directory serves as the central repository for all technical audits, perfor
 | **ENTERPRISE_EVIDENCE_SCORECARD.md** | Compliance with institutional engineering standards. | ⏳ Upcoming |
 | **CORRECTIVE_ACTION_VERIFICATION.md** | Post-incident audits and resolution verification. | ⏳ Upcoming |
 | **ADR_AUDIT_REPORT.md** | Review of key Architecture Decision Records (ADRs). | ⏳ Upcoming |
+| **AUDIT_TRAIL_SPEC.md** | Specification for structured enterprise audit trail events. | ✅ Active |
 
 ---
 
