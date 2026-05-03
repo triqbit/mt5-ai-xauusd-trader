@@ -25,6 +25,8 @@ def test_config_defaults(monkeypatch):
     assert cfg.symbol == "XAUUSD"
     assert cfg.mode == "demo"
     assert cfg.algorithm == "ensemble"
+    assert cfg.daily_loss_limit_l1 == 0.02
+    assert cfg.drawdown_limit_l5 == 0.30
 
 def test_config_risk_validation(monkeypatch):
     """Test risk_per_trade validation rejects unsafe values."""

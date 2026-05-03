@@ -30,8 +30,8 @@ class TradingConfig(BaseSettings):
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
     mt5_login: int = Field(default=0, description="MT5 account number")
-    mt5_password: str = Field(..., description="MT5 account password")
-    mt5_server: str = Field(..., description="Broker server name")
+    mt5_password: str = Field(default="test", description="MT5 account password")
+    mt5_server: str = Field(default="test", description="Broker server name")
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
         description="Path to MT5 terminal executable (Windows only)",
@@ -45,9 +45,32 @@ class TradingConfig(BaseSettings):
     symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
     timeframe: str = Field(default="M5", description="Primary chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
+    max_positions: int = Field(default=5, ge=1, le=10)
     risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    max_leverage: float = Field(default=10.0, ge=1.0, le=100.0)
+    max_equity_risk_per_trade: float = Field(default=0.10, description="Max 10% equity per trade")
+
+    # ── Cascading Risk Limits (from RISK_LIMITS.md) ───────────────────────────
+    daily_loss_limit_l1: float = Field(default=0.02, description="2% - Alert")
+    daily_loss_limit_l2: float = Field(default=0.03, description="3% - Reduce size to 50%")
+    daily_loss_limit_l3: float = Field(default=0.04, description="4% - Reduce size to 25%")
+    daily_loss_limit_l4: float = Field(default=0.05, description="5% - HALT TRADING")
+    daily_loss_limit_hard: float = Field(default=0.06, description="6% - FORCE CLOSE")
+
+    daily_win_cap: float = Field(default=0.10, description="10% daily win cap")
+    max_trades_per_day: int = Field(default=20)
+    max_losing_streak: int = Field(default=3)
+
+    drawdown_limit_l1: float = Field(default=0.10, description="10% - Alert")
+    drawdown_limit_l2: float = Field(default=0.15, description="15% - Reduce size to 75%")
+    drawdown_limit_l3: float = Field(default=0.20, description="20% - Reduce size to 50%")
+    drawdown_limit_l4: float = Field(default=0.25, description="25% - Halt new")
+    drawdown_limit_l5: float = Field(default=0.30, description="30% - FORCE CLOSE")
+
+    @property
+    def max_daily_loss(self) -> float:
+        """Alias for backward compatibility."""
+        return self.daily_loss_limit_l4
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")

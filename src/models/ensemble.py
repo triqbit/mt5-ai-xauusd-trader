@@ -173,8 +173,19 @@ class EnsembleModel(BaseModel):
         # Weighted average across available models
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+
+        # Consensus logic: check if models agree on direction
+        consensus_threshold = 0.60 # Need 60%+ agreement across ensemble as per RISK_LIMITS.md
+
+        # Determine the combined action
         action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
+
+        # Veto power: any model with <40% confidence forces skip as per RISK_LIMITS.md
+        for algo, probs in votes.items():
+            if np.max(probs) < 0.40:
+                logger.debug("Ensemble VETO | %s confidence too low", algo)
+                return Signal(direction=SignalDirection.HOLD, confidence=confidence, metadata={"veto": algo})
 
         # Map to standardized SignalDirection using ModelAction
         # ModelAction: 0=HOLD, 1=BUY, 2=SELL

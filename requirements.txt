@@ -72,6 +72,7 @@ ruff==0.4.3
 mypy==1.10.0
 
 # ── Utilities ───────────────────────────────────────────────
+nest-asyncio==1.6.0
 python-dateutil==2.9.0.post0
 pytz==2024.1
 click==8.3.3

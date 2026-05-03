@@ -9,15 +9,17 @@ License: MIT
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -25,13 +27,14 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
     MetaApi = None
 
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
+from src.trading.risk_engine import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +72,26 @@ class MT5Connector:
         self.cfg = config
         self.use_metaapi: bool = False
         self.metaapi: Optional[Any] = None
+        self.metaapi_account: Optional[Any] = None
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
+
+    def _run_sync(self, coro):
+        """Helper to run async MetaAPI methods synchronously."""
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        if loop.is_running():
+            # If we are already in an event loop (e.g. FastAPI), we need a different approach
+            # but for this CLI-first app, this should work.
+            import nest_asyncio
+
+            nest_asyncio.apply()
+
+        return loop.run_until_complete(coro)
 
     def initialize(self) -> bool:
         """
@@ -103,13 +124,20 @@ class MT5Connector:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
-        if METAAPI_AVAILABLE and self.cfg.metaapi_token:
+        if METAAPI_AVAILABLE and self.cfg.metaapi_token and self.cfg.metaapi_account_id:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
                 self.metaapi = MetaApi(self.cfg.metaapi_token)
+                self.metaapi_account = self._run_sync(
+                    self.metaapi.metatrader_account_api.get_account(self.cfg.metaapi_account_id)
+                )
+                self.metaapi_connection = self.metaapi_account.get_rpc_connection()
+                self._run_sync(self.metaapi_connection.connect())
+                self._run_sync(self.metaapi_connection.wait_synchronized())
+
                 self.use_metaapi = True
                 self._is_initialized = True
-                logger.info("MetaAPI fallback configured.")
+                logger.info("MetaAPI fallback configured and synchronized.")
                 return True
             except Exception as e:
                 logger.error("MetaAPI initialization failed: %s", e)
@@ -275,8 +303,41 @@ class MT5Connector:
 
             logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
             return int(result.order)
-
-        return None
+        else:
+            # MetaAPI execution
+            try:
+                action = "BUY" if signal.direction > 0 else "SELL"
+                if action == "BUY":
+                    result = self._run_sync(
+                        self.metaapi_connection.create_market_buy_order(
+                            symbol=signal.symbol,
+                            volume=signal.lot_size,
+                            stop_loss=signal.stop_loss,
+                            take_profit=signal.take_profit,
+                            options={
+                                "comment": f"AI:{signal.algorithm}",
+                                "magic": 20240419,
+                            },
+                        )
+                    )
+                else:
+                    result = self._run_sync(
+                        self.metaapi_connection.create_market_sell_order(
+                            symbol=signal.symbol,
+                            volume=signal.lot_size,
+                            stop_loss=signal.stop_loss,
+                            take_profit=signal.take_profit,
+                            options={
+                                "comment": f"AI:{signal.algorithm}",
+                                "magic": 20240419,
+                            },
+                        )
+                    )
+                logger.info("MetaAPI Order PLACED | Ticket #%s", result["orderId"])
+                return int(result["orderId"])
+            except Exception as e:
+                logger.error("MetaAPI order execution failed: %s", e)
+                return None
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""
