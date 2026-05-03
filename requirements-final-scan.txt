@@ -1,0 +1,82 @@
+
+#
+#
+#   - pandas-ta (requires Python <3.11; runtime-only)
+#   - stable-baselines3/gymnasium (pulls torch transitively)
+#   - torch/torchvision/transformers/timm (too heavy for unit tests)
+# -- Core numeric / data -------------------------------------------
+# -- Database ------------------------------------------------------
+# -- Pydantic / settings -------------------------------------------
+# -- Technical Analysis --------------------------------------------
+# -- Testing -------------------------------------------------------
+# Compatible: Python 3.10+
+# Excludes:
+# MT5 AI/ML Trading Bot - Enterprise Edition
+# Python wrapper; C library (0.6.4) built from source in ci.yml
+# and requires numpy>=2.0 (listed below).
+# requirements-ci.txt -- Linux CI-safe dependencies
+# requirements.txt — pinned production dependencies
+# ── Configuration ───────────────────────────────────────────
+# ── Core ML / RL ────────────────────────────────────────────
+# ── Dashboard / API ─────────────────────────────────────────
+# ── Data Acquisition ────────────────────────────────────────
+# ── Database ────────────────────────────────────────────────
+# ── Deep Learning Extras ────────────────────────────────────
+# ── DevOps / CI ─────────────────────────────────────────────
+# ── MetaTrader 5 ────────────────────────────────────────────
+# ── Monitoring & Logging ────────────────────────────────────
+# ── Technical Analysis ──────────────────────────────────────
+# ── Testing ─────────────────────────────────────────────────
+# ── Utilities ───────────────────────────────────────────────
+aiohttp
+alembic
+black
+click
+dash
+einops
+fastapi
+fastapi>=0.115.0
+gymnasium
+httpx
+hypothesis
+jinja2
+joblib
+metaapi-cloud-sdk
+mplfinance
+mypy
+numpy
+optuna
+pandas
+pandas-ta
+plotly
+pre-commit
+prometheus-client
+psycopg2-binary
+pydantic
+pydantic-settings
+pytest
+pytest-asyncio
+pytest-cov
+python-dateutil
+python-dotenv
+python-telegram-bot
+pytz
+redis
+requests
+rich
+ruff
+scikit-learn
+scipy
+sqlalchemy
+stable-baselines3
+starlette
+structlog
+tabulate
+timm
+tomli
+torch
+torchvision
+tqdm
+transformers
+uvicorn[standard]
+yfinance

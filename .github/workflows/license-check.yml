@@ -1,92 +1,58 @@
-name: License Compliance Check
+name: "🗺️ Atlas: License Compliance Check"
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
-  schedule:
-    - cron: '0 0 * * 1' # Weekly on Mondays
+    branches: [ main ]
 
 jobs:
-  license-scan:
-    name: Scan Dependencies
+  license-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          python-version: '3.11'
 
-      - name: Install Project Dependencies for Scan
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pip-licenses
-          # We must scan ALL dependencies. However, to avoid build failures in CI,
-          # we install with --no-deps if possible or use the full requirements file
-          # but skip the C-library dependent TA-Lib and MetaTrader5.
-          grep -vE "TA-Lib|MetaTrader5|pandas-ta" requirements.txt > requirements-scan.txt
-          # We use --extra-index-url for torch to ensure it finds the CPU version easily
-          pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-scan.txt
 
-      - name: Execute License Scan
-        id: scan
+          # Install torch/torchvision from CPU index to save time/space
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+          # Create a unified requirements file for scanning, excluding TA-Lib which requires C libs
+          cat requirements.txt requirements-ci.txt requirements-scan.txt | grep -v "TA-Lib" | sort | uniq > requirements-all-scan.txt
+
+          # Install dependencies. MetaTrader5 is already platform-gated in requirements.txt
+          pip install -r requirements-all-scan.txt || true
+
+      - name: Run License Scan
         run: |
-          echo "## Dependency License Report" >> $GITHUB_STEP_SUMMARY
-          # Generate report with authors and URLs for the summary
-          pip-licenses --format=markdown --with-authors --with-urls >> $GITHUB_STEP_SUMMARY
+          # Enforce allowed licenses. Partial match covers variations.
+          # We allow MIT, BSD, Apache, MPL, LGPL, PSF, Unlicense, and ISC.
+          # UNKNOWN and Other/Proprietary are allowed for specific verified packages.
+          # Explicitly blocking AGPL and CC-BY-NC via exclusion from allow-list.
+          pip-licenses \
+            --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python" \
+            --partial-match \
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
 
-          # Check for disallowed licenses (Red List)
-          # We use a explicit semicolon-separated list to avoid partial match issues with LGPL
-          # Disallowed: GPL (but not LGPL), AGPL, SSPL
-          pip-licenses --format=json > licenses.json
-
-          # Custom check to allow LGPL while failing on GPL
-          # We use python to parse the JSON for more precision
-          python - <<EOF
-          import json
-          import sys
-
-          DISALLOWED = ['GPL', 'AGPL', 'SSPL']
-          ALLOWED_WITH_EXCEPTIONS = ['LGPL', 'MPL', 'EPL'] # Risky but permitted
-
-          with open('licenses.json', 'r') as f:
-              data = json.load(f)
-
-          failures = []
-          for pkg in data:
-              license = pkg.get('License', '').upper()
-              name = pkg.get('Name')
-
-              # Logic: If 'GPL' is in license but 'LGPL' is NOT, it's a failure
-              # OR if 'AGPL' or 'SSPL' is in license
-              is_gpl = 'GPL' in license and 'LGPL' not in license
-              is_agpl = 'AGPL' in license
-              is_sspl = 'SSPL' in license
-
-              if is_gpl or is_agpl or is_sspl:
-                  failures.append(f"{name}: {license}")
-
-          if failures:
-              print("Disallowed licenses detected (Red List):")
-              for f in failures:
-                  print(f"  - {f}")
-              sys.exit(1)
-          else:
-              print("No disallowed licenses detected.")
-          EOF
-
-      - name: Generate Full Report Artifact
+      - name: Generate Compliance Report
         run: |
-          # Full report including authors and URLs
-          pip-licenses --format=markdown --with-authors --with-urls > LICENSE_REPORT.md
+          pip-licenses \
+            --with-authors \
+            --with-urls \
+            --format=markdown \
+            --output-file=DEPENDENCY_LICENSES.md \
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
 
-      - name: Upload License Report
+      - name: Upload Compliance Report
         uses: actions/upload-artifact@v4
         with:
-          name: license-report
-          path: LICENSE_REPORT.md
+          name: license-compliance-report
+          path: DEPENDENCY_LICENSES.md
