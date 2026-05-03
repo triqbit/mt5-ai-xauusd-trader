@@ -158,6 +158,8 @@ class RiskManager:
         """Accumulate intraday realised PnL."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+        if self.monitor:
+            self.monitor.log_pnl(self.daily.realised_pnl)
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""

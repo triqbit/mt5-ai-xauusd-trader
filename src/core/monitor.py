@@ -9,6 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -69,7 +70,7 @@ class Monitor:
 
     def __init__(self, config: TradingConfig) -> None:
         self.cfg = config
-        self.equity_history: List[Dict[str, Any]] = []
+        self.equity_history: deque[Dict[str, Any]] = deque(maxlen=1000)
         self.bot: Optional[telegram.Bot] = None
         self._server_started = False
         self._background_tasks: set[asyncio.Task] = set()
@@ -132,6 +133,11 @@ class Monitor:
         self.equity_history.append(data)
         EQUITY_GAUGE.set(equity)
         logger.debug("equity_logged", equity=equity)
+
+    def log_pnl(self, pnl: float) -> None:
+        """Update daily P&L metric."""
+        DAILY_PNL_GAUGE.set(pnl)
+        logger.debug("pnl_logged", pnl=pnl)
 
     def send_message(self, text: str) -> None:
         """
