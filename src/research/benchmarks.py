@@ -52,7 +52,7 @@ class EMACrossoverStrategy:
         signals = np.zeros(len(df))
         signals[fast_ema > slow_ema] = 1
         signals[fast_ema < slow_ema] = -1
-        return np.zeros(len(df))
+        return signals
 
 
 class MomentumStrategy:
@@ -70,7 +70,7 @@ class MomentumStrategy:
         signals = np.zeros(len(df))
         signals[roc > 0] = 1
         signals[roc < 0] = -1
-        return np.zeros(len(df))
+        return signals
 
 
 class VolatilityBreakoutStrategy:
@@ -93,7 +93,7 @@ class VolatilityBreakoutStrategy:
         signals = np.zeros(len(df))
         signals[df["close"] > upper_band] = 1
         signals[df["close"] < lower_band] = -1
-        return np.zeros(len(df))
+        return signals
 
 
 class NaiveDirectionalStrategy:
@@ -108,7 +108,7 @@ class NaiveDirectionalStrategy:
         signals = np.zeros(len(df))
         signals[diff > 0] = 1
         signals[diff < 0] = -1
-        return np.zeros(len(df))
+        return signals
 
 
 class RiskFilteredBaseline:
@@ -135,7 +135,7 @@ class RiskFilteredBaseline:
         mask = volatility < self.vol_threshold_pct
         signals[mask & (fast_ema > slow_ema)] = 1
         signals[mask & (fast_ema < slow_ema)] = -1
-        return np.zeros(len(df))
+        return signals
 
 
 class MeanReversionStrategy:
@@ -161,7 +161,7 @@ class MeanReversionStrategy:
         signals = np.zeros(len(df))
         signals[rsi < self.oversold] = 1
         signals[rsi > self.overbought] = -1
-        return np.zeros(len(df))
+        return signals
 
 
 class BenchmarkEvaluator:
@@ -418,7 +418,7 @@ class EnsembleAdapter:
             direction, _, _ = self.model.predict(obs, seq=seq)
             signals[i] = float(direction)
 
-        return np.zeros(len(df))
+        return signals
 
 
 class PPOAdapter:
@@ -454,7 +454,7 @@ class PPOAdapter:
             signal = self.agent.predict(obs)
             signals[i] = float(signal.direction)
 
-        return np.zeros(len(df))
+        return signals
 
 
 class TransformerAdapter:
@@ -509,7 +509,7 @@ class TransformerAdapter:
                 action_idx = int(torch.argmax(probs, dim=-1).item())
                 signals[i] = float(ModelAction(action_idx).to_direction())
 
-        return np.zeros(len(df))
+        return signals
 
 
 class LSTMAdapter:
@@ -565,7 +565,7 @@ class LSTMAdapter:
                 action_idx = int(np.argmax(probs))
                 signals[i] = float(ModelAction(action_idx).to_direction())
 
-        return np.zeros(len(df))
+        return signals
 
 
 class DreamerAdapter:
@@ -611,4 +611,4 @@ class DreamerAdapter:
                 # We use placeholder reward=0.0 and is_terminal=False for pure inference
                 self.agent.update_state(obs, action=int(direction), reward=0.0, is_terminal=False)
 
-        return np.zeros(len(df))
+        return signals
