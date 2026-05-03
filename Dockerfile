@@ -27,12 +27,16 @@ RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6
 COPY requirements-docker.txt .
 
 # Handle architecture-specific torch installation
+# For amd64, we use the CPU-optimized wheels from pytorch.org
+# For arm64, we use standard wheels from PyPI
 RUN pip install --upgrade pip && \
-    if [ "$TARGETARCH" = "arm64" ]; then \
-        sed -i '/--extra-index-url/d' requirements-docker.txt && \
-        sed -i 's/+cpu//g' requirements-docker.txt; \
-    fi && \
-    pip install --no-cache-dir --prefix=/install -r requirements-docker.txt
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        sed -i 's/torch==2.3.0/torch==2.3.0+cpu/g' requirements-docker.txt && \
+        sed -i 's/torchvision==0.18.0/torchvision==0.18.0+cpu/g' requirements-docker.txt && \
+        pip install --no-cache-dir --prefix=/install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-docker.txt; \
+    else \
+        pip install --no-cache-dir --prefix=/install -r requirements-docker.txt; \
+    fi
 
 # --- Stage 2: runtime ------------------------------------------
 FROM python:3.11-slim AS runtime
