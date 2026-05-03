@@ -6,7 +6,8 @@ body:
     attributes:
       value: |
         **WARNING:** If you have discovered a security vulnerability, please do NOT report it via a public issue.
-        Please follow the private disclosure process described in our SECURITY policy.
+        Please follow the private disclosure process described in our [SECURITY.md](../../SECURITY.md) policy.
+        Use GitHub Private Vulnerability Reporting if possible.
   - type: textarea
     id: vulnerability-details
     attributes:
@@ -34,5 +35,14 @@ body:
       label: Affected Versions
       description: Which versions of the system are affected?
       placeholder: e.g., v1.1.x, v1.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: disclosure-confirmation
+    attributes:
+      label: Disclosure Confirmation
+      description: I have read the SECURITY.md and understand that this report will NOT be public initially.
+      options:
+        - "I confirm and will follow private disclosure"
     validations:
       required: true
