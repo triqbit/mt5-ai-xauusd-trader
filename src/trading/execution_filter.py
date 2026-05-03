@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timezone
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
@@ -89,7 +88,9 @@ class ExecutionFilter:
             high = df["high"]
             low = df["low"]
             close = df["close"]
-            tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
+            tr = pd.concat(
+                [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+            ).max(axis=1)
             atr = tr.rolling(window=14).mean()
         else:
             atr = df["base_M5_atr"]

@@ -70,7 +70,7 @@ validate-config:
 
 backtest:
 	@echo "Running standardized backtest..."
-	$(PYTHON_EXEC) scripts/backtest.py
+	$(PYTHON_EXEC) scripts/backtest.py $(filter-out $@,$(MAKECMDGOALS))
 
 report:
 	@echo "Generating performance report (Stub)..."
