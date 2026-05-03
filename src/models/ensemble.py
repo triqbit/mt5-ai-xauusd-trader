@@ -28,8 +28,8 @@ except ImportError:
 
 from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
-from src.models.lstm_model import LSTMAttentionModel
 from src.models.dynamic_ensemble import DynamicEnsemble
+from src.models.lstm_model import LSTMAttentionModel
 from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)

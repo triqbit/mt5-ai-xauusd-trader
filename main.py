@@ -83,6 +83,7 @@ def run_live(
     dss: DecisionSupportSystem,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
+    console: Optional[Console] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     explainer = SignalExplainer()
@@ -252,7 +253,10 @@ def run_live(
                             cfg.symbol, explanation, regime_info, macro_risk, perf_metrics
                         )
                         # Render the institutional decision cockpit
-                        console.print(dss.format_for_operator(packet))
+                        if console:
+                            console.print(dss.format_for_operator(packet))
+                        else:
+                            print(dss.format_for_operator(packet))
 
                 if risk_approved and direction != 0:
                     with profile("execution"):
@@ -483,6 +487,7 @@ def main() -> int:
                 dss,
                 trade_logger=trade_logger,
                 monitor=monitor,
+                console=console,
             )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")
