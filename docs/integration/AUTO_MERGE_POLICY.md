@@ -19,11 +19,11 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 
 Automatically **BLOCK** and **ESCALATE** if any of these are true:
 
-- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py` or files interacting with MT5 order placement.
-- 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py` or `src/trading/risk_manager.py`.
-- 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*` or credential handling.
+- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py`, `src/trading/mt5_connector.py`, or `src/trading/order_manager.py`.
+- 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py`, `src/trading/risk_manager.py`, or `src/trading/portfolio_manager.py`.
+- 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*`, `src/core/config.py`, or credential handling.
 - 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
-- 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile` or container orchestration.
+- 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile` or `docker-compose.yml`.
 - 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*` or `ci.yml`.
 
 ## High-Risk Files (Auto-Merge Prohibited)
@@ -31,12 +31,17 @@ Automatically **BLOCK** and **ESCALATE** if any of these are true:
 The following patterns trigger an automatic block and escalation:
 
 - `src/trading/executor.py`
+- `src/trading/mt5_connector.py`
+- `src/trading/order_manager.py`
 - `src/core/risk_engine.py`
 - `src/trading/risk_manager.py`
+- `src/trading/portfolio_manager.py`
+- `src/core/config.py`
 - `config/secrets.*`
 - `.github/workflows/deploy.*`
 - `.github/workflows/ci.yml`
 - `Dockerfile`
+- `docker-compose.yml`
 - `migrations/.*`
 
 ## Escalation Procedure
@@ -53,5 +58,6 @@ This log is automatically maintained by the system.
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-03 | N/A | Updated | Strict auto-merge policy enforcement | [Jules05] |
 | 2026-04-30 | #368 | Auto-Merged | Policy checks passed | [PR](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/368) |
 | 2026-04-29 | #365 | Auto-Merged | Policy checks passed | [PR](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/365) |
