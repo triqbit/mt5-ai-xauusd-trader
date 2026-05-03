@@ -2,32 +2,35 @@
 
 This document defines the mandatory gates that must be satisfied and verified before any deployment to the production environment. No production push is permitted without explicit completion of this checklist.
 
-## 1. Automated Quality & Security Gates
-- [ ] **CI Pipeline Status:** All CI checks (linting, type checking) are passing, and all **unit tests pass** with a minimum of 80% statement coverage.
-- [ ] **Security Scans:** **Security scan** (pip-audit) and container scans (Trivy) are clean, with zero unresolved High or Critical vulnerabilities.
+## 1. Quality & Security Gates
+- [ ] **CI Pipeline Status:** All CI checks (linting, type checking) are passing.
+- [ ] **Automated Testing:** All unit and integration tests pass successfully.
+- [ ] **Test Coverage:** Statement coverage is ≥ 80% (aligned with `docs/SLO_TARGETS.md`).
+- [ ] **Security Scanning:** `pip-audit` and `Trivy` scans are clean with zero unresolved High or Critical vulnerabilities.
 
-## 2. Configuration & Environment Validation
-- [ ] **Environment Validation:** Environment configuration is validated via `scripts/validate_env.py` and synchronized with `src/core/config.py`.
-- [ ] **Risk Limits:** **Risk limits** (risk_per_trade ≤ 2%, max_daily_loss ≤ 15%) are confirmed and enforced.
+## 2. Configuration & Validation
+- [ ] **Environment Validation:** Environment configuration is validated via `scripts/validate_env.py`.
+- [ ] **Risk Compliance:** Hard risk limits are confirmed and enforced in the production config.
 
-## 3. Performance & Strategy Acceptance
-- [ ] **Backtest Review:** Latest backtest results for the release candidate have been reviewed and meet acceptable trading benchmarks.
+## 3. Strategy & Performance
+- [ ] **Backtest Review:** Latest backtest results for the release candidate have been reviewed and meet acceptable benchmarks.
 
-## 4. Staging & Infrastructure Verification
-- [ ] **Staging Health:** Full health checks (`/health/readiness`) are passing in the staging/pre-prod environment.
-- [ ] **Monitoring:** **Monitoring** and alerting systems (Prometheus, Telegram) are verified as functional and receiving telemetry data.
+## 4. Staging & Infrastructure
+- [ ] **Staging Verification:** Full health checks (`/health/readiness`) are passing in the staging environment.
+- [ ] **Observability:** Monitoring and alerting (Prometheus, Telegram) are verified functional and receiving data.
 
-## 5. Deployment Safety & Recoverability
-- [ ] **Rollback Plan:** A **Rollback plan** (per `docs/RELEASE_PLAYBOOK.md`) has been documented, tested, and verified.
-- [ ] **Database Reversibility:** Schema migrations have been verified for reversibility via `scripts/verify_migrations.py`.
+## 5. Safety & Recoverability
+- [ ] **Rollback Plan:** A version-specific rollback plan is documented and has been successfully tested.
+- [ ] **Migration Reversibility:** Database migrations have been verified for safe downgrade via `scripts/verify_migrations.py`.
 
-## 6. Release Governance & Documentation
-- [ ] **Release Notes:** `CHANGELOG.md` is updated, and release notes for the new version are prepared and reviewed.
-- [ ] **Bug Audit:** There are zero open critical or high-severity bugs impacting the release candidate.
-- [ ] **Documentation Update:** `README.md`, operational runbooks (docs/runbooks/), and API documentation are updated.
-- [ ] **Stakeholder Sign-off:** Final formal stakeholder sign-off obtained from the Trading and DevOps leads.
+## 6. Governance & Documentation
+- [ ] **Release Notes:** Version-specific release notes are prepared, reviewed, and finalized in `CHANGELOG.md`.
+- [ ] **Bug Audit:** Zero open Critical or High-severity bugs impacting the release candidate.
+- [ ] **Documentation:** `README.md`, `docs/runbooks/`, and API documentation are updated for the current release.
+- [ ] **Stakeholder Sign-off:** Final formal sign-off obtained from Trading and DevOps leads.
 
 ---
-*Completed by:* ____________________
-*Date:* ____________________
-*Release Version:* ____________________
+**Verified By:** ____________________
+**Date:** ____________________
+**Release Version:** ____________________
+**Status:** [ ] GO / [ ] NO-GO
