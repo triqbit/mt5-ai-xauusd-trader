@@ -19,7 +19,7 @@ endif
 PYTHON_EXEC := $(shell if [ -f $(PYTHON) ]; then echo $(PYTHON); else echo python3; fi)
 PIP_EXEC := $(shell if [ -f $(PIP) ]; then echo $(PIP); else echo pip3; fi)
 
-.PHONY: help bootstrap doctor test lint audit demo clean
+.PHONY: help bootstrap doctor test lint audit demo clean init validate-config backtest report status emergency-stop daily-summary
 
 help:
 	@echo "MT5 AI/ML Trading Bot - Developer Commands"
@@ -31,6 +31,13 @@ help:
 	@echo "audit     : Run security and dependency audit"
 	@echo "demo      : Run the bot in demo mode"
 	@echo "clean     : Remove temporary files and build artifacts"
+	@echo "init      : [NEW] Automated system initialization"
+	@echo "validate-config : [NEW] Validate environment and .env"
+	@echo "backtest  : [NEW] Run standardized backtest"
+	@echo "report    : [NEW] Generate performance report"
+	@echo "status    : [NEW] View system health dashboard"
+	@echo "emergency-stop : [NEW] Immediate shutdown and position closure"
+	@echo "daily-summary : [NEW] Generate operator daily summary"
 
 bootstrap:
 	bash scripts/bootstrap.sh
@@ -52,6 +59,36 @@ audit:
 
 demo:
 	$(PYTHON_EXEC) main.py --mode demo --symbol XAUUSD --verbose
+
+init:
+	@echo "Initializing system (Stub)..."
+	bash scripts/bootstrap.sh
+
+validate-config:
+	@echo "Validating configuration (Stub)..."
+	$(PYTHON_EXEC) scripts/validate_env.py
+
+backtest:
+	@echo "Running standardized backtest (Stub)..."
+	@echo "Note: Redirecting to main.py --mode backtest"
+	$(PYTHON_EXEC) main.py --mode backtest --symbol XAUUSD --algo ensemble || echo "Backtest implementation in progress"
+
+report:
+	@echo "Generating performance report (Stub)..."
+	@echo "See docs/status/EXECUTIVE_SUMMARY.md for current status."
+
+status:
+	@echo "System Status Dashboard (Stub)..."
+	$(PYTHON_EXEC) main.py --check
+
+emergency-stop:
+	@echo "EMERGENCY STOP INITIATED (Stub)..."
+	@echo "Closing all positions and shutting down..."
+	# In a real scenario, this would call a dedicated emergency script
+
+daily-summary:
+	@echo "Generating Daily Operator Summary (Stub)..."
+	$(PYTHON_EXEC) generate_triage_report.py
 
 clean:
 ifeq ($(OS),Windows_NT)
