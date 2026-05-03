@@ -63,7 +63,7 @@ def test_signal_explainer_aggregation():
     symbol = "XAUUSD"
     direction = 1
     confidence = 0.75
-    model_votes = {"ppo": 0, "lstm": 0}  # 0=buy in ensemble.py mapping
+    model_votes = {"ppo": 1, "lstm": 1}  # 1=buy in ModelAction mapping
     model_weights = {"ppo": 0.7, "lstm": 0.3}
     risk_data = {
         "passed": True,
@@ -125,7 +125,7 @@ def test_signal_explainer_execution_blocked():
         symbol="XAUUSD",
         direction=1,
         confidence=0.8,
-        model_votes={"ppo": 0},
+        model_votes={"ppo": 1}, # 1=buy
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 2.0, "summary": "Risk OK"},
         regime_info={"name": "Bullish"},
@@ -152,7 +152,7 @@ def test_signal_explainer_risk_rejection():
         symbol="XAUUSD",
         direction=-1,
         confidence=0.6,
-        model_votes={"ppo": 1},  # 1=sell
+        model_votes={"ppo": 2},  # 2=sell
         model_weights={"ppo": 1.0},
         risk_data=risk_data,
         regime_info={"name": "Volatile"},
@@ -171,7 +171,7 @@ def test_format_for_terminal_fallback():
         symbol="XAUUSD",
         direction=1,
         confidence=0.9,
-        model_votes={"ppo": 0},
+        model_votes={"ppo": 1}, # 1=buy
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 3.0, "summary": "Ok"},
         regime_info={"name": "Bullish"},
@@ -189,3 +189,97 @@ def test_format_for_terminal_fallback():
     assert "ppo" in formatted
     assert "Execution" in formatted or "EXECUTION" in formatted.upper()
     assert "Risk Assessment" in formatted or "RISK" in formatted.upper()
+
+
+def test_signal_explainer_dominant_tie():
+    """Test that multiple models are marked as dominant if they have the same weighted confidence."""
+    explainer = SignalExplainer()
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 1, "lstm": 1},
+        model_weights={"ppo": 0.5, "lstm": 0.5},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+    )
+
+    dominant_models = [a.model_name for a in explanation.model_attributions if a.is_dominant]
+    assert "ppo" in dominant_models
+    assert "lstm" in dominant_models
+    assert "Primary driver(s): ppo, lstm" in explanation.human_readable_summary
+
+
+def test_signal_explainer_no_risk_data():
+    """Test that SignalExplainer handles missing risk data with defaults."""
+    explainer = SignalExplainer()
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=0,  # HOLD
+        confidence=0.5,
+        model_votes={"ppo": 0},  # 0=HOLD
+        model_weights={"ppo": 1.0},
+        risk_data={},  # Empty risk data
+        regime_info={},  # Empty regime info
+    )
+
+    assert explanation.risk_assessment.passed is False
+    assert explanation.risk_assessment.summary == "No risk data provided"
+    assert explanation.regime_context.regime_name == "Unknown"
+    assert explanation.regime_context.volatility_state == "Normal"
+
+
+def test_signal_explainer_feature_contributions():
+    """Test that feature contributions are correctly processed."""
+    explainer = SignalExplainer()
+    feature_impacts = [
+        {"cluster": "Trend", "score": 0.8, "impact": "High", "summary": "Strong bullish trend"},
+        {"cluster": "Volatility", "score": -0.2, "impact": "Low", "summary": "Slightly elevated"},
+    ]
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.7,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        feature_impacts=feature_impacts,
+    )
+
+    assert len(explanation.feature_contributions) == 2
+    trend = next(c for c in explanation.feature_contributions if c.cluster_name == "Trend")
+    assert trend.contribution_score == 0.8
+    assert trend.impact_level == "High"
+
+
+def test_signal_explainer_mixed_votes():
+    """Test behavior when models have conflicting votes."""
+    explainer = SignalExplainer()
+
+    # PPO votes BUY (1), LSTM votes SELL (2)
+    # Ensemble confidence 0.6, final direction BUY (1)
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.6,
+        model_votes={"ppo": 1, "lstm": 2},
+        model_weights={"ppo": 0.6, "lstm": 0.4},
+        risk_data={"passed": True},
+        regime_info={"name": "Volatile"},
+    )
+
+    ppo_attr = next(a for a in explanation.model_attributions if a.model_name == "ppo")
+    lstm_attr = next(a for a in explanation.model_attributions if a.model_name == "lstm")
+
+    assert ppo_attr.vote == SignalDirection.BUY
+    assert lstm_attr.vote == SignalDirection.SELL
+    # ppo aligned with final direction, so it should have the confidence
+    assert ppo_attr.confidence == 0.6
+    # lstm not aligned, should have neutral 0.5
+    assert lstm_attr.confidence == 0.5
+    assert ppo_attr.is_dominant is True
+    assert lstm_attr.is_dominant is False
