@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from src.research.benchmarks import EMACrossoverStrategy
-from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
+from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer, OptimizationMetric
 
 
 @pytest.fixture
@@ -33,11 +33,6 @@ def test_window_generation(sample_data):
     )
 
     windows = optimizer.generate_windows()
-    # 500 total. 100 train + 20 test = 120.
-    # Start at 0, 20, 40, ...
-    # Last start: 500 - 120 = 380.
-    # Starts: 0, 20, 40, ..., 380.
-    # Number of steps = (380 - 0) / 20 + 1 = 20.
     assert len(windows) == 20
 
     train, test = windows[0]
@@ -91,3 +86,44 @@ def test_full_optimization_run(sample_data):
     assert "slow_window" in result.best_params
     assert result.metrics.robustness_score is not None
     assert result.metrics.oos_sharpe_mean is not None
+
+    # Verify window results
+    assert len(result.window_results) >= 3
+    assert result.window_results[0].window_index == 0
+    assert "Sharpe Ratio" in result.window_results[0].oos_metrics
+    assert "Sharpe Ratio" in result.window_results[0].is_metrics
+
+def test_metric_selection(sample_data):
+    def param_space(trial):
+        return {
+            "fast_window": trial.suggest_int("fast_window", 5, 15),
+            "slow_window": trial.suggest_int("slow_window", 20, 40)
+        }
+
+    # Test Total Return optimization
+    config_tr = WalkForwardConfig(
+        n_trials=5,
+        train_size=200,
+        test_size=50,
+        step_size=50,
+        metric=OptimizationMetric.TOTAL_RETURN
+    )
+    optimizer_tr = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config_tr
+    )
+    result_tr = optimizer_tr.run_optimization()
+    assert result_tr.metrics.robustness_score is not None
+
+def test_insufficient_data(sample_data):
+    config = WalkForwardConfig(train_size=1000, test_size=200)
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=lambda t: {},
+        config=config
+    )
+    with pytest.raises(ValueError, match="Insufficient data"):
+        optimizer.run_optimization()
