@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive unit and integration tests for the health check framework.
 - Semantic versioning policy (`docs/VERSIONING_POLICY.md`).
 - Automated changelog generation workflow (`.github/workflows/changelog.yml`).
+- High-impact macroeconomic event intelligence module in `src/data/event_intelligence.py`.
+- Support for CPI, NFP, FOMC, rate decisions, and geopolitical risk windows.
+- Event severity scoring and typed risk models using Pydantic.
+- Pre-event risk windows and post-event cooldown logic for XAUUSD.
+- Enterprise-safe fallback behavior for external event data feeds.
+- Comprehensive unit tests for event intelligence in `tests/test_event_intelligence.py`.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
