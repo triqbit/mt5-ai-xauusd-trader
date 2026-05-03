@@ -111,7 +111,6 @@ class RareEventSimulator:
             # Intraday range
             # Generate two random deviations for high and low
             # Scale by volatility and the actual move in the bar
-            move_size = abs(closes[i] - opens[i])
             noise = self.rng.rayleigh(base_vol * opens[i], 2)
 
             highs[i] = max(opens[i], closes[i]) + noise[0]
