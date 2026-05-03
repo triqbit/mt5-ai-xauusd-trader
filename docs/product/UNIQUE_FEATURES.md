@@ -113,8 +113,47 @@ Generic bots execute blindly based on the current price. The MT5 AI Trader, with
 
 ---
 
+## 4. Adaptive Capital-Preservation Operating Modes
+
+### What it is and why it matters
+**Adaptive Capital-Preservation Operating Modes** is a top-down risk governance framework that allows the trading system to switch between pre-defined "postures" (e.g., Defensive, Balanced, Aggressive, Event-Protected).
+
+In institutional trading, risk isn't just a static parameter; it's a strategic choice. During periods of extreme macro uncertainty (e.g., FOMC week) or when the system is approaching drawdown limits, the system must be able to pivot its entire logic—from position sizing to signal filtering—to a more conservative stance without requiring a full code redeploy or manual intervention in multiple modules.
+
+### How it differentiates from generic trading bots
+Generic bots usually have a single set of risk parameters (e.g., 1% risk per trade). The MT5 AI Trader, with this feature, can be commanded to "Protect Capital" (Defensive mode), which automatically:
+1.  **Scales Exposure**: Halves all position sizes and reduces the global capital cap.
+2.  **Tightens Logic**: Requires higher ensemble consensus (e.g., 90% instead of 60%) and tighter ATR filters.
+3.  **Active Avoidance**: Automatically disables trading during high-impact macro news windows.
+4.  **Resilience**: Shifts to a "trailing-only" exit strategy to lock in gains faster.
+
+### Architecture Outline
+1.  **Posture Manager**: A state-management service that holds the current `OperatingMode` (CONSERVATIVE, BALANCED, AGGRESSIVE, EVENT_DEFENSIVE).
+2.  **Dynamic Parameter Mapping**: A configuration layer that maps each mode to a set of overrides for the `RiskManager`, `CapitalAllocator`, and `ExecutionFilter`.
+3.  **Trigger Engine**: Logic that can automatically switch modes based on Daily Loss limits, imminent macro events (from Economic Calendar), or "High Volatility Ranging" regimes.
+4.  **Integration Hooks**: Middleware in the main loop that injects the current posture's constraints into every decision-making step.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | System must support at least 4 modes: `CONSERVATIVE`, `BALANCED`, `AGGRESSIVE`, and `EVENT_DEFENSIVE`. |
+| **Functional** | Mode switching must take effect within the next poll cycle (< 1s) and log the transition. |
+| **Technical** | Mode overrides must be implemented as a non-destructive layer over base configurations (original settings are preserved). |
+| **Operational** | Current mode must be prominently displayed in the **Decision Cockpit** and logged in every `TradeBriefing`. |
+| **Release Readiness** | Must include a "Recovery Mode" that automatically engages if connectivity or data integrity issues are detected. |
+
+### Implementation Lane
+*   **Jules05 (Integration Governor)**: Lead on defining the posture definitions and cross-module harmonization.
+*   **Jules02 (Quality & Hardening)**: Lead on the state-management logic and fail-safe triggers.
+*   **Jules03 (Release Reliability)**: Lead on the operational controls and "Emergency Mode" runbooks.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires the `RiskManager`, `CapitalAllocator`, and `ExecutionFilter` to support dynamic parameter updates.
+*   **Constraints**: Posture changes must be atomic to prevent "split-brain" states where modules operate under conflicting risk profiles.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Capital-preservation operating modes** (Conservative/Event-Defensive)
 - **Gold-specific macro sensitivity overlays** (Real Yields, DXY, Central Bank demand)
 - **Trade narrative memory** (Self-correcting memory of historical trades)
 - **Adaptive position sizing based on regime stability**
