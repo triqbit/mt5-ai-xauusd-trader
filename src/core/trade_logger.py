@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/trade_logger.py
-Trade logging system using SQLAlchemy ORM with SQLite.
+Trade logging system using SQLAlchemy 2.0 ORM with SQLite.
 Author : triqbit
 License: MIT
 """
@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from sqlalchemy import (
     Boolean,
-    Column,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -25,26 +25,38 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    sessionmaker,
+)
 
-Base = declarative_base()
 logger = logging.getLogger(__name__)
+
+
+class Base(DeclarativeBase):
+    """Base class for SQLAlchemy models."""
+    pass
 
 
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
     )
-    updated_at = Column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False, index=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    updated_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -52,20 +64,22 @@ class ModelSignal(Base, AuditMixin):
 
     __tablename__ = "model_signals"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False, index=True)
-    direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
-    entry_price = Column(Float, nullable=False)
-    stop_loss = Column(Float)
-    take_profit = Column(Float)
-    lot_size = Column(Float)
-    algorithm = Column(String(50))
-    confidence = Column(Float)
-    volatility = Column(Float)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    direction: Mapped[int] = mapped_column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
+    entry_price: Mapped[float] = mapped_column(Float, CheckConstraint("entry_price > 0"), nullable=False)
+    stop_loss: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    take_profit: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    lot_size: Mapped[Optional[float]] = mapped_column(Float, CheckConstraint("lot_size > 0"), nullable=True)
+    algorithm: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    volatility: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
 
     # Relationship
-    trade = relationship("Trade", back_populates="signal", uselist=False)
+    trade: Mapped[Optional["Trade"]] = relationship("Trade", back_populates="signal", uselist=False)
 
 
 class Trade(Base, AuditMixin):
@@ -73,19 +87,19 @@ class Trade(Base, AuditMixin):
 
     __tablename__ = "trades"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    ticket = Column(Integer, unique=True, index=True)
-    symbol = Column(String(20), nullable=False, index=True)
-    direction = Column(Integer, nullable=False)
-    entry_price = Column(Float, nullable=False)
-    exit_price = Column(Float)
-    lot_size = Column(Float, nullable=False)
-    pnl = Column(Float, default=0.0)
-    drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticket: Mapped[Optional[int]] = mapped_column(Integer, unique=True, index=True, nullable=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    direction: Mapped[int] = mapped_column(Integer, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, CheckConstraint("entry_price > 0"), nullable=False)
+    exit_price: Mapped[Optional[float]] = mapped_column(Float, CheckConstraint("exit_price > 0"), nullable=True)
+    lot_size: Mapped[float] = mapped_column(Float, CheckConstraint("lot_size > 0"), nullable=False)
+    pnl: Mapped[float] = mapped_column(Float, default=0.0)
+    drawdown_impact: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
-    signal_id = Column(Integer, ForeignKey("model_signals.id"))
-    signal = relationship("ModelSignal", back_populates="trade")
+    signal_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("model_signals.id"), nullable=True)
+    signal: Mapped[Optional["ModelSignal"]] = relationship("ModelSignal", back_populates="trade")
 
 
 class RiskEvent(Base, AuditMixin):
@@ -93,12 +107,12 @@ class RiskEvent(Base, AuditMixin):
 
     __tablename__ = "risk_events"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    event_type = Column(String(50), nullable=False)
-    description = Column(Text)
-    symbol = Column(String(20))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    symbol: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
 
-    signal_id = Column(Integer, ForeignKey("model_signals.id"), nullable=True)
+    signal_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("model_signals.id"), nullable=True)
 
 
 class PerformanceMetric(Base, AuditMixin):
@@ -106,13 +120,15 @@ class PerformanceMetric(Base, AuditMixin):
 
     __tablename__ = "performance_metrics"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    sharpe_ratio = Column(Float)
-    profit_factor = Column(Float)
-    max_drawdown = Column(Float)
-    total_trades = Column(Integer)
-    win_rate = Column(Float)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
+    sharpe_ratio: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    profit_factor: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    max_drawdown: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    total_trades: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    win_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
 
 class TradeLogger:
@@ -137,10 +153,11 @@ class TradeLogger:
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
                 timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
+                created_by=signal_data.get("created_by", "system"),
             )
             session.add(signal)
             session.commit()
-            return signal.id
+            return int(signal.id)
 
     def log_trade(
         self,
@@ -151,6 +168,7 @@ class TradeLogger:
         lot_size: float,
         signal_id: Optional[int] = None,
         status: str = "OPEN",
+        created_by: str = "system",
     ) -> int:
         """Log a trade execution."""
         with self.Session() as session:
@@ -162,10 +180,11 @@ class TradeLogger:
                 lot_size=lot_size,
                 signal_id=signal_id,
                 status=status,
+                created_by=created_by,
             )
             session.add(trade)
             session.commit()
-            return trade.id
+            return int(trade.id)
 
     def update_trade(
         self,
@@ -173,21 +192,20 @@ class TradeLogger:
         exit_price: float,
         pnl: Optional[float] = None,
         drawdown_impact: float = 0.0,
+        updated_by: str = "system",
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         with self.Session() as session:
-            trade = (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
-            )
+            stmt = select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+            trade = session.execute(stmt).scalar_one_or_none()
+
             if trade:
                 trade.exit_price = exit_price
                 if pnl is not None:
                     trade.pnl = pnl
                 else:
-                    # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
-                    # For XAUUSD, contract size is often 100.
+                    # Basic P&L calculation for gold: (exit - entry) * direction * lot_size * contract_size
+                    # Default contract size for gold is 100.
                     contract_size = 100
                     trade.pnl = (
                         (exit_price - trade.entry_price)
@@ -197,6 +215,7 @@ class TradeLogger:
                     )
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
+                trade.updated_by = updated_by
                 session.commit()
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
@@ -204,11 +223,8 @@ class TradeLogger:
     def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
-            return (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
-            )
+            stmt = select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+            return session.execute(stmt).scalar_one_or_none()
 
     def log_risk_event(
         self,
@@ -216,6 +232,7 @@ class TradeLogger:
         description: str,
         symbol: Optional[str] = None,
         signal_id: Optional[int] = None,
+        created_by: str = "system",
     ) -> None:
         """Log a risk-related event."""
         with self.Session() as session:
@@ -224,6 +241,7 @@ class TradeLogger:
                 description=description,
                 symbol=symbol,
                 signal_id=signal_id,
+                created_by=created_by,
             )
             session.add(event)
             session.commit()
@@ -234,16 +252,10 @@ class TradeLogger:
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
         """
         with self.Session() as session:
-            # Optimized: only fetch pnl column for active closed trades
-            pnls = np.array(
-                session.execute(
-                    select(Trade.pnl).where(
-                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
-                    )
-                )
-                .scalars()
-                .all()
+            stmt = select(Trade.pnl).where(
+                Trade.status == "CLOSED", Trade.is_deleted.is_(False)
             )
+            pnls = np.array(session.execute(stmt).scalars().all())
 
             if len(pnls) == 0:
                 return {
@@ -253,14 +265,14 @@ class TradeLogger:
                 }
 
             # Profit Factor
-            gross_profit = np.sum(pnls[pnls > 0])
-            gross_loss = abs(np.sum(pnls[pnls < 0]))
+            gross_profit = float(np.sum(pnls[pnls > 0]))
+            gross_loss = float(abs(np.sum(pnls[pnls < 0])))
             profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
-            # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
+            # Sharpe Ratio (annualized, assuming per-trade is daily equivalent for simplification)
             if len(pnls) > 1:
-                avg_ret = np.mean(pnls)
-                std_ret = np.std(pnls)
+                avg_ret = float(np.mean(pnls))
+                std_ret = float(np.std(pnls))
                 sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
             else:
                 sharpe = 0.0
@@ -269,7 +281,7 @@ class TradeLogger:
             equity_curve = np.cumsum(pnls)
             peak = np.maximum.accumulate(equity_curve)
             drawdown = peak - equity_curve
-            max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
+            max_dd = float(np.max(drawdown)) if len(drawdown) > 0 else 0.0
 
             metrics = {
                 "sharpe_ratio": float(sharpe),
@@ -277,13 +289,14 @@ class TradeLogger:
                 "max_drawdown": float(max_dd),
             }
 
-            # Optionally log these metrics to DB
+            # Persistence of metrics
             metric_record = PerformanceMetric(
                 sharpe_ratio=metrics["sharpe_ratio"],
                 profit_factor=metrics["profit_factor"],
                 max_drawdown=metrics["max_drawdown"],
                 total_trades=len(pnls),
                 win_rate=float(np.sum(pnls > 0) / len(pnls)),
+                created_by="system",
             )
             session.add(metric_record)
             session.commit()

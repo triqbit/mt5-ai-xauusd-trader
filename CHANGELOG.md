@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enterprise-grade trade logging system in `src/core/trade_logger.py` using SQLAlchemy 2.0 and SQLite.
+- Support for auditing signals, executions, performance metrics, and risk events with mandatory audit columns.
+- Database-level data integrity constraints and optimized indices for institutional reporting.
+- Annualized performance report generation including Sharpe Ratio, Profit Factor, and Maximum Drawdown.
+- Comprehensive integration test suite for trade logging and database schema verification.
 - Refined the 6-layer execution filter in `src/trading/execution_filter.py` with EMA20 trend angle logic.
 - Comprehensive unit test suite for execution filters in `tests/test_execution_filter.py`.
 - Institutional-grade decision support system in `src/core/decision_support.py`.
