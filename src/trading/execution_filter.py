@@ -102,10 +102,19 @@ class ExecutionFilter:
         return bool(current_atr <= threshold * avg_atr)
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
-        """Validates that the price trend matches signal direction using regression slope."""
-        close = df["close"].iloc[-window:]
-        x = np.arange(len(close))
-        slope, _, _, _, _ = stats.linregress(x, close.values)
+        """Validates that the price trend matches signal direction using regression slope of EMA20."""
+        ema_col = "base_M5_ema_20"
+        if ema_col in df.columns:
+            ema20 = df[ema_col]
+        else:
+            ema20 = df["close"].ewm(span=20, adjust=False).mean()
+
+        target_ema = ema20.iloc[-window:]
+        if len(target_ema) < window:
+            return True  # Not enough data to be sure, pass
+
+        x = np.arange(len(target_ema))
+        slope, _, _, _, _ = stats.linregress(x, target_ema.values)
 
         if direction > 0:  # BUY
             return bool(slope > 0)
