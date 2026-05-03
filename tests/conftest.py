@@ -6,6 +6,10 @@ import numpy as np
 # Mock talib before any imports
 mock_talib = MagicMock()
 
+# Mock telegram
+sys.modules["telegram"] = MagicMock()
+sys.modules["telegram.ext"] = MagicMock()
+
 # Setup common TA-Lib functions to return expected types matching input length
 mock_talib.RSI.side_effect = lambda x, **kwargs: np.zeros(len(x))
 mock_talib.MACD.side_effect = lambda x, *args, **kwargs: (np.zeros(len(x)), np.zeros(len(x)), np.zeros(len(x)))

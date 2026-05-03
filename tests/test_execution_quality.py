@@ -47,7 +47,9 @@ def test_trade_execution_quality_model():
         "timing_efficiency": 0.7,
         "spread_at_execution": 2.0,
         "slippage_to_spread_ratio": 0.75,
-        "alpha_decay_pips": 0.5
+        "alpha_decay_pips": 0.5,
+        "execution_cost_pips": 2.5,
+        "markout_pnls": {"1m": 0.5, "5m": 2.0}
     }
     model = TradeExecutionQuality(**data)
     assert model.trade_id == 1
@@ -113,6 +115,49 @@ def test_evaluate_opportunity_cost(analyzer, mock_connector):
     analysis = analyzer._evaluate_opportunity_cost(signal, "Risk limit reached")
 
     assert analysis is not None
+
+
+def test_calculate_markouts(analyzer, mock_connector):
+    """Test price drift calculation at different horizons."""
+    symbol = "XAUUSD"
+    entry_time = datetime.now(timezone.utc)
+    entry_price = 2300.0
+    direction = 1
+    horizons = [1, 5, 15]
+
+    # Mock market data: price goes up
+    mock_connector.get_rates_range.return_value = pd.DataFrame([
+        {"time": entry_time + timedelta(minutes=1), "close": 2301.0},
+        {"time": entry_time + timedelta(minutes=5), "close": 2305.0},
+        {"time": entry_time + timedelta(minutes=15), "close": 2315.0},
+    ])
+
+    results = analyzer.calculate_markouts(symbol, entry_time, entry_price, direction, horizons)
+
+    assert results["1m"] == 10.0  # (2301 - 2300) / 0.1
+    assert results["5m"] == 50.0
+    assert results["15m"] == 150.0
+
+
+def test_evaluate_opportunity_cost_final(analyzer, mock_connector):
+    """Re-verify opportunity cost after additions."""
+    signal = MagicMock(spec=ModelSignal)
+    signal.id = 1
+    signal.symbol = "XAUUSD"
+    signal.direction = 1
+    signal.entry_price = 2300.0
+    signal.take_profit = 2310.0
+    signal.stop_loss = 2290.0
+    signal.lot_size = 0.1
+    signal.timestamp = datetime.now(timezone.utc) - timedelta(minutes=60)
+
+    # Mock market movement: goes to 2315 (hits TP)
+    mock_connector.get_rates.return_value = pd.DataFrame([
+        {"time": signal.timestamp + timedelta(minutes=15), "open": 2300.0, "high": 2315.0, "low": 2299.0, "close": 2312.0}
+    ])
+
+    analysis = analyzer._evaluate_opportunity_cost(signal, "Risk limit reached")
+    assert analysis is not None
     assert analysis.would_have_won is True
     assert analysis.max_favorable_excursion > 0
     assert analysis.opportunity_cost_pnl > 0
@@ -128,7 +173,8 @@ def test_generate_summary_report(analyzer):
             execution_latency_ms=100.0, fill_quality_score=0.9,
             edge_capture=0.5, post_entry_drift_5m=1.0, post_entry_drift_15m=2.0,
             timing_efficiency=0.8, spread_at_execution=2.0,
-            slippage_to_spread_ratio=0.5, alpha_decay_pips=0.1
+            slippage_to_spread_ratio=0.5, alpha_decay_pips=0.1,
+            execution_cost_pips=2.0, markout_pnls={"5m": 1.0}
         )
 
         mock_abs.return_value = [
