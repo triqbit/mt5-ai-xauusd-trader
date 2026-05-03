@@ -4,11 +4,13 @@ tests/test_resilience.py
 Resilience tests for retry logic and exception handling.
 """
 
-import pytest
-import time
 from unittest.mock import MagicMock, patch
-from src.core.retry import with_retry
+
+import pytest
+
 from src.core.exceptions import MT5ConnectionError, MT5DataError
+from src.core.retry import with_retry
+
 
 def test_retry_success_after_failure():
     """Test that @with_retry eventually succeeds."""
@@ -55,8 +57,8 @@ def test_retry_unexpected_exception():
 @patch("src.trading.mt5_connector.mt5")
 def test_mt5_connector_connection_failure(mock_mt5):
     """Test MT5Connector raises MT5ConnectionError on failure."""
-    from src.trading.mt5_connector import MT5Connector
     from src.core.config import TradingConfig
+    from src.trading.mt5_connector import MT5Connector
 
     mock_mt5.initialize.return_value = False
     mock_mt5.last_error.return_value = (-1, "Connection failed")
@@ -82,8 +84,8 @@ def test_mt5_connector_connection_failure(mock_mt5):
 @patch("src.trading.mt5_connector.mt5")
 def test_mt5_connector_data_failure(mock_mt5):
     """Test MT5Connector raises MT5DataError on rates failure."""
-    from src.trading.mt5_connector import MT5Connector
     from src.core.config import TradingConfig
+    from src.trading.mt5_connector import MT5Connector
 
     mock_mt5.copy_rates_from_pos.return_value = None
     mock_mt5.last_error.return_value = (-2, "Data failed")
@@ -93,9 +95,8 @@ def test_mt5_connector_data_failure(mock_mt5):
     connector._is_initialized = True
     connector.use_metaapi = False
 
-    with patch("src.trading.mt5_connector.MT5_AVAILABLE", True):
-        with pytest.raises(MT5DataError):
-            # Should retry 3 times, so 4 calls total
-            connector.get_rates("XAUUSD", "M5", 100)
+    with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), pytest.raises(MT5DataError):
+        # Should retry 3 times, so 4 calls total
+        connector.get_rates("XAUUSD", "M5", 100)
 
     assert mock_mt5.copy_rates_from_pos.call_count == 4

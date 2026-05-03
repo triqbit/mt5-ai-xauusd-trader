@@ -6,10 +6,10 @@ Author : triqbit
 License: MIT
 """
 
-import time
-import random
-import logging
 import functools
+import logging
+import random
+import time
 from typing import Any, Callable, Optional, Tuple, Type, TypeVar
 
 logger = logging.getLogger(__name__)

@@ -27,12 +27,12 @@ from rich.console import Console
 from rich.table import Table
 
 from src.core import (
-    get_config,
-    profile,
+    BotError,
     MT5ConnectionError,
     MT5DataError,
     OrderExecutionError,
-    BotError,
+    get_config,
+    profile,
 )
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator

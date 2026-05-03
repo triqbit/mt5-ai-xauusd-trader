@@ -277,7 +277,7 @@ class MT5Connector:
             try:
                 tick = self.get_tick(signal.symbol)
             except MT5DataError as e:
-                raise OrderExecutionError(f"Cannot place order due to data error: {e}")
+                raise OrderExecutionError(f"Cannot place order due to data error: {e}") from e
 
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
