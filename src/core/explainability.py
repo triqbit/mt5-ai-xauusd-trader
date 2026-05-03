@@ -59,13 +59,17 @@ class RiskAssessment(BaseModel):
 class RegimeContext(BaseModel):
     """Market regime context at the time of signal generation."""
 
-    regime_name: str = Field("Unknown", description="Detected market regime (e.g., Trending, Ranging)")
+    regime_name: str = Field(
+        "Unknown", description="Detected market regime (e.g., Trending, Ranging)"
+    )
     confidence: float = Field(0.0, description="Regime detection confidence")
     volatility_state: str = Field(
         "Normal", description="Current volatility level (Low, Normal, High, Extreme)"
     )
     is_favorable: bool = Field(True, description="Whether the regime is favorable for the strategy")
-    summary: str = Field("Market state stable", description="Contextual summary of the market state")
+    summary: str = Field(
+        "Market state stable", description="Contextual summary of the market state"
+    )
 
 
 class FilterResult(BaseModel):

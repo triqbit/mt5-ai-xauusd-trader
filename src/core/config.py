@@ -1,11 +1,12 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/config.py
-Centralised Pydantic-v2 settings loaded from environment variables
+Centralized Pydantic-v2 settings loaded from environment variables
 or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -29,81 +30,70 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
-    mt5_login: int = Field(default=0, description="MT5 account number for login")
-    mt5_password: SecretStr = Field(..., description="MT5 account password for authentication")
-    mt5_server: str = Field(..., description="MT5 broker server name (e.g., Broker-Demo)")
+    mt5_login: int = Field(
+        default=0, description="MT5 account number for login", validation_alias="MT5_LOGIN"
+    )
+    mt5_password: SecretStr = Field(
+        default=SecretStr(""), description="MT5 account password", validation_alias="MT5_PASSWORD"
+    )
+    mt5_server: str = Field(
+        default="", description="MT5 broker server name", validation_alias="MT5_SERVER"
+    )
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
-        description="Full path to the MT5 terminal executable (Windows only)",
+        description="Full path to the MT5 terminal executable",
     )
 
     # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
-    metaapi_token: SecretStr = Field(default="", description="Authentication token for MetaAPI cloud services")
-    metaapi_account_id: str = Field(default="", description="Unique account identifier for MetaAPI provisioning")
+    metaapi_token: SecretStr = Field(default=SecretStr(""), description="MetaAPI auth token")
+    metaapi_account_id: str = Field(default="", description="MetaAPI account identifier")
 
     # ── Trading parameters ─────────────────────────────────────────────────────
-    symbol: str = Field(default="XAUUSD", description="The financial instrument to trade (e.g., XAUUSD)")
-    timeframe: str = Field(default="M5", description="The chart timeframe for analysis (e.g., M5, H1)")
+    symbol: str = Field(default="XAUUSD", description="Symbol to trade", validation_alias="SYMBOL")
+    timeframe: str = Field(default="M5", description="Chart timeframe")
     mode: Literal["demo", "live", "backtest"] = Field(
-        default="demo", description="Execution mode: demo, live, or backtest"
+        default="demo", description="Execution mode", validation_alias="MODE"
     )
-    max_positions: int = Field(
-        default=3, ge=1, le=10, description="Maximum number of concurrent open positions permitted"
-    )
+    max_positions: int = Field(default=3, ge=1, le=10, description="Max concurrent positions")
     risk_per_trade: float = Field(
-        default=0.01, ge=0.001, le=0.05, description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)"
+        default=0.01, ge=0.001, le=0.05, description="Fraction of equity to risk per trade"
     )
     max_daily_loss: float = Field(
-        default=0.05, ge=0.01, le=0.20, description="Maximum daily drawdown percentage before halting trading"
+        default=0.05, ge=0.01, le=0.20, description="Max daily drawdown fraction"
+    )
+    max_total_drawdown: float = Field(
+        default=0.30, ge=0.05, le=0.50, description="Hard drawdown limit (stop all trading)"
     )
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
-        default="ensemble", description="The ML algorithm architecture to use for signal generation"
+        default="ensemble", description="ML algorithm to use"
     )
     model_path: Path = Field(
         default=ROOT / "models" / "trained" / "ensemble_latest.pt",
-        description="Path to the serialized weights of the trained model",
-    )
-    train_steps: int = Field(
-        default=1_000_000, ge=100_000, description="Number of environment steps for model training"
+        description="Path to trained model weights",
     )
     device: Literal["cpu", "cuda", "mps", "auto"] = Field(
-        default="auto", description="Hardware accelerator for model inference (cpu, cuda, mps, auto)"
+        default="auto", description="Hardware accelerator"
     )
 
     # ── Database ────────────────────────────────────────────────────────────
     database_url: SecretStr = Field(
-        default="postgresql://trader:password@localhost:5432/mt5_trades",
-        description="SQLAlchemy-compatible connection string for the primary database",
-    )
-    redis_url: str = Field(
-        default="redis://localhost:6379/0",
-        description="Connection URL for the Redis instance used for caching/queuing",
+        default=SecretStr("postgresql://trader:password@localhost:5432/mt5_trades"),
+        description="Primary database connection string",
     )
 
     # ── Monitoring ──────────────────────────────────────────────────────────
-    prometheus_port: int = Field(
-        default=8000, description="Network port for exposing Prometheus metrics"
-    )
-    dashboard_port: int = Field(
-        default=8050, description="Network port for the interactive monitoring dashboard"
-    )
+    prometheus_port: int = Field(default=8000, description="Prometheus metrics port")
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
-        default="INFO", description="Granularity of application logs (DEBUG, INFO, WARNING, ERROR)"
+        default="INFO", description="Logging granularity"
     )
-    telegram_token: SecretStr = Field(
-        default="", description="Access token for the Telegram Bot API for real-time alerts"
-    )
-    telegram_chat_id: str = Field(
-        default="", description="Telegram Chat ID or Group ID where alerts will be sent"
-    )
-    confirm_live_trading: str = Field(
-        default="", description="Explicit confirmation for LIVE trading (must be 'YES' to start in live mode)"
-    )
-    confidence_threshold: float = Field(
-        default=0.6, ge=0.0, le=1.0, description="Minimum model confidence score required to execute a signal"
-    )
+    telegram_token: SecretStr = Field(default=SecretStr(""), description="Telegram bot token")
+    telegram_chat_id: str = Field(default="", description="Telegram chat ID")
+
+    # Backward compatibility fields for health checks
+    confirm_live_trading: str = Field(default="", description="Confirm live trading")
+    confidence_threshold: float = Field(default=0.6, description="Confidence threshold")
 
     @field_validator("risk_per_trade")
     @classmethod
@@ -116,18 +106,10 @@ class TradingConfig(BaseSettings):
     def is_live(self) -> bool:
         return self.mode == "live"
 
-    @property
-    def data_dir(self) -> Path:
-        return ROOT / "data"
-
-    @property
-    def logs_dir(self) -> Path:
-        return ROOT / "logs"
-
 
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
-    """Return singleton TradingConfig (cached after first call)."""
+    """Return singleton TradingConfig."""
     return TradingConfig()  # type: ignore[call-arg]
 
 

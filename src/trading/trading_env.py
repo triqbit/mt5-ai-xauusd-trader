@@ -71,9 +71,7 @@ class TradingEnv(gym.Env):
         obs = self._get_observation()
         return obs, {}
 
-    def step(
-        self, action: int
-    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """
         Executes one step in the environment.
 
@@ -115,9 +113,7 @@ class TradingEnv(gym.Env):
         if self.df is None:
             return np.zeros(self.observation_space.shape, dtype=np.float32)
 
-        obs = self.df.iloc[
-            self.current_step - self.window_size : self.current_step
-        ].values
+        obs = self.df.iloc[self.current_step - self.window_size : self.current_step].values
         return obs.astype(np.float32)
 
     def render(self) -> None:

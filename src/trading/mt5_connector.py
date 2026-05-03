@@ -7,18 +7,27 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import nest_asyncio
 import pandas as pd
+
+from src.core.config import TradingConfig
+from src.trading.risk_manager import TradeSignal
+
+nest_asyncio.apply()
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -26,13 +35,12 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
     MetaApi = None
 
-from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +61,16 @@ TIMEFRAME_MAP: Dict[str, int] = {
     "D1": 1440,
 }
 
+METAAPI_TIMEFRAME_MAP: Dict[str, str] = {
+    "M1": "1m",
+    "M5": "5m",
+    "M15": "15m",
+    "M30": "30m",
+    "H1": "1h",
+    "H4": "4h",
+    "D1": "1d",
+}
+
 
 class MT5Connector:
     """
@@ -70,8 +88,14 @@ class MT5Connector:
         self.cfg = config
         self.use_metaapi: bool = False
         self.metaapi: Optional[Any] = None
+        self.metaapi_account: Optional[Any] = None
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
+        self._loop = asyncio.get_event_loop()
+
+    def _run_async(self, coro):
+        """Helper to run coroutines synchronously."""
+        return self._loop.run_until_complete(coro)
 
     def initialize(self) -> bool:
         """
@@ -98,35 +122,59 @@ class MT5Connector:
                     return True
                 else:
                     error_code, error_desc = mt5.last_error()
-                    logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
+                    logger.warning(
+                        "Native mt5.initialize failed: %s (code: %d)", error_desc, error_code
+                    )
 
                     # Troubleshooting guidance
                     if error_code == mt5.RES_E_NOT_FOUND:
-                        logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s", self.cfg.mt5_path)
+                        logger.info(
+                            "TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s",
+                            self.cfg.mt5_path,
+                        )
                     elif error_code == mt5.RES_E_INVALID_PARAMS:
-                        logger.info("TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER.")
+                        logger.info(
+                            "TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER."
+                        )
                     elif error_code == mt5.RES_E_CONNECTION_FAILED:
-                        logger.info("TIP: Connection failed. Check your internet or if the broker server is reachable.")
+                        logger.info(
+                            "TIP: Connection failed. Check your internet or if the broker server is reachable."
+                        )
                     else:
-                        logger.info("TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options.")
+                        logger.info(
+                            "TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options."
+                        )
             except Exception as e:
                 logger.error("Native MT5 initialization error: %s", e)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
             if sys.platform == "win32":
-                logger.warning("Running on Windows but 'MetaTrader5' package is missing. Install with 'pip install MetaTrader5'.")
+                logger.warning(
+                    "Running on Windows but 'MetaTrader5' package is missing. Install with 'pip install MetaTrader5'."
+                )
             else:
                 logger.info("On Linux/Mac, use MetaAPI fallback by setting METAAPI_TOKEN.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         metaapi_token = self.cfg.metaapi_token.get_secret_value()
-        if METAAPI_AVAILABLE and metaapi_token:
+        if METAAPI_AVAILABLE and metaapi_token and self.cfg.metaapi_account_id:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
                 self.metaapi = MetaApi(metaapi_token)
+
+                async def _init_metaapi():
+                    self.metaapi_account = await self.metaapi.metatrader_account_api.get_account(
+                        self.cfg.metaapi_account_id
+                    )
+                    # Use streaming connection for real-time data and faster execution
+                    self.metaapi_connection = self.metaapi_account.get_streaming_connection()
+                    await self.metaapi_connection.connect()
+                    await self.metaapi_connection.wait_synchronized()
+
+                self._run_async(_init_metaapi())
                 self.use_metaapi = True
                 self._is_initialized = True
-                logger.info("MetaAPI fallback configured.")
+                logger.info("MetaAPI fallback configured and synchronized.")
                 return True
             except Exception as e:
                 logger.error("MetaAPI initialization failed: %s", e)
@@ -143,6 +191,11 @@ class MT5Connector:
         if self._is_initialized:
             if not self.use_metaapi and MT5_AVAILABLE:
                 mt5.shutdown()
+            elif self.use_metaapi and self.metaapi_connection:
+                try:
+                    self._run_async(self.metaapi_connection.close())
+                except Exception as e:
+                    logger.warning("Error closing MetaAPI connection: %s", e)
             logger.info("MT5 connector shutdown complete.")
             self._is_initialized = False
 
@@ -186,9 +239,27 @@ class MT5Connector:
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
-            # Placeholder for MetaAPI async rates fetching
-            logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
-            return pd.DataFrame()
+            try:
+                ma_tf = METAAPI_TIMEFRAME_MAP.get(timeframe, "5m")
+
+                async def _get_ma_rates():
+                    # get_historical_candles returns bars in descending order of time usually?
+                    # Actually MetaAPI returns them.
+                    return await self.metaapi_connection.get_historical_candles(
+                        symbol, ma_tf, None, n_bars
+                    )
+
+                candles = self._run_async(_get_ma_rates())
+                if not candles:
+                    return pd.DataFrame()
+                df = pd.DataFrame(candles)
+                df["time"] = pd.to_datetime(df["time"])
+                # Standardize column names to match MT5 SDK output
+                df = df.rename(columns={"tickVolume": "tick_volume", "realVolume": "real_volume"})
+                return df
+            except Exception as e:
+                logger.error("MetaAPI get_rates error: %s", e)
+                return pd.DataFrame()
 
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Alias for get_rates() to match main.py expectations."""
@@ -223,8 +294,24 @@ class MT5Connector:
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
-            logger.warning("MetaAPI get_rates_range not implemented.")
-            return pd.DataFrame()
+            try:
+                ma_tf = METAAPI_TIMEFRAME_MAP.get(timeframe, "5m")
+
+                async def _get_ma_rates_range():
+                    return await self.metaapi_connection.get_historical_candles(
+                        symbol, ma_tf, date_from, n_bars=None, end_time=date_to
+                    )
+
+                candles = self._run_async(_get_ma_rates_range())
+                if not candles:
+                    return pd.DataFrame()
+                df = pd.DataFrame(candles)
+                df["time"] = pd.to_datetime(df["time"])
+                df = df.rename(columns={"tickVolume": "tick_volume", "realVolume": "real_volume"})
+                return df
+            except Exception as e:
+                logger.error("MetaAPI get_rates_range error: %s", e)
+                return pd.DataFrame()
 
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
@@ -236,18 +323,30 @@ class MT5Connector:
         Returns:
             Dictionary with 'bid' and 'ask' prices.
         """
-        if not self._is_initialized or self.use_metaapi:
+        if not self._is_initialized:
             return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
 
-        tick = mt5.symbol_info_tick(symbol)
-        if tick is None:
-            logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
-            return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
+        if not self.use_metaapi:
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is None:
+                logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
+                return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
+            return {"bid": tick.bid, "ask": tick.ask, "spread": tick.ask - tick.bid}
+        else:
+            try:
 
-        # Calculate spread in price units
-        spread = tick.ask - tick.bid
+                async def _get_ma_tick():
+                    return await self.metaapi_connection.get_symbol_price(symbol)
 
-        return {"bid": tick.bid, "ask": tick.ask, "spread": spread}
+                price = self._run_async(_get_ma_tick())
+                return {
+                    "bid": price["bid"],
+                    "ask": price["ask"],
+                    "spread": price["ask"] - price["bid"],
+                }
+            except Exception as e:
+                logger.error("MetaAPI get_tick error: %s", e)
+                return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
 
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
@@ -292,15 +391,54 @@ class MT5Connector:
 
             logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
             return int(result.order)
+        else:
+            try:
+                side = "BUY" if signal.direction > 0 else "SELL"
 
-        return None
+                async def _place_ma_order():
+                    return (
+                        await self.metaapi_connection.create_market_buy_order(
+                            signal.symbol,
+                            signal.lot_size,
+                            signal.stop_loss,
+                            signal.take_profit,
+                            {"comment": f"AI:{signal.algorithm}"},
+                        )
+                        if side == "BUY"
+                        else await self.metaapi_connection.create_market_sell_order(
+                            signal.symbol,
+                            signal.lot_size,
+                            signal.stop_loss,
+                            signal.take_profit,
+                            {"comment": f"AI:{signal.algorithm}"},
+                        )
+                    )
+
+                result = self._run_async(_place_ma_order())
+                logger.info("MetaAPI Order PLACED | ID: %s", result["orderId"])
+                return int(result["orderId"])
+            except Exception as e:
+                logger.error("MetaAPI place_order error: %s", e)
+                return None
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""
-        if self._is_initialized and not self.use_metaapi:
+        if not self._is_initialized:
+            return {}
+
+        if not self.use_metaapi:
             acc = mt5.account_info()
             return acc._asdict() if acc else {}
-        return {}
+        else:
+            try:
+
+                async def _get_ma_acc():
+                    return await self.metaapi_connection.get_account_information()
+
+                return self._run_async(_get_ma_acc())
+            except Exception as e:
+                logger.error("MetaAPI get_account_info error: %s", e)
+                return {}
 
     def get_account_balance(self) -> float:
         """Retrieve current account balance."""
@@ -309,10 +447,25 @@ class MT5Connector:
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve current open positions."""
-        if self._is_initialized and not self.use_metaapi:
+        if not self._is_initialized:
+            return []
+
+        if not self.use_metaapi:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
             return [p._asdict() for p in positions] if positions else []
-        return []
+        else:
+            try:
+
+                async def _get_ma_pos():
+                    return await self.metaapi_connection.get_positions()
+
+                positions = self._run_async(_get_ma_pos())
+                if symbol:
+                    positions = [p for p in positions if p["symbol"] == symbol]
+                return positions
+            except Exception as e:
+                logger.error("MetaAPI get_positions error: %s", e)
+                return []
 
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]

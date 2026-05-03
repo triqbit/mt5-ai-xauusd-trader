@@ -75,7 +75,11 @@ class HealthChecker:
 
     def _update_gauge(self, component: str, status: HealthStatus) -> None:
         """Helper to update Prometheus health gauge."""
-        val = 1.0 if status == HealthStatus.HEALTHY else (0.5 if status == HealthStatus.DEGRADED else 0.0)
+        val = (
+            1.0
+            if status == HealthStatus.HEALTHY
+            else (0.5 if status == HealthStatus.DEGRADED else 0.0)
+        )
         HEALTH_GAUGES.labels(component=component).set(val)
 
     def check_liveness(self) -> ComponentStatus:
@@ -87,9 +91,7 @@ class HealthChecker:
     def check_database(self) -> ComponentStatus:
         """Verify database reachability."""
         if not self.trade_logger:
-            res = ComponentStatus(
-                status=HealthStatus.FAILED, message="TradeLogger not initialized"
-            )
+            res = ComponentStatus(status=HealthStatus.FAILED, message="TradeLogger not initialized")
             self._update_gauge("database", res.status)
             return res
 
@@ -212,7 +214,9 @@ class HealthChecker:
         Non-blocking: returns DEGRADED instead of FAILED if not configured or unreachable.
         """
         if not self.cfg.redis_url:
-            res = ComponentStatus(status=HealthStatus.DEGRADED, message="Redis URL not configured (Optional)")
+            res = ComponentStatus(
+                status=HealthStatus.DEGRADED, message="Redis URL not configured (Optional)"
+            )
             self._update_gauge("redis", res.status)
             return res
 
@@ -237,9 +241,13 @@ class HealthChecker:
             return res
 
         if self.audit_logger._initialized:
-            res = ComponentStatus(status=HealthStatus.HEALTHY, message="AuditLogger initialized and active")
+            res = ComponentStatus(
+                status=HealthStatus.HEALTHY, message="AuditLogger initialized and active"
+            )
         else:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="AuditLogger not properly initialized")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED, message="AuditLogger not properly initialized"
+            )
 
         self._update_gauge("audit_log", res.status)
         return res
