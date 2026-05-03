@@ -47,6 +47,12 @@ class TradeExecutionQuality(BaseModel):
     alpha_decay_pips: float = Field(
         ..., description="Alpha lost between signal and execution (pips)"
     )
+    execution_cost_pips: float = Field(
+        ..., description="Total cost of execution (slippage + half spread)"
+    )
+    markout_pnls: Dict[str, float] = Field(
+        default_factory=dict, description="Price drift at various horizons (1m, 5m, 15m, 30m, 60m)"
+    )
 
 
 class BlockedSignalQuality(BaseModel):
@@ -126,26 +132,33 @@ class ExecutionAnalyzer:
             latency_td = trade.created_at - signal.timestamp
             latency_ms = max(0.0, latency_td.total_seconds() * 1000.0)
 
-            # 3. Fill quality (0.0 to 1.0)
-            # Simple decay model: 1.0 is perfect, loses 5% per pip slippage and 5% per second latency
-            fill_quality = max(0.0, 1.0 - (abs(slippage_pips) * 0.05) - (latency_ms / 20000.0))
-
-            # 4. Drift and Edge Capture (requires market data)
-            drift_5m = self.calculate_drift(symbol, trade.created_at, signal.direction, 5)
-            drift_15m = self.calculate_drift(symbol, trade.created_at, signal.direction, 15)
-            edge_capture = self.calculate_edge_capture(trade, signal)
-
-            # 5. Timing Efficiency
-            timing_eff = self._calculate_timing_efficiency(trade)
-
-            # 6. Alpha Decay and Spread Metrics
-            alpha_decay = self.calculate_alpha_decay(trade, signal)
+            # 3. Spread calculation
             spread_info = self._get_execution_spread(trade)
             spread_pips = spread_info["spread_pips"]
 
+            # 4. Fill quality (0.0 to 1.0)
+            # Spread-relative decay model: better handles different market conditions
             slippage_ratio = (
-                abs(slippage_pips) / spread_pips if spread_pips > 0 else abs(slippage_pips)
+                abs(slippage_pips) / spread_pips if spread_pips > 0.1 else abs(slippage_pips)
             )
+            # Sigmoid-like penalty: small slippage is okay, large slippage is penalized heavily
+            fill_quality = 1.0 / (1.0 + np.exp(slippage_ratio - 2.0))
+            # Also penalize latency (10s latency halves quality)
+            fill_quality *= max(0.0, 1.0 - (latency_ms / 10000.0))
+
+            # 5. Drift and Edge Capture (requires market data)
+            markout_horizons = [1, 5, 15, 30, 60]
+            markouts = self.calculate_markouts(
+                symbol, trade.created_at, trade.entry_price, trade.direction, markout_horizons
+            )
+            edge_capture = self.calculate_edge_capture(trade, signal)
+
+            # 6. Timing Efficiency
+            timing_eff = self._calculate_timing_efficiency(trade)
+
+            # 7. Alpha Decay and Total Cost
+            alpha_decay = self.calculate_alpha_decay(trade, signal)
+            execution_cost = abs(slippage_pips) + (spread_pips / 2.0)
 
             return TradeExecutionQuality(
                 trade_id=trade.id,
@@ -155,12 +168,14 @@ class ExecutionAnalyzer:
                 execution_latency_ms=float(latency_ms),
                 fill_quality_score=float(fill_quality),
                 edge_capture=float(edge_capture),
-                post_entry_drift_5m=float(drift_5m),
-                post_entry_drift_15m=float(drift_15m),
+                post_entry_drift_5m=float(markouts.get("5m", 0.0)),
+                post_entry_drift_15m=float(markouts.get("15m", 0.0)),
                 timing_efficiency=float(timing_eff),
                 spread_at_execution=float(spread_pips),
                 slippage_to_spread_ratio=float(slippage_ratio),
                 alpha_decay_pips=float(alpha_decay),
+                execution_cost_pips=float(execution_cost),
+                markout_pnls=markouts,
             )
 
     def calculate_drift(
@@ -182,6 +197,50 @@ class ExecutionAnalyzer:
 
         drift = (later_price - entry_price) * direction
         return float(drift / pip_size)
+
+    def calculate_markouts(
+        self,
+        symbol: str,
+        entry_time: datetime,
+        entry_price: float,
+        direction: int,
+        horizons: List[int],
+    ) -> Dict[str, float]:
+        """
+        Calculate price drift at various horizons (in minutes) after entry.
+        Markouts help distinguish alpha quality from execution quality.
+        """
+        if not self.connector or not horizons:
+            return {}
+
+        pip_size = self._get_pip_size(symbol)
+        max_horizon = max(horizons)
+        # Fetch data once for all horizons
+        end_time = entry_time + timedelta(minutes=max_horizon + 2)
+        df = self.connector.get_rates_range(symbol, "M1", entry_time, end_time)
+
+        if df.empty:
+            return {f"{h}m": 0.0 for h in horizons}
+
+        results = {}
+        for h in horizons:
+            target_time = entry_time + timedelta(minutes=h)
+            # Ensure target_time is timezone-aware if the dataframe is aware
+            if df["time"].dt.tz is not None and target_time.tzinfo is None:
+                target_time = target_time.replace(tzinfo=timezone.utc)
+
+            # Find the row closest to target_time
+            # Since we use M1, we can find it by index or by time comparison
+            mask = df["time"] >= target_time
+            if mask.any():
+                later_price = df[mask].iloc[0]["close"]
+            else:
+                later_price = df.iloc[-1]["close"]
+
+            drift = (later_price - entry_price) * direction
+            results[f"{h}m"] = float(drift / pip_size)
+
+        return results
 
     def calculate_alpha_decay(self, trade: Trade, signal: ModelSignal) -> float:
         """
