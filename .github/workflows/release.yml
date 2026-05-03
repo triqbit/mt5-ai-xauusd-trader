@@ -211,22 +211,30 @@ jobs:
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Update Version in Files
+      - name: Update Version and Changelog
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false'
         run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DATE=$(date +%Y-%m-%d)
+
           # Update pyproject.toml
-          sed -i "s/^version = \".*\"/version = \"${{ steps.version.outputs.VERSION }}\"/" pyproject.toml
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
 
           # Update src/__init__.py if it exists
           if [ -f "src/__init__.py" ]; then
-            sed -i "s/__version__ = \".*\"/__version__ = \"${{ steps.version.outputs.VERSION }}\"/" src/__init__.py
+            sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" src/__init__.py
+          fi
+
+          # Transition [Unreleased] to Versioned in CHANGELOG.md
+          if grep -q "## \[Unreleased\]" CHANGELOG.md; then
+            sed -i "s/## \[Unreleased\]/## [Unreleased]\n\n## [${VERSION}] - ${DATE}/" CHANGELOG.md
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml src/__init__.py
+          git add pyproject.toml src/__init__.py CHANGELOG.md
           if ! git diff --cached --quiet; then
-            git commit -m "chore: bump version to ${{ steps.version.outputs.VERSION }} [skip ci]"
+            git commit -m "chore: release v${VERSION} [skip ci]"
             git push origin main
           fi
 
