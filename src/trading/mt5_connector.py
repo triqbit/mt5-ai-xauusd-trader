@@ -10,6 +10,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import sys
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -96,11 +97,26 @@ class MT5Connector:
                     self._is_initialized = True
                     return True
                 else:
-                    logger.warning("Native mt5.initialize failed: %s", mt5.last_error())
+                    error_code, error_desc = mt5.last_error()
+                    logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
+
+                    # Troubleshooting guidance
+                    if error_code == mt5.RES_E_NOT_FOUND:
+                        logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s", self.cfg.mt5_path)
+                    elif error_code == mt5.RES_E_INVALID_PARAMS:
+                        logger.info("TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER.")
+                    elif error_code == mt5.RES_E_CONNECTION_FAILED:
+                        logger.info("TIP: Connection failed. Check your internet or if the broker server is reachable.")
+                    else:
+                        logger.info("TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options.")
             except Exception as e:
                 logger.error("Native MT5 initialization error: %s", e)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
+            if sys.platform == "win32":
+                logger.warning("Running on Windows but 'MetaTrader5' package is missing. Install with 'pip install MetaTrader5'.")
+            else:
+                logger.info("On Linux/Mac, use MetaAPI fallback by setting METAAPI_TOKEN.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         metaapi_token = self.cfg.metaapi_token.get_secret_value()

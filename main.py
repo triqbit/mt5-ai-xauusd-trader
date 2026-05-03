@@ -24,6 +24,7 @@ from typing import Optional
 
 import structlog
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from src.core import get_config, profile
@@ -217,16 +218,17 @@ def run_live(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument("--mode", choices=["demo", "live", "backtest"], default="demo")
+    p.add_argument("--mode", choices=["demo", "live", "backtest"], help="Execution mode")
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
-        default="ensemble",
+        help="Trading algorithm",
     )
-    p.add_argument("--symbol", default="XAUUSD")
-    p.add_argument("--timeframe", default="M5")
-    p.add_argument("--model-dir", type=Path, default=Path("models/trained"))
-    p.add_argument("--log-level", default="INFO")
+    p.add_argument("--symbol", help="Trading symbol (e.g. XAUUSD)")
+    p.add_argument("--timeframe", help="Trading timeframe (e.g. M5)")
+    p.add_argument("--model-dir", type=Path, default=Path("models/trained"), help="Directory for model weights")
+    p.add_argument("--log-level", default="INFO", help="Logging level")
+    p.add_argument("--check", action="store_true", help="Perform pre-flight health checks and exit")
     return p.parse_args()
 
 
@@ -234,11 +236,16 @@ def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
     log, console = logging.getLogger("main"), Console()
-    # Override config from CLI
-    os.environ.setdefault("MODE", args.mode)
-    os.environ.setdefault("ALGORITHM", args.algo)
-    os.environ.setdefault("SYMBOL", args.symbol)
-    os.environ.setdefault("TIMEFRAME", args.timeframe)
+
+    # Override config from CLI: CLI > ENV > .env defaults
+    if args.mode:
+        os.environ["MODE"] = args.mode
+    if args.algo:
+        os.environ["ALGORITHM"] = args.algo
+    if args.symbol:
+        os.environ["SYMBOL"] = args.symbol
+    if args.timeframe:
+        os.environ["TIMEFRAME"] = args.timeframe
 
     try:
         cfg = get_config()
@@ -261,12 +268,18 @@ def main() -> int:
         for err in result.errors:
             log.warning(f"  [WARNING] {err.field}: {err.message}")
 
-    log.info(
-        "Configuration loaded and validated | mode=%s algo=%s symbol=%s",
-        cfg.mode,
-        cfg.algorithm,
-        cfg.symbol,
-    )
+    # ── Startup Summary ────────────────────────────────────────────────────────
+    summary = Table.grid(expand=True)
+    summary.add_column(style="cyan", justify="right")
+    summary.add_column(style="white", justify="left")
+    summary.add_row("Mode:  ", f"[bold]{cfg.mode.upper()}[/]")
+    summary.add_row("Symbol:  ", f"[bold]{cfg.symbol}[/]")
+    summary.add_row("Timeframe:  ", cfg.timeframe)
+    summary.add_row("Algorithm:  ", cfg.algorithm)
+    summary.add_row("Database:  ", "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite")
+
+    console.print(Panel(summary, title="[bold blue]Trading System Configuration[/]", border_style="blue", expand=False))
+
     # Initialise components
     # 1. Audit Logger (Mandatory for enterprise traceability)
     database_url = cfg.database_url.get_secret_value()
@@ -337,6 +350,10 @@ def main() -> int:
         return 1
 
     audit_logger.log("system", "startup_success", "All critical health checks passed")
+
+    if args.check:
+        log.info("Pre-flight check COMPLETE. System is healthy.")
+        return 0
 
     try:
         if cfg.mode in ("demo", "live"):
