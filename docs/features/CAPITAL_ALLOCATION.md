@@ -8,8 +8,10 @@ The `CapitalAllocator` is an institutional-grade capital management system desig
 - **Per-Strategy Capital Caps**: Limits the maximum capital any single strategy can use, regardless of its performance or requested risk.
 - **Adaptive Budget Allocation**: Dynamically adjusts requested risk based on a strategy's `performance_multiplier`, rewarding profitable strategies and scaling down underperforming ones.
 - **Diversification-Aware Routing**: Groups strategies by symbol and model family to enforce concentration limits, ensuring the portfolio remains diversified.
+- **Portfolio Diversification Scoring**: Provides a quantitative `diversification_score` (0.0 to 1.0) based on the normalized Herfindahl-Hirschman Index (HHI).
 - **Safety Limits**: Implements configurable limits for total portfolio heat, symbol-level risk, and model-family-level risk.
-- **Programmatic Rejection Codes**: Returns specific `RejectionCode` values (e.g., `TOTAL_HEAT_LIMIT`, `SYMBOL_CONCENTRATION_LIMIT`) for automated handling of allocation failures.
+- **Flexible Allocation Scaling**: Supports an `allow_scaling` mode that returns the maximum possible allocation within safety limits instead of a binary rejection.
+- **Programmatic Rejection Codes**: Returns specific `RejectionCode` values (e.g., `TOTAL_HEAT_LIMIT`, `SYMBOL_CONCENTRATION_LIMIT`) and maintains a `rejection_history` for audit and reporting.
 - **Dynamic Risk Adaptation**: Automatically updates strategy multipliers based on PnL outcomes and decays them back to baseline (1.0) over time.
 
 ## Configuration
@@ -52,15 +54,21 @@ gold_ppo_config = StrategyConfig(
 )
 allocator.add_strategy(gold_ppo_config)
 
-# Request allocation (1% risk)
-result = allocator.request_allocation("gold_ppo_v1", 0.01)
+# Request allocation (1% risk) with scaling allowed
+result = allocator.request_allocation("gold_ppo_v1", 0.01, allow_scaling=True)
 
 if result.is_allowed:
     print(f"Allocated {result.allocated_amount} ({result.allocated_risk_pct * 100}%)")
+    if result.was_capped:
+        print("Allocation was capped by portfolio limits.")
     # Update current allocation after placing trade
     allocator.update_allocation("gold_ppo_v1", result.allocated_amount)
 else:
     print(f"Rejected: {result.rejection_reason} (Code: {result.rejection_code})")
+
+# Get Portfolio Diversification Score
+score = allocator.get_diversification_score()
+print(f"Portfolio Diversification Score: {score:.2f}")
 
 # After trade closes
 allocator.update_strategy_performance("gold_ppo_v1", 500.0) # Profitable trade
