@@ -77,135 +77,139 @@ def run_live(
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
-        try:
-            # 1. Fetch latest market data
-            with profile("data_fetch"):
-                df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
-                tick = connector.get_tick(cfg.symbol)
+        with profile("loop_total"):
+            try:
+                # 1. Fetch latest market data
+                with profile("data_fetch"):
+                    df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                    tick = connector.get_tick(cfg.symbol)
 
-            # 2. Build observation vector
-            obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
-            volatility = float(df["close"].rolling(20).std().iloc[-1])
+                # 2. Build observation vector
+                obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
+                volatility = float(df["close"].rolling(20).std().iloc[-1])
 
-            # 3. Get model prediction
-            with profile("inference"):
-                # All models now implement BaseModel and return a Signal object
-                signal_obj = model.predict(obs)
-                direction = signal_obj.direction
-                confidence = signal_obj.confidence
-                if monitor:
-                    monitor.check_confidence_degradation(confidence)
+                # 3. Get model prediction
+                with profile("inference"):
+                    # All models now implement BaseModel and return a Signal object
+                    signal_obj = model.predict(obs)
+                    direction = signal_obj.direction
+                    confidence = signal_obj.confidence
+                    if monitor:
+                        monitor.check_confidence_degradation(confidence)
 
-            log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+                log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
-            signal_id = None
-            if trade_logger:
-                signal_id = trade_logger.log_signal(
-                    {
-                        "symbol": cfg.symbol,
-                        "direction": direction,
-                        "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
-                        "algorithm": cfg.algorithm,
-                        "confidence": confidence,
-                        "volatility": volatility,
-                    }
-                )
-
-            if direction == 0:
-                log.debug("HOLD signal - skipping")
-                time.sleep(poll_interval)
-                continue
-            # 4. Size position
-            price = tick["ask"] if direction == 1 else tick["bid"]
-            atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
-            stop_loss = price - direction * 2 * atr
-            take_profit = price + direction * 4 * atr
-            lot_size = risk.size_position(
-                cfg.symbol,
-                win_rate=0.58,
-                avg_win=4 * atr,
-                avg_loss=2 * atr,
-            )
-            signal = TradeSignal(
-                symbol=cfg.symbol,
-                direction=direction,
-                entry_price=price,
-                stop_loss=stop_loss,
-                take_profit=take_profit,
-                lot_size=lot_size,
-                algorithm=cfg.algorithm,
-                confidence=confidence,
-            )
-            # 5. Risk approval gate
-            with profile("risk_check"):
-                approved = risk.approve(signal, signal_id=signal_id)
-
-            # 5b. Execution Filter Cascade
-            if approved:
-                with profile("execution_filter"):
-                    # Calculate current drawdown for the filter
-                    drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
-                    decision = execution_filter.validate(
-                        signal, df, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
+                signal_id = None
+                if trade_logger:
+                    signal_id = trade_logger.log_signal(
+                        {
+                            "symbol": cfg.symbol,
+                            "direction": direction,
+                            "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
+                            "algorithm": cfg.algorithm,
+                            "confidence": confidence,
+                            "volatility": volatility,
+                        }
                     )
-                    if not decision.is_approved:
-                        log.warning(
-                            "Signal BLOCKED by ExecutionFilter | %s | Reason: %s",
-                            cfg.symbol,
-                            decision.blocked_by,
+
+                if direction == 0:
+                    log.debug("HOLD signal - skipping")
+                    time.sleep(poll_interval)
+                    continue
+                # 4. Size position
+                with profile("position_sizing"):
+                    price = tick["ask"] if direction == 1 else tick["bid"]
+                    atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
+                    stop_loss = price - direction * 2 * atr
+                    take_profit = price + direction * 4 * atr
+                    lot_size = risk.size_position(
+                        cfg.symbol,
+                        win_rate=0.58,
+                        avg_win=4 * atr,
+                        avg_loss=2 * atr,
+                    )
+                signal = TradeSignal(
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    entry_price=price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    lot_size=lot_size,
+                    algorithm=cfg.algorithm,
+                    confidence=confidence,
+                )
+                # 5. Risk approval gate
+                with profile("risk_check"):
+                    approved = risk.approve(signal, signal_id=signal_id)
+
+                # 5b. Execution Filter Cascade
+                if approved:
+                    with profile("execution_filter"):
+                        # Calculate current drawdown for the filter
+                        drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
+                        decision = execution_filter.validate(
+                            signal, df, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
                         )
-                        approved = False
-
-            if approved:
-                with profile("execution"):
-                    ticket = connector.place_order(signal)
-                    if ticket:
-                        risk.open_positions[cfg.symbol] = ticket
-                        log.info("Order placed | ticket=%d", ticket)
-                        if trade_logger:
-                            trade_logger.log_trade(
-                                ticket=ticket,
-                                symbol=cfg.symbol,
-                                direction=direction,
-                                entry_price=price,
-                                lot_size=lot_size,
-                                signal_id=signal_id,
+                        if not decision.is_approved:
+                            log.warning(
+                                "Signal BLOCKED by ExecutionFilter | %s | Reason: %s",
+                                cfg.symbol,
+                                decision.blocked_by,
                             )
-            # 6. Check for closed positions to update logger
-            current_positions = connector.get_positions(cfg.symbol)
-            current_tickets = {p["ticket"] for p in current_positions}
+                            approved = False
 
-            closed_tickets = []
-            for symbol, ticket in list(risk.open_positions.items()):
-                if symbol == cfg.symbol and ticket not in current_tickets:
-                    # Position closed - in a real scenario we'd fetch deal history
-                    log.info("Position CLOSED | ticket=%d", ticket)
-                    if trade_logger:
-                        # Retrieve trade info from DB to get correct direction
-                        trade_info = trade_logger.get_trade_by_ticket(ticket)
-                        if trade_info:
-                            # For a BUY, exit at BID. For a SELL, exit at ASK.
-                            exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
-                            # P&L will be calculated automatically by update_trade
-                            trade_logger.update_trade(
-                                ticket=ticket,
-                                exit_price=exit_price,
-                            )
-                    closed_tickets.append(symbol)
+                if approved:
+                    with profile("execution"):
+                        ticket = connector.place_order(signal)
+                        if ticket:
+                            risk.open_positions[cfg.symbol] = ticket
+                            log.info("Order placed | ticket=%d", ticket)
+                            if trade_logger:
+                                trade_logger.log_trade(
+                                    ticket=ticket,
+                                    symbol=cfg.symbol,
+                                    direction=direction,
+                                    entry_price=price,
+                                    lot_size=lot_size,
+                                    signal_id=signal_id,
+                                )
+                # 6. Check for closed positions to update logger
+                with profile("closed_positions_check"):
+                    current_positions = connector.get_positions(cfg.symbol)
+                    current_tickets = {p["ticket"] for p in current_positions}
 
-            for sym in closed_tickets:
-                risk.open_positions.pop(sym)
+                    closed_tickets = []
+                    for symbol, ticket in list(risk.open_positions.items()):
+                        if symbol == cfg.symbol and ticket not in current_tickets:
+                            # Position closed - in a real scenario we'd fetch deal history
+                            log.info("Position CLOSED | ticket=%d", ticket)
+                            if trade_logger:
+                                # Retrieve trade info from DB to get correct direction
+                                trade_info = trade_logger.get_trade_by_ticket(ticket)
+                                if trade_info:
+                                    # For a BUY, exit at BID. For a SELL, exit at ASK.
+                                    exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                                    # P&L will be calculated automatically by update_trade
+                                    trade_logger.update_trade(
+                                        ticket=ticket,
+                                        exit_price=exit_price,
+                                    )
+                            closed_tickets.append(symbol)
 
-            # 7. Update equity
-            balance = connector.get_account_balance()
-            risk.update_equity(balance)
-            monitor.log_equity(balance)
-        except KeyboardInterrupt:
-            log.info("Interrupted by user - shutting down")
-            break
-        except Exception as exc:
-            log.exception("Unhandled error in trading loop: %s", exc)
-            time.sleep(poll_interval)
+                    for sym in closed_tickets:
+                        risk.open_positions.pop(sym)
+
+                # 7. Update equity
+                with profile("account_updates"):
+                    balance = connector.get_account_balance()
+                    risk.update_equity(balance)
+                    monitor.log_equity(balance)
+            except KeyboardInterrupt:
+                log.info("Interrupted by user - shutting down")
+                break
+            except Exception as exc:
+                log.exception("Unhandled error in trading loop: %s", exc)
+                time.sleep(poll_interval)
 
 
 # -- CLI -------------------------------------------------------------------
