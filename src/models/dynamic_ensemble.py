@@ -20,11 +20,18 @@ logger = logging.getLogger(__name__)
 
 class DynamicEnsemble:
     """
-    Adaptive model weighting based on:
-    - Recent accuracy (Sharpe/Win-rate)
-    - Calibration error
-    - Drift/Degradation signals
-    - Market regime context
+    Institutional-grade adaptive model weighting engine.
+
+    Adjusts ensemble weights dynamically by combining performance metrics with
+    market regime context. Employs several stability mechanisms to prevent
+    overfitting to noise and ensure controlled rebalancing:
+
+    1. EMA Decay: Weights move towards target scores via an Exponential Moving Average.
+    2. Swing Caps: Maximum allowed change per update is strictly capped by `max_swing`.
+    3. Oscillation Dampening: Detects 'flip-flopping' targets and aggressively
+       reduces the adaptation rate to preserve portfolio stability.
+    4. Volatility Scaling: Adaptation slows down automatically in high-volatility
+       regimes to avoid reacting to transient price shocks.
     """
 
     def __init__(
@@ -51,14 +58,17 @@ class DynamicEnsemble:
         regime_info: Optional[RegimeInfo] = None,
     ) -> Dict[str, float]:
         """
-        Update weights based on performance and market context.
-        metrics: {
-            'model_name': {
-                'accuracy': 0.0-1.0,
-                'calibration_error': 0.0-1.0,
-                'drift_score': 0.0-1.0
-            }
-        }
+        Update ensemble weights using a multi-factor scoring model and stability controls.
+
+        Args:
+            metrics: Dictionary mapping model names to their performance metrics:
+                - accuracy: Normalized Sharpe or Win-rate (0.0 to 1.0).
+                - calibration_error: Deviation between confidence and success (0.0 to 1.0).
+                - drift_score: Signal of performance degradation (0.0 to 1.0).
+            regime_info: Current market regime context for heuristic-based scoring adjustments.
+
+        Returns:
+            Dict[str, float]: The updated weight distribution (sums to 1.0).
         """
         raw_scores: Dict[str, float] = {}
 
@@ -81,6 +91,18 @@ class DynamicEnsemble:
                     score -= 0.2
             elif regime == MarketRegime.RANGING:
                 score -= 0.2 * cal
+            elif regime == MarketRegime.TRENDING:
+                # In trending markets, favor models with low drift (consistency)
+                score -= 0.3 * drift
+            elif regime == MarketRegime.VOLATILE_BREAKOUT:
+                # In breakouts, calibration is critical for stop-loss reliability
+                score -= 0.4 * cal
+            elif regime == MarketRegime.MEAN_REVERSION:
+                # In mean reversion, overconfidence is deadly
+                score -= 0.5 * cal
+            elif regime == MarketRegime.LOW_VOLATILITY_DRIFT:
+                # Drift is expected, but accuracy is paramount
+                score += 0.1 * acc
 
             # Volatility context (penalize uncalibrated models in high volatility)
             if volatility > 2.0:
@@ -96,7 +118,7 @@ class DynamicEnsemble:
         for name in self.model_names:
             target = new_targets[name]
             current = self.weights[name]
-            prev_target = self._prev_target_weights[name]
+            prev_target = self._target_weights[name]
 
             # 1. Dynamic smoothing and oscillation dampening:
             # If target and prev_target are on opposite sides of current, it indicates oscillation
@@ -108,10 +130,12 @@ class DynamicEnsemble:
             vol_factor = float(np.clip(2.0 / (volatility + 1.0), 0.2, 1.0))
             alpha = self.smoothing_factor * vol_factor
             if is_oscillating:
-                alpha *= 0.3  # Aggressive dampening on flip-flops
+                # Aggressive dampening on flip-flops (Oscillation Prevention)
+                alpha *= 0.2
 
-            # 2. EMA adaptation with swing cap
+            # 2. EMA adaptation (Decay Logic) with safety cap (Swing Cap)
             diff = target - current
+            # Limit the step size to max_swing to ensure stability
             deltas[name] = float(np.clip(diff * alpha, -self.max_swing, self.max_swing))
 
         # 3. Balance deltas to maintain sum=1 and respect constraints

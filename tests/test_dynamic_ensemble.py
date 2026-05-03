@@ -109,5 +109,80 @@ class TestDynamicEnsemble(unittest.TestCase):
         for name in self.models:
             self.assertGreaterEqual(weights[name], self.ensemble.min_weight - 1e-6)
 
+    def test_regime_scoring_trending(self):
+        # In TRENDING regime, low drift should be favored.
+        # "ppo" has high drift, "lstm" has low drift.
+        metrics = {
+            "ppo": {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 1.0},
+            "lstm": {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 0.0},
+            "transformer": {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 0.5},
+        }
+        regime_trending = RegimeInfo(
+            label=MarketRegime.TRENDING, confidence=1.0, transition_score=0.0, volatility_index=1.0
+        )
+
+        for _ in range(10):
+            weights = self.ensemble.update_weights(metrics, regime_info=regime_trending)
+
+        self.assertGreater(weights["lstm"], weights["ppo"])
+
+    def test_regime_scoring_volatile_breakout(self):
+        # In VOLATILE_BREAKOUT regime, low calibration error should be favored.
+        # "ppo" has high calibration error, "lstm" has low calibration error.
+        metrics = {
+            "ppo": {"accuracy": 0.5, "calibration_error": 1.0, "drift_score": 0.0},
+            "lstm": {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 0.0},
+            "transformer": {"accuracy": 0.5, "calibration_error": 0.5, "drift_score": 0.0},
+        }
+        regime_breakout = RegimeInfo(
+            label=MarketRegime.VOLATILE_BREAKOUT, confidence=1.0, transition_score=0.0, volatility_index=1.0
+        )
+
+        for _ in range(10):
+            weights = self.ensemble.update_weights(metrics, regime_info=regime_breakout)
+
+        self.assertGreater(weights["lstm"], weights["ppo"])
+
+    def test_regime_scoring_mean_reversion(self):
+        # In MEAN_REVERSION regime, overconfidence (high calibration error) is penalized even more severely.
+        metrics = {
+            "ppo": {"accuracy": 0.5, "calibration_error": 1.0, "drift_score": 0.0},
+            "lstm": {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 0.0},
+            "transformer": {"accuracy": 0.5, "calibration_error": 0.5, "drift_score": 0.0},
+        }
+        regime_mean_rev = RegimeInfo(
+            label=MarketRegime.MEAN_REVERSION, confidence=1.0, transition_score=0.0, volatility_index=1.0
+        )
+
+        for _ in range(10):
+            weights = self.ensemble.update_weights(metrics, regime_info=regime_mean_rev)
+
+        self.assertGreater(weights["lstm"], weights["ppo"])
+
+    def test_ema_decay_logic(self):
+        # Verify that weights move towards the target incrementally (EMA decay)
+        # Target: ppo=1.0, others=0.0
+        metrics = {
+            "ppo": {"accuracy": 1.0, "calibration_error": 0.0, "drift_score": 0.0},
+            "lstm": {"accuracy": 0.0, "calibration_error": 0.0, "drift_score": 0.0},
+            "transformer": {"accuracy": 0.0, "calibration_error": 0.0, "drift_score": 0.0},
+        }
+
+        initial_ppo = self.ensemble.weights["ppo"]
+
+        # First update
+        self.ensemble.update_weights(metrics)
+        w1 = self.ensemble.weights["ppo"]
+
+        # Second update
+        self.ensemble.update_weights(metrics)
+        w2 = self.ensemble.weights["ppo"]
+
+        # Weights should be increasing towards target 1.0
+        self.assertGreater(w1, initial_ppo)
+        self.assertGreater(w2, w1)
+        # But it shouldn't jump to the target (0.9+) immediately due to smoothing (EMA) and swing cap
+        self.assertLess(w2, 0.8)
+
 if __name__ == '__main__':
     unittest.main()
