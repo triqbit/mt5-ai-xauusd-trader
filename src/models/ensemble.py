@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -89,7 +89,7 @@ class EnsembleModel(BaseModel):
     def predict(
         self,
         features: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional[Any] = None,
         regime_info: Optional[RegimeInfo] = None,
     ) -> Signal:
         """

@@ -68,29 +68,15 @@ class ExecutionFilter:
 
         is_approved = all(layer_results.values())
         blocked_by = None
-        confidence_score = signal.confidence
-
         if not is_approved:
-            # Mapping for legacy confidence scores on failure
-            legacy_scores = {
-                "atr_volatility": 0.0,
-                "trend_angle": 0.2,
-                "ema_sequence": 0.3,
-                "momentum": 0.4,
-                "session_time": 0.5,
-                "drawdown_limit": 0.1,
-            }
-
             # Identify first failure for backward compatibility
             failed_layers = [name for name, res in layer_results.items() if not res]
-            first_fail = failed_layers[0]
-            blocked_by = first_fail.upper()
-            confidence_score = legacy_scores.get(first_fail, 0.0)
+            blocked_by = failed_layers[0].upper() if failed_layers else "UNKNOWN"
 
         return ExecutionDecision(
             signal=signal,
             is_approved=is_approved,
-            confidence_score=confidence_score,
+            confidence_score=signal.confidence if is_approved else 0.0,
             blocked_by=blocked_by,
             layer_results=layer_results,
         )
@@ -132,6 +118,10 @@ class ExecutionFilter:
             return True  # Not enough data to be sure, pass
 
         x = np.arange(len(target_ema))
+        # Ensure we have non-constant values for regression
+        if np.all(target_ema.values == target_ema.values[0]):
+             return True # Neutral, pass
+
         slope, _, _, _, _ = stats.linregress(x, target_ema.values)
 
         if direction > 0:  # BUY
