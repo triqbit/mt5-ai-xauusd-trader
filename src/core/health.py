@@ -12,7 +12,7 @@ import logging
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import redis
 from fastapi import APIRouter, HTTPException, status
@@ -96,7 +96,9 @@ class HealthChecker:
         try:
             # Simple connectivity check using SQLAlchemy engine
             with self.trade_logger.engine.connect() as conn:
-                conn.execute(self.trade_logger.engine.dialect.do_ping(conn.connection))
+                # Use a simple SELECT 1 for standard cross-DB ping
+                from sqlalchemy import text
+                conn.execute(text("SELECT 1"))
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
@@ -298,13 +300,13 @@ def init_health_checker(
 
 
 @router.get("/liveness", response_model=ComponentStatus)
-async def liveness():
+async def liveness() -> Any:
     checker = get_health_checker()
     return checker.check_liveness()
 
 
 @router.get("/readiness", response_model=HealthReport)
-async def readiness():
+async def readiness() -> Any:
     checker = get_health_checker()
     report = checker.get_full_report()
 
@@ -317,6 +319,6 @@ async def readiness():
 
 
 @router.get("/full", response_model=HealthReport)
-async def full_report():
+async def full_report() -> Any:
     checker = get_health_checker()
     return checker.get_full_report()

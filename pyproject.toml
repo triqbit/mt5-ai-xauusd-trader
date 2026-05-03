@@ -69,10 +69,12 @@ split-on-trailing-comma = true
 # ===========================================================
 [tool.mypy]
 python_version = "3.11"
+plugins = ["pydantic.mypy"]
 strict = true
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+disallow_untyped_decorators = false
 
 # ===========================================================
 # pytest
