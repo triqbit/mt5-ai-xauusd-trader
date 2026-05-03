@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Optional
 import numpy as np
 import pandas as pd
 from scipy import stats
+
 from src.core.audit_log import get_audit_logger
 
 if TYPE_CHECKING:
@@ -93,7 +94,7 @@ class ExecutionFilter:
                 audit.log_trade_blocked(
                     symbol=signal.symbol,
                     reason=f"Blocked by execution layer: {blocked_by}",
-                    decision_chain=decision_chain
+                    decision_chain=decision_chain,
                 )
         except Exception as e:
             logger.error(f"Failed to log execution filter result to audit trail: {e}")
@@ -107,7 +108,9 @@ class ExecutionFilter:
             high = df["high"]
             low = df["low"]
             close = df["close"]
-            tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
+            tr = pd.concat(
+                [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+            ).max(axis=1)
             atr = tr.rolling(window=14).mean()
         else:
             atr = df["base_M5_atr"]

@@ -15,9 +15,9 @@ from typing import Any, Dict, Optional
 from sqlalchemy import (
     JSON,
     DateTime,
-    create_engine,
     String,
     Text,
+    create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
@@ -111,9 +111,7 @@ class AuditLogger:
             metadata={"old": old_config, "new": new_config},
         )
 
-    def log_trade_blocked(
-        self, symbol: str, reason: str, decision_chain: Dict[str, Any]
-    ) -> int:
+    def log_trade_blocked(self, symbol: str, reason: str, decision_chain: Dict[str, Any]) -> int:
         """Detail why a trade was rejected by risk or execution filters."""
         return self.log(
             actor="risk_engine",
@@ -140,9 +138,7 @@ class AuditLogger:
             metadata=pred_meta,
         )
 
-    def log_risk_decision(
-        self, symbol: str, passed: bool, decision_chain: Dict[str, Any]
-    ) -> int:
+    def log_risk_decision(self, symbol: str, passed: bool, decision_chain: Dict[str, Any]) -> int:
         """Log the full risk engine decision chain."""
         return self.log(
             actor="risk_engine",
@@ -185,9 +181,7 @@ class AuditLogger:
         Retrieve the singleton instance of the AuditLogger.
         """
         if cls._instance is None or not cls._instance._initialized:
-            raise RuntimeError(
-                "AuditLogger not initialized. Call AuditLogger(db_url) first."
-            )
+            raise RuntimeError("AuditLogger not initialized. Call AuditLogger(db_url) first.")
         return cls._instance
 
 

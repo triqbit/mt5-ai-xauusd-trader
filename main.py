@@ -302,7 +302,7 @@ def main() -> int:
             reason="Initial startup configuration"
         )
     except Exception as e:
-        logging.error(f"Failed to log initial config to audit trail: {e}")
+        log.error(f"Failed to log initial config to audit trail: {e}")
 
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
@@ -374,8 +374,12 @@ def main() -> int:
         version = "unknown"
         try:
             with open("pyproject.toml", "rb") as f:
-                import tomllib
-                pyproject = tomllib.load(f)
+                try:
+                    import tomllib
+                    pyproject = tomllib.load(f)
+                except ImportError:
+                    import tomli
+                    pyproject = tomli.load(f)
                 version = pyproject.get("project", {}).get("version", "unknown")
         except Exception:
             pass
@@ -387,7 +391,7 @@ def main() -> int:
             metadata={"algo": cfg.algorithm, "symbol": cfg.symbol}
         )
     except Exception as e:
-        logging.error(f"Failed to log deployment event to audit trail: {e}")
+        log.error(f"Failed to log deployment event to audit trail: {e}")
 
     try:
         if cfg.mode in ("demo", "live"):
