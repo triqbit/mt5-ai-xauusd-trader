@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
@@ -129,7 +129,7 @@ class DecisionSupportSystem:
 
             header_content = Text()
             header_content.append(f"SYMBOL: {packet.symbol}\n", style="bold")
-            header_content.append(f"STATUS: ", style="bold")
+            header_content.append("STATUS: ", style="bold")
             header_content.append(status_text, style=f"bold {status_color}")
 
             if packet.blocking_reasons:
