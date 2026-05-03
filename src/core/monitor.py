@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import telegram
-from prometheus_client import Counter, Gauge, start_http_server
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 from src.core.config import TradingConfig
 
@@ -30,6 +30,11 @@ SHARPE_RATIO_GAUGE = Gauge("trading_sharpe_ratio", "Annualized Sharpe Ratio")
 WIN_RATE_GAUGE = Gauge("trading_win_rate", "Trading win rate percentage")
 SYSTEM_ERROR_COUNTER = Counter(
     "trading_system_errors", "Total count of system errors", ["component"]
+)
+TRADING_BLOCK_DURATION = Histogram(
+    "trading_block_duration_seconds",
+    "Duration of trading code blocks in seconds",
+    ["block_label"],
 )
 
 

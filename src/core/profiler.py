@@ -13,6 +13,12 @@ from typing import Generator
 
 import structlog
 
+# Conditional import to avoid circular dependencies and handle missing metrics
+try:
+    from src.core.monitor import TRADING_BLOCK_DURATION
+except ImportError:
+    TRADING_BLOCK_DURATION = None
+
 logger = structlog.get_logger(__name__)
 
 @contextmanager
@@ -29,8 +35,18 @@ def profile(label: str) -> Generator[None, None, None]:
     finally:
         duration = time.perf_counter() - start_time
         duration_ms = round(duration * 1000, 3)
+
+        # Log to structured logger
         logger.info(
             "performance_metric",
             label=label,
             duration_ms=duration_ms
         )
+
+        # Log to Prometheus Histogram if available
+        if TRADING_BLOCK_DURATION is not None:
+            try:
+                TRADING_BLOCK_DURATION.labels(block_label=label).observe(duration)
+            except Exception as e:
+                # Avoid crashing the trading loop if metrics fail
+                logger.debug("Failed to log Prometheus metric", error=str(e))
