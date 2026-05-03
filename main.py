@@ -75,6 +75,19 @@ def run_live(
 ) -> None:
     log = logging.getLogger("main.live")
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+
+    # Audit Trail: Entry into trading mode
+    try:
+        audit = AuditLogger.get_instance()
+        audit.log_operator_action(
+            actor="system",
+            action="mode_entry",
+            reason=f"Entering {cfg.mode} mode for {cfg.symbol}",
+            metadata={"mode": cfg.mode, "symbol": cfg.symbol}
+        )
+    except Exception as e:
+        log.error(f"Failed to log mode entry to audit trail: {e}")
+
     poll_interval = 60  # seconds between signal evaluations
     while True:
         try:
@@ -97,6 +110,18 @@ def run_live(
                     monitor.check_confidence_degradation(confidence)
 
             log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+
+            # Audit Trail: Model prediction
+            try:
+                audit = AuditLogger.get_instance()
+                audit.log_model_prediction(
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    confidence=confidence,
+                    metadata={"volatility": volatility, "algorithm": cfg.algorithm}
+                )
+            except Exception as e:
+                log.error(f"Failed to log model prediction to audit trail: {e}")
 
             signal_id = None
             if trade_logger:
@@ -269,6 +294,16 @@ def main() -> int:
     audit_logger = AuditLogger(db_url=audit_db_url)
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
+    # Audit Trail: Log initial configuration
+    try:
+        audit_logger.log_config_change(
+            old_config={},
+            new_config=cfg.model_dump() if hasattr(cfg, "model_dump") else str(cfg),
+            reason="Initial startup configuration"
+        )
+    except Exception as e:
+        logging.error(f"Failed to log initial config to audit trail: {e}")
+
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
         if not connector.connect():
@@ -332,6 +367,27 @@ def main() -> int:
         return 1
 
     audit_logger.log("system", "startup_success", "All critical health checks passed")
+
+    # Audit Trail: Deployment Event
+    try:
+        # Try to get version from pyproject.toml if available
+        version = "unknown"
+        try:
+            with open("pyproject.toml", "rb") as f:
+                import tomllib
+                pyproject = tomllib.load(f)
+                version = pyproject.get("project", {}).get("version", "unknown")
+        except Exception:
+            pass
+
+        audit_logger.log_deployment_event(
+            version=version,
+            environment=cfg.mode,
+            status="SUCCESS",
+            metadata={"algo": cfg.algorithm, "symbol": cfg.symbol}
+        )
+    except Exception as e:
+        logging.error(f"Failed to log deployment event to audit trail: {e}")
 
     try:
         if cfg.mode in ("demo", "live"):

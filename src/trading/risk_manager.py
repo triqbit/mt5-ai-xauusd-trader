@@ -19,6 +19,7 @@ from typing import Dict, Optional
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.audit_log import get_audit_logger
 
 logger = logging.getLogger(__name__)
 
@@ -88,22 +89,24 @@ class RiskManager:
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        decision_chain = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
 
-        passed = rejection_reason == ""
+        passed = all(decision_chain.values())
+        rejection_reason = ""
         if not passed:
+            # Find first failure for the simple rejection reason
+            for key, status in decision_chain.items():
+                if not status:
+                    rejection_reason = key.replace("_", " ").capitalize()
+                    break
+
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
@@ -117,6 +120,18 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+
+        # Audit Trail
+        try:
+            audit = get_audit_logger()
+            audit.log_risk_decision(
+                symbol=signal.symbol,
+                passed=passed,
+                decision_chain=decision_chain
+            )
+        except Exception as e:
+            logger.error(f"Failed to log risk decision to audit trail: {e}")
+
         return passed
 
     def size_position(

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Optional
 import numpy as np
 import pandas as pd
 from scipy import stats
+from src.core.audit_log import get_audit_logger
 
 if TYPE_CHECKING:
     from src.trading.risk_manager import TradeSignal
@@ -55,31 +56,49 @@ class ExecutionFilter:
         """
         timestamp = timestamp or signal.timestamp or datetime.utcnow()
 
-        # Layer 1: ATR Volatility
-        if not self._check_atr_volatility(market_data):
-            return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
+        decision_chain = {
+            "ATR_VOLATILITY": self._check_atr_volatility(market_data),
+            "TREND_ANGLE": self._check_trend_angle(market_data, signal.direction),
+            "EMA_SEQUENCE": self._check_ema_sequence(market_data, signal.direction),
+            "MOMENTUM": self._check_momentum(market_data, signal.direction),
+            "SESSION_TIME": self._check_session_time(timestamp),
+            "DRAWDOWN_LIMIT": self._check_drawdown_limit(current_drawdown),
+        }
 
-        # Layer 2: Trend Angle
-        if not self._check_trend_angle(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
+        is_approved = all(decision_chain.values())
+        blocked_by = None
+        confidence_score = signal.confidence if is_approved else 0.0
 
-        # Layer 3: EMA Sequence
-        if not self._check_ema_sequence(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
+        if not is_approved:
+            for layer, status in decision_chain.items():
+                if not status:
+                    blocked_by = layer
+                    # Assign rough confidence penalties for specific layer failures if needed
+                    # (Matching original behavior roughly)
+                    confidence_map = {
+                        "ATR_VOLATILITY": 0.0,
+                        "TREND_ANGLE": 0.2,
+                        "EMA_SEQUENCE": 0.3,
+                        "MOMENTUM": 0.4,
+                        "SESSION_TIME": 0.5,
+                        "DRAWDOWN_LIMIT": 0.1,
+                    }
+                    confidence_score = confidence_map.get(layer, 0.0)
+                    break
 
-        # Layer 4: Momentum (RSI)
-        if not self._check_momentum(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
+        # Audit Trail
+        try:
+            audit = get_audit_logger()
+            if not is_approved:
+                audit.log_trade_blocked(
+                    symbol=signal.symbol,
+                    reason=f"Blocked by execution layer: {blocked_by}",
+                    decision_chain=decision_chain
+                )
+        except Exception as e:
+            logger.error(f"Failed to log execution filter result to audit trail: {e}")
 
-        # Layer 5: Session/Time
-        if not self._check_session_time(timestamp):
-            return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
-
-        # Layer 6: Drawdown
-        if not self._check_drawdown_limit(current_drawdown):
-            return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
-
-        return ExecutionDecision(signal, True, signal.confidence)
+        return ExecutionDecision(signal, is_approved, confidence_score, blocked_by)
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""
