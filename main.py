@@ -23,14 +23,12 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 
-from pydantic import ValidationError
-
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
-from src.core.constants import SignalDirection
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
