@@ -9,28 +9,32 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel, Field
 from scipy import stats
 
-if TYPE_CHECKING:
-    from src.trading.risk_manager import TradeSignal
+from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class ExecutionDecision:
-    """Result of the execution filter cascade."""
+class ExecutionDecision(BaseModel):
+    """
+    Result of the execution filter cascade.
+    Uses Pydantic for validation and structured output.
+    """
 
     signal: TradeSignal
     is_approved: bool
-    confidence_score: float
+    confidence_score: float = Field(..., ge=0.0, le=1.0)
     blocked_by: Optional[str] = None
+
+
+ExecutionDecision.model_rebuild()
 
 
 class ExecutionFilter:
@@ -53,33 +57,33 @@ class ExecutionFilter:
         """
         Run the full 6-layer filter cascade.
         """
-        timestamp = timestamp or signal.timestamp or datetime.utcnow()
+        timestamp = timestamp or signal.timestamp or datetime.now(timezone.utc)
 
         # Layer 1: ATR Volatility
         if not self._check_atr_volatility(market_data):
-            return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
+            return ExecutionDecision(signal=signal, is_approved=False, confidence_score=0.0, blocked_by="ATR_VOLATILITY")
 
         # Layer 2: Trend Angle
         if not self._check_trend_angle(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
+            return ExecutionDecision(signal=signal, is_approved=False, confidence_score=0.2, blocked_by="TREND_ANGLE")
 
         # Layer 3: EMA Sequence
         if not self._check_ema_sequence(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
+            return ExecutionDecision(signal=signal, is_approved=False, confidence_score=0.3, blocked_by="EMA_SEQUENCE")
 
         # Layer 4: Momentum (RSI)
         if not self._check_momentum(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
+            return ExecutionDecision(signal=signal, is_approved=False, confidence_score=0.4, blocked_by="MOMENTUM")
 
         # Layer 5: Session/Time
         if not self._check_session_time(timestamp):
-            return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
+            return ExecutionDecision(signal=signal, is_approved=False, confidence_score=0.5, blocked_by="SESSION_TIME")
 
         # Layer 6: Drawdown
         if not self._check_drawdown_limit(current_drawdown):
-            return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
+            return ExecutionDecision(signal=signal, is_approved=False, confidence_score=0.1, blocked_by="DRAWDOWN_LIMIT")
 
-        return ExecutionDecision(signal, True, signal.confidence)
+        return ExecutionDecision(signal=signal, is_approved=True, confidence_score=signal.confidence)
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""

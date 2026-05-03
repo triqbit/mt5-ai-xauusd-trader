@@ -31,6 +31,7 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.constants import SignalDirection
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -246,7 +247,7 @@ class MT5Connector:
             return None
 
         if not self.use_metaapi:
-            order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
+            order_type = ORDER_TYPE_BUY if signal.direction == SignalDirection.BUY else ORDER_TYPE_SELL
             tick = self.get_tick(signal.symbol)
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
