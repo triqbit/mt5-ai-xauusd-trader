@@ -53,6 +53,23 @@ def test_malformed_regime():
     # Zero volume at index 3
     assert df.loc[3, "tick_volume"] == 0
 
+def test_whipsaw_regime():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate(n_steps=100, regime="whipsaw")
+    # Midpoint should show a spike then drop
+    # mid = 50. returns[45:50] = 0.01, returns[50:55] = -0.015
+    # Price at index 50 should be higher than at 45
+    # Price at index 55 should be lower than at 50
+    assert df["close"].iloc[50] > df["close"].iloc[45]
+    assert df["close"].iloc[55] < df["close"].iloc[50]
+
+def test_stale_regime():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate(n_steps=50, regime="stale")
+    # Prices should be mostly constant (only minor noise in OHLC if any)
+    # Actually _generate_base adds noise to open/high/low but close is exact
+    assert (df["close"].diff().dropna() == 0).all()
+
 def test_invalid_regime():
     gen = ScenarioGenerator()
     with pytest.raises(ValueError, match="Unknown regime"):

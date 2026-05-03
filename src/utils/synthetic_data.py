@@ -11,6 +11,8 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from src.trading.risk_manager import TradeSignal
+
 
 class ScenarioGenerator:
     """
@@ -25,7 +27,7 @@ class ScenarioGenerator:
     def generate(
         self,
         n_steps: int = 100,
-        regime: Literal["trending", "ranging", "volatile", "gapping", "malformed"] = "ranging",
+        regime: Literal["trending", "ranging", "volatile", "gapping", "malformed", "whipsaw", "stale"] = "ranging",
         start_price: float = 2300.0,
         trend_strength: float = 0.001,
         volatility: float = 0.002,
@@ -43,6 +45,10 @@ class ScenarioGenerator:
             return self._generate_gapping(n_steps, start_price, volatility)
         elif regime == "malformed":
             return self._generate_malformed(n_steps, start_price)
+        elif regime == "whipsaw":
+            return self._generate_whipsaw(n_steps, start_price, volatility)
+        elif regime == "stale":
+            return self._generate_stale(n_steps, start_price)
         else:
             raise ValueError(f"Unknown regime: {regime}")
 
@@ -97,6 +103,23 @@ class ScenarioGenerator:
         returns += gaps * self.rng.choice([-0.02, 0.02], size=n_steps)  # 2% gaps
         return self._generate_base(n_steps, start_price, returns)
 
+    def _generate_whipsaw(
+        self, n_steps: int, start_price: float, volatility: float
+    ) -> pd.DataFrame:
+        """Breakout followed by immediate sharp reversal."""
+        mid = n_steps // 2
+        returns = self.rng.normal(0, volatility, n_steps)
+        # Bullish breakout
+        returns[mid - 5 : mid] = 0.01
+        # Bearish reversal
+        returns[mid : mid + 5] = -0.015
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_stale(self, n_steps: int, start_price: float) -> pd.DataFrame:
+        """Frozen price scenario."""
+        returns = np.zeros(n_steps)
+        return self._generate_base(n_steps, start_price, returns)
+
     def _generate_malformed(self, n_steps: int, start_price: float) -> pd.DataFrame:
         df = self._generate_ranging(n_steps, start_price, 0.001)
 
@@ -114,3 +137,66 @@ class ScenarioGenerator:
         df.loc[3, "tick_volume"] = 0
 
         return df
+
+
+class RiskScenarioBuilder:
+    """
+    Generates deterministic sequences of TradeSignal objects for risk testing.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+
+    def consecutive_losses(
+        self,
+        n_signals: int = 5,
+        symbol: str = "XAUUSD",
+        start_price: float = 2000.0,
+    ) -> list[TradeSignal]:
+        """Generates a sequence of signals likely to hit SL."""
+        signals = []
+        for i in range(n_signals):
+            price = start_price - (i * 10)
+            signals.append(
+                TradeSignal(
+                    symbol=symbol,
+                    direction=1,  # BUY
+                    entry_price=price,
+                    stop_loss=price - 20,
+                    take_profit=price + 40,
+                    lot_size=0.1,
+                    algorithm="ensemble",
+                    confidence=0.7,
+                )
+            )
+        return signals
+
+    def ensemble_dissent(
+        self,
+        symbol: str = "XAUUSD",
+        price: float = 2000.0,
+    ) -> list[TradeSignal]:
+        """Generates signals representing conflicting model votes."""
+        return [
+            TradeSignal(
+                symbol=symbol,
+                direction=1,
+                entry_price=price,
+                stop_loss=price - 10,
+                take_profit=price + 20,
+                lot_size=0.1,
+                algorithm="ppo",
+                confidence=0.9,
+            ),
+            TradeSignal(
+                symbol=symbol,
+                direction=-1,
+                entry_price=price,
+                stop_loss=price + 10,
+                take_profit=price - 20,
+                lot_size=0.1,
+                algorithm="lstm",
+                confidence=0.8,
+            ),
+        ]
