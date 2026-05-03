@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+
 class Base(DeclarativeBase):
     pass
 

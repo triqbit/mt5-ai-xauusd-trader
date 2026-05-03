@@ -27,6 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
+
 class Base(DeclarativeBase):
     pass
 
