@@ -4,6 +4,8 @@ src/core/config_validator.py
 """
 
 import os
+import sys
+from pathlib import Path
 from typing import List, NamedTuple
 
 from src.core.config import TradingConfig
@@ -45,37 +47,57 @@ class ConfigValidator:
         """Verify MT5 credentials are provided and formatted correctly."""
         if self.config.mt5_login <= 0:
             self.errors.append(
-                ValidationError("MT5_LOGIN", "MT5 login must be a positive integer.", True)
-            )
-
-        placeholders = ["", "server_name", "test", "your_server_here"]
-        if not self.config.mt5_server or self.config.mt5_server.lower() in placeholders:
-            self.errors.append(
                 ValidationError(
-                    "MT5_SERVER", "MT5 server name is missing or using placeholder.", True
+                    "MT5_LOGIN",
+                    "MT5 login must be a positive integer. Check your .env file.",
+                    True,
                 )
             )
 
-        password_placeholders = ["", "password", "test", "your_password_here"]
+        mt5_placeholders = ["", "server_name", "test", "your_server_here", "change_me"]
+        if not self.config.mt5_server or self.config.mt5_server.lower() in mt5_placeholders:
+            self.errors.append(
+                ValidationError(
+                    "MT5_SERVER",
+                    "MT5 server name is missing or using placeholder. Provide your broker's server name.",
+                    True,
+                )
+            )
+
+        password_placeholders = ["", "password", "test", "your_password_here", "change_me"]
         if (
             not self.config.mt5_password
             or self.config.mt5_password.lower() in password_placeholders
         ):
             self.errors.append(
                 ValidationError(
-                    "MT5_PASSWORD", "MT5 password is missing or using placeholder.", True
+                    "MT5_PASSWORD",
+                    "MT5 password is missing or using placeholder. Ensure your MT5 password is set.",
+                    True,
                 )
             )
+
+        # Path validation for Windows
+        if sys.platform == "win32":
+            mt5_path = Path(self.config.mt5_path)
+            if not mt5_path.exists():
+                self.errors.append(
+                    ValidationError(
+                        "MT5_PATH",
+                        f"MT5 terminal not found at: {mt5_path}. Verify MT5_PATH in .env.",
+                        True,
+                    )
+                )
 
     def _check_live_mode_confirmation(self) -> None:
         """Enforce explicit confirmation for LIVE trading."""
         if self.config.mode == "live":
-            confirm = os.getenv("CONFIRM_LIVE_TRADING", "").upper()
-            if confirm != "YES":
+            if self.config.confirm_live_trading.upper() != "YES":
                 self.errors.append(
                     ValidationError(
                         "MODE",
-                        "LIVE mode detected but CONFIRM_LIVE_TRADING is not set to 'YES'.",
+                        "LIVE mode detected but CONFIRM_LIVE_TRADING is not set to 'YES'. "
+                        "Safety gate: set CONFIRM_LIVE_TRADING=YES in your environment.",
                         True,
                     )
                 )
@@ -87,64 +109,103 @@ class ConfigValidator:
         if self.config.database_url == default_db:
             self.errors.append(
                 ValidationError(
-                    "DATABASE_URL", "Database URL is using default placeholder credentials.", True
+                    "DATABASE_URL",
+                    "Database URL is using default placeholder credentials. Update DATABASE_URL with a secure password.",
+                    True,
                 )
             )
+
+        # Common placeholder patterns
+        placeholders = ["YOUR_TOKEN", "CHANGE_ME", "YOUR_ACCOUNT_ID", "YOUR_CHAT_ID", "123456789"]
 
         # Check Telegram
-        if self.config.telegram_token and any(
-            p in self.config.telegram_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]
-        ):
-            self.errors.append(
-                ValidationError("TELEGRAM_TOKEN", "Telegram token contains placeholder text.", True)
-            )
+        if self.config.telegram_token:
+            if any(p in self.config.telegram_token.upper() for p in placeholders):
+                self.errors.append(
+                    ValidationError(
+                        "TELEGRAM_TOKEN",
+                        "Telegram token contains placeholder text. Replace with your actual bot token.",
+                        True,
+                    )
+                )
 
         # Check MetaAPI
-        if self.config.metaapi_token and any(
-            p in self.config.metaapi_token.upper() for p in ["YOUR_TOKEN", "CHANGE_ME"]
-        ):
-            self.errors.append(
-                ValidationError("METAAPI_TOKEN", "MetaAPI token contains placeholder text.", True)
-            )
-
-        if self.config.metaapi_account_id and any(
-            p in self.config.metaapi_account_id.upper() for p in ["YOUR_ACCOUNT_ID", "CHANGE_ME"]
-        ):
-            self.errors.append(
-                ValidationError(
-                    "METAAPI_ACCOUNT_ID", "MetaAPI account ID contains placeholder text.", True
+        if self.config.metaapi_token:
+            if any(p in self.config.metaapi_token.upper() for p in placeholders):
+                self.errors.append(
+                    ValidationError(
+                        "METAAPI_TOKEN",
+                        "MetaAPI token contains placeholder text. Replace with your actual MetaAPI token.",
+                        True,
+                    )
                 )
-            )
+
+        if self.config.metaapi_account_id:
+            if any(p in self.config.metaapi_account_id.upper() for p in placeholders):
+                self.errors.append(
+                    ValidationError(
+                        "METAAPI_ACCOUNT_ID",
+                        "MetaAPI account ID contains placeholder text. Replace with your actual MetaAPI account ID.",
+                        True,
+                    )
+                )
 
     def _check_risk_parameters(self) -> None:
-        """Verify risk parameters are within safe enterprise bounds."""
+        """Verify risk parameters are within safe enterprise bounds (RISK_LIMITS.md)."""
         # 1. Per-trade risk limits (RISK_LIMITS.md 1.3)
+        # Policy limit is 1%, 2% is hard prohibition.
         if self.config.risk_per_trade > 0.02:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    "Risk per trade > 2% is strictly prohibited (Enterprise Limit: 1%).",
+                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds the absolute maximum of 2%.",
                     True,
+                )
+            )
+        elif self.config.risk_per_trade > 0.01:
+            self.errors.append(
+                ValidationError(
+                    "RISK_PER_TRADE",
+                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds the policy limit of 1%.",
+                    False,  # Non-critical warning
                 )
             )
 
         # 2. Daily loss limits (RISK_LIMITS.md 2.1)
-        if self.config.max_daily_loss > 0.15:
+        # Level 4 (Emergency Stop) is 5%.
+        if self.config.max_daily_loss > 0.06:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    "Max daily loss > 15% is outside safe range (Emergency Stop: 5%).",
+                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds hard stop of 6%.",
                     True,
+                )
+            )
+        elif self.config.max_daily_loss > 0.05:
+            self.errors.append(
+                ValidationError(
+                    "MAX_DAILY_LOSS",
+                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds emergency stop limit of 5%.",
+                    False,
                 )
             )
 
         # 3. Position limits (RISK_LIMITS.md 1.1)
+        # Maximum 5 open positions is the policy limit.
         if self.config.max_positions > 10:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
-                    "Maximum positions > 10 is strictly prohibited for capital safety.",
+                    f"Maximum positions {self.config.max_positions} is strictly prohibited (Limit: 5).",
                     True,
+                )
+            )
+        elif self.config.max_positions > 5:
+            self.errors.append(
+                ValidationError(
+                    "MAX_POSITIONS",
+                    f"Maximum positions {self.config.max_positions} exceeds the standard policy limit of 5.",
+                    False,
                 )
             )
 
@@ -155,7 +216,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
-                    "Maximum positions > 5 is not allowed in LIVE mode for safety.",
+                    "Maximum positions > 5 is strictly prohibited in LIVE mode for capital safety.",
                     True,
                 )
             )
@@ -203,7 +264,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",
-                    "Telegram notifications should be disabled in backtest mode.",
-                    False,  # Non-critical warning
+                    "Telegram notifications should be disabled in backtest mode to avoid spam.",
+                    False,
                 )
             )

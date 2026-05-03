@@ -1,5 +1,6 @@
 """Tests for src.core.config_validator module."""
 import os
+import sys
 import pytest
 from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
@@ -42,6 +43,21 @@ def test_validator_mt5_placeholders(monkeypatch):
     assert result.success is False
     assert any(e.field == "MT5_SERVER" for e in result.errors)
     assert any(e.field == "MT5_PASSWORD" for e in result.errors)
+
+def test_validator_mt5_path_windows(monkeypatch):
+    """Test validator checks MT5 path on Windows."""
+    if sys.platform != "win32":
+        pytest.skip("Windows-only test")
+
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "pass")
+    monkeypatch.setenv("MT5_SERVER", "server")
+    monkeypatch.setenv("MT5_PATH", "C:/non_existent_path.exe")
+    cfg = TradingConfig()
+    validator = ConfigValidator(cfg)
+    result = validator.validate()
+    assert result.success is False
+    assert any(e.field == "MT5_PATH" for e in result.errors)
 
 def test_validator_live_mode_no_confirmation(monkeypatch):
     """Test validator fails in LIVE mode without CONFIRM_LIVE_TRADING=YES."""
@@ -94,13 +110,59 @@ def test_validator_risk_parameters(monkeypatch):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("MAX_DAILY_LOSS", "0.16") # 16% is > 15% limit in validator
 
+    # 1. Critical risk breach (> 2%)
+    # Note: Pydantic field_validator might catch this first if we instantiate TradingConfig
+    # but let's test the validator's logic.
+    monkeypatch.setenv("RISK_PER_TRADE", "0.03")
+    try:
+        cfg = TradingConfig()
+    except ValueError:
+        # Pydantic already caught it, which is also fine.
+        return
+
+    validator = ConfigValidator(cfg)
+    result = validator.validate()
+    assert result.success is False
+    assert any(e.field == "RISK_PER_TRADE" and e.critical for e in result.errors)
+
+def test_validator_risk_warnings(monkeypatch):
+    """Test validator gives warnings for risk parameters exceeding policy but not hard limits."""
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
+
+    # Policy limit is 1%, Warning if > 1%
+    monkeypatch.setenv("RISK_PER_TRADE", "0.015")
+    cfg = TradingConfig()
+    validator = ConfigValidator(cfg)
+    result = validator.validate()
+    assert result.success is True
+    assert any(e.field == "RISK_PER_TRADE" and not e.critical for e in result.errors)
+
+def test_validator_max_daily_loss(monkeypatch):
+    """Test validator detects unsafe daily loss limits."""
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
+
+    # Hard stop is 6%
+    monkeypatch.setenv("MAX_DAILY_LOSS", "0.07")
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
     result = validator.validate()
     assert result.success is False
-    assert any(e.field == "MAX_DAILY_LOSS" for e in result.errors)
+    assert any(e.field == "MAX_DAILY_LOSS" and e.critical for e in result.errors)
+
+    # Warning if > 5% (Emergency Stop)
+    monkeypatch.setenv("MAX_DAILY_LOSS", "0.055")
+    cfg = TradingConfig()
+    validator = ConfigValidator(cfg)
+    result = validator.validate()
+    assert result.success is True
+    assert any(e.field == "MAX_DAILY_LOSS" and not e.critical for e in result.errors)
 
 def test_validator_incompatible_live_positions(monkeypatch):
     """Test validator detects too many positions in LIVE mode."""
@@ -116,7 +178,7 @@ def test_validator_incompatible_live_positions(monkeypatch):
     validator = ConfigValidator(cfg)
     result = validator.validate()
     assert result.success is False
-    assert any(e.field == "MAX_POSITIONS" for e in result.errors)
+    assert any(e.field == "MAX_POSITIONS" and e.critical for e in result.errors)
 
 def test_validator_backtest_warning(monkeypatch):
     """Test validator gives a non-critical warning for Telegram in backtest."""
