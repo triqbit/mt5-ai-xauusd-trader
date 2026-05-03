@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2024-05-24
 ### Added
+- Standardized startup UX in `main.py` using `rich.Table` for configuration validation and health reporting.
 - Initial enterprise-grade trading engine.
 - MT5 integration and risk management framework.
 - CI/CD pipelines for validation and security.

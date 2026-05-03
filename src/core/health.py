@@ -14,16 +14,26 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Optional
 
+import redis
 from fastapi import APIRouter, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from prometheus_client import Gauge
 from pydantic import BaseModel, Field
 
+from src.core.audit_log import AuditLogger
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
 from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
+
+# --- Prometheus Metrics for Component Health ---
+HEALTH_GAUGES = Gauge(
+    "system_component_health",
+    "Status of system components (1.0=Healthy, 0.5=Degraded, 0.0=Failed)",
+    ["component"],
+)
 
 
 class HealthStatus(str, Enum):
@@ -55,68 +65,94 @@ class HealthChecker:
         connector: Optional[MT5Connector] = None,
         trade_logger: Optional[TradeLogger] = None,
         model: Optional[object] = None,
+        audit_logger: Optional[AuditLogger] = None,
     ) -> None:
         self.cfg = config
         self.connector = connector
         self.trade_logger = trade_logger
         self.model = model
+        self.audit_logger = audit_logger
+
+    def _update_gauge(self, component: str, status: HealthStatus) -> None:
+        """Helper to update Prometheus health gauge."""
+        val = 1.0 if status == HealthStatus.HEALTHY else (0.5 if status == HealthStatus.DEGRADED else 0.0)
+        HEALTH_GAUGES.labels(component=component).set(val)
 
     def check_liveness(self) -> ComponentStatus:
         """Basic application responsiveness check."""
-        return ComponentStatus(status=HealthStatus.HEALTHY, message="Application is running")
+        res = ComponentStatus(status=HealthStatus.HEALTHY, message="Application is running")
+        self._update_gauge("liveness", res.status)
+        return res
 
     def check_database(self) -> ComponentStatus:
         """Verify database reachability."""
         if not self.trade_logger:
-            return ComponentStatus(
+            res = ComponentStatus(
                 status=HealthStatus.FAILED, message="TradeLogger not initialized"
             )
+            self._update_gauge("database", res.status)
+            return res
 
         try:
             # Simple connectivity check using SQLAlchemy engine
             with self.trade_logger.engine.connect() as conn:
                 conn.execute(self.trade_logger.engine.dialect.do_ping(conn.connection))
-            return ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
+            res = ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
-            return ComponentStatus(
+            res = ComponentStatus(
                 status=HealthStatus.FAILED, message=f"Database unreachable: {e!s}"
             )
+
+        self._update_gauge("database", res.status)
+        return res
 
     def check_mt5(self) -> ComponentStatus:
         """Verify MT5 connection status."""
         if not self.connector:
-            return ComponentStatus(
+            res = ComponentStatus(
                 status=HealthStatus.FAILED, message="MT5Connector not initialized"
             )
+            self._update_gauge("mt5", res.status)
+            return res
 
         if self.connector._is_initialized:
-            return ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection alive")
+            res = ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection alive")
         else:
-            return ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection down")
+            res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection down")
+
+        self._update_gauge("mt5", res.status)
+        return res
 
     def check_models(self) -> ComponentStatus:
         """Verify models are loaded in the ensemble."""
         if not self.model:
-            return ComponentStatus(
-                status=HealthStatus.FAILED, message="EnsembleModel not initialized"
+            res = ComponentStatus(
+                status=HealthStatus.FAILED, message="Model orchestrator not initialized"
             )
+            self._update_gauge("models", res.status)
+            return res
 
-        # Use hasattr/getattr to avoid strict type dependency on torch-heavy EnsembleModel
+        # Use hasattr/getattr to avoid strict type dependency on torch-heavy models
         loaded = []
         if getattr(self.model, "_ppo_model", None) is not None:
             loaded.append("PPO")
         if getattr(self.model, "lstm_model", None) is not None:
             loaded.append("LSTM")
+        if getattr(self.model, "_dreamer_model", None) is not None:
+            loaded.append("Dreamer")
 
         if not loaded:
-            return ComponentStatus(
+            res = ComponentStatus(
                 status=HealthStatus.FAILED, message="No models loaded in ensemble"
             )
+        else:
+            res = ComponentStatus(
+                status=HealthStatus.HEALTHY, message=f"Models loaded: {', '.join(loaded)}"
+            )
 
-        return ComponentStatus(
-            status=HealthStatus.HEALTHY, message=f"Models loaded: {', '.join(loaded)}"
-        )
+        self._update_gauge("models", res.status)
+        return res
 
     def check_config(self) -> ComponentStatus:
         """Validate current environment configuration."""
@@ -125,17 +161,21 @@ class HealthChecker:
 
         if result.success:
             if result.errors:
-                return ComponentStatus(
+                res = ComponentStatus(
                     status=HealthStatus.DEGRADED,
                     message=f"Config valid with warnings: {'; '.join(e.message for e in result.errors)}",
                 )
-            return ComponentStatus(status=HealthStatus.HEALTHY, message="Configuration valid")
+            else:
+                res = ComponentStatus(status=HealthStatus.HEALTHY, message="Configuration valid")
         else:
             critical_errors = [e.message for e in result.errors if e.critical]
-            return ComponentStatus(
+            res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message=f"Configuration invalid: {'; '.join(critical_errors)}",
             )
+
+        self._update_gauge("config", res.status)
+        return res
 
     def check_disk_space(self, min_mb: int = 100) -> ComponentStatus:
         """Check for sufficient disk space in log directory."""
@@ -144,22 +184,65 @@ class HealthChecker:
             try:
                 logs_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
-                return ComponentStatus(
+                res = ComponentStatus(
                     status=HealthStatus.FAILED, message=f"Cannot create logs directory: {e}"
                 )
+                self._update_gauge("disk", res.status)
+                return res
 
         usage = shutil.disk_usage(logs_dir)
         free_mb = usage.free / (1024 * 1024)
 
         if free_mb < min_mb:
-            return ComponentStatus(
+            res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message=f"Low disk space: {free_mb:.2f}MB free, required {min_mb}MB",
             )
+        else:
+            res = ComponentStatus(
+                status=HealthStatus.HEALTHY, message=f"Disk space sufficient: {free_mb:.2f}MB free"
+            )
 
-        return ComponentStatus(
-            status=HealthStatus.HEALTHY, message=f"Disk space sufficient: {free_mb:.2f}MB free"
-        )
+        self._update_gauge("disk", res.status)
+        return res
+
+    def check_redis(self) -> ComponentStatus:
+        """
+        Verify Redis connectivity.
+        Non-blocking: returns DEGRADED instead of FAILED if not configured or unreachable.
+        """
+        if not self.cfg.redis_url:
+            res = ComponentStatus(status=HealthStatus.DEGRADED, message="Redis URL not configured (Optional)")
+            self._update_gauge("redis", res.status)
+            return res
+
+        try:
+            client = redis.from_url(self.cfg.redis_url, socket_timeout=2)
+            if client.ping():
+                res = ComponentStatus(status=HealthStatus.HEALTHY, message="Redis reachable")
+            else:
+                res = ComponentStatus(status=HealthStatus.DEGRADED, message="Redis ping failed")
+        except Exception as e:
+            logger.warning("Health check - Redis degradation: %s", e)
+            res = ComponentStatus(status=HealthStatus.DEGRADED, message=f"Redis unreachable: {e!s}")
+
+        self._update_gauge("redis", res.status)
+        return res
+
+    def check_audit_log(self) -> ComponentStatus:
+        """Verify AuditLogger initialization status."""
+        if not self.audit_logger:
+            res = ComponentStatus(status=HealthStatus.FAILED, message="AuditLogger not initialized")
+            self._update_gauge("audit_log", res.status)
+            return res
+
+        if self.audit_logger._initialized:
+            res = ComponentStatus(status=HealthStatus.HEALTHY, message="AuditLogger initialized and active")
+        else:
+            res = ComponentStatus(status=HealthStatus.FAILED, message="AuditLogger not properly initialized")
+
+        self._update_gauge("audit_log", res.status)
+        return res
 
     def get_full_report(self) -> HealthReport:
         """Aggregate all checks into a comprehensive report."""
@@ -170,6 +253,8 @@ class HealthChecker:
             "models": self.check_models(),
             "config": self.check_config(),
             "disk": self.check_disk_space(),
+            "redis": self.check_redis(),
+            "audit_log": self.check_audit_log(),
         }
 
         # Determine overall status
@@ -205,9 +290,10 @@ def init_health_checker(
     connector: MT5Connector,
     trade_logger: TradeLogger,
     model: object,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> HealthChecker:
     global _health_checker
-    _health_checker = HealthChecker(config, connector, trade_logger, model)
+    _health_checker = HealthChecker(config, connector, trade_logger, model, audit_logger)
     return _health_checker
 
 

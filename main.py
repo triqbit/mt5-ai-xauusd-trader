@@ -23,11 +23,12 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
-from rich import box
 from rich.console import Console
+from rich import box
 from rich.table import Table
 
 from src.core import get_config, profile
+from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
@@ -261,15 +262,27 @@ def main() -> int:
 
     if not result.success:
         log.critical("Startup validation FAILED - fix critical configuration errors to proceed.")
+        for err in result.errors:
+            level = "CRITICAL" if err.critical else "WARNING"
+            log.error(f"  [{level}] {err.field}: {err.message}")
         return 1
 
+    if result.errors:
+        for err in result.errors:
+            log.warning(f"  [WARNING] {err.field}: {err.message}")
+
     log.info(
-        "Configuration loaded | mode=%s algo=%s symbol=%s",
+        "Configuration loaded and validated | mode=%s algo=%s symbol=%s",
         cfg.mode,
         cfg.algorithm,
         cfg.symbol,
     )
     # Initialise components
+    # 1. Audit Logger (Mandatory for enterprise traceability)
+    audit_db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///audit.db"
+    audit_logger = AuditLogger(db_url=audit_db_url)
+    audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
+
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
         if not connector.connect():
@@ -308,7 +321,7 @@ def main() -> int:
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
-    health_checker = init_health_checker(cfg, connector, trade_logger, model)
+    health_checker = init_health_checker(cfg, connector, trade_logger, model, audit_logger=audit_logger)
     with console.status("[bold blue]Running health checks..."):
         report = health_checker.get_full_report()
 
@@ -329,7 +342,10 @@ def main() -> int:
 
     if report.status == HealthStatus.FAILED:
         log.critical("Startup HEALTH CHECK FAILED")
+        audit_logger.log("system", "startup_failed", "Critical health checks failed")
         return 1
+
+    audit_logger.log("system", "startup_success", "All critical health checks passed")
 
     try:
         if cfg.mode in ("demo", "live"):
