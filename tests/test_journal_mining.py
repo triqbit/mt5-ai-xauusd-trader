@@ -72,11 +72,20 @@ def test_drawdown_clusters(miner, sample_trades):
     assert clusters[0].total_loss == -110.0
 
 def test_profitable_patterns(miner, sample_trades):
-    patterns = miner.find_profitable_patterns(sample_trades)
+    # Add symbol to sample_trades for this test
+    df = sample_trades.copy()
+    df["symbol"] = "XAUUSD"
+
+    patterns = miner.find_profitable_patterns(df)
     # Ensemble: 1 win, 1 loss. Win rate 0.5. Profit factor 100/50 = 2.0
     ensemble = next(p for p in patterns if p.value == "ensemble")
     assert ensemble.win_rate == 0.5
     assert ensemble.profit_factor == 2.0
+
+    # Symbol concentration
+    xau = next(p for p in patterns if p.value == "XAUUSD")
+    assert xau.attribute == "symbol"
+    assert xau.total_trades == 5
 
 def test_risk_blocks(miner, sample_signals):
     risk_events = pd.DataFrame([
@@ -157,17 +166,18 @@ def test_drawdown_clusters_single_loss(miner):
 
 def test_find_frequent_motifs(miner):
     signals = pd.DataFrame([
-        {"id": 1, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "pnl": -10, "win": False},
-        {"id": 2, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "pnl": -20, "win": False},
-        {"id": 3, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "pnl": 100, "win": True},
-        {"id": 4, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "pnl": 50, "win": True},
+        {"id": 1, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "confidence": 0.85, "pnl": -10, "win": False},
+        {"id": 2, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "confidence": 0.85, "pnl": -20, "win": False},
+        {"id": 3, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "confidence": 0.95, "pnl": 100, "win": True},
+        {"id": 4, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "confidence": 0.95, "pnl": 50, "win": True},
     ])
     motifs = miner.find_frequent_motifs(signals)
     assert len(motifs) == 2
-    # Ensemble motif (direction 1, Low vol) has 0% win rate
+    # Ensemble motif (direction 1, Low vol, High conf) has 0% win rate
     ensemble_motif = next(m for m in motifs if m.algorithm == "ensemble")
     assert ensemble_motif.win_rate == 0.0
     assert ensemble_motif.volatility_bucket == "Low"
+    assert ensemble_motif.confidence_bucket == "High"
 
 def test_strategy_state_correlation(miner):
     # Setup trades with a drawdown cluster
@@ -200,7 +210,7 @@ def test_to_report_section_with_toxic_motif(miner):
             BlockReasonSummary(reason="FRAGILE", count=10, impacted_algorithms=["ppo"], weak_state_correlation=0.9)
         ],
         recurring_motifs=[
-            SignalMotif(algorithm="ensemble", direction=1, volatility_bucket="High", frequency=5, win_rate=0.1)
+            SignalMotif(algorithm="ensemble", direction=1, volatility_bucket="High", confidence_bucket="Medium", frequency=5, win_rate=0.1)
         ]
     )
 
@@ -209,3 +219,40 @@ def test_to_report_section_with_toxic_motif(miner):
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Strategy Fragility" in risk_types
     assert "Toxic Motif" in risk_types
+
+def test_detect_pre_drawdown_motifs(miner):
+    now = datetime.now(timezone.utc)
+    # 3 consecutive losses form a cluster starting at now
+    trades = pd.DataFrame([
+        {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
+        {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
+        {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+    ])
+
+    # Signal 1 hour before cluster
+    signals = pd.DataFrame([
+        {"id": 10, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -5, "created_at": now - pd.Timedelta(hours=1)},
+        {"id": 11, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -5, "created_at": now - pd.Timedelta(hours=1, minutes=1)},
+    ])
+
+    motifs = miner.detect_pre_drawdown_motifs(signals, trades)
+    assert len(motifs) == 1
+    assert motifs[0].algorithm == "ensemble"
+    assert motifs[0].frequency == 2
+
+def test_find_frequent_motifs_with_clusters(miner):
+    now = datetime.now(timezone.utc)
+    trades = pd.DataFrame([
+        {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
+        {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
+        {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+    ])
+
+    signals = pd.DataFrame([
+        {"id": 1, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -10, "created_at": now},
+        {"id": 2, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1)},
+    ])
+
+    motifs = miner.find_frequent_motifs(signals, trades)
+    assert len(motifs) == 1
+    assert motifs[0].cluster_frequency == 2

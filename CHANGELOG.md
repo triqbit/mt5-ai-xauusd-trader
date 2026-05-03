@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enhanced `JournalMiner` in `src/analytics/journal_mining.py` with multi-dimensional motif detection (volatility, confidence).
+- Implemented `detect_pre_drawdown_motifs` for early warning pattern recognition.
+- Added symbol-based concentration analysis to `find_profitable_patterns`.
+- Integrated `cluster_frequency` tracking into `SignalMotif` to identify toxic signal combinations.
+- Comprehensive unit tests for new journal mining capabilities in `tests/test_journal_mining.py`.
 - Enterprise-grade trade signal explainability and attribution system in `src/core/explainability.py`.
 - Decomposition of signals into execution, model, regime, risk, and feature cluster contributions.
 - Standardized signal direction mapping (0=HOLD, 1=BUY, 2=SELL) across the explainer.

@@ -72,8 +72,10 @@ class SignalMotif(BaseModel):
     algorithm: str
     direction: int
     volatility_bucket: str
+    confidence_bucket: str
     frequency: int
     win_rate: float
+    cluster_frequency: int = 0
 
 
 class JournalReport(BaseModel):
@@ -86,6 +88,7 @@ class JournalReport(BaseModel):
     profitable_concentrations: List[PatternConcentration]
     risk_block_summary: List[BlockReasonSummary]
     recurring_motifs: List[SignalMotif] = Field(default_factory=list)
+    pre_drawdown_motifs: List[SignalMotif] = Field(default_factory=list)
 
     def to_report_section(self) -> Any:
         """Convert results to TradePatternSection for ResearchReporter."""
@@ -323,11 +326,37 @@ class JournalMiner:
         return clusters
 
     def find_profitable_patterns(self, trades_df: pd.DataFrame) -> List[PatternConcentration]:
-        """Find concentrations of profitable patterns by algorithm and hour."""
+        """Find concentrations of profitable patterns by symbol, algorithm and hour."""
         if trades_df.empty:
             return []
 
         results = []
+
+        # By Symbol
+        if "symbol" in trades_df.columns:
+            for symbol in trades_df["symbol"].unique():
+                group = trades_df[trades_df["symbol"] == symbol]
+                trade_count = len(group)
+                wins = group[group["pnl"] > 0]
+                losses = group[group["pnl"] < 0]
+                win_rate = len(wins) / trade_count
+                gross_profit = wins["pnl"].sum()
+                gross_loss = abs(losses["pnl"].sum())
+                profit_factor = (
+                    gross_profit / gross_loss
+                    if gross_loss > 0
+                    else (float("inf") if gross_profit > 0 else 0.0)
+                )
+
+                results.append(
+                    PatternConcentration(
+                        attribute="symbol",
+                        value=str(symbol),
+                        win_rate=win_rate,
+                        profit_factor=profit_factor,
+                        total_trades=trade_count,
+                    )
+                )
 
         # By Algorithm
         if "algorithm" in trades_df.columns:
@@ -415,6 +444,8 @@ class JournalMiner:
 
     def _extract_volatility_bucket(self, volatility: float) -> str:
         """Heuristic for volatility bucket assignment."""
+        if pd.isna(volatility):
+            return "Unknown"
         if volatility < 0.1:
             return "Low"
         if volatility < 0.3:
@@ -422,6 +453,51 @@ class JournalMiner:
         if volatility < 0.6:
             return "High"
         return "Extreme"
+
+    def _extract_confidence_bucket(self, confidence: float) -> str:
+        """Heuristic for confidence bucket assignment."""
+        if pd.isna(confidence):
+            return "Unknown"
+        if confidence < 0.4:
+            return "Low"
+        if confidence < 0.7:
+            return "Medium"
+        if confidence < 0.9:
+            return "High"
+        return "Extreme"
+
+    def detect_pre_drawdown_motifs(
+        self, signals_df: pd.DataFrame, trades_df: pd.DataFrame, window_hours: int = 6
+    ) -> List[SignalMotif]:
+        """
+        Identify signal motifs that frequently occur shortly before a drawdown cluster.
+        These are 'early warning' motifs that might indicate a strategy is about to fail.
+        """
+        if signals_df.empty or trades_df.empty:
+            return []
+
+        clusters = self.detect_drawdown_clusters(trades_df)
+        if not clusters:
+            return []
+
+        # Find signals that occurred within window_hours before any cluster started
+        pre_cluster_signals = []
+        for cluster in clusters:
+            start_window = cluster.start_time - pd.Timedelta(hours=window_hours)
+            mask = (signals_df["created_at"] >= start_window) & (
+                signals_df["created_at"] < cluster.start_time
+            )
+            pre_cluster_signals.append(signals_df[mask])
+
+        if not pre_cluster_signals:
+            return []
+
+        pre_df = pd.concat(pre_cluster_signals).drop_duplicates(subset=["id"])
+        if pre_df.empty:
+            return []
+
+        # We can reuse the motif logic on this subset
+        return self.find_frequent_motifs(pre_df)
 
     def find_frequent_motifs(
         self, signals_df: pd.DataFrame, trades_df: pd.DataFrame = None
@@ -435,6 +511,11 @@ class JournalMiner:
 
         df = signals_df.copy()
         df["vol_bucket"] = df["volatility"].apply(self._extract_volatility_bucket)
+        df["conf_bucket"] = (
+            df["confidence"].apply(self._extract_confidence_bucket)
+            if "confidence" in df.columns
+            else "Unknown"
+        )
         df["win"] = df["pnl"] > 0
 
         # Identify signals in drawdown clusters if trades_df is provided
@@ -451,23 +532,28 @@ class JournalMiner:
                 if "signal_id" in trades_df.columns:
                     cluster_signal_ids.update(cluster_trades["signal_id"].unique())
 
-        # Group by algo, direction, vol_bucket
-        groups = df.groupby(["algorithm", "direction", "vol_bucket"])
+        df["is_in_cluster"] = df["id"].isin(cluster_signal_ids)
+
+        # Group by algo, direction, vol_bucket, conf_bucket
+        groups = df.groupby(["algorithm", "direction", "vol_bucket", "conf_bucket"])
         results = []
 
-        for (algo, direction, vol), group in groups:
+        for (algo, direction, vol, conf), group in groups:
             freq = len(group)
             if freq < 2:
                 continue
 
             win_rate = group["win"].mean()
+            cluster_freq = group["is_in_cluster"].sum()
             results.append(
                 SignalMotif(
                     algorithm=str(algo),
                     direction=int(direction),
                     volatility_bucket=str(vol),
+                    confidence_bucket=str(conf),
                     frequency=int(freq),
                     win_rate=float(win_rate),
+                    cluster_frequency=int(cluster_freq),
                 )
             )
 
@@ -529,6 +615,7 @@ class JournalMiner:
                     {
                         "id": t.id,
                         "pnl": t.pnl,
+                        "symbol": t.symbol,
                         "created_at": t.created_at,
                         "algorithm": t.signal.algorithm if t.signal else "Unknown",
                         "signal_id": t.signal_id,
@@ -576,4 +663,5 @@ class JournalMiner:
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
                 risk_block_summary=risk_blocks,
                 recurring_motifs=self.find_frequent_motifs(signals_df, trades_df),
+                pre_drawdown_motifs=self.detect_pre_drawdown_motifs(signals_df, trades_df),
             )

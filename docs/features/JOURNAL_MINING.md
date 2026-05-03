@@ -13,30 +13,31 @@ Detects overtrading and profitability decay across major global sessions:
 
 Flags a session as "overtrading" if trade frequency exceeds 150% of the session average.
 
-### 2. Volatility-Aware False Positives
-Analyzes AI signal reliability under different market conditions by binning historical volatility into four regimes:
-- **Low**
-- **Normal**
-- **High**
-- **Extreme**
+### 2. Multi-Dimensional Signal Motifs
+Analyzes AI signal reliability under different market conditions by binning historical volatility and confidence into regimes:
+- **Volatility Buckets**: Low, Normal, High, Extreme.
+- **Confidence Buckets**: Low (<0.4), Medium (<0.7), High (<0.9), Extreme.
 
-This helps identify if specific algorithms become prone to false breakouts during high-volatility spikes or news shocks.
+This helps identify "Toxic Motifs"—recurring attribute combinations (e.g., "PPO + Long + High Volatility + Low Confidence") that show significantly lower win rates.
 
 ### 3. Drawdown Cluster Detection
 Automatically identifies sequences of 3 or more consecutive losing trades. This is used to diagnose "streakiness" and identify if the system is failing to adapt to rapid regime transitions.
 
 ### 4. Profitable Pattern Concentrations
 Aggregates performance by:
+- **Symbol**: Asset-level performance (e.g., XAUUSD vs others).
 - **Algorithm**: Which AI model family is currently dominant.
 - **Hour of Day**: Identifying specific intraday windows of high edge.
 
-### 5. Risk Block Analysis
+### 5. Early Warning & Toxic Motif Tracking
+Detects advanced behavioral risks:
+- **Toxic Motifs**: Recurring attribute combinations that show significantly lower win rates or high frequency within drawdown clusters.
+- **Pre-Drawdown Motifs**: Identification of signal combinations that frequently occur shortly before (default 6 hours) a drawdown cluster begins.
+- **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as being within 24h of a drawdown cluster).
+
+### 6. Risk Block Analysis
 Summarizes recurring reasons why the `RiskManager` rejected AI signals (e.g., `MAX_DRAWDOWN`, `SPREAD_TOO_WIDE`). This reveals the "opportunity cost" of the current risk parameters.
 
-### 6. Strategy Fragility & Toxic Motifs
-Detects advanced behavioral risks:
-- **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as being within 24h of a drawdown cluster).
-- **Toxic Motifs**: Recurring attribute combinations (e.g., "PPO + Long + High Volatility") that show significantly lower win rates.
 
 ## Technical Implementation
 
