@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
@@ -31,6 +31,7 @@ class ExecutionDecision:
     is_approved: bool
     confidence_score: float
     blocked_by: Optional[str] = None
+    layer_results: dict = field(default_factory=dict)
 
 
 class ExecutionFilter:
@@ -52,34 +53,33 @@ class ExecutionFilter:
     ) -> ExecutionDecision:
         """
         Run the full 6-layer filter cascade.
+        Evaluates all layers for structured auditing.
         """
         timestamp = timestamp or signal.timestamp or datetime.utcnow()
 
-        # Layer 1: ATR Volatility
-        if not self._check_atr_volatility(market_data):
-            return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
+        layer_results = {
+            "atr_volatility": self._check_atr_volatility(market_data),
+            "trend_angle": self._check_trend_angle(market_data, signal.direction),
+            "ema_sequence": self._check_ema_sequence(market_data, signal.direction),
+            "momentum": self._check_momentum(market_data, signal.direction),
+            "session_time": self._check_session_time(timestamp),
+            "drawdown_limit": self._check_drawdown_limit(current_drawdown),
+        }
 
-        # Layer 2: Trend Angle
-        if not self._check_trend_angle(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
+        is_approved = all(layer_results.values())
+        blocked_by = None
+        if not is_approved:
+            # Identify first failure for backward compatibility
+            failed_layers = [name for name, res in layer_results.items() if not res]
+            blocked_by = failed_layers[0].upper() if failed_layers else "UNKNOWN"
 
-        # Layer 3: EMA Sequence
-        if not self._check_ema_sequence(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
-
-        # Layer 4: Momentum (RSI)
-        if not self._check_momentum(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
-
-        # Layer 5: Session/Time
-        if not self._check_session_time(timestamp):
-            return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
-
-        # Layer 6: Drawdown
-        if not self._check_drawdown_limit(current_drawdown):
-            return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
-
-        return ExecutionDecision(signal, True, signal.confidence)
+        return ExecutionDecision(
+            signal=signal,
+            is_approved=is_approved,
+            confidence_score=signal.confidence if is_approved else 0.0,
+            blocked_by=blocked_by,
+            layer_results=layer_results,
+        )
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""
@@ -118,6 +118,10 @@ class ExecutionFilter:
             return True  # Not enough data to be sure, pass
 
         x = np.arange(len(target_ema))
+        # Ensure we have non-constant values for regression
+        if np.all(target_ema.values == target_ema.values[0]):
+             return True # Neutral, pass
+
         slope, _, _, _, _ = stats.linregress(x, target_ema.values)
 
         if direction > 0:  # BUY

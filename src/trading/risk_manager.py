@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
 
+from src.core.audit_log import AuditLogger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -86,24 +87,24 @@ class RiskManager:
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
         Run the full 6-layer risk filter cascade.
+        Evaluates all layers for structured auditing.
         Returns True only if ALL layers pass.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        results = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "minimum_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
 
-        passed = rejection_reason == ""
+        passed = all(results.values())
+
         if not passed:
+            rejection_reason = next(
+                (name for name, res in results.items() if not res), "Unknown"
+            )
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
@@ -117,6 +118,25 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+
+        # Trace decision in AuditLogger
+        try:
+            audit = AuditLogger.get_instance()
+            audit.log(
+                actor="risk_manager",
+                action="signal_evaluation",
+                details=f"Symbol: {signal.symbol}, Direction: {signal.direction}, Passed: {passed}",
+                metadata={
+                    "signal_id": signal_id,
+                    "symbol": signal.symbol,
+                    "direction": signal.direction,
+                    "passed": passed,
+                    "layers": results,
+                },
+            )
+        except Exception as e:
+            logger.error("Failed to log risk decision to audit trail: %s", e)
+
         return passed
 
     def size_position(

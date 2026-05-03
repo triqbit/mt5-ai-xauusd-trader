@@ -84,6 +84,7 @@ def run_live(
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
     console: Optional[Console] = None,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     explainer = SignalExplainer()
@@ -191,10 +192,34 @@ def run_live(
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
                         filter_decision = execution_filter.validate(
-                            signal, df_features, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
+                            signal,
+                            df_features,
+                            current_drawdown=drawdown,
+                            timestamp=datetime.now(timezone.utc),
                         )
+
+                        # Trace decision in AuditLogger
+                        try:
+                            audit_logger.log(
+                                actor="execution_filter",
+                                action="signal_vetting",
+                                details=f"Symbol: {cfg.symbol}, Approved: {filter_decision.is_approved}",
+                                metadata={
+                                    "signal_id": signal_id,
+                                    "symbol": cfg.symbol,
+                                    "approved": filter_decision.is_approved,
+                                    "layers": filter_decision.layer_results,
+                                },
+                            )
+                        except Exception as e:
+                            log.error("Failed to log filter decision to audit trail: %s", e)
+
                         if not filter_decision.is_approved:
-                            log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
+                            log.warning(
+                                "Filter BLOCKED | %s | Reason: %s",
+                                cfg.symbol,
+                                filter_decision.blocked_by,
+                            )
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
@@ -488,6 +513,7 @@ def main() -> int:
                 trade_logger=trade_logger,
                 monitor=monitor,
                 console=console,
+                audit_logger=audit_logger,
             )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")

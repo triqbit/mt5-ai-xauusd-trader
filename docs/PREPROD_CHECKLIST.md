@@ -24,6 +24,7 @@ This document defines the mandatory gates that must be satisfied and verified be
 - [ ] **Migration Reversibility:** Database migrations have been verified for safe downgrade via `scripts/verify_migrations.py`.
 
 ## 6. Governance & Documentation
+- [ ] **Decision Traceability:** The audit trail captures the full decision chain (Risk & Filter) for the release candidate.
 - [ ] **Release Notes:** Version-specific release notes are prepared, reviewed, and finalized in `CHANGELOG.md`.
 - [ ] **Bug Audit:** Zero open Critical or High-severity bugs impacting the release candidate.
 - [ ] **Documentation:** `README.md`, `docs/runbooks/`, and API documentation are updated for the current release.

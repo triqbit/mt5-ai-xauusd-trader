@@ -3,6 +3,7 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 src/models/lstm_model.py
 LSTM sequence model using PyTorch for short-term price prediction.
 """
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -21,7 +22,7 @@ from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
 
 
-class LSTMAttentionModel(nn.Module if nn else object):
+class LSTMAttentionModel(nn.Module if (nn and torch) else object):
     """
     Bidirectional LSTM with multi-head self-attention.
     Input : (batch, seq_len, n_features)
@@ -37,7 +38,7 @@ class LSTMAttentionModel(nn.Module if nn else object):
         n_heads: int = 8,
         dropout: float = 0.2,
     ) -> None:
-        if not nn:
+        if not (nn and torch):
             raise ImportError("PyTorch is required for LSTMAttentionModel")
         super().__init__()
         self.lstm = nn.LSTM(
@@ -62,7 +63,7 @@ class LSTMAttentionModel(nn.Module if nn else object):
             nn.Linear(64, 3),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Any) -> Any:
         out, _ = self.lstm(x)  # (B, T, 2*H)
         attn_out, _ = self.attn(out, out, out)
         out = self.norm(out + attn_out)  # residual
@@ -70,7 +71,7 @@ class LSTMAttentionModel(nn.Module if nn else object):
         return self.head(pooled)  # (B, 3)
 
 
-class LSTMPricePredictor(nn.Module if nn else object):
+class LSTMPricePredictor(nn.Module if (nn and torch) else object):
     """
     Simple LSTM-based neural network for price direction prediction.
 
@@ -93,8 +94,9 @@ class LSTMPricePredictor(nn.Module if nn else object):
         Raises:
             ImportError: If PyTorch is not installed.
         """
-        if not nn:
-            raise ImportError("PyTorch is required for LSTMPricePredictor")
+        if not (nn and torch):
+            super().__init__()
+            return
         super().__init__()
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 3)  # Outputs: [hold, buy, sell]

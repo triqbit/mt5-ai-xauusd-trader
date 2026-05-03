@@ -5,12 +5,17 @@ Transformer-based architecture for time-series forecasting and signal generation
 """
 
 import math
+from typing import Any
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+except ImportError:
+    torch = None
+    nn = None
 
 
-class TimeSeriesTransformer(nn.Module):
+class TimeSeriesTransformer(nn.Module if (nn and torch) else object):
     """
     Advanced Transformer model for price action forecasting.
     Input: [batch_size, seq_len, features]
@@ -43,7 +48,9 @@ class TimeSeriesTransformer(nn.Module):
         self.input_projection = nn.Linear(input_dim, model_dim)
         self.decoder = nn.Linear(model_dim, 3)  # Output: [Hold, Buy, Sell] probabilities
 
-    def forward(self, src: torch.Tensor) -> torch.Tensor:
+    def forward(self, src: Any) -> Any:
+        if not torch:
+             raise ImportError("PyTorch is required for TimeSeriesTransformer forward pass")
         # src shape: [batch_size, seq_len, input_dim]
         src = self.input_projection(src) * math.sqrt(self.model_dim)
         src = self.pos_encoder(src)
@@ -54,7 +61,7 @@ class TimeSeriesTransformer(nn.Module):
         return torch.softmax(output, dim=-1)
 
 
-class PositionalEncoding(nn.Module):
+class PositionalEncoding(nn.Module if (nn and torch) else object):
     """Injects positional information into the sequence."""
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
@@ -69,7 +76,7 @@ class PositionalEncoding(nn.Module):
         pe = pe.unsqueeze(0)
         self.register_buffer("pe", pe)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Any) -> Any:
         # x shape: [batch_size, seq_len, d_model]
         x = x + self.pe[:, : x.size(1), :]
         return self.dropout(x)
