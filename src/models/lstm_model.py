@@ -4,6 +4,8 @@ src/models/lstm_model.py
 LSTM sequence model using PyTorch for short-term price prediction.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -13,9 +15,11 @@ import numpy as np
 try:
     import torch
     import torch.nn as nn
+    from torch import Tensor
 except ImportError:
     torch = None
     nn = None
+    Tensor = Any
 
 from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
@@ -62,7 +66,7 @@ class LSTMAttentionModel(nn.Module if nn else object):
             nn.Linear(64, 3),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: 'Tensor') -> 'Tensor':
         out, _ = self.lstm(x)  # (B, T, 2*H)
         attn_out, _ = self.attn(out, out, out)
         out = self.norm(out + attn_out)  # residual
@@ -99,7 +103,7 @@ class LSTMPricePredictor(nn.Module if nn else object):
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 3)  # Outputs: [hold, buy, sell]
 
-    def forward(self, x: Any) -> Any:
+    def forward(self, x: 'Tensor') -> 'Tensor':
         """
         Forward pass of the network.
 

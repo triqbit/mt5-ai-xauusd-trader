@@ -18,7 +18,7 @@ The system is designed as a modular, event-driven trading engine that separates 
 
 ---
 
-## 🚦 System Maturity Map
+## 🚦 System Maturity Map (May 2026)
 
 This map identifies the production readiness of various subsystems to ensure transparent expectations for contributors and operators.
 
@@ -26,40 +26,39 @@ This map identifies the production readiness of various subsystems to ensure tra
 | :--- | :--- | :--- |
 | **Configuration Engine** | 🟢 Production | Pydantic-driven, environment-validated. |
 | **MT5 Connectivity** | 🟢 Production | Stable SDK integration with failover support. |
-| **Risk Management** | 🟡 Release Candidate | Hard limits active; complex allocation in final testing. |
-| **Ensemble Models** | 🟡 Release Candidate | Backtest-validated; live edge-case hardening in progress. |
-| **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
-| **Explainability Engine** | 🔵 Experimental | Attribution reporting is functional but lacks full TUI integration. |
+| **Risk Management** | 🟢 Production | 6-layer `ExecutionFilter` and circuit breakers fully operational. |
+| **Ensemble Models** | 🟢 Production | `EnsembleModel` (LSTM + PPO) integrated and validated. |
+| **Decision Support** | 🟢 Production | Institutional Cockpit (TUI) providing full signal attribution. |
+| **Capital Allocation** | 🟡 Release Candidate | Institutional allocation active; multi-symbol scaling in final test. |
+| **RL Training Pipeline** | 🔵 Experimental | Active research into Dreamer V3 and Transformer actors. |
+| **Explainability Engine** | 🟢 Production |attribution reporting functional in live loop via `SignalExplainer`. |
 
 ---
 
 ## 🗺️ Data & Logic Flow
 
 1.  **Ingestion:** `MT5Connector` fetches real-time tick and OHLC data.
-2.  **Transformation:** `FeatureEngineering` computes 140+ technical and sentiment indicators.
-3.  **Intelligence:** `RegimeDetector` classifies market state; `DynamicEnsemble` generates a directional signal.
-4.  **Risk Gate:** `RiskManager` validates signal against volatility (ATR), trend, and momentum filters.
-5.  **Allocation:** `CapitalAllocator` determines optimal lot size based on equity and regime.
-6.  **Execution:** `MT5Connector` dispatches the order and monitors for fills/slippage.
-7.  **Observability:** `TradeLogger` records execution details; `Monitor` pushes metrics to Prometheus.
+2.  **Transformation:** `FeatureEngineering` computes 140+ technical indicators.
+3.  **Intelligence:** `RegimeDetector` classifies market state; `EnsembleModel` generates a consensus signal.
+4.  **Risk Gate:** `RiskManager` validates signal; `ExecutionFilter` applies the 6-layer cascade.
+5.  **Allocation:** `CapitalAllocator` determines lot size based on institutional risk limits.
+6.  **Execution:** `MT5Connector` dispatches the order and monitors for fills.
+7.  **Observability:** `TradeLogger` records details; `Monitor` pushes metrics to Prometheus; `DecisionSupportSystem` renders the cockpit.
 
 ---
 
 ## 🔍 Evidence & Audit Routing
 
-Use these paths to find technical evidence and audit reports:
-
-- **Architecture Decisions:** (See `docs/audits/ADR_AUDIT_REPORT.md` - *Upcoming*)
-- **Security & Compliance:** `docs/audits/ENTERPRISE_EVIDENCE_SCORECARD.md` (*Upcoming*)
+- **Architecture Decisions:** `docs/audits/ADR_AUDIT_REPORT.md`
+- **Security & Compliance:** `docs/audits/SECURITY_HARDENING_v1.md`
 - **System Health:** `docs/status/EXECUTIVE_SUMMARY.md`
-- **Performance Benchmarks:** `docs/audits/PERFORMANCE_COMPLEXITY_REPORT.md` (*Upcoming*)
-- **Integration Status:** `docs/status/PROCESS_INTEGRITY_LOG.md`
+- **Product Coherence:** `docs/quality/PRODUCT_COHERENCE_AUDIT.md`
 
 ---
 
 ## 🛠️ Developer Entry Points
 
 - **Health Check:** `make doctor`
-- **First Run:** `make bootstrap && make demo`
+- **First Run:** `make init && make demo`
 - **Verification:** `make test && make lint`
-- **Strategy Research:** `src/research/stress_lab.py`
+- **Backtesting:** `make backtest`

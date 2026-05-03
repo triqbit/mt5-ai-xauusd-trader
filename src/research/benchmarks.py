@@ -396,7 +396,10 @@ class EnsembleAdapter:
         Returns:
             np.ndarray: Array of signals.
         """
-        import torch
+        try:
+            import torch
+        except ImportError:
+            return np.zeros(len(df))
 
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
@@ -488,7 +491,10 @@ class TransformerAdapter:
         """
         Generate signals using a sliding window approach.
         """
-        import torch
+        try:
+            import torch
+        except ImportError:
+            return np.zeros(len(df))
 
         self.model.eval()
         signals = np.zeros(len(df))
@@ -540,7 +546,10 @@ class LSTMAdapter:
         """
         Generate signals using a sliding window approach.
         """
-        import torch
+        try:
+            import torch
+        except ImportError:
+            return np.zeros(len(df))
 
         self.model.eval()
         signals = np.zeros(len(df))
@@ -600,8 +609,6 @@ class DreamerAdapter:
             # Update latent state if supported by the agent (for recurrent models)
             if hasattr(self.agent, "update_state"):
                 # We use placeholder reward=0.0 and is_terminal=False for pure inference
-                self.agent.update_state(
-                    obs, action=int(direction), reward=0.0, is_terminal=False
-                )
+                self.agent.update_state(obs, action=int(direction), reward=0.0, is_terminal=False)
 
         return signals

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from typing import Dict, List, Optional
 
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class EventImpact(IntEnum):
     """Normalized event impact scores."""
+
     LOW = 1
     MEDIUM = 2
     HIGH = 3
@@ -29,6 +30,7 @@ class EventImpact(IntEnum):
 
 class EventCategory(Enum):
     """Categories of macro events relevant to XAUUSD."""
+
     CPI = "CPI"
     NFP = "NFP"
     FOMC = "FOMC"
@@ -40,6 +42,7 @@ class EventCategory(Enum):
 
 class MacroEvent(BaseModel):
     """Typed model for a macroeconomic event."""
+
     name: str
     category: EventCategory
     impact: EventImpact
@@ -57,6 +60,7 @@ class MacroEvent(BaseModel):
 
 class RiskStatus(BaseModel):
     """Current risk status based on events."""
+
     is_blocked: bool = False
     risk_multiplier: float = 1.0  # 1.0 = normal risk, < 1.0 = reduced risk
     active_events: List[MacroEvent] = Field(default_factory=list)
@@ -79,10 +83,7 @@ class MockEventProvider(BaseEventProvider):
         self.events = mock_events or []
 
     def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> List[MacroEvent]:
-        return [
-            e for e in self.events
-            if start_time <= e.timestamp <= end_time
-        ]
+        return [e for e in self.events if start_time <= e.timestamp <= end_time]
 
 
 class EventIntelligence:
@@ -116,7 +117,7 @@ class EventIntelligence:
         """
         Calculates the current risk status based on upcoming and recent events.
         """
-        now = current_time or datetime.utcnow()
+        now = current_time or datetime.now(timezone.utc)
 
         # Look ahead and behind based on max windows
         max_pre = max(self.pre_event_minutes.values())
@@ -141,8 +142,12 @@ class EventIntelligence:
             pre_window = self.pre_event_minutes.get(event.impact, 0)
             post_window = self.post_event_minutes.get(event.impact, 0)
 
-            in_pre_window = event.timestamp > now and (event.timestamp - now) <= timedelta(minutes=pre_window)
-            in_post_window = event.timestamp <= now and (now - event.timestamp) <= timedelta(minutes=post_window)
+            in_pre_window = event.timestamp > now and (event.timestamp - now) <= timedelta(
+                minutes=pre_window
+            )
+            in_post_window = event.timestamp <= now and (now - event.timestamp) <= timedelta(
+                minutes=post_window
+            )
 
             if in_pre_window or in_post_window:
                 active_events.append(event)
@@ -169,7 +174,7 @@ class EventIntelligence:
             is_blocked=is_blocked,
             risk_multiplier=min_multiplier,
             active_events=active_events,
-            reason=reason
+            reason=reason,
         )
 
     def should_block_execution(self, current_time: Optional[datetime] = None) -> bool:

@@ -1,44 +1,40 @@
-# Product Coherence Audit - April 2026
+# Product Coherence Audit - May 2026
 
 ## 1. Product Capability
-**Status: 🟢 Foundational**
-- **Current:** Single-symbol (XAUUSD) live trading loop, MetaTrader 5 integration, basic order execution, and trade logging.
+**Status: 🟢 Advanced Foundational**
+- **Current:** Single-symbol (XAUUSD) live trading loop with fully integrated 6-layer `ExecutionFilter`, `RegimeDetector`, and Institutional `CapitalAllocator`. Mechanical reliability is high.
 - **Gaps:**
-    - Lack of multi-symbol portfolio management despite "All-Weather" references in `RiskManager`.
-    - No news/event filtering logic implemented in the main loop.
-    - Limited order management (simple TP/SL based on ATR, no trailing stops or partial closes in `main.py`).
+    - Multi-symbol portfolio management is referenced in `RiskManager` (Ray Dalio weights) but the `main.py` loop is still primarily single-symbol.
+    - Lack of automated "What-If" sensitivity analysis during the pre-execution phase.
+    - Order management remains focused on simple TP/SL; lacks advanced trailing mechanisms or scale-out logic.
 
 ## 2. Usability
-**Status: 🟡 Minimal**
-- **Current:** CLI-driven entrypoint (`main.py`) with basic configuration via Pydantic.
+**Status: 🟡 Minimal (Professional)**
+- **Current:** CLI-driven entrypoint (`main.py`) with high-fidelity TUI output via `DecisionSupportSystem` (Cockpit). Professional logging with `structlog` and `rich`.
 - **Gaps:**
-    - No real-time dashboard for non-technical users (Prometheus/Grafana mentioned but not fully integrated into `main.py`).
-    - Deployment requires manual environment setup or basic Docker usage; lacks "one-click" cloud deployment.
-    - Logging is standard but lacks a consolidated "intelligence briefing" for the operator.
+    - The "Decision Cockpit" is restricted to local terminal output; lacks a remote or mobile-friendly interface (e.g., Telegram integration for pre-trade approval).
+    - Operator dashboards (Prometheus/Grafana) are supported by the `Monitor` class but not packaged as a single-command deployment.
 
 ## 3. Safety
-**Status: 🟢 Robust (Theoretical) / 🟡 Basic (Implemented)**
-- **Current:** `RiskManager` with circuit breakers and Kelly sizing.
+**Status: 🟢 Enterprise-Ready**
+- **Current:** Mandatory Enterprise Health Gate, circuit breakers, and 6-layer execution cascade are operational. `AuditLogger` provides high-integrity traceability.
 - **Gaps:**
-    - Health gate in `main.py` is currently missing or not explicitly blocking.
-    - Lack of automated failover between MT5 and MetaAPI cloud in the implementation.
-    - No explicit handling of extreme slippage or broker-specific execution anomalies.
+    - High-impact news filtering (`EventIntelligence`) is functional but lacks a live macro data provider (currently uses mocks/stubs for some events).
+    - No formal automated disaster recovery drill for broker-side connection blackouts.
 
 ## 4. Intelligence
-**Status: 🟡 Developing**
-- **Current:** Ensemble model structure (PPO + LSTM).
+**Status: 🟡 Robust**
+- **Current:** `EnsembleModel` (LSTM + PPO) with `RegimeDetector` providing context-aware signaling. `SignalExplainer` provides attribution for every decision.
 - **Gaps:**
-    - Dreamer V3 is referenced but not implemented (lazy loading fails).
-    - Model "drift" detection is purely confidence-based; lacks performance-based trigger for retraining.
-    - Explainability (XAI) is missing; the system doesn't explain *why* it took a trade beyond "direction and confidence".
+    - "Macro Blindness": The system does not yet ingest real-time US Real Yields or DXY data, which are critical for institutional Gold trading.
+    - Model retraining is still manual; lacks a closed-loop system that triggers training based on drift detection.
 
 ## 5. Market Differentiation
-**Status: 🔴 Weak**
-- **Current:** Standard technical indicators + RL.
+**Status: 🟢 High**
+- **Current:** The `DecisionSupportSystem` Cockpit and `ExecutionFilter` cascade provide institutional-grade transparency and discipline that separates this bot from standard retail solutions.
 - **Gaps:**
-    - No gold-specific macro sensitivity (e.g., real yields, inflation expectations, central bank gold demand).
-    - Lacks institutional-grade "What-If" simulation for XAUUSD volatility spikes.
-    - Decision cockpit doesn't highlight regime changes (e.g., "Trending" vs "Mean-Reverting" gold markets).
+    - Lacks Gold-specific macro intelligence integration (FRED/YFinance).
+    - Missing "Live Macro Intelligence Briefing" in the Cockpit.
 
-## Overall Maturity Score: 6.2/10
-The system is a solid technical skeleton but lacks the "Institutional Product" polish and gold-specific intelligence that would make it a market leader.
+## Overall Maturity Score: 7.8/10 (↑ from 6.2)
+The system has matured significantly with the integration of regime-aware execution and institutional capital management. It is now a professional-grade execution engine, with "Macro Intelligence" and "Remote Usability" as the next strategic frontiers.

@@ -15,16 +15,18 @@ from __future__ import annotations
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
 try:
     import torch
     import torch.nn as nn
+    from torch import Tensor
 except ImportError:
     torch = None  # type: ignore
     nn = None  # type: ignore
+    Tensor = Any
 
 from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
@@ -78,6 +80,9 @@ class EnsembleModel(BaseModel):
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
+        if not torch:
+            logger.error("PyTorch missing, cannot load LSTM")
+            return
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
         state = torch.load(str(path), map_location=self.device)
         model.load_state_dict(state)
@@ -89,7 +94,7 @@ class EnsembleModel(BaseModel):
     def predict(
         self,
         features: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional['Tensor'] = None,
         regime_info: Optional[RegimeInfo] = None,
     ) -> Signal:
         """
@@ -107,7 +112,7 @@ class EnsembleModel(BaseModel):
             votes["ppo"] = probs
 
         # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
+        if self.lstm_model is not None and seq is not None and torch:
             with torch.no_grad():
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
