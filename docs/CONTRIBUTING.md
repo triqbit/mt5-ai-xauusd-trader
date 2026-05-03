@@ -29,13 +29,34 @@ pip install -r requirements-ci.txt
 Before you start coding, consult the [**Contribution Map**](./CONTRIBUTION_MAP.md) to identify the **Safe Zones** (low risk, fast review) vs. **Sensitive Zones** (high risk, mandatory lead review). This will help you choose a task that matches your expertise and current project needs.
 
 ### 4. Branching Strategy
-- `main`: Production-ready stable code.
+- `main`: Production-ready stable code. No direct commits allowed.
 - `develop`: Integration branch for new features.
 - `feature/*`: New features.
 - `fix/*`: Bug fixes.
 - `docs/*`: Documentation updates.
 
-## 📝 Contribution Standards
+## ⚖️ Pull Request Lifecycle
+
+1.  **Preparation:** Ensure your branch is up to date with `develop`.
+2.  **Implementation:** Follow the code quality and testing standards below.
+3.  **Self-Review:** Perform a thorough self-review of your changes.
+4.  **Submission:** Open a PR targeting `develop`. Fill out the [PR Template](../.github/PULL_REQUEST_TEMPLATE.md) completely.
+5.  **Quality Gates:** Automated CI will run. All checks (Tests, Coverage, Security, Lint) MUST pass.
+6.  **Review:** Tag the appropriate [CODEOWNERS](../.github/CODEOWNERS) based on the modules modified.
+7.  **Address Feedback:** Respond to and implement requested changes.
+8.  **Merge:** Once approved and gates pass, a maintainer will merge the PR.
+
+## 🛡️ Quality Gates & Standards
+
+Every Pull Request must pass the following mandatory gates:
+1.  **CI Pipeline:** Must pass all automated tests and linting.
+2.  **Code Coverage:** Minimum **85%** statement coverage (as defined in `EXCELLENCE_BLUEPRINT.md`). New code must be covered.
+3.  **Security Scan:** No HIGH or CRITICAL vulnerabilities (verified via `pip-audit` and `Trivy`).
+4.  **License Compliance:** All new dependencies must have approved licenses (MIT, Apache 2.0, BSD). See `docs/LICENSE_COMPLIANCE.md`.
+5.  **Documentation:** Documentation must be updated in `docs/` or root `.md` files if source code is modified.
+6.  **Type Safety:** `mypy` must pass with zero errors on the modified code.
+
+## 📝 Coding Standards
 
 ### Conventional Commits
 We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
@@ -49,34 +70,26 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org/) speci
 ### Code Quality & Formatting
 - **Linting:** We use [Ruff](https://github.com/astral-sh/ruff). Run `ruff check .` before committing.
 - **Typing:** Type hints are mandatory. Run `mypy src/ --ignore-missing-imports`.
-- **Formatting:** Code must be formatted using Black standards (via Ruff).
-
-## 🛡️ Quality Gates
-Every Pull Request must pass the following mandatory gates:
-1. **CI Pipeline:** Must pass all automated tests and linting.
-2. **Code Coverage:** Minimum **80%** statement coverage. New code must be covered.
-3. **Security Scan:** No HIGH or CRITICAL vulnerabilities (verified via Trivy/Bandit).
-4. **License Compliance:** All new dependencies must have approved licenses (MIT, Apache 2.0, BSD).
-5. **Documentation:** Documentation must be updated in `docs/` or root `.md` files if source code is modified.
+- **Formatting:** Code must be formatted using Black standards (via `ruff format src/ main.py`).
 
 ## 🧪 Testing Requirements
-- All new features MUST include unit tests.
+- All new features MUST include unit tests in `tests/`.
 - Risk-sensitive code (trading logic) must include integration tests or backtest evidence.
 - Run tests locally:
   ```bash
   python -m pytest tests/ --cov=src --cov-report=term-missing
   ```
 
-## ⚖️ Pull Request Process
-0. **Check the Map:** Ensure your PR aligns with the [Contribution Map](./CONTRIBUTION_MAP.md) for its respective zone.
-1. Ensure your branch is up to date with `develop`.
-2. Fill out the [PR Template](.github/PULL_REQUEST_TEMPLATE.md) completely.
-3. PRs require at least one approval from a designated [CODEOWNER](.github/CODEOWNERS).
-4. For changes to `src/trading/` or `src/core/`, explicit approval from @andonly1348 or the respective Lead is required.
-5. All mandatory Quality Gates must be green.
+## 🛡️ Security First
+If you find a security vulnerability, please **do NOT open a public issue**.
+1.  Read the [SECURITY Policy](../SECURITY.md).
+2.  Report via **GitHub Private Vulnerability Reporting** (preferred).
+3.  Or use the **Security Report** issue template which is configured for private triage.
 
-## 🛡️ Security
-If you find a security vulnerability, please do NOT open a public issue. Use the Security Report template or contact the maintainers privately at security@example.com.
+## 📖 Related Policies
+- [Versioning Policy](./VERSIONING_POLICY.md)
+- [Release Playbook](./RELEASE_PLAYBOOK.md)
+- [SLO Targets](./SLO_TARGETS.md)
 
 ---
 *By contributing, you agree that your contributions will be licensed under the project's MIT License.*

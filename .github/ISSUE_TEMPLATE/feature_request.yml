@@ -17,6 +17,13 @@ body:
     validations:
       required: true
   - type: textarea
+    id: business-value
+    attributes:
+      label: Business Value / ROI
+      description: What is the expected benefit or value of this feature? (e.g., higher Sharpe ratio, reduced latency, improved observability)
+    validations:
+      required: true
+  - type: textarea
     id: use-cases
     attributes:
       label: Target Use Cases

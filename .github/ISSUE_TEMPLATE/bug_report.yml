@@ -14,6 +14,26 @@ body:
       placeholder: Describe the issue here...
     validations:
       required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How critical is this issue to trading operations?
+      options:
+        - Critical (Trading blocked / Capital at risk)
+        - High (Core feature broken / Operational degradation)
+        - Medium (Non-critical feature broken)
+        - Low (UI/UX or minor issue)
+    validations:
+      required: true
+  - type: textarea
+    id: operational-impact
+    attributes:
+      label: Operational Impact
+      description: What is the impact on live trading or system reliability?
+      placeholder: e.g., "The bot is failing to close positions, leading to unmanaged risk."
+    validations:
+      required: true
   - type: input
     id: system-version
     attributes:

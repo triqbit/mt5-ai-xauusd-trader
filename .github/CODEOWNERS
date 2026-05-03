@@ -1,18 +1,23 @@
 # Code Owners for MT5 AI/ML Trading Bot
+# This file defines who must approve changes to specific modules.
 
 # Global ownership for all files
 * @maintainer-quality
 
 # Core system, governance, and infrastructure
-/src/core/ @andonly1348
+/src/core/ @andonly1348 @maintainer-quality
 /.github/ @andonly1348
 /.github/workflows/ @andonly1348
 /docs/ @andonly1348
 /migrations/ @andonly1348
 /scripts/ @andonly1348
+/main.py @andonly1348
+/pyproject.toml @andonly1348 @maintainer-quality
+/Dockerfile @andonly1348 @maintainer-quality
+/alembic.ini @andonly1348
 
 # Trading logic, execution, and analytics
-/src/trading/ @maintainer-trading
+/src/trading/ @maintainer-trading @andonly1348
 /src/analytics/ @maintainer-trading
 
 # AI/ML Model architectures and research
@@ -22,3 +27,4 @@
 
 # Utilities and shared components
 /src/utils/ @maintainer-quality
+/tests/ @maintainer-quality
