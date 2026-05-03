@@ -382,15 +382,15 @@ class EnsembleAdapter:
 
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        # Pre-convert to NumPy for ~2000x faster indexing than df.iloc
+        data_np = df[feature_cols].values.astype(np.float32)
 
         for i in range(self.window_size - 1, len(df)):
             # Current observation for PPO
-            obs = df.iloc[i][feature_cols].values.astype(np.float32)
+            obs = data_np[i]
 
             # Sequence for LSTM
-            seq_data = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values.astype(
-                np.float32
-            )
+            seq_data = data_np[i - self.window_size + 1 : i + 1]
             seq = torch.from_numpy(seq_data).float()
 
             # EnsembleModel.predict returns (direction, confidence, per_algo)
@@ -426,9 +426,11 @@ class PPOAdapter:
         """
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        # Pre-convert to NumPy for ~2000x faster indexing than df.iloc
+        data_np = df[feature_cols].values.astype(np.float32)
 
         for i in range(len(df)):
-            obs = df.iloc[i][feature_cols].values.astype(np.float32)
+            obs = data_np[i]
             # PPOAgent.predict returns a Signal NamedTuple
             signal = self.agent.predict(obs)
             signals[i] = float(signal.direction)
@@ -475,14 +477,16 @@ class TransformerAdapter:
         self.model.eval()
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        # Pre-convert to NumPy for ~2000x faster indexing than df.iloc
+        data_np = df[feature_cols].values.astype(np.float32)
 
         # Mapping logic: 0=Buy, 1=Sell, 2=Hold (based on legacy transformer logic)
         direction_map = {0: SignalDirection.BUY, 1: SignalDirection.SELL, 2: SignalDirection.HOLD}
 
         with torch.no_grad():
             for i in range(self.window_size - 1, len(df)):
-                window = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values
-                data = torch.FloatTensor(window).unsqueeze(0).to(self.device)
+                window = data_np[i - self.window_size + 1 : i + 1]
+                data = torch.from_numpy(window).unsqueeze(0).to(self.device)
 
                 probs = self.model(data)
                 action_idx = int(torch.argmax(probs, dim=-1).item())

@@ -148,8 +148,14 @@ def test_ppo_adapter(sample_data):
     assert mock_agent.predict.call_count == len(sample_data)
 
 
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 @pytest.mark.skipif(
-    True, reason="torch not installed"
+    not TORCH_AVAILABLE, reason="torch not installed"
 )  # Simplified skip logic as torch is known missing in this environment
 def test_ensemble_adapter(sample_data):
     mock_model = MagicMock()
@@ -168,7 +174,7 @@ def test_ensemble_adapter(sample_data):
 
 
 @pytest.mark.skipif(
-    True, reason="torch not installed"
+    not TORCH_AVAILABLE, reason="torch not installed"
 )  # Simplified skip logic as torch is known missing in this environment
 def test_transformer_adapter(sample_data):
     import torch
