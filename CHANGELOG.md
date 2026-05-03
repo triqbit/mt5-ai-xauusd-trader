@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Refined the 6-layer execution filter in `src/trading/execution_filter.py` with EMA20 trend angle logic.
+- Comprehensive unit test suite for execution filters in `tests/test_execution_filter.py`.
 - Institutional-grade decision support system in `src/core/decision_support.py`.
 - Aggregation of signal explainability, market regime, macro-risk status, and recent performance into a unified `DecisionPacket`.
 - High-fidelity terminal reporting with `rich` dashboarding for operator oversight.
