@@ -30,6 +30,7 @@ from rich.table import Table
 from src.core import get_config, profile
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
+from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -37,6 +38,7 @@ from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
+from src.trading.backtester import BacktestEngine
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -372,9 +374,6 @@ def main() -> int:
             log.info("Starting Vectorized Walk-Forward Backtest")
             start_date = datetime.strptime(args.start or "2023-01-01", "%Y-%m-%d")
             end_date = datetime.strptime(args.end or "2023-12-31", "%Y-%m-%d")
-
-            from src.core.feature_engineering import FeatureEngineer
-            from src.trading.backtester import BacktestEngine
 
             with console.status(f"[bold green]Fetching historical data for {cfg.symbol}..."):
                 df = connector.get_ohlcv(

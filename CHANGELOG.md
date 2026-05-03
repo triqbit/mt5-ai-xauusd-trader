@@ -72,6 +72,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Execution cost tracking (slippage + half-spread).
 - Automated timezone handling for accurate market data comparisons.
 - Comprehensive unit tests for execution quality in `tests/test_execution_quality.py`.
+- Vectorized walk-forward backtesting engine in `src/trading/backtester.py`.
+- Support for sliding window out-of-sample evaluation and institutional metrics.
+- Transaction cost simulation (spread + commission) for realistic XAUUSD performance tracking.
+- CLI integration for historical backtesting via `main.py --mode backtest`.
+- Comprehensive unit tests for backtesting in `tests/test_backtester.py`.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
