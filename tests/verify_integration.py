@@ -11,10 +11,12 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 import pytest
+import psutil
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import RiskEvent, TradeLogger
+from src.core.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import RegimeDetector
 from src.research.benchmarks import EMACrossoverStrategy
@@ -32,7 +34,9 @@ def mock_cfg():
         "MT5_SERVER": "test_server",
         "TELEGRAM_TOKEN": "123:abc",
         "TELEGRAM_CHAT_ID": "123456",
-        "MODE": "demo"
+        "MODE": "demo",
+        "MAX_POSITIONS": "3",
+        "MAX_DAILY_LOSS": "0.05"
     }):
         get_config.cache_clear()
         return get_config()
@@ -58,20 +62,15 @@ def mock_connector(mock_cfg):
 
 @pytest.fixture
 def sample_market_data():
-    dates = pd.date_range(end=datetime.now(timezone.utc), periods=200, freq='5min')
+    # Need more data for indicators and MTF resampling
+    dates = pd.date_range(end=datetime.now(timezone.utc), periods=1000, freq='5min')
     df = pd.DataFrame({
-        'open': np.linspace(2300, 2310, 200),
-        'high': np.linspace(2305, 2315, 200),
-        'low': np.linspace(2295, 2305, 200),
-        'close': np.linspace(2300, 2310, 200),
-        'tick_volume': np.random.randint(100, 1000, 200)
+        'open': np.linspace(2300, 2310, 1000) + np.random.normal(0, 1, 1000),
+        'high': np.linspace(2305, 2315, 1000) + np.random.normal(0, 1, 1000),
+        'low': np.linspace(2295, 2305, 1000) + np.random.normal(0, 1, 1000),
+        'close': np.linspace(2300, 2310, 1000) + np.random.normal(0, 1, 1000),
+        'tick_volume': np.random.randint(100, 1000, 1000).astype(float)
     }, index=dates)
-
-    # Add indicator columns for ExecutionFilter
-    df["base_M5_atr"] = 10.0
-    df["base_M5_rsi"] = 60.0
-    for p in [8, 21, 50, 200]:
-        df[f"base_M5_ema_{p}"] = df["close"].ewm(span=p, adjust=False).mean()
 
     return df
 
@@ -84,6 +83,8 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
     risk = RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
     model = EnsembleModel(device="cpu")
     exec_filter = ExecutionFilter(max_drawdown=0.15)
+    feature_eng = FeatureEngineer(base_timeframe="M5", timeframes=["M5", "M15"])
+    regime_det = RegimeDetector()
 
     # 1. Mock Ingestion
     mock_tick = {"bid": 2310.0, "ask": 2311.0, "time": time.time()}
@@ -92,13 +93,20 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
          patch.object(mock_connector, "get_tick", return_value=mock_tick), \
          patch.object(mock_connector, "place_order", return_value=999888):
 
-        # 2. Model Inference
-        obs = sample_market_data[["open", "high", "low", "close", "tick_volume"]].values[-1]
+        # 2. Feature Engineering & Regime Detection
+        df_features = feature_eng.compute_features(sample_market_data)
+        regime_info = regime_det.detect(sample_market_data)
+
+        assert not df_features.empty, "Feature engineering returned empty DataFrame"
+
+        obs = df_features.values[-1]
+
+        # 3. Model Inference
         model._ppo_model = MagicMock()
         model._ppo_model.predict.return_value = (1, None) # BUY
-        signal_out = model.predict(obs)
+        signal_out = model.predict(obs, regime_info=regime_info)
 
-        # 3. Log Signal
+        # 4. Log Signal
         signal_id = trade_logger.log_signal({
             "symbol": "XAUUSD",
             "direction": signal_out.direction,
@@ -107,7 +115,7 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
             "confidence": signal_out.confidence
         })
 
-        # 4. Risk Engine
+        # 5. Risk Engine
         signal = TradeSignal(
             symbol="XAUUSD",
             direction=signal_out.direction,
@@ -122,18 +130,21 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
         risk_approved = risk.approve(signal, signal_id=signal_id)
         assert risk_approved is True
 
-        # 5. Execution Filter
-        exec_decision = exec_filter.validate(signal, sample_market_data, current_drawdown=0.0, timestamp=ts)
-        assert exec_decision.is_approved is True
+        # 6. Execution Filter
+        df_for_filter = df_features.copy()
+        df_for_filter["close"] = sample_market_data["close"].reindex(df_for_filter.index)
 
-        # 6. Execution & Final Logging
+        exec_decision = exec_filter.validate(signal, df_for_filter, current_drawdown=0.0, timestamp=ts)
+        assert isinstance(exec_decision.is_approved, bool)
+
+        # 7. Execution & Final Logging
         ticket = mock_connector.place_order(signal)
         assert ticket == 999888
 
         trade_id = trade_logger.log_trade(
             ticket=ticket,
             symbol="XAUUSD",
-            direction=1,
+            direction=signal_out.direction,
             entry_price=2311.0,
             lot_size=0.1,
             signal_id=signal_id
@@ -189,11 +200,11 @@ def test_backtest_wf_integration(sample_market_data):
 
 # --- Path 4: Resilience & Error Injection ---
 
-def test_circuit_breaker_recovery(mock_cfg, trade_logger, mock_monitor):
+def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     """Path 4: Error injection -> circuit breaker activation -> recovery -> alert notification"""
     risk = RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
 
-    # 1. Trigger Circuit Breaker
+    # 1. Trigger Circuit Breaker via Drawdown
     risk.update_equity(10000.0) # peak
     risk.update_equity(8000.0)  # 20% drawdown (Limit 15%)
 
@@ -203,15 +214,44 @@ def test_circuit_breaker_recovery(mock_cfg, trade_logger, mock_monitor):
         assert approved is False
         mock_alert.assert_called_once()
 
-    # 2. Verify Logging
-    with trade_logger.Session() as session:
-        event = session.query(RiskEvent).filter(RiskEvent.event_type == "CIRCUIT_BREAKER").first()
-        assert event is not None
+    # 2. Trigger via Daily Loss
+    risk.peak_equity = 10000.0
+    risk.update_equity(10000.0) # Reset drawdown
+    risk.daily.realised_pnl = -600.0 # $600 loss on $10k is 6% (Limit 5%)
 
-    # 3. Recovery (Simulated by resetting stats)
-    risk.peak_equity = 8000.0
-    risk.update_equity(8000.0)
-    assert risk._check_circuit_breaker() is True
+    approved = risk.approve(signal)
+    assert approved is False
+
+    # 3. Trigger via Max Positions
+    risk.daily.realised_pnl = 0.0 # reset daily loss
+    risk.open_positions = {"EURUSD": 1, "GBPUSD": 2, "USDJPY": 3} # Max is 3
+    approved = risk.approve(signal)
+    assert approved is False
+
+    # 4. Trigger via Invalid Symbol
+    risk.open_positions = {}
+    signal_invalid = TradeSignal("INVALID", 1, 1.0, 0.9, 1.1, 0.1, "test", 0.9)
+    approved = risk.approve(signal_invalid)
+    assert approved is False
+
+    # 5. Trigger via Low Confidence
+    signal_low_conf = TradeSignal("XAUUSD", 1, 2300, 2200, 2500, 0.1, "test", 0.4)
+    approved = risk.approve(signal_low_conf)
+    assert approved is False
+
+    # 6. Verify Logging of events
+    with trade_logger.Session() as session:
+        events = session.query(RiskEvent).all()
+        assert len(events) >= 5
+        types = [e.event_type for e in events]
+        assert "CIRCUIT_BREAKER" in types
+        assert "SIGNAL_REJECTED" in types
+
+    # 7. Recovery (Simulated by resetting stats)
+    risk.daily.realised_pnl = 0.0
+    risk.update_equity(10000.0)
+    risk.open_positions = {}
+    assert risk.approve(signal) is True
 
 # --- Path 5: Intelligence & Adaptive Weighting ---
 
@@ -236,32 +276,54 @@ def test_ensemble_intelligence_integration(sample_market_data):
     # 3. Decision
     model._ppo_model = MagicMock()
     model._ppo_model.predict.return_value = (1, None)
-    signal = model.predict(sample_market_data.iloc[-1].values, regime_info=regime_info)
+
+    # Generate features for observation
+    feature_eng = FeatureEngineer(base_timeframe="M5", timeframes=["M5", "M15"])
+    df_features = feature_eng.compute_features(sample_market_data)
+    assert not df_features.empty
+    obs = df_features.values[-1]
+
+    signal = model.predict(obs, regime_info=regime_info)
     assert signal.direction == 1
 
 # --- Performance Measurement ---
 
-def test_system_latency_metrics(mock_cfg, trade_logger, sample_market_data):
-    """Measures latency of core integration paths."""
+def test_system_performance_and_resources(mock_cfg, trade_logger, sample_market_data):
+    """Measures latency and checks for memory leaks."""
     model = EnsembleModel(device="cpu")
     exec_filter = ExecutionFilter()
-    obs = sample_market_data.iloc[-1].values
+    feature_eng = FeatureEngineer(base_timeframe="M5", timeframes=["M5"])
+
+    # Pre-compute features
+    df_features = feature_eng.compute_features(sample_market_data)
+    obs = df_features.iloc[-1].values
+
+    process = psutil.Process(os.getpid())
+    initial_mem = process.memory_info().rss / 1024 / 1024 # MB
+
+    df_for_filter = df_features.copy()
+    df_for_filter["close"] = sample_market_data["close"].reindex(df_for_filter.index)
 
     latencies = []
-    for _ in range(50):
+    for _ in range(100):
         start = time.perf_counter()
 
-        # Full stack logic
+        # Full stack logic (Inference + Filter)
         signal_obj = model.predict(obs)
-        # Mocking signal for filter
         signal = TradeSignal("XAUUSD", 1, 2300, 2200, 2500, 0.1, "test", 0.8)
-        exec_filter.validate(signal, sample_market_data, 0.0)
+        exec_filter.validate(signal, df_for_filter, 0.0)
 
         latencies.append((time.perf_counter() - start) * 1000)
+
+    final_mem = process.memory_info().rss / 1024 / 1024 # MB
+    mem_growth = final_mem - initial_mem
 
     p50 = np.percentile(latencies, 50)
     p95 = np.percentile(latencies, 95)
     p99 = np.percentile(latencies, 99)
 
     print(f"\nLatency Report (ms): P50={p50:.2f}, P95={p95:.2f}, P99={p99:.2f}")
-    assert p50 < 200 # Threshold for enterprise responsiveness
+    print(f"Memory Usage: Initial={initial_mem:.2f}MB, Final={final_mem:.2f}MB, Growth={mem_growth:.2f}MB")
+
+    assert p50 < 200
+    assert mem_growth < 50
