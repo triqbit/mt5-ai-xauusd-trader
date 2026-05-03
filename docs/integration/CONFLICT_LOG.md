@@ -52,3 +52,26 @@
 - **Impact**: Medium. Restricts user flexibility and complicates testing of individual models in the live environment.
 - **Resolution**: Update `main.py` to use a factory-style initialization based on the `--algo` flag, utilizing the standardized `BaseModel` interface.
 - **Owner**: Jules05
+
+## [2026-05-03] - Feature Pipeline & Institutional Integration Gap
+
+### 1. Feature Pipeline Mismatch
+- **Conflict**: `main.py` extracts 5 raw OHLCV features, but models (`EnsembleModel`, `LSTMModel`) expect 140+ features from `FeatureEngineer`.
+- **Agents**: Jules01, Jules04
+- **Impact**: Critical. Inference fails or returns garbage due to dimension mismatch.
+- **Resolution**: Integrate `FeatureEngineer` into `main.py` and ensure it is called before `model.predict`.
+- **Owner**: Jules05
+
+### 2. Institutional Integration Gap (Orphaned Components)
+- **Conflict**: `RegimeDetector`, `CapitalAllocator`, and `DecisionSupportSystem` are implemented but omitted from the `main.py` live loop.
+- **Agents**: Jules01, Jules04
+- **Impact**: Medium. BOT operates without market context or institutional risk controls.
+- **Resolution**: Harmonize `main.py` to initialize and utilize these components in the `run_live` loop.
+- **Owner**: Jules05
+
+### 3. Model Output Alignment (Transformer)
+- **Conflict**: `TimeSeriesTransformer` and its adapter use `[Buy, Sell, Hold]` output ordering, contradicting the `ModelAction` standard `[Hold, Buy, Sell]`.
+- **Agents**: Jules01, Jules02
+- **Impact**: High. Causes incorrect trade execution for transformer-based models.
+- **Resolution**: Refactor `TimeSeriesTransformer` and `TransformerAdapter` to align with `ModelAction`.
+- **Owner**: Jules05

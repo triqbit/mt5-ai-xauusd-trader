@@ -494,8 +494,8 @@ class TransformerAdapter:
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
 
-        # Mapping logic: 0=Buy, 1=Sell, 2=Hold (based on legacy transformer logic)
-        direction_map = {0: SignalDirection.BUY, 1: SignalDirection.SELL, 2: SignalDirection.HOLD}
+        # Mapping: 0=HOLD, 1=BUY, 2=SELL (Aligned with ModelAction)
+        direction_map = {0: SignalDirection.HOLD, 1: SignalDirection.BUY, 2: SignalDirection.SELL}
 
         with torch.no_grad():
             for i in range(self.window_size - 1, len(df)):

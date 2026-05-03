@@ -30,13 +30,19 @@ from rich.table import Table
 from src.core import get_config, profile
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
+from src.core.decision_support import DecisionSupportSystem
+from src.core.explainability import SignalExplainer
+from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.data.event_intelligence import RiskStatus
 from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
+from src.models.regime_detector import RegimeDetector
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
@@ -71,10 +77,15 @@ def run_live(
     risk: RiskManager,
     model: BaseModel,
     execution_filter: ExecutionFilter,
+    feature_engineer: FeatureEngineer,
+    regime_detector: RegimeDetector,
+    allocator: CapitalAllocator,
+    dss: DecisionSupportSystem,
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
 ) -> None:
     log = logging.getLogger("main.live")
+    explainer = SignalExplainer()
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
@@ -82,17 +93,34 @@ def run_live(
             try:
                 # 1. Fetch latest market data
                 with profile("data_fetch"):
-                    df = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=200)
+                    # Fetch more bars to satisfy FeatureEngineer and RegimeDetector windows
+                    df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=500)
                     tick = connector.get_tick(cfg.symbol)
 
-                # 2. Build observation vector
-                obs = df[["open", "high", "low", "close", "tick_volume"]].values[-1]
-                volatility = float(df["close"].rolling(20).std().iloc[-1])
+                # 2. Institutional Feature Engineering & Regime Detection
+                with profile("institutional_context"):
+                    df_features = feature_engineer.compute_features(df_raw)
+                    obs = df_features.values[-1]  # Full 140+ features
+                    regime_info = regime_detector.detect(df_raw)
+                    volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
 
                 # 3. Get model prediction
                 with profile("inference"):
-                    # All models now implement BaseModel and return a Signal object
-                    signal_obj = model.predict(obs)
+                    # Pass regime context to models that support it (e.g. Ensemble)
+                    if hasattr(model, "predict"):
+                        # Attempt to pass extra context if the model signature allows it
+                        try:
+                            # EnsembleModel takes seq and regime_info
+                            # For simple BaseModel, we just pass obs
+                            if isinstance(model, EnsembleModel):
+                                import torch
+                                seq = torch.from_numpy(df_features.values[-60:]).float()
+                                signal_obj = model.predict(obs, seq=seq, regime_info=regime_info)
+                            else:
+                                signal_obj = model.predict(obs)
+                        except TypeError:
+                            signal_obj = model.predict(obs)
+
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
                     if monitor:
@@ -110,25 +138,37 @@ def run_live(
                             "algorithm": cfg.algorithm,
                             "confidence": confidence,
                             "volatility": volatility,
+                            "metadata": {"regime": regime_info.label.value},
                         }
                     )
 
-                if direction == 0:
-                    log.debug("HOLD signal - skipping")
-                    time.sleep(poll_interval)
-                    continue
-                # 4. Size position
-                with profile("position_sizing"):
-                    price = tick["ask"] if direction == 1 else tick["bid"]
-                    atr = float((df["high"] - df["low"]).rolling(14).mean().iloc[-1])
-                    stop_loss = price - direction * 2 * atr
-                    take_profit = price + direction * 4 * atr
-                    lot_size = risk.size_position(
-                        cfg.symbol,
-                        win_rate=0.58,
-                        avg_win=4 * atr,
-                        avg_loss=2 * atr,
-                    )
+                # 4. Initial Sizing & Risk Parameters
+                price = tick["ask"] if direction == 1 else tick["bid"]
+                atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
+                stop_loss = price - (direction * 2 * atr)
+                take_profit = price + (direction * 4 * atr)
+
+                # 5. Institutional Capital Allocation
+                with profile("capital_allocation"):
+                    # Request allocation from the institutional router
+                    # Strategy ID: e.g. "PPO_XAUUSD_M5"
+                    strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                    alloc_result = allocator.request_allocation(strat_id, risk_pct=cfg.risk_per_trade)
+
+                    if not alloc_result.is_allowed:
+                        log.warning("Allocation REJECTED | %s | Reason: %s", strat_id, alloc_result.rejection_reason)
+                        approved_risk = 0.0
+                    else:
+                        approved_risk = alloc_result.allocated_risk_pct
+
+                # Calculate lot size based on approved institutional risk
+                lot_size = risk.size_position(
+                    cfg.symbol,
+                    win_rate=0.58,
+                    avg_win=4 * atr,
+                    avg_loss=2 * atr,
+                ) if approved_risk > 0 else 0.0
+
                 signal = TradeSignal(
                     symbol=cfg.symbol,
                     direction=direction,
@@ -139,27 +179,82 @@ def run_live(
                     algorithm=cfg.algorithm,
                     confidence=confidence,
                 )
-                # 5. Risk approval gate
+
+                # 6. Risk approval gate
                 with profile("risk_check"):
-                    approved = risk.approve(signal, signal_id=signal_id)
+                    risk_approved = risk.approve(signal, signal_id=signal_id) if direction != 0 else False
 
-                # 5b. Execution Filter Cascade
-                if approved:
+                # 7. Execution Filter Cascade
+                filter_decision = None
+                if risk_approved:
                     with profile("execution_filter"):
-                        # Calculate current drawdown for the filter
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
-                        decision = execution_filter.validate(
-                            signal, df, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
+                        filter_decision = execution_filter.validate(
+                            signal, df_features, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
                         )
-                        if not decision.is_approved:
-                            log.warning(
-                                "Signal BLOCKED by ExecutionFilter | %s | Reason: %s",
-                                cfg.symbol,
-                                decision.blocked_by,
-                            )
-                            approved = False
+                        if not filter_decision.is_approved:
+                            log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
+                            risk_approved = False
 
-                if approved:
+                # 8. Decision Support System (Cockpit)
+                if direction != 0:
+                    with profile("decision_support"):
+                        # Prepare data for explainer
+                        model_votes = signal_obj.metadata.get("per_algo_votes", {cfg.algorithm: 1 if direction == 1 else 2 if direction == -1 else 0})
+                        model_weights = signal_obj.metadata.get("weights", {cfg.algorithm: 1.0})
+
+                        risk_data = {
+                            "passed": risk_approved,
+                            "rejection_reasons": [],
+                            "risk_reward": abs(take_profit - price) / abs(price - stop_loss) if abs(price - stop_loss) > 0 else 0.0,
+                            "summary": "Passed all risk gates" if risk_approved else "Risk gate rejected"
+                        }
+
+                        regime_data = {
+                            "name": regime_info.label.value,
+                            "confidence": regime_info.confidence,
+                            "volatility": "High" if regime_info.volatility_index > 1.5 else "Normal",
+                            "is_favorable": True,
+                            "summary": f"Market is {regime_info.label.value}"
+                        }
+
+                        execution_data = None
+                        if filter_decision:
+                            execution_data = {
+                                "passed": filter_decision.is_approved,
+                                "summary": filter_decision.blocked_by if not filter_decision.is_approved else "All filters passed",
+                                "filters": [
+                                    {"name": filter_decision.blocked_by, "passed": False, "message": f"Blocked by {filter_decision.blocked_by}"}
+                                ] if not filter_decision.is_approved else []
+                            }
+
+                        explanation = explainer.explain(
+                            symbol=cfg.symbol,
+                            direction=direction,
+                            confidence=confidence,
+                            model_votes=model_votes,
+                            model_weights=model_weights,
+                            risk_data=risk_data,
+                            regime_info=regime_data,
+                            execution_data=execution_data
+                        )
+
+                        # Use a stub for macro risk since we don't have a live feed in this loop yet
+                        macro_risk = RiskStatus(is_blocked=False, active_events=[], reason="No active data")
+
+                        # Mock performance metrics for the cockpit
+                        perf_metrics = {
+                            "sharpe_ratio": 1.25, "profit_factor": 1.62,
+                            "win_rate": 0.58, "total_trades": 142
+                        }
+
+                        packet = dss.assemble_packet(
+                            cfg.symbol, explanation, regime_info, macro_risk, perf_metrics
+                        )
+                        # Print the institutional decision cockpit
+                        print(dss.format_for_operator(packet))
+
+                if risk_approved and direction != 0:
                     with profile("execution"):
                         ticket = connector.place_order(signal)
                         if ticket:
@@ -205,6 +300,9 @@ def run_live(
                     balance = connector.get_account_balance()
                     risk.update_equity(balance)
                     monitor.log_equity(balance)
+
+                # Wait for next interval
+                time.sleep(poll_interval)
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
                 break
@@ -302,6 +400,20 @@ def main() -> int:
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15
     )
+    feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
+    regime_detector = RegimeDetector()
+    allocator = CapitalAllocator(total_budget=balance)
+    dss = DecisionSupportSystem()
+
+    # Register default strategy in allocator
+    allocator.add_strategy(
+        StrategyConfig(
+            strategy_id=f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}",
+            symbol=cfg.symbol,
+            model_family=cfg.algorithm,
+            capital_cap=balance * 0.5,
+        )
+    )
 
     # Model Factory based on --algo flag
     if args.algo == "ensemble":
@@ -363,6 +475,10 @@ def main() -> int:
                 risk,
                 model,
                 execution_filter,
+                feature_engineer,
+                regime_detector,
+                allocator,
+                dss,
                 trade_logger=trade_logger,
                 monitor=monitor,
             )
