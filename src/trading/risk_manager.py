@@ -11,12 +11,14 @@ License: MIT
 """
 from __future__ import annotations
 
+import datetime
 import logging
-from dataclasses import dataclass, field
-from datetime import date, datetime
 from typing import Dict, Optional
 
+from pydantic import BaseModel, Field, model_validator
+
 from src.core.config import TradingConfig
+from src.core.constants import SignalDirection
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
@@ -35,26 +37,48 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
 }
 
 
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
+class TradeSignal(BaseModel):
+    """
+    Validated trading signal schema.
+    Enforces structural correctness, price sanity, and risk-reward alignment.
+    """
 
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    symbol: str = Field(..., description="The financial instrument (e.g., 'XAUUSD')")
+    direction: SignalDirection = Field(..., description="Trade direction (1: BUY, -1: SELL)")
+    entry_price: float = Field(..., gt=0, description="Target execution price")
+    stop_loss: float = Field(..., gt=0, description="Price at which the trade is closed at a loss")
+    take_profit: float = Field(..., gt=0, description="Price at which the trade is closed at a profit")
+    lot_size: float = Field(..., gt=0, description="Position size in lots")
+    algorithm: str = Field(..., description="Name of the model generating the signal")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Model confidence score [0, 1]")
+    timestamp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
+        description="Signal generation timestamp (UTC)",
+    )
+
+    @model_validator(mode="after")
+    def validate_tp_sl_sides(self) -> TradeSignal:
+        """Ensure SL and TP are on the correct side of entry price."""
+        if self.direction == SignalDirection.BUY:
+            if self.stop_loss >= self.entry_price:
+                raise ValueError(f"Stop Loss ({self.stop_loss}) must be below Entry Price ({self.entry_price}) for BUY")
+            if self.take_profit <= self.entry_price:
+                raise ValueError(f"Take Profit ({self.take_profit}) must be above Entry Price ({self.entry_price}) for BUY")
+        elif self.direction == SignalDirection.SELL:
+            if self.stop_loss <= self.entry_price:
+                raise ValueError(f"Stop Loss ({self.stop_loss}) must be above Entry Price ({self.entry_price}) for SELL")
+            if self.take_profit >= self.entry_price:
+                raise ValueError(f"Take Profit ({self.take_profit}) must be below Entry Price ({self.entry_price}) for SELL")
+        return self
 
 
-@dataclass
-class DailyStats:
-    """Intraday PnL tracker reset each trading day."""
+class DailyStats(BaseModel):
+    """
+    Intraday PnL tracker.
+    Used for monitoring daily drawdown and performance.
+    """
 
-    date: date = field(default_factory=date.today)
+    date: datetime.date = Field(default_factory=datetime.date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
     peak_equity: float = 0.0

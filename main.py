@@ -26,8 +26,11 @@ import structlog
 from rich.console import Console
 from rich.table import Table
 
+from pydantic import ValidationError
+
 from src.core import get_config, profile
 from src.core.config_validator import ConfigValidator
+from src.core.constants import SignalDirection
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -125,16 +128,21 @@ def run_live(
                 avg_win=4 * atr,
                 avg_loss=2 * atr,
             )
-            signal = TradeSignal(
-                symbol=cfg.symbol,
-                direction=direction,
-                entry_price=price,
-                stop_loss=stop_loss,
-                take_profit=take_profit,
-                lot_size=lot_size,
-                algorithm=cfg.algorithm,
-                confidence=confidence,
-            )
+            try:
+                signal = TradeSignal(
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    entry_price=price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    lot_size=lot_size,
+                    algorithm=cfg.algorithm,
+                    confidence=confidence,
+                )
+            except ValidationError as ve:
+                log.error("Invalid signal parameters: %s", ve)
+                time.sleep(poll_interval)
+                continue
             # 5. Risk approval gate
             with profile("risk_check"):
                 approved = risk.approve(signal, signal_id=signal_id)
