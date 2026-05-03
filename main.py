@@ -402,16 +402,18 @@ def main() -> int:
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
     regime_detector = RegimeDetector()
+    # Use balance for allocator; if balance is 0, CapitalAllocator will handle it (or fail validation)
     allocator = CapitalAllocator(total_budget=balance)
     dss = DecisionSupportSystem()
 
     # Register default strategy in allocator
+    # Ensure capital_cap is at least 0.01 to pass Pydantic gt=0 validation if balance is 0
     allocator.add_strategy(
         StrategyConfig(
             strategy_id=f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}",
             symbol=cfg.symbol,
             model_family=cfg.algorithm,
-            capital_cap=balance * 0.5,
+            capital_cap=max(0.01, balance * 0.5),
         )
     )
 

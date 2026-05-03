@@ -163,7 +163,7 @@ class Monitor:
 
             logger.info("Telegram message sent")
         except Exception as e:
-            logger.error("Failed to send Telegram message: %s", e)
+            logger.error("Failed to send Telegram message", error=str(e))
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger and update metrics."""
