@@ -48,22 +48,24 @@ class RiskAssessment(BaseModel):
     rejection_reasons: List[str] = Field(
         default_factory=list, description="Reasons for rejection if any"
     )
-    risk_reward_ratio: float = Field(..., description="Calculated R:R for the trade")
-    drawdown_impact_pct: float = Field(..., description="Estimated impact on total drawdown")
+    risk_reward_ratio: float = Field(0.0, description="Calculated R:R for the trade")
+    drawdown_impact_pct: float = Field(0.0, description="Estimated impact on total drawdown")
     kelly_fraction: float = Field(0.0, description="Kelly Criterion suggested sizing")
-    summary: str = Field(..., description="Human-readable risk assessment summary")
+    summary: str = Field(
+        "No risk data provided", description="Human-readable risk assessment summary"
+    )
 
 
 class RegimeContext(BaseModel):
     """Market regime context at the time of signal generation."""
 
-    regime_name: str = Field(..., description="Detected market regime (e.g., Trending, Ranging)")
-    confidence: float = Field(..., description="Regime detection confidence")
+    regime_name: str = Field("Unknown", description="Detected market regime (e.g., Trending, Ranging)")
+    confidence: float = Field(0.0, description="Regime detection confidence")
     volatility_state: str = Field(
-        ..., description="Current volatility level (Low, Normal, High, Extreme)"
+        "Normal", description="Current volatility level (Low, Normal, High, Extreme)"
     )
-    is_favorable: bool = Field(..., description="Whether the regime is favorable for the strategy")
-    summary: str = Field(..., description="Contextual summary of the market state")
+    is_favorable: bool = Field(True, description="Whether the regime is favorable for the strategy")
+    summary: str = Field("Market state stable", description="Contextual summary of the market state")
 
 
 class FilterResult(BaseModel):
@@ -170,14 +172,14 @@ class SignalExplainer:
 
         # 2. Model Attribution
         attributions = []
-        dominant_model = ""
+        dominant_models = []
         max_weighted_conf = -1.0
 
-        # Mapping: 0=buy, 1=sell, 2=hold (from ensemble.py logic)
+        # Mapping: Aligned with ModelAction (0=HOLD, 1=BUY, 2=SELL)
         direction_map = {
-            0: SignalDirection.BUY,
-            1: SignalDirection.SELL,
-            2: SignalDirection.HOLD,
+            0: SignalDirection.HOLD,
+            1: SignalDirection.BUY,
+            2: SignalDirection.SELL,
         }
 
         for name, vote_idx in model_votes.items():
@@ -191,7 +193,9 @@ class SignalExplainer:
             weighted_conf = weight * model_conf
             if weighted_conf > max_weighted_conf:
                 max_weighted_conf = weighted_conf
-                dominant_model = name
+                dominant_models = [name]
+            elif abs(weighted_conf - max_weighted_conf) < 1e-6 and max_weighted_conf > 0:
+                dominant_models.append(name)
 
             attributions.append(
                 ModelAttribution(
@@ -203,9 +207,9 @@ class SignalExplainer:
                 )
             )
 
-        # Finalize dominant model
+        # Finalize dominant models
         for attr in attributions:
-            if attr.model_name == dominant_model:
+            if attr.model_name in dominant_models:
                 attr.is_dominant = True
 
         # 3. Risk Assessment
@@ -244,7 +248,8 @@ class SignalExplainer:
         # 6. Generate Human Readable Summary
         dir_str = "BUY" if direction == 1 else "SELL" if direction == -1 else "HOLD"
         reasoning = f"Ensemble generated a {dir_str} signal with {confidence:.1%} confidence. "
-        reasoning += f"Primary driver was the {dominant_model} model. "
+        if dominant_models:
+            reasoning += f"Primary driver(s): {', '.join(dominant_models)}. "
         reasoning += f"Market is currently in a {regime_context.regime_name} regime. "
 
         if not execution_summary.passed:
@@ -260,8 +265,7 @@ class SignalExplainer:
             "risk_passed": risk_assessment.passed,
             "execution_passed": execution_summary.passed,
             "regime_confluence": regime_context.confidence,
-            "dominant_model_weight": model_weights.get(dominant_model, 0.0),
-            "dominant_model_name": dominant_model,
+            "dominant_models": dominant_models,
         }
 
         return SignalExplanation(

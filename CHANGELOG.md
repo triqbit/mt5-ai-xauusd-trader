@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enterprise-grade trade signal explainability and attribution system in `src/core/explainability.py`.
+- Decomposition of signals into execution, model, regime, risk, and feature cluster contributions.
+- Standardized signal direction mapping (0=HOLD, 1=BUY, 2=SELL) across the explainer.
+- Robust handling of model confidence ties and dominant driver identification.
+- Support for human-readable terminal formatting (via `rich`) and machine-readable metadata.
+- Comprehensive unit tests for the explainability module in `tests/test_explainability.py`.
 - Standardized `BaseModel` interface and `Signal` output format in `src/models/base_model.py`.
 - Production-ready stubs for `PPOAgent`, `LSTMModel`, and `DreamerAgent` in `src/models/`.
 - Gymnasium-compatible `TradingEnv` skeleton for XAUUSD in `src/trading/trading_env.py`.
