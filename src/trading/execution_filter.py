@@ -102,14 +102,18 @@ class ExecutionFilter:
         return bool(current_atr <= threshold * avg_atr)
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
-        """Validates that the price trend matches signal direction using regression slope of EMA20."""
-        ema_col = "base_M5_ema_20"
+        """Validates that the price trend matches signal direction using regression slope of EMA21."""
+        # Align with FeatureEngineer default EMA stack (8, 21, 50, 200)
+        ema_col = "base_M5_ema_21"
         if ema_col in df.columns:
-            ema20 = df[ema_col]
+            ema_series = df[ema_col]
+        elif "close" in df.columns:
+            ema_series = df["close"].ewm(span=21, adjust=False).mean()
         else:
-            ema20 = df["close"].ewm(span=20, adjust=False).mean()
+            logger.warning("Trend angle check failed: No EMA21 or close price available")
+            return True # Pass by default if data is missing to avoid blocking valid trades
 
-        target_ema = ema20.iloc[-window:]
+        target_ema = ema_series.iloc[-window:]
         if len(target_ema) < window:
             return True  # Not enough data to be sure, pass
 
