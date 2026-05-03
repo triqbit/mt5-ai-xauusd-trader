@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+from sqlalchemy.exc import IntegrityError
+
 from src.core.trade_logger import TradeLogger
 
 
@@ -65,3 +67,33 @@ def test_log_risk_event(logger):
         from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
+
+def test_signal_integrity_constraints(logger):
+    # Invalid entry price (<= 0)
+    invalid_signal = {
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": -10.0,
+    }
+    with pytest.raises(IntegrityError):
+        logger.log_signal(invalid_signal)
+
+    # Invalid direction (not in -1, 0, 1)
+    invalid_direction = {
+        "symbol": "XAUUSD",
+        "direction": 5,
+        "entry_price": 2000.0,
+    }
+    with pytest.raises(IntegrityError):
+        logger.log_signal(invalid_direction)
+
+def test_trade_integrity_constraints(logger):
+    # Invalid lot size (<= 0)
+    with pytest.raises(IntegrityError):
+        logger.log_trade(
+            ticket=999,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            lot_size=-0.1
+        )
