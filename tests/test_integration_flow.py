@@ -141,7 +141,7 @@ def test_config_and_startup_integration():
         get_config.cache_clear()
         cfg = get_config()
         assert cfg.mode == "live"
-        assert cfg.mt5_password == "test"
+        assert cfg.mt5_password.get_secret_value() == "test"
 
         # Test validation
         with patch.dict(os.environ, {"RISK_PER_TRADE": "0.05"}):
