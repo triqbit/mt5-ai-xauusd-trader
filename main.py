@@ -78,12 +78,12 @@ def run_live(
 
     # Audit Trail: Entry into trading mode
     try:
-        audit = AuditLogger.get_instance()
+        audit = get_audit_logger()
         audit.log_operator_action(
             actor="system",
             action="mode_entry",
             reason=f"Entering {cfg.mode} mode for {cfg.symbol}",
-            metadata={"mode": cfg.mode, "symbol": cfg.symbol}
+            metadata={"mode": cfg.mode, "symbol": cfg.symbol},
         )
     except Exception as e:
         log.error(f"Failed to log mode entry to audit trail: {e}")
@@ -113,12 +113,12 @@ def run_live(
 
             # Audit Trail: Model prediction
             try:
-                audit = AuditLogger.get_instance()
+                audit = get_audit_logger()
                 audit.log_model_prediction(
                     symbol=cfg.symbol,
                     direction=direction,
                     confidence=confidence,
-                    metadata={"volatility": volatility, "algorithm": cfg.algorithm}
+                    metadata={"volatility": volatility, "algorithm": cfg.algorithm},
                 )
             except Exception as e:
                 log.error(f"Failed to log model prediction to audit trail: {e}")
@@ -299,7 +299,7 @@ def main() -> int:
         audit_logger.log_config_change(
             old_config={},
             new_config=cfg.model_dump() if hasattr(cfg, "model_dump") else str(cfg),
-            reason="Initial startup configuration"
+            reason="Initial startup configuration",
         )
     except Exception as e:
         log.error(f"Failed to log initial config to audit trail: {e}")
@@ -342,7 +342,9 @@ def main() -> int:
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
-    health_checker = init_health_checker(cfg, connector, trade_logger, model, audit_logger=audit_logger)
+    health_checker = init_health_checker(
+        cfg, connector, trade_logger, model, audit_logger=audit_logger
+    )
     with console.status("[bold blue]Running health checks..."):
         report = health_checker.get_full_report()
 
@@ -376,9 +378,11 @@ def main() -> int:
             with open("pyproject.toml", "rb") as f:
                 try:
                     import tomllib
+
                     pyproject = tomllib.load(f)
                 except ImportError:
                     import tomli
+
                     pyproject = tomli.load(f)
                 version = pyproject.get("project", {}).get("version", "unknown")
         except Exception:
@@ -388,7 +392,7 @@ def main() -> int:
             version=version,
             environment=cfg.mode,
             status="SUCCESS",
-            metadata={"algo": cfg.algorithm, "symbol": cfg.symbol}
+            metadata={"algo": cfg.algorithm, "symbol": cfg.symbol},
         )
     except Exception as e:
         log.error(f"Failed to log deployment event to audit trail: {e}")
