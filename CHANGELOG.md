@@ -35,9 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive unit and integration tests for the health check framework.
 - Semantic versioning policy (`docs/VERSIONING_POLICY.md`).
 - Automated changelog generation workflow (`.github/workflows/changelog.yml`).
+- Enforced static type checking with `mypy` in CI pipeline for hardened code quality.
+- SQLAlchemy 2.0 modernization for `TradeLogger` with `Mapped` syntax and type-safe models.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
+- Standardized CI dependencies and tooling versions in `requirements-ci.txt`.
 
 ### Fixed
 - Dependency conflict in CI by updating `gymnasium` version constraint.
