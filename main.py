@@ -269,7 +269,8 @@ def main() -> int:
     )
     # Initialise components
     # 1. Audit Logger (Mandatory for enterprise traceability)
-    audit_db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///audit.db"
+    database_url = cfg.database_url.get_secret_value()
+    audit_db_url = database_url if "sqlite" in database_url else "sqlite:///audit.db"
     audit_logger = AuditLogger(db_url=audit_db_url)
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
@@ -280,7 +281,7 @@ def main() -> int:
             return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
-        db_url=cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+        db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
     monitor.start_metrics_server()

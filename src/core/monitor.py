@@ -51,9 +51,10 @@ class Monitor:
         self._server_started = False
         self._background_tasks: set[asyncio.Task] = set()
 
-        if self.cfg.telegram_token:
+        telegram_token = self.cfg.telegram_token.get_secret_value()
+        if telegram_token:
             try:
-                self.bot = telegram.Bot(token=self.cfg.telegram_token)
+                self.bot = telegram.Bot(token=telegram_token)
                 logger.info("Telegram bot initialized")
             except Exception as e:
                 logger.error("Failed to initialize Telegram bot: %s", e)

@@ -64,10 +64,8 @@ class ConfigValidator:
             )
 
         password_placeholders = ["", "password", "test", "your_password_here", "change_me"]
-        if (
-            not self.config.mt5_password
-            or self.config.mt5_password.lower() in password_placeholders
-        ):
+        mt5_password = self.config.mt5_password.get_secret_value()
+        if not mt5_password or mt5_password.lower() in password_placeholders:
             self.errors.append(
                 ValidationError(
                     "MT5_PASSWORD",
@@ -104,7 +102,7 @@ class ConfigValidator:
         """Detect default or placeholder values in secrets."""
         # Check database URL
         default_db = "postgresql://trader:password@localhost:5432/mt5_trades"
-        if self.config.database_url == default_db:
+        if self.config.database_url.get_secret_value() == default_db:
             self.errors.append(
                 ValidationError(
                     "DATABASE_URL",
@@ -117,9 +115,8 @@ class ConfigValidator:
         placeholders = ["YOUR_TOKEN", "CHANGE_ME", "YOUR_ACCOUNT_ID", "YOUR_CHAT_ID", "123456789"]
 
         # Check Telegram
-        if self.config.telegram_token and any(
-            p in self.config.telegram_token.upper() for p in placeholders
-        ):
+        telegram_token = self.config.telegram_token.get_secret_value()
+        if telegram_token and any(p in telegram_token.upper() for p in placeholders):
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",
@@ -129,9 +126,8 @@ class ConfigValidator:
             )
 
         # Check MetaAPI
-        if self.config.metaapi_token and any(
-            p in self.config.metaapi_token.upper() for p in placeholders
-        ):
+        metaapi_token = self.config.metaapi_token.get_secret_value()
+        if metaapi_token and any(p in metaapi_token.upper() for p in placeholders):
             self.errors.append(
                 ValidationError(
                     "METAAPI_TOKEN",
