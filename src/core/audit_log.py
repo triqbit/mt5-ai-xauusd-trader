@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     DateTime,
     String,
     Text,
@@ -47,6 +48,7 @@ class AuditEntry(Base):
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 
 class AuditLogger:
@@ -74,15 +76,22 @@ class AuditLogger:
         self._initialized = True
         logger.info("AuditLogger initialized with database: %s", db_url)
 
-    def log(self, actor: str, action: str, details: Optional[str] = None) -> int:
+    def log(
+        self,
+        actor: str,
+        action: str,
+        details: Optional[str] = None,
+        metadata: Optional[dict] = None,
+    ) -> int:
         """
-        Record a new audit entry.
+        Record a new audit entry with optional structured metadata.
         """
         with self.Session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
                 details=details,
+                metadata_json=metadata,
             )
             session.add(entry)
             session.commit()
