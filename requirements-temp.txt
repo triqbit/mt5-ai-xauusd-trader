@@ -1,0 +1,42 @@
+# ============================================================
+# MT5 AI/ML Trading Bot - Enterprise Edition
+# requirements-ci.txt -- Linux CI-safe dependencies
+#
+# Excludes:
+#   - MetaTrader5 (Windows-only, no Linux wheel)
+#   - torch/torchvision/transformers/timm (too heavy for unit tests)
+#   - stable-baselines3/gymnasium (pulls torch transitively)
+#   - pandas-ta (requires Python <3.11; runtime-only)
+#
+# and requires numpy>=2.0 (listed below).
+# ============================================================
+
+# -- Core numeric / data -------------------------------------------
+numpy==2.2.6
+scipy==1.15.2
+scikit-learn==1.7.2
+pandas==2.2.3
+
+# -- Technical Analysis --------------------------------------------
+# Python wrapper; C library (0.6.4) built from source in ci.yml
+
+# -- Database ------------------------------------------------------
+sqlalchemy==2.0.30
+alembic==1.13.1
+
+# -- Pydantic / settings -------------------------------------------
+pydantic==2.13.3
+pydantic-settings==2.8.1
+
+# -- Testing -------------------------------------------------------
+optuna==4.2.1
+pytest==9.0.3
+pytest-cov==6.1.0
+python-telegram-bot
+fastapi>=0.115.0
+httpx==0.28.0
+structlog==24.1.0
+rich==15.0.0
+gymnasium==1.3.0
+jinja2==3.1.6
+prometheus-client==0.20.0
