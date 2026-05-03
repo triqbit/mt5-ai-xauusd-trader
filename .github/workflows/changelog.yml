@@ -8,14 +8,13 @@ on:
       - 'CHANGELOG.md'
       - 'docs/**'
       - '*.md'
-      - '.github/workflows/changelog.yml'
 
 permissions:
   contents: write
 
 jobs:
   changelog:
-    name: Update Changelog
+    name: Update Unreleased Section
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     steps:
@@ -24,11 +23,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate Changelog
-        id: changelog
+      - name: Update Changelog [Unreleased]
         uses: Conventional-Changelog/github-action-generate-changelog@v1
         with:
           path-to-changelog: CHANGELOG.md
+          # This action by default updates the Unreleased section if no tag is provided
+          # or appends to the top.
 
       - name: Commit and Push Changelog
         run: |

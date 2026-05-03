@@ -13,14 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Market Regime Detection:** Statistical market state classifier for XAUUSD (Trending, Ranging, News Shock, etc.) in `src/models/regime_detector.py`.
 - **Institutional Feature Engineering:** Scalable pipeline for 190+ technical indicators with multi-timeframe support in `src/core/feature_engineering.py`.
 - **CI Quality Gates:** Mandatory Mypy type enforcement and Docker dependency harmonization for enterprise stability.
+- **Versioning Policy:** Defined comprehensive SemVer criteria and automated release workflows in `docs/VERSIONING_POLICY.md`.
+- **Automated Changelog:** Integrated conventional commit-based changelog updates in `.github/workflows/changelog.yml`.
 
 ### Changed
 - Rebalanced the 6-layer execution filter in `src/trading/execution_filter.py` with refined trend angle thresholds.
 - Standardized `BaseModel` and `Signal` interfaces across all institutional models.
+- Enhanced release orchestration logic to automate version bumping and changelog transitions.
 
 ### Fixed
 - Resolved critical import errors and synchronized CI dependencies across 18 files.
 - Optimized rolling slope calculations and row access in benchmark adapters (2000x speedup).
+- Dependency conflict in CI by updating `gymnasium` version constraint.
+- Unused `Dict` imports in `src/models/lstm_model.py` and `src/models/ppo_agent.py`.
 
 ## [1.1.0-rc1] - 2024-05-02
 ### Added
@@ -101,3 +106,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial enterprise-grade trading engine.
 - MT5 integration and risk management framework.
 - CI/CD pipelines for validation and security.
+- Health check system and Prometheus metrics.
+- Audit logging for traceability and compliance.

@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -78,6 +78,9 @@ class EnsembleModel(BaseModel):
 
     def load_lstm(self, path: Path, n_features: int = 140) -> None:
         """Load LSTM-Attention checkpoint."""
+        if not torch:
+            logger.warning("PyTorch not found. Cannot load LSTM.")
+            return
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
         state = torch.load(str(path), map_location=self.device)
         model.load_state_dict(state)
@@ -89,7 +92,7 @@ class EnsembleModel(BaseModel):
     def predict(
         self,
         features: np.ndarray,
-        seq: Optional[torch.Tensor] = None,
+        seq: Optional[Any] = None,
         regime_info: Optional[RegimeInfo] = None,
     ) -> Signal:
         """
