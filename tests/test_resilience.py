@@ -73,11 +73,11 @@ def test_mt5_connector_connection_failure(mock_mt5):
 
     connector = MT5Connector(cfg)
 
-    with patch("src.trading.mt5_connector.MT5_AVAILABLE", True):
-        with patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False):
-            with pytest.raises(MT5ConnectionError):
-                # Should retry 2 times, so 3 calls total
-                connector.initialize()
+    with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), \
+         patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False), \
+         pytest.raises(MT5ConnectionError):
+        # Should retry 2 times, so 3 calls total
+        connector.initialize()
 
     assert mock_mt5.initialize.call_count == 3
 
