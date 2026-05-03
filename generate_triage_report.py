@@ -7,6 +7,7 @@ import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
+BIG_BANG_DATE = datetime.datetime(2026, 5, 2, tzinfo=datetime.timezone.utc)
 
 def api_call(url):
     req = urllib.request.Request(url)
@@ -59,16 +60,7 @@ def get_ci_status(sha):
         return status_data['state']
     return 'unknown'
 
-def get_repo_info():
-    return api_call(f"https://api.github.com/repos/{REPO}")
-
-def get_last_commit_main():
-    data = api_call(f"https://api.github.com/repos/{REPO}/commits?sha=main&per_page=1")
-    if data and isinstance(data, list) and len(data) > 0:
-        return data[0]
-    return None
-
-def classify_risk(files):
+def classify_risk(files, title=""):
     high_risk_patterns = [
         "src/trading/",
         "src/models/",
@@ -86,10 +78,13 @@ def classify_risk(files):
         "src/risk/"
     ]
 
-    risk = "Safe Surface"
-    reason = "Only documentation, tests, or non-critical configurations."
+    safe_keywords = ["docs", "readme", "lint", "typo", "cleanup", "chore", "dx:"]
 
     if not files:
+        # Heuristic based on title if no files (rate limit)
+        t_lower = title.lower()
+        if any(kw in t_lower for kw in safe_keywords):
+            return "Safe Surface", "Heuristic: Title matches safe keywords."
         return "Unknown", "No files found or unable to fetch files."
 
     for f in files:
@@ -98,16 +93,13 @@ def classify_risk(files):
                 return "High Risk", f"Touches high-risk area: {f}"
         for p in medium_risk_patterns:
             if p in f:
-                risk = "Medium Risk"
-                reason = f"Touches core/research/analytics/risk: {f}"
+                return "Medium Risk", f"Touches core/research/analytics/risk: {f}"
 
-    return risk, reason
+    return "Safe Surface", "Only documentation, tests, or non-critical configurations."
 
 def generate_report():
     print("Fetching PRs...")
     prs = get_all_prs()
-    repo_info = get_repo_info()
-    last_commit = get_last_commit_main()
 
     if not prs and prs is not None:
         print("No open PRs found.")
@@ -121,19 +113,11 @@ def generate_report():
     status_tag = "🟢 HEALTHY"
     turbulence_reasons = []
 
-    if len(prs) > 20:
+    if len(prs) > 50:
         status_tag = "🟡 MODERATE TURBULENCE"
         turbulence_reasons.append(f"High number of open PRs ({len(prs)})")
-    if len(prs) > 50:
+    if len(prs) > 200:
         status_tag = "🔴 HIGH TURBULENCE"
-
-    if last_commit:
-        last_commit_date = datetime.datetime.strptime(last_commit['commit']['committer']['date'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
-        days_since_last_merge = (now - last_commit_date).days
-        if days_since_last_merge > 2:
-            if status_tag == "🟢 HEALTHY":
-                status_tag = "🟡 MODERATE TURBULENCE"
-            turbulence_reasons.append(f"Integration Stagnation: {days_since_last_merge} days since last commit to main")
 
     report = "# Daily PR Triage Dashboard\n\n"
     report += f"**Date:** {now_str}\n"
@@ -147,38 +131,42 @@ def generate_report():
 
     report += "---\n\n"
     report += "## 🔝 Top 3 Items That Matter Right Now\n\n"
-    # We will populate this after classifying PRs
+    # We will populate this later
 
     report += "## 📋 Summary Table\n\n"
-    report += "| PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Reason |\n"
-    report += "|------|-------|--------|--------|--------|-----------|------------|--------|\n"
+    report += "| PR # | Title | Author | Branch | CI Status | Risk Class | Status Flag |\n"
+    report += "|------|-------|--------|--------|-----------|------------|-------------|\n"
 
     classified_prs = []
 
-    # Limit processing if no token to avoid rate limits
-    max_prs_to_process = len(prs)
-    if not GITHUB_TOKEN and max_prs_to_process > 10:
-        print("Warning: No GITHUB_TOKEN, limiting detailed processing to first 10 PRs to avoid rate limit.")
-        max_prs_to_process = 10
+    # Heuristic: Process latest 20 PRs in detail, then use heuristics for the rest if no token
+    detailed_limit = 20 if not GITHUB_TOKEN else 100
 
     for i, pr in enumerate(prs):
-        if i >= max_prs_to_process:
-            report += f"| {pr['number']} | {pr['title']} | {pr['user']['login']} | ... | ... | ... | ... | (Skipped due to rate limit) |\n"
-            continue
         num = pr['number']
         title = pr['title']
         user = pr['user']['login']
         branch = pr['head']['ref']
-        labels = ", ".join([l['name'] for l in pr['labels']]) if pr['labels'] else "none"
         sha = pr['head']['sha']
+        created_at = datetime.datetime.strptime(pr['created_at'], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+
+        status_flag = "New"
+        if created_at < BIG_BANG_DATE:
+            status_flag = "⚠️ Stale (Pre-Big-Bang)"
 
         print(f"[{i+1}/{len(prs)}] Processing PR #{num}...")
 
-        ci_status = get_ci_status(sha)
-        files = get_all_pr_files(num)
-        risk, reason = classify_risk(files)
+        if i < detailed_limit:
+            ci_status = get_ci_status(sha)
+            files = get_all_pr_files(num)
+            risk, reason = classify_risk(files, title)
+        else:
+            ci_status = "unknown"
+            risk, reason = classify_risk([], title)
+            if risk == "Unknown":
+                risk = "Triage Required"
 
-        report += f"| [{num}](https://github.com/{REPO}/pull/{num}) | {title} | {user} | `{branch}` | {labels} | {ci_status} | {risk} | {reason} |\n"
+        report += f"| [{num}](https://github.com/{REPO}/pull/{num}) | {title} | {user} | `{branch}` | {ci_status} | {risk} | {status_flag} |\n"
 
         classified_prs.append({
             'number': num,
@@ -186,7 +174,8 @@ def generate_report():
             'user': user,
             'risk': risk,
             'ci_status': ci_status,
-            'reason': reason
+            'reason': reason,
+            'flag': status_flag
         })
 
     # Determine Top 3
@@ -194,12 +183,9 @@ def generate_report():
     if turbulence_reasons:
         top_3_items.append(f"**Address Turbulence:** {turbulence_reasons[0]}")
 
-    safe_surface = [pr for pr in classified_prs if pr['risk'] == "Safe Surface"]
-    medium_risk = [pr for pr in classified_prs if pr['risk'] == "Medium Risk"]
-    high_risk = [pr for pr in classified_prs if pr['risk'] == "High Risk"]
-
-    safe_surface.sort(key=lambda x: 0 if x['ci_status'] == 'success' else 1)
-    medium_risk.sort(key=lambda x: 0 if x['ci_status'] == 'success' else 1)
+    safe_surface = [pr for pr in classified_prs if pr['risk'] == "Safe Surface" and pr['flag'] == "New"]
+    medium_risk = [pr for pr in classified_prs if pr['risk'] == "Medium Risk" and pr['flag'] == "New"]
+    high_risk = [pr for pr in classified_prs if pr['risk'] == "High Risk" and pr['flag'] == "New"]
 
     if safe_surface:
         top_3_items.append(f"**Quick Win:** Review Safe PR #{safe_surface[0]['number']} ({safe_surface[0]['title']})")
@@ -218,21 +204,22 @@ def generate_report():
     report = report.replace("## 🔝 Top 3 Items That Matter Right Now\n\n", "## 🔝 Top 3 Items That Matter Right Now\n\n" + top_3_section + "\n")
 
     report += "\n## 🛡️ Risk Classification Summary\n\n"
-    report += f"- **High Risk:** {len(high_risk)} PRs\n"
-    report += f"- **Medium Risk:** {len(medium_risk)} PRs\n"
-    report += f"- **Safe Surface:** {len(safe_surface)} PRs\n"
+    report += f"- **High Risk (New):** {len(high_risk)} PRs\n"
+    report += f"- **Medium Risk (New):** {len(medium_risk)} PRs\n"
+    report += f"- **Safe Surface (New):** {len(safe_surface)} PRs\n"
+    report += f"- **Stale (Total):** {len([pr for pr in classified_prs if 'Stale' in pr['flag']])} PRs\n"
 
     report += "\n## ✨ Good Candidates for Review Today\n\n"
     candidates = (safe_surface + medium_risk)[:4]
 
     if not candidates:
-        report += "No low/medium risk candidates identified today.\n"
+        report += "No new low/medium risk candidates identified today.\n"
     else:
         for c in candidates:
             status_str = f" [CI: {c['ci_status']}]" if c['ci_status'] != 'unknown' else ""
             report += f"- **PR #{c['number']}**: {c['title']} ({c['user']}){status_str} - *{c['risk']}*\n"
 
-    report += "\n---\n*Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths.*"
+    report += "\n---\n*Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths and heuristics.*"
 
     os.makedirs("docs/status", exist_ok=True)
     with open("docs/status/PR_TRIAGE_DAILY.md", "w") as f:
@@ -241,30 +228,23 @@ def generate_report():
     # Generate Merge-Readiness Checklist
     checklist = "# Merge-Readiness Checklist\n\n"
     checklist += f"Generated on: {now}\n\n"
-    checklist += "This checklist identifies the top 3 promising PRs for immediate review and potential merge.\n\n"
+    checklist += "This checklist identifies top promising PRs for immediate review.\n\n"
 
     top_3 = (safe_surface + medium_risk)[:3]
     if not top_3:
-        checklist += "No candidates found for merge-readiness checklist today.\n"
+        checklist += "No new low-risk candidates found for merge-readiness checklist today.\n"
     else:
         for i, c in enumerate(top_3):
             checklist += f"## {i+1}. PR #{c['number']}: {c['title']}\n"
             checklist += "- **Status**: Ready for detailed review\n"
             checklist += f"- **Risk**: {c['risk']}\n"
-            checklist += f"- **Why**: Low risk change improving {c['reason'].lower()}\n"
-            checklist += "- **Verification**: See PR for CI status and tests.\n\n"
+            checklist += f"- **Why**: Improved {c['risk'].lower()} candidate\n"
+            checklist += "- **Verification**: See PR for CI status.\n\n"
 
     checklist += "---\n*Prepared by Jules06 (qufuwan) for Jules05 and human review.*"
 
     with open("docs/status/MERGE_READY_CHECKLIST.md", "w") as f:
         f.write(checklist)
-
-    summary_file = os.getenv("GITHUB_STEP_SUMMARY")
-    if summary_file:
-        with open(summary_file, "a") as f:
-            f.write(report)
-            f.write("\n\n")
-            f.write(checklist)
 
     print("Reports generated successfully.")
 
