@@ -79,9 +79,7 @@ class LSTMPricePredictor(nn.Module if nn else object):
         fc: Fully connected layer for classification (HOLD, BUY, SELL).
     """
 
-    def __init__(
-        self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2
-    ) -> None:
+    def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2) -> None:
         """
         Initializes the LSTM architecture.
 
@@ -161,15 +159,11 @@ class LSTMModel(BaseModel):
 
         if torch:
             try:
-                self.model = LSTMPricePredictor(
-                    input_dim, hidden_dim, num_layers
-                ).to(self.device)
+                self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(self.device)
 
                 if model_path and Path(model_path).exists():
                     self.logger.info(f"Loading LSTM model from {model_path}")
-                    self.model.load_state_dict(
-                        torch.load(model_path, map_location=self.device)
-                    )
+                    self.model.load_state_dict(torch.load(model_path, map_location=self.device))
                     self.model.eval()
                 else:
                     self.logger.debug("LSTMModel initialized with random weights.")
@@ -206,9 +200,7 @@ class LSTMModel(BaseModel):
             if x.dim() == 2:
                 x = x.unsqueeze(0)
             elif x.dim() != 3:
-                raise ValueError(
-                    f"Expected 2D or 3D input, got {x.dim()}D with shape {x.shape}"
-                )
+                raise ValueError(f"Expected 2D or 3D input, got {x.dim()}D with shape {x.shape}")
 
             self.model.eval()
             with torch.no_grad():

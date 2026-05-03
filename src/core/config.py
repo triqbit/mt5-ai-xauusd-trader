@@ -6,6 +6,7 @@ or a .env file. All secrets stay out of the codebase.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -29,9 +30,15 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
-    mt5_login: int = Field(default=0, description="MT5 account number for login", validation_alias="MT5_LOGIN")
-    mt5_password: SecretStr = Field(default=SecretStr(""), description="MT5 account password", validation_alias="MT5_PASSWORD")
-    mt5_server: str = Field(default="", description="MT5 broker server name", validation_alias="MT5_SERVER")
+    mt5_login: int = Field(
+        default=0, description="MT5 account number for login", validation_alias="MT5_LOGIN"
+    )
+    mt5_password: SecretStr = Field(
+        default=SecretStr(""), description="MT5 account password", validation_alias="MT5_PASSWORD"
+    )
+    mt5_server: str = Field(
+        default="", description="MT5 broker server name", validation_alias="MT5_SERVER"
+    )
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
         description="Full path to the MT5 terminal executable",
@@ -47,14 +54,15 @@ class TradingConfig(BaseSettings):
     mode: Literal["demo", "live", "backtest"] = Field(
         default="demo", description="Execution mode", validation_alias="MODE"
     )
-    max_positions: int = Field(
-        default=3, ge=1, le=10, description="Max concurrent positions"
-    )
+    max_positions: int = Field(default=3, ge=1, le=10, description="Max concurrent positions")
     risk_per_trade: float = Field(
         default=0.01, ge=0.001, le=0.05, description="Fraction of equity to risk per trade"
     )
     max_daily_loss: float = Field(
         default=0.05, ge=0.01, le=0.20, description="Max daily drawdown fraction"
+    )
+    max_total_drawdown: float = Field(
+        default=0.30, ge=0.05, le=0.50, description="Hard drawdown limit (stop all trading)"
     )
 
     # ── Model ──────────────────────────────────────────────────────────────────

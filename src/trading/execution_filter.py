@@ -88,7 +88,9 @@ class ExecutionFilter:
             high = df["high"]
             low = df["low"]
             close = df["close"]
-            tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
+            tr = pd.concat(
+                [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+            ).max(axis=1)
             atr = tr.rolling(window=14).mean()
         else:
             atr = df["base_M5_atr"]
@@ -111,7 +113,7 @@ class ExecutionFilter:
             ema_series = df["close"].ewm(span=21, adjust=False).mean()
         else:
             logger.warning("Trend angle check failed: No EMA21 or close price available")
-            return True # Pass by default if data is missing to avoid blocking valid trades
+            return True  # Pass by default if data is missing to avoid blocking valid trades
 
         target_ema = ema_series.iloc[-window:]
         if len(target_ema) < window:

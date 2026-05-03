@@ -9,28 +9,30 @@ Institutional risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Dict, Optional, Any
+from datetime import date
 
-import numpy as np
 from src.core.config import TradingConfig
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class RiskStats:
     """Intraday and historical risk metrics."""
+
     peak_equity: float = 0.0
     daily_peak_equity: float = 0.0
     daily_loss: float = 0.0
     daily_trades: int = 0
     consecutive_losses: int = 0
     last_reset: date = field(default_factory=date.today)
+
 
 class RiskEngine:
     """
@@ -40,10 +42,7 @@ class RiskEngine:
 
     def __init__(self, config: TradingConfig, initial_balance: float) -> None:
         self.cfg = config
-        self.stats = RiskStats(
-            peak_equity=initial_balance,
-            daily_peak_equity=initial_balance
-        )
+        self.stats = RiskStats(peak_equity=initial_balance, daily_peak_equity=initial_balance)
         self.current_equity = initial_balance
         logger.info("RiskEngine initialized | balance=%.2f", initial_balance)
 
@@ -53,7 +52,7 @@ class RiskEngine:
         atr: float,
         avg_atr: float,
         tick_value: float = 1.0,
-        tick_size: float = 0.01
+        tick_size: float = 0.01,
     ) -> bool:
         """
         Comprehensive signal validation against institutional risk limits.
@@ -95,7 +94,7 @@ class RiskEngine:
         avg_atr: float,
         tick_value: float = 1.0,
         tick_size: float = 0.01,
-        contract_size: float = 100.0
+        contract_size: float = 100.0,
     ) -> float:
         """
         Calculate position size based on ATR-adjusted risk.
@@ -165,7 +164,7 @@ class RiskEngine:
             self.stats.daily_peak_equity = equity
 
         if pnl != 0:
-            self.stats.daily_loss -= pnl # loss is positive if pnl is negative
+            self.stats.daily_loss -= pnl  # loss is positive if pnl is negative
             if pnl < 0:
                 self.stats.consecutive_losses += 1
             else:
@@ -185,17 +184,26 @@ class RiskEngine:
     # -- Internal Guards ---------------------------------------------------
 
     def _check_volatility(self, atr: float, avg_atr: float) -> bool:
-        if avg_atr <= 0: return True
+        if avg_atr <= 0:
+            return True
         if atr / avg_atr > 3.0:
             logger.warning("Signal rejected: Extreme volatility (ATR > 3x avg)")
             return False
         return True
 
     def _check_daily_loss(self) -> bool:
-        loss_pct = self.stats.daily_loss / self.stats.daily_peak_equity if self.stats.daily_peak_equity > 0 else 0
+        loss_pct = (
+            self.stats.daily_loss / self.stats.daily_peak_equity
+            if self.stats.daily_peak_equity > 0
+            else 0
+        )
 
-        if loss_pct >= 0.05: # Level 4: 5% Emergency Stop
-            logger.critical("CIRCUIT BREAKER: Daily loss %.2f%% hit Level 4 limit (5%%)", loss_pct * 100)
+        if loss_pct >= self.cfg.max_daily_loss:  # Level 4: Emergency Stop
+            logger.critical(
+                "CIRCUIT BREAKER: Daily loss %.2f%% hit limit (%.2f%%)",
+                loss_pct * 100,
+                self.cfg.max_daily_loss * 100,
+            )
             return False
 
         if self.stats.consecutive_losses >= 3:
@@ -209,13 +217,23 @@ class RiskEngine:
         return True
 
     def _check_drawdown(self) -> bool:
-        drawdown = (self.stats.peak_equity - self.current_equity) / self.stats.peak_equity if self.stats.peak_equity > 0 else 0
-        if drawdown >= 0.30: # Level 5: 30% Hard Drawdown
-            logger.critical("EMERGENCY: Total drawdown %.2f%% hit Hard Stop (30%%)", drawdown * 100)
+        drawdown = (
+            (self.stats.peak_equity - self.current_equity) / self.stats.peak_equity
+            if self.stats.peak_equity > 0
+            else 0
+        )
+        if drawdown >= self.cfg.max_total_drawdown:  # Level 5: Hard Drawdown
+            logger.critical(
+                "EMERGENCY: Total drawdown %.2f%% hit Hard Stop (%.2f%%)",
+                drawdown * 100,
+                self.cfg.max_total_drawdown * 100,
+            )
             return False
         return True
 
-    def _check_trade_risk(self, signal: TradeSignal, tick_value: float = 1.0, tick_size: float = 0.01) -> bool:
+    def _check_trade_risk(
+        self, signal: TradeSignal, tick_value: float = 1.0, tick_size: float = 0.01
+    ) -> bool:
         """Verify that the actual monetary risk of the trade is within safe bounds."""
         risk_distance = abs(signal.entry_price - signal.stop_loss)
         if risk_distance <= 0:
@@ -226,9 +244,12 @@ class RiskEngine:
         risk_pct = total_risk / self.current_equity if self.current_equity > 0 else 1.0
 
         if risk_pct > 0.02:  # Hard cap at 2% risk per trade for extra safety
-            logger.warning("Signal rejected: Monetary risk %.2f%% exceeds 2%% safety cap", risk_pct * 100)
+            logger.warning(
+                "Signal rejected: Monetary risk %.2f%% exceeds 2%% safety cap", risk_pct * 100
+            )
             return False
 
         return True
+
 
 __all__ = ["RiskEngine", "RiskStats"]

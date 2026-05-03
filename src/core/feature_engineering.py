@@ -281,7 +281,7 @@ class FeatureEngineer:
         # Reindex to original DataFrame using forward fill to handle frequency misalignment.
         # We then shift by 1 to ensure that at any time T, we only use MTF data
         # from periods that have completely closed.
-        mtf_indicators = mtf_indicators.reindex(df.index, method='ffill').shift(1)
+        mtf_indicators = mtf_indicators.reindex(df.index, method="ffill").shift(1)
 
         return mtf_indicators
 

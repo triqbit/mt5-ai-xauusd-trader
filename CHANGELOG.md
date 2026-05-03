@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enterprise Core Scaffolding:** Standardized environment-driven configuration with Pydantic Settings V2 in `src/core/config.py`.
+- **Hybrid MT5/MetaAPI Connector:** Production-grade dual-path connectivity with robust cloud failover in `src/trading/mt5_connector.py`.
+- **Institutional Risk Engine:** Advanced risk management featuring ATR-based position sizing, cascading daily loss circuit breakers, and hard drawdown safeguards in `src/trading/risk_engine.py`.
+- **Ensemble Consensus Layer:** Sophisticated signal aggregation with dissent detection and weighted confidence requirements in `src/models/ensemble.py`.
 - **Institutional Capital Allocation:** Implemented a multi-strategy budget management system with concentration limits and performance-based scaling in `src/trading/capital_allocator.py`.
 - **Vectorized Backtesting v2:** Enhanced the walk-forward backtesting engine with vectorized trade execution and performance metrics in `src/research/hyperopt_walkforward.py`.
 - **Market Regime Detection:** Statistical market state classifier for XAUUSD (Trending, Ranging, News Shock, etc.) in `src/models/regime_detector.py`.

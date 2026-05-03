@@ -41,6 +41,7 @@ def test_ensemble_veto_logic():
         # This is harder because ALGORITHMS is class-level.
         pass
 
+@pytest.mark.skipif(torch is None, reason="torch not installed")
 def test_ensemble_dissent_buy_sell():
     ensemble = EnsembleModel(device="cpu")
 
@@ -70,6 +71,7 @@ def test_ensemble_dissent_buy_sell():
         assert signal.direction == SignalDirection.HOLD
         assert signal.metadata.get("dissent") is True
 
+@pytest.mark.skipif(torch is None, reason="torch not installed")
 def test_ensemble_consensus_threshold_fail():
     ensemble = EnsembleModel(device="cpu")
 

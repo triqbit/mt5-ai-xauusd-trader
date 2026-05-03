@@ -7,22 +7,27 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import sys
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import nest_asyncio
 import pandas as pd
 
+from src.core.config import TradingConfig
+from src.trading.risk_manager import TradeSignal
+
 nest_asyncio.apply()
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -30,13 +35,12 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
     MetaApi = None
 
-from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -118,23 +122,36 @@ class MT5Connector:
                     return True
                 else:
                     error_code, error_desc = mt5.last_error()
-                    logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
+                    logger.warning(
+                        "Native mt5.initialize failed: %s (code: %d)", error_desc, error_code
+                    )
 
                     # Troubleshooting guidance
                     if error_code == mt5.RES_E_NOT_FOUND:
-                        logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s", self.cfg.mt5_path)
+                        logger.info(
+                            "TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s",
+                            self.cfg.mt5_path,
+                        )
                     elif error_code == mt5.RES_E_INVALID_PARAMS:
-                        logger.info("TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER.")
+                        logger.info(
+                            "TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER."
+                        )
                     elif error_code == mt5.RES_E_CONNECTION_FAILED:
-                        logger.info("TIP: Connection failed. Check your internet or if the broker server is reachable.")
+                        logger.info(
+                            "TIP: Connection failed. Check your internet or if the broker server is reachable."
+                        )
                     else:
-                        logger.info("TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options.")
+                        logger.info(
+                            "TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options."
+                        )
             except Exception as e:
                 logger.error("Native MT5 initialization error: %s", e)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
             if sys.platform == "win32":
-                logger.warning("Running on Windows but 'MetaTrader5' package is missing. Install with 'pip install MetaTrader5'.")
+                logger.warning(
+                    "Running on Windows but 'MetaTrader5' package is missing. Install with 'pip install MetaTrader5'."
+                )
             else:
                 logger.info("On Linux/Mac, use MetaAPI fallback by setting METAAPI_TOKEN.")
 
@@ -228,7 +245,9 @@ class MT5Connector:
                 async def _get_ma_rates():
                     # get_historical_candles returns bars in descending order of time usually?
                     # Actually MetaAPI returns them.
-                    return await self.metaapi_connection.get_historical_candles(symbol, ma_tf, None, n_bars)
+                    return await self.metaapi_connection.get_historical_candles(
+                        symbol, ma_tf, None, n_bars
+                    )
 
                 candles = self._run_async(_get_ma_rates())
                 if not candles:
@@ -377,18 +396,22 @@ class MT5Connector:
                 side = "BUY" if signal.direction > 0 else "SELL"
 
                 async def _place_ma_order():
-                    return await self.metaapi_connection.create_market_buy_order(
-                        signal.symbol,
-                        signal.lot_size,
-                        signal.stop_loss,
-                        signal.take_profit,
-                        {"comment": f"AI:{signal.algorithm}"},
-                    ) if side == "BUY" else await self.metaapi_connection.create_market_sell_order(
-                        signal.symbol,
-                        signal.lot_size,
-                        signal.stop_loss,
-                        signal.take_profit,
-                        {"comment": f"AI:{signal.algorithm}"},
+                    return (
+                        await self.metaapi_connection.create_market_buy_order(
+                            signal.symbol,
+                            signal.lot_size,
+                            signal.stop_loss,
+                            signal.take_profit,
+                            {"comment": f"AI:{signal.algorithm}"},
+                        )
+                        if side == "BUY"
+                        else await self.metaapi_connection.create_market_sell_order(
+                            signal.symbol,
+                            signal.lot_size,
+                            signal.stop_loss,
+                            signal.take_profit,
+                            {"comment": f"AI:{signal.algorithm}"},
+                        )
                     )
 
                 result = self._run_async(_place_ma_order())
