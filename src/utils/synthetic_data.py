@@ -27,7 +27,9 @@ class ScenarioGenerator:
     def generate(
         self,
         n_steps: int = 100,
-        regime: Literal["trending", "ranging", "volatile", "gapping", "malformed", "whipsaw", "stale"] = "ranging",
+        regime: Literal[
+            "trending", "ranging", "volatile", "gapping", "malformed", "whipsaw", "stale"
+        ] = "ranging",
         start_price: float = 2300.0,
         trend_strength: float = 0.001,
         volatility: float = 0.002,

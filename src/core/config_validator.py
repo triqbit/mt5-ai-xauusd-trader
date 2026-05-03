@@ -155,7 +155,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds the absolute maximum of 2%.",
+                    f"Risk per trade {self.config.risk_per_trade * 100}% exceeds the absolute maximum of 2%.",
                     True,
                 )
             )
@@ -163,7 +163,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds the policy limit of 1%.",
+                    f"Risk per trade {self.config.risk_per_trade * 100}% exceeds the policy limit of 1%.",
                     False,  # Non-critical warning
                 )
             )
@@ -174,7 +174,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds hard stop of 6%.",
+                    f"Max daily loss {self.config.max_daily_loss * 100}% exceeds hard stop of 6%.",
                     True,
                 )
             )
@@ -182,7 +182,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds emergency stop limit of 5%.",
+                    f"Max daily loss {self.config.max_daily_loss * 100}% exceeds emergency stop limit of 5%.",
                     False,
                 )
             )
