@@ -27,7 +27,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from src.core import get_config, profile
+from src.core import get_config, profile, TradingConfig
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
 from src.core.health import HealthStatus, init_health_checker
@@ -66,7 +66,7 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 def run_live(
-    cfg,
+    cfg: TradingConfig,
     connector: MT5Connector,
     risk: RiskManager,
     model: BaseModel,
@@ -204,7 +204,8 @@ def run_live(
                 with profile("account_updates"):
                     balance = connector.get_account_balance()
                     risk.update_equity(balance)
-                    monitor.log_equity(balance)
+                    if monitor:
+                        monitor.log_equity(balance)
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
                 break
@@ -314,10 +315,10 @@ def main() -> int:
             model.load_lstm(lstm_path)
     elif args.algo == "ppo":
         ppo_path = args.model_dir / "ppo_xauusd.zip"
-        model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
+        model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)  # type: ignore[assignment]
     elif args.algo == "lstm":
         lstm_path = args.model_dir / "lstm_xauusd.pt"
-        model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
+        model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)  # type: ignore[assignment]
     else:
         log.warning(
             f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble"

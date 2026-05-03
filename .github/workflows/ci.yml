@@ -29,16 +29,15 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install quality tools
-        run: pip install ruff==0.4.3 mypy==1.10.0
-      - name: Ruff lint (auto-fixable violations fail the build)
+      - name: Install dependencies and quality tools
+        run: |
+          pip install -r requirements-ci.txt
+      - name: Ruff lint and import sort check
         run: ruff check src/ main.py
-      - name: Ruff format (apply formatting)
-        run: ruff format src/ main.py
       - name: Ruff format check (formatting enforced)
         run: ruff format --check src/ main.py
-      - name: Import sort check (isort via ruff I-rules)
-        run: ruff check --select I src/ main.py
+      - name: Mypy static type check
+        run: mypy src/ main.py
 
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan
