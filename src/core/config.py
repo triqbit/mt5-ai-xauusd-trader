@@ -29,43 +29,81 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
-    mt5_login: int = Field(default=0, description="MT5 account number")
-    mt5_password: str = Field(..., description="MT5 account password")
-    mt5_server: str = Field(..., description="Broker server name")
+    mt5_login: int = Field(default=0, description="MT5 account number for login")
+    mt5_password: str = Field(..., description="MT5 account password for authentication")
+    mt5_server: str = Field(..., description="MT5 broker server name (e.g., Broker-Demo)")
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
-        description="Path to MT5 terminal executable (Windows only)",
+        description="Full path to the MT5 terminal executable (Windows only)",
     )
 
     # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
-    metaapi_token: str = Field(default="", description="MetaAPI cloud token")
-    metaapi_account_id: str = Field(default="", description="MetaAPI account ID")
+    metaapi_token: str = Field(default="", description="Authentication token for MetaAPI cloud services")
+    metaapi_account_id: str = Field(default="", description="Unique account identifier for MetaAPI provisioning")
 
     # ── Trading parameters ─────────────────────────────────────────────────────
-    symbol: str = Field(default="XAUUSD", description="Primary trading symbol")
-    timeframe: str = Field(default="M5", description="Primary chart timeframe")
-    mode: Literal["demo", "live", "backtest"] = Field(default="demo", description="Execution mode")
-    max_positions: int = Field(default=3, ge=1, le=10)
-    risk_per_trade: float = Field(default=0.01, ge=0.001, le=0.05)
-    max_daily_loss: float = Field(default=0.05, ge=0.01, le=0.20)
+    symbol: str = Field(default="XAUUSD", description="The financial instrument to trade (e.g., XAUUSD)")
+    timeframe: str = Field(default="M5", description="The chart timeframe for analysis (e.g., M5, H1)")
+    mode: Literal["demo", "live", "backtest"] = Field(
+        default="demo", description="Execution mode: demo, live, or backtest"
+    )
+    max_positions: int = Field(
+        default=3, ge=1, le=10, description="Maximum number of concurrent open positions permitted"
+    )
+    risk_per_trade: float = Field(
+        default=0.01, ge=0.001, le=0.05, description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)"
+    )
+    max_daily_loss: float = Field(
+        default=0.05, ge=0.01, le=0.20, description="Maximum daily drawdown percentage before halting trading"
+    )
 
     # ── Model ──────────────────────────────────────────────────────────────────
-    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(default="ensemble")
-    model_path: Path = Field(default=ROOT / "models" / "trained" / "ensemble_latest.pt")
-    train_steps: int = Field(default=1_000_000, ge=100_000)
-    device: Literal["cpu", "cuda", "mps", "auto"] = Field(default="auto")
+    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
+        default="ensemble", description="The ML algorithm architecture to use for signal generation"
+    )
+    model_path: Path = Field(
+        default=ROOT / "models" / "trained" / "ensemble_latest.pt",
+        description="Path to the serialized weights of the trained model",
+    )
+    train_steps: int = Field(
+        default=1_000_000, ge=100_000, description="Number of environment steps for model training"
+    )
+    device: Literal["cpu", "cuda", "mps", "auto"] = Field(
+        default="auto", description="Hardware accelerator for model inference (cpu, cuda, mps, auto)"
+    )
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(default="postgresql://trader:password@localhost:5432/mt5_trades")
-    redis_url: str = Field(default="redis://localhost:6379/0")
+    database_url: str = Field(
+        default="postgresql://trader:password@localhost:5432/mt5_trades",
+        description="SQLAlchemy-compatible connection string for the primary database",
+    )
+    redis_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Connection URL for the Redis instance used for caching/queuing",
+    )
 
     # ── Monitoring ──────────────────────────────────────────────────────────
-    prometheus_port: int = Field(default=8000)
-    dashboard_port: int = Field(default=8050)
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
-    telegram_token: str = Field(default="", description="Telegram Bot API token")
-    telegram_chat_id: str = Field(default="", description="Telegram Chat ID for alerts")
-    confidence_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    prometheus_port: int = Field(
+        default=8000, description="Network port for exposing Prometheus metrics"
+    )
+    dashboard_port: int = Field(
+        default=8050, description="Network port for the interactive monitoring dashboard"
+    )
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO", description="Granularity of application logs (DEBUG, INFO, WARNING, ERROR)"
+    )
+    telegram_token: str = Field(
+        default="", description="Access token for the Telegram Bot API for real-time alerts"
+    )
+    telegram_chat_id: str = Field(
+        default="", description="Telegram Chat ID or Group ID where alerts will be sent"
+    )
+    confirm_live_trading: str = Field(
+        default="", description="Explicit confirmation for LIVE trading (must be 'YES' to start in live mode)"
+    )
+    confidence_threshold: float = Field(
+        default=0.6, ge=0.0, le=1.0, description="Minimum model confidence score required to execute a signal"
+    )
 
     @field_validator("risk_per_trade")
     @classmethod
