@@ -6,7 +6,7 @@ Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 
 import logging
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 
@@ -17,7 +17,13 @@ from src.models.base_model import BaseModel, Signal
 class PPOAgent(BaseModel):
     """
     PPO-based reinforcement learning agent.
-    Uses Stable-Baselines3 PPO under the hood.
+    Uses Stable-Baselines3 PPO under the hood for policy-based trading decisions.
+
+    Attributes:
+        logger: Logger instance for monitoring agent activity.
+        device: Torch device to use for inference (e.g., 'cpu', 'cuda', 'auto').
+        model: Loaded PPO model instance or None.
+        env: Vectorized environment used for model loading/training.
     """
 
     def __init__(
@@ -26,9 +32,18 @@ class PPOAgent(BaseModel):
         model_path: Optional[Union[str, Path]] = None,
         device: str = "auto",
     ) -> None:
+        """
+        Initializes the PPO agent with lazy loading for stable-baselines3.
+
+        Args:
+            env: An instance of the Gymnasium-compatible TradingEnv.
+            model_path: Optional path to a pre-trained PPO model file (.zip).
+            device: Computing device to use ('cpu', 'cuda', 'auto').
+        """
         self.logger = logging.getLogger(__name__)
         self.device = device
         self.model = None
+        self.env = None
 
         # Lazy loading of SB3 to avoid dependency issues in non-training environments
         try:
@@ -36,27 +51,37 @@ class PPOAgent(BaseModel):
             from stable_baselines3.common.vec_env import DummyVecEnv
 
             if env is not None:
+                # Wrap in DummyVecEnv as SB3 models expect vectorized environments
                 self.env = DummyVecEnv([lambda: env])
-            else:
-                self.env = None
 
             if model_path and Path(model_path).exists():
                 self.logger.info(f"Loading existing PPO model from {model_path}")
                 self.model = PPO.load(model_path, env=self.env, device=device)
             elif self.env is not None:
-                self.logger.info("Creating new PPO model...")
+                self.logger.info("Creating new PPO model with MlpPolicy...")
                 self.model = PPO(
                     policy="MlpPolicy",
                     env=self.env,
                     verbose=1,
                     device=device,
                 )
-        except ImportError:
-            self.logger.warning("Stable-Baselines3 not installed. PPOAgent will be limited.")
+            else:
+                self.logger.debug("PPOAgent initialized without model or environment.")
+
+        except ImportError as e:
+            self.logger.warning(
+                f"Stable-Baselines3 not installed. PPOAgent will be limited: {e}"
+            )
 
     def predict(self, features: np.ndarray) -> Signal:
         """
-        Generate a trading signal from the current observation.
+        Generate a trading signal from input features using the PPO policy.
+
+        Args:
+            features: Input feature array (e.g., OHLCV window).
+
+        Returns:
+            A Signal object containing direction, confidence, and metadata.
         """
         if self.model is None:
             return Signal(
@@ -65,15 +90,52 @@ class PPOAgent(BaseModel):
                 metadata={"error": "Model not loaded"},
             )
 
-        # SB3 predict returns (action, states)
-        action, _states = self.model.predict(features, deterministic=True)
+        try:
+            # SB3 predict returns (action, states)
+            # deterministic=True is used for production/inference consistency
+            action, _states = self.model.predict(features, deterministic=True)
 
-        # In a real implementation, we might derive confidence from action probabilities
-        # For now, we use a placeholder confidence
-        model_action = ModelAction(int(action))
+            # Convert numpy action to native Python int for indexing/mapping
+            action_val = int(action)
 
-        return Signal(
-            direction=model_action.to_direction(),
-            confidence=0.85,  # Placeholder
-            metadata={"raw_action": int(action)},
-        )
+            # Map categorical action (0, 1, 2) to ModelAction enum
+            try:
+                model_action = ModelAction(action_val)
+                direction = model_action.to_direction()
+            except ValueError:
+                self.logger.error(f"Model returned invalid action index: {action_val}")
+                return Signal(
+                    direction=SignalDirection.HOLD,
+                    confidence=0.0,
+                    metadata={"error": f"Invalid action index {action_val}"},
+                )
+
+            # In RL, confidence is often derived from the action probability (policy logit)
+            # For this stub, we use a placeholder or 1.0 since it's a deterministic policy choice
+            # A production implementation would query the policy distribution
+            return Signal(
+                direction=direction,
+                confidence=1.0,
+                metadata={"raw_action": action_val, "policy_type": "deterministic"},
+            )
+
+        except Exception as e:
+            self.logger.exception(f"Error during PPO prediction: {e}")
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": str(e)},
+            )
+
+    def save(self, path: Union[str, Path]) -> None:
+        """
+        Saves the PPO model to the specified path.
+
+        Args:
+            path: Target file path for the .zip model.
+        """
+        if self.model is not None:
+            self.model.save(path)
+            self.logger.info(f"PPO model saved to {path}")
+        else:
+            self.logger.error("Attempted to save PPOAgent but no model is loaded.")

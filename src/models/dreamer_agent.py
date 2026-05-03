@@ -16,29 +16,76 @@ from src.models.base_model import BaseModel, Signal
 class DreamerAgent(BaseModel):
     """
     DreamerV3 wrapper (placeholder).
-    DreamerV3 is a world model-based reinforcement learning algorithm.
+    DreamerV3 is a world model-based reinforcement learning algorithm that
+    learns a latent dynamics model and plans in the imagination.
+
+    Attributes:
+        logger: Logger instance for monitoring agent activity.
+        config: Configuration dictionary for the Dreamer model.
+        state: Optional latent state for the recurrent world model.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Initializes the DreamerAgent placeholder.
+
+        Args:
+            config: Optional configuration dictionary.
+        """
         self.logger = logging.getLogger(__name__)
         self.config = config or {}
-        self.logger.info("DreamerAgent initialized (placeholder mode)")
+        self.state: Optional[Any] = None
+        self.logger.info("DreamerAgent initialized in placeholder mode.")
 
     def predict(self, features: np.ndarray) -> Signal:
         """
-        Placeholder prediction for DreamerV3.
-        In a real implementation, this would involve updating the world model
-        latent state and querying the actor policy.
+        Generates a trading signal using the Dreamer policy (placeholder).
+
+        In a full implementation, this would involve updating the latent
+        state of the world model and querying the actor policy.
+
+        Args:
+            features: Input features array.
+
+        Returns:
+            A Signal object (currently returns HOLD as placeholder).
         """
+        self.logger.debug("DreamerAgent.predict called (placeholder).")
+
         # Placeholder logic: return neutral signal
         return Signal(
-            direction=SignalDirection.HOLD, confidence=0.0, metadata={"status": "placeholder"}
+            direction=SignalDirection.HOLD,
+            confidence=0.0,
+            metadata={
+                "status": "placeholder",
+                "model_type": "DreamerV3",
+                "note": "World model inference not implemented",
+            },
         )
 
     def update_state(
-        self, features: np.ndarray, action: int, reward: float, terminal: bool
+        self,
+        features: np.ndarray,
+        action: int,
+        reward: float,
+        is_terminal: bool,
     ) -> None:
         """
-        Dreamer-specific state update for the recurrent world model.
+        Updates the internal latent state of the world model.
+
+        Args:
+            features: Current observation features.
+            action: Action taken in the environment.
+            reward: Reward received from the environment.
+            is_terminal: Whether the episode has ended.
         """
+        # In Dreamer, the world model is recurrent and must be updated
+        # with every step to maintain the latent representation.
         pass
+
+    def reset_state(self) -> None:
+        """
+        Resets the latent state of the world model (e.g., at episode start).
+        """
+        self.state = None
+        self.logger.debug("DreamerAgent latent state reset.")
