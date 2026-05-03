@@ -31,6 +31,7 @@ def mock_config():
     cfg.mt5_password = "TestPassword"
     cfg.mode = "demo"
     cfg.database_url = "sqlite:///:memory:"
+    cfg.redis_url = "redis://localhost:6379/0"
     cfg.telegram_token = ""
     cfg.risk_per_trade = 0.01
     cfg.max_daily_loss = 0.05
@@ -57,11 +58,18 @@ def mock_model():
     model = MagicMock()
     model._ppo_model = MagicMock()
     model.lstm_model = MagicMock()
+    model._dreamer_model = MagicMock()
     return model
 
 @pytest.fixture
-def health_checker(mock_config, mock_connector, mock_trade_logger, mock_model):
-    return HealthChecker(mock_config, mock_connector, mock_trade_logger, mock_model)
+def mock_audit_logger():
+    logger = MagicMock()
+    logger._initialized = True
+    return logger
+
+@pytest.fixture
+def health_checker(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger):
+    return HealthChecker(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger)
 
 def test_check_liveness(health_checker):
     status = health_checker.check_liveness()
@@ -96,9 +104,11 @@ def test_check_models_success(health_checker):
     assert status.status == HealthStatus.HEALTHY
     assert "PPO" in status.message
     assert "LSTM" in status.message
+    assert "Dreamer" in status.message
 
 def test_check_models_partial(health_checker, mock_model):
     mock_model.lstm_model = None
+    mock_model._dreamer_model = None
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
     assert "PPO" in status.message
@@ -107,6 +117,7 @@ def test_check_models_partial(health_checker, mock_model):
 def test_check_models_failed(health_checker, mock_model):
     mock_model._ppo_model = None
     mock_model.lstm_model = None
+    mock_model._dreamer_model = None
     status = health_checker.check_models()
     assert status.status == HealthStatus.FAILED
 
@@ -151,11 +162,18 @@ def test_get_full_report(health_checker):
         with patch.object(HealthChecker, 'check_disk_space') as mock_disk:
             mock_disk.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
 
-            report = health_checker.get_full_report()
-            assert isinstance(report, HealthReport)
-            assert report.status == HealthStatus.HEALTHY
-            assert "liveness" in report.components
-            assert "database" in report.components
+            with patch.object(HealthChecker, 'check_redis') as mock_redis:
+                mock_redis.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+                with patch.object(HealthChecker, 'check_audit_log') as mock_audit:
+                    mock_audit.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+
+                    report = health_checker.get_full_report()
+                    assert isinstance(report, HealthReport)
+                    assert report.status == HealthStatus.HEALTHY
+                    assert "liveness" in report.components
+                    assert "database" in report.components
+                    assert "redis" in report.components
+                    assert "audit_log" in report.components
 
 # --- FastAPI Endpoint Tests ---
 
@@ -163,10 +181,10 @@ from fastapi import FastAPI
 
 
 @pytest.fixture
-def client(mock_config, mock_connector, mock_trade_logger, mock_model):
+def client(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger):
     app = FastAPI()
     app.include_router(router)
-    init_health_checker(mock_config, mock_connector, mock_trade_logger, mock_model)
+    init_health_checker(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger)
     return TestClient(app)
 
 def test_api_liveness(client):
@@ -179,10 +197,14 @@ def test_api_readiness_success(client):
         mock_conf.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
         with patch("src.core.health.HealthChecker.check_disk_space") as mock_disk:
             mock_disk.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+            with patch("src.core.health.HealthChecker.check_redis") as mock_redis:
+                mock_redis.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+                with patch("src.core.health.HealthChecker.check_audit_log") as mock_audit:
+                    mock_audit.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
 
-            response = client.get("/health/readiness")
-            assert response.status_code == 200
-            assert response.json()["status"] == "healthy"
+                    response = client.get("/health/readiness")
+                    assert response.status_code == 200
+                    assert response.json()["status"] == "healthy"
 
 def test_api_readiness_failure(client):
     with patch("src.core.health.HealthChecker.check_mt5") as mock_mt5:
