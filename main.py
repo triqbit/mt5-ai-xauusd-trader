@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
+from rich import box
 from rich.console import Console
 from rich.table import Table
 
@@ -245,19 +246,25 @@ def main() -> int:
     validator = ConfigValidator(cfg)
     result = validator.validate()
 
-    if not result.success:
-        log.critical("Startup validation FAILED")
+    if result.errors:
+        val_table = Table(title="Configuration Validation", box=box.ROUNDED)
+        val_table.add_column("Field", style="cyan")
+        val_table.add_column("Level", justify="center")
+        val_table.add_column("Message")
+
         for err in result.errors:
-            level = "CRITICAL" if err.critical else "WARNING"
-            log.error(f"  [{level}] {err.field}: {err.message}")
+            level_str = "CRITICAL" if err.critical else "WARNING"
+            level_color = "red" if err.critical else "yellow"
+            val_table.add_row(err.field, f"[{level_color}]{level_str}[/]", err.message)
+
+        console.print(val_table)
+
+    if not result.success:
+        log.critical("Startup validation FAILED - fix critical configuration errors to proceed.")
         return 1
 
-    if result.errors:
-        for err in result.errors:
-            log.warning(f"  [WARNING] {err.field}: {err.message}")
-
     log.info(
-        "Configuration loaded and validated | mode=%s algo=%s symbol=%s",
+        "Configuration loaded | mode=%s algo=%s symbol=%s",
         cfg.mode,
         cfg.algorithm,
         cfg.symbol,
@@ -305,7 +312,7 @@ def main() -> int:
     with console.status("[bold blue]Running health checks..."):
         report = health_checker.get_full_report()
 
-    table = Table(title="System Health", box=None)
+    table = Table(title="System Health Status", box=box.ROUNDED, header_style="bold magenta")
     table.add_column("Component", style="cyan")
     table.add_column("Status", justify="center")
     table.add_column("Message")
@@ -317,7 +324,7 @@ def main() -> int:
             if comp.status == HealthStatus.DEGRADED
             else "red"
         )
-        table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message)
+        table.add_row(name.capitalize(), f"[{color}]{comp.status.value.upper()}[/]", comp.message)
     console.print(table)
 
     if report.status == HealthStatus.FAILED:
