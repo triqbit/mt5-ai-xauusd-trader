@@ -58,6 +58,16 @@ if [ -d "${LOGS_DIR}" ] && [ "$(ls -A ${LOGS_DIR})" ]; then
     LOGS_ARCHIVE="${LOGS_BACKUP_DIR}/logs_${TIMESTAMP}.tar.gz"
     echo "Archiving logs to ${LOGS_ARCHIVE}..."
     tar -czf "${LOGS_ARCHIVE}" -C "${LOGS_DIR}" .
+
+    # 4.1 Verify Log Archive Integrity
+    echo "Verifying log archive integrity..."
+    if tar -tzf "${LOGS_ARCHIVE}" > /dev/null; then
+        echo "SUCCESS: Log archive integrity verified."
+    else
+        echo "FAILURE: Log archive is corrupt."
+        exit 1
+    fi
+
     (cd "${LOGS_BACKUP_DIR}" && sha256sum "$(basename "${LOGS_ARCHIVE}")" > "$(basename "${LOGS_ARCHIVE}").sha256")
 else
     echo "INFO: Logs directory empty or not found. Skipping log archival."
@@ -68,6 +78,16 @@ if [ -d "${REPORTS_DIR}" ] && [ "$(ls -A ${REPORTS_DIR})" ]; then
     REPORTS_ARCHIVE="${REPORTS_BACKUP_DIR}/reports_${TIMESTAMP}.tar.gz"
     echo "Archiving reports to ${REPORTS_ARCHIVE}..."
     tar -czf "${REPORTS_ARCHIVE}" -C "${REPORTS_DIR}" .
+
+    # 5.1 Verify Report Archive Integrity
+    echo "Verifying report archive integrity..."
+    if tar -tzf "${REPORTS_ARCHIVE}" > /dev/null; then
+        echo "SUCCESS: Report archive integrity verified."
+    else
+        echo "FAILURE: Report archive is corrupt."
+        exit 1
+    fi
+
     (cd "${REPORTS_BACKUP_DIR}" && sha256sum "$(basename "${REPORTS_ARCHIVE}")" > "$(basename "${REPORTS_ARCHIVE}").sha256")
 else
     echo "INFO: Reports directory empty or not found. Skipping report archival."
@@ -75,6 +95,7 @@ fi
 
 # 6. Retention Policy Enforcement
 echo "Enforcing retention policy (Pruning files older than ${RETENTION_DAYS} days)..."
-find "${BACKUP_ROOT}" -type f -mtime +${RETENTION_DAYS} -delete
+# Prune data files and their associated .sha256 files
+find "${BACKUP_ROOT}" -type f -mtime +${RETENTION_DAYS} -exec rm -f {} +
 
 echo "[$(date)] Disaster Recovery Backup Process Completed Successfully."
