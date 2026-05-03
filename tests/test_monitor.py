@@ -4,6 +4,8 @@ Tests for Monitor class.
 import unittest
 from unittest.mock import MagicMock, patch
 
+from pydantic import SecretStr
+
 from src.core.config import TradingConfig
 from src.core.monitor import (
     CONFIDENCE_GAUGE,
@@ -21,7 +23,7 @@ from src.core.monitor import (
 class TestMonitor(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock(spec=TradingConfig)
-        self.config.telegram_token = "fake_token"
+        self.config.telegram_token = SecretStr("fake_token")
         self.config.telegram_chat_id = "fake_chat_id"
         self.config.confidence_threshold = 0.6
         self.config.prometheus_port = 8000

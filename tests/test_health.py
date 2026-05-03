@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 from fastapi.testclient import TestClient
 
 from src.core.config import TradingConfig
@@ -28,10 +29,10 @@ def mock_config():
     cfg.logs_dir.exists.return_value = True
     cfg.mt5_login = 12345
     cfg.mt5_server = "TestServer"
-    cfg.mt5_password = "TestPassword"
+    cfg.mt5_password = SecretStr("TestPassword")
     cfg.mode = "demo"
-    cfg.database_url = "sqlite:///:memory:"
-    cfg.telegram_token = ""
+    cfg.database_url = SecretStr("sqlite:///:memory:")
+    cfg.telegram_token = SecretStr("")
     cfg.risk_per_trade = 0.01
     cfg.max_daily_loss = 0.05
     cfg.max_positions = 3
