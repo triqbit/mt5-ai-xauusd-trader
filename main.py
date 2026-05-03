@@ -251,8 +251,8 @@ def run_live(
                         packet = dss.assemble_packet(
                             cfg.symbol, explanation, regime_info, macro_risk, perf_metrics
                         )
-                        # Print the institutional decision cockpit
-                        print(dss.format_for_operator(packet))
+                        # Render the institutional decision cockpit
+                        console.print(dss.format_for_operator(packet))
 
                 if risk_approved and direction != 0:
                     with profile("execution"):
