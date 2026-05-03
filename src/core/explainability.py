@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from src.core.constants import SignalDirection
+from src.core.constants import ModelAction, SignalDirection
 
 logger = logging.getLogger(__name__)
 
@@ -175,15 +175,8 @@ class SignalExplainer:
         dominant_models = []
         max_weighted_conf = -1.0
 
-        # Mapping: Aligned with ModelAction (0=HOLD, 1=BUY, 2=SELL)
-        direction_map = {
-            0: SignalDirection.HOLD,
-            1: SignalDirection.BUY,
-            2: SignalDirection.SELL,
-        }
-
         for name, vote_idx in model_votes.items():
-            vote_dir = direction_map.get(int(vote_idx), SignalDirection.HOLD)
+            vote_dir = ModelAction(int(vote_idx)).to_direction()
             weight = model_weights.get(name, 0.0)
 
             # Individual model confidence is either the ensemble confidence (if aligned)

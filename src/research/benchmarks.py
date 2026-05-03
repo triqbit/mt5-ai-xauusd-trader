@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.core.constants import SignalDirection
+from src.core.constants import ModelAction
 
 
 class BenchmarkStrategy(Protocol):
@@ -494,9 +494,6 @@ class TransformerAdapter:
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
 
-        # Mapping: 0=HOLD, 1=BUY, 2=SELL (Aligned with ModelAction)
-        direction_map = {0: SignalDirection.HOLD, 1: SignalDirection.BUY, 2: SignalDirection.SELL}
-
         with torch.no_grad():
             for i in range(self.window_size - 1, len(df)):
                 window = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values
@@ -504,7 +501,7 @@ class TransformerAdapter:
 
                 probs = self.model(data)
                 action_idx = int(torch.argmax(probs, dim=-1).item())
-                signals[i] = float(direction_map.get(action_idx, SignalDirection.HOLD))
+                signals[i] = float(ModelAction(action_idx).to_direction())
 
         return signals
 
@@ -549,13 +546,6 @@ class LSTMAdapter:
         signals = np.zeros(len(df))
         feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
 
-        # Mapping: 0 -> HOLD, 1 -> BUY, 2 -> SELL (from LSTMPricePredictor)
-        direction_map = {
-            0: SignalDirection.HOLD,
-            1: SignalDirection.BUY,
-            2: SignalDirection.SELL,
-        }
-
         with torch.no_grad():
             for i in range(self.window_size - 1, len(df)):
                 window = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values
@@ -564,7 +554,7 @@ class LSTMAdapter:
                 logits = self.model(data)
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
                 action_idx = int(np.argmax(probs))
-                signals[i] = float(direction_map.get(action_idx, SignalDirection.HOLD))
+                signals[i] = float(ModelAction(action_idx).to_direction())
 
         return signals
 

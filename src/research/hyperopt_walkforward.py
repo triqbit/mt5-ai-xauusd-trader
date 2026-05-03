@@ -375,4 +375,4 @@ if __name__ == "__main__":
     )
 
     result = optimizer.run_optimization()
-    print(result.model_dump_json(indent=2))
+    logger.info("Optimization complete", best_params=result.best_params, score=result.metrics.robustness_score)
