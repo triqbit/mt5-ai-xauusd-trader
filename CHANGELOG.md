@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pre-event risk windows and post-event cooldown logic for XAUUSD.
 - Enterprise-safe fallback behavior for external event data feeds.
 - Comprehensive unit tests for event intelligence in `tests/test_event_intelligence.py`.
+- Institutional-grade rare event simulation framework in `src/research/rare_event_simulator.py`.
+- Support for Flash Crashes, Liquidity Vacuums, Gold Gaps, Violent Reversals, and Market Dislocations.
+- Statistical verification tests for synthetic black-swan scenario generation in `tests/test_rare_event_simulator.py`.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.

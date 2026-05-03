@@ -12,7 +12,7 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from enum import Enum, IntEnum
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -94,8 +94,8 @@ class EventIntelligence:
     def __init__(
         self,
         provider: BaseEventProvider,
-        pre_event_minutes: Dict[EventImpact, int] = None,
-        post_event_minutes: Dict[EventImpact, int] = None,
+        pre_event_minutes: Optional[Dict[EventImpact, int]] = None,
+        post_event_minutes: Optional[Dict[EventImpact, int]] = None,
     ):
         self.provider = provider
         # Default risk windows (minutes)
