@@ -34,7 +34,9 @@ def test_audit_logger_structured_metadata(audit_logger):
         entry = session.scalar(select(AuditEntry).where(AuditEntry.id == entry_id))
         assert entry.metadata_json == metadata
 
-def test_risk_manager_audit_trail(audit_logger, mocker):
+from unittest.mock import patch
+
+def test_risk_manager_audit_trail(audit_logger):
     # Manually create config to avoid env-var requirements
     config = TradingConfig(
         mt5_password="test_password",
@@ -55,14 +57,14 @@ def test_risk_manager_audit_trail(audit_logger, mocker):
     )
 
     # Mock checks to control results
-    mocker.patch.object(rm, "_check_circuit_breaker", return_value=True)
-    mocker.patch.object(rm, "_check_daily_loss", return_value=True)
-    mocker.patch.object(rm, "_check_max_positions", return_value=True)
-    mocker.patch.object(rm, "_check_symbol_allocation", return_value=True)
-    mocker.patch.object(rm, "_check_minimum_confidence", return_value=True)
-    mocker.patch.object(rm, "_check_risk_reward", return_value=True)
+    with patch.object(rm, "_check_circuit_breaker", return_value=True), \
+         patch.object(rm, "_check_daily_loss", return_value=True), \
+         patch.object(rm, "_check_max_positions", return_value=True), \
+         patch.object(rm, "_check_symbol_allocation", return_value=True), \
+         patch.object(rm, "_check_minimum_confidence", return_value=True), \
+         patch.object(rm, "_check_risk_reward", return_value=True):
 
-    approved = rm.approve(signal, signal_id=123)
+        approved = rm.approve(signal, signal_id=123)
     assert approved is True
 
     with audit_logger.Session() as session:

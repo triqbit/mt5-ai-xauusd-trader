@@ -3,6 +3,7 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 src/models/lstm_model.py
 LSTM sequence model using PyTorch for short-term price prediction.
 """
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -93,8 +94,9 @@ class LSTMPricePredictor(nn.Module if (nn and torch) else object):
         Raises:
             ImportError: If PyTorch is not installed.
         """
-        if not nn:
-            raise ImportError("PyTorch is required for LSTMPricePredictor")
+        if not (nn and torch):
+            super().__init__()
+            return
         super().__init__()
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 3)  # Outputs: [hold, buy, sell]
