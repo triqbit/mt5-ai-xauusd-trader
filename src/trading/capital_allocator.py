@@ -50,6 +50,8 @@ class AllocationResult(BaseModel):
     is_allowed: bool
     rejection_reason: Optional[str] = None
     rejection_code: Optional[RejectionCode] = None
+    was_capped: bool = False
+    was_scaled: bool = False
 
 
 class CapitalAllocator:
@@ -77,6 +79,7 @@ class CapitalAllocator:
 
         self.strategies: Dict[str, StrategyConfig] = {}
         self.current_allocations: Dict[str, float] = {}  # strategy_id -> current allocated amount
+        self.rejection_history: Dict[str, int] = {code.value: 0 for code in RejectionCode}
 
     def add_strategy(self, config: StrategyConfig) -> None:
         """Register a new strategy for capital allocation."""
@@ -163,6 +166,27 @@ class CapitalAllocator:
         cap = self.strategies[strategy_id].capital_cap
         return allocated / cap if cap > 0 else 1.0
 
+    def get_diversification_score(self) -> float:
+        """
+        Calculate portfolio diversification score using normalized HHI.
+        Ranges from 0.0 (maximum concentration) to 1.0 (perfectly diversified).
+        """
+        total_allocated = sum(self.current_allocations.values())
+        if total_allocated <= 0 or len(self.strategies) <= 1:
+            return 1.0
+
+        # Calculate Herfindahl-Hirschman Index (HHI)
+        # HHI = sum(s_i^2) where s_i is the share of each strategy in the portfolio
+        hhi = sum((amt / total_allocated) ** 2 for amt in self.current_allocations.values())
+
+        # Normalize HHI to [0, 1] range: (HHI - 1/n) / (1 - 1/n)
+        # where n is the number of strategies.
+        n = len(self.strategies)
+        normalized_hhi = (hhi - 1 / n) / (1 - 1 / n) if n > 1 else 1.0
+
+        # Return 1 - normalized_hhi so that higher is better
+        return max(0.0, min(1.0, 1.0 - normalized_hhi))
+
     def to_report_section(self, rejection_history: Optional[Dict[str, int]] = None) -> Any:
         """Convert current state to AllocationSection for ResearchReporter."""
         from src.research.reporting import AllocationEntry, AllocationSection
@@ -182,15 +206,25 @@ class CapitalAllocator:
         return AllocationSection(
             total_heat_pct=float(self.get_total_heat() * 100),
             allocations=allocations,
-            rejection_summary=rejection_history or {},
+            rejection_summary=rejection_history or self.rejection_history,
         )
 
-    def request_allocation(self, strategy_id: str, risk_pct: float) -> AllocationResult:
+    def _record_rejection(self, code: RejectionCode) -> None:
+        """Increment the counter for a specific rejection reason."""
+        self.rejection_history[code.value] += 1
+
+    def request_allocation(
+        self, strategy_id: str, risk_pct: float, allow_scaling: bool = False
+    ) -> AllocationResult:
         """
         Evaluate if a strategy can be allocated the requested risk.
         Applies adaptive budget allocation, caps, and concentration limits.
+
+        If allow_scaling is True, instead of rejecting due to heat limits,
+        it will return the maximum possible allocation that fits within limits.
         """
         if strategy_id not in self.strategies:
+            self._record_rejection(RejectionCode.STRATEGY_NOT_FOUND)
             return AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
@@ -202,10 +236,14 @@ class CapitalAllocator:
             )
 
         config = self.strategies[strategy_id]
+        was_capped = False
+        was_scaled = False
 
         # 1. Apply Performance Multiplier (Adaptive Allocation)
         # This scales the requested risk based on historical performance.
         target_risk_pct = risk_pct * config.performance_multiplier
+        if config.performance_multiplier != 1.0:
+            was_scaled = True
         target_amount = self.total_budget * target_risk_pct
 
         # 2. Check Strategy-Level Capital Cap
@@ -219,8 +257,10 @@ class CapitalAllocator:
             )
             target_amount = config.capital_cap
             target_risk_pct = target_amount / self.total_budget
+            was_capped = True
 
             if target_amount <= 0:
+                self._record_rejection(RejectionCode.CAPITAL_CAP_REACHED)
                 return AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
@@ -235,41 +275,74 @@ class CapitalAllocator:
         # Use the final adjusted_risk_pct (scaled and capped) for safety checks.
         current_total_heat = self.get_total_heat()
         if current_total_heat + target_risk_pct > self.max_total_heat:
-            return AllocationResult(
-                strategy_id=strategy_id,
-                allocated_amount=0.0,
-                allocated_risk_pct=0.0,
-                requested_risk_pct=risk_pct,
-                is_allowed=False,
-                rejection_reason=f"Total heat limit reached: {current_total_heat:.2f}",
-                rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
-            )
+            if allow_scaling:
+                target_risk_pct = max(0.0, self.max_total_heat - current_total_heat)
+                was_capped = True
+            else:
+                self._record_rejection(RejectionCode.TOTAL_HEAT_LIMIT)
+                return AllocationResult(
+                    strategy_id=strategy_id,
+                    allocated_amount=0.0,
+                    allocated_risk_pct=0.0,
+                    requested_risk_pct=risk_pct,
+                    is_allowed=False,
+                    rejection_reason=f"Total heat limit reached: {current_total_heat:.2f}",
+                    rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
+                )
 
         # 4. Check Symbol Concentration
         symbol_heat = self.get_symbol_heat(config.symbol)
         if symbol_heat + target_risk_pct > self.max_symbol_risk:
-            return AllocationResult(
-                strategy_id=strategy_id,
-                allocated_amount=0.0,
-                allocated_risk_pct=0.0,
-                requested_risk_pct=risk_pct,
-                is_allowed=False,
-                rejection_reason=f"Symbol concentration limit reached for {config.symbol}",
-                rejection_code=RejectionCode.SYMBOL_CONCENTRATION_LIMIT,
-            )
+            if allow_scaling:
+                target_risk_pct = max(0.0, self.max_symbol_risk - symbol_heat)
+                was_capped = True
+            else:
+                self._record_rejection(RejectionCode.SYMBOL_CONCENTRATION_LIMIT)
+                return AllocationResult(
+                    strategy_id=strategy_id,
+                    allocated_amount=0.0,
+                    allocated_risk_pct=0.0,
+                    requested_risk_pct=risk_pct,
+                    is_allowed=False,
+                    rejection_reason=f"Symbol concentration limit reached for {config.symbol}",
+                    rejection_code=RejectionCode.SYMBOL_CONCENTRATION_LIMIT,
+                )
 
         # 5. Check Model Family Concentration
         family_heat = self.get_family_heat(config.model_family)
         if family_heat + target_risk_pct > self.max_family_risk:
+            if allow_scaling:
+                target_risk_pct = max(0.0, self.max_family_risk - family_heat)
+                was_capped = True
+            else:
+                self._record_rejection(RejectionCode.FAMILY_CONCENTRATION_LIMIT)
+                return AllocationResult(
+                    strategy_id=strategy_id,
+                    allocated_amount=0.0,
+                    allocated_risk_pct=0.0,
+                    requested_risk_pct=risk_pct,
+                    is_allowed=False,
+                    rejection_reason=f"Family concentration limit reached for {config.model_family}",
+                    rejection_code=RejectionCode.FAMILY_CONCENTRATION_LIMIT,
+                )
+
+        # Final check if scaling reduced it to zero
+        if target_risk_pct <= 0:
+            # We already checked RejectionCode.CAPITAL_CAP_REACHED in step 2.
+            # If scaling brought it to 0, it means we're at some heat limit.
+            # For simplicity, we use the last limit check's code or a generic one.
+            self._record_rejection(RejectionCode.TOTAL_HEAT_LIMIT)
             return AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
                 allocated_risk_pct=0.0,
                 requested_risk_pct=risk_pct,
                 is_allowed=False,
-                rejection_reason=f"Family concentration limit reached for {config.model_family}",
-                rejection_code=RejectionCode.FAMILY_CONCENTRATION_LIMIT,
+                rejection_reason="Scaling reduced allocation to zero due to limits",
+                rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
             )
+
+        target_amount = self.total_budget * target_risk_pct
 
         return AllocationResult(
             strategy_id=strategy_id,
@@ -277,6 +350,8 @@ class CapitalAllocator:
             allocated_risk_pct=target_risk_pct,
             requested_risk_pct=risk_pct,
             is_allowed=True,
+            was_capped=was_capped,
+            was_scaled=was_scaled,
         )
 
 
