@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Dependency conflict in CI by updating `gymnasium` version constraint.
+- Dependency conflict between `pytest` and `pytest-asyncio` by downgrading `pytest` to `8.3.4`.
+
+### Security
+- Hardened sensitive configuration fields (MT5 password, MetaAPI token, Telegram token, Database URL) using `pydantic.SecretStr` to prevent accidental exposure in logs and string representations.
 
 ## [1.0.0] - 2024-05-24
 ### Added
