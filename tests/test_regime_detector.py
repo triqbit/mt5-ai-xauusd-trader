@@ -1,7 +1,10 @@
 import unittest
-import pandas as pd
+
 import numpy as np
-from src.models.regime_detector import RegimeDetector, MarketRegime
+import pandas as pd
+
+from src.models.regime_detector import MarketRegime, RegimeDetector
+
 
 class TestRegimeDetector(unittest.TestCase):
     def setUp(self):

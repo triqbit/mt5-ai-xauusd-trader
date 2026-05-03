@@ -1,6 +1,7 @@
-import sys
 import platform
+import sys
 from pathlib import Path
+
 
 def check_python_version():
     print("Checking Python version...", end=" ")
@@ -16,11 +17,11 @@ def check_dependencies():
     print("Checking dependencies...", end=" ")
     try:
         # Check a few key dependencies
-        import torch
-        import pandas
         import numpy
+        import pandas
         import pydantic
         import talib
+        import torch
         print("OK")
         return True
     except ImportError as e:

@@ -6,16 +6,17 @@ import pytest
 
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock, patch
-from src.models.regime_detector import RegimeDetector, MarketRegime
-from src.models.dynamic_ensemble import DynamicEnsemble
+
+from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
+from src.models.regime_detector import MarketRegime, RegimeDetector
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.risk_manager import RiskManager, TradeSignal
-from src.core.config import get_config
-from src.core.trade_logger import TradeLogger
+
 
 @pytest.fixture
 def mock_ohlcv_data():

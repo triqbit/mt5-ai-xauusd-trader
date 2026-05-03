@@ -4,18 +4,21 @@ tests/test_integration_flow.py
 Verifies end-to-end integration across all system components.
 """
 import time
-import pytest
+
 import numpy as np
+import pytest
+
 try:
     import torch
 except ImportError:
     torch = None
 import os
-from unittest.mock import MagicMock, patch, Mock
 from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
 from pydantic import ValidationError
 
-from src.core.config import TradingConfig, get_config
+from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector

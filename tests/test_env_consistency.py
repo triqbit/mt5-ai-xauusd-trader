@@ -1,8 +1,8 @@
 
 import numpy as np
-import pandas as pd
-import pytest
+
 from src.environment.gym_env import TradingEnv
+
 
 def test_observation_consistency():
     # Set seed for reproducibility

@@ -1,9 +1,9 @@
+import datetime
 import json
 import os
-import datetime
-import urllib.request
-import urllib.error
 import sys
+import urllib.error
+import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
@@ -158,7 +158,7 @@ def generate_report():
     # Limit processing if no token to avoid rate limits
     max_prs_to_process = len(prs)
     if not GITHUB_TOKEN and max_prs_to_process > 10:
-        print(f"Warning: No GITHUB_TOKEN, limiting detailed processing to first 10 PRs to avoid rate limit.")
+        print("Warning: No GITHUB_TOKEN, limiting detailed processing to first 10 PRs to avoid rate limit.")
         max_prs_to_process = 10
 
     for i, pr in enumerate(prs):
@@ -249,7 +249,7 @@ def generate_report():
     else:
         for i, c in enumerate(top_3):
             checklist += f"## {i+1}. PR #{c['number']}: {c['title']}\n"
-            checklist += f"- **Status**: Ready for detailed review\n"
+            checklist += "- **Status**: Ready for detailed review\n"
             checklist += f"- **Risk**: {c['risk']}\n"
             checklist += f"- **Why**: Low risk change improving {c['reason'].lower()}\n"
             checklist += "- **Verification**: See PR for CI status and tests.\n\n"

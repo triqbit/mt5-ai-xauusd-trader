@@ -1,8 +1,13 @@
 
-import pytest
-import pandas as pd
 from datetime import datetime, timezone
-from src.analytics.journal_mining import JournalMiner, SessionAnalysis, VolatilityPattern, DrawdownCluster
+
+import pandas as pd
+import pytest
+
+from src.analytics.journal_mining import (
+    JournalMiner,
+)
+
 
 @pytest.fixture
 def miner():
@@ -88,7 +93,7 @@ def test_risk_blocks(miner, sample_signals):
 def test_run_mining(miner):
     # Setup database with some data
     with miner.Session() as session:
-        from src.core.trade_logger import ModelSignal, Trade, RiskEvent
+        from src.core.trade_logger import ModelSignal, RiskEvent, Trade
 
         sig = ModelSignal(
             symbol="XAUUSD",
@@ -184,7 +189,7 @@ def test_strategy_state_correlation(miner):
     assert correlations["MAX_DRAWDOWN"] == 0.5
 
 def test_to_report_section_with_toxic_motif(miner):
-    from src.analytics.journal_mining import JournalReport, SignalMotif, BlockReasonSummary
+    from src.analytics.journal_mining import BlockReasonSummary, JournalReport, SignalMotif
 
     report = JournalReport(
         session_analysis=[],

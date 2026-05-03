@@ -3,18 +3,26 @@ Integration tests for the research reporting system.
 """
 
 import os
-import pytest
-import pandas as pd
+from datetime import datetime
+
 import numpy as np
-from datetime import datetime, timezone
-from src.research.reporting import ResearchReport, ResearchReporter
-from src.research.hyperopt_walkforward import WalkForwardResult, RobustnessMetrics
-from src.analytics.journal_mining import JournalReport, SessionAnalysis, PatternConcentration, DrawdownCluster
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.models.regime_detector import RegimeDetector, MarketRegime
+import pandas as pd
+import pytest
+
 from src.analytics.drift_analyzer import DriftAnalysisReport, DriftMetric
+from src.analytics.journal_mining import (
+    DrawdownCluster,
+    JournalReport,
+    PatternConcentration,
+    SessionAnalysis,
+)
+from src.models.regime_detector import MarketRegime, RegimeDetector
+from src.research.benchmarks import BenchmarkEvaluator
+from src.research.hyperopt_walkforward import RobustnessMetrics, WalkForwardResult
+from src.research.reporting import ResearchReport, ResearchReporter
 from src.research.stress_lab import ResilienceReport, StressTestMetrics
-from src.research.benchmarks import BenchmarkEvaluator, EMACrossoverStrategy
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+
 
 @pytest.fixture
 def mock_walk_forward_result():

@@ -2,21 +2,20 @@
 Tests for Monitor class.
 """
 import unittest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime, timezone
-import asyncio
-from src.core.monitor import (
-    Monitor,
-    EQUITY_GAUGE,
-    DAILY_PNL_GAUGE,
-    TRADE_COUNTER,
-    DRAWDOWN_GAUGE,
-    CONFIDENCE_GAUGE,
-    SHARPE_RATIO_GAUGE,
-    WIN_RATE_GAUGE,
-    SYSTEM_ERROR_COUNTER,
-)
+from unittest.mock import MagicMock, patch
+
 from src.core.config import TradingConfig
+from src.core.monitor import (
+    CONFIDENCE_GAUGE,
+    DAILY_PNL_GAUGE,
+    DRAWDOWN_GAUGE,
+    EQUITY_GAUGE,
+    SHARPE_RATIO_GAUGE,
+    SYSTEM_ERROR_COUNTER,
+    TRADE_COUNTER,
+    WIN_RATE_GAUGE,
+    Monitor,
+)
 
 
 class TestMonitor(unittest.TestCase):

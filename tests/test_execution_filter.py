@@ -4,12 +4,15 @@ tests/test_execution_filter.py
 Unit tests for the 6-layer execution filter.
 """
 
-import pytest
-import pandas as pd
-import numpy as np
 from datetime import datetime
-from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.trading.execution_filter import ExecutionFilter
 from src.trading.risk_manager import TradeSignal
+
 
 @pytest.fixture
 def base_data():

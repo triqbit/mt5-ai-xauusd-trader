@@ -1,15 +1,16 @@
 import os
+import shutil
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import tempfile
-import shutil
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from src.core.trade_logger import Base, ModelSignal, Trade, RiskEvent, PerformanceMetric
-from scripts.data_cleanup import cleanup_database, cleanup_logs, cleanup_backtests
+from scripts.data_cleanup import cleanup_backtests, cleanup_database, cleanup_logs
+from src.core.trade_logger import Base, ModelSignal, PerformanceMetric, RiskEvent, Trade
+
 
 class TestDataCleanup(unittest.TestCase):
     def setUp(self):

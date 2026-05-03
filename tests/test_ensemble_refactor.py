@@ -6,14 +6,14 @@ import pytest
 
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
-import sys
 from unittest.mock import MagicMock
-from pathlib import Path
+
 import numpy as np
 
 # Use the standardized SignalDirection from constants
 from src.core.constants import SignalDirection
 from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+
 
 def test_lstm_attention_model_output_shape():
     """Verify LSTM+Attention model produces correct logit shapes."""

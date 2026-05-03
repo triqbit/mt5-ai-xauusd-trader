@@ -3,18 +3,20 @@ Tests for the research reporting system.
 """
 
 import os
+
 import pytest
-from datetime import datetime, timezone
+
 from src.research.reporting import (
-    ResearchReport,
-    ResearchReporter,
+    AllocationEntry,
+    AllocationSection,
     RegimeSection,
     RegimeSummary,
-    StressTestSection,
+    ResearchReport,
+    ResearchReporter,
     StressedMetric,
-    AllocationSection,
-    AllocationEntry
+    StressTestSection,
 )
+
 
 @pytest.fixture
 def sample_report():

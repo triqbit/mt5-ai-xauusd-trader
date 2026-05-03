@@ -3,27 +3,25 @@ MT5 AI/ML Trading Bot - Comprehensive Integration Test Suite
 tests/verify_integration.py
 Verifies multi-agent work composes into a functioning, reliable system.
 """
+import os
 import time
-import pytest
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
-import torch
-import os
-from unittest.mock import MagicMock, patch, Mock
-from datetime import datetime, timezone
-from pydantic import ValidationError
+import pytest
 
-from src.core.config import TradingConfig, get_config
+from src.core.config import get_config
 from src.core.monitor import Monitor
-from src.core.trade_logger import TradeLogger, RiskEvent
-from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
-from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
+from src.core.trade_logger import RiskEvent, TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import RegimeDetector
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.research.hyperopt_walkforward import WalkForwardOptimizer, WalkForwardConfig
 from src.research.benchmarks import EMACrossoverStrategy
+from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
+from src.trading.execution_filter import ExecutionFilter
+from src.trading.mt5_connector import MT5Connector
+from src.trading.risk_manager import RiskManager, TradeSignal
 
 # --- Fixtures ---
 
