@@ -95,6 +95,7 @@ class JournalReport(BaseModel):
         from src.research.reporting import (
             BehavioralRisk,
             PatternConcentration as ReportingPattern,
+            SignalMotif as ReportingMotif,
             TradePatternSection,
         )
 
@@ -155,11 +156,26 @@ class JournalReport(BaseModel):
         if risks:
             primary_insight = f"Behavioral risks identified: {risks[0].type}."
 
+        # Map motifs
+        motifs = []
+        for m in self.recurring_motifs:
+            motifs.append(
+                ReportingMotif(
+                    algorithm=m.algorithm,
+                    direction=m.direction,
+                    volatility_bucket=m.volatility_bucket,
+                    confidence_bucket=m.confidence_bucket,
+                    frequency=m.frequency,
+                    win_rate=m.win_rate,
+                    cluster_frequency=m.cluster_frequency,
+                )
+            )
+
         return TradePatternSection(
             primary_insight=primary_insight,
             concentrations=concentrations[:5],  # Top 5 for clarity
             behavioral_risks=risks,
-            motifs=self.recurring_motifs[:5],  # Top 5 for clarity
+            motifs=motifs[:5],  # Top 5 for clarity
         )
 
 
