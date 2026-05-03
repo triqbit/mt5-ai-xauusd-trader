@@ -17,7 +17,10 @@ jobs:
   enforce-policy:
     name: Enforce Auto-Merge Policy
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    # Exemption for Jules05 policy updates
+    if: |
+      github.event.pull_request.draft == false &&
+      !(github.actor == 'yxynoty' && contains(github.event.pull_request.title, '🤖 Jules05: Auto-merge policy update'))
     outputs:
       risk_status: ${{ steps.risk-check.outputs.risk_status }}
       has_tests: ${{ steps.compliance-check.outputs.has_tests }}
@@ -40,12 +43,17 @@ jobs:
           # Patterns that strictly block and escalate
           HIGH_RISK_PATTERNS=(
             "src/trading/executor.py"      # Live trading execution logic
+            "src/trading/mt5_connector.py" # MT5 connectivity
+            "src/trading/order_manager.py" # Order management
             "src/core/risk_engine.py"      # Core risk calculation engine
-            "src/trading/risk_manager.py"  # Risk parameters and position sizing
+            "src/trading/risk_manager.py"  # Risk parameters
+            "src/trading/portfolio_manager.py" # Position sizing
+            "src/core/config.py"           # System configuration
             "config/secrets.*"             # Credentials and secrets
             ".github/workflows/deploy.*"   # Deployment workflows
             ".github/workflows/ci.yml"     # CI workflows affecting deployment
             "Dockerfile"                   # Infrastructure control
+            "docker-compose.yml"           # Orchestration control
             "migrations/.*"                # Database migrations
           )
 
@@ -79,9 +87,20 @@ jobs:
             if [[ "$file" =~ ^src/ || "$file" == "main.py" ]]; then SOURCE_MODIFIED=true; fi
           done
 
+          # Check for forbidden print statements (observability standard)
+          FORBIDDEN_PRINT=false
+          if [ "$SOURCE_MODIFIED" = "true" ]; then
+            # Search for \bprint( but exclude console.print( (rich)
+            if grep -rE "\bprint\(" src/ | grep -v "console.print(" | grep -qE "\bprint\("; then
+               echo "❌ FORBIDDEN PRINT DETECTED: src/ files must use structlog for observability."
+               FORBIDDEN_PRINT=true
+            fi
+          fi
+
           echo "has_tests=$HAS_TESTS" >> $GITHUB_OUTPUT
           echo "has_docs=$HAS_DOCS" >> $GITHUB_OUTPUT
           echo "source_modified=$SOURCE_MODIFIED" >> $GITHUB_OUTPUT
+          echo "forbidden_print=$FORBIDDEN_PRINT" >> $GITHUB_OUTPUT
 
       - name: Check Coverage
         id: coverage-check
@@ -96,12 +115,15 @@ jobs:
         if: |
           steps.risk-check.outputs.risk_status == 'blocked' ||
           (steps.compliance-check.outputs.source_modified == 'true' &&
-           (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
+           (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false' || steps.compliance-check.outputs.forbidden_print == 'true')) ||
           steps.coverage-check.outputs.coverage_pass == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          # Ensure label exists
+          gh label create "escalated-risk" --color "B60205" --description "High-risk changes requiring manual escalation" || true
+
           REASON="The following auto-merge criteria were not met:"
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
             REASON="$REASON\n- 🚨 **High-risk files modified.** (Must be ESCALATED and manually reviewed)"
@@ -116,6 +138,9 @@ jobs:
             fi
             if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
               REASON="$REASON\n- ❌ **Source code modified but no documentation updated.**"
+            fi
+            if [ "${{ steps.compliance-check.outputs.forbidden_print }}" = "true" ]; then
+              REASON="$REASON\n- ❌ **Forbidden print() statements detected in src/.** Use structlog."
             fi
           fi
 
