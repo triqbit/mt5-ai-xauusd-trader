@@ -256,7 +256,8 @@ def run_live(
                         if console:
                             console.print(dss.format_for_operator(packet))
                         else:
-                            print(dss.format_for_operator(packet))
+                            # Fallback to standard logging if console is missing
+                            log.info("Institutional Decision Cockpit:\n%s", dss.format_for_operator(packet))
 
                 if risk_approved and direction != 0:
                     with profile("execution"):

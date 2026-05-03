@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from src.data.event_intelligence import (
     EventIntelligence,
     MockEventProvider,
@@ -10,7 +10,7 @@ from src.data.event_intelligence import (
 
 @pytest.fixture
 def mock_events():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return [
         MacroEvent(
             name="CPI Data",
@@ -39,7 +39,7 @@ def mock_events():
     ]
 
 def test_risk_status_blocking():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     events = [
         MacroEvent(
             name="CPI Data",
@@ -67,7 +67,7 @@ def test_risk_status_blocking():
 
 def test_risk_status_critical_blocking(mock_events):
     # Move current time closer to FOMC
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     fomc_time = now + timedelta(minutes=30)
 
     # Update FOMC event in provider
@@ -88,7 +88,7 @@ def test_risk_status_critical_blocking(mock_events):
     assert status.risk_multiplier == 0.0
 
 def test_risk_status_cooldown(mock_events):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     # Past NFP was 10 mins ago, HIGH impact has 120 mins cooldown
     events = [
         MacroEvent(
@@ -107,7 +107,7 @@ def test_risk_status_cooldown(mock_events):
     assert status.active_events[0].name == "Past NFP"
 
 def test_no_active_events():
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     provider = MockEventProvider([])
     intel = EventIntelligence(provider)
 
@@ -122,7 +122,7 @@ def test_fallback_behavior():
             raise Exception("API Down")
 
     intel = EventIntelligence(BrokenProvider())
-    status = intel.get_risk_status(datetime.utcnow())
+    status = intel.get_risk_status(datetime.now(timezone.utc))
 
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0

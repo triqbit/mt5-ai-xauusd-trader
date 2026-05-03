@@ -61,17 +61,16 @@ demo:
 	$(PYTHON_EXEC) main.py --mode demo --symbol XAUUSD --verbose
 
 init:
-	@echo "Initializing system (Stub)..."
+	@echo "Initializing system..."
 	bash scripts/bootstrap.sh
 
 validate-config:
-	@echo "Validating configuration (Stub)..."
+	@echo "Validating configuration..."
 	$(PYTHON_EXEC) scripts/validate_env.py
 
 backtest:
-	@echo "Running standardized backtest (Stub)..."
-	@echo "Note: Redirecting to main.py --mode backtest"
-	$(PYTHON_EXEC) main.py --mode backtest --symbol XAUUSD --algo ensemble || echo "Backtest implementation in progress"
+	@echo "Running standardized backtest..."
+	$(PYTHON_EXEC) scripts/backtest.py
 
 report:
 	@echo "Generating performance report (Stub)..."
@@ -87,7 +86,7 @@ emergency-stop:
 	# In a real scenario, this would call a dedicated emergency script
 
 daily-summary:
-	@echo "Generating Daily Operator Summary (Stub)..."
+	@echo "Generating Daily Operator Summary..."
 	$(PYTHON_EXEC) generate_triage_report.py
 
 clean:
