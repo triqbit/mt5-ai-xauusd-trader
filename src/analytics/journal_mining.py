@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, List
+from typing import Any, Dict, List
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -460,13 +460,6 @@ class JournalMiner:
             if freq < 2:
                 continue
 
-            # Check if this motif is heavily present in drawdown clusters
-            if cluster_signal_ids:
-                in_cluster_count = group["id"].isin(cluster_signal_ids).sum()
-                # If a motif appears frequently in clusters, we treat it as more significant
-                # even if overall frequency is low. But for now we just use win_rate.
-                pass
-
             win_rate = group["win"].mean()
             results.append(
                 SignalMotif(
@@ -502,10 +495,7 @@ class JournalMiner:
             weak_windows.append((cluster.start_time, end_time))
 
         def is_weak(dt: datetime) -> bool:
-            for start, end in weak_windows:
-                if start <= dt <= end:
-                    return True
-            return False
+            return any(start <= dt <= end for start, end in weak_windows)
 
         # Assume risk_events_df has a timestamp. If not, we might need to join with signals
         # Let's check RiskEvent model in trade_logger. It has AuditMixin (created_at)
