@@ -338,3 +338,34 @@ latency_histogram.observe(45.2)
 ## Conclusion
 
 Proactive monitoring and intelligent alerting are critical for maintaining a high-performance trading bot. Regular review of alerts, tuning of thresholds, and continuous improvement of observability ensure reliable operations 24/7.
+
+## 11. Exposed Metrics (Prometheus)
+
+The following metrics are exposed by the `Monitor` module:
+
+### 11.1 Trading Performance
+- `trading_equity`: Current account equity (Gauge)
+- `trading_pnl_daily`: Realized P&L for the current day (Gauge)
+- `trading_trades_total`: Total number of trades executed (Counter)
+- `trading_drawdown_percent`: Current account drawdown percentage (Gauge)
+- `trading_sharpe_ratio`: Annualized Sharpe Ratio (Gauge)
+- `trading_win_rate`: Trading win rate percentage (Gauge)
+
+### 11.2 Execution Quality
+- `trading_execution_latency_seconds`: Time from signal to execution (Histogram)
+- `trading_slippage_pips`: Difference between expected and actual price (Histogram)
+- `trading_fill_rate`: Percentage of orders filled at intended price (Gauge)
+- `trading_orders_rejected_total`: Total number of rejected orders (Counter)
+
+### 11.3 System Health
+- `system_cpu_usage_percent`: System CPU utilization percentage (Gauge)
+- `system_memory_usage_percent`: System memory usage percentage (Gauge)
+- `system_disk_usage_percent`: System disk usage percentage (Gauge)
+- `trading_system_errors`: Total count of system errors labeled by component (Counter)
+- `trading_block_duration_seconds`: Duration of trading code blocks labeled by label (Histogram)
+
+### 11.4 Model & Data
+- `trading_model_confidence`: Latest model prediction confidence (Gauge)
+- `trading_model_accuracy`: Model prediction accuracy (Gauge)
+- `trading_model_drift_score`: Statistical drift from baseline (Gauge)
+- `trading_data_freshness_seconds`: Age of latest data point in seconds (Gauge)

@@ -9,25 +9,41 @@ License: MIT
 from __future__ import annotations
 
 import asyncio
-import logging
+from collections import deque
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
+import psutil
+import structlog
 import telegram
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 from src.core.config import TradingConfig
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # --- Prometheus Metrics Definitions ---
+
+# 1. Trading Performance Metrics
 EQUITY_GAUGE = Gauge("trading_equity", "Current account equity")
 DAILY_PNL_GAUGE = Gauge("trading_pnl_daily", "Realized P&L for the current day")
 TRADE_COUNTER = Counter("trading_trades_total", "Total number of trades executed")
 DRAWDOWN_GAUGE = Gauge("trading_drawdown_percent", "Current account drawdown percentage")
-CONFIDENCE_GAUGE = Gauge("trading_model_confidence", "Latest model prediction confidence")
 SHARPE_RATIO_GAUGE = Gauge("trading_sharpe_ratio", "Annualized Sharpe Ratio")
 WIN_RATE_GAUGE = Gauge("trading_win_rate", "Trading win rate percentage")
+
+# 2. Execution Metrics
+EXECUTION_LATENCY_HISTOGRAM = Histogram(
+    "trading_execution_latency_seconds", "Time from signal to execution"
+)
+SLIPPAGE_HISTOGRAM = Histogram("trading_slippage_pips", "Difference between expected and actual price")
+FILL_RATE_GAUGE = Gauge("trading_fill_rate", "Percentage of orders filled at intended price")
+REJECTED_ORDER_COUNTER = Counter("trading_orders_rejected_total", "Total number of rejected orders")
+
+# 3. System Health Metrics
+CPU_USAGE_GAUGE = Gauge("system_cpu_usage_percent", "System CPU utilization percentage")
+MEMORY_USAGE_GAUGE = Gauge("system_memory_usage_percent", "System memory usage percentage")
+DISK_USAGE_GAUGE = Gauge("system_disk_usage_percent", "System disk usage percentage")
 SYSTEM_ERROR_COUNTER = Counter(
     "trading_system_errors", "Total count of system errors", ["component"]
 )
@@ -36,6 +52,14 @@ TRADING_BLOCK_DURATION = Histogram(
     "Duration of trading code blocks in seconds",
     ["block_label"],
 )
+
+# 4. Model Metrics
+CONFIDENCE_GAUGE = Gauge("trading_model_confidence", "Latest model prediction confidence")
+MODEL_ACCURACY_GAUGE = Gauge("trading_model_accuracy", "Model prediction accuracy")
+MODEL_DRIFT_GAUGE = Gauge("trading_model_drift_score", "Statistical drift from baseline")
+
+# 5. Data Quality Metrics
+DATA_FRESHNESS_GAUGE = Gauge("trading_data_freshness_seconds", "Age of latest data point in seconds")
 
 
 class Monitor:
@@ -46,10 +70,13 @@ class Monitor:
 
     def __init__(self, config: TradingConfig) -> None:
         self.cfg = config
-        self.equity_history: List[Dict[str, Any]] = []
+        self.equity_history: deque[Dict[str, Any]] = deque(maxlen=1000)
         self.bot: Optional[telegram.Bot] = None
         self._server_started = False
         self._background_tasks: set[asyncio.Task] = set()
+
+        # Initialize psutil for non-blocking cpu_percent calls
+        psutil.cpu_percent(interval=None)
 
         telegram_token = self.cfg.telegram_token.get_secret_value()
         if telegram_token:
@@ -66,16 +93,51 @@ class Monitor:
         try:
             start_http_server(self.cfg.prometheus_port)
             self._server_started = True
-            logger.info("Prometheus metrics server started on port %d", self.cfg.prometheus_port)
+            logger.info("prometheus_server_started", port=self.cfg.prometheus_port)
+
+            # Start background task for system metrics
+            try:
+                loop = asyncio.get_running_loop()
+                task = loop.create_task(self._collect_system_metrics())
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
+            except RuntimeError:
+                # If no loop is running (e.g. during startup), we don't start the background task here.
+                # In a real app, main.py ensures a loop is running.
+                logger.warning("no_running_loop_skipping_system_metrics")
         except Exception as e:
-            logger.error("Failed to start Prometheus metrics server: %s", e)
+            logger.error("failed_to_start_prometheus_server", error=str(e))
+
+    async def _collect_system_metrics(self, interval: int = 60) -> None:
+        """Background task to collect system metrics periodically."""
+        logger.info("system_metrics_collection_started", interval_seconds=interval)
+        while True:
+            try:
+                cpu = psutil.cpu_percent(interval=None)
+                memory = psutil.virtual_memory().percent
+                disk = psutil.disk_usage("/").percent
+
+                CPU_USAGE_GAUGE.set(cpu)
+                MEMORY_USAGE_GAUGE.set(memory)
+                DISK_USAGE_GAUGE.set(disk)
+
+                logger.debug("system_metrics_updated", cpu=cpu, memory=memory, disk=disk)
+            except Exception as e:
+                logger.error("failed_to_collect_system_metrics", error=str(e))
+
+            await asyncio.sleep(interval)
 
     def log_equity(self, equity: float) -> None:
         """Record current equity and update Prometheus metrics."""
         data = {"timestamp": datetime.now(timezone.utc), "equity": equity}
         self.equity_history.append(data)
         EQUITY_GAUGE.set(equity)
-        logger.debug("Equity logged: %.2f", equity)
+        logger.debug("equity_logged", equity=equity)
+
+    def log_pnl(self, pnl: float) -> None:
+        """Update daily P&L metric."""
+        DAILY_PNL_GAUGE.set(pnl)
+        logger.debug("pnl_logged", pnl=pnl)
 
     def send_message(self, text: str) -> None:
         """
@@ -143,17 +205,60 @@ class Monitor:
         SYSTEM_ERROR_COUNTER.labels(component=component).inc()
         msg = f"❌ SYSTEM ERROR: {component}\nError: {error_message}"
         self.send_message(msg)
-        logger.error("System error logged | component=%s, error=%s", component, error_message)
+        logger.error("system_error_logged", component=component, error=error_message)
 
     def update_performance_metrics(self, win_rate: float, sharpe_ratio: float) -> None:
         """Update Sharpe Ratio and Win Rate Prometheus metrics."""
         WIN_RATE_GAUGE.set(win_rate * 100)
         SHARPE_RATIO_GAUGE.set(sharpe_ratio)
         logger.debug(
-            "Performance metrics updated | Win Rate: %.2f%%, Sharpe: %.2f",
-            win_rate * 100,
-            sharpe_ratio,
+            "performance_metrics_updated",
+            win_rate_pct=win_rate * 100,
+            sharpe_ratio=sharpe_ratio,
         )
+
+    def alert_balance_mismatch(self, broker_balance: float, local_balance: float) -> None:
+        """Send critical alert for account balance mismatch."""
+        diff = abs(broker_balance - local_balance)
+        diff_pct = (diff / broker_balance) * 100 if broker_balance > 0 else 0
+        msg = (
+            f"🚨 CRITICAL: Balance Mismatch Detected!\n"
+            f"Broker: {broker_balance:.2f}\n"
+            f"Local: {local_balance:.2f}\n"
+            f"Difference: {diff_pct:.2f}%"
+        )
+        self.send_message(msg)
+        logger.error("balance_mismatch_detected", broker=broker_balance, local=local_balance, diff_pct=diff_pct)
+
+    def alert_margin_call(self, margin_ratio: float) -> None:
+        """Send critical alert for low margin ratio."""
+        msg = f"🚨 CRITICAL: Margin Call Warning!\nMargin Ratio: {margin_ratio:.2f}%"
+        self.send_message(msg)
+        logger.error("margin_call_warning", margin_ratio=margin_ratio)
+
+    def log_execution_quality(self, latency_ms: float, slippage_pips: float, fill_rate: float) -> None:
+        """Log execution quality metrics to Prometheus."""
+        EXECUTION_LATENCY_HISTOGRAM.observe(latency_ms / 1000.0)
+        SLIPPAGE_HISTOGRAM.observe(slippage_pips)
+        FILL_RATE_GAUGE.set(fill_rate * 100)
+        logger.debug("execution_quality_logged", latency_ms=latency_ms, slippage=slippage_pips, fill_rate=fill_rate)
+
+    def record_rejection(self, reason: str) -> None:
+        """Record a rejected order."""
+        REJECTED_ORDER_COUNTER.inc()
+        logger.warning("order_rejected", reason=reason)
+
+    def log_model_performance(self, accuracy: float, drift_score: float) -> None:
+        """Log model performance metrics."""
+        MODEL_ACCURACY_GAUGE.set(accuracy * 100)
+        MODEL_DRIFT_GAUGE.set(drift_score)
+        logger.info("model_performance_logged", accuracy=accuracy, drift=drift_score)
+
+    def log_data_freshness(self, timestamp: datetime) -> None:
+        """Log data freshness metric."""
+        age = (datetime.now(timezone.utc) - timestamp).total_seconds()
+        DATA_FRESHNESS_GAUGE.set(age)
+        logger.debug("data_freshness_logged", age_seconds=age)
 
 
 __all__ = ["Monitor"]
