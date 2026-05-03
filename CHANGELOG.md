@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Standardized startup UX in `main.py` using `rich.Table` for configuration validation and health reporting.
 - Standardized `BaseModel` interface and `Signal` output format in `src/models/base_model.py`.
 - Production-ready stubs for `PPOAgent`, `LSTMModel`, and `DreamerAgent` in `src/models/`.
 - Gymnasium-compatible `TradingEnv` skeleton for XAUUSD in `src/trading/trading_env.py`.
