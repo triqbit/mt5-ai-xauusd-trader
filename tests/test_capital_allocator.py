@@ -301,3 +301,101 @@ def test_complex_scaling_and_capping(allocator):
     result = allocator.request_allocation("s1", 0.15)
     assert result.is_allowed is False
     assert result.rejection_code == RejectionCode.SYMBOL_CONCENTRATION_LIMIT
+
+
+def test_rejection_history(allocator):
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=1000.0,
+    )
+    allocator.add_strategy(config)
+
+    # Trigger different rejections
+    allocator.request_allocation("unknown", 0.01)  # STRATEGY_NOT_FOUND
+
+    allocator.max_total_heat = 0.05
+    allocator.update_allocation("s1", 5000.0)  # Already used 5%
+    allocator.request_allocation("s1", 0.01)  # TOTAL_HEAT_LIMIT (requests another 1%)
+
+    assert allocator.rejection_history[RejectionCode.STRATEGY_NOT_FOUND.value] == 1
+    assert allocator.rejection_history[RejectionCode.TOTAL_HEAT_LIMIT.value] == 1
+
+
+def test_diversification_score(allocator):
+    # Empty portfolio
+    assert allocator.get_diversification_score() == 1.0
+
+    s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
+    s2 = StrategyConfig(strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0)
+    allocator.add_strategy(s1)
+    allocator.add_strategy(s2)
+
+    # Single strategy allocated
+    allocator.update_allocation("s1", 10000.0)
+    assert allocator.get_diversification_score() == 0.0  # Fully concentrated in one
+
+    # Balanced allocation
+    allocator.update_allocation("s2", 10000.0)
+    # HHI = (0.5^2 + 0.5^2) = 0.25 + 0.25 = 0.5
+    # Normalized HHI = (0.5 - 1/2) / (1 - 1/2) = 0 / 0.5 = 0
+    # Score = 1 - 0 = 1.0
+    assert allocator.get_diversification_score() == 1.0
+
+    # Unbalanced
+    allocator.update_allocation("s1", 30000.0)
+    allocator.update_allocation("s2", 10000.0)
+    # s1=0.75, s2=0.25
+    # HHI = 0.75^2 + 0.25^2 = 0.5625 + 0.0625 = 0.625
+    # Normalized HHI = (0.625 - 0.5) / (1 - 0.5) = 0.125 / 0.5 = 0.25
+    # Score = 1 - 0.25 = 0.75
+    assert allocator.get_diversification_score() == 0.75
+
+
+def test_request_allocation_with_scaling(allocator):
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+    )
+    allocator.add_strategy(config)
+    allocator.max_total_heat = 0.1  # 10% limit (10,000)
+    allocator.update_allocation("s1", 8000.0)  # 8% used
+
+    # Request 5% risk (5,000). Only 2% (2,000) available.
+    # Without scaling it should fail
+    res_fail = allocator.request_allocation("s1", 0.05, allow_scaling=False)
+    assert res_fail.is_allowed is False
+    assert res_fail.rejection_code == RejectionCode.TOTAL_HEAT_LIMIT
+
+    # With scaling it should return 2%
+    res_scale = allocator.request_allocation("s1", 0.05, allow_scaling=True)
+    assert res_scale.is_allowed is True
+    assert res_scale.allocated_risk_pct == pytest.approx(0.02)
+    assert res_scale.allocated_amount == pytest.approx(2000.0)
+    assert res_scale.was_capped is True
+
+
+def test_allocation_result_flags(allocator):
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=5000.0,
+        performance_multiplier=1.2,
+    )
+    allocator.add_strategy(config)
+
+    # Request 1% (1000). Scaled by 1.2 -> 1200.
+    result = allocator.request_allocation("s1", 0.01)
+    assert result.was_scaled is True
+    assert result.was_capped is False
+    assert result.allocated_risk_pct == 0.012
+
+    # Request 10% (10000). Scaled -> 12000. Capped -> 5000.
+    result_cap = allocator.request_allocation("s1", 0.1)
+    assert result_cap.was_scaled is True
+    assert result_cap.was_capped is True
+    assert result_cap.allocated_risk_pct == 0.05
