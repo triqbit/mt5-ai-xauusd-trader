@@ -15,11 +15,13 @@ This document outlines the acceptance criteria and usage for the benchmarking fr
     - Equity-curve-based backtesting.
     - Metrics: Total Return, Sharpe Ratio, Sortino Ratio, Calmar Ratio, Max Drawdown, Win Rate, Profit Factor, Expectancy, Trade Count.
 - **Statistical Comparison**:
-    - Support for comparing strategy return distributions using Welch's t-test.
+    - Support for comparing strategy return distributions using a paired t-test with warmup-trimming alignment.
 - **Model Adapters**:
     - `EnsembleAdapter`: Wraps `EnsembleModel`.
     - `PPOAdapter`: Wraps `PPOAgent`.
     - `TransformerAdapter`: Wraps `TimeSeriesTransformer`.
+    - `LSTMAdapter`: Wraps `LSTMPricePredictor`.
+    - `DreamerAdapter`: Wraps `DreamerAgent` with state management.
 
 ## Acceptance Criteria
 - [x] All baseline strategies produce signals in the set {-1, 0, 1}.
