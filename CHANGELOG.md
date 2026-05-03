@@ -54,6 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Institutional-grade rare event simulation framework in `src/research/rare_event_simulator.py`.
 - Support for Flash Crashes, Liquidity Vacuums, Gold Gaps, Violent Reversals, and Market Dislocations.
 - Statistical verification tests for synthetic black-swan scenario generation in `tests/test_rare_event_simulator.py`.
+- Institutional-grade dynamic ensemble weighting engine in `src/models/dynamic_ensemble.py`.
+- Stability controls for ensemble rebalancing including EMA decay, swing caps, and oscillation dampening.
+- Regime-aware scoring heuristics for XAUUSD (Trending, News Shock, Mean Reversion, etc.).
+- Integration of `DynamicEnsemble` into the core `EnsembleModel` in `src/models/ensemble.py`.
+- Comprehensive unit tests for dynamic weighting and stability in `tests/test_dynamic_ensemble.py`.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
