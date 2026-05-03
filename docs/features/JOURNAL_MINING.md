@@ -33,6 +33,11 @@ Aggregates performance by:
 ### 5. Risk Block Analysis
 Summarizes recurring reasons why the `RiskManager` rejected AI signals (e.g., `MAX_DRAWDOWN`, `SPREAD_TOO_WIDE`). This reveals the "opportunity cost" of the current risk parameters.
 
+### 6. Strategy Fragility & Toxic Motifs
+Detects advanced behavioral risks:
+- **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as being within 24h of a drawdown cluster).
+- **Toxic Motifs**: Recurring attribute combinations (e.g., "PPO + Long + High Volatility") that show significantly lower win rates.
+
 ## Technical Implementation
 
 - **Location**: `src/analytics/journal_mining.py`

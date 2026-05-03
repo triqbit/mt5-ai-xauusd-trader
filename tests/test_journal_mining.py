@@ -149,3 +149,58 @@ def test_drawdown_clusters_single_loss(miner):
         {"id": 1, "pnl": -10.0, "created_at": datetime.now(timezone.utc)}
     ])
     assert miner.detect_drawdown_clusters(df) == []
+
+def test_find_frequent_motifs(miner):
+    signals = pd.DataFrame([
+        {"id": 1, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "pnl": -10, "win": False},
+        {"id": 2, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "pnl": -20, "win": False},
+        {"id": 3, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "pnl": 100, "win": True},
+        {"id": 4, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "pnl": 50, "win": True},
+    ])
+    motifs = miner.find_frequent_motifs(signals)
+    assert len(motifs) == 2
+    # Ensemble motif (direction 1, Low vol) has 0% win rate
+    ensemble_motif = next(m for m in motifs if m.algorithm == "ensemble")
+    assert ensemble_motif.win_rate == 0.0
+    assert ensemble_motif.volatility_bucket == "Low"
+
+def test_strategy_state_correlation(miner):
+    # Setup trades with a drawdown cluster
+    now = datetime.now(timezone.utc)
+    trades = pd.DataFrame([
+        {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
+        {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
+        {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+    ])
+
+    # Risk events: one within 24h of the cluster, one outside
+    risk_events = pd.DataFrame([
+        {"event_type": "MAX_DRAWDOWN", "created_at": now + pd.Timedelta(hours=1)},
+        {"event_type": "MAX_DRAWDOWN", "created_at": now + pd.Timedelta(hours=48)},
+    ])
+
+    correlations = miner.analyze_strategy_state_correlation(risk_events, trades)
+    # 1 out of 2 events are in 'weak state' (within 24h of cluster)
+    assert correlations["MAX_DRAWDOWN"] == 0.5
+
+def test_to_report_section_with_toxic_motif(miner):
+    from src.analytics.journal_mining import JournalReport, SignalMotif, BlockReasonSummary
+
+    report = JournalReport(
+        session_analysis=[],
+        volatility_patterns=[],
+        drawdown_clusters=[],
+        profitable_concentrations=[],
+        risk_block_summary=[
+            BlockReasonSummary(reason="FRAGILE", count=10, impacted_algorithms=["ppo"], weak_state_correlation=0.9)
+        ],
+        recurring_motifs=[
+            SignalMotif(algorithm="ensemble", direction=1, volatility_bucket="High", frequency=5, win_rate=0.1)
+        ]
+    )
+
+    section = report.to_report_section()
+    # Should detect Strategy Fragility and Toxic Motif
+    risk_types = [r.type for r in section.behavioral_risks]
+    assert "Strategy Fragility" in risk_types
+    assert "Toxic Motif" in risk_types
