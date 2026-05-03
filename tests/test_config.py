@@ -13,7 +13,7 @@ def test_config_from_env(monkeypatch):
 
     cfg = TradingConfig()
     assert cfg.mt5_login == 12345
-    assert cfg.mt5_password == "testpass"
+    assert cfg.mt5_password.get_secret_value() == "testpass"
     assert cfg.mt5_server == "TestServer-Demo"
     assert cfg.mode == "demo"
 

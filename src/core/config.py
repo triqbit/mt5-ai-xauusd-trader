@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]  # repo root
@@ -30,7 +30,7 @@ class TradingConfig(BaseSettings):
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
     mt5_login: int = Field(default=0, description="MT5 account number for login")
-    mt5_password: str = Field(..., description="MT5 account password for authentication")
+    mt5_password: SecretStr = Field(..., description="MT5 account password for authentication")
     mt5_server: str = Field(..., description="MT5 broker server name (e.g., Broker-Demo)")
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
@@ -38,7 +38,7 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
-    metaapi_token: str = Field(default="", description="Authentication token for MetaAPI cloud services")
+    metaapi_token: SecretStr = Field(default="", description="Authentication token for MetaAPI cloud services")
     metaapi_account_id: str = Field(default="", description="Unique account identifier for MetaAPI provisioning")
 
     # ── Trading parameters ─────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ class TradingConfig(BaseSettings):
     )
 
     # ── Database ────────────────────────────────────────────────────────────
-    database_url: str = Field(
+    database_url: SecretStr = Field(
         default="postgresql://trader:password@localhost:5432/mt5_trades",
         description="SQLAlchemy-compatible connection string for the primary database",
     )
@@ -92,7 +92,7 @@ class TradingConfig(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
         default="INFO", description="Granularity of application logs (DEBUG, INFO, WARNING, ERROR)"
     )
-    telegram_token: str = Field(
+    telegram_token: SecretStr = Field(
         default="", description="Access token for the Telegram Bot API for real-time alerts"
     )
     telegram_chat_id: str = Field(
