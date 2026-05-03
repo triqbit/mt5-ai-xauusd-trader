@@ -62,7 +62,7 @@ class LSTMAttentionModel(nn.Module if nn else object):
             nn.Linear(64, 3),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: "torch.Tensor") -> "torch.Tensor":
         out, _ = self.lstm(x)  # (B, T, 2*H)
         attn_out, _ = self.attn(out, out, out)
         out = self.norm(out + attn_out)  # residual
