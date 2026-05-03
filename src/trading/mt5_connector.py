@@ -190,9 +190,23 @@ class MT5Connector:
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
             return pd.DataFrame()
 
-    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        """Alias for get_rates() to match main.py expectations."""
-        return self.get_rates(symbol, timeframe, n_bars)
+    def get_ohlcv(
+        self,
+        symbol: str,
+        timeframe: str,
+        n_bars: Optional[int] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> pd.DataFrame:
+        """
+        Unified method to fetch historical OHLCV data.
+        Supports both bar-count and date-range based retrieval.
+        """
+        if start_date and end_date:
+            return self.get_rates_range(symbol, timeframe, start_date, end_date)
+        elif n_bars:
+            return self.get_rates(symbol, timeframe, n_bars)
+        return pd.DataFrame()
 
     def get_rates_range(
         self, symbol: str, timeframe: str, date_from: datetime, date_to: datetime
