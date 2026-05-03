@@ -149,7 +149,10 @@ def run_live(
                         # Calculate current drawdown for the filter
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
                         decision = execution_filter.validate(
-                            signal, df, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
+                            signal,
+                            df,
+                            current_drawdown=drawdown,
+                            timestamp=datetime.now(timezone.utc),
                         )
                         if not decision.is_approved:
                             log.warning(
@@ -189,7 +192,9 @@ def run_live(
                                 trade_info = trade_logger.get_trade_by_ticket(ticket)
                                 if trade_info:
                                     # For a BUY, exit at BID. For a SELL, exit at ASK.
-                                    exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                                    exit_price = (
+                                        tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                                    )
                                     # P&L will be calculated automatically by update_trade
                                     trade_logger.update_trade(
                                         ticket=ticket,
@@ -226,7 +231,9 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--symbol", help="Trading symbol (e.g. XAUUSD)")
     p.add_argument("--timeframe", help="Trading timeframe (e.g. M5)")
-    p.add_argument("--model-dir", type=Path, default=Path("models/trained"), help="Directory for model weights")
+    p.add_argument(
+        "--model-dir", type=Path, default=Path("models/trained"), help="Directory for model weights"
+    )
     p.add_argument("--log-level", default="INFO", help="Logging level")
     p.add_argument("--check", action="store_true", help="Perform pre-flight health checks and exit")
     return p.parse_args()
@@ -276,9 +283,19 @@ def main() -> int:
     summary.add_row("Symbol:  ", f"[bold]{cfg.symbol}[/]")
     summary.add_row("Timeframe:  ", cfg.timeframe)
     summary.add_row("Algorithm:  ", cfg.algorithm)
-    summary.add_row("Database:  ", "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite")
+    summary.add_row(
+        "Database:  ",
+        "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite",
+    )
 
-    console.print(Panel(summary, title="[bold blue]Trading System Configuration[/]", border_style="blue", expand=False))
+    console.print(
+        Panel(
+            summary,
+            title="[bold blue]Trading System Configuration[/]",
+            border_style="blue",
+            expand=False,
+        )
+    )
 
     # Initialise components
     # 1. Audit Logger (Mandatory for enterprise traceability)
@@ -325,7 +342,9 @@ def main() -> int:
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
-    health_checker = init_health_checker(cfg, connector, trade_logger, model, audit_logger=audit_logger)
+    health_checker = init_health_checker(
+        cfg, connector, trade_logger, model, audit_logger=audit_logger
+    )
     with console.status("[bold blue]Running health checks..."):
         report = health_checker.get_full_report()
 

@@ -14,6 +14,7 @@ class TradingEnv(gym.Env):
     Custom environment for trading XAUUSD.
     Follows Gymnasium API.
     """
+
     metadata = {"render_modes": ["human"]}
 
     def __init__(self, df=None, window_size=20):
@@ -59,5 +60,5 @@ class TradingEnv(gym.Env):
         if self.df is None:
             return np.zeros(self.observation_space.shape, dtype=np.float32)
 
-        obs = self.df.iloc[self.current_step - self.window_size:self.current_step].values
+        obs = self.df.iloc[self.current_step - self.window_size : self.current_step].values
         return obs.astype(np.float32)

@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """SQLAlchemy 2.0 DeclarativeBase."""
+
     pass
 
 
@@ -33,6 +34,7 @@ class AuditEntry(Base):
     Audit log entry for recording system actions and events.
     Aligned with enterprise traceability requirements.
     """
+
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -53,6 +55,7 @@ class AuditLogger:
     """
     Singleton AuditLogger for managing system audit traces.
     """
+
     _instance: Optional[AuditLogger] = None
     _initialized: bool = False
 
