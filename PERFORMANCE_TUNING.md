@@ -11,7 +11,7 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 - **Instrumentation**: High-resolution `profile` context manager in `src/core/profiler.py`
 - **Target**: Identify functions consuming >10% CPU time
 - **Analysis**: Continuous monitoring of main loop latency (data_fetch, inference, risk_check, execution)
-- **Output**: Structured logs with `duration_ms`
+- **Output**: Structured logs with `duration_ms` AND Prometheus Histogram metrics (`trading_block_duration_seconds`)
 - **Action**: Optimize top 3 CPU consumers
 
 ### 1.2 Memory Profiling
