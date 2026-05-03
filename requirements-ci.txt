@@ -40,7 +40,7 @@ pytest==8.3.4
 pytest-cov==5.0.0
 python-telegram-bot==22.7
 fastapi==0.115.2
-starlette==0.37.2
+starlette==0.40.0
 httpx==0.28.0
 structlog==25.5.0
 rich==15.0.0
