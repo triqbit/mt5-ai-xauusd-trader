@@ -105,8 +105,11 @@ MODE=demo
 
 ### 3. Execution
 ```bash
-# Run validation and start in demo mode
-python main.py --mode demo --symbol XAUUSD --verbose
+# Perform a pre-flight health check (connectivity, database, models)
+python main.py --check
+
+# Start trading in demo mode (CLI flags override .env)
+python main.py --mode demo --symbol XAUUSD --algo ensemble
 ```
 
 ---
