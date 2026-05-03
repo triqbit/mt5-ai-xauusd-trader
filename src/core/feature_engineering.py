@@ -13,7 +13,11 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-import talib
+
+try:
+    import talib
+except ImportError:
+    talib = None
 
 from src.core.profiler import profile as profile_context
 
@@ -22,8 +26,12 @@ logger = logging.getLogger(__name__)
 
 class FeatureEngineer:
     """
-    Engineers technical features from raw OHLCV data.
-    Implements multi-timeframe analysis and ensures no look-ahead bias.
+    Institutional-grade feature engineering pipeline for financial time series.
+
+    This class computes a comprehensive set of technical features including
+    standard indicators, candle patterns, multi-timeframe analysis, and
+    custom price action/volume features. It ensures data integrity by
+    preventing look-ahead bias and providing normalization.
     """
 
     def __init__(
@@ -37,10 +45,11 @@ class FeatureEngineer:
         Initialize the FeatureEngineer.
 
         Args:
-            base_timeframe: The timeframe of the input DataFrame.
-            timeframes: List of timeframes for multi-timeframe features.
-            normalize: Whether to normalize the output feature matrix.
-            method: Normalization method ('zscore' or 'minmax').
+            base_timeframe (str): The timeframe of the input DataFrame (e.g., 'M5').
+            timeframes (Optional[List[str]]): List of timeframes for multi-timeframe features.
+                Defaults to ["M1", "M5", "M15", "H1", "H4", "D1"].
+            normalize (bool): Whether to normalize the output feature matrix.
+            method (str): Normalization method ('zscore' or 'minmax').
         """
         self.base_timeframe = base_timeframe
         self.timeframes = timeframes or ["M1", "M5", "M15", "H1", "H4", "D1"]
@@ -59,18 +68,30 @@ class FeatureEngineer:
         Compute all features for the given OHLCV DataFrame.
 
         Args:
-            df: Input DataFrame with 'open', 'high', 'low', 'close', 'tick_volume'.
+            df: Input DataFrame with 'open', 'high', 'low', 'close', 'volume'.
+                Must have a DatetimeIndex.
 
         Returns:
-            DataFrame containing the engineered features.
+            pd.DataFrame: Normalized feature matrix ready for model inference.
+                The original OHLCV columns are removed.
         """
         with profile_context("compute_features"):
             if df.empty:
                 return pd.DataFrame()
 
-            # Ensure column names are lowercase
+            # Ensure column names are lowercase and standardized
             df = df.copy()
             df.columns = [col.lower() for col in df.columns]
+
+            # Standardize volume column name
+            if "tick_volume" in df.columns:
+                df = df.rename(columns={"tick_volume": "volume"})
+            elif "vol" in df.columns:
+                df = df.rename(columns={"vol": "volume"})
+
+            if "volume" not in df.columns:
+                logger.warning("Volume column not found. Creating dummy volume column.")
+                df["volume"] = 1.0  # Use 1.0 to avoid division by zero if used as denominator
 
             # 1. Base Timeframe Features
             feature_blocks = []
@@ -88,18 +109,22 @@ class FeatureEngineer:
                 mtf_features = self._compute_mtf_features(df, tf)
                 feature_blocks.append(mtf_features)
 
+            # Filter out empty DataFrames before concatenation
+            feature_blocks = [fb for fb in feature_blocks if not fb.empty]
+
             # Concatenate all blocks to avoid fragmentation
+            if not feature_blocks:
+                return pd.DataFrame(index=df.index)
+
             full_df = pd.concat([df, *feature_blocks], axis=1)
 
             # Drop rows with NaNs resulting from indicator windows
             full_df = full_df.dropna()
 
             # Remove original OHLCV columns for the final feature matrix
-            features_only = full_df.drop(columns=["open", "high", "low", "close", "tick_volume"])
-
-            # Also drop any 'real_volume' if present
-            if "real_volume" in features_only.columns:
-                features_only = features_only.drop(columns=["real_volume"])
+            to_drop = ["open", "high", "low", "close", "volume", "tick_volume", "real_volume", "vol"]
+            existing_to_drop = [col for col in to_drop if col in full_df.columns]
+            features_only = full_df.drop(columns=existing_to_drop)
 
             if self.normalize:
                 features_only = self._normalize_features(features_only)
@@ -108,7 +133,20 @@ class FeatureEngineer:
             return features_only
 
     def _get_technical_indicators(self, df: pd.DataFrame, prefix: str) -> pd.DataFrame:
-        """Compute standard technical indicators."""
+        """
+        Compute standard technical indicators using TA-Lib.
+
+        Args:
+            df: Input OHLCV DataFrame.
+            prefix: String prefix for the feature names (e.g., 'base_M5').
+
+        Returns:
+            pd.DataFrame: DataFrame containing technical indicators.
+        """
+        if talib is None:
+            logger.warning("TA-Lib not installed. Skipping technical indicators.")
+            return pd.DataFrame(index=df.index)
+
         indicators = {}
         close = df["close"].values
         high = df["high"].values
@@ -158,7 +196,19 @@ class FeatureEngineer:
         return pd.DataFrame(indicators, index=df.index)
 
     def _get_candle_patterns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute all TA-Lib candle patterns."""
+        """
+        Compute all available TA-Lib candle pattern recognition features.
+
+        Args:
+            df: Input OHLCV DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame where each column is a candle pattern (values -100, 0, 100).
+        """
+        if talib is None:
+            logger.warning("TA-Lib not installed. Skipping candle patterns.")
+            return pd.DataFrame(index=df.index)
+
         op = df["open"].values
         hi = df["high"].values
         lo = df["low"].values
@@ -172,7 +222,15 @@ class FeatureEngineer:
         return pd.DataFrame(patterns, index=df.index)
 
     def _get_price_action_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute custom price action features."""
+        """
+        Compute custom price action features including returns and vectorized slopes.
+
+        Args:
+            df: Input OHLCV DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame containing price action features.
+        """
         pa = {}
         close = df["close"]
 
@@ -198,11 +256,20 @@ class FeatureEngineer:
     def _calculate_rolling_slope(self, series: pd.Series, window: int) -> pd.Series:
         """
         Compute linear regression slope over a rolling window using vectorized operations.
+
         Formula: Slope = (sum(i*y) - x_bar * sum(y)) / SS_xx
+        This implementation is significantly faster than using rolling().apply().
+
+        Args:
+            series: Input price series.
+            window: Rolling window size.
+
+        Returns:
+            pd.Series: Rolling slope values.
         """
         n = window
         if len(series) < n:
-            return pd.Series(0.0, index=series.index)
+            return pd.Series(np.nan, index=series.index)
 
         x_idx = np.arange(len(series))
         sum_y = series.rolling(window=n).sum()
@@ -219,32 +286,70 @@ class FeatureEngineer:
         return slope
 
     def _get_volume_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute volume-based features including rolling VWAP and VPT."""
+        """
+        Compute volume-based features including rolling VWAP and VPT.
+
+        Args:
+            df: Input OHLCV DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame containing volume-related features.
+        """
         vol = {}
         close = df["close"]
         high = df["high"]
         low = df["low"]
-        volume = df["tick_volume"]
+        volume = df["volume"]
 
-        vol["vol_sma_20"] = volume / volume.rolling(window=20).mean().replace(0, 1e-8)
-        vol["obv"] = talib.OBV(close.values, volume.values.astype(float))
+        # Relative Volume (RVOL)
+        vol["rvol_20"] = volume / volume.rolling(window=20).mean().replace(0, 1e-8)
+        vol["rvol_100"] = volume / volume.rolling(window=100).mean().replace(0, 1e-8)
 
-        # VWAP Approximation (Rolling)
+        # VWAP Approximation (Rolling) - A proxy for Volume Profile Value Areas
         typical_price = (high + low + close) / 3
+
+        # Short-term VWAP
         vol["vwap_20"] = (typical_price * volume).rolling(window=20).sum() / volume.rolling(
             window=20
         ).sum().replace(0, 1e-8)
         vol["dist_vwap_20"] = (close - vol["vwap_20"]) / vol["vwap_20"].replace(0, 1e-8)
 
+        # Medium-term VWAP
+        vol["vwap_50"] = (typical_price * volume).rolling(window=50).sum() / volume.rolling(
+            window=50
+        ).sum().replace(0, 1e-8)
+        vol["dist_vwap_50"] = (close - vol["vwap_50"]) / vol["vwap_50"].replace(0, 1e-8)
+
         # Volume Price Trend (VPT)
         vol["vpt"] = (volume * close.pct_change().fillna(0)).cumsum()
+
+        if talib is not None:
+            # Re-calculating as values to ensure they match index length if TA-Lib is mocked
+            obv = talib.OBV(close.values, volume.values.astype(float))
+            if len(obv) == len(df):
+                vol["obv"] = obv
+
+            mfi = talib.MFI(high.values, low.values, close.values, volume.values.astype(float), timeperiod=14)
+            if len(mfi) == len(df):
+                vol["mfi_14"] = mfi
+        else:
+            logger.warning("TA-Lib not installed. Skipping TA-Lib volume indicators.")
 
         return pd.DataFrame(vol, index=df.index)
 
     def _compute_mtf_features(self, df: pd.DataFrame, tf: str) -> pd.DataFrame:
         """
-        Resample data to a different timeframe and compute features.
-        Ensures no look-ahead bias by shifting.
+        Resample data to a different timeframe and compute technical indicators.
+
+        Ensures no look-ahead bias by shifting resampled indicators forward by one
+        period before reindexing back to the base timeframe.
+
+        Args:
+            df: Input OHLCV DataFrame at base timeframe.
+            tf: Target timeframe string (e.g., 'H1').
+
+        Returns:
+            pd.DataFrame: Multi-timeframe features aligned to the base timeframe.
         """
         # Map MT5-style timeframe strings to Pandas frequency strings
         tf_map = {
@@ -269,7 +374,7 @@ class FeatureEngineer:
                     "high": "max",
                     "low": "min",
                     "close": "last",
-                    "tick_volume": "sum",
+                    "volume": "sum",
                 }
             )
             .dropna()
@@ -280,7 +385,8 @@ class FeatureEngineer:
 
         # Shift to avoid look-ahead bias
         # The feature at time T must only use data available BEFORE T.
-        mtf_indicators = mtf_indicators.shift(1)
+        if not mtf_indicators.empty:
+            mtf_indicators = mtf_indicators.shift(1)
 
         # Reindex to original DataFrame
         mtf_indicators = mtf_indicators.reindex(df.index).ffill()
@@ -288,7 +394,15 @@ class FeatureEngineer:
         return mtf_indicators
 
     def _normalize_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize the feature matrix."""
+        """
+        Normalize the feature matrix using Z-score or Min-Max scaling.
+
+        Args:
+            df: Input feature matrix.
+
+        Returns:
+            pd.DataFrame: Normalized feature matrix.
+        """
         if self.method == "zscore":
             if self.means is None:
                 self.means = df.mean()
@@ -302,5 +416,10 @@ class FeatureEngineer:
         return df
 
     def get_feature_count(self) -> int:
-        """Return the number of engineered features."""
+        """
+        Return the number of engineered features.
+
+        Returns:
+            int: Count of feature columns.
+        """
         return len(self.feature_columns)
