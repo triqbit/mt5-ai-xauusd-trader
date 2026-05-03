@@ -1,53 +1,55 @@
-# 🎯 Jules05: Deterministic Merge Queue [2026-05-02]
+# 🎯 Jules05: Deterministic Merge Queue [2026-05-03]
 
 This document serves as the authoritative source of truth for the integration state and merge priorities of the repository, managed by Jules05.
 
 ## 📊 Summary State
-- **Merge-Ready**: 2
-- **Fix-Required**: 5
+- **Merge-Ready**: 5
+- **Fix-Required**: 2
 - **Blocked**: 0
-- **Risky (Escalated)**: 3
+- **Risky (Escalated)**: 4
 - **Superseded**: 0
 
 ---
 
 ## 🚀 Priority Merge Queue
 
-| Order | Branch | Classification | Rationale | Next Action |
-| :--- | :--- | :--- | :--- | :--- |
-| 1 | `origin/fix-ci-and-imports-10275903423945476535` (#370) | fix-required | Resolves critical CI blockers. Requires rebase after #469. | Rebase and merge to stabilize the build. |
-| 2 | `origin/implement-model-stubs-11387061741357092186` (#375) | fix-required | Provides production-ready model stubs. Requires rebase after #469. | Rebase and merge. |
-| 3 | `origin/feat/vectorized-backtester-engine-2507153487072586691` (#368) | fix-required | High-value vectorized backtesting engine. Requires rebase after #469. | Rebase and merge. |
-| 4 | `origin/release/v1.1.0-2506536362439602818` (#373) | merge-ready | Assembles the v1.1.0 release candidate. | Finalize release composition. |
-| 5 | `origin/feat/decision-support-system-5901454689429807923` (#468) | merge-ready | Implements institutional decision support system. Already integrated with main. | Merge. |
+| Order | PR # | Branch | Classification | Rationale | Next Action |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | #535 | `origin/fix-ci-and-imports-12240891966680375670` | merge-ready | **CRITICAL:** Resolves import errors and stabilizes CI. Top priority for build health. | Merge to stabilize the development environment. |
+| 2 | #539 | `origin/feature-engineering-pipeline-7579800350118622268` | merge-ready | High-value institutional feature engineering (140+ indicators). Fully tested. | Merge to enable advanced model features. |
+| 3 | #527 | `origin/regime-detector-implementation-813110743689190159` | merge-ready | Core institutional component for market regime detection. | Merge and begin live loop integration. |
+| 4 | #532 | `origin/bolt-vectorize-benchmark-adapters-7970088729794148970` | merge-ready | Significant performance optimization (2000x speedup in row access). | Merge to unblock large-scale backtesting. |
+| 5 | #530 | `origin/jules02-ci-quality-mypy-enforcement-13107669412525356373` | merge-ready | Hardens codebase quality with mandatory Mypy type checking. | Merge to prevent regression in type safety. |
 
 ---
 
 ## 🛠️ Fix Required (Minor Quality Issues / Rebase Needed)
 
-| Branch | Reason |
-| :--- | :--- |
-| `origin/jules-ci-mypy-hardening-4853801334882103621` (#359) | Requires rebase and resolution of new typing issues after #469. |
-| `origin/jules02-cli-ux-improvement-869278649885808152` (#358) | Requires rebase to align with new CLI structure. |
+| PR # | Branch | Reason |
+| :--- | :--- | :--- |
+| #512 | `origin/jules02-schema-governance-hardening-2410621016519174842` | Requires rebase after #535 and alignment with new SQLAlchemy 2.0 mappings. |
+| #511 | `origin/palette/startup-ux-enhancement-16312159025761050256` | Minor formatting regressions in table rendering; requires TUI testing. |
 
 ---
 
 ## ⚠️ Escalation List (Requires Human Sign-off)
 
-The following changes touch high-risk areas (trading logic, risk limits) and require manual review per the Jules05 Escalation Policy.
+The following changes touch high-risk areas (trading logic, risk limits, core infrastructure) and require manual review per the Jules05 Escalation Policy.
 
-| Branch | Reason for Escalation | Impact Area |
-| :--- | :--- | :--- |
-| `origin/jules-execution-filter-impl-9884553851395903715` (#372) | Implements 8-layer execution filter. Touches core `main.py`. | Trading Execution / Risk |
-| `origin/macro-event-intelligence-9573672987878901155` (#360) | Implements macroeconomic event intelligence affecting live trading loop. | Risk Engine / Live Loop |
-| `remotes/origin/feature/decision-support-system-5565901309274814363` (#366) | Superseded by #468 but contains legacy UX logic for review. | Core Trading / UX |
+| PR # | Branch | Reason for Escalation | Impact Area |
+| :--- | :--- | :--- | :--- |
+| #542 | `origin/feature/trade-logger-enterprise-standards-12095589433892550217` | Modifies core trade logging and audit trail logic. | Trade Persistence / Audit |
+| #525 | `origin/jules02-db-reliability-hardening-2103510521801094201` | Adds SQL-level CheckConstraints. High risk for destructive migration. | Database Schema |
+| #516 | `origin/jules02-resilience-improvement-11471532050985137513` | Touches global retry logic and core exception handling. | System Stability |
+| #508 | `origin/jules/security-hardening-secrets-masking-2404359204864337475` | Modifies sensitive secret handling in configuration. | Security / Auth |
 
 ---
 
 ## 📅 Stale / Superseded / Low-Priority
 
-- 300+ stale PRs identified following #469 "Big Bang" merge. Targeted for pruning in next cycle.
+- **Stale (Pre-Big-Bang):** 316 PRs (e.g., #428, #427, #375) have been identified as stale following the repository root reset to `acea08b`. They are slated for automated closing unless explicitly claimed by authors.
+- **Superseded:** #366 (Superseded by #471 / #468 Institutional Decision Support).
 
 ---
 
-*Last Updated: 2026-05-02 by Jules05*
+*Last Updated: 2026-05-03 by Jules05*
