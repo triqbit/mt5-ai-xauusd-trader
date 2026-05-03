@@ -1,11 +1,12 @@
-import pytest
 import numpy as np
-from src.models.ppo_agent import PPOAgent
-from src.models.lstm_model import LSTMModel
-from src.models.dreamer_agent import DreamerAgent
-from src.models.base_model import Signal
+
 from src.core.constants import SignalDirection
+from src.models.base_model import Signal
+from src.models.dreamer_agent import DreamerAgent
+from src.models.lstm_model import LSTMModel
+from src.models.ppo_agent import PPOAgent
 from src.trading.trading_env import TradingEnv
+
 
 def test_ppo_agent_stub():
     # Test initialization without env

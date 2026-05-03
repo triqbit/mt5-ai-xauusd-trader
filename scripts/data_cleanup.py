@@ -5,12 +5,11 @@ Automates the purging of old operational data based on the Data Retention Policy
 
 import argparse
 import logging
-import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from sqlalchemy import create_engine, delete, func, select
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import sessionmaker
 
 # Add src to path to import models

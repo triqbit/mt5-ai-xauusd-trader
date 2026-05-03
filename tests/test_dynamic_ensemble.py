@@ -1,6 +1,8 @@
 import unittest
+
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.regime_detector import MarketRegime, RegimeInfo
+
 
 class TestDynamicEnsemble(unittest.TestCase):
     def setUp(self):

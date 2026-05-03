@@ -1,8 +1,8 @@
 import time
-import os
+
 import numpy as np
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, select
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import Boolean, Column, Float, Integer, String, create_engine, select
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
 

@@ -1,9 +1,11 @@
 """Tests for src.core.config_validator module."""
-import os
 import sys
+
 import pytest
+
 from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
+
 
 @pytest.fixture
 def base_config(monkeypatch):

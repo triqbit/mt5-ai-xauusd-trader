@@ -6,11 +6,11 @@ Verifies the high-value integration path:
 Data Ingestion (Synthetic) -> Feature Generation -> Model Input/Inference
 """
 
-import pytest
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock, patch
-import sys
+import pytest
 
 # Standardize mocks for use across all tests and imports
 mock_torch = MagicMock()
@@ -41,11 +41,11 @@ with patch.dict("sys.modules", {
     "talib": mock_talib
 }):
     # Import components we want to test
+    from src.core.constants import SignalDirection
     from src.core.feature_engineering import FeatureEngineer
     from src.models import ensemble  # Use the module to avoid attribute errors on reload
     from src.models.ensemble import EnsembleModel
     from src.utils.synthetic_data import ScenarioGenerator
-    from src.core.constants import SignalDirection
 
 @pytest.fixture
 def data_generator():

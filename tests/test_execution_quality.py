@@ -2,19 +2,19 @@
 Unit tests for ExecutionAnalyzer and execution quality models.
 """
 
-import pytest
-import pandas as pd
-import numpy as np
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
+import pytest
+
 from src.analytics.execution_quality import (
+    BlockedSignalQuality,
     ExecutionAnalyzer,
     TradeExecutionQuality,
-    BlockedSignalQuality,
-    ExecutionSummary
 )
-from src.core.trade_logger import Trade, ModelSignal, RiskEvent
+from src.core.trade_logger import ModelSignal, Trade
+
 
 @pytest.fixture
 def mock_connector():

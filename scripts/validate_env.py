@@ -1,6 +1,7 @@
-import sys
 import ast
+import sys
 from pathlib import Path
+
 
 def get_required_vars_from_config():
     config_path = Path("src/core/config.py")
@@ -59,7 +60,7 @@ def validate():
         print("="*60)
         print("  DEPLOYMENT BLOCKED: ENVIRONMENT TEMPLATE INCOMPLETE")
         print("="*60)
-        print(f"Error: The following required configuration fields are missing from .env.example:")
+        print("Error: The following required configuration fields are missing from .env.example:")
         for m in missing:
             print(f"  [MISSING] -> {m.upper()}")
         print("\nREMEDIATION: Add these fields to .env.example to ensure production deployment safety.")

@@ -2,11 +2,13 @@
 Tests for Walk-Forward Optimization.
 """
 
-import pytest
-import pandas as pd
 import numpy as np
-from src.research.hyperopt_walkforward import WalkForwardOptimizer, WalkForwardConfig
+import pandas as pd
+import pytest
+
 from src.research.benchmarks import EMACrossoverStrategy
+from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
+
 
 @pytest.fixture
 def sample_data():

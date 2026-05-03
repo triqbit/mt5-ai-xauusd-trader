@@ -485,7 +485,7 @@ class JournalMiner:
 
         clusters = self.detect_drawdown_clusters(trades_df)
         if not clusters:
-            return {reason: 0.0 for reason in risk_events_df["event_type"].unique()}
+            return dict.fromkeys(risk_events_df["event_type"].unique(), 0.0)
 
         # Mark 'weak' time windows
         weak_windows = []
@@ -500,7 +500,7 @@ class JournalMiner:
         # Assume risk_events_df has a timestamp. If not, we might need to join with signals
         # Let's check RiskEvent model in trade_logger. It has AuditMixin (created_at)
         if "created_at" not in risk_events_df.columns:
-            return {reason: 0.0 for reason in risk_events_df["event_type"].unique()}
+            return dict.fromkeys(risk_events_df["event_type"].unique(), 0.0)
 
         risk_events_df["is_weak_state"] = risk_events_df["created_at"].apply(is_weak)
 

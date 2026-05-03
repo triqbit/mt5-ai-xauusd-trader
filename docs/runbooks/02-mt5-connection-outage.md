@@ -6,63 +6,69 @@ This runbook details the response procedure for connection failures between the 
 ## Symptoms
 - Telegram Alert: `Broker Connection Lost` (P0/P1)
 - Logs: `MT5 connection failed`, `Terminal not found`, or `MetaAPI connection timeout`.
-- Trading halted or orders rejected.
+- Health Check: `/health/readiness` returns 503 or `MT5: FAILED`.
 
 ## Diagnostic Steps
 
-### 1. Check Local MT5 Terminal (If using local execution)
-1. Verify if the MT5 Terminal is running on the host machine.
-2. Check the `Journal` tab in the MT5 Terminal for connection errors.
-3. Verify account login status (green icon in bottom right).
+### 1. Run Automated Diagnostics
+Execute the bot "doctor" script to identify connectivity and environment issues:
+```bash
+python scripts/doctor.py
+```
 
-### 2. Verify Credentials
-Check `.env` or environment variables:
+### 2. Check Local MT5 Terminal (Windows Execution)
+1. Verify if the MT5 Terminal is running on the host machine.
+2. Check the `Journal` tab in the MT5 Terminal for broker-side authentication errors.
+3. Verify account login status (green/blue icon in the bottom right corner).
+
+### 3. Verify Configuration
+Check `.env` via `scripts/validate_env.py` to ensure credentials are correct:
 - `MT5_LOGIN`
 - `MT5_SERVER`
 - `MT5_PASSWORD`
 
-### 3. Network Connectivity
-1. Ping the broker's server address.
-2. Check for firewall rules blocking the MT5 terminal or Python process.
+### 4. Network Connectivity
+1. Ping the broker's server address (found in MT5 terminal properties).
+2. Verify that `MT5_PATH` in `src/core/config.py` correctly points to the `terminal64.exe`.
 
 ## Recovery Procedures
 
 ### Scenario A: Local Terminal Crash
 1. Restart the MT5 Terminal:
    ```powershell
-   # If on Windows
-   Restart-Process -Name "terminal64"
+   # On Windows
+   Stop-Process -Name "terminal64" -ErrorAction SilentlyContinue
+   Start-Process "C:\Program Files\MetaTrader 5\terminal64.exe"
    ```
 2. The bot should automatically attempt to reconnect on the next heartbeat.
 
-### Scenario B: MetaAPI Gateway Issue (Cloud Fallback)
+### Scenario B: MetaAPI Gateway Issue (Cloud Mode)
 1. Check [MetaAPI Status Page](https://status.metaapi.cloud/).
-2. Verify `METAAPI_TOKEN` and `METAAPI_ACCOUNT_ID`.
-3. Force a reconnect by restarting the bot service:
+2. Force a reconnect by restarting the container:
    ```bash
    docker restart mt5-trader
    ```
 
 ### Scenario C: Broker Maintenance
-1. Check broker website for scheduled maintenance.
-2. If maintenance is confirmed, pause the bot until the window ends.
+1. Check the broker's website or portal for scheduled maintenance.
+2. If maintenance is confirmed, set `MODE=backtest` or shut down the bot to prevent logic errors.
 
 ## Fallback Protocol
-If MT5 remains unreachable for >15 minutes:
-1. **Manual Intervention:** Use a mobile MT5 app to monitor and manage open positions.
-2. **Emergency Stop:** Set `MODE=backtest` or shut down the bot to prevent unintended trades once connection is restored.
+If MT5 remains unreachable for >15 minutes during market hours:
+1. **Manual Intervention:** Use the MT5 mobile app to monitor and manage open positions.
+2. **Emergency Stop:** Stop the bot process to prevent unintended execution if the connection flickers.
 
 ## Expected Outcomes
-- Bot successfully initializes and connects to the MT5 terminal or MetaAPI.
-- Trading activity resumes (if market is open and signals are valid).
-- Real-time price data starts flowing into the application.
+- `scripts/doctor.py` shows all connectivity checks as `PASSED`.
+- `/health/readiness` returns a 200 OK response with `MT5: HEALTHY`.
+- Real-time price data (ticks) resumes in the logs.
 
 ## Verification Commands
 - **Check Health API:** `curl http://localhost:8000/health/readiness`
-- **Tail Logs:** `tail -n 50 trading_bot.log | grep -E "MT5|MetaAPI"`
-- **Docker Status:** `docker ps | grep mt5-trader`
+- **Tail Logs:** `tail -f logs/trading_bot.log | grep -E "MT5|MetaAPI"`
+- **Verify Connections:** `python scripts/doctor.py`
 
 ## Escalation Path
-1. **Level 1:** Trading Operations.
-2. **Level 2:** Infrastructure / DevOps.
+1. **Level 1:** Trading Operations (@maintainer-trading).
+2. **Level 2:** Infrastructure / Release Reliability (Jules03).
 3. **Level 3:** Broker Support.

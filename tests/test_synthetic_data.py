@@ -1,10 +1,12 @@
 """
 Unit tests for the ScenarioGenerator.
 """
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
+
 from src.utils.synthetic_data import ScenarioGenerator
+
 
 def test_determinism():
     gen1 = ScenarioGenerator(seed=42)
