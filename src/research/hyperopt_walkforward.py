@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 import optuna
