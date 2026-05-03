@@ -66,10 +66,20 @@ class BehavioralRisk(BaseModel):
     type: str
     description: str
 
+class SignalMotif(BaseModel):
+    algorithm: str
+    direction: int
+    volatility_bucket: str
+    confidence_bucket: str
+    frequency: int
+    win_rate: float
+    cluster_frequency: int = 0
+
 class TradePatternSection(BaseModel):
     primary_insight: str
     concentrations: List[PatternConcentration]
     behavioral_risks: List[BehavioralRisk]
+    motifs: List[SignalMotif] = Field(default_factory=list)
 
 class DriftMetric(BaseModel):
     name: str
@@ -117,6 +127,16 @@ class RLSection(BaseModel):
     performance_gap: float
     metrics: List[RLMetric]
 
+class RareEventSummary(BaseModel):
+    event_type: str
+    peak_impact_pct: float
+    realized_volatility: float
+    recovery_attained: float
+
+class RareEventSection(BaseModel):
+    scenarios: List[RareEventSummary]
+    insights: str
+
 # --- Full Report Model ---
 
 class ResearchReport(BaseModel):
@@ -134,6 +154,7 @@ class ResearchReport(BaseModel):
     allocation_insights: Optional[AllocationSection] = None
     benchmarks: Optional[BenchmarkSection] = None
     rl_evaluation: Optional[RLSection] = None
+    rare_events: Optional[RareEventSection] = None
 
     conclusion: str
 
@@ -227,6 +248,18 @@ class ResearchReporter:
                 table.add_row(c.attribute, c.value, f"{c.profit_factor:.2f}")
             self.console.print(table)
 
+            if report.trade_patterns.motifs:
+                self.console.print("[dim]Signal Motifs (Losing Combinations):[/]")
+                m_table = Table(box=None)
+                m_table.add_column("Algo")
+                m_table.add_column("Vol")
+                m_table.add_column("Conf")
+                m_table.add_column("WR")
+                for m in report.trade_patterns.motifs:
+                    if m.win_rate < 0.5:
+                        m_table.add_row(m.algorithm, m.volatility_bucket, m.confidence_bucket, f"{m.win_rate:.1%}")
+                self.console.print(m_table)
+
         if report.model_drift:
             self.console.print("\n[bold blue]5. Model Drift Observations[/]")
             table = Table(box=None)
@@ -278,6 +311,55 @@ class ResearchReporter:
                 )
             self.console.print(table)
 
+        if report.rare_events:
+            self.console.print("\n[bold red]9. Rare Event Simulations[/]")
+            table = Table(box=None)
+            table.add_column("Event Type")
+            table.add_column("Impact")
+            table.add_column("Recovery")
+            for s in report.rare_events.scenarios:
+                table.add_row(s.event_type, f"{s.peak_impact_pct:.2%}", f"{s.recovery_attained:.1%}")
+            self.console.print(table)
+
         self.console.print("\n[bold]Conclusion[/]")
         self.console.print(report.conclusion)
         self.console.print("\n" + "="*50 + "\n")
+
+
+class ResearchOrchestrator:
+    """
+    Automates the aggregation of research results into a unified report.
+    """
+    def __init__(self, title: str, executive_summary: str, conclusion: str):
+        self.report = ResearchReport(
+            title=title,
+            executive_summary=executive_summary,
+            conclusion=conclusion
+        )
+
+    def add_section(self, section: BaseModel) -> None:
+        """Add a section to the report based on its type."""
+        if isinstance(section, RegimeSection):
+            self.report.regime_analysis = section
+        elif isinstance(section, StressTestSection):
+            self.report.stress_tests = section
+        elif isinstance(section, HyperparameterSection):
+            self.report.hyperparameter_robustness = section
+        elif isinstance(section, TradePatternSection):
+            self.report.trade_patterns = section
+        elif isinstance(section, ModelDriftSection):
+            self.report.model_drift = section
+        elif isinstance(section, AllocationSection):
+            self.report.allocation_insights = section
+        elif isinstance(section, BenchmarkSection):
+            self.report.benchmarks = section
+        elif isinstance(section, RLSection):
+            self.report.rl_evaluation = section
+        elif isinstance(section, RareEventSection):
+            self.report.rare_events = section
+        else:
+            raise ValueError(f"Unknown section type: {type(section)}")
+
+    def build(self) -> ResearchReport:
+        """Return the finalized report."""
+        return self.report

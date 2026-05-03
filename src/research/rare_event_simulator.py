@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -52,6 +52,17 @@ class RareEventResult(BaseModel):
     peak_impact_pct: float
     realized_volatility: float
     recovery_attained: float
+
+    def to_report_summary(self) -> Any:
+        """Convert to RareEventSummary for ResearchReporter."""
+        from src.research.reporting import RareEventSummary
+
+        return RareEventSummary(
+            event_type=self.event_type.value,
+            peak_impact_pct=self.peak_impact_pct,
+            realized_volatility=self.realized_volatility,
+            recovery_attained=self.recovery_attained,
+        )
 
 
 class RareEventSimulator:

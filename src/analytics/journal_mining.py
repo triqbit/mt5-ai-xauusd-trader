@@ -159,6 +159,7 @@ class JournalReport(BaseModel):
             primary_insight=primary_insight,
             concentrations=concentrations[:5],  # Top 5 for clarity
             behavioral_risks=risks,
+            motifs=self.recurring_motifs[:5],  # Top 5 for clarity
         )
 
 

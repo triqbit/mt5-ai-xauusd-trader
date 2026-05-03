@@ -15,6 +15,11 @@ from src.research.reporting import (
     ResearchReporter,
     StressedMetric,
     StressTestSection,
+    ResearchOrchestrator,
+    RareEventSection,
+    RareEventSummary,
+    TradePatternSection,
+    SignalMotif,
 )
 
 
@@ -56,15 +61,15 @@ def test_markdown_generation(sample_report):
     markdown = reporter.generate_markdown(sample_report)
 
     assert "# Q1 2024 Strategy Robustness Audit" in markdown
-    assert "## 1. Market Regime Analysis" in markdown
+    assert "Market Regime Analysis" in markdown
     assert "Trending" in markdown
     assert "65.0%" in markdown
-    assert "## 2. Stress Test Outcomes" in markdown
+    assert "Stress Test Outcomes" in markdown
     assert "Resilience Score" in markdown
     assert "85.5/100" in markdown
     assert "Spread Widening" in markdown
     assert "PASS" in markdown
-    assert "## 6. Capital Allocation Insights" in markdown
+    assert "Capital Allocation Insights" in markdown
     assert "XAUUSD_PPO" in markdown
     assert "$45,000" in markdown
     assert "Recommend deploying" in markdown
@@ -89,3 +94,74 @@ def test_save_markdown(sample_report, tmp_path):
     with open(file_path, "r") as f:
         content = f.read()
         assert "Q1 2024 Strategy Robustness Audit" in content
+
+def test_research_orchestrator():
+    orchestrator = ResearchOrchestrator(
+        title="Orchestrated Report",
+        executive_summary="Summary",
+        conclusion="Conclusion"
+    )
+
+    regime = RegimeSection(
+        summary="Test Summary",
+        regimes=[RegimeSummary(label="Trending", frequency_pct=50, avg_duration_bars=10, profitability="Neutral")],
+        transition_insights="None"
+    )
+
+    orchestrator.add_section(regime)
+    report = orchestrator.build()
+
+    assert report.title == "Orchestrated Report"
+    assert report.regime_analysis is not None
+    assert report.regime_analysis.summary == "Test Summary"
+
+def test_rare_event_reporting():
+    rare_event_section = RareEventSection(
+        scenarios=[
+            RareEventSummary(event_type="flash_crash", peak_impact_pct=-0.05, realized_volatility=0.1, recovery_attained=0.8)
+        ],
+        insights="Resilient to small crashes."
+    )
+
+    report = ResearchReport(
+        title="Rare Event Audit",
+        executive_summary="Testing rare events.",
+        rare_events=rare_event_section,
+        conclusion="Final."
+    )
+
+    reporter = ResearchReporter()
+    md = reporter.generate_markdown(report)
+    html = reporter.generate_html(report)
+
+    assert "Rare Event Simulations" in md
+    assert "flash_crash" in md
+    assert "-5.0%" in md
+    assert "80.0%" in md
+
+    assert "Rare Event Simulations" in html
+    assert "flash_crash" in html
+
+def test_trade_pattern_motifs():
+    trade_section = TradePatternSection(
+        primary_insight="Insight",
+        concentrations=[],
+        behavioral_risks=[],
+        motifs=[
+            SignalMotif(algorithm="PPO", direction=1, volatility_bucket="High", confidence_bucket="Low", frequency=5, win_rate=0.2)
+        ]
+    )
+
+    report = ResearchReport(
+        title="Motif Audit",
+        executive_summary="Testing motifs.",
+        trade_patterns=trade_section,
+        conclusion="Final."
+    )
+
+    reporter = ResearchReporter()
+    md = reporter.generate_markdown(report)
+
+    assert "### Signal Motifs (Losing Combinations)" in md
+    assert "PPO" in md
+    assert "20.0%" in md
