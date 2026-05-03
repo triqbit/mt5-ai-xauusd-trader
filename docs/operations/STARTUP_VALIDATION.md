@@ -10,6 +10,7 @@ At startup, the `ConfigValidator` performs the following checks:
 - **MT5_LOGIN**: Must be a positive integer.
 - **MT5_SERVER**: Must be provided and cannot be "server_name", "test", or "your_server_here".
 - **MT5_PASSWORD**: Must be provided and cannot be "password", "test", or "your_password_here".
+- **MT5_PATH**: On Windows systems, the specified terminal path must exist on the filesystem.
 
 ### 2. Trading Mode Safety
 - **LIVE Mode**: If `MODE` is set to `live`, the environment variable `CONFIRM_LIVE_TRADING` must be explicitly set to `YES`. This acts as a safety switch to prevent accidental production execution.

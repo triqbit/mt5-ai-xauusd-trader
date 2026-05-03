@@ -3,7 +3,6 @@ Startup Validation Layer for MT5 AI Trading Bot.
 src/core/config_validator.py
 """
 
-import os
 import sys
 from pathlib import Path
 from typing import List, NamedTuple
@@ -91,16 +90,15 @@ class ConfigValidator:
 
     def _check_live_mode_confirmation(self) -> None:
         """Enforce explicit confirmation for LIVE trading."""
-        if self.config.mode == "live":
-            if self.config.confirm_live_trading.upper() != "YES":
-                self.errors.append(
-                    ValidationError(
-                        "MODE",
-                        "LIVE mode detected but CONFIRM_LIVE_TRADING is not set to 'YES'. "
-                        "Safety gate: set CONFIRM_LIVE_TRADING=YES in your environment.",
-                        True,
-                    )
+        if self.config.mode == "live" and self.config.confirm_live_trading.upper() != "YES":
+            self.errors.append(
+                ValidationError(
+                    "MODE",
+                    "LIVE mode detected but CONFIRM_LIVE_TRADING is not set to 'YES'. "
+                    "Safety gate: set CONFIRM_LIVE_TRADING=YES in your environment.",
+                    True,
                 )
+            )
 
     def _check_placeholder_secrets(self) -> None:
         """Detect default or placeholder values in secrets."""
@@ -119,36 +117,39 @@ class ConfigValidator:
         placeholders = ["YOUR_TOKEN", "CHANGE_ME", "YOUR_ACCOUNT_ID", "YOUR_CHAT_ID", "123456789"]
 
         # Check Telegram
-        if self.config.telegram_token:
-            if any(p in self.config.telegram_token.upper() for p in placeholders):
-                self.errors.append(
-                    ValidationError(
-                        "TELEGRAM_TOKEN",
-                        "Telegram token contains placeholder text. Replace with your actual bot token.",
-                        True,
-                    )
+        if self.config.telegram_token and any(
+            p in self.config.telegram_token.upper() for p in placeholders
+        ):
+            self.errors.append(
+                ValidationError(
+                    "TELEGRAM_TOKEN",
+                    "Telegram token contains placeholder text. Replace with your actual bot token.",
+                    True,
                 )
+            )
 
         # Check MetaAPI
-        if self.config.metaapi_token:
-            if any(p in self.config.metaapi_token.upper() for p in placeholders):
-                self.errors.append(
-                    ValidationError(
-                        "METAAPI_TOKEN",
-                        "MetaAPI token contains placeholder text. Replace with your actual MetaAPI token.",
-                        True,
-                    )
+        if self.config.metaapi_token and any(
+            p in self.config.metaapi_token.upper() for p in placeholders
+        ):
+            self.errors.append(
+                ValidationError(
+                    "METAAPI_TOKEN",
+                    "MetaAPI token contains placeholder text. Replace with your actual MetaAPI token.",
+                    True,
                 )
+            )
 
-        if self.config.metaapi_account_id:
-            if any(p in self.config.metaapi_account_id.upper() for p in placeholders):
-                self.errors.append(
-                    ValidationError(
-                        "METAAPI_ACCOUNT_ID",
-                        "MetaAPI account ID contains placeholder text. Replace with your actual MetaAPI account ID.",
-                        True,
-                    )
+        if self.config.metaapi_account_id and any(
+            p in self.config.metaapi_account_id.upper() for p in placeholders
+        ):
+            self.errors.append(
+                ValidationError(
+                    "METAAPI_ACCOUNT_ID",
+                    "MetaAPI account ID contains placeholder text. Replace with your actual MetaAPI account ID.",
+                    True,
                 )
+            )
 
     def _check_risk_parameters(self) -> None:
         """Verify risk parameters are within safe enterprise bounds (RISK_LIMITS.md)."""
