@@ -3,6 +3,7 @@ MT5 AI/ML Trading Bot - Comprehensive Integration Test Suite
 tests/verify_integration.py
 Verifies multi-agent work composes into a functioning, reliable system.
 """
+
 import time
 import pytest
 import numpy as np
@@ -27,47 +28,61 @@ from src.research.benchmarks import EMACrossoverStrategy
 
 # --- Fixtures ---
 
+
 @pytest.fixture
 def mock_cfg():
-    with patch.dict(os.environ, {
-        "MT5_PASSWORD": "test_password",
-        "MT5_SERVER": "test_server",
-        "TELEGRAM_TOKEN": "123:abc",
-        "TELEGRAM_CHAT_ID": "123456",
-        "MODE": "demo"
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "MT5_PASSWORD": "test_password",
+            "MT5_SERVER": "test_server",
+            "TELEGRAM_TOKEN": "123:abc",
+            "TELEGRAM_CHAT_ID": "123456",
+            "MODE": "demo",
+        },
+    ):
         get_config.cache_clear()
         return get_config()
+
 
 @pytest.fixture
 def trade_logger():
     return TradeLogger(db_url="sqlite:///:memory:")
+
 
 @pytest.fixture
 def mock_monitor(mock_cfg):
     with patch("telegram.Bot"):
         return Monitor(mock_cfg)
 
+
 @pytest.fixture
 def mock_connector(mock_cfg):
     with patch("src.trading.mt5_connector.mt5") as mock_mt5:
         mock_mt5.initialize.return_value = True
         mock_mt5.login.return_value = True
-        mock_mt5.account_info.return_value._asdict.return_value = {"balance": 10000.0, "equity": 10000.0}
+        mock_mt5.account_info.return_value._asdict.return_value = {
+            "balance": 10000.0,
+            "equity": 10000.0,
+        }
         connector = MT5Connector(mock_cfg)
         connector.connect()
         return connector
 
+
 @pytest.fixture
 def sample_market_data():
-    dates = pd.date_range(end=datetime.now(timezone.utc), periods=200, freq='5min')
-    df = pd.DataFrame({
-        'open': np.linspace(2300, 2310, 200),
-        'high': np.linspace(2305, 2315, 200),
-        'low': np.linspace(2295, 2305, 200),
-        'close': np.linspace(2300, 2310, 200),
-        'tick_volume': np.random.randint(100, 1000, 200)
-    }, index=dates)
+    dates = pd.date_range(end=datetime.now(timezone.utc), periods=200, freq="5min")
+    df = pd.DataFrame(
+        {
+            "open": np.linspace(2300, 2310, 200),
+            "high": np.linspace(2305, 2315, 200),
+            "low": np.linspace(2295, 2305, 200),
+            "close": np.linspace(2300, 2310, 200),
+            "tick_volume": np.random.randint(100, 1000, 200),
+        },
+        index=dates,
+    )
 
     # Add indicator columns for ExecutionFilter
     df["base_M5_atr"] = 10.0
@@ -77,37 +92,46 @@ def sample_market_data():
 
     return df
 
+
 # --- Path 1: Full Trading Flow Integration ---
 
-def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_connector, sample_market_data):
+
+def test_full_pipeline_integration(
+    mock_cfg, trade_logger, mock_monitor, mock_connector, sample_market_data
+):
     # Set a Tuesday 10:00 AM UTC to pass session filter
     ts = datetime(2026, 5, 5, 10, 0, 0, tzinfo=timezone.utc)
     """Path 1: Data ingestion -> feature engineering -> model inference -> execution filter -> risk engine -> logging"""
-    risk = RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
+    risk = RiskManager(
+        mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor
+    )
     model = EnsembleModel(device="cpu")
     exec_filter = ExecutionFilter(max_drawdown=0.15)
 
     # 1. Mock Ingestion
     mock_tick = {"bid": 2310.0, "ask": 2311.0, "time": time.time()}
 
-    with patch.object(mock_connector, "get_ohlcv", return_value=sample_market_data), \
-         patch.object(mock_connector, "get_tick", return_value=mock_tick), \
-         patch.object(mock_connector, "place_order", return_value=999888):
-
+    with (
+        patch.object(mock_connector, "get_ohlcv", return_value=sample_market_data),
+        patch.object(mock_connector, "get_tick", return_value=mock_tick),
+        patch.object(mock_connector, "place_order", return_value=999888),
+    ):
         # 2. Model Inference
         obs = sample_market_data[["open", "high", "low", "close", "tick_volume"]].values[-1]
         model._ppo_model = MagicMock()
-        model._ppo_model.predict.return_value = (1, None) # BUY
+        model._ppo_model.predict.return_value = (1, None)  # BUY
         signal_out = model.predict(obs)
 
         # 3. Log Signal
-        signal_id = trade_logger.log_signal({
-            "symbol": "XAUUSD",
-            "direction": signal_out.direction,
-            "entry_price": 2311.0,
-            "algorithm": "ensemble",
-            "confidence": signal_out.confidence
-        })
+        signal_id = trade_logger.log_signal(
+            {
+                "symbol": "XAUUSD",
+                "direction": signal_out.direction,
+                "entry_price": 2311.0,
+                "algorithm": "ensemble",
+                "confidence": signal_out.confidence,
+            }
+        )
 
         # 4. Risk Engine
         signal = TradeSignal(
@@ -118,14 +142,16 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
             take_profit=2350.0,
             lot_size=0.1,
             algorithm="ensemble",
-            confidence=signal_out.confidence
+            confidence=signal_out.confidence,
         )
 
         risk_approved = risk.approve(signal, signal_id=signal_id)
         assert risk_approved is True
 
         # 5. Execution Filter
-        exec_decision = exec_filter.validate(signal, sample_market_data, current_drawdown=0.0, timestamp=ts)
+        exec_decision = exec_filter.validate(
+            signal, sample_market_data, current_drawdown=0.0, timestamp=ts
+        )
         assert exec_decision.is_approved is True
 
         # 6. Execution & Final Logging
@@ -138,7 +164,7 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
             direction=1,
             entry_price=2311.0,
             lot_size=0.1,
-            signal_id=signal_id
+            signal_id=signal_id,
         )
 
         # Data Consistency Check
@@ -146,57 +172,72 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
         assert trade is not None
         assert trade.signal_id == signal_id
 
+
 # --- Path 2: Configuration & Startup ---
+
 
 def test_startup_integration():
     """Path 2: Configuration loading -> validation -> trading mode selection -> monitoring startup"""
-    with patch.dict(os.environ, {
-        "MT5_LOGIN": "123456",
-        "MT5_PASSWORD": "StartupTestPassword",
-        "MT5_SERVER": "StartupTestServer",
-        "DATABASE_URL": "sqlite:///trades.db",
-        "MODE": "demo",
-        "ALGORITHM": "ensemble"
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "MT5_LOGIN": "123456",
+            "MT5_PASSWORD": "StartupTestPassword",
+            "MT5_SERVER": "StartupTestServer",
+            "DATABASE_URL": "sqlite:///trades.db",
+            "MODE": "demo",
+            "ALGORITHM": "ensemble",
+        },
+    ):
         get_config.cache_clear()
         cfg = get_config()
         assert cfg.mode == "demo"
 
         from src.core.config_validator import ConfigValidator
+
         validator = ConfigValidator(cfg)
         result = validator.validate()
         assert result.success is True
 
+
 # --- Path 3: Backtesting & Walk-Forward ---
+
 
 def test_backtest_wf_integration(sample_market_data):
     """Path 3: Backtest initialization -> walk-forward validation -> performance reporting"""
+
     def param_space(trial):
         return {
             "fast_window": trial.suggest_int("fast_window", 5, 10),
-            "slow_window": trial.suggest_int("slow_window", 20, 30)
+            "slow_window": trial.suggest_int("slow_window", 20, 30),
         }
 
-    config = WalkForwardConfig(n_trials=2, train_size=100, test_size=20, step_size=40, min_windows=2)
+    config = WalkForwardConfig(
+        n_trials=2, train_size=100, test_size=20, step_size=40, min_windows=2
+    )
     optimizer = WalkForwardOptimizer(
         data=sample_market_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     result = optimizer.run_optimization()
     assert result.best_params is not None
     assert result.metrics.oos_sharpe_mean is not None
 
+
 # --- Path 4: Resilience & Error Injection ---
+
 
 def test_circuit_breaker_recovery(mock_cfg, trade_logger, mock_monitor):
     """Path 4: Error injection -> circuit breaker activation -> recovery -> alert notification"""
-    risk = RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
+    risk = RiskManager(
+        mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor
+    )
 
     # 1. Trigger Circuit Breaker
-    risk.update_equity(10000.0) # peak
+    risk.update_equity(10000.0)  # peak
     risk.update_equity(8000.0)  # 20% drawdown (Limit 15%)
 
     with patch.object(mock_monitor, "alert_circuit_breaker") as mock_alert:
@@ -215,7 +256,9 @@ def test_circuit_breaker_recovery(mock_cfg, trade_logger, mock_monitor):
     risk.update_equity(8000.0)
     assert risk._check_circuit_breaker() is True
 
+
 # --- Path 5: Intelligence & Adaptive Weighting ---
+
 
 def test_ensemble_intelligence_integration(sample_market_data):
     """Path 5: Model ensemble -> regime detection -> dynamic weighting -> trade decision"""
@@ -241,7 +284,9 @@ def test_ensemble_intelligence_integration(sample_market_data):
     signal = model.predict(sample_market_data.iloc[-1].values, regime_info=regime_info)
     assert signal.direction == 1
 
+
 # --- Performance Measurement ---
+
 
 def test_system_latency_metrics(mock_cfg, trade_logger, sample_market_data):
     """Measures latency of core integration paths."""
@@ -266,4 +311,4 @@ def test_system_latency_metrics(mock_cfg, trade_logger, sample_market_data):
     p99 = np.percentile(latencies, 99)
 
     print(f"\nLatency Report (ms): P50={p50:.2f}, P95={p95:.2f}, P99={p99:.2f}")
-    assert p50 < 200 # Threshold for enterprise responsiveness
+    assert p50 < 200  # Threshold for enterprise responsiveness

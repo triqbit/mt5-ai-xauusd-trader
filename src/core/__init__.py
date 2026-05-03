@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING
 
+from src.core.audit_log import AuditLogger, get_audit_logger
 from src.core.config import TradingConfig, get_config
 from src.core.profiler import profile
 
@@ -12,7 +13,16 @@ else:
     def __getattr__(name):
         if name == "FeatureEngineer":
             from src.core.feature_engineering import FeatureEngineer
+
             return FeatureEngineer
         raise AttributeError(f"module {__name__} has no attribute {name}")
 
-__all__ = ["FeatureEngineer", "TradingConfig", "get_config", "profile"]
+
+__all__ = [
+    "AuditLogger",
+    "FeatureEngineer",
+    "TradingConfig",
+    "get_audit_logger",
+    "get_config",
+    "profile",
+]
