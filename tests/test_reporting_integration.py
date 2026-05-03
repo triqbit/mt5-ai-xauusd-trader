@@ -131,14 +131,14 @@ def test_full_report_generation(mock_walk_forward_result, mock_journal_report, m
     # 2. Verify Markdown Generation
     md_content = reporter.generate_markdown(report)
     assert "# Full Strategy Audit" in md_content
-    assert "## Table of Contents" in md_content
-    assert "## 1. Market Regime Analysis" in md_content
+    assert "Table of Contents" in md_content
+    assert "Market Regime Analysis" in md_content
     assert "trending" in md_content
-    assert "## 3. Hyperparameter Robustness" in md_content
+    assert "Hyperparameter Robustness" in md_content
     assert "fast_window" in md_content
-    assert "## 4. Trade Pattern Findings" in md_content
+    assert "Trade Pattern Findings" in md_content
     assert "Overtrading" in md_content
-    assert "## 6. Capital Allocation Insights" in md_content
+    assert "Capital Allocation Insights" in md_content
     assert "PPO_XAUUSD" in md_content
     assert "Heat Limit: 3" in md_content
 

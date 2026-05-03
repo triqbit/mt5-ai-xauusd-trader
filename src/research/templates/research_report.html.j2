@@ -181,6 +181,32 @@
             </tbody>
         </table>
 
+        {% if trade_patterns.motifs %}
+        <h3>Signal Motifs (Losing Combinations)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Algorithm</th>
+                    <th>Volatility</th>
+                    <th>Confidence</th>
+                    <th>Win Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in trade_patterns.motifs %}
+                {% if m.win_rate < 0.5 %}
+                <tr>
+                    <td>{{ m.algorithm }}</td>
+                    <td>{{ m.volatility_bucket }}</td>
+                    <td>{{ m.confidence_bucket }}</td>
+                    <td>{{ (m.win_rate * 100)|round(1) }}%</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
         <h3>Behavioral Risks</h3>
         <ul>
             {% for risk in trade_patterns.behavioral_risks %}
@@ -281,6 +307,36 @@
         </tbody>
     </table>
     <p>{{ benchmarks.statistical_summary }}</p>
+    </section>
+    {% endif %}
+
+    {% if rare_events %}
+    <section>
+        <h2>8. Rare Event Simulations</h2>
+        <div class="insight-box">
+            <strong>Insights:</strong><br>
+            {{ rare_events.insights }}
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Event Type</th>
+                    <th>Peak Impact</th>
+                    <th>Realized Volatility</th>
+                    <th>Recovery</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in rare_events.scenarios %}
+                <tr>
+                    <td><strong>{{ s.event_type }}</strong></td>
+                    <td>{{ (s.peak_impact_pct * 100)|round(2) }}%</td>
+                    <td>{{ s.realized_volatility|round(4) }}</td>
+                    <td>{{ (s.recovery_attained * 100)|round(1) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </section>
     {% endif %}
 

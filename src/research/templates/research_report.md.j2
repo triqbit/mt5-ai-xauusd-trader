@@ -7,26 +7,41 @@
 - **Scope:** Research and Strategy Audit
 ---
 
+{% set ns = namespace(count=1) %}
 ## Table of Contents
-1. [Executive Summary](#executive-summary)
-{% if regime_analysis %}2. [Market Regime Analysis](#1-market-regime-analysis){% endif %}
-{% if stress_tests %}3. [Stress Test Outcomes](#2-stress-test-outcomes){% endif %}
-{% if hyperparameter_robustness %}4. [Hyperparameter Robustness](#3-hyperparameter-robustness){% endif %}
-{% if trade_patterns %}5. [Trade Pattern Findings](#4-trade-pattern-findings-journal-mining){% endif %}
-{% if model_drift %}6. [Model Drift Observations](#5-model-drift-observations){% endif %}
-{% if allocation_insights %}7. [Capital Allocation Insights](#6-capital-allocation-insights){% endif %}
-{% if benchmarks %}8. [Benchmark Comparisons](#7-benchmark-comparisons){% endif %}
-9. [Conclusion & Recommendations](#conclusion--recommendations)
+{{ ns.count }}. [Executive Summary](#executive-summary)
+{% set ns.count = ns.count + 1 %}
+{% if regime_analysis %}{{ ns.count }}. [Market Regime Analysis](#{{ ns.count }}-market-regime-analysis)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if stress_tests %}{{ ns.count }}. [Stress Test Outcomes](#{{ ns.count }}-stress-test-outcomes)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if hyperparameter_robustness %}{{ ns.count }}. [Hyperparameter Robustness](#{{ ns.count }}-hyperparameter-robustness)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if trade_patterns %}{{ ns.count }}. [Trade Pattern Findings](#{{ ns.count }}-trade-pattern-findings-journal-mining)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if model_drift %}{{ ns.count }}. [Model Drift Observations](#{{ ns.count }}-model-drift-observations)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if allocation_insights %}{{ ns.count }}. [Capital Allocation Insights](#{{ ns.count }}-capital-allocation-insights)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if benchmarks %}{{ ns.count }}. [Benchmark Comparisons](#{{ ns.count }}-benchmark-comparisons)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if rl_evaluation %}{{ ns.count }}. [RL Agent Evaluation](#{{ ns.count }}-rl-agent-evaluation)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if rare_events %}{{ ns.count }}. [Rare Event Simulations](#{{ ns.count }}-rare-event-simulations)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{{ ns.count }}. [Conclusion & Recommendations](#conclusion--recommendations)
 
 ---
 
+{% set ns.count = 1 %}
 ## Executive Summary
 {{ executive_summary }}
 
 ---
 
 {% if regime_analysis %}
-## 1. Market Regime Analysis
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Market Regime Analysis
 **Summary:** {{ regime_analysis.summary }}
 
 | Regime | Frequency | Avg Duration | Profitability |
@@ -40,7 +55,8 @@
 {% endif %}
 
 {% if stress_tests %}
-## 2. Stress Test Outcomes
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Stress Test Outcomes
 **Resilience Score:** {{ stress_tests.resilience_score }}/100
 
 | Scenario | Total Return | Max Drawdown | Sharpe | Outcome |
@@ -62,7 +78,8 @@
 {% endif %}
 
 {% if hyperparameter_robustness %}
-## 3. Hyperparameter Robustness
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Hyperparameter Robustness
 **Stability Score:** {{ hyperparameter_robustness.stability_score }}/100
 
 | Parameter | Range Tested | Optimal Value | Sensitivity |
@@ -76,7 +93,8 @@
 {% endif %}
 
 {% if trade_patterns %}
-## 4. Trade Pattern Findings (Journal Mining)
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Trade Pattern Findings (Journal Mining)
 **Key Insight:** {{ trade_patterns.primary_insight }}
 
 ### Profitable Concentrations
@@ -86,6 +104,17 @@
 | {{ c.attribute }} | {{ c.value }} | {{ (c.win_rate * 100)|round(1) }}% | {{ c.profit_factor|round(2) }} |
 {% endfor %}
 
+{% if trade_patterns.motifs %}
+### Signal Motifs (Losing Combinations)
+| Algorithm | Volatility | Confidence | Frequency | Win Rate |
+|-----------|------------|------------|-----------|----------|
+{% for m in trade_patterns.motifs %}
+{% if m.win_rate < 0.5 %}
+| {{ m.algorithm }} | {{ m.volatility_bucket }} | {{ m.confidence_bucket }} | {{ m.frequency }} | {{ (m.win_rate * 100)|round(1) }}% |
+{% endif %}
+{% endfor %}
+{% endif %}
+
 ### Behavioral Risks
 {% for risk in trade_patterns.behavioral_risks %}
 - **{{ risk.type }}:** {{ risk.description }}
@@ -93,7 +122,8 @@
 {% endif %}
 
 {% if model_drift %}
-## 5. Model Drift Observations
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Model Drift Observations
 | Metric | Baseline | Current | Drift | Status |
 |--------|----------|---------|-------|--------|
 {% for m in model_drift.metrics %}
@@ -105,7 +135,8 @@
 {% endif %}
 
 {% if allocation_insights %}
-## 6. Capital Allocation Insights
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Capital Allocation Insights
 **Portfolio Heat:** {{ allocation_insights.total_heat_pct }}%
 
 | Symbol/Family | Allocated | Heat | Performance Multiplier |
@@ -121,7 +152,8 @@
 {% endif %}
 
 {% if benchmarks %}
-## 7. Benchmark Comparisons
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Benchmark Comparisons
 | Strategy | Total Return | Sharpe Ratio | Max Drawdown | P-Value (vs Baseline) |
 |----------|--------------|--------------|--------------|-----------------------|
 {% for b in benchmarks.comparisons %}
@@ -130,6 +162,30 @@
 
 **Statistical Significance:**
 {{ benchmarks.statistical_summary }}
+{% endif %}
+
+{% if rl_evaluation %}
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. RL Agent Evaluation
+**Summary:** {{ rl_evaluation.comparison_summary }}
+
+| Agent | Sharpe | Profit Factor | MaxDD | Win Rate |
+|-------|--------|---------------|-------|----------|
+{% for m in rl_evaluation.metrics %}
+| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.profit_factor|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ (m.win_rate * 100)|round(1) }}% |
+{% endfor %}
+{% endif %}
+
+{% if rare_events %}
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Rare Event Simulations
+**Insights:** {{ rare_events.insights }}
+
+| Event Type | Peak Impact | Realized Vol | Recovery |
+|------------|-------------|--------------|----------|
+{% for s in rare_events.scenarios %}
+| {{ s.event_type }} | {{ (s.peak_impact_pct * 100)|round(2) }}% | {{ s.realized_volatility|round(4) }} | {{ (s.recovery_attained * 100)|round(1) }}% |
+{% endfor %}
 {% endif %}
 
 ---
