@@ -87,10 +87,12 @@ python3 scripts/generate_config_docs.py src/core/config.py "${RELEASE_PATH}/CONF
 echo "Extracting Release Notes..."
 if [ -f "CHANGELOG.md" ]; then
     # Improved extraction logic: find [Unreleased] section and stop at the next version header
+    # We use a more robust sed pattern to get content between [Unreleased] and the first versioned header
     sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
-    if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ]; then
-         echo "Warning: RELEASE_NOTES.md is empty. Ensure [Unreleased] section in CHANGELOG.md is populated."
-         echo "Development Build - No specific release notes." > "${RELEASE_PATH}/RELEASE_NOTES.md"
+
+    if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ] || [ "$(grep -c "[a-zA-Z]" "${RELEASE_PATH}/RELEASE_NOTES.md")" -eq 0 ]; then
+         echo "Warning: RELEASE_NOTES.md is empty or only contains whitespace. Using fallback."
+         echo "Development Build - No specific release notes for v${VERSION}." > "${RELEASE_PATH}/RELEASE_NOTES.md"
     fi
 else
     echo "Error: CHANGELOG.md not found."
@@ -99,8 +101,13 @@ fi
 
 # --- 4. Validation & Checksums ---
 
+echo "Generating Checksum Manifest..."
+(cd "${RELEASE_PATH}" && find . -type f ! -name "checksums.sha256" | sort | while read -r f; do
+    sha256_cmd "$f" >> "checksums.sha256"
+done)
+
 echo "Validating Artifact Completeness..."
-MANDATORY_FILES=("docker_info.json" ".env.example" "CONFIG_REFERENCE.md" "RELEASE_NOTES.md" "migrations/env.py")
+MANDATORY_FILES=("docker_info.json" ".env.example" "CONFIG_REFERENCE.md" "RELEASE_NOTES.md" "checksums.sha256" "migrations/env.py")
 
 for file in "${MANDATORY_FILES[@]}"; do
     if [ ! -f "${RELEASE_PATH}/${file}" ]; then
@@ -113,10 +120,9 @@ for file in "${MANDATORY_FILES[@]}"; do
     fi
 done
 
-echo "Generating Checksum Manifest..."
-(cd "${RELEASE_PATH}" && find . -type f ! -name "checksums.sha256" | while read -r f; do
-    sha256_cmd "$f" >> "checksums.sha256"
-done)
+# Verify manifest itself
+echo "Verifying Checksum Manifest integrity..."
+(cd "${RELEASE_PATH}" && sha256_cmd -c checksums.sha256 > /dev/null)
 
 echo "--------------------------------------------------------"
 echo "SUCCESS: Release v${VERSION} packaged successfully."
