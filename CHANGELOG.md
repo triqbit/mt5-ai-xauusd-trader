@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Regime-aware scoring heuristics for XAUUSD (Trending, News Shock, Mean Reversion, etc.).
 - Integration of `DynamicEnsemble` into the core `EnsembleModel` in `src/models/ensemble.py`.
 - Comprehensive unit tests for dynamic weighting and stability in `tests/test_dynamic_ensemble.py`.
+- Institutional-grade execution quality analytics in `src/analytics/execution_quality.py`.
+- Multi-horizon markout (drift) tracking (1m, 5m, 15m, 30m, 60m).
+- Spread-relative sigmoid fill quality model.
+- Execution cost tracking (slippage + half-spread).
+- Automated timezone handling for accurate market data comparisons.
+- Comprehensive unit tests for execution quality in `tests/test_execution_quality.py`.
 
 ### Changed
 - Refactored release orchestration to integrate automated versioning logic.
