@@ -8,6 +8,7 @@ This policy defines the retention periods and disposal procedures for operationa
 | Data Category | Data Type | Retention Period | Disposal Method | Reason |
 |---------------|-----------|------------------|-----------------|--------|
 | **Compliance** | Trade Records (`trades` table) | 7 Years | Archival/Purge | Regulatory Requirement |
+| **Audit** | Audit Log (`audit_log` table) | 7 Years | Archival/Purge | Enterprise Traceability |
 | **Audit** | Risk Events (`risk_events` table) | 2 Years | Purge | Operational Auditing |
 | **Audit** | Linked Model Signals | 7 Years | Archival/Purge | Trade Traceability |
 | **Operational** | Unlinked Model Signals | 90 Days | Purge | Performance Tuning |
@@ -20,8 +21,8 @@ This policy defines the retention periods and disposal procedures for operationa
 ### 3.1 Audit-Critical Data (Preserve)
 The following data must be preserved for the full 7-year compliance window:
 - **Trade Records**: All fields in the `trades` table, including tickets, symbols, prices, and PnL.
+- **Audit Log**: System actions, configuration changes, and operator events in the `audit_log` table.
 - **Linked Signals**: Any `model_signals` record referenced by a `trade` record via `signal_id`.
-- **System Configuration Audit**: Logs of critical configuration changes (e.g., risk limit adjustments).
 
 ### 3.2 Ephemeral Data (Rotate/Purge)
 The following data can be purged more frequently to manage storage:
@@ -33,7 +34,7 @@ The following data can be purged more frequently to manage storage:
 
 ### 4.0 Archival Procedures
 Prior to purging, certain data categories may be archived for long-term historical analysis:
-- **Trade Records & Linked Signals**: After 7 years, these records are exported to compressed CSV/Parquet format and stored in the enterprise cold-storage (e.g., AWS S3 Glacier) before being purged from the production database.
+- **Trade Records, Audit Logs & Linked Signals**: After 7 years, these records are exported to compressed CSV/Parquet format and stored in the enterprise cold-storage (e.g., AWS S3 Glacier) before being purged from the production database.
 - **Backtest Results**: High-value backtest reports (PDFs, key metrics) should be archived in the project's research repository or shared drive before the 1-year automated deletion of temporary artifacts.
 
 ### 4.1 Automated Purging
@@ -43,6 +44,7 @@ An automated cleanup script (`scripts/data_cleanup.py`) runs periodically to:
 3. Delete `risk_events` older than 2 years.
 4. Delete `performance_metrics` records older than 2 years.
 5. Delete temporary backtest artifacts older than 1 year.
+6. Delete `audit_log` entries older than 7 years.
 
 ### 4.2 Safe Deletion Logic
 - **Foreign Key Integrity**: The cleanup script must ensure that `model_signals` linked to `trades` are NOT deleted if the trade record is still within its 7-year retention window.

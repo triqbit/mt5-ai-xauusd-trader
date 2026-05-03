@@ -7,16 +7,24 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from scripts.data_cleanup import cleanup_backtests, cleanup_database, cleanup_logs
+from src.core.audit_log import AuditEntry, Base as AuditBase
 from src.core.trade_logger import Base, ModelSignal, PerformanceMetric, RiskEvent, Trade
 
 
 class TestDataCleanup(unittest.TestCase):
     def setUp(self):
         # Setup temporary database
-        self.engine = create_engine("sqlite:///:memory:")
+        # Use StaticPool to ensure the in-memory database persists across multiple connections from the same engine
+        self.engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
         Base.metadata.create_all(self.engine)
+        AuditBase.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         self.db_url = "sqlite:///:memory:" # Not used directly by cleanup_database in this test but good for reference
 
@@ -122,7 +130,15 @@ class TestDataCleanup(unittest.TestCase):
                 lot_size=0.1, created_at=now - timedelta(days=3000)
             )
 
-            session.add_all([trade, old_risk, new_risk, old_perf, very_old_trade])
+            # 8. Audit Log entries
+            old_audit = AuditEntry(
+                actor="system", action="config_change", created_at=now - timedelta(days=3000)
+            )
+            new_audit = AuditEntry(
+                actor="system", action="startup", created_at=now - timedelta(days=10)
+            )
+
+            session.add_all([trade, old_risk, new_risk, old_perf, very_old_trade, old_audit, new_audit])
             session.commit()
 
             # Capture IDs while session is still open
@@ -145,6 +161,7 @@ class TestDataCleanup(unittest.TestCase):
         self.assertEqual(results["risk_events"], 1)    # only old_risk
         self.assertEqual(results["performance_metrics"], 1)
         self.assertEqual(results["trades"], 1) # very_old_trade
+        self.assertEqual(results["audit_log"], 1)
 
         with self.Session() as session:
             signals = session.execute(select(ModelSignal)).scalars().all()
@@ -156,6 +173,10 @@ class TestDataCleanup(unittest.TestCase):
             trades = session.execute(select(Trade)).scalars().all()
             self.assertEqual(len(trades), 1)
             self.assertEqual(trades[0].ticket, 123)
+
+            audit_entries = session.execute(select(AuditEntry)).scalars().all()
+            self.assertEqual(len(audit_entries), 1)
+            self.assertEqual(audit_entries[0].action, "startup")
 
 if __name__ == "__main__":
     unittest.main()
