@@ -174,12 +174,16 @@ class EnsembleModel(BaseModel):
         total_weight = sum(self.weights[k] for k in votes)
         blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
 
-        # Consensus logic: check if models agree on direction
-        consensus_threshold = 0.60 # Need 60%+ agreement across ensemble as per RISK_LIMITS.md
-
         # Determine the combined action
         action_idx = int(np.argmax(blended))
         confidence = float(blended[action_idx])
+
+        # Consensus logic: check if models agree on direction as per RISK_LIMITS.md
+        # If the highest probability action doesn't meet the consensus threshold, return HOLD
+        consensus_threshold = 0.60
+        if action_idx != 0 and confidence < consensus_threshold:
+            logger.debug("Ensemble | Consensus not reached: %.2f < %.2f", confidence, consensus_threshold)
+            return Signal(direction=SignalDirection.HOLD, confidence=confidence, metadata={"reason": "low_consensus"})
 
         # Veto power: any model with <40% confidence forces skip as per RISK_LIMITS.md
         for algo, probs in votes.items():

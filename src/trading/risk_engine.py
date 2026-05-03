@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 import numpy as np
@@ -32,7 +32,7 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 @dataclass
 class DailyStats:
@@ -91,9 +91,11 @@ class RiskEngine:
         # Enforce Max Position Size: 10% of account equity per trade nominal
         # Assuming gold (XAUUSD) ~2300 price, 1 lot = 100 oz
         # Nominal = lots * 100 * price
-        # This is a simplified check for the scaffold
+        price_estimate = 2300.0 # placeholder
         max_nominal = equity * self.cfg.max_equity_risk_per_trade
+        max_lots_by_nominal = max_nominal / (100 * price_estimate)
 
+        lots = min(lots, max_lots_by_nominal)
         lots = max(0.01, min(lots, 10.0)) # Hard cap for safety in scaffold
         lots = round(lots, 2)
 
@@ -189,7 +191,7 @@ class RiskEngine:
 
     def reset_daily(self) -> None:
         """Daily reset at 00:00 UTC."""
-        self.daily = DailyStats(peak_equity=self.balance)
+        self.daily = DailyStats(date=date.today(), peak_equity=self.balance)
         logger.info("RiskEngine daily stats reset.")
 
 __all__ = ["RiskEngine", "TradeSignal", "DailyStats"]

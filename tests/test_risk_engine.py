@@ -1,10 +1,11 @@
 import pytest
 from src.trading.risk_engine import RiskEngine, TradeSignal
-from src.core.config import get_config
+from src.core.config import get_config, TradingConfig
 
 @pytest.fixture
 def risk_engine():
-    cfg = get_config()
+    # Use a fresh config for each test to avoid singleton side effects
+    cfg = TradingConfig()
     return RiskEngine(cfg, account_balance=10000.0)
 
 def test_daily_loss_cascading(risk_engine):
@@ -46,15 +47,33 @@ def test_drawdown_levels(risk_engine):
     assert risk_engine.check_drawdown_levels() == 0.0
 
 def test_atr_position_sizing(risk_engine):
+    # Use high equity and disable nominal cap for this test
+    risk_engine.cfg.max_equity_risk_per_trade = 1.0
+    equity = 1000000.0
+    atr = 50.0 # stop_dist = 100
+    symbol = "XAUUSD"
+
+    # risk_per_trade = 0.01 (1%) -> $10,000 risk
+    # stop_dist = 2 * ATR = 100.0
+    # lots = 10,000 / (100 * 100) = 1.0
+    lots = risk_engine.calculate_atr_position_size(equity, atr, symbol)
+    assert lots == 1.0
+
+def test_atr_position_sizing_nominal_cap(risk_engine):
     equity = 10000.0
     atr = 5.0
     symbol = "XAUUSD"
 
     # risk_per_trade = 0.01 (1%) -> $100 risk
-    # stop_dist = 2 * ATR = 10.0
-    # lots = 100 / (10 * 100) = 0.10
+    # stop_dist = 10.0
+    # base_lots = 0.10
+    # Nominal cap: 10% of 10,000 = 1,000
+    # Price estimate in engine: 2300
+    # 1 lot = 100 oz -> nominal = 1 lot * 100 * 2300 = 230,000
+    # Max lots = 1,000 / 230,000 = 0.0043 -> 0.01 floor
+
     lots = risk_engine.calculate_atr_position_size(equity, atr, symbol)
-    assert lots == 0.10
+    assert lots == 0.01
 
 def test_validate_signal_streaks(risk_engine):
     signal = TradeSignal(

@@ -7,23 +7,22 @@ from src.core.constants import SignalDirection
 def ensemble():
     return EnsembleModel(device="cpu")
 
-def test_ensemble_veto_logic(ensemble):
-    # Mock votes where one model has < 40% confidence
-    # votes: ppo -> [0.35, 0.35, 0.30] (max 0.35)
-    # Ensemble should HOLD due to veto
+def test_ensemble_low_consensus(ensemble):
+    # Mock votes that don't reach 60% consensus
+    ensemble.lstm_model = MagicMock()
+    ensemble.lstm_model.return_value = MagicMock()
 
-    obs = np.random.rand(140)
+    with patch("torch.no_grad"), patch("torch.softmax") as mock_softmax:
+        # Votes [hold=0.45, buy=0.55, sell=0.0] -> BUY is max but 0.55 < 0.60
+        mock_softmax.return_value.cpu.return_value.numpy.return_value = [np.array([0.55, 0.0, 0.45])]
+        ensemble.dynamic_ensemble.get_weights = MagicMock(return_value={"ppo": 0.0, "dreamer": 0.0, "lstm": 1.0})
 
-    mock_ppo = pytest.importorskip("stable_baselines3").PPO
-    ensemble._ppo_model = MagicMock()
-    ensemble._ppo_model.predict.return_value = (1, None) # BUY
+        obs = np.random.rand(140)
+        seq = MagicMock()
+        signal = ensemble.predict(obs, seq=seq)
 
-    # We need to bypass the actual predict if we want to test veto logic easily
-    # Or mock the internal vote collection
-
-    with patch.object(EnsembleModel, "predict") as mock_predict:
-        # This doesn't test the logic inside predict.
-        pass
+        assert signal.direction == SignalDirection.HOLD
+        assert signal.metadata["reason"] == "low_consensus"
 
 def test_ensemble_consensus_veto_actual(ensemble):
     # Manually trigger predict logic by mocking internal components
