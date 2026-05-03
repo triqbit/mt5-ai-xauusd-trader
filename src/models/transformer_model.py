@@ -14,7 +14,7 @@ class TimeSeriesTransformer(nn.Module):
     """
     Advanced Transformer model for price action forecasting.
     Input: [batch_size, seq_len, features]
-    Output: [batch_size, 3] (Buy, Sell, Hold)
+    Output: [batch_size, 3] (Hold, Buy, Sell) - Aligned with ModelAction.
     """
 
     def __init__(
@@ -41,7 +41,7 @@ class TimeSeriesTransformer(nn.Module):
 
         # Input and Output Projections
         self.input_projection = nn.Linear(input_dim, model_dim)
-        self.decoder = nn.Linear(model_dim, 3)  # Output: [Long, Short, Neutral] probabilities
+        self.decoder = nn.Linear(model_dim, 3)  # Output: [Hold, Buy, Sell] probabilities
 
     def forward(self, src: torch.Tensor) -> torch.Tensor:
         # src shape: [batch_size, seq_len, input_dim]

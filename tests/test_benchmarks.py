@@ -181,8 +181,8 @@ def test_transformer_adapter(sample_data):
     import torch
 
     mock_model = MagicMock()
-    # Mock return: a tensor of probabilities [batch, 3] where index 0 is BUY
-    mock_model.return_value = torch.tensor([[1.0, 0.0, 0.0]])
+    # Mock return: a tensor of probabilities [batch, 3] where index 1 is BUY (ModelAction standard)
+    mock_model.return_value = torch.tensor([[0.0, 1.0, 0.0]])
 
     window_size = 5
     adapter = TransformerAdapter(mock_model, window_size=window_size)
