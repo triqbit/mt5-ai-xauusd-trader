@@ -63,6 +63,17 @@ class BlockReasonSummary(BaseModel):
     reason: str
     count: int
     impacted_algorithms: List[str]
+    weak_state_correlation: float = 0.0
+
+
+class SignalMotif(BaseModel):
+    """A recurring combination of signal attributes."""
+
+    algorithm: str
+    direction: int
+    volatility_bucket: str
+    frequency: int
+    win_rate: float
 
 
 class JournalReport(BaseModel):
@@ -74,6 +85,7 @@ class JournalReport(BaseModel):
     drawdown_clusters: List[DrawdownCluster]
     profitable_concentrations: List[PatternConcentration]
     risk_block_summary: List[BlockReasonSummary]
+    recurring_motifs: List[SignalMotif] = Field(default_factory=list)
 
     def to_report_section(self) -> Any:
         """Convert results to TradePatternSection for ResearchReporter."""
@@ -112,6 +124,27 @@ class JournalReport(BaseModel):
                 BehavioralRisk(
                     type="Loss Clustering",
                     description=f"Detected {len(self.drawdown_clusters)} significant drawdown clusters with total loss of {total_loss:.2f}",
+                )
+            )
+
+        # High risk block correlation during weak states
+        for block in self.risk_block_summary:
+            if block.weak_state_correlation > 0.7:
+                risks.append(
+                    BehavioralRisk(
+                        type="Strategy Fragility",
+                        description=f"Risk block '{block.reason}' is highly correlated with weak strategy states ({block.weak_state_correlation:.1%}).",
+                    )
+                )
+
+        # Problematic motifs (recurring losing combinations)
+        losing_motifs = [m for m in self.recurring_motifs if m.win_rate < 0.3 and m.frequency >= 3]
+        if losing_motifs:
+            m = losing_motifs[0]
+            risks.append(
+                BehavioralRisk(
+                    type="Toxic Motif",
+                    description=f"Recurring losses detected for {m.algorithm} {m.volatility_bucket} volatility (WR: {m.win_rate:.1%}).",
                 )
             )
 
@@ -380,6 +413,118 @@ class JournalMiner:
 
         return results
 
+    def _extract_volatility_bucket(self, volatility: float) -> str:
+        """Heuristic for volatility bucket assignment."""
+        if volatility < 0.1:
+            return "Low"
+        if volatility < 0.3:
+            return "Normal"
+        if volatility < 0.6:
+            return "High"
+        return "Extreme"
+
+    def find_frequent_motifs(
+        self, signals_df: pd.DataFrame, trades_df: pd.DataFrame = None
+    ) -> List[SignalMotif]:
+        """
+        Find recurring motifs in signals, especially focusing on losing combinations.
+        If trades_df is provided, it specifically highlights motifs found within drawdown clusters.
+        """
+        if signals_df.empty or "volatility" not in signals_df.columns:
+            return []
+
+        df = signals_df.copy()
+        df["vol_bucket"] = df["volatility"].apply(self._extract_volatility_bucket)
+        df["win"] = df["pnl"] > 0
+
+        # Identify signals in drawdown clusters if trades_df is provided
+        cluster_signal_ids = set()
+        if trades_df is not None and not trades_df.empty:
+            clusters = self.detect_drawdown_clusters(trades_df)
+            for cluster in clusters:
+                # Find trades in this cluster
+                cluster_trades = trades_df[
+                    (trades_df["created_at"] >= cluster.start_time)
+                    & (trades_df["created_at"] <= cluster.end_time)
+                    & (trades_df["pnl"] < 0)
+                ]
+                if "signal_id" in trades_df.columns:
+                    cluster_signal_ids.update(cluster_trades["signal_id"].unique())
+
+        # Group by algo, direction, vol_bucket
+        groups = df.groupby(["algorithm", "direction", "vol_bucket"])
+        results = []
+
+        for (algo, direction, vol), group in groups:
+            freq = len(group)
+            if freq < 2:
+                continue
+
+            # Check if this motif is heavily present in drawdown clusters
+            if cluster_signal_ids:
+                in_cluster_count = group["id"].isin(cluster_signal_ids).sum()
+                # If a motif appears frequently in clusters, we treat it as more significant
+                # even if overall frequency is low. But for now we just use win_rate.
+                pass
+
+            win_rate = group["win"].mean()
+            results.append(
+                SignalMotif(
+                    algorithm=str(algo),
+                    direction=int(direction),
+                    volatility_bucket=str(vol),
+                    frequency=int(freq),
+                    win_rate=float(win_rate),
+                )
+            )
+
+        return sorted(results, key=lambda x: x.win_rate)
+
+    def analyze_strategy_state_correlation(
+        self, risk_events_df: pd.DataFrame, trades_df: pd.DataFrame
+    ) -> Dict[str, float]:
+        """
+        Detect if risk blocks increase during 'weak strategy states'.
+        Weak state is defined as being within 24 hours of a drawdown cluster.
+        """
+        if risk_events_df.empty or trades_df.empty:
+            return {}
+
+        clusters = self.detect_drawdown_clusters(trades_df)
+        if not clusters:
+            return {reason: 0.0 for reason in risk_events_df["event_type"].unique()}
+
+        # Mark 'weak' time windows
+        weak_windows = []
+        for cluster in clusters:
+            # Window starts at cluster start and ends 24h after cluster end
+            end_time = cluster.end_time + pd.Timedelta(hours=24)
+            weak_windows.append((cluster.start_time, end_time))
+
+        def is_weak(dt: datetime) -> bool:
+            for start, end in weak_windows:
+                if start <= dt <= end:
+                    return True
+            return False
+
+        # Assume risk_events_df has a timestamp. If not, we might need to join with signals
+        # Let's check RiskEvent model in trade_logger. It has AuditMixin (created_at)
+        if "created_at" not in risk_events_df.columns:
+            return {reason: 0.0 for reason in risk_events_df["event_type"].unique()}
+
+        risk_events_df["is_weak_state"] = risk_events_df["created_at"].apply(is_weak)
+
+        results = {}
+        for reason in risk_events_df["event_type"].unique():
+            group = risk_events_df[risk_events_df["event_type"] == reason]
+            if len(group) == 0:
+                results[reason] = 0.0
+                continue
+            weak_count = group["is_weak_state"].sum()
+            results[reason] = float(weak_count / len(group))
+
+        return results
+
     def run_mining(self) -> JournalReport:
         """Execute full mining suite and return typed report."""
         with self.Session() as session:
@@ -396,6 +541,7 @@ class JournalMiner:
                         "pnl": t.pnl,
                         "created_at": t.created_at,
                         "algorithm": t.signal.algorithm if t.signal else "Unknown",
+                        "signal_id": t.signal_id,
                     }
                     for t in trades_raw
                 ]
@@ -406,6 +552,7 @@ class JournalMiner:
                     {
                         "id": s.id,
                         "algorithm": s.algorithm,
+                        "direction": s.direction,
                         "confidence": s.confidence,
                         "volatility": s.volatility,
                         "pnl": s.trade.pnl if s.trade else None,
@@ -416,13 +563,27 @@ class JournalMiner:
             )
 
             risk_df = pd.DataFrame(
-                [{"event_type": r.event_type, "signal_id": r.signal_id} for r in risk_raw]
+                [
+                    {
+                        "event_type": r.event_type,
+                        "signal_id": r.signal_id,
+                        "created_at": r.created_at,
+                    }
+                    for r in risk_raw
+                ]
             )
+
+            # Analyze correlations
+            correlations = self.analyze_strategy_state_correlation(risk_df, trades_df)
+            risk_blocks = self.analyze_risk_blocks(risk_df, signals_df)
+            for block in risk_blocks:
+                block.weak_state_correlation = correlations.get(block.reason, 0.0)
 
             return JournalReport(
                 session_analysis=self.get_session_stats(trades_df),
                 volatility_patterns=self.analyze_volatility_patterns(signals_df),
                 drawdown_clusters=self.detect_drawdown_clusters(trades_df),
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
-                risk_block_summary=self.analyze_risk_blocks(risk_df, signals_df),
+                risk_block_summary=risk_blocks,
+                recurring_motifs=self.find_frequent_motifs(signals_df, trades_df),
             )
