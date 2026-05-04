@@ -11,6 +11,7 @@ This document outlines the acceptance criteria and usage for the benchmarking fr
     - `VolatilityBreakoutStrategy`: Bollinger Band breakout signals.
     - `NaiveDirectionalStrategy`: Last candle direction persistence.
     - `RiskFilteredBaseline`: EMA crossover with a volatility threshold filter.
+    - `RandomStrategy`: Reproducible random signals for null-hypothesis testing.
 - **Quantitative Evaluator**:
     - Equity-curve-based backtesting.
     - Metrics: Total Return, Sharpe Ratio, Sortino Ratio, Calmar Ratio, Max Drawdown, Win Rate, Profit Factor, Expectancy, Trade Count.
