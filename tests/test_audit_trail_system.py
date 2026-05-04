@@ -20,6 +20,9 @@ def audit_logger(db_url):
     AuditLogger._initialized = False
     logger = AuditLogger(db_url=db_url)
     yield logger
+    # Reset singleton after testing
+    AuditLogger._instance = None
+    AuditLogger._initialized = False
     # Cleanup
     if os.path.exists("test_audit.db"):
         os.remove("test_audit.db")

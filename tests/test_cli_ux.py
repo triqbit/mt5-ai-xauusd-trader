@@ -25,9 +25,7 @@ def test_cli_argument_precedence():
              "DATABASE_URL": "sqlite:///:memory:"
          }), \
          patch("main.configure_logging"), \
-         patch("src.core.audit_log.AuditLogger.log"), \
-         patch("src.core.audit_log.AuditLogger.log_deployment"), \
-         patch("src.core.audit_log.AuditLogger.log_config_snapshot"):
+         patch("main.AuditLogger"):
 
         # We need to clear the lru_cache of get_config
         get_config.cache_clear()
@@ -52,9 +50,7 @@ def test_check_flag_exits_early():
          patch("src.trading.mt5_connector.MT5Connector.disconnect"), \
          patch("src.core.config_validator.ConfigValidator.validate") as mock_validate, \
          patch("src.core.health.HealthChecker.get_full_report") as mock_report, \
-         patch("src.core.audit_log.AuditLogger.log"), \
-         patch("src.core.audit_log.AuditLogger.log_deployment"), \
-         patch("src.core.audit_log.AuditLogger.log_config_snapshot"), \
+         patch("main.AuditLogger"), \
          patch.dict(os.environ, {
              "MT5_LOGIN": "123456",
              "MT5_PASSWORD": "ValidPassword",
