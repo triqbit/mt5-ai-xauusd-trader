@@ -16,4 +16,4 @@ This document provides detailed attribution for third-party components integrate
 - **MetaTrader 5 Simulator**: Based on [AminHP/gym-mtsim](https://github.com/AminHP/gym-mtsim) (MIT License).
 
 ## Third-Party Libraries
-For a full list of Python dependencies and their licenses, please refer to the [License Compliance Report](docs/LICENSE_COMPLIANCE.md) or the automated CI reports.
+For a full list of Python dependencies and their licenses, please refer to the [License Compliance Report](docs/LICENSE_COMPLIANCE.md) and the automated report in [docs/DEPENDENCY_LICENSES.md](docs/DEPENDENCY_LICENSES.md).

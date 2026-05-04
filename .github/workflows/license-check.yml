@@ -25,18 +25,18 @@ jobs:
           # Install torch/torchvision from CPU index to save time/space
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
-          # Create a unified requirements file for scanning, excluding TA-Lib which requires C libs
-          cat requirements.txt requirements-ci.txt requirements-scan.txt | grep -v "TA-Lib" | sort | uniq > requirements-all-scan.txt
+          # Create a unified requirements file for scanning, excluding TA-Lib and MetaTrader5 which are platform-specific
+          cat requirements.txt requirements-ci.txt requirements-scan.txt | grep -vE "TA-Lib|MetaTrader5" | sort | uniq > requirements-all-scan.txt
 
-          # Install dependencies. MetaTrader5 is already platform-gated in requirements.txt
+          # Install dependencies for scanning
           pip install -r requirements-all-scan.txt || true
 
       - name: Run License Scan
         run: |
-          # Enforce allowed licenses. Partial match covers variations.
+          # Enforce allowed licenses according to docs/LICENSE_COMPLIANCE.md
           # We allow MIT, BSD, Apache, MPL, LGPL, PSF, Unlicense, and ISC.
-          # UNKNOWN and Other/Proprietary are allowed for specific verified packages.
-          # Explicitly blocking AGPL and CC-BY-NC via exclusion from allow-list.
+          # UNKNOWN and Other/Proprietary are allowed for specific verified packages like pandas-ta and MetaAPI.
+          # Explicitly blocking AGPL and CC-BY-NC by not including them in the allow-list.
           pip-licenses \
             --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python" \
             --partial-match \
@@ -48,11 +48,11 @@ jobs:
             --with-authors \
             --with-urls \
             --format=markdown \
-            --output-file=DEPENDENCY_LICENSES.md \
+            --output-file=docs/DEPENDENCY_LICENSES.md \
             --ignore-packages pip pip-licenses prettytable wcwidth setuptools
 
       - name: Upload Compliance Report
         uses: actions/upload-artifact@v4
         with:
           name: license-compliance-report
-          path: DEPENDENCY_LICENSES.md
+          path: docs/DEPENDENCY_LICENSES.md

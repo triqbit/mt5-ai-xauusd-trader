@@ -21,6 +21,7 @@ The following licenses are pre-approved for use in this project:
 ## ⚠️ Restricted Licenses (Review Required)
 The following licenses are allowed but must be used as external dependencies only (dynamic linking):
 - **LGPL (v2.1, v3)** - Allowed as long as the library is used without modification and user-replaceability is maintained.
+- **Other/Proprietary** - Allowed only for specific, verified commercial SDKs (e.g., MetaAPI) where no open-source alternative exists.
 
 ## 🚫 Disallowed Licenses (Copyleft & Restricted)
 The following licenses are strictly prohibited unless a formal legal exception is granted:
@@ -43,7 +44,7 @@ A full list of runtime dependencies and their detected licenses is available in 
 If a required dependency uses a disallowed or unknown license:
 1. **Identify Alternatives:** Search for a permissively licensed alternative.
 2. **Impact Assessment:** Determine if the library is optional or can be replaced by custom implementation.
-3. **Formal Exception:** If no alternative exists, escalate to the repository maintainer for a formal risk assessment.
+3. **Formal Exception:** If no alternative exists, escalate to the repository maintainer for a formal risk assessment. MetaAPI SDKs and certain verified "UNKNOWN" packages (e.g., `pandas-ta`) have been granted exceptions.
 
 ---
 *Last Updated: 2024-05-22*
