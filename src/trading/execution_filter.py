@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,6 @@ from scipy import stats
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
-    from src.core.trade_logger import TradeLogger
     from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -37,9 +36,8 @@ class ExecutionDecision:
 
 class ExecutionFilter:
     """
-    Implements a 9-layer validation cascade for trading signals.
-    Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown,
-    Model Stability, Performance Floor, Confidence Threshold.
+    Implements a 6-layer validation cascade for trading signals.
+    Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown.
     """
 
     def __init__(
@@ -58,11 +56,9 @@ class ExecutionFilter:
         market_data: pd.DataFrame,
         current_drawdown: float,
         timestamp: Optional[datetime] = None,
-        model_health: Optional[Dict[str, float]] = None,
-        trade_logger: Optional[TradeLogger] = None,
     ) -> ExecutionDecision:
         """
-        Run the full 9-layer filter cascade.
+        Run the full 6-layer filter cascade.
         """
         timestamp = timestamp or signal.timestamp or datetime.utcnow()
 
@@ -90,58 +86,7 @@ class ExecutionFilter:
         if not self._check_drawdown_limit(current_drawdown):
             return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
 
-        # Layer 7: Model Stability Guard
-        if not self._check_model_stability(model_health):
-            return ExecutionDecision(signal, False, 0.0, "MODEL_STABILITY")
-
-        # Layer 8: Performance Floor
-        if not self._check_performance_floor(trade_logger):
-            return ExecutionDecision(signal, False, 0.0, "PERFORMANCE_FLOOR")
-
-        # Layer 9: Confidence Threshold
-        if not self._check_dynamic_confidence(signal.confidence):
-            return ExecutionDecision(signal, False, signal.confidence, "CONFIDENCE_THRESHOLD")
-
         return ExecutionDecision(signal, True, signal.confidence)
-
-    def _check_model_stability(self, health: Optional[Dict[str, float]]) -> bool:
-        """Blocks if aggregate model drift or accuracy breaches limits."""
-        if health is None or self.cfg is None:
-            return True
-
-        drift = health.get("drift", 0.0)
-        acc = health.get("accuracy", 1.0)
-
-        if drift > self.cfg.model_drift_threshold:
-            logger.warning("EXECUTION BLOCKED: Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold)
-            return False
-
-        if acc < self.cfg.model_accuracy_floor:
-            logger.warning("EXECUTION BLOCKED: Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor)
-            return False
-
-        return True
-
-    def _check_performance_floor(self, trade_logger: Optional[TradeLogger]) -> bool:
-        """Blocks if historical win rate drops below floor."""
-        if trade_logger is None or self.cfg is None:
-            return True
-
-        report = trade_logger.read_performance_report()
-        win_rate = report.get("win_rate", 1.0)
-        total_trades = report.get("total_trades", 0)
-
-        if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
-            logger.warning("EXECUTION BLOCKED: Win rate %.2f < %.2f", win_rate, self.cfg.model_win_rate_floor)
-            return False
-
-        return True
-
-    def _check_dynamic_confidence(self, confidence: float) -> bool:
-        """Enforces configured confidence threshold."""
-        if self.cfg is None:
-            return True
-        return confidence >= self.cfg.confidence_threshold
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""
@@ -164,16 +109,16 @@ class ExecutionFilter:
         return bool(current_atr <= threshold * avg_atr)
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
-        """Validates that the price trend matches signal direction using regression slope of EMA21."""
-        # Align with FeatureEngineer default EMA stack (8, 21, 50, 200)
-        ema_col = "base_M5_ema_21"
+        """Validates that the price trend matches signal direction using regression slope of EMA20."""
+        # Align with FeatureEngineer default EMA stack (8, 20, 50, 200)
+        ema_col = "base_M5_ema_20"
         if ema_col in df.columns:
             ema_series = df[ema_col]
         elif "close" in df.columns:
-            ema_series = df["close"].ewm(span=21, adjust=False).mean()
+            ema_series = df["close"].ewm(span=20, adjust=False).mean()
         else:
-            logger.warning("Trend angle check failed: No EMA21 or close price available")
-            return True # Pass by default if data is missing to avoid blocking valid trades
+            logger.warning("Trend angle check failed: No EMA20 or close price available")
+            return True  # Pass by default if data is missing to avoid blocking valid trades
 
         target_ema = ema_series.iloc[-window:]
         if len(target_ema) < window:

@@ -95,6 +95,7 @@ def test_decision_pipeline_full_confluence(
 
     # Enrich DF with expected columns for ExecutionFilter
     df["base_M5_ema_8"] = df["close"].ewm(span=8).mean()
+    df["base_M5_ema_20"] = df["close"].ewm(span=20).mean()
     df["base_M5_ema_21"] = df["close"].ewm(span=21).mean()
     df["base_M5_ema_50"] = df["close"].ewm(span=50).mean()
     df["base_M5_ema_200"] = df["close"].ewm(span=200).mean()
@@ -231,8 +232,15 @@ def test_decision_pipeline_execution_block(
 ):
     """Case 3: Execution Block - Rejected due to Trend Angle mismatch."""
     df = data_generator.generate(n_steps=50, regime="ranging")
-    # Force a downtrend in EMA
-    df["base_M5_ema_21"] = np.linspace(100, 90, 50)
+    # For execution filter, Trend Angle uses EMA20 regression slope.
+    # EMA Sequence check (8 > 21 > 50 > 200 for BUY) also runs.
+    # We ensure EMA sequence passes but Trend Angle fails.
+    df["base_M5_ema_8"] = 110.0
+    df["base_M5_ema_21"] = 100.0
+    df["base_M5_ema_50"] = 90.0
+    df["base_M5_ema_200"] = 80.0
+    # Force a downtrend in EMA20 for Trend Angle check
+    df["base_M5_ema_20"] = np.linspace(100, 90, 50)
 
     signal = TradeSignal(
         symbol="XAUUSD",
