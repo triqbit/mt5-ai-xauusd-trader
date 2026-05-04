@@ -15,6 +15,7 @@ The `DynamicEnsemble` class implements an adaptive weighting engine that adjusts
 - **Regime & Volatility Awareness**: Weights are adjusted based on the current `RegimeInfo`, including `MarketRegime` (e.g., penalizing drift during news shocks) and a `volatility_index` which modulates the adaptation speed.
 - **XAUUSD Heuristics**: Specific scoring logic tailored for gold market behaviors:
     - **Trending**: Favors models with low drift to capitalize on sustained moves.
+    - **Low Volatility Drift**: Focuses on accuracy as the primary weight driver.
     - **Volatile Breakout**: Prioritizes calibration for reliable stop-loss and exit signals.
     - **Mean Reversion**: Penalizes overconfidence/high calibration error to avoid traps.
     - **News Shock**: Aggressively penalizes models showing significant performance drift.

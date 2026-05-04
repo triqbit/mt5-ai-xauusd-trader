@@ -17,6 +17,8 @@ from src.models.regime_detector import MarketRegime, RegimeInfo
 
 logger = logging.getLogger(__name__)
 
+__all__ = ["DynamicEnsemble"]
+
 
 class DynamicEnsemble:
     """
@@ -41,6 +43,18 @@ class DynamicEnsemble:
         max_swing: float = 0.05,
         min_weight: float = 0.05,
     ) -> None:
+        """
+        Initialize the dynamic ensemble engine.
+
+        Args:
+            model_names: List of model identifiers.
+            smoothing_factor: EMA decay factor for weight updates.
+            max_swing: Maximum allowed weight change per update.
+            min_weight: Minimum weight floor for any single model.
+        """
+        if not model_names:
+            raise ValueError("model_names cannot be empty")
+
         self.model_names = model_names
         self.smoothing_factor = smoothing_factor  # EMA decay
         self.max_swing = max_swing  # Cap on abrupt changes
@@ -56,6 +70,7 @@ class DynamicEnsemble:
         self,
         metrics: Dict[str, Dict[str, float]],
         regime_info: Optional[RegimeInfo] = None,
+        volatility_context: Optional[float] = None,
     ) -> Dict[str, float]:
         """
         Update ensemble weights using a multi-factor scoring model and stability controls.
@@ -66,14 +81,24 @@ class DynamicEnsemble:
                 - calibration_error: Deviation between confidence and success (0.0 to 1.0).
                 - drift_score: Signal of performance degradation (0.0 to 1.0).
             regime_info: Current market regime context for heuristic-based scoring adjustments.
+            volatility_context: Optional manual override or additional volatility metric.
 
         Returns:
             Dict[str, float]: The updated weight distribution (sums to 1.0).
         """
+        if not metrics:
+            return self.weights
+
         raw_scores: Dict[str, float] = {}
 
         regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
-        volatility = regime_info.volatility_index if regime_info else 1.0
+
+        # Determine volatility: prefer explicit context, then regime info, default to 1.0
+        volatility = 1.0
+        if volatility_context is not None:
+            volatility = volatility_context
+        elif regime_info is not None:
+            volatility = regime_info.volatility_index
 
         for name in self.model_names:
             m = metrics.get(name, {})
@@ -81,15 +106,16 @@ class DynamicEnsemble:
             cal = m.get("calibration_error", 0.0)
             drift = m.get("drift_score", 0.0)
 
-            # Core scoring formula
-            # Penalty for drift and calibration error
+            # Core scoring formula: High weight on accuracy, penalized by drift and miscalibration.
             score = acc - (0.3 * cal) - (0.4 * drift)
 
             # Regime-based adjustments (XAUUSD heuristics)
             if regime == MarketRegime.NEWS_SHOCK:
+                # In news shocks, penalize drifting models heavily
                 if drift > 0.5:
                     score -= 0.2
             elif regime == MarketRegime.RANGING:
+                # In ranging markets, calibration is slightly more important to avoid fakeouts
                 score -= 0.2 * cal
             elif regime == MarketRegime.TRENDING:
                 # In trending markets, favor models with low drift (consistency)
@@ -139,6 +165,7 @@ class DynamicEnsemble:
             deltas[name] = float(np.clip(diff * alpha, -self.max_swing, self.max_swing))
 
         # 3. Balance deltas to maintain sum=1 and respect constraints
+        # Sum of deltas must be 0 to keep weights sum = 1
         pos_sum = sum(d for d in deltas.values() if d > 0)
         neg_sum = sum(abs(d) for d in deltas.values() if d < 0)
 
@@ -201,3 +228,6 @@ class DynamicEnsemble:
     def get_weights(self) -> Dict[str, float]:
         """Return current ensemble weights."""
         return self.weights.copy()
+
+    def __repr__(self) -> str:
+        return f"DynamicEnsemble(models={self.model_names}, weights={self.weights})"
