@@ -11,7 +11,13 @@ import pandas as pd
 import pytest
 
 from src.environment.gym_env import TradingEnv
-from src.research.rl_evaluation import MomentumBaseline, RLEvaluator, RLReport
+from src.research.rl_evaluation import (
+    MeanReversionBaseline,
+    MomentumBaseline,
+    RandomBaseline,
+    RLEvaluator,
+    RLReport,
+)
 
 
 @pytest.fixture
@@ -36,19 +42,43 @@ def test_rl_evaluator_initialization(trading_env):
 
 def test_momentum_baseline_predict():
     baseline = MomentumBaseline()
-    # Mock observation: [window_normalized, balance, position]
-    # last_val is at index -3
+    # Mock observation: [window_normalized_flattened, balance, position]
+    # n_features=5. last close is at -(5+2)+3 = -4
     obs_buy = np.zeros(52)
-    obs_buy[-3] = 0.6
+    obs_buy[-4] = 0.6
     assert baseline.predict(obs_buy) == 1
 
     obs_sell = np.zeros(52)
-    obs_sell[-3] = -0.6
+    obs_sell[-4] = -0.6
     assert baseline.predict(obs_sell) == 2
 
     obs_hold = np.zeros(52)
-    obs_hold[-3] = 0.1
+    obs_hold[-4] = 0.1
     assert baseline.predict(obs_hold) == 0
+
+
+def test_mean_reversion_baseline_predict():
+    baseline = MeanReversionBaseline()
+    # n_features=5. last close is at -4
+    obs_buy = np.zeros(52)
+    obs_buy[-4] = -2.0  # Very oversold
+    assert baseline.predict(obs_buy) == 1
+
+    obs_sell = np.zeros(52)
+    obs_sell[-4] = 2.0   # Very overbought
+    assert baseline.predict(obs_sell) == 2
+
+    obs_hold = np.zeros(52)
+    obs_hold[-4] = 0.5
+    assert baseline.predict(obs_hold) == 0
+
+
+def test_random_baseline_predict():
+    baseline = RandomBaseline()
+    obs = np.zeros(52)
+    for _ in range(10):
+        action = baseline.predict(obs)
+        assert action in [0, 1, 2]
 
 
 def test_evaluate_runs_to_completion(trading_env):
@@ -128,31 +158,38 @@ def test_to_report_section(trading_env):
 def test_extract_trades():
     evaluator = RLEvaluator(env=MagicMock())
     df = pd.DataFrame({
-        "balances": [1000, 1000, 1010, 1010, 1005],
-        "positions": [0, 1, 1, 0, 0]
-    })
-    trades = evaluator._extract_trades(df)
-    assert len(trades) == 1
-    assert trades[0] == 0.0 # balance[3] - balance[2] = 1010 - 1010
-
-    df2 = pd.DataFrame({
-        "balances": [1000, 1000, 1010, 1020, 1020],
+        "balances": [1000, 1000, 1010, 1010, 1015], # balances[1] is entry step (after reset)
         "positions": [0, 1, 1, 1, 0]
     })
+    # Entry at index 1. Exit at index 4.
+    # PnL = balances[4] - balances[entry_idx - 1] = balances[4] - balances[0] = 1015 - 1000 = 15.0
+    trades = evaluator._extract_trades(df)
+    assert len(trades) == 1
+    assert trades[0]["pnl"] == 15.0
+    assert trades[0]["hold_time"] == 3
+
+    df2 = pd.DataFrame({
+        "balances": [1000, 1010, 1020, 1030, 1030],
+        "positions": [0, 1, 1, 1, 0]
+    })
+    # Entry at index 1. Exit at index 4.
+    # PnL = balances[4] - balances[0] = 1030 - 1000 = 30.0
     trades2 = evaluator._extract_trades(df2)
     assert len(trades2) == 1
-    assert trades2[0] == 0.0 # balance[4] - balance[3] = 1020 - 1020
+    assert trades2[0]["pnl"] == 30.0
+    assert trades2[0]["hold_time"] == 3
 
-    # In our env, balance is updated when position is closed.
-    # So if positions[i-1] != 0 and positions[i] == 0,
-    # the PnL is in balances[i] - balances[i-1]
+    # Multiple trades
     df3 = pd.DataFrame({
-        "balances": [1000, 1000, 1000, 1050, 1050],
-        "positions": [0, 1, 1, 0, 0]
+        "balances": [1000, 1050, 1050, 1050, 1100],
+        "positions": [0, 1, 0, 1, 0]
     })
+    # Trade 1: Entry 1, Exit 2. PnL = balances[2] - balances[0] = 1050 - 1000 = 50.0
+    # Trade 2: Entry 3, Exit 4. PnL = balances[4] - balances[2] = 1100 - 1050 = 50.0
     trades3 = evaluator._extract_trades(df3)
-    assert len(trades3) == 1
-    assert trades3[0] == 50.0
+    assert len(trades3) == 2
+    assert trades3[0]["pnl"] == 50.0
+    assert trades3[1]["pnl"] == 50.0
 
 
 def test_calculate_drawdown():
@@ -172,8 +209,58 @@ def test_reward_decomposition():
         "balances": [1000, 1050],
         "commissions": [0, 10]
     })
-    decomp = evaluator._calculate_reward_decomposition(df)
+    trades = [{"pnl": 50.0, "hold_time": 10}]
+    decomp = evaluator._calculate_reward_decomposition(df, trades)
     assert decomp.net_pnl == 50.0
     assert decomp.total_commissions == 10.0
     assert decomp.gross_pnl == 60.0
     assert decomp.commission_drag == pytest.approx(10/60 * 100)
+    assert decomp.avg_win == 50.0
+    assert decomp.avg_loss == 0.0
+
+
+def test_advanced_stability_metrics(trading_env):
+    evaluator = RLEvaluator(env=trading_env)
+
+    # Need enough steps for VaR (needs > 20)
+    class TrendAgent:
+        def predict(self, observation):
+            return 1 # Just buy to generate some returns
+
+    report = evaluator.evaluate(TrendAgent(), agent_name="Trend")
+
+    assert report.stability.skewness is not None
+    assert report.stability.kurtosis is not None
+    assert report.stability.var_95 != 0.0
+    assert report.stability.cvar_95 != 0.0
+
+
+def test_profit_concentration():
+    evaluator = RLEvaluator(env=MagicMock())
+    df = pd.DataFrame({
+        "balances": [1000, 1100],
+        "commissions": [0, 0]
+    })
+    # 10 trades, top 1 is 50% of profit
+    trades = [{"pnl": 50.0, "hold_time": 1}] + [{"pnl": 5.55, "hold_time": 1}] * 9
+    # Total net_pnl = 100 (approx)
+    decomp = evaluator._calculate_reward_decomposition(df, trades)
+
+    # top 10% of 10 trades is 1 trade.
+    # top_profit = 50.0. net_pnl = 100.0. conc = 0.5
+    assert decomp.profit_concentration == pytest.approx(0.5, rel=1e-2)
+
+
+def test_turnover_metrics():
+    evaluator = RLEvaluator(env=MagicMock())
+    df = pd.DataFrame({"balances": [1000] * 100})
+    trades = [
+        {"pnl": 10.0, "hold_time": 5},
+        {"pnl": -5.0, "hold_time": 15}
+    ]
+    turnover = evaluator._calculate_turnover(df, trades)
+    assert turnover.total_trades == 2
+    assert turnover.avg_hold_time == 10.0
+    assert turnover.max_hold_time == 15
+    assert turnover.min_hold_time == 5
+    assert turnover.trade_frequency == (2/100) * 1000
