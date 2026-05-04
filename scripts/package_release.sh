@@ -28,15 +28,21 @@ sha256_cmd() {
 }
 
 # --- 1. Version Extraction ---
-if [ ! -f "$PYPROJECT_FILE" ]; then
-    echo "Error: $PYPROJECT_FILE not found. Ensure you are in the project root."
-    exit 1
-fi
+# Logic: If VERSION is provided, use it. If it starts with 'v', strip it to get the raw semantic version.
+if [ -n "$VERSION" ]; then
+    VERSION=${VERSION#v}
+    echo "Using version from environment: $VERSION"
+else
+    if [ ! -f "$PYPROJECT_FILE" ]; then
+        echo "Error: $PYPROJECT_FILE not found. Ensure you are in the project root."
+        exit 1
+    fi
 
-VERSION=$(grep '^version =' "$PYPROJECT_FILE" | cut -d '"' -f 2)
-if [ -z "$VERSION" ]; then
-    echo "Error: Could not extract version from $PYPROJECT_FILE."
-    exit 1
+    VERSION=$(grep '^version =' "$PYPROJECT_FILE" | cut -d '"' -f 2)
+    if [ -z "$VERSION" ]; then
+        echo "Error: Could not extract version from $PYPROJECT_FILE."
+        exit 1
+    fi
 fi
 
 RELEASE_PATH="${RELEASES_DIR}/v${VERSION}"
@@ -66,25 +72,37 @@ mkdir -p "$RELEASE_PATH"
 
 # --- 4. Artifact Collection ---
 
-# A. Docker Image (Build and Save)
-echo "Building Docker Image..."
-# We use --load if using buildx, or just build for standard docker.
-# Added a check if buildx is being used.
-if docker buildx version >/dev/null 2>&1; then
-    docker buildx build --load -t "${IMAGE_NAME}:v${VERSION}" .
+# A. Docker Image (Save)
+# Check if the image already exists (either as vX.X.X or raw version)
+if docker image inspect "${IMAGE_NAME}:v${VERSION}" >/dev/null 2>&1; then
+    echo "Docker Image ${IMAGE_NAME}:v${VERSION} already exists. Skipping build..."
+    IMAGE_TAG="v${VERSION}"
+elif docker image inspect "${IMAGE_NAME}:${VERSION}" >/dev/null 2>&1; then
+    echo "Docker Image ${IMAGE_NAME}:${VERSION} exists. Skipping build..."
+    IMAGE_TAG="${VERSION}"
+elif [ -n "$GITHUB_SHA" ] && docker image inspect "${IMAGE_NAME}:${GITHUB_SHA}" >/dev/null 2>&1; then
+    echo "Docker Image for SHA ${GITHUB_SHA} exists. Tagging as v${VERSION} and using..."
+    docker tag "${IMAGE_NAME}:${GITHUB_SHA}" "${IMAGE_NAME}:v${VERSION}"
+    IMAGE_TAG="v${VERSION}"
 else
-    docker build -t "${IMAGE_NAME}:v${VERSION}" .
+    echo "Building Docker Image..."
+    if docker buildx version >/dev/null 2>&1; then
+        docker buildx build --load -t "${IMAGE_NAME}:v${VERSION}" .
+    else
+        docker build -t "${IMAGE_NAME}:v${VERSION}" .
+    fi
+    IMAGE_TAG="v${VERSION}"
 fi
 
-echo "Exporting Docker Image to tarball..."
-docker save "${IMAGE_NAME}:v${VERSION}" | gzip > "${RELEASE_PATH}/image.tar.gz"
+echo "Exporting Docker Image ${IMAGE_NAME}:${IMAGE_TAG} to tarball..."
+docker save "${IMAGE_NAME}:${IMAGE_TAG}" | gzip > "${RELEASE_PATH}/image.tar.gz"
 
 # B. Docker Info (Metadata)
 echo "Collecting Docker Information..."
 cat <<EOF > "${RELEASE_PATH}/docker_info.json"
 {
   "image": "${IMAGE_NAME}",
-  "tag": "v${VERSION}",
+  "tag": "${IMAGE_TAG}",
   "build_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "vcs_ref": "$(git rev-parse HEAD 2>/dev/null || echo "unknown")"
 }
@@ -104,8 +122,12 @@ python3 scripts/generate_config_docs.py src/core/config.py "${RELEASE_PATH}/CONF
 
 # F. Release Notes
 echo "Extracting Release Notes..."
-# Improved extraction logic: find [Unreleased] section and stop at the next version header
-sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+# Improved extraction logic: find specific version header or [Unreleased] section
+if grep -q "## \[${VERSION}\]" CHANGELOG.md; then
+    sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+else
+    sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+fi
 
 if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ] || [ "$(grep -c "[a-zA-Z]" "${RELEASE_PATH}/RELEASE_NOTES.md")" -eq 0 ]; then
      echo "Warning: RELEASE_NOTES.md is empty or only contains whitespace. Using fallback."
