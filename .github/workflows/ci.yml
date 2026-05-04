@@ -32,7 +32,7 @@ jobs:
       - name: Install quality tools and stubs
         run: |
           pip install ruff==0.4.3 mypy==1.10.0
-          pip install pydantic==2.13.3 pydantic-settings==2.14.0 sqlalchemy==2.0.49 numpy==2.2.6
+          pip install pydantic==2.13.3 pydantic-settings==2.14.0 sqlalchemy==2.0.49 numpy==2.2.6 requests==2.33.1
           pip install types-redis types-requests types-python-dateutil types-setuptools types-PyYAML
       - name: Static type check (mypy)
         run: mypy src/core/config.py src/core/trade_logger.py src/core/exceptions.py src/core/constants.py src/core/retry.py --follow-imports=silent
