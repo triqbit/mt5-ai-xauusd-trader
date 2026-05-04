@@ -210,12 +210,14 @@ def main():
     if args.db_url:
         db_url = args.db_url
     else:
-        db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///trades.db"
+        db_val = cfg.database_url.get_secret_value()
+        db_url = db_val if "sqlite" in db_val else "sqlite:///trades.db"
 
     if args.audit_db_url:
         audit_db_url = args.audit_db_url
     else:
-        audit_db_url = cfg.database_url if "sqlite" in cfg.database_url else "sqlite:///audit.db"
+        db_val = cfg.database_url.get_secret_value()
+        audit_db_url = db_val if "sqlite" in db_val else "sqlite:///audit.db"
 
     # Ensure we don't accidentally wipe a production PG DB unless intended
     if "sqlite" not in db_url:
