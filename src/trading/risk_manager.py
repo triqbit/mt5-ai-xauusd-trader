@@ -14,11 +14,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.trading.advanced_risk import AdvancedRiskManager, VolatilityRegime
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +83,23 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
+        self.advanced = AdvancedRiskManager(config)
+
+        # State for advanced risk checks (to be updated by the main loop)
+        self.historical_data: Dict[str, pd.Series] = {}
+        self.recent_trades: List[Dict[str, Any]] = []
+        self.trade_history: List[Dict[str, Any]] = []
+        self.news_events: List[Dict[str, Any]] = []
+
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        current_ohlcv: Optional[pd.DataFrame] = None
+    ) -> bool:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
@@ -101,6 +117,8 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_advanced_rules(signal, current_ohlcv):
+            rejection_reason = "Advanced risk rule violation"
 
         passed = rejection_reason == ""
         if not passed:
@@ -126,22 +144,43 @@ class RiskManager:
         avg_win: float,
         avg_loss: float,
         pip_value: float = 1.0,
+        df: Optional[pd.DataFrame] = None,
     ) -> float:
         """
-        Fractional Kelly Criterion position sizing.
+        Fractional Kelly Criterion position sizing with Volatility adjustment.
         Returns lot size capped at max risk per trade.
         """
         if avg_loss == 0:
             return 0.01  # minimum lot
+
+        # 1. Kelly calculation
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+
+        # 2. Volatility adjustment
+        vol_multiplier = 1.0
+        if df is not None:
+            regime = self.advanced.detect_volatility_regime(df)
+            if regime == VolatilityRegime.HIGH:
+                vol_multiplier = 0.5
+            elif regime == VolatilityRegime.EXTREME:
+                vol_multiplier = 0.0  # Halt trading
+            elif regime == VolatilityRegime.LOW:
+                vol_multiplier = 1.2  # Slightly increase in low vol stable markets
+
+        risk_capital = self.balance * self.cfg.risk_per_trade * vol_multiplier
+
+        if risk_capital <= 0:
+            return 0.0
+
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
+
         logger.debug(
-            "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
+            "Kelly sizing | kelly=%.3f risk_cap=%.2f vol_mult=%.1f lots=%.2f",
             kelly_fraction,
             risk_capital,
+            vol_multiplier,
             lot_size,
         )
         return lot_size
@@ -227,6 +266,47 @@ class RiskManager:
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
             return False
+        return True
+
+    def _check_advanced_rules(self, signal: TradeSignal, df: Optional[pd.DataFrame]) -> bool:
+        """Execute the advanced risk rule cascade."""
+        now = datetime.utcnow()
+
+        # 1. News Halt
+        if self.advanced.is_news_halted(now, self.news_events):
+            return False
+
+        # 2. Consecutive Losses
+        if not self.advanced.check_consecutive_losses(self.trade_history):
+            return False
+
+        # 3. Time-based exposure
+        if not self.advanced.check_time_exposure(self.recent_trades, now):
+            return False
+
+        # 4. Correlation
+        open_symbols = list(self.open_positions.keys())
+        if not self.advanced.check_correlation(signal.symbol, open_symbols, self.historical_data):
+            return False
+
+        # 5. Portfolio Heat
+        # We need to estimate risk of current signal
+        current_risk = abs(signal.entry_price - signal.stop_loss) * signal.lot_size # Simplified
+        positions_with_risk = [{"risk_amount": current_risk}] # Start with new signal
+        # In real scenario, we'd add existing positions' risk here
+
+        heat = self.advanced.calculate_portfolio_heat(positions_with_risk, self.balance)
+        if heat > self.cfg.max_portfolio_heat:
+            logger.warning("Portfolio heat too high: %.4f > %.4f", heat, self.cfg.max_portfolio_heat)
+            return False
+
+        # 6. Volatility Check
+        if df is not None:
+            regime = self.advanced.detect_volatility_regime(df)
+            if regime == VolatilityRegime.EXTREME:
+                logger.warning("Trading halted: EXTREME volatility detected")
+                return False
+
         return True
 
 

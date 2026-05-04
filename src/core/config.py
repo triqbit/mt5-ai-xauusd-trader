@@ -57,6 +57,14 @@ class TradingConfig(BaseSettings):
         default=0.05, ge=0.01, le=0.06, description="Maximum daily drawdown percentage before halting trading"
     )
 
+    # ── Advanced Risk ──────────────────────────────────────────────────────────
+    max_correlation: float = Field(default=0.7, ge=0.0, le=1.0)
+    max_portfolio_heat: float = Field(default=0.10, ge=0.01, le=0.30)
+    max_consecutive_losses: int = Field(default=3, ge=1, le=10)
+    max_slippage_pips: float = Field(default=2.0, ge=0.1, le=10.0)
+    news_halt_window: int = Field(default=30, ge=5, le=120)  # minutes
+    max_risk_per_hour: float = Field(default=0.02, ge=0.005, le=0.10)
+
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
         default="ensemble", description="The ML algorithm architecture to use for signal generation"
