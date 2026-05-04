@@ -153,7 +153,42 @@ Generic bots usually have a single set of risk parameters (e.g., 1% risk per tra
 
 ---
 
+## 5. Gold-specific Macro Sensitivity Overlays
+
+### What it is and why it matters
+**Gold-specific Macro Sensitivity Overlays** is a specialized analytical layer that quantifies the relationship between XAUUSD and its primary macroeconomic drivers: Real Interest Rates (US 10Y TIPS), the US Dollar Index (DXY), and Central Bank demand indicators.
+
+XAUUSD does not trade in a vacuum; it is a monetary asset that historically moves inversely to real yields and the dollar. Institutional traders never look at a gold chart without checking the 10Y Real Yield. This feature brings that institutional rigor to the AI, allowing it to "veto" or "boost" technical signals based on whether they are supported by the underlying macro regime.
+
+### How it differentiates from generic trading bots
+Generic bots rely on price-action lag (moving averages, RSI) or local order flow. They often get "caught" during major macro shifts (e.g., a hawkish Fed pivot) because they don't "see" the change in real rates. The MT5 AI Trader differentiates by incorporating these fundamental "First Principles" of gold pricing into its final decision logic.
+
+### Architecture Outline
+1.  **Macro Data Ingestor**: A background service in `src/data/event_intelligence.py` that polls FRED (Federal Reserve Economic Data) for Real Yields and YFinance for DXY and Treasury spreads.
+2.  **Correlation Engine**: A mathematical module that computes rolling 30-day and 90-day correlations between XAUUSD and macro drivers to detect when historical relationships are strengthening or breaking down.
+3.  **Sensitivity Matrix**: A dynamic lookup table that assigns a "Macro Alignment Score" (-1 to +1) to every trade signal. For example, a "Buy" signal during falling real yields and a weakening DXY receives a +1.0 boost.
+4.  **Signal Overlay Hook**: Logic in the `EnsembleModel` that uses the Sensitivity Matrix to adjust the final model confidence before the execution filter is applied.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Automated daily ingestion of US 10Y Real Yields and DXY closing prices. |
+| **Functional** | Calculation of rolling Pearson correlation between XAUUSD and Real Yields. |
+| **Technical** | Macro data must be cached locally to ensure sub-100ms access during the trading loop. |
+| **Operational** | "Macro Alignment" (e.g., "Yield-Supported" or "Macro-Divergent") must be displayed in the Decision Cockpit. |
+| **Release Readiness** | Backtests must show the "Macro Veto" logic successfully avoiding at least 20% of false breakouts during hawkish macro shifts. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on macro correlation logic, FRED integration, and sensitivity mathematics.
+*   **Jules01 (Core Development)**: Lead on data caching infrastructure and integrating the overlay into the signal pipeline.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires a valid FRED API key and reliable connectivity to macro data providers.
+*   **Constraints**: Macro data is often low-frequency (daily); the system must handle the "mixing" of daily macro data with high-frequency M5/M15 price data without look-ahead bias.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Gold-specific macro sensitivity overlays** (Real Yields, DXY, Central Bank demand)
 - **Trade narrative memory** (Self-correcting memory of historical trades)
 - **Adaptive position sizing based on regime stability**
+- **Institutional Liquidity Heatmap** (Identifying "Smart Money" resting orders)
