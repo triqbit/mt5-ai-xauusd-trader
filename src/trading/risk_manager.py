@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime
+from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -22,7 +23,7 @@ from src.core.trade_logger import TradeLogger
 logger = logging.getLogger(__name__)
 
 # Ray Dalio All-Weather allocation weights
-ALLOCATION_WEIGHTS: dict[str, float] = {
+ALLOCATION_WEIGHTS: Dict[str, float] = {
     "XAUUSD": 0.18,  # Gold - inflation hedge
     "USDCHF": 0.15,  # CHF - deflation hedge
     "GBPUSD": 0.13,  # GBP - growth / balanced
@@ -46,7 +47,7 @@ class TradeSignal:
     lot_size: float
     algorithm: str
     confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -69,20 +70,20 @@ class RiskManager:
         self,
         config: TradingConfig,
         account_balance: float,
-        logger_db: TradeLogger | None = None,
-        monitor: Monitor | None = None,
+        logger_db: Optional[TradeLogger] = None,
+        monitor: Optional[Monitor] = None,
     ) -> None:
         self.cfg = config
         self.balance = account_balance
         self.peak_equity = account_balance
         self.daily = DailyStats(peak_equity=account_balance)
-        self.open_positions: dict[str, int] = {}  # symbol -> ticket
+        self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: int | None = None) -> bool:
+    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
