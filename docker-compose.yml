@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xauusd_trader
+    ports:
+      - "8000:8000"  # Prometheus metrics / API
+      - "8050:8050"  # Dash dashboard
+    volumes:
+      - .env:/app/.env:ro
+      - ./logs:/app/logs
+    environment:
+      - MODE=${MODE:-demo}
+      - ALGO=${ALGO:-ensemble}
+    restart: unless-stopped
