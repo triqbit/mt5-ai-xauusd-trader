@@ -2,10 +2,12 @@
 Integration tests for TradeLogger.
 """
 import os
+from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
-from src.core.trade_logger import TradeLogger
+from src.core.trade_logger import TradeLogger, Trade, ModelSignal, RiskEvent
 
 
 @pytest.fixture
@@ -29,6 +31,21 @@ def test_log_signal(logger):
     signal_id = logger.log_signal(signal_data)
     assert signal_id > 0
 
+    with logger.Session() as session:
+        signal = session.get(ModelSignal, signal_id)
+        assert signal.symbol == "XAUUSD"
+        assert signal.created_at is not None
+        assert signal.is_deleted is False
+
+def test_log_signal_invalid_price(logger):
+    signal_data = {
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": -100.0,
+    }
+    with pytest.raises(IntegrityError):
+        logger.log_signal(signal_data)
+
 def test_log_trade(logger):
     signal_id = logger.log_signal({
         "symbol": "XAUUSD",
@@ -45,6 +62,22 @@ def test_log_trade(logger):
     )
     assert trade_id > 0
 
+    with logger.Session() as session:
+        trade = session.get(Trade, trade_id)
+        assert trade.ticket == 12345
+        assert trade.created_at is not None
+        assert trade.is_deleted is False
+
+def test_log_trade_invalid_lot_size(logger):
+    with pytest.raises(IntegrityError):
+        logger.log_trade(
+            ticket=12345,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            lot_size=-0.1,
+        )
+
 def test_performance_report(logger):
     # Log some closed trades
     logger.log_trade(1, "XAUUSD", 1, 2000.0, 0.1, status="OPEN")
@@ -57,11 +90,28 @@ def test_performance_report(logger):
     assert report["profit_factor"] == 2.0
     assert report["sharpe_ratio"] != 0
     assert report["max_drawdown"] == 50.0
+    assert report["win_rate"] == 0.5
+    assert report["total_trades"] == 2
 
 def test_log_risk_event(logger):
     logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")
-    # No exception means success, we could query DB to be sure
     with logger.Session() as session:
-        from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
+        assert event.created_at is not None
+
+def test_audit_columns_presence(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    })
+    with logger.Session() as session:
+        signal = session.get(ModelSignal, signal_id)
+        assert hasattr(signal, 'created_at')
+        assert hasattr(signal, 'updated_at')
+        assert hasattr(signal, 'created_by')
+        assert hasattr(signal, 'updated_by')
+        assert hasattr(signal, 'deleted_at')
+        assert hasattr(signal, 'is_deleted')
+        assert isinstance(signal.created_at, datetime)
