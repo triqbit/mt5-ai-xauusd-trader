@@ -31,7 +31,7 @@ redis==5.0.4
 
 # -- Pydantic / settings -------------------------------------------
 pydantic==2.13.3
-pydantic-settings==2.8.1
+pydantic-settings==2.14.0
 
 # -- Testing -------------------------------------------------------
 optuna==4.8.0
