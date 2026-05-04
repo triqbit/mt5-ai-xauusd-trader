@@ -119,7 +119,9 @@ def run_live(
                             log.info("Reconnection successful.")
                             continue
                         except MT5ConnectionError as reconnect_exc:
-                            log.critical("Reconnection failed: %s. Waiting for next cycle.", reconnect_exc)
+                            log.critical(
+                                "Reconnection failed: %s. Waiting for next cycle.", reconnect_exc
+                            )
                             time.sleep(poll_interval)
                             continue
 
@@ -179,21 +181,31 @@ def run_live(
                     # Request allocation from the institutional router
                     # Strategy ID: e.g. "PPO_XAUUSD_M5"
                     strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
-                    alloc_result = allocator.request_allocation(strat_id, risk_pct=cfg.risk_per_trade)
+                    alloc_result = allocator.request_allocation(
+                        strat_id, risk_pct=cfg.risk_per_trade
+                    )
 
                     if not alloc_result.is_allowed:
-                        log.warning("Allocation REJECTED | %s | Reason: %s", strat_id, alloc_result.rejection_reason)
+                        log.warning(
+                            "Allocation REJECTED | %s | Reason: %s",
+                            strat_id,
+                            alloc_result.rejection_reason,
+                        )
                         approved_risk = 0.0
                     else:
                         approved_risk = alloc_result.allocated_risk_pct
 
                 # Calculate lot size based on approved institutional risk
-                lot_size = risk.size_position(
-                    cfg.symbol,
-                    win_rate=0.58,
-                    avg_win=4 * atr,
-                    avg_loss=2 * atr,
-                ) if approved_risk > 0 else 0.0
+                lot_size = (
+                    risk.size_position(
+                        cfg.symbol,
+                        win_rate=0.58,
+                        avg_win=4 * atr,
+                        avg_loss=2 * atr,
+                    )
+                    if approved_risk > 0
+                    else 0.0
+                )
 
                 signal = TradeSignal(
                     symbol=cfg.symbol,
@@ -209,7 +221,11 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = risk.approve(signal, signal_id=signal_id, model_health=health) if direction != 0 else False
+                    risk_approved = (
+                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                        if direction != 0
+                        else False
+                    )
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -226,39 +242,60 @@ def run_live(
                             trade_logger=trade_logger,
                         )
                         if not filter_decision.is_approved:
-                            log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
+                            log.warning(
+                                "Filter BLOCKED | %s | Reason: %s",
+                                cfg.symbol,
+                                filter_decision.blocked_by,
+                            )
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
                 if direction != 0:
                     with profile("decision_support"):
                         # Prepare data for explainer
-                        model_votes = signal_obj.metadata.get("per_algo_votes", {cfg.algorithm: 1 if direction == 1 else 2 if direction == -1 else 0})
+                        model_votes = signal_obj.metadata.get(
+                            "per_algo_votes",
+                            {cfg.algorithm: 1 if direction == 1 else 2 if direction == -1 else 0},
+                        )
                         model_weights = signal_obj.metadata.get("weights", {cfg.algorithm: 1.0})
 
                         risk_data = {
                             "passed": risk_approved,
                             "rejection_reasons": [],
-                            "risk_reward": abs(take_profit - price) / abs(price - stop_loss) if abs(price - stop_loss) > 0 else 0.0,
-                            "summary": "Passed all risk gates" if risk_approved else "Risk gate rejected"
+                            "risk_reward": abs(take_profit - price) / abs(price - stop_loss)
+                            if abs(price - stop_loss) > 0
+                            else 0.0,
+                            "summary": "Passed all risk gates"
+                            if risk_approved
+                            else "Risk gate rejected",
                         }
 
                         regime_data = {
                             "name": regime_info.label.value,
                             "confidence": regime_info.confidence,
-                            "volatility": "High" if regime_info.volatility_index > 1.5 else "Normal",
+                            "volatility": "High"
+                            if regime_info.volatility_index > 1.5
+                            else "Normal",
                             "is_favorable": True,
-                            "summary": f"Market is {regime_info.label.value}"
+                            "summary": f"Market is {regime_info.label.value}",
                         }
 
                         execution_data = None
                         if filter_decision:
                             execution_data = {
                                 "passed": filter_decision.is_approved,
-                                "summary": filter_decision.blocked_by if not filter_decision.is_approved else "All filters passed",
+                                "summary": filter_decision.blocked_by
+                                if not filter_decision.is_approved
+                                else "All filters passed",
                                 "filters": [
-                                    {"name": filter_decision.blocked_by, "passed": False, "message": f"Blocked by {filter_decision.blocked_by}"}
-                                ] if not filter_decision.is_approved else []
+                                    {
+                                        "name": filter_decision.blocked_by,
+                                        "passed": False,
+                                        "message": f"Blocked by {filter_decision.blocked_by}",
+                                    }
+                                ]
+                                if not filter_decision.is_approved
+                                else [],
                             }
 
                         explanation = explainer.explain(
@@ -269,19 +306,23 @@ def run_live(
                             model_weights=model_weights,
                             risk_data=risk_data,
                             regime_info=regime_data,
-                            execution_data=execution_data
+                            execution_data=execution_data,
                         )
 
                         # Use a stub for macro risk since we don't have a live feed in this loop yet
-                        macro_risk = RiskStatus(is_blocked=False, active_events=[], reason="No active data")
+                        macro_risk = RiskStatus(
+                            is_blocked=False, active_events=[], reason="No active data"
+                        )
 
                         # Optimization: Use real performance metrics from TradeLogger
                         if trade_logger:
                             perf_metrics = trade_logger.read_performance_report()
                         else:
                             perf_metrics = {
-                                "sharpe_ratio": 0.0, "profit_factor": 0.0,
-                                "win_rate": 0.0, "total_trades": 0
+                                "sharpe_ratio": 0.0,
+                                "profit_factor": 0.0,
+                                "win_rate": 0.0,
+                                "total_trades": 0,
                             }
 
                         packet = dss.assemble_packet(
@@ -329,7 +370,9 @@ def run_live(
                                 trade_info = trade_logger.get_trade_by_ticket(ticket)
                                 if trade_info:
                                     # For a BUY, exit at BID. For a SELL, exit at ASK.
-                                    exit_price = tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                                    exit_price = (
+                                        tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                                    )
                                     # P&L will be calculated automatically by update_trade
                                     trade_logger.update_trade(
                                         ticket=ticket,
@@ -376,7 +419,9 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--symbol", help="Trading symbol (e.g. XAUUSD)")
     p.add_argument("--timeframe", help="Trading timeframe (e.g. M5)")
-    p.add_argument("--model-dir", type=Path, default=Path("models/trained"), help="Directory for model weights")
+    p.add_argument(
+        "--model-dir", type=Path, default=Path("models/trained"), help="Directory for model weights"
+    )
     p.add_argument("--log-level", default="INFO", help="Logging level")
     p.add_argument("--check", action="store_true", help="Perform pre-flight health checks and exit")
     return p.parse_args()
@@ -399,6 +444,7 @@ def main() -> int:
 
     # Ensure get_config() picks up the CLI-overridden environment variables
     from src.core.config import get_config
+
     get_config.cache_clear()
 
     try:
@@ -406,17 +452,19 @@ def main() -> int:
     except Exception as exc:
         # Check if it's a Pydantic validation error (usually missing required fields)
         if "validation error" in str(exc).lower():
-            console.print(Panel(
-                "[bold red]Configuration Error:[/]\n\n"
-                "One or more required environment variables are missing.\n"
-                "Please ensure you have a [bold].env[/] file in the project root.\n\n"
-                "Quick Fix:\n"
-                "1. Copy [cyan].env.example[/] to [cyan].env[/]\n"
-                "2. Fill in your [bold]MT5_PASSWORD[/] and [bold]MT5_SERVER[/]\n\n"
-                f"[dim]Technical details: {exc}[/]",
-                title="[bold red]Bootstrap Failure[/]",
-                border_style="red"
-            ))
+            console.print(
+                Panel(
+                    "[bold red]Configuration Error:[/]\n\n"
+                    "One or more required environment variables are missing.\n"
+                    "Please ensure you have a [bold].env[/] file in the project root.\n\n"
+                    "Quick Fix:\n"
+                    "1. Copy [cyan].env.example[/] to [cyan].env[/]\n"
+                    "2. Fill in your [bold]MT5_PASSWORD[/] and [bold]MT5_SERVER[/]\n\n"
+                    f"[dim]Technical details: {exc}[/]",
+                    title="[bold red]Bootstrap Failure[/]",
+                    border_style="red",
+                )
+            )
         else:
             log.critical("Failed to load configuration: %s", exc)
         return 1
@@ -439,7 +487,9 @@ def main() -> int:
         console.print(validation_table)
 
         if not result.success:
-            log.critical("Startup validation FAILED - One or more critical configuration errors found.")
+            log.critical(
+                "Startup validation FAILED - One or more critical configuration errors found."
+            )
             return 1
         else:
             log.warning("Startup validation passed with warnings.")
@@ -452,9 +502,19 @@ def main() -> int:
     summary.add_row("Symbol:  ", f"[bold]{cfg.symbol}[/]")
     summary.add_row("Timeframe:  ", cfg.timeframe)
     summary.add_row("Algorithm:  ", cfg.algorithm)
-    summary.add_row("Database:  ", "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite")
+    summary.add_row(
+        "Database:  ",
+        "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite",
+    )
 
-    console.print(Panel(summary, title="[bold blue]Trading System Configuration[/]", border_style="blue", expand=False))
+    console.print(
+        Panel(
+            summary,
+            title="[bold blue]Trading System Configuration[/]",
+            border_style="blue",
+            expand=False,
+        )
+    )
 
     # Initialise components
     # 1. Audit Logger (Mandatory for enterprise traceability)
@@ -524,7 +584,9 @@ def main() -> int:
         model = EnsembleModel(device="cpu")
 
     # Enterprise Health Gate
-    health_checker = init_health_checker(cfg, connector, trade_logger, model, audit_logger=audit_logger)
+    health_checker = init_health_checker(
+        cfg, connector, trade_logger, model, audit_logger=audit_logger
+    )
     with console.status("[bold blue]Running health checks..."):
         try:
             report = health_checker.startup_gate()

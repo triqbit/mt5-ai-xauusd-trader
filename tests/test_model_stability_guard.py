@@ -1,12 +1,14 @@
 
-import pytest
-from unittest.mock import MagicMock, patch
-from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
-from src.trading.risk_manager import TradeSignal
-from src.core.config import TradingConfig
 from datetime import datetime
+from unittest.mock import MagicMock
+
 import pandas as pd
-import numpy as np
+import pytest
+
+from src.core.config import TradingConfig
+from src.trading.execution_filter import ExecutionFilter
+from src.trading.risk_manager import TradeSignal
+
 
 @pytest.fixture
 def mock_config():

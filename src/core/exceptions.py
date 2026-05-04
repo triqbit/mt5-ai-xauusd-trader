@@ -8,8 +8,10 @@ src/core/exceptions.py
 Centralized exception hierarchy for robust error handling and recovery.
 """
 
+
 class TradingError(Exception):
     """Base exception for all trading-related errors."""
+
     def __init__(self, message: str, details: Optional[dict[str, Any]] = None):
         super().__init__(message)
         self.details = details or {}
@@ -17,24 +19,29 @@ class TradingError(Exception):
 
 class MT5Error(TradingError):
     """Base exception for MetaTrader 5 related errors."""
+
     pass
 
 
 class MT5ConnectionError(MT5Error):
     """Raised when connection to MT5 terminal or MetaAPI fails."""
+
     pass
 
 
 class MT5DataError(MT5Error):
     """Raised when data retrieval (rates, ticks) from MT5 fails."""
+
     pass
 
 
 class MT5ExecutionError(MT5Error):
     """Raised when order execution or management fails."""
+
     pass
 
 
 class ConfigurationError(TradingError):
     """Raised when there is an issue with the system configuration."""
+
     pass

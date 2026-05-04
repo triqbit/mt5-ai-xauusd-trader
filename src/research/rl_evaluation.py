@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 class RLModel(Protocol):
     """Protocol for RL agents to ensure consistent evaluation."""
 
-    def predict(self, observation: np.ndarray) -> Any:
-        ...
+    def predict(self, observation: np.ndarray) -> Any: ...
 
 
 class StabilityMetrics(BaseModel):
     """Metrics assessing the consistency and risk-adjusted returns."""
+
     sharpe_ratio: float = Field(..., description="Annualized Sharpe Ratio")
     sortino_ratio: float = Field(..., description="Annualized Sortino Ratio")
     volatility: float = Field(..., description="Annualized volatility")
@@ -45,6 +45,7 @@ class StabilityMetrics(BaseModel):
 
 class TurnoverMetrics(BaseModel):
     """Metrics assessing trading activity and execution costs."""
+
     trade_frequency: float = Field(..., description="Number of trades per 1000 steps")
     avg_hold_time: float = Field(..., description="Average steps per trade")
     max_hold_time: int = Field(default=0, description="Maximum steps held for a single trade")
@@ -55,6 +56,7 @@ class TurnoverMetrics(BaseModel):
 
 class DrawdownMetrics(BaseModel):
     """Metrics assessing downside risk and recovery."""
+
     max_drawdown: float = Field(..., description="Maximum peak-to-trough decline")
     max_drawdown_duration: int = Field(..., description="Maximum steps spent in drawdown")
     avg_drawdown: float = Field(..., description="Average drawdown depth")
@@ -62,28 +64,37 @@ class DrawdownMetrics(BaseModel):
 
 class RegimePerformance(BaseModel):
     """Performance metrics segmented by market regime."""
+
     regime: MarketRegime
     sharpe_ratio: float
     win_rate: float
     total_trades: int
     profit_factor: float
-    recovery_factor: float = Field(default=0.0, description="Total PnL / Max Drawdown for this regime")
+    recovery_factor: float = Field(
+        default=0.0, description="Total PnL / Max Drawdown for this regime"
+    )
     max_drawdown: float = Field(default=0.0, description="Max drawdown encountered in this regime")
 
 
 class RewardDecomposition(BaseModel):
     """Breakdown of returns into gross profit and costs."""
+
     gross_pnl: float
     net_pnl: float
     total_commissions: float
-    commission_drag: float = Field(..., description="Percentage impact of commissions on gross returns")
+    commission_drag: float = Field(
+        ..., description="Percentage impact of commissions on gross returns"
+    )
     avg_win: float = Field(default=0.0, description="Average profit of winning trades")
     avg_loss: float = Field(default=0.0, description="Average loss of losing trades")
-    profit_concentration: float = Field(default=0.0, description="Ratio of top 10% of trades to total net profit")
+    profit_concentration: float = Field(
+        default=0.0, description="Ratio of top 10% of trades to total net profit"
+    )
 
 
 class RLReport(BaseModel):
     """Final aggregate evaluation report for an RL agent."""
+
     agent_name: str
     total_steps: int
     stability: StabilityMetrics
@@ -96,6 +107,7 @@ class RLReport(BaseModel):
 
 class RLComparison(BaseModel):
     """Comparative report across multiple agents."""
+
     baseline_name: str
     agent_reports: List[RLReport]
     performance_gap_pct: float = Field(..., description="Gap between best RL agent and baseline")
@@ -234,12 +246,12 @@ class RLEvaluator:
             if hasattr(self.env, "data") and hasattr(self.env, "current_step"):
                 data = self.env.data
                 current_step = self.env.current_step
-                current_price = data[current_step - 1, 3] # Close price
+                current_price = data[current_step - 1, 3]  # Close price
 
                 if current_step >= 100:
                     df_slice = pd.DataFrame(
                         data[current_step - 100 : current_step],
-                        columns=["open", "high", "low", "close", "tick_volume"]
+                        columns=["open", "high", "low", "close", "tick_volume"],
                     )
                     current_regime = self.regime_detector.detect(df_slice).label
 
@@ -292,7 +304,11 @@ class RLEvaluator:
         baseline_sharpe = baseline_report.stability.sharpe_ratio
         best_sharpe = best_report.stability.sharpe_ratio
 
-        gap = ((best_sharpe - baseline_sharpe) / abs(baseline_sharpe) * 100) if baseline_sharpe != 0 else 0.0
+        gap = (
+            ((best_sharpe - baseline_sharpe) / abs(baseline_sharpe) * 100)
+            if baseline_sharpe != 0
+            else 0.0
+        )
 
         return RLComparison(
             baseline_name=baseline_name,
@@ -386,10 +402,10 @@ class RLEvaluator:
         entry_idx = 0
         for i in range(1, len(df)):
             # Entry detected
-            if positions[i-1] == 0 and positions[i] != 0:
+            if positions[i - 1] == 0 and positions[i] != 0:
                 entry_idx = i
             # Exit detected
-            elif positions[i-1] != 0 and positions[i] == 0:
+            elif positions[i - 1] != 0 and positions[i] == 0:
                 # PnL is the change in MtM equity from the step BEFORE entry to the exit step
                 pnl = balances[i] - balances[entry_idx - 1]
                 hold_time = i - entry_idx
@@ -419,9 +435,7 @@ class RLEvaluator:
         mean_ret = returns.mean()
         std_ret = returns.std()
 
-        sharpe = (
-            (mean_ret / std_ret * np.sqrt(self.annualization_factor)) if std_ret > 0 else 0.0
-        )
+        sharpe = (mean_ret / std_ret * np.sqrt(self.annualization_factor)) if std_ret > 0 else 0.0
 
         downside_ret = returns[returns < 0]
         downside_std = downside_ret.std() if len(downside_ret) > 1 else std_ret
@@ -447,9 +461,7 @@ class RLEvaluator:
         losses = [abs(p) for p in trade_pnls if p < 0]
 
         profit_factor = (
-            sum(wins) / sum(losses)
-            if sum(losses) > 0
-            else (float("inf") if sum(wins) > 0 else 1.0)
+            sum(wins) / sum(losses) if sum(losses) > 0 else (float("inf") if sum(wins) > 0 else 1.0)
         )
 
         win_rate = len(wins) / len(trade_pnls) if trade_pnls else 0.0
@@ -496,7 +508,9 @@ class RLEvaluator:
             max_consecutive_losses=int(max_consecutive_losses),
         )
 
-    def _calculate_turnover(self, df: pd.DataFrame, trades: List[Dict[str, Any]]) -> TurnoverMetrics:
+    def _calculate_turnover(
+        self, df: pd.DataFrame, trades: List[Dict[str, Any]]
+    ) -> TurnoverMetrics:
         """Assess trading activity and execution costs."""
         num_trades = len(trades)
         hold_times = [t["hold_time"] for t in trades]
@@ -517,7 +531,7 @@ class RLEvaluator:
             max_hold_time=int(max_hold_time),
             min_hold_time=int(min_hold_time),
             total_trades=num_trades,
-            turnover_ratio=float(turnover_ratio)
+            turnover_ratio=float(turnover_ratio),
         )
 
     def _calculate_drawdown(self, df: pd.DataFrame) -> DrawdownMetrics:
@@ -548,7 +562,7 @@ class RLEvaluator:
         return DrawdownMetrics(
             max_drawdown=float(max_dd),
             max_drawdown_duration=int(max_dd_dur),
-            avg_drawdown=float(avg_dd)
+            avg_drawdown=float(avg_dd),
         )
 
     def _calculate_regime_sensitivity(self, df: pd.DataFrame) -> List[RegimePerformance]:
@@ -565,7 +579,11 @@ class RLEvaluator:
                 continue
 
             returns = regime_df["balances"].pct_change().replace([np.inf, -np.inf], 0).fillna(0)
-            sharpe = (returns.mean() / returns.std() * np.sqrt(self.annualization_factor)) if len(returns) > 1 and returns.std() > 0 else 0.0
+            sharpe = (
+                (returns.mean() / returns.std() * np.sqrt(self.annualization_factor))
+                if len(returns) > 1 and returns.std() > 0
+                else 0.0
+            )
 
             # Extract trades within this regime
             regime_pnls = []
@@ -575,18 +593,22 @@ class RLEvaluator:
 
             entry_idx = 0
             for i in range(1, len(df)):
-                if positions[i-1] == 0 and positions[i] != 0:
+                if positions[i - 1] == 0 and positions[i] != 0:
                     entry_idx = i
-                elif positions[i-1] != 0 and positions[i] == 0 and regimes[entry_idx] == regime:
+                elif positions[i - 1] != 0 and positions[i] == 0 and regimes[entry_idx] == regime:
                     pnl = balances[i] - balances[entry_idx - 1]
                     regime_pnls.append(pnl)
 
-            win_rate = len([p for p in regime_pnls if p > 0]) / len(regime_pnls) if regime_pnls else 0.0
+            win_rate = (
+                len([p for p in regime_pnls if p > 0]) / len(regime_pnls) if regime_pnls else 0.0
+            )
 
             # Profit factor: sum(profits) / abs(sum(losses))
             profits = sum([p for p in regime_pnls if p > 0])
             losses = abs(sum([p for p in regime_pnls if p < 0]))
-            profit_factor = profits / losses if losses > 0 else (float('inf') if profits > 0 else 1.0)
+            profit_factor = (
+                profits / losses if losses > 0 else (float("inf") if profits > 0 else 1.0)
+            )
 
             # Max drawdown within this regime
             regime_bals = regime_df["balances"].values
@@ -596,21 +618,29 @@ class RLEvaluator:
 
             # Recovery factor
             total_regime_pnl = regime_bals[-1] - regime_bals[0]
-            recovery_factor = total_regime_pnl / (regime_max_dd * regime_bals[0] + 1e-9) if regime_max_dd > 0 else 1.0
+            recovery_factor = (
+                total_regime_pnl / (regime_max_dd * regime_bals[0] + 1e-9)
+                if regime_max_dd > 0
+                else 1.0
+            )
 
-            regime_stats.append(RegimePerformance(
-                regime=regime,
-                sharpe_ratio=float(sharpe),
-                win_rate=float(win_rate),
-                total_trades=len(regime_pnls),
-                profit_factor=float(profit_factor),
-                recovery_factor=float(recovery_factor),
-                max_drawdown=float(regime_max_dd),
-            ))
+            regime_stats.append(
+                RegimePerformance(
+                    regime=regime,
+                    sharpe_ratio=float(sharpe),
+                    win_rate=float(win_rate),
+                    total_trades=len(regime_pnls),
+                    profit_factor=float(profit_factor),
+                    recovery_factor=float(recovery_factor),
+                    max_drawdown=float(regime_max_dd),
+                )
+            )
 
         return regime_stats
 
-    def _calculate_reward_decomposition(self, df: pd.DataFrame, trades: List[Dict[str, Any]]) -> RewardDecomposition:
+    def _calculate_reward_decomposition(
+        self, df: pd.DataFrame, trades: List[Dict[str, Any]]
+    ) -> RewardDecomposition:
         """Breakdown of returns into gross profit and costs, with concentration analysis."""
         total_commissions = df["commissions"].iloc[-1] if len(df) > 0 else 0.0
         final_pnl = df["balances"].iloc[-1] - df["balances"].iloc[0] if len(df) > 0 else 0.0
@@ -645,5 +675,3 @@ class RLEvaluator:
             avg_loss=float(avg_loss),
             profit_concentration=float(profit_concentration),
         )
-
-

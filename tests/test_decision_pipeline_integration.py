@@ -183,7 +183,7 @@ def test_decision_pipeline_risk_rejection(
     mock_cfg, data_generator, ensemble_model, risk_manager, execution_filter, explainer, dss
 ):
     """Case 2: Risk Rejection - Rejected due to low R:R."""
-    df = data_generator.generate(n_steps=10)
+    data_generator.generate(n_steps=10)
     price = 2300.0
 
     # Low R:R (0.5)

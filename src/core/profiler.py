@@ -5,6 +5,7 @@ High-resolution performance profiling utilities.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import time
@@ -20,6 +21,7 @@ except ImportError:
     TRADING_BLOCK_DURATION = None
 
 logger = structlog.get_logger(__name__)
+
 
 @contextmanager
 def profile(label: str) -> Generator[None, None, None]:
@@ -37,11 +39,7 @@ def profile(label: str) -> Generator[None, None, None]:
         duration_ms = round(duration * 1000, 3)
 
         # Log to structured logger
-        logger.info(
-            "performance_metric",
-            label=label,
-            duration_ms=duration_ms
-        )
+        logger.info("performance_metric", label=label, duration_ms=duration_ms)
 
         # Log to Prometheus Histogram if available
         if TRADING_BLOCK_DURATION is not None:
