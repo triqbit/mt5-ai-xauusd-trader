@@ -137,7 +137,7 @@
 {% if allocation_insights %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Capital Allocation Insights
-**Portfolio Heat:** {{ allocation_insights.total_heat_pct }}%
+**Portfolio Heat:** {{ allocation_insights.total_heat_pct }}% | **Diversification Score:** {{ allocation_insights.diversification_score|round(2) }}
 
 | Symbol/Family | Allocated | Heat | Performance Multiplier |
 |---------------|-----------|------|------------------------|
@@ -169,10 +169,10 @@
 ## {{ ns.count }}. RL Agent Evaluation
 **Summary:** {{ rl_evaluation.comparison_summary }}
 
-| Agent | Sharpe | Profit Factor | MaxDD | Win Rate |
-|-------|--------|---------------|-------|----------|
+| Agent | Sharpe | Sortino | PF | MaxDD | Recovery | VaR(95%) |
+|-------|--------|---------|----|-------|----------|----------|
 {% for m in rl_evaluation.metrics %}
-| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.profit_factor|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ (m.win_rate * 100)|round(1) }}% |
+| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.sortino|round(2) }} | {{ m.profit_factor|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ m.recovery_factor|round(2) }} | {{ (m.var_95 * 100)|round(2) }}% |
 {% endfor %}
 {% endif %}
 

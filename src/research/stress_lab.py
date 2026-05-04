@@ -318,18 +318,21 @@ class StressLab:
                     spike_size = atr.iloc[i] * 3.0
                     direction = rng.choice([1, -1])
 
+                    idx = df.index[i]
+                    next_idx = df.index[i + 1]
+
                     if direction == 1:
-                        df.at[i, "high"] += spike_size
-                        df.at[i, "close"] = df.at[i, "open"] + (spike_size * 0.1)
+                        df.at[idx, "high"] += spike_size
+                        df.at[idx, "close"] = df.at[idx, "open"] + (spike_size * 0.1)
                         # Immediate reversal in next candle
-                        df.at[i + 1, "close"] = df.at[i, "open"] - (spike_size * 0.5)
-                        df.at[i + 1, "low"] = df.at[i + 1, "close"] - (spike_size * 0.1)
+                        df.at[next_idx, "close"] = df.at[idx, "open"] - (spike_size * 0.5)
+                        df.at[next_idx, "low"] = df.at[next_idx, "close"] - (spike_size * 0.1)
                     else:
-                        df.at[i, "low"] -= spike_size
-                        df.at[i, "close"] = df.at[i, "open"] - (spike_size * 0.1)
+                        df.at[idx, "low"] -= spike_size
+                        df.at[idx, "close"] = df.at[idx, "open"] - (spike_size * 0.1)
                         # Immediate reversal
-                        df.at[i + 1, "close"] = df.at[i, "open"] + (spike_size * 0.5)
-                        df.at[i + 1, "high"] = df.at[i + 1, "close"] + (spike_size * 0.1)
+                        df.at[next_idx, "close"] = df.at[idx, "open"] + (spike_size * 0.5)
+                        df.at[next_idx, "high"] = df.at[next_idx, "close"] + (spike_size * 0.1)
 
         # 4. Regime transitions (Simulate sudden volatility expansion or trend exhaustion)
         if scenario.regime_flip_prob > 0:
@@ -342,7 +345,7 @@ class StressLab:
                         returns = df["close"].iloc[i : i + window].pct_change().fillna(0)
                         # Flip and amplify volatility
                         inverted_returns = -returns * 2.5
-                        base_price = df.at[i, "close"]
+                        base_price = df.at[df.index[i], "close"]
                         new_prices = base_price * np.exp(np.cumsum(inverted_returns))
                         df.loc[df.index[i : i + window], "close"] = new_prices.values
 
