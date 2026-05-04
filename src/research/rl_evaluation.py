@@ -41,6 +41,9 @@ class StabilityMetrics(BaseModel):
     var_95: float = Field(default=0.0, description="Value at Risk (95%)")
     cvar_95: float = Field(default=0.0, description="Conditional Value at Risk (95%)")
     max_consecutive_losses: int = Field(default=0, description="Max sequence of losing trades")
+    ulcer_index: float = Field(default=0.0, description="Ulcer Index (measure of drawdown stress)")
+    sqn: float = Field(default=0.0, description="System Quality Number")
+    win_loss_ratio: float = Field(default=0.0, description="Average Win / Average Loss")
 
 
 class TurnoverMetrics(BaseModel):
@@ -106,38 +109,40 @@ class RLComparison(BaseModel):
 class MomentumBaseline:
     """Rule-based momentum baseline for RL comparison."""
 
-    def __init__(self, window: int = 14):
+    def __init__(self, window: int = 14, n_features: int = 5, close_idx: int = 3):
         self.window = window
+        self.n_features = n_features
+        self.close_idx = close_idx
 
     def predict(self, observation: np.ndarray) -> int:
         """
         Simple momentum: if current price > price N steps ago, buy.
         Note: This expects the observation to contain historical prices.
         In TradingEnv, observations are normalized windows [window_size, n_features].
-        Close price is at index 3 in each step's features.
         """
         # Observation format from TradingEnv: [window_normalized_flattened, balance, position]
-        # To get the last close, we need to know n_features.
-        # However, if we don't know it, we can guess from observation size.
-        # Typical window_size=60, n_features=5 -> 300 + 2 = 302 elements.
-        # The last step of the window starts at (window_size - 1) * n_features.
-        # But we can also look at the relative index from the end.
         # balance is -2, position is -1.
         # The last step's features are from -(n_features+2) to -3.
         # If n_features=5 (OHLCV), close is 4th feature (index 3).
-        # So last close is at -(5+2) + 3 = -4.
+        # So last close is at -(n_features+2) + close_idx.
+        last_close_idx = -(self.n_features + 2) + self.close_idx
+        prev_close_idx = last_close_idx - (self.window * self.n_features)
 
-        # Let's use a more robust way: assume 5 features if not specified.
-        n_features = 5
-        last_close_idx = -(n_features + 2) + 3
-
-        if len(observation) < abs(last_close_idx):
+        if len(observation) < abs(prev_close_idx):
+            # Fallback if window is larger than available history in observation
+            if len(observation) < abs(last_close_idx):
+                return 0
+            last_val = observation[last_close_idx]
+            if last_val > 0.5: return 1
+            if last_val < -0.5: return 2
             return 0
 
         last_val = observation[last_close_idx]
-        if last_val > 0.2:  # Reduced threshold for normalized values
+        prev_val = observation[prev_close_idx]
+
+        if last_val > prev_val + 0.1:
             return 1  # Buy
-        elif last_val < -0.2:
+        elif last_val < prev_val - 0.1:
             return 2  # Sell
         return 0  # Hold
 
@@ -145,23 +150,26 @@ class MomentumBaseline:
 class MeanReversionBaseline:
     """Rule-based Mean Reversion baseline for RL comparison."""
 
-    def __init__(self, window: int = 14):
+    def __init__(self, window: int = 14, n_features: int = 5, close_idx: int = 3):
         self.window = window
+        self.n_features = n_features
+        self.close_idx = close_idx
 
     def predict(self, observation: np.ndarray) -> int:
         # Simplified RSI-like logic on normalized values
         # Normalized values already represent distance from mean.
         # If last close is very high relative to window mean, sell.
-        n_features = 5
-        last_close_idx = -(n_features + 2) + 3
+        last_close_idx = -(self.n_features + 2) + self.close_idx
 
         if len(observation) < abs(last_close_idx):
             return 0
 
         last_val = observation[last_close_idx]
-        if last_val > 1.5:  # Overbought
+        # Normalized values in TradingEnv are (val - mean) / std
+        # 1.5-2.0 std dev is a typical mean reversion trigger
+        if last_val > 2.0:  # Overbought
             return 2  # Sell
-        elif last_val < -1.5:  # Oversold
+        elif last_val < -2.0:  # Oversold
             return 1  # Buy
         return 0
 
@@ -201,10 +209,14 @@ class RLEvaluator:
         env: Any,
         regime_detector: Optional[RegimeDetector] = None,
         annualization_factor: int = 252,
+        close_idx: int = 3,
+        n_features: int = 5,
     ):
         self.env = env
         self.regime_detector = regime_detector or RegimeDetector()
         self.annualization_factor = annualization_factor
+        self.close_idx = close_idx
+        self.n_features = n_features
 
     def evaluate(self, agent: RLModel, agent_name: str = "RL_Agent") -> RLReport:
         """
@@ -235,12 +247,22 @@ class RLEvaluator:
             if hasattr(self.env, "data") and hasattr(self.env, "current_step"):
                 data = self.env.data
                 current_step = self.env.current_step
-                current_price = data[current_step - 1, 3] # Close price
+                # Use current price from data. In TradingEnv, current_step starts at window_size.
+                # After env.step(action), current_step has been incremented.
+                # So the price that was just traded at is data[current_step - 1, close_idx]
+                current_price = data[current_step - 1, self.close_idx]
 
                 if current_step >= 100:
+                    # Attempt to get columns if they exist, otherwise use standard OHLCV names
+                    cols = ["open", "high", "low", "close", "tick_volume"]
+                    if data.shape[1] > 5:
+                        cols += [f"feat_{i}" for i in range(5, data.shape[1])]
+                    elif data.shape[1] < 5:
+                        cols = cols[:data.shape[1]]
+
                     df_slice = pd.DataFrame(
                         data[current_step - 100 : current_step],
-                        columns=["open", "high", "low", "close", "tick_volume"]
+                        columns=cols
                     )
                     current_regime = self.regime_detector.detect(df_slice).label
 
@@ -284,7 +306,7 @@ class RLEvaluator:
         baseline_report = next((r for r in reports if r.agent_name == baseline_name), None)
         if not baseline_report:
             # If baseline not in list, run it separately
-            baseline_agent = MomentumBaseline()
+            baseline_agent = MomentumBaseline(n_features=self.n_features, close_idx=self.close_idx)
             baseline_report = self.evaluate(baseline_agent, baseline_name)
             reports.append(baseline_report)
 
@@ -327,6 +349,9 @@ class RLEvaluator:
                     var_95=report.stability.var_95,
                     cvar_95=report.stability.cvar_95,
                     recovery_factor=float(recovery_factor),
+                    ulcer_index=report.stability.ulcer_index,
+                    sqn=report.stability.sqn,
+                    win_loss_ratio=report.stability.win_loss_ratio,
                 )
             )
 
@@ -392,17 +417,27 @@ class RLEvaluator:
         balances = df["balances"].values
         positions = df["positions"].values
 
-        entry_idx = 0
+        entry_idx = -1
         for i in range(1, len(df)):
-            # Entry detected
+            # Entry detected: from no position to having a position
             if positions[i-1] == 0 and positions[i] != 0:
                 entry_idx = i
-            # Exit detected
+            # Exit detected: from having a position to no position
             elif positions[i-1] != 0 and positions[i] == 0:
-                # PnL is the change in MtM equity from the step BEFORE entry to the exit step
-                pnl = balances[i] - balances[entry_idx - 1]
-                hold_time = i - entry_idx
-                trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
+                if entry_idx != -1:
+                    # PnL is the change in MtM equity from the step BEFORE entry to the exit step
+                    # If entry_idx is 0, we can't look back, but TradingEnv starts at window_size > 0.
+                    pnl = balances[i] - balances[entry_idx - 1] if entry_idx > 0 else balances[i] - balances[0]
+                    hold_time = i - entry_idx
+                    trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
+                    entry_idx = -1
+            # Reversal detected: position flipped sign
+            elif positions[i-1] != 0 and positions[i] != 0 and np.sign(positions[i-1]) != np.sign(positions[i]):
+                if entry_idx != -1:
+                    pnl = balances[i] - balances[entry_idx - 1] if entry_idx > 0 else balances[i] - balances[0]
+                    hold_time = i - entry_idx
+                    trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
+                entry_idx = i
 
         return trades
 
@@ -465,6 +500,21 @@ class RLEvaluator:
         avg_win = np.mean(wins) if wins else 0.0
         avg_loss = np.mean(losses) if losses else 0.0
         expectancy = (avg_win * win_rate) - (avg_loss * (1 - win_rate))
+        win_loss_ratio = avg_win / avg_loss if avg_loss > 0 else (float("inf") if avg_win > 0 else 0.0)
+
+        # SQN: (Average PnL / StdDev of PnL) * sqrt(NumTrades)
+        sqn = 0.0
+        if len(trade_pnls) > 1:
+            mean_pnl = np.mean(trade_pnls)
+            std_pnl = np.std(trade_pnls)
+            sqn = (mean_pnl / (std_pnl + 1e-9) * np.sqrt(len(trade_pnls)))
+
+        # Ulcer Index: sqrt(mean(drawdown_squared))
+        bals = df["balances"].values
+        peaks = np.maximum.accumulate(bals)
+        # We use relative drawdown here
+        drawdowns = (bals - peaks) / (peaks + 1e-9)
+        ulcer_index = np.sqrt(np.mean(np.square(drawdowns))) if len(drawdowns) > 0 else 0.0
 
         # Stability score: consistency of equity curve (R-squared of linear fit)
         x = np.arange(len(df))
@@ -503,6 +553,9 @@ class RLEvaluator:
             var_95=float(var_95),
             cvar_95=float(cvar_95),
             max_consecutive_losses=int(max_consecutive_losses),
+            ulcer_index=float(ulcer_index),
+            sqn=float(sqn),
+            win_loss_ratio=float(win_loss_ratio),
         )
 
     def _calculate_turnover(self, df: pd.DataFrame, trades: List[Dict[str, Any]]) -> TurnoverMetrics:
