@@ -271,10 +271,13 @@ class TradeLogger:
             drawdown = peak - equity_curve
             max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
 
+            win_rate = float(np.sum(pnls > 0) / len(pnls))
             metrics = {
                 "sharpe_ratio": float(sharpe),
                 "profit_factor": float(profit_factor),
                 "max_drawdown": float(max_dd),
+                "win_rate": win_rate,
+                "total_trades": len(pnls),
             }
 
             # Optionally log these metrics to DB
@@ -282,8 +285,8 @@ class TradeLogger:
                 sharpe_ratio=metrics["sharpe_ratio"],
                 profit_factor=metrics["profit_factor"],
                 max_drawdown=metrics["max_drawdown"],
-                total_trades=len(pnls),
-                win_rate=float(np.sum(pnls > 0) / len(pnls)),
+                total_trades=metrics["total_trades"],
+                win_rate=metrics["win_rate"],
             )
             session.add(metric_record)
             session.commit()

@@ -54,17 +54,20 @@ class FeatureEngineer:
         self.mins: Optional[pd.Series] = None
         self.maxs: Optional[pd.Series] = None
 
-    def compute_features(self, df: pd.DataFrame) -> pd.DataFrame:
+    def compute_features(
+        self, df: pd.DataFrame, drop_ohlcv: bool = True
+    ) -> pd.DataFrame:
         """
         Compute all features for the given OHLCV DataFrame.
 
         Args:
             df: Input DataFrame with 'open', 'high', 'low', 'close', 'tick_volume'.
+            drop_ohlcv: Whether to remove original OHLCV columns.
 
         Returns:
             DataFrame containing the engineered features.
         """
-        with profile_context("compute_features"):
+        with profile_context("compute_features_total"):
             if df.empty:
                 return pd.DataFrame()
 
@@ -74,32 +77,73 @@ class FeatureEngineer:
 
             # 1. Base Timeframe Features
             feature_blocks = []
-            feature_blocks.append(
-                self._get_technical_indicators(df, prefix=f"base_{self.base_timeframe}")
-            )
-            feature_blocks.append(self._get_candle_patterns(df))
-            feature_blocks.append(self._get_price_action_features(df))
-            feature_blocks.append(self._get_volume_features(df))
+            with profile_context("fe_base_technical"):
+                feature_blocks.append(
+                    self._get_technical_indicators(df, prefix=f"base_{self.base_timeframe}")
+                )
+            with profile_context("fe_candle_patterns"):
+                feature_blocks.append(self._get_candle_patterns(df))
+            with profile_context("fe_price_action"):
+                feature_blocks.append(self._get_price_action_features(df))
+            with profile_context("fe_volume"):
+                feature_blocks.append(self._get_volume_features(df))
 
             # 2. Multi-Timeframe Features
-            for tf in self.timeframes:
-                if tf == self.base_timeframe:
-                    continue
-                mtf_features = self._compute_mtf_features(df, tf)
-                feature_blocks.append(mtf_features)
+            with profile_context("fe_mtf_all"):
+                for tf in self.timeframes:
+                    if tf == self.base_timeframe:
+                        continue
+                    with profile_context(f"fe_mtf_{tf}"):
+                        mtf_features = self._compute_mtf_features(df, tf)
+                        feature_blocks.append(mtf_features)
 
             # Concatenate all blocks to avoid fragmentation
             full_df = pd.concat([df, *feature_blocks], axis=1)
 
-            # Drop rows with NaNs resulting from indicator windows
-            full_df = full_df.dropna()
+            # Optimization: Be selective with dropna to avoid losing all data if MTF fails
+            # We identify base features and MTF features
+            base_cols = [c for c in full_df.columns if c.startswith(f"base_{self.base_timeframe}") or c.startswith("pattern_")]
+            mtf_cols = [c for c in full_df.columns if c.startswith("mtf_")]
 
-            # Remove original OHLCV columns for the final feature matrix
-            features_only = full_df.drop(columns=["open", "high", "low", "close", "tick_volume"])
+            # First, drop rows where base features are NaN
+            if base_cols:
+                full_df = full_df.dropna(subset=base_cols)
+
+            # If MTF features are all NaN (data too short), we might want to keep the base features
+            # instead of returning an empty DataFrame.
+            if not full_df.empty and mtf_cols:
+                # Check if MTF columns are entirely NaN for the remaining rows
+                if full_df[mtf_cols].isna().all().all():
+                    logger.warning("MTF features are entirely NaN due to insufficient data history. Falling back to base features.")
+                    # Keep rows, but MTF features will be NaN or we can drop the columns
+                    # To be safe for models, we might need to fill with 0 or drop columns.
+                    # Here we choose to drop columns to maintain model input integrity if expected.
+                    # But if the model EXPECTS MTF, it will fail later.
+                    # Better to drop rows and see if any remain.
+                    temp_df = full_df.dropna(subset=mtf_cols)
+                    if temp_df.empty:
+                         logger.error("Insufficient data for MTF features. Row count dropped to 0.")
+                    else:
+                         full_df = temp_df
+                else:
+                    full_df = full_df.dropna(subset=mtf_cols)
+
+            if full_df.empty:
+                logger.error("Feature engineering resulted in an empty DataFrame.")
+                return pd.DataFrame()
+
+            # Remove original OHLCV columns for the final feature matrix if requested
+            if drop_ohlcv:
+                features_only = full_df.drop(columns=["open", "high", "low", "close", "tick_volume"])
+            else:
+                features_only = full_df
 
             # Also drop any 'real_volume' if present
             if "real_volume" in features_only.columns:
                 features_only = features_only.drop(columns=["real_volume"])
+
+            # Ensure all remaining features are NaN-free before normalization
+            features_only = features_only.dropna()
 
             if self.normalize:
                 features_only = self._normalize_features(features_only)

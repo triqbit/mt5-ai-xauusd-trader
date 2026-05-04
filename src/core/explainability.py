@@ -274,7 +274,7 @@ class SignalExplainer:
             machine_attribution=machine_attr,
         )
 
-    def format_for_terminal(self, explanation: SignalExplanation) -> str:
+    def format_for_terminal(self, explanation: SignalExplanation, console: Optional[Any] = None) -> str:
         """
         Format the explanation for terminal display.
         Uses 'rich' for pretty printing if available, otherwise returns plain text.
@@ -285,7 +285,10 @@ class SignalExplainer:
             from rich.panel import Panel
             from rich.table import Table
 
-            console = Console(force_terminal=True)
+            # Reuse provided console or create a lightweight one
+            console_provided = console is not None
+            if console is None:
+                console = Console(force_terminal=True)
 
             # 1. Main Header Panel
             status_color = (
@@ -358,7 +361,16 @@ class SignalExplainer:
                 f"Favored: {'[green]YES[/green]' if explanation.regime_context.is_favorable else '[red]NO[/red]'}"
             )
 
-            # Capture output
+            # Bypass expensive capture if we are printing directly to a console
+            if console_provided and not getattr(console, "_record", False):
+                 console.print(header)
+                 console.print(model_table)
+                 if explanation.execution_summary.filters:
+                     console.print(exec_table)
+                 console.print(Panel(risk_info, title="Risk Assessment"))
+                 console.print(Panel(regime_info, title="Market Context"))
+                 return ""
+
             with console.capture() as capture:
                 console.print(header)
                 console.print(model_table)

@@ -22,6 +22,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+try:
+    import torch
+except ImportError:
+    torch = None
+
 import structlog
 from rich.console import Console
 from rich.panel import Panel
@@ -123,6 +128,7 @@ def run_live(
                     df_features = feature_engineer.compute_features(df_raw)
                     obs = df_features.values[-1]  # Full 140+ features
                     regime_info = regime_detector.detect(df_raw)
+
                     volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
 
                 # 3. Get model prediction
@@ -133,8 +139,7 @@ def run_live(
                         try:
                             # EnsembleModel takes seq and regime_info
                             # For simple BaseModel, we just pass obs
-                            if isinstance(model, EnsembleModel):
-                                import torch
+                            if isinstance(model, EnsembleModel) and torch:
                                 seq = torch.from_numpy(df_features.values[-60:]).float()
                                 signal_obj = model.predict(obs, seq=seq, regime_info=regime_info)
                             else:
@@ -263,18 +268,22 @@ def run_live(
                         # Use a stub for macro risk since we don't have a live feed in this loop yet
                         macro_risk = RiskStatus(is_blocked=False, active_events=[], reason="No active data")
 
-                        # Mock performance metrics for the cockpit
-                        perf_metrics = {
-                            "sharpe_ratio": 1.25, "profit_factor": 1.62,
-                            "win_rate": 0.58, "total_trades": 142
-                        }
+                        # Optimization: Use real performance metrics from TradeLogger
+                        if trade_logger:
+                            perf_metrics = trade_logger.read_performance_report()
+                        else:
+                            perf_metrics = {
+                                "sharpe_ratio": 0.0, "profit_factor": 0.0,
+                                "win_rate": 0.0, "total_trades": 0
+                            }
 
                         packet = dss.assemble_packet(
                             cfg.symbol, explanation, regime_info, macro_risk, perf_metrics
                         )
                         # Render the institutional decision cockpit
                         if console:
-                            console.print(dss.format_for_operator(packet))
+                            # Optimization: Pass console to avoid redundant creation and captures
+                            dss.format_for_operator(packet, console=console)
                         else:
                             print(dss.format_for_operator(packet))
 

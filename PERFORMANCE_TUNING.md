@@ -9,6 +9,12 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 ### 1.1 CPU Profiling
 - **Tool**: cProfile, py-spy for runtime profiling
 - **Instrumentation**: High-resolution `profile` context manager in `src/core/profiler.py`
+- **Granular Blocks**:
+    - `compute_features_total`: Entire feature engineering pipeline.
+    - `fe_base_technical`, `fe_candle_patterns`, `fe_price_action`, `fe_volume`: Specific base-timeframe feature blocks.
+    - `fe_mtf_all`: All multi-timeframe feature generation.
+    - `fe_mtf_[TF]`: Latency for a specific timeframe (e.g., `fe_mtf_H1`).
+    - `inference_ppo`, `inference_lstm`: Latency for individual model predictions within the ensemble.
 - **Target**: Identify functions consuming >10% CPU time
 - **Analysis**: Continuous monitoring of main loop latency (data_fetch, inference, risk_check, execution)
 - **Output**: Structured logs with `duration_ms` AND Prometheus Histogram metrics (`trading_block_duration_seconds`)

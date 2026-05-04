@@ -27,6 +27,7 @@ except ImportError:
     nn = None  # type: ignore
 
 from src.core.constants import ModelAction, SignalDirection
+from src.core.profiler import profile
 from src.models.base_model import BaseModel, Signal
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMAttentionModel
@@ -104,19 +105,21 @@ class EnsembleModel(BaseModel):
 
         # PPO prediction
         if self._ppo_model is not None:
-            action, _ = self._ppo_model.predict(features, deterministic=True)
-            # action index should be aligned with ModelAction (0=HOLD, 1=BUY, 2=SELL)
-            probs = np.zeros(3)
-            probs[int(action)] = 1.0
-            votes["ppo"] = probs
+            with profile("inference_ppo"):
+                action, _ = self._ppo_model.predict(features, deterministic=True)
+                # action index should be aligned with ModelAction (0=HOLD, 1=BUY, 2=SELL)
+                probs = np.zeros(3)
+                probs[int(action)] = 1.0
+                votes["ppo"] = probs
 
         # LSTM-Attention prediction
         if self.lstm_model is not None and seq is not None:
-            with torch.no_grad():
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-            # Standardized: [HOLD, BUY, SELL]
-            votes["lstm"] = probs
+            with profile("inference_lstm"):
+                with torch.no_grad():
+                    logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                # Standardized: [HOLD, BUY, SELL]
+                votes["lstm"] = probs
 
         # Cache confidences for calibration tracking
         for k, v in votes.items():
