@@ -90,7 +90,7 @@ def test_validator_live_mode_no_confirmation(monkeypatch, tmp_path):
     validator = ConfigValidator(cfg)
     result = validator.validate()
     assert result.success is False
-    assert any(e.field == "MODE" for e in result.errors)
+    assert any(e.field == "MODE" and "CONFIRM_LIVE_TRADING" in e.message for e in result.errors)
 
 def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     """Test validator succeeds in LIVE mode with confirmation."""
