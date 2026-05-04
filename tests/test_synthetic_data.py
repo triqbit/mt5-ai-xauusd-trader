@@ -74,3 +74,22 @@ def test_invalid_regime():
     gen = ScenarioGenerator()
     with pytest.raises(ValueError, match="Unknown regime"):
         gen.generate(regime="invalid")
+
+def test_flash_crash_regime():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate(n_steps=100, regime="flash_crash")
+    # Midpoint should show a sharp drop
+    # returns[50:55] = -0.04
+    # Compare price before crash (49) and after crash (54)
+    assert df["close"].iloc[54] < df["close"].iloc[49] * 0.85
+    # Partial recovery follows
+    # returns[55:60] = 0.02
+    assert df["close"].iloc[59] > df["close"].iloc[54]
+
+def test_regime_shift_regime():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate(n_steps=100, regime="regime_shift", volatility=0.001)
+    # First half should be less volatile than second half
+    first_half_vol = df["close"].iloc[:50].pct_change().std()
+    second_half_vol = df["close"].iloc[50:].pct_change().std()
+    assert second_half_vol > first_half_vol * 2
