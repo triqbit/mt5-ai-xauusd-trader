@@ -40,7 +40,15 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - name: Cache TA-Lib
+        id: cache-talib
+        uses: actions/cache@v4
+        with:
+          path: /usr/lib/libta_lib.*
+          key: ${{ runner.os }}-talib-v0.6.4
+
       - name: Install TA-Lib C library
+        if: steps.cache-talib.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           sudo apt-get update -qq
@@ -77,8 +85,8 @@ jobs:
           pip-licenses --summary --fail-on GPL AGPL
           pip-licenses --format=markdown --output-file=docs/DEPENDENCY_LICENSES.md
 
-      - name: Run Tests
-        run: pytest tests/ --cov=src --cov-report=xml
+      - name: Run Tests with Coverage Gate (85%)
+        run: pytest tests/ --cov=src --cov-report=xml --cov-fail-under=85
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"
@@ -94,7 +102,7 @@ jobs:
       - name: Validate Release Notes
         run: python scripts/check_release_notes.py
 
-      - name: Verify Pre-Prod Checklist
+      - name: Automated Pre-Prod Checklist Verification
         run: |
           CHECKLIST="docs/PREPROD_CHECKLIST.md"
           if [ ! -f "$CHECKLIST" ]; then
@@ -102,25 +110,10 @@ jobs:
             exit 1
           fi
 
-          # Define mandatory items that must be checked [x]
-          MANDATORY_ITEMS=(
-            "unit tests pass"
-            "Security scan"
-            "Risk limits"
-            "Monitoring"
-            "Rollback plan"
-          )
-
-          MISSING=0
-          for item in "${MANDATORY_ITEMS[@]}"; do
-            if ! grep -i "\[x\].*$item" "$CHECKLIST" > /dev/null; then
-              echo "::error::Mandatory checklist item not completed: $item"
-              MISSING=$((MISSING+1))
-            fi
-          done
-
-          if [ $MISSING -gt 0 ]; then
-            echo "::error::$MISSING mandatory checklist items are incomplete. Release blocked."
+          # Fail if there are any unchecked boxes [ ]
+          if grep -q "\[ \]" "$CHECKLIST"; then
+            echo "::error::Uncompleted items found in PREPROD_CHECKLIST.md. Release blocked."
+            grep -n "\[ \]" "$CHECKLIST"
             exit 1
           fi
           echo "Pre-prod checklist validation passed."
@@ -145,9 +138,17 @@ jobs:
         id: version
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "TAG=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            if [[ "${{ github.event.inputs.version }}" != "" ]]; then
+              echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+              echo "TAG=v${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            else
+              echo "VERSION=0.0.0-draft" >> $GITHUB_OUTPUT
+              echo "TAG=v0.0.0-draft" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "TAG=$TAG" >> $GITHUB_OUTPUT
+            echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up Docker Buildx
@@ -165,7 +166,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.29.0
         with:
           image-ref: 'triqbit/mt5-ai-xauusd-trader:${{ github.sha }}'
           format: 'table'
@@ -207,8 +208,9 @@ jobs:
               echo "TAG=${{ steps.tag_action.outputs.new_tag }}" >> $GITHUB_OUTPUT
             fi
           else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "TAG=$TAG" >> $GITHUB_OUTPUT
+            echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
           fi
 
       - name: Update Version and Changelog
@@ -238,6 +240,19 @@ jobs:
             git push origin main
           fi
 
+      - name: Create Git Tag (if manual)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false'
+        run: |
+          TAG="${{ steps.version.outputs.TAG }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+          else
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
       - name: Download Compliance Report
         uses: actions/download-artifact@v4
         with:
@@ -247,30 +262,19 @@ jobs:
       - name: Package Release Artifacts
         run: |
           chmod +x scripts/package_release.sh
-          ./scripts/package_release.sh
           VERSION="${{ steps.version.outputs.VERSION }}"
+          export VERSION
+          ./scripts/package_release.sh
           cd releases
           zip -r "mt5-ai-xauusd-trader-v${VERSION}.zip" "v${VERSION}"
           sha256sum "mt5-ai-xauusd-trader-v${VERSION}.zip" > "checksums.txt"
           cd ..
 
-      - name: Create Git Tag (if manual)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          if git rev-parse ${{ steps.version.outputs.TAG }} >/dev/null 2>&1; then
-            echo "Tag ${{ steps.version.outputs.TAG }} already exists."
-          else
-            git tag -a ${{ steps.version.outputs.TAG }} -m "Release ${{ steps.version.outputs.VERSION }}"
-            git push origin ${{ steps.version.outputs.TAG }}
-          fi
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.TAG }}
-          name: Release ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.TAG }}
           body_path: releases/v${{ steps.version.outputs.VERSION }}/RELEASE_NOTES.md
           files: |
             releases/mt5-ai-xauusd-trader-v${{ steps.version.outputs.VERSION }}.zip
