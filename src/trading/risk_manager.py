@@ -83,40 +83,64 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        model_health: Optional[Dict[str, float]] = None,
+    ) -> bool:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
+        Does not short-circuit to ensure all layer results are recorded.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
+        layer_results = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+        }
 
-        passed = rejection_reason == ""
+        passed = all(layer_results.values())
+        rejection_reasons = [layer for layer, ok in layer_results.items() if not ok]
+
         if not passed:
+            rejection_summary = ", ".join(rejection_reasons)
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
+                "Signal REJECTED | %s %s | Reasons: %s",
                 signal.symbol,
                 signal.direction,
-                rejection_reason,
+                rejection_summary,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
+                    description=f"Rejected by layers: {rejection_summary}",
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+
+        # Enterprise structured auditing
+        try:
+            from src.core.audit_log import get_audit_logger
+
+            audit = get_audit_logger()
+            audit.log_risk_decision(
+                signal_id=signal_id if signal_id is not None else 0,
+                decision=passed,
+                context={
+                    "layers": layer_results,
+                    "symbol": signal.symbol,
+                    "direction": signal.direction,
+                    "confidence": signal.confidence,
+                    "model_health": model_health,
+                },
+            )
+        except Exception as exc:
+            logger.error("Audit log failure in RiskManager: %s", exc)
+
         return passed
 
     def size_position(

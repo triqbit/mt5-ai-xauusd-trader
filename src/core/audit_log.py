@@ -11,8 +11,12 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+import json
+from typing import Any
+
 from sqlalchemy import (
     DateTime,
+    JSON,
     String,
     Text,
     create_engine,
@@ -46,6 +50,7 @@ class AuditEntry(Base):
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
 class AuditLogger:
@@ -73,19 +78,83 @@ class AuditLogger:
         self._initialized = True
         logger.info("AuditLogger initialized with database: %s", db_url)
 
-    def log(self, actor: str, action: str, details: str | None = None) -> int:
+    def log(
+        self,
+        actor: str,
+        action: str,
+        details: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
         """
-        Record a new audit entry.
+        Record a new audit entry with optional structured metadata.
         """
         with self.Session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
                 details=details,
+                metadata_json=metadata,
             )
             session.add(entry)
             session.commit()
             return entry.id
+
+    def log_config_snapshot(self, config_dict: dict[str, Any]) -> int:
+        """Record a sanitized snapshot of the runtime configuration."""
+        return self.log(
+            actor="system",
+            action="config_snapshot",
+            details="Runtime configuration snapshot captured at startup.",
+            metadata=config_dict,
+        )
+
+    def log_blocked_trade(self, signal_id: int, reasons: list[str], context: dict[str, Any]) -> int:
+        """Record a signal that was blocked by the execution filter or risk layers."""
+        return self.log(
+            actor="risk_manager",
+            action="trade_blocked",
+            details=f"Signal {signal_id} blocked. Reasons: {', '.join(reasons)}",
+            metadata={"signal_id": signal_id, "reasons": reasons, "context": context},
+        )
+
+    def log_prediction(
+        self, symbol: str, direction: int, confidence: float, metadata: dict[str, Any]
+    ) -> int:
+        """Record a raw prediction from the AI models."""
+        return self.log(
+            actor="model",
+            action="prediction_generated",
+            details=f"Prediction for {symbol}: dir={direction}, conf={confidence:.2f}",
+            metadata={
+                "symbol": symbol,
+                "direction": direction,
+                "confidence": confidence,
+                **metadata,
+            },
+        )
+
+    def log_risk_decision(self, signal_id: int, decision: bool, context: dict[str, Any]) -> int:
+        """Record a final risk approval/rejection decision with full context."""
+        status = "APPROVED" if decision else "REJECTED"
+        return self.log(
+            actor="risk_manager",
+            action="risk_decision",
+            details=f"Signal {signal_id} risk check: {status}",
+            metadata={"signal_id": signal_id, "decision": decision, "context": context},
+        )
+
+    def log_operator_action(self, actor: str, action: str, details: str) -> int:
+        """Record an explicit action taken by a human operator or automated guardian."""
+        return self.log(actor=actor, action=action, details=details)
+
+    def log_deployment(self, version: str, environment: str) -> int:
+        """Record a deployment event."""
+        return self.log(
+            actor="deploy_pipeline",
+            action="deployment_started",
+            details=f"Deploying version {version} to {environment}",
+            metadata={"version": version, "environment": environment},
+        )
 
     @classmethod
     def get_instance(cls) -> AuditLogger:

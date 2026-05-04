@@ -468,6 +468,9 @@ def main() -> int:
     audit_logger = AuditLogger(db_url=audit_db_url)
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
+    # Log structured configuration snapshot (sanitized by Pydantic)
+    audit_logger.log_config_snapshot(cfg.model_dump(mode="json", exclude={"mt5_password", "metaapi_token", "database_url", "telegram_token"}))
+
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
         try:
@@ -533,10 +536,24 @@ def main() -> int:
     with console.status("[bold blue]Running health checks..."):
         try:
             report = health_checker.startup_gate()
+            # Log successful health report
+            audit_logger.log(
+                actor="system",
+                action="startup_health_passed",
+                details="Startup health gate passed.",
+                metadata=report.model_dump(mode="json")
+            )
         except RuntimeError as exc:
             log.critical(str(exc))
             # Fetch report directly to show failure state in table
             report = health_checker.get_full_report()
+            # Log failed health report
+            audit_logger.log(
+                actor="system",
+                action="startup_health_failed",
+                details=str(exc),
+                metadata=report.model_dump(mode="json")
+            )
 
     table = Table(title="System Health", box=None)
     table.add_column("Component", style="cyan")
