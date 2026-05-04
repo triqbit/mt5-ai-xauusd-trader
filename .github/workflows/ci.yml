@@ -30,7 +30,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install quality tools
-        run: pip install ruff==0.4.3 mypy==1.10.0
+        run: pip install ruff==0.15.5 mypy==1.20.2
       - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
       - name: Ruff format (apply formatting)
