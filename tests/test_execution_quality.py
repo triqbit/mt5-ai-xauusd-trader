@@ -93,7 +93,12 @@ def test_analyze_trade_logic(analyzer, mock_connector):
     assert pytest.approx(quality.slippage_pips) == 2.0
     assert pytest.approx(quality.execution_latency_ms) == 500.0
     assert quality.fill_quality_score < 1.0
-    assert pytest.approx(quality.edge_capture) == 0.48
+    # theoretical move: 2310 - 2300 = 10.0 (100 pips)
+    # realized move: 2305 - 2300.2 = 4.8 (48 pips)
+    # spread_pips (mock): 2.0 -> half_spread = 1.0
+    # adjusted_realized = 48 - 1.0 = 47.0
+    # edge_capture = 47 / 100 = 0.47
+    assert pytest.approx(quality.edge_capture) == 0.47
 
 def test_evaluate_opportunity_cost(analyzer, mock_connector):
     """Test analysis of blocked signals."""
@@ -108,9 +113,11 @@ def test_evaluate_opportunity_cost(analyzer, mock_connector):
     signal.timestamp = datetime.now(timezone.utc) - timedelta(minutes=60)
 
     # Mock market movement: goes to 2315 (hits TP)
-    mock_connector.get_rates.return_value = pd.DataFrame([
+    df = pd.DataFrame([
         {"time": signal.timestamp + timedelta(minutes=15), "open": 2300.0, "high": 2315.0, "low": 2299.0, "close": 2312.0}
     ])
+    mock_connector.get_rates.return_value = df
+    mock_connector.get_rates_range.return_value = df
 
     analysis = analyzer._evaluate_opportunity_cost(signal, "Risk limit reached")
 
@@ -152,9 +159,11 @@ def test_evaluate_opportunity_cost_final(analyzer, mock_connector):
     signal.timestamp = datetime.now(timezone.utc) - timedelta(minutes=60)
 
     # Mock market movement: goes to 2315 (hits TP)
-    mock_connector.get_rates.return_value = pd.DataFrame([
+    df = pd.DataFrame([
         {"time": signal.timestamp + timedelta(minutes=15), "open": 2300.0, "high": 2315.0, "low": 2299.0, "close": 2312.0}
     ])
+    mock_connector.get_rates.return_value = df
+    mock_connector.get_rates_range.return_value = df
 
     analysis = analyzer._evaluate_opportunity_cost(signal, "Risk limit reached")
     assert analysis is not None
@@ -197,3 +206,9 @@ def test_generate_summary_report(analyzer):
         assert summary.rejected_signal_count == 1
         assert summary.total_opportunity_cost == 50.0
         assert summary.avg_slippage == 1.0
+
+        # Test reporting integration
+        report_section = summary.to_report_section()
+        assert report_section.efficiency_score == pytest.approx(summary.execution_efficiency_score * 100)
+        assert report_section.opportunity_cost == "$50.00"
+        assert len(report_section.metrics) > 0

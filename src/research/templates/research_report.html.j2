@@ -57,6 +57,7 @@
                 {% if benchmarks %}<a href="#benchmarks">Benchmarks</a>{% endif %}
                 {% if rl_evaluation %}<a href="#rl-evaluation">RL</a>{% endif %}
                 {% if rare_events %}<a href="#rare-events">Rare</a>{% endif %}
+                {% if execution_quality %}<a href="#execution-quality">Execution</a>{% endif %}
                 <a href="#conclusion">Conclusion</a>
             </nav>
         </div>
@@ -86,6 +87,7 @@
             {% if benchmarks %}<li><a href="#benchmarks">{{ ns.count }}. Benchmark Comparisons</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if rl_evaluation %}<li><a href="#rl-evaluation">{{ ns.count }}. RL Agent Evaluation</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if rare_events %}<li><a href="#rare-events">{{ ns.count }}. Rare Event Simulations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if execution_quality %}<li><a href="#execution-quality">{{ ns.count }}. Execution Quality</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             <li><a href="#conclusion">{{ ns.count }}. Conclusion & Recommendations</a></li>
         </ul>
     </nav>
@@ -457,6 +459,56 @@
                 {% endfor %}
             </tbody>
         </table>
+    </section>
+    {% endif %}
+
+    {% if execution_quality %}
+    {% set ns.count = ns.count + 1 %}
+    <section id="execution-quality">
+        <h2>{{ ns.count }}. Execution Quality & Alpha Decay</h2>
+        <div class="score-container">
+            <span>Execution Efficiency:</span>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ execution_quality.efficiency_score }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill" style="width: {{ execution_quality.efficiency_score }}%;"></div>
+            </div>
+            <span class="score">{{ execution_quality.efficiency_score|round(1) }}/100</span>
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Metric</th>
+                            <th scope="col">Value</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in execution_quality.metrics %}
+                        <tr>
+                            <td>{{ m.name }}</td>
+                            <td>{{ m.value }}</td>
+                            <td>
+                                {% if m.status == 'OK' %}<span class="badge badge-stable">{{ m.status }}</span>
+                                {% else %}<span class="badge badge-warning">{{ m.status }}</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="insight-box" style="display: flex; flex-direction: column; justify-content: center;">
+                <strong>Opportunity Cost (Blocked):</strong>
+                <span style="font-size: 2rem; color: var(--danger); font-weight: 800;">{{ execution_quality.opportunity_cost }}</span>
+                <p style="font-size: 0.9rem; margin-top: 1rem;">
+                    This represents the hypothetical PnL from signals that were rejected by risk management filters.
+                </p>
+                <div style="margin-top: auto; font-size: 0.8rem; opacity: 0.7;">
+                    Sample size: {{ execution_quality.trade_count }} trades, {{ execution_quality.rejected_count }} rejections
+                </div>
+            </div>
+        </div>
     </section>
     {% endif %}
 
