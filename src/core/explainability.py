@@ -448,7 +448,6 @@ class SignalExplainer:
             from rich.console import Group
             from rich.panel import Panel
             from rich.table import Table
-            from rich.text import Text
 
             # 1. Model Votes Table
             model_table = Table(title="Model Attribution", box=box.SIMPLE)

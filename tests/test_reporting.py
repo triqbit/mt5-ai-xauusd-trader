@@ -192,3 +192,43 @@ def test_trade_pattern_motifs():
     assert "### Signal Motifs (Losing Combinations)" in md
     assert "PPO" in md
     assert "20.0%" in md
+
+def test_rl_evaluation_reporting():
+    from src.research.reporting import RLMetric, RLSection
+
+    rl_section = RLSection(
+        comparison_summary="Better than baseline.",
+        best_agent="Agent_V2",
+        performance_gap=15.5,
+        metrics=[
+            RLMetric(
+                agent_name="Agent_V2",
+                sharpe=2.1,
+                sortino=2.5,
+                profit_factor=1.8,
+                max_dd=0.12,
+                win_rate=0.6,
+                recovery_factor=4.2
+            )
+        ]
+    )
+
+    report = ResearchReport(
+        title="RL Audit",
+        executive_summary="Testing RL.",
+        rl_evaluation=rl_section,
+        conclusion="Final."
+    )
+
+    reporter = ResearchReporter()
+    md = reporter.generate_markdown(report)
+    html = reporter.generate_html(report)
+
+    assert "RL Agent Evaluation" in md
+    assert "Agent_V2" in md
+    assert "2.5" in md
+    assert "4.2" in md
+
+    assert "RL Agent Evaluation" in html
+    assert "Agent_V2" in html
+    assert 'href="#rl-evaluation"' in html
