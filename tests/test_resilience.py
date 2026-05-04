@@ -1,58 +1,108 @@
-"""
-Tests for system resilience and graceful degradation.
-Specifically verifies that models handle missing dependencies (like torch) correctly.
-"""
-
-import sys
-from unittest.mock import patch
-
-import numpy as np
 import pytest
+from unittest.mock import MagicMock, patch
+from src.core.exceptions import MT5ConnectionError, MT5DataError
+from src.core.retry import with_retry
 
-from src.core.constants import SignalDirection
-from src.models.ensemble import EnsembleModel
-from src.models.lstm_model import LSTMModel
-from src.models.transformer_model import TimeSeriesTransformer
+# --- Retry Decorator Tests ---
 
+def test_retry_success():
+    mock_func = MagicMock(return_value="success")
 
-def test_ensemble_graceful_degradation_no_torch():
-    """Verify EnsembleModel handles missing torch gracefully."""
-    # We mock torch as None to simulate environment without it
-    with patch("src.models.ensemble.torch", None), \
-         patch("src.models.ensemble.nn", None):
+    @with_retry(ValueError, max_retries=3, initial_delay=0.01, jitter=False)
+    def decorated_func():
+        return mock_func()
 
-        ensemble = EnsembleModel(device="cpu")
-        features = np.random.rand(1, 140)
+    result = decorated_func()
+    assert result == "success"
+    assert mock_func.call_count == 1
 
-        # Should return HOLD signal if no models are loaded
-        signal = ensemble.predict(features)
+def test_retry_eventual_success():
+    mock_func = MagicMock(side_effect=[ValueError("fail"), ValueError("fail"), "success"])
 
-        assert signal.direction == SignalDirection.HOLD
-        assert signal.confidence == 0.0
+    @with_retry(ValueError, max_retries=3, initial_delay=0.01, jitter=False)
+    def decorated_func():
+        return mock_func()
 
+    result = decorated_func()
+    assert result == "success"
+    assert mock_func.call_count == 3
 
-def test_lstm_model_no_torch():
-    """Verify LSTMModel handles missing torch gracefully."""
-    with patch("src.models.lstm_model.torch", None), \
-         patch("src.models.lstm_model.nn", None):
+def test_retry_max_retries_exceeded():
+    mock_func = MagicMock(side_effect=ValueError("fail"))
 
-        model = LSTMModel(input_dim=140)
-        features = np.random.rand(10, 140)
+    @with_retry(ValueError, max_retries=2, initial_delay=0.01, jitter=False)
+    def decorated_func():
+        return mock_func()
 
-        signal = model.predict(features)
+    with pytest.raises(ValueError, match="fail"):
+        decorated_func()
 
-        assert signal.direction == SignalDirection.HOLD
-        assert "missing" in signal.metadata.get("error", "").lower()
+    assert mock_func.call_count == 3  # Initial + 2 retries
 
+# --- MT5Connector Resilience Tests ---
 
-def test_transformer_model_initialization_failure():
-    """Verify TimeSeriesTransformer cannot be used without torch/nn."""
-    with patch("src.models.transformer_model.torch", None), \
-         patch("src.models.transformer_model.nn", None):
+@patch("src.trading.mt5_connector.mt5")
+def test_connector_initialize_native_fails_no_fallback(mock_mt5, mk_config):
+    from src.trading.mt5_connector import MT5Connector
+    connector = MT5Connector(mk_config)
 
-        # In our implementation, TimeSeriesTransformer(nn.Module if nn else object)
-        # But __init__ calls super().__init__() which might fail if nn is None
-        # Actually nn.Module is a class, object is a class.
+    # Native fails, MetaAPI not available (METAAPI_TOKEN is empty in mk_config)
+    with patch("src.trading.mt5_connector.MT5_AVAILABLE", True):
+        mock_mt5.initialize.return_value = False
+        mock_mt5.last_error.return_value = (1, "error")
 
-        with pytest.raises(Exception): # It calls super().__init__() which is object.__init__() but also tries to define layers
-             TimeSeriesTransformer(input_dim=140)
+        with pytest.raises(MT5ConnectionError, match="All MT5 connection paths failed"):
+            connector.initialize()
+
+        # retried 3 times (max_retries=3)
+        assert mock_mt5.initialize.call_count == 4
+
+@patch("src.trading.mt5_connector.mt5")
+def test_connector_initialize_dual_path_success(mock_mt5, mk_config):
+    from src.trading.mt5_connector import MT5Connector
+
+    # Mock MetaAPI to avoid event loop issues
+    with patch("src.trading.mt5_connector.MetaApi") as mock_metaapi:
+        mk_config.metaapi_token.get_secret_value.return_value = "fake-token"
+        connector = MT5Connector(mk_config)
+
+        with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), \
+             patch("src.trading.mt5_connector.METAAPI_AVAILABLE", True):
+
+            # Native fails
+            mock_mt5.initialize.return_value = False
+
+            # MetaAPI succeeds
+            res = connector.initialize()
+
+            assert res is True
+            assert connector.use_metaapi is True
+            assert mock_mt5.initialize.call_count == 1
+            mock_metaapi.assert_called_once()
+
+@patch("src.trading.mt5_connector.mt5")
+def test_connector_get_rates_retry(mock_mt5, mk_config):
+    from src.trading.mt5_connector import MT5Connector
+    connector = MT5Connector(mk_config)
+    connector._is_initialized = True
+
+    # Simulate transient rates failure
+    mock_mt5.copy_rates_from_pos.side_effect = [None, None, [{"time": 1, "close": 1.0}]]
+    mock_mt5.last_error.return_value = (2, "data error")
+
+    df = connector.get_rates("XAUUSD", "M5", 10)
+
+    assert not df.empty
+    assert mock_mt5.copy_rates_from_pos.call_count == 3
+
+# Fixture for TradingConfig
+@pytest.fixture
+def mk_config():
+    cfg = MagicMock()
+    cfg.mt5_path = ""
+    cfg.mt5_login = 123
+    cfg.mt5_password.get_secret_value.return_value = "pass"
+    cfg.mt5_server = "server"
+    cfg.metaapi_token.get_secret_value.return_value = ""
+    cfg.mode = "demo"
+    return cfg

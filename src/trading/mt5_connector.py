@@ -32,6 +32,12 @@ except ImportError:
     MetaApi = None
 
 from src.core.config import TradingConfig
+from src.core.exceptions import (
+    MT5ConnectionError,
+    MT5DataError,
+    MT5ExecutionError,
+)
+from src.core.retry import with_retry
 from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -73,13 +79,17 @@ class MT5Connector:
         self.metaapi_connection: Optional[Any] = None
         self._is_initialized: bool = False
 
+    @with_retry(MT5ConnectionError, max_retries=3)
     def initialize(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
         Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
 
         Returns:
-            True if connection established, False otherwise.
+            True if connection established.
+
+        Raises:
+            MT5ConnectionError: If all connection paths fail.
         """
         logger.info("Initializing MT5 connector | mode=%s", self.cfg.mode)
 
@@ -110,7 +120,7 @@ class MT5Connector:
                     else:
                         logger.info("TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options.")
             except Exception as e:
-                logger.error("Native MT5 initialization error: %s", e)
+                logger.warning("Native MT5 initialization encountered an error: %s. Attempting fallback if available.", e)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
             if sys.platform == "win32":
@@ -130,9 +140,12 @@ class MT5Connector:
                 return True
             except Exception as e:
                 logger.error("MetaAPI initialization failed: %s", e)
+                # We raise MT5ConnectionError here to trigger the retry decorator
+                raise MT5ConnectionError(f"MetaAPI initialization failed: {e}") from e
 
-        logger.error("All MT5 connection paths failed.")
-        return False
+        msg = "All MT5 connection paths failed."
+        logger.error(msg)
+        raise MT5ConnectionError(msg)
 
     def connect(self) -> bool:
         """Alias for initialize() to support existing interfaces."""
@@ -160,6 +173,7 @@ class MT5Connector:
         finally:
             self.shutdown()
 
+    @with_retry(MT5DataError, max_retries=3)
     def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
@@ -170,25 +184,29 @@ class MT5Connector:
             n_bars: Number of bars to retrieve.
 
         Returns:
-            DataFrame containing OHLCV data or empty DataFrame on failure.
+            DataFrame containing OHLCV data.
+
+        Raises:
+            MT5DataError: If data retrieval fails.
         """
         if not self._is_initialized:
-            return pd.DataFrame()
+            raise MT5ConnectionError("MT5 connector not initialized.")
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
-                logger.error("Failed to copy rates for %s: %s", symbol, mt5.last_error())
-                return pd.DataFrame()
+                error_msg = f"Failed to copy rates for {symbol}: {mt5.last_error()}"
+                logger.error(error_msg)
+                raise MT5DataError(error_msg)
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
-            return pd.DataFrame()
+            raise MT5DataError("MetaAPI get_rates not implemented.")
 
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Alias for get_rates() to match main.py expectations."""
@@ -226,6 +244,7 @@ class MT5Connector:
             logger.warning("MetaAPI get_rates_range not implemented.")
             return pd.DataFrame()
 
+    @with_retry(MT5DataError, max_retries=2)
     def get_tick(self, symbol: str) -> Dict[str, float]:
         """
         Retrieve latest symbol tick (bid/ask).
@@ -235,14 +254,21 @@ class MT5Connector:
 
         Returns:
             Dictionary with 'bid' and 'ask' prices.
+
+        Raises:
+            MT5DataError: If tick retrieval fails.
         """
-        if not self._is_initialized or self.use_metaapi:
-            return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
+        if not self._is_initialized:
+            raise MT5ConnectionError("MT5 connector not initialized.")
+
+        if self.use_metaapi:
+            raise MT5DataError("MetaAPI get_tick not implemented.")
 
         tick = mt5.symbol_info_tick(symbol)
         if tick is None:
-            logger.error("Failed to get tick for %s: %s", symbol, mt5.last_error())
-            return {"bid": 0.0, "ask": 0.0, "spread": 0.0}
+            error_msg = f"Failed to get tick for {symbol}: {mt5.last_error()}"
+            logger.error(error_msg)
+            raise MT5DataError(error_msg)
 
         # Calculate spread in price units
         spread = tick.ask - tick.bid
@@ -257,19 +283,25 @@ class MT5Connector:
             signal: Validated TradeSignal object.
 
         Returns:
-            Order ticket ID if successful, None otherwise.
+            Order ticket ID if successful.
+
+        Raises:
+            MT5ExecutionError: If order placement fails.
         """
         if not self._is_initialized:
-            return None
+            raise MT5ConnectionError("MT5 connector not initialized.")
 
         if not self.use_metaapi:
             order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
-            tick = self.get_tick(signal.symbol)
+            try:
+                tick = self.get_tick(signal.symbol)
+            except MT5DataError as e:
+                raise MT5ExecutionError(f"Cannot place order due to tick retrieval failure: {e}") from e
+
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
             if price == 0:
-                logger.error("Invalid price for order execution.")
-                return None
+                raise MT5ExecutionError("Invalid price (0.0) for order execution.")
 
             request = {
                 "action": TRADE_ACTION_DEAL,
@@ -287,13 +319,14 @@ class MT5Connector:
 
             result = mt5.order_send(request)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                logger.error("Order rejected: %s (code: %d)", result.comment, result.retcode)
-                return None
+                error_msg = f"Order rejected: {result.comment} (code: {result.retcode})"
+                logger.error(error_msg)
+                raise MT5ExecutionError(error_msg)
 
             logger.info("Order PLACED | Ticket #%d | %s", result.order, signal.symbol)
             return int(result.order)
 
-        return None
+        raise MT5ExecutionError("MetaAPI place_order not implemented.")
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""

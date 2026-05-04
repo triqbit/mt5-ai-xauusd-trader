@@ -31,6 +31,11 @@ from src.core import get_config, profile
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
 from src.core.decision_support import DecisionSupportSystem
+from src.core.exceptions import (
+    MT5ConnectionError,
+    MT5DataError,
+    MT5ExecutionError,
+)
 from src.core.explainability import SignalExplainer
 from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
@@ -94,9 +99,24 @@ def run_live(
             try:
                 # 1. Fetch latest market data
                 with profile("data_fetch"):
-                    # Fetch more bars to satisfy FeatureEngineer and RegimeDetector windows
-                    df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=500)
-                    tick = connector.get_tick(cfg.symbol)
+                    try:
+                        # Fetch more bars to satisfy FeatureEngineer and RegimeDetector windows
+                        df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=500)
+                        tick = connector.get_tick(cfg.symbol)
+                    except MT5DataError as e:
+                        log.error("Transient data retrieval error: %s. Skipping this iteration.", e)
+                        time.sleep(poll_interval)
+                        continue
+                    except MT5ConnectionError:
+                        log.warning("Connection lost. Attempting reconnection...")
+                        try:
+                            connector.connect()
+                            log.info("Reconnection successful.")
+                            continue
+                        except MT5ConnectionError as reconnect_exc:
+                            log.critical("Reconnection failed: %s. Waiting for next cycle.", reconnect_exc)
+                            time.sleep(poll_interval)
+                            continue
 
                 # 2. Institutional Feature Engineering & Regime Detection
                 with profile("institutional_context"):
@@ -260,7 +280,12 @@ def run_live(
 
                 if risk_approved and direction != 0:
                     with profile("execution"):
-                        ticket = connector.place_order(signal)
+                        try:
+                            ticket = connector.place_order(signal)
+                        except MT5ExecutionError as e:
+                            log.error("Order execution FAILED: %s", e)
+                            ticket = None
+
                         if ticket:
                             risk.open_positions[cfg.symbol] = ticket
                             log.info("Order placed | ticket=%d", ticket)
@@ -310,6 +335,13 @@ def run_live(
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
                 break
+            except MT5ConnectionError as exc:
+                log.error("Critical connection failure: %s. Re-initializing...", exc)
+                time.sleep(5)
+                try:
+                    connector.connect()
+                except MT5ConnectionError:
+                    log.error("Re-initialization failed during outer loop recovery.")
             except Exception as exc:
                 log.exception("Unhandled error in trading loop: %s", exc)
                 time.sleep(poll_interval)
@@ -391,8 +423,10 @@ def main() -> int:
 
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
-        if not connector.connect():
-            log.critical("Cannot connect to MT5 terminal. Aborting.")
+        try:
+            connector.connect()
+        except MT5ConnectionError as exc:
+            log.critical("Cannot connect to MT5 terminal: %s. Aborting.", exc)
             return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
