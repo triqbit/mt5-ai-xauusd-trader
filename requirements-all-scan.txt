@@ -57,7 +57,7 @@ pandas==2.3.3
 pandas==3.0.2
 plotly==5.22.0
 pre-commit==3.7.0
-prometheus-client==0.20.0
+prometheus-client==0.25.0
 prometheus-client==0.25.0
 psycopg2-binary==2.9.9
 pydantic-settings==2.14.0
