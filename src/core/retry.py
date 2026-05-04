@@ -8,12 +8,13 @@ import functools
 import logging
 import random
 import time
-from typing import Any, Callable, Tuple, Type, Union
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 def with_retry(
-    exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]],
+    exceptions: type[Exception] | tuple[type[Exception], ...],
     max_retries: int = 3,
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,

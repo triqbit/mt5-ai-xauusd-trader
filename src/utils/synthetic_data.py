@@ -39,24 +39,23 @@ class ScenarioGenerator:
         """
         if regime == "trending":
             return self._generate_trending(n_steps, start_price, trend_strength, volatility)
-        elif regime == "ranging":
+        if regime == "ranging":
             return self._generate_ranging(n_steps, start_price, volatility)
-        elif regime == "volatile":
+        if regime == "volatile":
             return self._generate_volatile(n_steps, start_price, volatility)
-        elif regime == "gapping":
+        if regime == "gapping":
             return self._generate_gapping(n_steps, start_price, volatility)
-        elif regime == "malformed":
+        if regime == "malformed":
             return self._generate_malformed(n_steps, start_price)
-        elif regime == "whipsaw":
+        if regime == "whipsaw":
             return self._generate_whipsaw(n_steps, start_price, volatility)
-        elif regime == "stale":
+        if regime == "stale":
             return self._generate_stale(n_steps, start_price)
-        elif regime == "flash_crash":
+        if regime == "flash_crash":
             return self._generate_flash_crash(n_steps, start_price, volatility)
-        elif regime == "regime_shift":
+        if regime == "regime_shift":
             return self._generate_regime_shift(n_steps, start_price, volatility)
-        else:
-            raise ValueError(f"Unknown regime: {regime}")
+        raise ValueError(f"Unknown regime: {regime}")
 
     def _generate_base(self, n_steps: int, start_price: float, returns: np.ndarray) -> pd.DataFrame:
         """Helper to convert returns to OHLCV."""

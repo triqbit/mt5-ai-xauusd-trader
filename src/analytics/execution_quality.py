@@ -9,8 +9,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -50,7 +50,7 @@ class TradeExecutionQuality(BaseModel):
     execution_cost_pips: float = Field(
         ..., description="Total cost of execution (slippage + half spread)"
     )
-    markout_pnls: Dict[str, float] = Field(
+    markout_pnls: dict[str, float] = Field(
         default_factory=dict, description="Price drift at various horizons (1m, 5m, 15m, 30m, 60m)"
     )
 
@@ -72,7 +72,7 @@ class BlockedSignalQuality(BaseModel):
 class ExecutionSummary(BaseModel):
     """Aggregate execution analytics."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     avg_slippage: float
     avg_latency_ms: float
     total_opportunity_cost: float
@@ -139,7 +139,7 @@ class ExecutionAnalyzer:
     def __init__(
         self,
         db_url: str = "sqlite:///trades.db",
-        connector: Optional[MT5Connector] = None,
+        connector: MT5Connector | None = None,
     ) -> None:
         self.engine = create_engine(db_url)
         Base.metadata.create_all(self.engine)
@@ -154,7 +154,7 @@ class ExecutionAnalyzer:
             return 0.01
         return 0.0001
 
-    def analyze_trade(self, trade_id: int) -> Optional[TradeExecutionQuality]:
+    def analyze_trade(self, trade_id: int) -> TradeExecutionQuality | None:
         """
         Analyze execution quality for a specific trade.
         Compares requested signal price vs actual execution price.
@@ -249,8 +249,8 @@ class ExecutionAnalyzer:
         entry_time: datetime,
         entry_price: float,
         direction: int,
-        horizons: List[int],
-    ) -> Dict[str, float]:
+        horizons: list[int],
+    ) -> dict[str, float]:
         """
         Calculate price drift at various horizons (in minutes) after entry.
         Markouts help distinguish alpha quality from execution quality.
@@ -272,7 +272,7 @@ class ExecutionAnalyzer:
             target_time = entry_time + timedelta(minutes=h)
             # Ensure target_time is timezone-aware if the dataframe is aware
             if df["time"].dt.tz is not None and target_time.tzinfo is None:
-                target_time = target_time.replace(tzinfo=timezone.utc)
+                target_time = target_time.replace(tzinfo=UTC)
 
             # Find the row closest to target_time
             # Since we use M1, we can find it by index or by time comparison
@@ -334,7 +334,7 @@ class ExecutionAnalyzer:
 
         return float(np.clip(adjusted_realized / theoretical_pips, 0.0, 1.2))
 
-    def _get_execution_spread(self, trade: Trade) -> Dict[str, float]:
+    def _get_execution_spread(self, trade: Trade) -> dict[str, float]:
         """Estimate spread at the time of execution."""
         if not self.connector:
             return {"spread_pips": 0.0}
@@ -386,7 +386,7 @@ class ExecutionAnalyzer:
 
         return float(np.clip(efficiency, 0.0, 1.0))
 
-    def analyze_blocked_signals(self, start_time: datetime) -> List[BlockedSignalQuality]:
+    def analyze_blocked_signals(self, start_time: datetime) -> list[BlockedSignalQuality]:
         """
         Evaluate opportunity cost of signals rejected by risk management.
         Calculates what would have happened if the trade was taken.
@@ -419,7 +419,7 @@ class ExecutionAnalyzer:
 
     def _evaluate_opportunity_cost(
         self, signal: ModelSignal, reason: str
-    ) -> Optional[BlockedSignalQuality]:
+    ) -> BlockedSignalQuality | None:
         """
         Calculate MFE, MAE, and potential PnL for a rejected signal.
         """
@@ -429,10 +429,10 @@ class ExecutionAnalyzer:
         # Ensure start_time is timezone-aware before any operations
         start_time = signal.timestamp
         if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=timezone.utc)
+            start_time = start_time.replace(tzinfo=UTC)
 
         # Fetch data from signal time until 24 hours later or now
-        end_time = min(datetime.now(timezone.utc), start_time + timedelta(hours=24))
+        end_time = min(datetime.now(UTC), start_time + timedelta(hours=24))
 
         df = self.connector.get_rates_range(signal.symbol, "M5", start_time, end_time)
         if df.empty:
@@ -444,7 +444,7 @@ class ExecutionAnalyzer:
 
         # Filter bars that happened AFTER the signal
         if df["time"].dt.tz is None:
-            df["time"] = df["time"].dt.tz_localize(timezone.utc)
+            df["time"] = df["time"].dt.tz_localize(UTC)
 
         df = df[df["time"] >= start_time]
         if df.empty:
@@ -500,7 +500,7 @@ class ExecutionAnalyzer:
         """Aggregate execution quality metrics into a summary report."""
         from datetime import timedelta
 
-        start_time = datetime.now(timezone.utc) - timedelta(days=days)
+        start_time = datetime.now(UTC) - timedelta(days=days)
 
         with self.Session() as session:
             trades = session.query(Trade).filter(Trade.created_at >= start_time).all()

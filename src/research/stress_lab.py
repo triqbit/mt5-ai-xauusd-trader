@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -75,10 +75,10 @@ class ResilienceReport(BaseModel):
     strategy_name: str
     timestamp: datetime = Field(default_factory=datetime.now)
     baseline_metrics: StressTestMetrics
-    scenario_results: Dict[str, StressTestMetrics]
+    scenario_results: dict[str, StressTestMetrics]
     resilience_score: float  # Composite score 0-100
-    fragility_indicators: List[str]
-    failure_points: List[str]
+    fragility_indicators: list[str]
+    failure_points: list[str]
     degradation_summary: str
 
     def to_report_section(self) -> Any:
@@ -127,7 +127,7 @@ class StressLab:
         self.strategy = strategy
         self.data = data.copy()
         self.initial_balance = initial_balance
-        self.results: Dict[str, StressTestMetrics] = {}
+        self.results: dict[str, StressTestMetrics] = {}
 
     @staticmethod
     def create_execution_hell_scenario() -> StressScenario:
@@ -264,7 +264,7 @@ class StressLab:
         )
 
     def _generate_summary(
-        self, baseline: StressTestMetrics, results: Dict[str, StressTestMetrics]
+        self, baseline: StressTestMetrics, results: dict[str, StressTestMetrics]
     ) -> str:
         summary = (
             f"Strategy '{self.strategy.name}' evaluated against {len(results)} stress scenarios.\n"

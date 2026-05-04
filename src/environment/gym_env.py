@@ -7,7 +7,6 @@ Custom Gymnasium trading environment for RL training.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import numpy as np
@@ -59,7 +58,7 @@ class TradingEnv(gym.Env):
 
         self.reset()
 
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None) -> Tuple[np.ndarray, Dict]:
+    def reset(self, seed: int | None = None, options: dict | None = None) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -69,7 +68,7 @@ class TradingEnv(gym.Env):
         self.cumulative_commissions = 0.0
         return self._get_observation(), {}
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict]:
         current_price = self.data[self.current_step, 3]  # Close price
         reward = 0.0
 

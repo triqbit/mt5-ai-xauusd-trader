@@ -5,7 +5,7 @@ Custom Gymnasium-compatible environment for XAUUSD trading.
 """
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
@@ -27,7 +27,7 @@ class TradingEnv(gym.Env):
 
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, df: Optional[pd.DataFrame] = None, window_size: int = 20) -> None:
+    def __init__(self, df: pd.DataFrame | None = None, window_size: int = 20) -> None:
         """
         Initializes the trading environment.
 
@@ -58,8 +58,8 @@ class TradingEnv(gym.Env):
         self.reset()
 
     def reset(
-        self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None
-    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        self, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -> tuple[np.ndarray, dict[str, Any]]:
         """
         Resets the environment to its initial state.
 
@@ -77,7 +77,7 @@ class TradingEnv(gym.Env):
 
     def step(
         self, action: int
-    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+    ) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Executes one step in the environment.
 

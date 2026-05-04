@@ -5,7 +5,7 @@ src/core/config_validator.py
 
 import sys
 from pathlib import Path
-from typing import List, NamedTuple
+from typing import NamedTuple
 
 from src.core.config import TradingConfig
 
@@ -19,7 +19,7 @@ class ValidationError(NamedTuple):
 
 class ValidationResult(NamedTuple):
     success: bool
-    errors: List[ValidationError]
+    errors: list[ValidationError]
 
 
 class ConfigValidator:
@@ -27,7 +27,7 @@ class ConfigValidator:
 
     def __init__(self, config: TradingConfig):
         self.config = config
-        self.errors: List[ValidationError] = []
+        self.errors: list[ValidationError] = []
 
     def validate(self) -> ValidationResult:
         """Runs all validation rules and returns a result."""

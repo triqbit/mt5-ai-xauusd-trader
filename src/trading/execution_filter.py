@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from typing import TYPE_CHECKING, Dict, Optional
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -32,7 +32,7 @@ class ExecutionDecision:
     signal: TradeSignal
     is_approved: bool
     confidence_score: float
-    blocked_by: Optional[str] = None
+    blocked_by: str | None = None
 
 
 class ExecutionFilter:
@@ -46,7 +46,7 @@ class ExecutionFilter:
         self,
         max_drawdown: float = 0.15,
         rsi_period: int = 14,
-        config: Optional[TradingConfig] = None,
+        config: TradingConfig | None = None,
     ):
         self.max_drawdown = max_drawdown
         self.rsi_period = rsi_period
@@ -57,14 +57,14 @@ class ExecutionFilter:
         signal: TradeSignal,
         market_data: pd.DataFrame,
         current_drawdown: float,
-        timestamp: Optional[datetime] = None,
-        model_health: Optional[Dict[str, float]] = None,
-        trade_logger: Optional[TradeLogger] = None,
+        timestamp: datetime | None = None,
+        model_health: dict[str, float] | None = None,
+        trade_logger: TradeLogger | None = None,
     ) -> ExecutionDecision:
         """
         Run the full 9-layer filter cascade.
         """
-        timestamp = timestamp or signal.timestamp or datetime.utcnow()
+        timestamp = timestamp or signal.timestamp or datetime.now(UTC)
 
         # Layer 1: ATR Volatility
         if not self._check_atr_volatility(market_data):
@@ -104,7 +104,7 @@ class ExecutionFilter:
 
         return ExecutionDecision(signal, True, signal.confidence)
 
-    def _check_model_stability(self, health: Optional[Dict[str, float]]) -> bool:
+    def _check_model_stability(self, health: dict[str, float] | None) -> bool:
         """Blocks if aggregate model drift or accuracy breaches limits."""
         if health is None or self.cfg is None:
             return True
@@ -122,7 +122,7 @@ class ExecutionFilter:
 
         return True
 
-    def _check_performance_floor(self, trade_logger: Optional[TradeLogger]) -> bool:
+    def _check_performance_floor(self, trade_logger: TradeLogger | None) -> bool:
         """Blocks if historical win rate drops below floor."""
         if trade_logger is None or self.cfg is None:
             return True
@@ -184,7 +184,7 @@ class ExecutionFilter:
 
         if direction > 0:  # BUY
             return bool(slope > 0)
-        elif direction < 0:  # SELL
+        if direction < 0:  # SELL
             return bool(slope < 0)
         return False
 
@@ -202,7 +202,7 @@ class ExecutionFilter:
 
         if direction > 0:  # BUY
             return bool(emas[8] > emas[21] > emas[50] > emas[200])
-        elif direction < 0:  # SELL
+        if direction < 0:  # SELL
             return bool(emas[8] < emas[21] < emas[50] < emas[200])
         return False
 
@@ -223,7 +223,7 @@ class ExecutionFilter:
 
         if direction > 0:  # BUY
             return bool(50 <= rsi <= 75)
-        elif direction < 0:  # SELL
+        if direction < 0:  # SELL
             return bool(25 <= rsi <= 50)
         return False
 

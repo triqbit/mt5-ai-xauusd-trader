@@ -10,8 +10,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -41,12 +41,12 @@ class DecisionPacket(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     symbol: str = Field(..., description="Target trading symbol")
     direction: SignalDirection = Field(..., description="Final signal direction")
     consensus: str = Field(..., description="Qualitative model consensus level")
     is_executable: bool = Field(False, description="Final decision on whether the trade should proceed")
-    blocking_reasons: List[str] = Field(default_factory=list, description="List of reasons if the trade is blocked")
+    blocking_reasons: list[str] = Field(default_factory=list, description="List of reasons if the trade is blocked")
 
     # Components
     explanation: SignalExplanation = Field(..., description="ML signal attribution and explainability")
@@ -70,7 +70,7 @@ class DecisionSupportSystem:
         explanation: SignalExplanation,
         regime_info: RegimeInfo,
         macro_risk: RiskStatus,
-        performance_metrics: Dict[str, Any],
+        performance_metrics: dict[str, Any],
     ) -> DecisionPacket:
         """
         Assemble a complete decision packet from system components.
@@ -134,14 +134,13 @@ class DecisionSupportSystem:
 
         if agreement_pct >= 1.0:
             return "Unanimous"
-        elif agreement_pct >= 0.66:
+        if agreement_pct >= 0.66:
             return "Strong Majority"
-        elif agreement_pct >= 0.5:
+        if agreement_pct >= 0.5:
             return "Mixed Confluence"
-        else:
-            return "Divided/Weak"
+        return "Divided/Weak"
 
-    def format_for_operator(self, packet: DecisionPacket, console: Optional[Any] = None) -> str:
+    def format_for_operator(self, packet: DecisionPacket, console: Any | None = None) -> str:
         """
         Generate a human-readable, high-fidelity terminal dashboard.
         Aggregates all dimensions of the decision into a single visual summary.

@@ -4,6 +4,41 @@ This log tracks architectural drift, code quality degradation, and fragmented lo
 
 ## Active Debt Items
 
+### Debt Item: Legacy Temporal Markers
+**Category:** Quality
+**Impact:** Medium
+**Effort:** S
+**Resolution plan:** Replace all `datetime.utcnow()` calls with `datetime.now(timezone.utc)` for Python 3.12 compatibility and standardization.
+**Owner:** Jules05 (Immediate cleanup)
+
+### Debt Item: Linting Debt (Ruff/UP)
+**Category:** Quality
+**Impact:** Low
+**Effort:** M
+**Resolution plan:** Systematic application of `ruff --fix` to resolve hundreds of `UP` (Upgrade), `I` (Import), and `F` (Pyflakes) errors.
+**Owner:** Jules05 (Immediate cleanup)
+
+### Debt Item: Raw Print Statements
+**Category:** Quality
+**Impact:** Low
+**Effort:** S
+**Resolution plan:** Replace `print()` with `structlog` or `rich.console` across core modules (main.py, explainability, etc.).
+**Owner:** Jules05 (Immediate cleanup)
+
+### Debt Item: Fragmented Signal Mapping
+**Category:** Duplication
+**Impact:** Medium
+**Effort:** S
+**Resolution plan:** Replace manual string/integer to SignalDirection mappings with `ModelAction(idx).to_direction()` or `SignalDirection` constants.
+**Owner:** Jules05 (Immediate cleanup)
+
+### Debt Item: Placeholder Secrets in Validator
+**Category:** Quality
+**Impact:** Medium
+**Effort:** S
+**Resolution plan:** Ensure `ConfigValidator` strictly rejects placeholder passwords ("password", "change_me") in production-like environments.
+**Owner:** Jules03 (Governance)
+
 ### Debt Item: Fragmented LSTM Architecture
 **Category:** Fragmentation
 **Impact:** High
@@ -16,13 +51,6 @@ This log tracks architectural drift, code quality degradation, and fragmented lo
 **Impact:** Medium
 **Effort:** S
 **Resolution plan:** Replace manual `IntEnum` to index mappings with centralized `ModelAction(idx).to_direction()` calls across the codebase.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Raw Print Statements in Research Modules
-**Category:** Quality
-**Impact:** Low
-**Effort:** S
-**Resolution plan:** Replace `print()` with `structlog` or `rich.console` in `src/research/hyperopt_walkforward.py` and `main.py`.
 **Owner:** Jules05 (Immediate cleanup)
 
 ### Debt Item: Placeholder RL Agents (Dreamer/PPO stubs)

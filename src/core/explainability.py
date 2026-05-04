@@ -10,8 +10,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -45,7 +45,7 @@ class RiskAssessment(BaseModel):
     """Summary of risk management constraints and filters applied to the signal."""
 
     passed: bool = Field(..., description="Whether the signal passed all risk filters")
-    rejection_reasons: List[str] = Field(
+    rejection_reasons: list[str] = Field(
         default_factory=list, description="Reasons for rejection if any"
     )
     risk_reward_ratio: float = Field(0.0, description="Calculated R:R for the trade")
@@ -75,14 +75,14 @@ class FilterResult(BaseModel):
     passed: bool = Field(..., description="Whether the filter passed")
     value: Any = Field(None, description="Actual value observed")
     threshold: Any = Field(None, description="Threshold value for the filter")
-    message: Optional[str] = Field(None, description="Details about the filter result")
+    message: str | None = Field(None, description="Details about the filter result")
 
 
 class ExecutionSummary(BaseModel):
     """Summary of execution-level filters applied before signal generation."""
 
     passed: bool = Field(..., description="Whether all execution filters passed")
-    filters: List[FilterResult] = Field(default_factory=list, description="Detailed filter results")
+    filters: list[FilterResult] = Field(default_factory=list, description="Detailed filter results")
     summary: str = Field(..., description="Human-readable execution summary")
 
 
@@ -92,9 +92,9 @@ class SignalExplanation(BaseModel):
     Aggregates execution, model, feature, risk, and regime data into a structured format.
     """
 
-    signal_id: Optional[int] = Field(None, description="Database ID of the signal")
+    signal_id: int | None = Field(None, description="Database ID of the signal")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Time the explanation was generated",
     )
     symbol: str = Field(..., description="Trading symbol (e.g., XAUUSD)")
@@ -103,8 +103,8 @@ class SignalExplanation(BaseModel):
 
     # Components
     execution_summary: ExecutionSummary = Field(..., description="Execution-level filter breakdown")
-    model_attributions: List[ModelAttribution] = Field(..., description="Breakdown per model")
-    feature_contributions: List[FeatureContribution] = Field(
+    model_attributions: list[ModelAttribution] = Field(..., description="Breakdown per model")
+    feature_contributions: list[FeatureContribution] = Field(
         ..., description="Breakdown per feature cluster"
     )
     risk_assessment: RiskAssessment = Field(..., description="Risk management breakdown")
@@ -114,7 +114,7 @@ class SignalExplanation(BaseModel):
     human_readable_summary: str = Field(
         ..., description="Natural language explanation for operators"
     )
-    machine_attribution: Dict[str, Any] = Field(
+    machine_attribution: dict[str, Any] = Field(
         ..., description="Key-value pairs for automated post-trade analysis"
     )
 
@@ -135,12 +135,12 @@ class SignalExplainer:
         symbol: str,
         direction: int,
         confidence: float,
-        model_votes: Dict[str, Any],
-        model_weights: Dict[str, float],
-        risk_data: Dict[str, Any],
-        regime_info: Dict[str, Any],
-        execution_data: Optional[Dict[str, Any]] = None,
-        feature_impacts: Optional[List[Dict[str, Any]]] = None,
+        model_votes: dict[str, Any],
+        model_weights: dict[str, float],
+        risk_data: dict[str, Any],
+        regime_info: dict[str, Any],
+        execution_data: dict[str, Any] | None = None,
+        feature_impacts: list[dict[str, Any]] | None = None,
     ) -> SignalExplanation:
         """
         Generate a comprehensive explanation for a trade signal.
@@ -253,7 +253,7 @@ class SignalExplainer:
         ]
 
         # 6. Generate Human Readable Summary
-        dir_str = "BUY" if direction == 1 else "SELL" if direction == -1 else "HOLD"
+        dir_str = SignalDirection(direction).name
         reasoning = f"Ensemble generated a {dir_str} signal with {confidence:.1%} confidence. "
         if dominant_models:
             reasoning += f"Primary driver(s): {', '.join(dominant_models)}. "
@@ -295,7 +295,7 @@ class SignalExplainer:
             machine_attribution=machine_attr,
         )
 
-    def format_for_terminal(self, explanation: SignalExplanation, console: Optional[Any] = None) -> str:
+    def format_for_terminal(self, explanation: SignalExplanation, console: Any | None = None) -> str:
         """
         Format the explanation for terminal display.
         Uses 'rich' for pretty printing if available, otherwise returns plain text.

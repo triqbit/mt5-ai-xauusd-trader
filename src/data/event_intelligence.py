@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum, IntEnum
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -46,12 +45,12 @@ class MacroEvent(BaseModel):
     category: EventCategory
     impact: EventImpact
     timestamp: datetime
-    end_timestamp: Optional[datetime] = None
-    symbol_impact: List[str] = Field(default_factory=lambda: ["XAUUSD", "USD"])
-    description: Optional[str] = None
-    actual: Optional[float] = None
-    forecast: Optional[float] = None
-    previous: Optional[float] = None
+    end_timestamp: datetime | None = None
+    symbol_impact: list[str] = Field(default_factory=lambda: ["XAUUSD", "USD"])
+    description: str | None = None
+    actual: float | None = None
+    forecast: float | None = None
+    previous: float | None = None
 
     @property
     def is_high_impact(self) -> bool:
@@ -69,16 +68,16 @@ class RiskStatus(BaseModel):
 
     is_blocked: bool = False
     risk_multiplier: float = 1.0  # 1.0 = normal risk, < 1.0 = reduced risk
-    active_events: List[MacroEvent] = Field(default_factory=list)
-    blocking_events: List[MacroEvent] = Field(default_factory=list)
-    reason: Optional[str] = None
+    active_events: list[MacroEvent] = Field(default_factory=list)
+    blocking_events: list[MacroEvent] = Field(default_factory=list)
+    reason: str | None = None
 
 
 class BaseEventProvider(ABC):
     """Abstract base class for event data providers."""
 
     @abstractmethod
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> List[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
         """Fetch events within a time range."""
         pass
 
@@ -86,10 +85,10 @@ class BaseEventProvider(ABC):
 class MockEventProvider(BaseEventProvider):
     """Mock provider for testing and fallback."""
 
-    def __init__(self, mock_events: Optional[List[MacroEvent]] = None):
+    def __init__(self, mock_events: list[MacroEvent] | None = None):
         self.events = mock_events or []
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> List[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
         return [
             e for e in self.events
             if (e.end_timestamp or e.timestamp) >= start_time and e.timestamp <= end_time
@@ -102,7 +101,7 @@ class JSONEventProvider(BaseEventProvider):
     def __init__(self, file_path: str):
         self.file_path = file_path
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> List[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
         import json
         import os
 
@@ -111,7 +110,7 @@ class JSONEventProvider(BaseEventProvider):
             return []
 
         try:
-            with open(self.file_path, "r") as f:
+            with open(self.file_path) as f:
                 data = json.load(f)
 
             events = []
@@ -139,7 +138,7 @@ class MetaAPIEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH
         }
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> List[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
         """
         Fetches events via MetaAPI's REST interface.
         Note: This is a simplified implementation for the example.
@@ -205,8 +204,8 @@ class EventIntelligence:
     def __init__(
         self,
         provider: BaseEventProvider,
-        pre_event_minutes: Optional[Dict[EventImpact, int]] = None,
-        post_event_minutes: Optional[Dict[EventImpact, int]] = None,
+        pre_event_minutes: dict[EventImpact, int] | None = None,
+        post_event_minutes: dict[EventImpact, int] | None = None,
     ):
         self.provider = provider
         # Default risk windows (minutes)
@@ -223,11 +222,11 @@ class EventIntelligence:
             EventImpact.CRITICAL: 240,
         }
 
-    def get_risk_status(self, current_time: Optional[datetime] = None) -> RiskStatus:
+    def get_risk_status(self, current_time: datetime | None = None) -> RiskStatus:
         """
         Calculates the current risk status based on upcoming and recent events.
         """
-        now = current_time or datetime.utcnow()
+        now = current_time or datetime.now(UTC)
 
         # Look ahead and behind based on max windows
         max_pre = max(self.pre_event_minutes.values())
@@ -337,10 +336,10 @@ class EventIntelligence:
             reason=reason,
         )
 
-    def should_block_execution(self, current_time: Optional[datetime] = None) -> bool:
+    def should_block_execution(self, current_time: datetime | None = None) -> bool:
         """Helper to check if execution should be blocked."""
         return self.get_risk_status(current_time).is_blocked
 
-    def get_risk_multiplier(self, current_time: Optional[datetime] = None) -> float:
+    def get_risk_multiplier(self, current_time: datetime | None = None) -> float:
         """Helper to get the current risk multiplier."""
         return self.get_risk_status(current_time).risk_multiplier

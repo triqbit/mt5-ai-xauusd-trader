@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -36,8 +36,8 @@ class PerformanceReport:
     total_trades: int = 0
     win_rate: float = 0.0
     total_return: float = 0.0
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
 
 
 @dataclass
@@ -70,8 +70,8 @@ class BacktestEngine:
         spread: float = 0.0001,
         commission_per_lot: float = 7.0,
         leverage: int = 100,
-        feature_engineer: Optional[FeatureEngineer] = None,
-        execution_filter: Optional[ExecutionFilter] = None,
+        feature_engineer: FeatureEngineer | None = None,
+        execution_filter: ExecutionFilter | None = None,
         max_positions: int = 1,
     ):
         self.symbol = symbol
@@ -84,8 +84,8 @@ class BacktestEngine:
         self.max_positions = max_positions
 
         self.balance = initial_balance
-        self.trades: List[BacktestTrade] = []
-        self.results: Optional[PerformanceReport] = None
+        self.trades: list[BacktestTrade] = []
+        self.results: PerformanceReport | None = None
 
     def run_walk_forward(
         self,
@@ -131,7 +131,7 @@ class BacktestEngine:
         data["atr"] = tr.rolling(14).mean()
 
         start = 0
-        active_trades: List[Dict[str, Any]] = []
+        active_trades: list[dict[str, Any]] = []
 
         while start + train_window + test_window <= n:
             test_start_idx = start + train_window
@@ -207,7 +207,7 @@ class BacktestEngine:
 
         return self._calculate_performance()
 
-    def _open_trade(self, active_trades: List[Dict[str, Any]], signal: TradeSignal) -> None:
+    def _open_trade(self, active_trades: list[dict[str, Any]], signal: TradeSignal) -> None:
         """Opens a new trade and adds it to the active list."""
         execution_price = signal.entry_price + (signal.direction * self.spread / 2)
         active_trades.append({
@@ -217,7 +217,7 @@ class BacktestEngine:
             "mfe": 0.0
         })
 
-    def _update_active_trades(self, active_trades: List[Dict[str, Any]], current_bar: pd.Series, timestamp: datetime) -> None:
+    def _update_active_trades(self, active_trades: list[dict[str, Any]], current_bar: pd.Series, timestamp: datetime) -> None:
         """Checks SL/TP for all active trades and closes them if hit."""
         closed_indices = []
         for i, trade in enumerate(active_trades):
@@ -254,13 +254,13 @@ class BacktestEngine:
         for i in sorted(closed_indices, reverse=True):
             active_trades.pop(i)
 
-    def _close_all_trades(self, active_trades: List[Dict[str, Any]], last_bar: pd.Series) -> None:
+    def _close_all_trades(self, active_trades: list[dict[str, Any]], last_bar: pd.Series) -> None:
         """Force close all remaining trades."""
         for trade in active_trades:
             self._record_trade(trade, last_bar["close"], last_bar.name)
         active_trades.clear()
 
-    def _record_trade(self, trade: Dict[str, Any], exit_price: float, exit_time: datetime) -> None:
+    def _record_trade(self, trade: dict[str, Any], exit_price: float, exit_time: datetime) -> None:
         """Finalizes a trade, calculates PnL, and records it."""
         signal = trade["signal"]
         direction = signal.direction

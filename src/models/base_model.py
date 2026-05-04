@@ -5,7 +5,7 @@ Base interface for all AI/ML models.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, NamedTuple, Optional
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -17,7 +17,7 @@ class Signal(NamedTuple):
 
     direction: SignalDirection
     confidence: float
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 class BaseModel(ABC):

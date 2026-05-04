@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -157,7 +157,7 @@ class RegimeDetector:
 
     def _apply_regime_logic(
         self, atr_ratio: float, er: float, slope: float, z_score: float, vc: float
-    ) -> Tuple[MarketRegime, float, float]:
+    ) -> tuple[MarketRegime, float, float]:
         """Heuristic logic to classify market regime."""
         label = MarketRegime.RANGING
         confidence = 0.5

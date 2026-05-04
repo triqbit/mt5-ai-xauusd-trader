@@ -13,7 +13,7 @@ import logging
 import sys
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
 
@@ -49,7 +49,7 @@ TRADE_ACTION_DEAL = 1
 ORDER_TIME_GTC = 1
 ORDER_FILLING_IOC = 1
 
-TIMEFRAME_MAP: Dict[str, int] = {
+TIMEFRAME_MAP: dict[str, int] = {
     "M1": 1,
     "M5": 5,
     "M15": 15,
@@ -75,8 +75,8 @@ class MT5Connector:
         """
         self.cfg = config
         self.use_metaapi: bool = False
-        self.metaapi: Optional[Any] = None
-        self.metaapi_connection: Optional[Any] = None
+        self.metaapi: Any | None = None
+        self.metaapi_connection: Any | None = None
         self._is_initialized: bool = False
 
     @with_retry(MT5ConnectionError, max_retries=3)
@@ -106,19 +106,18 @@ class MT5Connector:
                     self.use_metaapi = False
                     self._is_initialized = True
                     return True
-                else:
-                    error_code, error_desc = mt5.last_error()
-                    logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
+                error_code, error_desc = mt5.last_error()
+                logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
 
-                    # Troubleshooting guidance
-                    if error_code == mt5.RES_E_NOT_FOUND:
-                        logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s", self.cfg.mt5_path)
-                    elif error_code == mt5.RES_E_INVALID_PARAMS:
-                        logger.info("TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER.")
-                    elif error_code == mt5.RES_E_CONNECTION_FAILED:
-                        logger.info("TIP: Connection failed. Check your internet or if the broker server is reachable.")
-                    else:
-                        logger.info("TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options.")
+                # Troubleshooting guidance
+                if error_code == mt5.RES_E_NOT_FOUND:
+                    logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s", self.cfg.mt5_path)
+                elif error_code == mt5.RES_E_INVALID_PARAMS:
+                    logger.info("TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER.")
+                elif error_code == mt5.RES_E_CONNECTION_FAILED:
+                    logger.info("TIP: Connection failed. Check your internet or if the broker server is reachable.")
+                else:
+                    logger.info("TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options.")
             except Exception as e:
                 logger.warning("Native MT5 initialization encountered an error: %s. Attempting fallback if available.", e)
         else:
@@ -203,10 +202,9 @@ class MT5Connector:
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
-        else:
-            # Placeholder for MetaAPI async rates fetching
-            logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
-            raise MT5DataError("MetaAPI get_rates not implemented.")
+        # Placeholder for MetaAPI async rates fetching
+        logger.warning("MetaAPI get_rates not implemented in sync wrapper.")
+        raise MT5DataError("MetaAPI get_rates not implemented.")
 
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Alias for get_rates() to match main.py expectations."""
@@ -240,12 +238,11 @@ class MT5Connector:
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
-        else:
-            logger.warning("MetaAPI get_rates_range not implemented.")
-            return pd.DataFrame()
+        logger.warning("MetaAPI get_rates_range not implemented.")
+        return pd.DataFrame()
 
     @with_retry(MT5DataError, max_retries=2)
-    def get_tick(self, symbol: str) -> Dict[str, float]:
+    def get_tick(self, symbol: str) -> dict[str, float]:
         """
         Retrieve latest symbol tick (bid/ask).
 
@@ -275,7 +272,7 @@ class MT5Connector:
 
         return {"bid": tick.bid, "ask": tick.ask, "spread": spread}
 
-    def place_order(self, signal: TradeSignal) -> Optional[int]:
+    def place_order(self, signal: TradeSignal) -> int | None:
         """
         Execute a market order based on a validated trade signal.
 
@@ -328,7 +325,7 @@ class MT5Connector:
 
         raise MT5ExecutionError("MetaAPI place_order not implemented.")
 
-    def get_account_info(self) -> Dict[str, Any]:
+    def get_account_info(self) -> dict[str, Any]:
         """Retrieve account balance, equity, and margin information."""
         if self._is_initialized and not self.use_metaapi:
             acc = mt5.account_info()
@@ -340,7 +337,7 @@ class MT5Connector:
         info = self.get_account_info()
         return float(info.get("balance", 0.0))
 
-    def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_positions(self, symbol: str | None = None) -> list[dict[str, Any]]:
         """Retrieve current open positions."""
         if self._is_initialized and not self.use_metaapi:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -40,7 +40,7 @@ class RareEventConfig(BaseModel):
     base_volume: int = Field(500, ge=10)
     event_magnitude: float = Field(1.0, gt=0)  # Multiplier for the severity
     recovery_factor: float = Field(0.5, ge=0, le=1.0, description="Proportion of event impact recovered")
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 class RareEventResult(BaseModel):
@@ -72,10 +72,10 @@ class RareEventSimulator:
     Designed to test XAUUSD strategy resilience beyond historical distributions.
     """
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(self, seed: int | None = None):
         self.rng = np.random.default_rng(seed)
 
-    def generate_scenario(self, config: RareEventConfig) -> Tuple[pd.DataFrame, RareEventResult]:
+    def generate_scenario(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """
         Generates a synthetic OHLCV DataFrame containing the specified rare event.
         Returns both the DataFrame and the metadata about the event.
@@ -85,20 +85,19 @@ class RareEventSimulator:
 
         if config.event_type == RareEventType.FLASH_CRASH:
             return self._simulate_flash_crash(config)
-        elif config.event_type == RareEventType.LIQUIDITY_VACUUM:
+        if config.event_type == RareEventType.LIQUIDITY_VACUUM:
             return self._simulate_liquidity_vacuum(config)
-        elif config.event_type == RareEventType.GOLD_GAP:
+        if config.event_type == RareEventType.GOLD_GAP:
             return self._simulate_gold_gap(config)
-        elif config.event_type == RareEventType.VIOLENT_REVERSAL:
+        if config.event_type == RareEventType.VIOLENT_REVERSAL:
             return self._simulate_violent_reversal(config)
-        elif config.event_type == RareEventType.DISLOCATION:
+        if config.event_type == RareEventType.DISLOCATION:
             return self._simulate_dislocation(config)
-        elif config.event_type == RareEventType.VOL_CLUSTER:
+        if config.event_type == RareEventType.VOL_CLUSTER:
             return self._simulate_vol_cluster(config)
-        elif config.event_type == RareEventType.MULTI_SESSION_DISLOCATION:
+        if config.event_type == RareEventType.MULTI_SESSION_DISLOCATION:
             return self._simulate_multi_session_dislocation(config)
-        else:
-            raise ValueError(f"Unknown rare event type: {config.event_type}")
+        raise ValueError(f"Unknown rare event type: {config.event_type}")
 
     def _generate_base_ohlc(
         self,
@@ -106,7 +105,7 @@ class RareEventSimulator:
         returns: np.ndarray,
         base_vol: float,
         base_volume: int,
-        gaps: Optional[np.ndarray] = None,
+        gaps: np.ndarray | None = None,
         spread_multiplier: float = 1.0,
     ) -> pd.DataFrame:
         """
@@ -158,7 +157,7 @@ class RareEventSimulator:
 
         return df
 
-    def _simulate_flash_crash(self, config: RareEventConfig) -> Tuple[pd.DataFrame, RareEventResult]:
+    def _simulate_flash_crash(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a rapid price collapse and partial/full recovery."""
         n = config.n_steps
         returns = self.rng.normal(config.drift, config.base_volatility, n)
@@ -211,7 +210,7 @@ class RareEventSimulator:
 
     def _simulate_liquidity_vacuum(
         self, config: RareEventConfig
-    ) -> Tuple[pd.DataFrame, RareEventResult]:
+    ) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a period of erratic price jumps and extreme spreads."""
         n = config.n_steps
         returns = self.rng.normal(config.drift, config.base_volatility, n)
@@ -257,7 +256,7 @@ class RareEventSimulator:
 
         return df, result
 
-    def _simulate_gold_gap(self, config: RareEventConfig) -> Tuple[pd.DataFrame, RareEventResult]:
+    def _simulate_gold_gap(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates discontinuous price jumps."""
         n = config.n_steps
         returns = self.rng.normal(config.drift, config.base_volatility, n)
@@ -288,7 +287,7 @@ class RareEventSimulator:
         )
         return df, result
 
-    def _simulate_violent_reversal(self, config: RareEventConfig) -> Tuple[pd.DataFrame, RareEventResult]:
+    def _simulate_violent_reversal(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a strong trend followed by an abrupt reversal."""
         n = config.n_steps
         returns = self.rng.normal(config.drift, config.base_volatility, n)
@@ -323,7 +322,7 @@ class RareEventSimulator:
         )
         return df, result
 
-    def _simulate_dislocation(self, config: RareEventConfig) -> Tuple[pd.DataFrame, RareEventResult]:
+    def _simulate_dislocation(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a regime shift."""
         n = config.n_steps
         returns = self.rng.normal(config.drift, config.base_volatility, n)
@@ -353,7 +352,7 @@ class RareEventSimulator:
         )
         return df, result
 
-    def _simulate_vol_cluster(self, config: RareEventConfig) -> Tuple[pd.DataFrame, RareEventResult]:
+    def _simulate_vol_cluster(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates an abnormal cluster of high volatility with multiple shocks."""
         n = config.n_steps
         vols = np.full(n, config.base_volatility)
@@ -396,8 +395,8 @@ class RareEventSimulator:
         return df, result
 
     def generate_suite(
-        self, n_steps: int = 500, magnitude: float = 1.0, seed: Optional[int] = None
-    ) -> Dict[str, Tuple[pd.DataFrame, RareEventResult]]:
+        self, n_steps: int = 500, magnitude: float = 1.0, seed: int | None = None
+    ) -> dict[str, tuple[pd.DataFrame, RareEventResult]]:
         """Generates a standard suite of all rare event scenarios."""
         suite = {}
         for event_type in RareEventType:
@@ -412,7 +411,7 @@ class RareEventSimulator:
 
     def _simulate_multi_session_dislocation(
         self, config: RareEventConfig
-    ) -> Tuple[pd.DataFrame, RareEventResult]:
+    ) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a sequence of regime shifts across multiple sessions."""
         n = config.n_steps
         returns = np.zeros(n)

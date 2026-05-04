@@ -9,8 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     DateTime,
@@ -37,23 +36,23 @@ class AuditEntry(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+        DateTime, default=lambda: datetime.now(UTC), index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
-    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class AuditLogger:
     """
     Singleton AuditLogger for managing system audit traces.
     """
-    _instance: Optional[AuditLogger] = None
+    _instance: AuditLogger | None = None
     _initialized: bool = False
 
     def __new__(cls, *args, **kwargs):
@@ -61,7 +60,7 @@ class AuditLogger:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, db_url: Optional[str] = None) -> None:
+    def __init__(self, db_url: str | None = None) -> None:
         if self._initialized:
             return
 
@@ -74,7 +73,7 @@ class AuditLogger:
         self._initialized = True
         logger.info("AuditLogger initialized with database: %s", db_url)
 
-    def log(self, actor: str, action: str, details: Optional[str] = None) -> int:
+    def log(self, actor: str, action: str, details: str | None = None) -> int:
         """
         Record a new audit entry.
         """

@@ -6,7 +6,7 @@ Benchmarking framework to compare advanced models against baseline strategies.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Protocol
+from typing import Any, Protocol
 
 import numpy as np
 import pandas as pd
@@ -194,9 +194,9 @@ class BenchmarkEvaluator:
         self.initial_balance = initial_balance
         self.commission = commission
         self.bars_per_year = bars_per_year
-        self.results: Dict[str, Any] = {}
+        self.results: dict[str, Any] = {}
 
-    def evaluate_all(self, strategies: List[BenchmarkStrategy]) -> pd.DataFrame:
+    def evaluate_all(self, strategies: list[BenchmarkStrategy]) -> pd.DataFrame:
         """Run evaluation for all provided strategies."""
         summary = {}
         for strategy in strategies:
@@ -207,7 +207,7 @@ class BenchmarkEvaluator:
 
         return pd.DataFrame(summary).T
 
-    def _calculate_metrics(self, signals: np.ndarray, name: str) -> Dict[str, Any]:
+    def _calculate_metrics(self, signals: np.ndarray, name: str) -> dict[str, Any]:
         """Backtest signals and calculate performance metrics using equity curve."""
         close = self.df["close"].values
         n = len(signals)
@@ -309,7 +309,7 @@ class BenchmarkEvaluator:
             "Num Trades": len(trade_pnls),
         }
 
-    def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> Dict[str, Any]:
+    def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> dict[str, Any]:
         """Perform statistical comparison between a strategy and a baseline."""
         if strategy_name not in self.results or baseline_name not in self.results:
             return {"error": "Strategy or baseline not found in results."}

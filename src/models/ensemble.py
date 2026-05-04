@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 
@@ -53,21 +53,21 @@ class EnsembleModel(BaseModel):
         )
         self._ppo_model = None  # loaded lazily
         self._dreamer_model = None  # loaded lazily
-        self.lstm_model: Optional[LSTMAttentionModel] = None
+        self.lstm_model: LSTMAttentionModel | None = None
         # Internal cache for compatibility with existing record_return calls
         # Using deque for memory safety in long-running processes
-        self._performance: Dict[str, deque[float]] = {k: deque(maxlen=200) for k in self.ALGORITHMS}
-        self._last_confidences: Dict[str, deque[float]] = {
+        self._performance: dict[str, deque[float]] = {k: deque(maxlen=200) for k in self.ALGORITHMS}
+        self._last_confidences: dict[str, deque[float]] = {
             k: deque(maxlen=200) for k in self.ALGORITHMS
         }
-        self._latest_health_metrics: Dict[str, float] = {
+        self._latest_health_metrics: dict[str, float] = {
             "accuracy": 1.0,
             "drift": 0.0,
             "calibration": 0.0,
         }
 
     @property
-    def weights(self) -> Dict[str, float]:
+    def weights(self) -> dict[str, float]:
         """Expose weights from dynamic_ensemble."""
         return self.dynamic_ensemble.get_weights()
 
@@ -99,14 +99,14 @@ class EnsembleModel(BaseModel):
     def predict(
         self,
         features: np.ndarray,
-        seq: Optional[Any] = None,
-        regime_info: Optional[RegimeInfo] = None,
+        seq: Any | None = None,
+        regime_info: RegimeInfo | None = None,
     ) -> Signal:
         """
         Generate a trading signal from input features.
         Returns a Signal object (direction, confidence, metadata).
         """
-        votes: Dict[str, np.ndarray] = {}
+        votes: dict[str, np.ndarray] = {}
 
         # PPO prediction
         if self._ppo_model is not None:
@@ -160,7 +160,7 @@ class EnsembleModel(BaseModel):
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(
-        self, algorithm: str, ret: float, regime_info: Optional[RegimeInfo] = None
+        self, algorithm: str, ret: float, regime_info: RegimeInfo | None = None
     ) -> None:
         """Track per-algorithm returns for weight rebalancing."""
         if algorithm in self._performance:
@@ -169,10 +169,10 @@ class EnsembleModel(BaseModel):
                 self._rebalance_weights(regime_info=regime_info)
 
     def _rebalance_weights(
-        self, regime_info: Optional[RegimeInfo] = None, window: int = 50
+        self, regime_info: RegimeInfo | None = None, window: int = 50
     ) -> None:
         """Delegate rebalancing to DynamicEnsemble."""
-        metrics: Dict[str, Dict[str, float]] = {}
+        metrics: dict[str, dict[str, float]] = {}
         for algo, rets in self._performance.items():
             tail = list(rets)[-window:]
             if len(tail) < 10:
@@ -233,7 +233,7 @@ class EnsembleModel(BaseModel):
             self.weights, agg_acc, agg_drift
         )
 
-    def get_health_metrics(self) -> Dict[str, float]:
+    def get_health_metrics(self) -> dict[str, float]:
         """Expose latest aggregate health metrics."""
         return self._latest_health_metrics.copy()
 
