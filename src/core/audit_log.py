@@ -10,13 +10,11 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-
-import json
 from typing import Any
 
 from sqlalchemy import (
-    DateTime,
     JSON,
+    DateTime,
     String,
     Text,
     create_engine,
@@ -28,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """SQLAlchemy 2.0 DeclarativeBase."""
+
     pass
 
 
@@ -36,6 +35,7 @@ class AuditEntry(Base):
     Audit log entry for recording system actions and events.
     Aligned with enterprise traceability requirements.
     """
+
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -57,6 +57,7 @@ class AuditLogger:
     """
     Singleton AuditLogger for managing system audit traces.
     """
+
     _instance: AuditLogger | None = None
     _initialized: bool = False
 

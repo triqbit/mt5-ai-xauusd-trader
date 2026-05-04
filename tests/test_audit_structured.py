@@ -3,12 +3,14 @@ Unit tests for modernized structured AuditLogger.
 """
 
 import pytest
-from src.core.audit_log import AuditLogger, AuditEntry
-from sqlalchemy import select
+
+from src.core.audit_log import AuditEntry, AuditLogger
+
 
 @pytest.fixture
 def db_url():
     return "sqlite:///:memory:"
+
 
 @pytest.fixture
 def logger(db_url):
@@ -16,6 +18,7 @@ def logger(db_url):
     AuditLogger._instance = None
     AuditLogger._initialized = False
     return AuditLogger(db_url)
+
 
 def test_log_with_metadata(logger):
     metadata = {"key": "value", "nested": {"a": 1}}
@@ -25,6 +28,7 @@ def test_log_with_metadata(logger):
         entry = session.get(AuditEntry, entry_id)
         assert entry.metadata_json == metadata
 
+
 def test_log_config_snapshot(logger):
     config = {"symbol": "XAUUSD", "mode": "demo", "risk": 0.01}
     entry_id = logger.log_config_snapshot(config)
@@ -33,6 +37,7 @@ def test_log_config_snapshot(logger):
         entry = session.get(AuditEntry, entry_id)
         assert entry.action == "config_snapshot"
         assert entry.metadata_json == config
+
 
 def test_log_blocked_trade(logger):
     signal_id = 123
@@ -46,6 +51,7 @@ def test_log_blocked_trade(logger):
         assert entry.metadata_json["signal_id"] == signal_id
         assert entry.metadata_json["reasons"] == reasons
         assert entry.metadata_json["context"] == context
+
 
 def test_log_prediction(logger):
     symbol = "XAUUSD"
@@ -62,6 +68,7 @@ def test_log_prediction(logger):
         assert entry.metadata_json["confidence"] == confidence
         assert entry.metadata_json["model_id"] == "ppo_v1"
 
+
 def test_log_risk_decision(logger):
     signal_id = 456
     decision = True
@@ -73,6 +80,7 @@ def test_log_risk_decision(logger):
         assert entry.action == "risk_decision"
         assert entry.metadata_json["decision"] is True
         assert "APPROVED" in entry.details
+
 
 def test_log_deployment(logger):
     version = "1.2.3"

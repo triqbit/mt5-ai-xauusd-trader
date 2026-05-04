@@ -1,8 +1,8 @@
 """modernize audit_log with structured metadata
 
-Revision ID: f4ca917ea524
+Revision ID: b4dfa42bdd96
 Revises: c1b7f28e5748
-Create Date: 2026-05-04 23:17:37.583847
+Create Date: 2026-05-04 23:39:04.065478
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f4ca917ea524'
+revision: str = 'b4dfa42bdd96'
 down_revision: Union[str, None] = 'c1b7f28e5748'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
