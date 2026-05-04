@@ -87,6 +87,11 @@ def test_profitable_patterns(miner, sample_trades):
     assert xau.attribute == "symbol"
     assert xau.total_trades == 5
 
+    # Day of week analysis (2024-01-01 was a Monday)
+    monday = next(p for p in patterns if p.value == "Monday")
+    assert monday.attribute == "day"
+    assert monday.total_trades == 5
+
 def test_risk_blocks(miner, sample_signals):
     risk_events = pd.DataFrame([
         {"event_type": "MAX_DRAWDOWN", "signal_id": 1},
@@ -120,11 +125,15 @@ def test_run_mining(miner):
             symbol="XAUUSD",
             direction=1,
             entry_price=2000.0,
+            exit_price=2100.0,
             lot_size=0.1,
             pnl=100.0,
             status="CLOSED",
             signal_id=sig.id
         )
+        # Manually set updated_at to simulate duration (10 mins)
+        trd.created_at = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+        trd.updated_at = datetime(2024, 1, 1, 12, 10, tzinfo=timezone.utc)
         session.add(trd)
 
         evt = RiskEvent(
@@ -140,6 +149,7 @@ def test_run_mining(miner):
     assert len(report.volatility_patterns) > 0
     assert len(report.profitable_concentrations) > 0
     assert len(report.risk_block_summary) == 1
+    assert report.avg_win_duration == 10.0
 
 def test_empty_dataframe_guards(miner):
     empty_df = pd.DataFrame()
@@ -166,10 +176,10 @@ def test_drawdown_clusters_single_loss(miner):
 
 def test_find_frequent_motifs(miner):
     signals = pd.DataFrame([
-        {"id": 1, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "confidence": 0.85, "pnl": -10, "win": False},
-        {"id": 2, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "confidence": 0.85, "pnl": -20, "win": False},
-        {"id": 3, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "confidence": 0.95, "pnl": 100, "win": True},
-        {"id": 4, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "confidence": 0.95, "pnl": 50, "win": True},
+        {"id": 1, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "confidence": 0.85, "pnl": -10, "win": False, "created_at": datetime(2024, 1, 1, 14, 0, tzinfo=timezone.utc)},
+        {"id": 2, "algorithm": "ensemble", "direction": 1, "volatility": 0.05, "confidence": 0.85, "pnl": -20, "win": False, "created_at": datetime(2024, 1, 1, 15, 0, tzinfo=timezone.utc)},
+        {"id": 3, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "confidence": 0.95, "pnl": 100, "win": True, "created_at": datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)},
+        {"id": 4, "algorithm": "ppo", "direction": -1, "volatility": 0.5, "confidence": 0.95, "pnl": 50, "win": True, "created_at": datetime(2024, 1, 1, 11, 0, tzinfo=timezone.utc)},
     ])
     motifs = miner.find_frequent_motifs(signals)
     assert len(motifs) == 2
@@ -178,6 +188,7 @@ def test_find_frequent_motifs(miner):
     assert ensemble_motif.win_rate == 0.0
     assert ensemble_motif.volatility_bucket == "Low"
     assert ensemble_motif.confidence_bucket == "High"
+    assert ensemble_motif.session in ["London", "New York"]
 
 def test_strategy_state_correlation(miner):
     # Setup trades with a drawdown cluster
@@ -210,8 +221,10 @@ def test_to_report_section_with_toxic_motif(miner):
             BlockReasonSummary(reason="FRAGILE", count=10, impacted_algorithms=["ppo"], weak_state_correlation=0.9)
         ],
         recurring_motifs=[
-            SignalMotif(algorithm="ensemble", direction=1, volatility_bucket="High", confidence_bucket="Medium", frequency=5, win_rate=0.1)
-        ]
+            SignalMotif(algorithm="ensemble", direction=1, volatility_bucket="High", confidence_bucket="Medium", session="London", frequency=5, win_rate=0.1)
+        ],
+        avg_win_duration=15.5,
+        avg_loss_duration=45.2
     )
 
     section = report.to_report_section()
@@ -219,6 +232,23 @@ def test_to_report_section_with_toxic_motif(miner):
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Strategy Fragility" in risk_types
     assert "Toxic Motif" in risk_types
+    assert section.avg_win_duration == 15.5
+    assert section.avg_loss_duration == 45.2
+    assert section.motifs[0].session == "London"
+
+
+def test_analyze_trade_durations(miner):
+    from src.core.trade_logger import Trade
+
+    now = datetime.now(timezone.utc)
+    trades = [
+        Trade(pnl=100, created_at=now, updated_at=now + pd.Timedelta(minutes=10), status="CLOSED", exit_price=2000),
+        Trade(pnl=-50, created_at=now, updated_at=now + pd.Timedelta(minutes=30), status="CLOSED", exit_price=1990),
+    ]
+
+    durations = miner.analyze_trade_durations(trades)
+    assert durations["avg_win_duration"] == 10.0
+    assert durations["avg_loss_duration"] == 30.0
 
 def test_detect_pre_drawdown_motifs(miner):
     now = datetime.now(timezone.utc)

@@ -71,6 +71,7 @@ class SignalMotif(BaseModel):
     direction: int
     volatility_bucket: str
     confidence_bucket: str
+    session: str = "Unknown"
     frequency: int
     win_rate: float
     cluster_frequency: int = 0
@@ -80,6 +81,8 @@ class TradePatternSection(BaseModel):
     concentrations: List[PatternConcentration]
     behavioral_risks: List[BehavioralRisk]
     motifs: List[SignalMotif] = Field(default_factory=list)
+    avg_win_duration: float = 0.0
+    avg_loss_duration: float = 0.0
 
 class DriftMetric(BaseModel):
     name: str

@@ -73,6 +73,7 @@ class SignalMotif(BaseModel):
     direction: int
     volatility_bucket: str
     confidence_bucket: str
+    session: str = "Unknown"
     frequency: int
     win_rate: float
     cluster_frequency: int = 0
@@ -89,6 +90,8 @@ class JournalReport(BaseModel):
     risk_block_summary: List[BlockReasonSummary]
     recurring_motifs: List[SignalMotif] = Field(default_factory=list)
     pre_drawdown_motifs: List[SignalMotif] = Field(default_factory=list)
+    avg_win_duration: float = 0.0
+    avg_loss_duration: float = 0.0
 
     def to_report_section(self) -> Any:
         """Convert results to TradePatternSection for ResearchReporter."""
@@ -165,6 +168,7 @@ class JournalReport(BaseModel):
                     direction=m.direction,
                     volatility_bucket=m.volatility_bucket,
                     confidence_bucket=m.confidence_bucket,
+                    session=m.session,
                     frequency=m.frequency,
                     win_rate=m.win_rate,
                     cluster_frequency=m.cluster_frequency,
@@ -176,6 +180,8 @@ class JournalReport(BaseModel):
             concentrations=concentrations[:5],  # Top 5 for clarity
             behavioral_risks=risks,
             motifs=reporting_motifs,
+            avg_win_duration=self.avg_win_duration,
+            avg_loss_duration=self.avg_loss_duration,
         )
 
 
@@ -343,7 +349,7 @@ class JournalMiner:
         return clusters
 
     def find_profitable_patterns(self, trades_df: pd.DataFrame) -> List[PatternConcentration]:
-        """Find concentrations of profitable patterns by symbol, algorithm and hour."""
+        """Find concentrations of profitable patterns by symbol, algorithm, hour, and day."""
         if trades_df.empty:
             return []
 
@@ -424,6 +430,36 @@ class JournalMiner:
                 PatternConcentration(
                     attribute="hour",
                     value=f"{hour:02d}:00",
+                    win_rate=win_rate,
+                    profit_factor=profit_factor,
+                    total_trades=trade_count,
+                )
+            )
+
+        # By Day of Week
+        trades_df["day_of_week"] = trades_df["created_at"].apply(lambda x: x.strftime("%A"))
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        for day in days:
+            group = trades_df[trades_df["day_of_week"] == day]
+            if group.empty:
+                continue
+
+            trade_count = len(group)
+            wins = group[group["pnl"] > 0]
+            losses = group[group["pnl"] < 0]
+            win_rate = len(wins) / trade_count
+            gross_profit = wins["pnl"].sum()
+            gross_loss = abs(losses["pnl"].sum())
+            profit_factor = (
+                gross_profit / gross_loss
+                if gross_loss > 0
+                else (float("inf") if gross_profit > 0 else 0.0)
+            )
+
+            results.append(
+                PatternConcentration(
+                    attribute="day",
+                    value=day,
                     win_rate=win_rate,
                     profit_factor=profit_factor,
                     total_trades=trade_count,
@@ -533,6 +569,9 @@ class JournalMiner:
             if "confidence" in df.columns
             else "Unknown"
         )
+        df["session"] = df["created_at"].apply(
+            lambda x: (self._get_session(x) or ["Unknown"])[0]
+        )
         df["win"] = df["pnl"] > 0
 
         # Identify signals in drawdown clusters if trades_df is provided
@@ -551,11 +590,11 @@ class JournalMiner:
 
         df["is_in_cluster"] = df["id"].isin(cluster_signal_ids)
 
-        # Group by algo, direction, vol_bucket, conf_bucket
-        groups = df.groupby(["algorithm", "direction", "vol_bucket", "conf_bucket"])
+        # Group by algo, direction, vol_bucket, conf_bucket, session
+        groups = df.groupby(["algorithm", "direction", "vol_bucket", "conf_bucket", "session"])
         results = []
 
-        for (algo, direction, vol, conf), group in groups:
+        for (algo, direction, vol, conf, sess), group in groups:
             freq = len(group)
             if freq < 2:
                 continue
@@ -568,6 +607,7 @@ class JournalMiner:
                     direction=int(direction),
                     volatility_bucket=str(vol),
                     confidence_bucket=str(conf),
+                    session=str(sess),
                     frequency=int(freq),
                     win_rate=float(win_rate),
                     cluster_frequency=int(cluster_freq),
@@ -575,6 +615,28 @@ class JournalMiner:
             )
 
         return sorted(results, key=lambda x: x.win_rate)
+
+    def analyze_trade_durations(self, trades_raw: List[Trade]) -> Dict[str, float]:
+        """Calculate average win vs loss holding times in minutes."""
+        if not trades_raw:
+            return {"avg_win_duration": 0.0, "avg_loss_duration": 0.0}
+
+        win_durations = []
+        loss_durations = []
+
+        for t in trades_raw:
+            if t.status == "CLOSED" and t.exit_price is not None:
+                # updated_at is roughly the exit time if not explicitly stored
+                duration = (t.updated_at - t.created_at).total_seconds() / 60.0
+                if t.pnl > 0:
+                    win_durations.append(duration)
+                elif t.pnl < 0:
+                    loss_durations.append(duration)
+
+        return {
+            "avg_win_duration": float(pd.Series(win_durations).mean()) if win_durations else 0.0,
+            "avg_loss_duration": float(pd.Series(loss_durations).mean()) if loss_durations else 0.0,
+        }
 
     def analyze_strategy_state_correlation(
         self, risk_events_df: pd.DataFrame, trades_df: pd.DataFrame
@@ -625,6 +687,9 @@ class JournalMiner:
             trades_raw = session.query(Trade).filter(Trade.is_deleted.is_(False)).all()
             signals_raw = session.query(ModelSignal).filter(ModelSignal.is_deleted.is_(False)).all()
             risk_raw = session.query(RiskEvent).filter(RiskEvent.is_deleted.is_(False)).all()
+
+            # Analyze durations
+            durations = self.analyze_trade_durations(trades_raw)
 
             # Convert to DataFrames
             trades_df = pd.DataFrame(
@@ -681,4 +746,6 @@ class JournalMiner:
                 risk_block_summary=risk_blocks,
                 recurring_motifs=self.find_frequent_motifs(signals_df, trades_df),
                 pre_drawdown_motifs=self.detect_pre_drawdown_motifs(signals_df, trades_df),
+                avg_win_duration=durations["avg_win_duration"],
+                avg_loss_duration=durations["avg_loss_duration"],
             )
