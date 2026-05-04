@@ -29,7 +29,7 @@ pydantic==2.13.3
 pydantic-settings==2.8.1
 
 # -- Testing -------------------------------------------------------
-optuna==4.2.1
+optuna==4.8.0
 pytest==9.0.3
 pytest-cov==6.1.0
 python-telegram-bot

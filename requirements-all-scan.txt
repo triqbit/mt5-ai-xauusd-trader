@@ -50,7 +50,7 @@ metaapi-cloud-sdk==29.1.1
 mplfinance==0.12.10b0
 mypy==1.10.0
 numpy==2.2.6
-optuna==4.2.1
+optuna==4.8.0
 pandas-ta==0.4.71b0
 pandas==2.2.2
 pandas==2.2.3
