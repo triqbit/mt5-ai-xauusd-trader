@@ -161,10 +161,9 @@ class HealthChecker:
             loaded.append("Dreamer (Ensemble)")
 
         # 2. Check for individual model wrappers (PPOAgent, LSTMModel)
-        if not loaded:
-            if hasattr(self.model, "model") and getattr(self.model, "model", None) is not None:
-                class_name = self.model.__class__.__name__
-                loaded.append(f"{class_name} (Loaded)")
+        if not loaded and hasattr(self.model, "model") and getattr(self.model, "model", None) is not None:
+            class_name = self.model.__class__.__name__
+            loaded.append(f"{class_name} (Loaded)")
 
         if not loaded:
             res = ComponentStatus(

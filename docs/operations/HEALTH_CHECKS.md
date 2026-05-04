@@ -4,7 +4,7 @@ The MT5 AI/ML Trading Bot includes an enterprise-grade health check system for p
 
 ## Endpoints
 
-The health check endpoints are exposed via FastAPI (default port 8000, prefix `/health`).
+The health check endpoints are exposed via FastAPI (default port 8000, prefix `/health`). The system also includes a standalone metrics endpoint (`GET /metrics`) for Prometheus monitoring.
 
 ### 1. Liveness Probe (`GET /health/liveness`)
 **Purpose:** Indicates if the application process is alive.
@@ -32,9 +32,9 @@ The health check endpoints are exposed via FastAPI (default port 8000, prefix `/
 
 ## Startup Health Gate
 
-The application performs a mandatory full health check during startup (`main.py`).
+The application performs a mandatory full health check during startup (`main.py`) using the `HealthChecker.startup_gate()` method.
 
-- **CRITICAL FAILURE:** If any component returns a `FAILED` status, the application will log a `CRITICAL` error and refuse to start (exit code 1).
+- **CRITICAL FAILURE:** If any component returns a `FAILED` status, the application will log a `CRITICAL` error and refuse to start (exit code 1). The gate returns a `HealthReport` which is reused to display diagnostic information without re-running expensive checks.
 - **DEGRADED STATUS:** If components return a `DEGRADED` status (e.g., optional Redis unreachable), the application will log a `WARNING` but continue to start.
 
 ## Prometheus Metrics
