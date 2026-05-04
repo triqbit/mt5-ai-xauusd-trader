@@ -13,10 +13,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from rich.console import Console
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.core.constants import SignalDirection
 from src.core.explainability import SignalExplainer, SignalExplanation
+from src.core.types import ExecutionDecision, TradeSignal
 from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
@@ -153,6 +156,9 @@ class DecisionSupportSystem:
             from rich.table import Table
             from rich.text import Text
 
+            # Use provided console or create a temporary one for rendering
+            active_console = console or Console()
+
             # 1. Header with Go/No-Go status
             status_color = "green" if packet.is_executable else "red"
             status_text = "EXECUTE" if packet.is_executable else "BLOCKED"
@@ -240,14 +246,13 @@ class DecisionSupportSystem:
                 macro_panel,
                 attribution_summary,
                 Text("\n[bold]DETAILED ATTRIBUTION BREAKDOWN[/bold]\n"),
-                self.explainer.get_renderable(packet.explanation)
+                self.explainer.get_renderable(packet.explanation),
             )
 
-            # Print to console if provided
-            if console:
-                console.print(dashboard)
+            # Print to active console
+            active_console.print(dashboard)
 
-            # Return string representation
+            # Return string representation (for logging or other purposes)
             temp_console = Console(force_terminal=True, width=100)
             with temp_console.capture() as capture:
                 temp_console.print(dashboard)

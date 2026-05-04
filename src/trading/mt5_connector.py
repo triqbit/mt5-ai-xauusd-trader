@@ -38,7 +38,7 @@ from src.core.exceptions import (
     MT5ExecutionError,
 )
 from src.core.retry import with_retry
-from src.trading.risk_manager import TradeSignal
+from src.core.types import TradeSignal
 
 logger = logging.getLogger(__name__)
 
@@ -195,14 +195,21 @@ class MT5Connector:
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         if not self.use_metaapi:
-            rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
-            if rates is None:
-                error_msg = f"Failed to copy rates for {symbol}: {mt5.last_error()}"
+            try:
+                rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+                if rates is None:
+                    error_msg = f"Failed to copy rates for {symbol}: {mt5.last_error()}"
+                    logger.error(error_msg)
+                    raise MT5DataError(error_msg)
+                df = pd.DataFrame(rates)
+                df["time"] = pd.to_datetime(df["time"], unit="s")
+                return df
+            except MT5DataError:
+                raise
+            except Exception as e:
+                error_msg = f"Unexpected error while fetching rates: {e}"
                 logger.error(error_msg)
-                raise MT5DataError(error_msg)
-            df = pd.DataFrame(rates)
-            df["time"] = pd.to_datetime(df["time"], unit="s")
-            return df
+                raise MT5DataError(error_msg) from e
         else:
             # Placeholder for MetaAPI async rates fetching
             logger.warning("MetaAPI get_rates not implemented in sync wrapper.")

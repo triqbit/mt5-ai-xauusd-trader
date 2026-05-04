@@ -11,7 +11,7 @@ License: MIT
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
@@ -19,8 +19,9 @@ from typing import Dict, Optional
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.types import TradeSignal
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Ray Dalio All-Weather allocation weights
 ALLOCATION_WEIGHTS: Dict[str, float] = {
@@ -33,21 +34,6 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
     "USDJPY": 0.08,  # JPY - carry trade
     "EURJPY": 0.07,  # EUR/JPY cross
 }
-
-
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
-
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -80,7 +66,7 @@ class RiskManager:
         self.open_positions: Dict[str, int] = {}  # symbol -> ticket
         self.trade_logger = logger_db
         self.monitor = monitor
-        logger.info("RiskManager initialised | balance=%.2f", account_balance)
+        logger.info("risk_manager_initialized", balance=account_balance)
 
     # -- Public API ---------------------------------------------------------
     def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
@@ -105,10 +91,10 @@ class RiskManager:
         passed = rejection_reason == ""
         if not passed:
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
+                "signal_rejected",
+                symbol=signal.symbol,
+                direction=signal.direction,
+                reason=rejection_reason,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
@@ -139,10 +125,10 @@ class RiskManager:
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(
-            "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
-            kelly_fraction,
-            risk_capital,
-            lot_size,
+            "kelly_sizing",
+            kelly=kelly_fraction,
+            risk_cap=risk_capital,
+            lots=lot_size,
         )
         return lot_size
 
@@ -166,15 +152,15 @@ class RiskManager:
                 self.daily.realised_pnl, self.daily.trade_count
             )
         self.daily = DailyStats(peak_equity=self.balance)
-        logger.info("Daily stats reset")
+        logger.info("daily_stats_reset")
 
     # -- Private filter layers ----------------------------------------------
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
-                drawdown * 100,
+                "circuit_breaker_triggered",
+                drawdown_pct=drawdown * 100,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
@@ -191,20 +177,20 @@ class RiskManager:
             return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
         if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
+            logger.warning("daily_loss_limit_hit", loss_pct=loss_pct * 100)
             return False
         return True
 
     def _check_max_positions(self) -> bool:
         if len(self.open_positions) >= self.cfg.max_positions:
-            logger.debug("Max positions reached (%d)", self.cfg.max_positions)
+            logger.debug("max_positions_reached", count=self.cfg.max_positions)
             return False
         return True
 
     def _check_symbol_allocation(self, symbol: str) -> bool:
         """Block trading on symbols not in the All-Weather portfolio."""
         if symbol not in ALLOCATION_WEIGHTS:
-            logger.warning("Symbol %s not in approved portfolio", symbol)
+            logger.warning("symbol_not_in_portfolio", symbol=symbol)
             return False
         return True
 
@@ -213,7 +199,7 @@ class RiskManager:
     ) -> bool:
         if confidence < threshold:
             logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
+                "confidence_too_low", confidence=confidence, threshold=threshold
             )
             return False
         return True
@@ -225,9 +211,9 @@ class RiskManager:
             return False
         rr = reward / risk
         if rr < min_rr:
-            logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
+            logger.debug("risk_reward_too_low", rr=rr, min_rr=min_rr)
             return False
         return True
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]

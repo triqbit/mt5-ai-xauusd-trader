@@ -46,6 +46,7 @@ from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.types import TradeSignal
 from src.data.event_intelligence import RiskStatus
 from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
@@ -55,7 +56,7 @@ from src.models.regime_detector import RegimeDetector
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_manager import RiskManager
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -288,11 +289,7 @@ def run_live(
                             cfg.symbol, explanation, regime_info, macro_risk, perf_metrics
                         )
                         # Render the institutional decision cockpit
-                        if console:
-                            # Optimization: Pass console to avoid redundant creation and captures
-                            dss.format_for_operator(packet, console=console)
-                        else:
-                            print(dss.format_for_operator(packet))
+                        dss.format_for_operator(packet, console=console)
 
                 if risk_approved and direction != 0:
                     with profile("execution"):

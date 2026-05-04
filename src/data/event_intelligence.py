@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from typing import Dict, List, Optional
 
@@ -227,7 +227,7 @@ class EventIntelligence:
         """
         Calculates the current risk status based on upcoming and recent events.
         """
-        now = current_time or datetime.utcnow()
+        now = current_time or datetime.now(timezone.utc)
 
         # Look ahead and behind based on max windows
         max_pre = max(self.pre_event_minutes.values())

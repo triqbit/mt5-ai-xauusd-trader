@@ -1,44 +1,48 @@
-# Product Coherence Audit - April 2026
+# Product Coherence Audit - May 2026
 
-## 1. Product Capability
-**Status: 🟢 Foundational**
-- **Current:** Single-symbol (XAUUSD) live trading loop, MetaTrader 5 integration, basic order execution, and trade logging.
-- **Gaps:**
-    - Lack of multi-symbol portfolio management despite "All-Weather" references in `RiskManager`.
-    - No news/event filtering logic implemented in the main loop.
-    - Limited order management (simple TP/SL based on ATR, no trailing stops or partial closes in `main.py`).
+## 🏛️ Executive Summary
+This audit evaluates the MT5 AI/ML Trading Bot against enterprise standards for naming consistency, UX coherence, documentation accuracy, and module boundaries. While the system has achieved high functional maturity, several "rough edges" persist that fragment the user experience and weaken architectural integrity.
 
-## 2. Usability
-**Status: 🟡 Minimal**
-- **Current:** CLI-driven entrypoint (`main.py`) with basic configuration via Pydantic.
-- **Gaps:**
-    - No real-time dashboard for non-technical users (Prometheus/Grafana mentioned but not fully integrated into `main.py`).
-    - Deployment requires manual environment setup or basic Docker usage; lacks "one-click" cloud deployment.
-    - Logging is standard but lacks a consolidated "intelligence briefing" for the operator.
+**Overall Coherence Score: 7.8/10**
 
-## 3. Safety
-**Status: 🟢 Robust (Theoretical) / 🟡 Basic (Implemented)**
-- **Current:** `RiskManager` with circuit breakers and Kelly sizing.
-- **Gaps:**
-    - Health gate in `main.py` is currently missing or not explicitly blocking.
-    - Lack of automated failover between MT5 and MetaAPI cloud in the implementation.
-    - No explicit handling of extreme slippage or broker-specific execution anomalies.
+---
 
-## 4. Intelligence
-**Status: 🟡 Developing**
-- **Current:** Ensemble model structure (PPO + LSTM).
-- **Gaps:**
-    - Dreamer V3 is referenced but not implemented (lazy loading fails).
-    - Model "drift" detection is purely confidence-based; lacks performance-based trigger for retraining.
-    - Explainability (XAI) is missing; the system doesn't explain *why* it took a trade beyond "direction and confidence".
+## 🔍 Detailed Findings
 
-## 5. Market Differentiation
-**Status: 🔴 Weak**
-- **Current:** Standard technical indicators + RL.
-- **Gaps:**
-    - No gold-specific macro sensitivity (e.g., real yields, inflation expectations, central bank gold demand).
-    - Lacks institutional-grade "What-If" simulation for XAUUSD volatility spikes.
-    - Decision cockpit doesn't highlight regime changes (e.g., "Trending" vs "Mean-Reverting" gold markets).
+### 1. Naming & Type Consistency
+- **Fragmented Core Types:** Fundamental trading structures like `TradeSignal` and `ExecutionDecision` are currently defined deep within the `trading` module. This forces upstream modules (like `core.decision_support`) to have circular or unnecessarily deep dependencies on execution logic.
+- **Alias Proliferation:** `MT5Connector` maintains multiple aliases for initialization (`initialize`/`connect`) and shutdown (`shutdown`/`disconnect`). While intended for compatibility, it creates ambiguity for new developers.
+- **Mixed Logging Standards:** The system uses both standard `logging` and `structlog` inconsistently across `src/trading` and `src/core`.
 
-## Overall Maturity Score: 6.2/10
-The system is a solid technical skeleton but lacks the "Institutional Product" polish and gold-specific intelligence that would make it a market leader.
+### 2. UX & Operator Workflow
+- **Output Inconsistency:** `main.py` and `DecisionSupportSystem` mix raw Python `print()` statements with structured `rich` console output. This results in fragmented terminal rendering where professional tables are interrupted by unformatted text.
+- **Error Clarity:** Some transient MT5 errors are logged with insufficient context, making it difficult for an operator to distinguish between a broker-side timeout and a local configuration issue.
+
+### 3. Documentation Coherence
+- **The "Layer" Discrepancy:** The `README.md` and several module headers still refer to a "6-layer" execution filter, whereas the implementation has matured to a "9-layer" cascade.
+- **Stale API References:** Some docstrings in `src/trading/mt5_connector.py` refer to methods that have been refactored or moved to fallback paths.
+
+### 4. Module Boundaries
+- **Dependency Inversion Violation:** Core components like `SignalExplainer` and `DecisionSupportSystem` are importing types from the `trading` sub-package, violating the principle that core logic should not depend on implementation-specific trading details.
+
+### 5. Institutional Polish
+- **Temporal Consistency:** Multiple files still utilize `datetime.utcnow()`, which is deprecated and can lead to timezone-naive ambiguity. The enterprise standard is `datetime.now(timezone.utc)`.
+- **Exception Handling:** While a centralized `exceptions.py` exists, several components still catch generic `Exception` or fail to wrap SDK-level errors into the system's hierarchy.
+
+---
+
+## 🛠️ Remediation Plan
+
+### Immediate Fixes (PR ✨ Jules05)
+1. **Consolidate Types:** Move `TradeSignal` and `ExecutionDecision` to a centralized `src/core/types.py`.
+2. **Temporal Alignment:** Bulk replace `utcnow()` with `now(timezone.utc)`.
+3. **UX Harmonization:** Replace all raw `print()` calls in `main.py` and `decision_support.py` with `console.print()`.
+4. **Documentation Sync:** Update all references to the "9-layer" filter architecture.
+
+### Secondary Lane Escalations
+- **Jules02 (Hardening):** Standardize all `src/trading` modules to use `structlog` exclusively.
+- **Jules01 (Core):** Deprecate method aliases in `MT5Connector` in favor of a single unified API.
+
+---
+**Audit performed by:** Jules05 (Product Steward)
+**Status:** 🔴 REVISION REQUIRED (Fixes in progress)

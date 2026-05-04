@@ -1,17 +1,18 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/execution_filter.py
-6-layer entry filter cascade to vet signals before execution.
+9-layer entry filter cascade to vet signals before execution.
 Author : triqbit
 License: MIT
 """
 
 from __future__ import annotations
 
-import logging
-from dataclasses import dataclass
-from datetime import datetime
+import structlog
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Dict, Optional
+
+from src.core.types import ExecutionDecision, TradeSignal
 
 import numpy as np
 import pandas as pd
@@ -20,19 +21,8 @@ from scipy import stats
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.trade_logger import TradeLogger
-    from src.trading.risk_manager import TradeSignal
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ExecutionDecision:
-    """Result of the execution filter cascade."""
-
-    signal: TradeSignal
-    is_approved: bool
-    confidence_score: float
-    blocked_by: Optional[str] = None
+logger = structlog.get_logger(__name__)
 
 
 class ExecutionFilter:
@@ -64,7 +54,7 @@ class ExecutionFilter:
         """
         Run the full 9-layer filter cascade.
         """
-        timestamp = timestamp or signal.timestamp or datetime.utcnow()
+        timestamp = timestamp or signal.timestamp or datetime.now(timezone.utc)
 
         # Layer 1: ATR Volatility
         if not self._check_atr_volatility(market_data):
@@ -113,11 +103,11 @@ class ExecutionFilter:
         acc = health.get("accuracy", 1.0)
 
         if drift > self.cfg.model_drift_threshold:
-            logger.warning("EXECUTION BLOCKED: Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold)
+            logger.warning("execution_blocked_model_drift", drift=drift, threshold=self.cfg.model_drift_threshold)
             return False
 
         if acc < self.cfg.model_accuracy_floor:
-            logger.warning("EXECUTION BLOCKED: Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor)
+            logger.warning("execution_blocked_model_accuracy", accuracy=acc, floor=self.cfg.model_accuracy_floor)
             return False
 
         return True
@@ -132,7 +122,7 @@ class ExecutionFilter:
         total_trades = report.get("total_trades", 0)
 
         if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
-            logger.warning("EXECUTION BLOCKED: Win rate %.2f < %.2f", win_rate, self.cfg.model_win_rate_floor)
+            logger.warning("execution_blocked_win_rate_floor", win_rate=win_rate, floor=self.cfg.model_win_rate_floor)
             return False
 
         return True
@@ -172,7 +162,7 @@ class ExecutionFilter:
         elif "close" in df.columns:
             ema_series = df["close"].ewm(span=21, adjust=False).mean()
         else:
-            logger.warning("Trend angle check failed: No EMA21 or close price available")
+            logger.warning("trend_angle_check_failed_missing_data")
             return True # Pass by default if data is missing to avoid blocking valid trades
 
         target_ema = ema_series.iloc[-window:]
