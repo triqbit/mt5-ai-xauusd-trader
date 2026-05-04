@@ -137,12 +137,44 @@ def test_volume_profile_features(synthetic_ohlcv):
     fe = FeatureEngineer(base_timeframe="M1", normalize=False)
     features = fe.compute_features(synthetic_ohlcv)
 
-    assert "vwap_20" in features.columns
-    assert "dist_vwap_20" in features.columns
-    assert "vpt" in features.columns
+    for period in [20, 50, 100]:
+        assert f"vwap_{period}" in features.columns
+        assert f"dist_vwap_{period}" in features.columns
+        assert not features[f"vwap_{period}"].isna().any()
 
-    # Check that VWAP is between low and high
-    # Note: vwap_20 is calculated from typical price, so it should generally stay within price range
-    # However, since it's a rolling average, it might lag.
-    assert not features["vwap_20"].isna().any()
+    assert "vpt" in features.columns
+    assert "rvol" in features.columns
     assert not features["vpt"].isna().any()
+
+
+def test_new_momentum_indicators(synthetic_ohlcv):
+    """Test that MFI, CCI, and MOM are present and computed."""
+    fe = FeatureEngineer(base_timeframe="M1", normalize=False)
+    features = fe.compute_features(synthetic_ohlcv)
+
+    assert "base_M1_mfi" in features.columns
+    assert "base_M1_cci" in features.columns
+    assert "base_M1_mom" in features.columns
+
+    assert not features["base_M1_mfi"].isna().any()
+    assert not features["base_M1_cci"].isna().any()
+    assert not features["base_M1_mom"].isna().any()
+
+
+def test_full_mtf_suite(synthetic_ohlcv):
+    """Test that all requested timeframes generate features."""
+    # We need a longer series to have enough D1 data for indicators
+    # 1440 mins * 30 days = 43200 steps.
+    # For mocking purposes, 3000 is enough if we mock the indicators correctly.
+    tfs = ["M1", "M5", "M15", "H1", "H4", "D1"]
+    fe = FeatureEngineer(base_timeframe="M5", timeframes=tfs, normalize=False)
+    features = fe.compute_features(synthetic_ohlcv)
+
+    assert not features.empty
+    # M1 and M5 are handled specially (base vs mtf)
+    for tf in ["M1", "M15", "H1", "H4", "D1"]:
+        mtf_cols = [c for c in features.columns if f"mtf_{tf}" in c]
+        assert len(mtf_cols) > 0, f"No features found for {tf}"
+
+    # Explicitly check for 140+ features as requested
+    assert fe.get_feature_count() >= 140
