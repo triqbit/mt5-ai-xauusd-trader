@@ -1,12 +1,12 @@
 #!/bin/bash
 # MT5 AI/ML Trading Bot - Disaster Recovery Backup & Verification Script
-# This script performs a backup of the SQLite database, archives logs and reports,
-# generates SHA256 checksums, and verifies backup integrity.
+# This script performs a backup of the SQLite databases (trades.db, audit.db),
+# archives logs and reports, generates SHA256 checksums, and verifies backup integrity.
 
 set -e
 
 # Configuration
-DB_FILE="trades.db"
+DB_FILES=("trades.db" "audit.db")
 LOGS_DIR="logs"
 REPORTS_DIR="reports"
 BACKUP_ROOT="backups"
@@ -23,35 +23,38 @@ mkdir -p "${REPORTS_BACKUP_DIR}"
 
 echo "[$(date)] Starting Disaster Recovery Backup Process..."
 
-# 1. Database Backup
-if [ -f "${DB_FILE}" ]; then
-    BACKUP_FILE="${DB_BACKUP_DIR}/trades_${TIMESTAMP}.db"
-    echo "Backing up database to ${BACKUP_FILE}..."
+# 1. Database Backup Loop
+for DB_FILE in "${DB_FILES[@]}"; do
+    if [ -f "${DB_FILE}" ]; then
+        DB_BASE=$(basename "${DB_FILE}" .db)
+        BACKUP_FILE="${DB_BACKUP_DIR}/${DB_BASE}_${TIMESTAMP}.db"
+        echo "Backing up database ${DB_FILE} to ${BACKUP_FILE}..."
 
-    # Use sqlite3 .backup command for a safe online/hot backup
-    if command -v sqlite3 >/dev/null 2>&1; then
-        sqlite3 "${DB_FILE}" ".backup '${BACKUP_FILE}'"
+        # Use sqlite3 .backup command for a safe online/hot backup
+        if command -v sqlite3 >/dev/null 2>&1; then
+            sqlite3 "${DB_FILE}" ".backup '${BACKUP_FILE}'"
 
-        # 2. Automated Verification (Restoration Dry-run)
-        echo "Verifying backup integrity (SQLite dry-run)..."
-        INTEGRITY=$(sqlite3 "${BACKUP_FILE}" "PRAGMA integrity_check;")
-        if [ "${INTEGRITY}" == "ok" ]; then
-            echo "SUCCESS: Database integrity verified."
+            # 2. Automated Verification (Restoration Dry-run)
+            echo "Verifying backup integrity for ${BACKUP_FILE} (SQLite dry-run)..."
+            INTEGRITY=$(sqlite3 "${BACKUP_FILE}" "PRAGMA integrity_check;")
+            if [ "${INTEGRITY}" == "ok" ]; then
+                echo "SUCCESS: ${DB_FILE} backup integrity verified."
+            else
+                echo "FAILURE: ${DB_FILE} backup integrity check failed: ${INTEGRITY}"
+                exit 1
+            fi
         else
-            echo "FAILURE: Database integrity check failed: ${INTEGRITY}"
-            exit 1
+            echo "WARNING: sqlite3 not found, falling back to cp for ${DB_FILE}. Hot backup not guaranteed."
+            cp "${DB_FILE}" "${BACKUP_FILE}"
         fi
-    else
-        echo "WARNING: sqlite3 not found, falling back to cp. Hot backup not guaranteed."
-        cp "${DB_FILE}" "${BACKUP_FILE}"
-    fi
 
-    # 3. Checksum Generation
-    echo "Generating SHA256 checksum..."
-    (cd "${DB_BACKUP_DIR}" && sha256sum "$(basename "${BACKUP_FILE}")" > "$(basename "${BACKUP_FILE}").sha256")
-else
-    echo "WARNING: ${DB_FILE} not found. Skipping database backup."
-fi
+        # 3. Checksum Generation
+        echo "Generating SHA256 checksum for ${BACKUP_FILE}..."
+        (cd "${DB_BACKUP_DIR}" && sha256sum "$(basename "${BACKUP_FILE}")" > "$(basename "${BACKUP_FILE}").sha256")
+    else
+        echo "INFO: ${DB_FILE} not found. Skipping backup for this database."
+    fi
+done
 
 # 4. Logs Archival
 if [ -d "${LOGS_DIR}" ] && [ "$(ls -A ${LOGS_DIR})" ]; then
