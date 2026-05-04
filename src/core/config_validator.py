@@ -35,6 +35,7 @@ class ConfigValidator:
         self._check_mt5_credentials()
         self._check_live_mode_confirmation()
         self._check_placeholder_secrets()
+        self._check_model_settings()
         self._check_risk_parameters()
         self._check_incompatible_settings()
 
@@ -125,6 +126,17 @@ class ConfigValidator:
                 )
             )
 
+        if self.config.telegram_chat_id and any(
+            p in str(self.config.telegram_chat_id).upper() for p in placeholders
+        ):
+            self.errors.append(
+                ValidationError(
+                    "TELEGRAM_CHAT_ID",
+                    "Telegram chat ID contains placeholder text. Replace with your actual chat ID.",
+                    True,
+                )
+            )
+
         # Check MetaAPI
         metaapi_token = self.config.metaapi_token.get_secret_value()
         if metaapi_token and any(p in metaapi_token.upper() for p in placeholders):
@@ -143,6 +155,20 @@ class ConfigValidator:
                 ValidationError(
                     "METAAPI_ACCOUNT_ID",
                     "MetaAPI account ID contains placeholder text. Replace with your actual MetaAPI account ID.",
+                    True,
+                )
+            )
+
+    def _check_model_settings(self) -> None:
+        """Verify model settings and path existence."""
+        if self.config.mode != "backtest" and (
+            not self.config.model_path.exists() or not self.config.model_path.is_file()
+        ):
+            self.errors.append(
+                ValidationError(
+                    "MODEL_PATH",
+                    f"Model file not found at: {self.config.model_path}. "
+                    "Ensure the model is trained and path is correct.",
                     True,
                 )
             )
@@ -187,7 +213,25 @@ class ConfigValidator:
                 )
             )
 
-        # 3. Position limits (RISK_LIMITS.md 1.1)
+        # 3. Confidence Threshold (RISK_LIMITS.md 4.1)
+        if self.config.confidence_threshold < 0.50:
+            self.errors.append(
+                ValidationError(
+                    "CONFIDENCE_THRESHOLD",
+                    f"Confidence threshold {self.config.confidence_threshold} is dangerously low (Min: 0.50).",
+                    True,
+                )
+            )
+        elif self.config.confidence_threshold < 0.55:
+            self.errors.append(
+                ValidationError(
+                    "CONFIDENCE_THRESHOLD",
+                    f"Confidence threshold {self.config.confidence_threshold} is below the recommended 0.55.",
+                    False,
+                )
+            )
+
+        # 4. Position limits (RISK_LIMITS.md 1.1)
         # Maximum 5 open positions is the policy limit.
         if self.config.max_positions > 10:
             self.errors.append(
@@ -209,6 +253,15 @@ class ConfigValidator:
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
         # 1. LIVE mode restrictions
+        if self.config.mode == "live" and self.config.log_level == "DEBUG":
+            self.errors.append(
+                ValidationError(
+                    "LOG_LEVEL",
+                    "DEBUG logging in LIVE mode can cause performance degradation and log flooding.",
+                    False,
+                )
+            )
+
         if self.config.mode == "live" and self.config.max_positions > 5:
             self.errors.append(
                 ValidationError(
