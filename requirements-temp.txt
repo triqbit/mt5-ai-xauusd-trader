@@ -21,7 +21,7 @@ pandas==2.3.3
 # Python wrapper; C library (0.6.4) built from source in ci.yml
 
 # -- Database ------------------------------------------------------
-sqlalchemy==2.0.30
+sqlalchemy==2.0.49
 alembic==1.13.1
 
 # -- Pydantic / settings -------------------------------------------
