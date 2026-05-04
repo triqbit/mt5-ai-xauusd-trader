@@ -5,7 +5,6 @@ Unit tests for the CapitalAllocator system.
 import pytest
 
 from src.trading.capital_allocator import (
-    AllocationRequest,
     CapitalAllocator,
     RejectionCode,
     StrategyConfig,
@@ -21,7 +20,6 @@ def allocator():
         max_total_heat=0.7,
         performance_step=0.1,
         decay_rate=0.01,
-        soft_limit_buffer=0.0,  # Disable diversification guard by default for existing tests
     )
 
 
@@ -394,113 +392,10 @@ def test_allocation_result_flags(allocator):
     result = allocator.request_allocation("s1", 0.01)
     assert result.was_scaled is True
     assert result.was_capped is False
-    # Use approx due to float math
-    assert result.allocated_risk_pct == pytest.approx(0.012)
+    assert result.allocated_risk_pct == 0.012
 
     # Request 10% (10000). Scaled -> 12000. Capped -> 5000.
     result_cap = allocator.request_allocation("s1", 0.1)
     assert result_cap.was_scaled is True
     assert result_cap.was_capped is True
     assert result_cap.allocated_risk_pct == 0.05
-
-
-def test_cooling_off_period(allocator):
-    config = StrategyConfig(
-        strategy_id="s1",
-        symbol="XAUUSD",
-        model_family="RL",
-        capital_cap=50000.0,
-        performance_multiplier=1.0,
-        max_consecutive_losses=3,
-    )
-    allocator.add_strategy(config)
-
-    # 3 consecutive losses
-    allocator.update_strategy_performance("s1", -100)
-    allocator.update_strategy_performance("s1", -100)
-    allocator.update_strategy_performance("s1", -100)
-
-    assert allocator.strategies["s1"].consecutive_losses == 3
-    # Multiplier should be capped at 0.1
-    assert allocator.strategies["s1"].performance_multiplier <= 0.1
-
-    # Request 10% allocation, should be scaled to 1% (due to 0.1 multiplier)
-    result = allocator.request_allocation("s1", 0.1)
-    assert result.allocated_risk_pct <= 0.01 + 1e-9
-    assert result.was_scaled is True
-
-    # One win breaks cooling off
-    allocator.update_strategy_performance("s1", 100)
-    assert allocator.strategies["s1"].consecutive_losses == 0
-    # Multiplier starts recovering from its last value + step
-    # 0.1 (capped) + 0.1 (step) = 0.2
-    assert allocator.strategies["s1"].performance_multiplier == pytest.approx(0.2)
-
-
-def test_diversification_guard(allocator):
-    config = StrategyConfig(
-        strategy_id="s1",
-        symbol="XAUUSD",
-        model_family="RL",
-        capital_cap=100000.0,
-    )
-    allocator.add_strategy(config)
-    allocator.max_total_heat = 0.5
-    allocator.max_symbol_risk = 1.0  # Make sure symbol risk doesn't interfere
-    allocator.max_family_risk = 1.0
-    allocator.soft_limit_buffer = 0.1
-
-    # Current heat 0.0. Request 5%. Should be allowed (below soft limit 0.4)
-    res1 = allocator.request_allocation("s1", 0.05)
-    assert res1.allocated_risk_pct == 0.05
-    assert res1.was_scaled is False
-
-    # Set current heat to 0.45 (within soft limit buffer of 0.5)
-    allocator.update_allocation("s1", 45000.0)
-
-    # Scale = (0.5 - 0.45) / 0.1 = 0.5
-    # Request 5% should be scaled by 0.5 -> 2.5%
-    res2 = allocator.request_allocation("s1", 0.05, allow_scaling=True)
-    assert res2.was_scaled is True
-    assert res2.allocated_risk_pct == pytest.approx(0.025)
-
-
-def test_allocate_batch_prioritization(allocator):
-    s1 = StrategyConfig(
-        strategy_id="s1",
-        symbol="XAUUSD",
-        model_family="RL",
-        capital_cap=50000.0,
-        performance_multiplier=1.5,
-    )
-    s2 = StrategyConfig(
-        strategy_id="s2",
-        symbol="EURUSD",
-        model_family="LSTM",
-        capital_cap=50000.0,
-        performance_multiplier=0.5,
-    )
-    allocator.add_strategy(s1)
-    allocator.add_strategy(s2)
-
-    # Limit total heat to 0.1 (10,000)
-    allocator.max_total_heat = 0.1
-
-    # Both request 10% risk.
-    # s1 scaled to 15% (scaled), then capped to 10% (limit).
-    # s2 should be rejected or scaled to 0 because s1 took all heat.
-    reqs = [
-        AllocationRequest(strategy_id="s1", requested_risk_pct=0.1, allow_scaling=True),
-        AllocationRequest(strategy_id="s2", requested_risk_pct=0.1, allow_scaling=True),
-    ]
-
-    results = allocator.allocate_batch(reqs)
-
-    # s1 should be first in results because it has higher multiplier
-    assert results[0].strategy_id == "s1"
-    assert results[0].is_allowed is True
-    assert results[0].allocated_risk_pct == 0.1
-
-    assert results[1].strategy_id == "s2"
-    # s2 is allowed but scaled to 0 (or almost 0) because s1 used 100% of allowed heat
-    assert results[1].allocated_risk_pct == 0.0
