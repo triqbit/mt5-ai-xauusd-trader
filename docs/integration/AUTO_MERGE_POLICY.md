@@ -6,14 +6,14 @@ This document defines the strict auto-merge policy for the MT5 AI/ML Trading Bot
 
 Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 
-- ✅ **CI Checks Passing:** All required CI checks must pass (tests, lint, coverage ≥ 80%, security scan clean).
-- ✅ **Required Approvals:** Required code owners have approved the pull request.
+- ✅ **CI Checks:** All required CI checks must pass (tests, lint, coverage ≥ 80%, security scan clean).
+- ✅ **Approvals:** Required code owners have approved the pull request.
 - ✅ **No Merge Conflicts:** No conflicts with the target branch.
-- ✅ **Safety / No High-Risk Files:** No high-risk files (as defined below) are touched.
-- ✅ **Tests Added/Updated:** Tests must be added or updated for any new functionality.
-- ✅ **Documentation Updated:** Documentation must be updated where required by the change.
-- ✅ **Observability Standards:** Observability and logging must meet project standards (standard `structlog`, no raw `print()` statements, mandatory docstrings).
-- ✅ **Architectural Convention:** Changes must fit within existing architectural conventions.
+- ✅ **Safety:** No high-risk files (as defined below) are touched.
+- ✅ **Test Coverage:** Tests must be added or updated for any new functionality.
+- ✅ **Documentation:** Documentation must be updated where required by the change.
+- ✅ **Observability:** Observability and logging must meet project standards (standard `structlog`, no `print` statements, mandatory docstrings).
+- ✅ **Architecture:** Changes must fit within existing architectural conventions.
 
 ## Block and Escalate Rules
 
@@ -26,7 +26,7 @@ Automatically **BLOCK** and **ESCALATE** if any of these are true:
 - 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile` or container orchestration.
 - 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*` or `ci.yml`.
 
-## High-Risk File Patterns (Auto-Merge Prohibited)
+## High-Risk Files (Auto-Merge Prohibited)
 
 The following patterns trigger an automatic block and escalation:
 

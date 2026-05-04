@@ -36,9 +36,13 @@ jobs:
 
       - name: Check for High-Risk Files
         id: risk-check
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          ACTOR: ${{ github.actor }}
         run: |
           # Exemption for governance maintenance
-          if [[ "${{ github.event.pull_request.title }}" == "🤖 Jules05: Auto-merge policy update" && "${{ github.actor }}" == "yxynoty" ]]; then
+          # Use environment variables to prevent script injection
+          if [[ "$PR_TITLE" == "🤖 Jules05: Auto-merge policy update" && "$ACTOR" == "yxynoty" ]]; then
             echo "🛡️ Governance Maintenance Exemption Applied."
             echo "risk_status=pass" >> $GITHUB_OUTPUT
             exit 0

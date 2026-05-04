@@ -31,9 +31,12 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          ACTOR: ${{ github.actor }}
         run: |
           # Exemption for governance maintenance
-          if [[ "${{ github.event.pull_request.title }}" == "🤖 Jules05: Auto-merge policy update" && "${{ github.actor }}" == "yxynoty" ]]; then
+          # Use environment variables to prevent script injection
+          if [[ "$PR_TITLE" == "🤖 Jules05: Auto-merge policy update" && "$ACTOR" == "yxynoty" ]]; then
             echo "🛡️ Governance Maintenance Audit Logging."
             # We still log it, but as a maintenance action
             DATE=$(date +'%Y-%m-%d')
