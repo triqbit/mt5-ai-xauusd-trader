@@ -31,6 +31,9 @@ def mock_walk_forward_result():
         metrics=RobustnessMetrics(
             oos_sharpe_mean=1.5,
             oos_sharpe_std=0.2,
+            worst_window_sharpe=0.5,
+            win_rate_consistency=0.8,
+            max_drawdown_consistency=0.9,
             is_oos_gap=0.3,
             stability_penalty=0.1,
             regime_consistency=0.9,
@@ -155,7 +158,7 @@ def test_save_html(mock_walk_forward_result, tmp_path):
         title="Save Test",
         executive_summary="Testing save functionality.",
         hyperparameter_robustness=mock_walk_forward_result.to_report_section(),
-        conclusion="Done."
+        conclusion="Done.",
     )
     reporter = ResearchReporter()
     file_path = tmp_path / "test_report.html"
