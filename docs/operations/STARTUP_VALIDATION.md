@@ -30,6 +30,9 @@ At startup, the `ConfigValidator` performs the following checks:
 - **MAX_DAILY_LOSS**: Strictly prohibited if greater than 6% (0.06). Warning if > 5%.
 - **MAX_POSITIONS**: Strictly prohibited if greater than 10 always.
 - **CONFIDENCE_THRESHOLD**: Strictly prohibited if less than 0.50. Warning if < 0.55.
+- **MODEL_DRIFT_THRESHOLD**: Warning if set greater than 0.4 (Recommended: 0.3).
+- **MODEL_ACCURACY_FLOOR**: Strictly prohibited if less than 0.45.
+- **MODEL_WIN_RATE_FLOOR**: Strictly prohibited if less than 0.40.
 
 ### 6. Incompatible Settings & Consistency
 - **LOG_LEVEL**: Warning if set to `DEBUG` in `live` mode.

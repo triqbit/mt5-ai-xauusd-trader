@@ -104,6 +104,15 @@ class TradingConfig(BaseSettings):
     confidence_threshold: float = Field(
         default=0.6, ge=0.0, le=1.0, description="Minimum model confidence score required to execute a signal"
     )
+    model_drift_threshold: float = Field(
+        default=0.3, ge=0.05, le=0.5, description="Maximum allowed model drift score before halting trades"
+    )
+    model_accuracy_floor: float = Field(
+        default=0.5, ge=0.4, le=0.9, description="Minimum allowed model accuracy score before halting trades"
+    )
+    model_win_rate_floor: float = Field(
+        default=0.45, ge=0.3, le=0.7, description="Minimum allowed historical win rate before halting trades"
+    )
 
     @field_validator("risk_per_trade")
     @classmethod

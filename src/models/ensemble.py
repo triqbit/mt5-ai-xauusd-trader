@@ -60,6 +60,11 @@ class EnsembleModel(BaseModel):
         self._last_confidences: Dict[str, deque[float]] = {
             k: deque(maxlen=200) for k in self.ALGORITHMS
         }
+        self._latest_health_metrics: Dict[str, float] = {
+            "accuracy": 1.0,
+            "drift": 0.0,
+            "calibration": 0.0,
+        }
 
     @property
     def weights(self) -> Dict[str, float]:
@@ -205,7 +210,32 @@ class EnsembleModel(BaseModel):
             }
 
         self.dynamic_ensemble.update_weights(metrics, regime_info=regime_info)
-        logger.info("Weights rebalanced: %s", self.weights)
+
+        # Update aggregate health metrics (weighted average)
+        current_weights = self.weights
+        agg_acc = 0.0
+        agg_drift = 0.0
+        agg_cal = 0.0
+        for algo, m in metrics.items():
+            w = current_weights.get(algo, 0.0)
+            agg_acc += w * m["accuracy"]
+            agg_drift += w * m["drift_score"]
+            agg_cal += w * m["calibration_error"]
+
+        self._latest_health_metrics = {
+            "accuracy": agg_acc,
+            "drift": agg_drift,
+            "calibration": agg_cal,
+        }
+
+        logger.info(
+            "Weights rebalanced: %s | Agg Health: acc=%.2f drift=%.2f",
+            self.weights, agg_acc, agg_drift
+        )
+
+    def get_health_metrics(self) -> Dict[str, float]:
+        """Expose latest aggregate health metrics."""
+        return self._latest_health_metrics.copy()
 
 
 __all__ = ["EnsembleModel", "LSTMAttentionModel"]

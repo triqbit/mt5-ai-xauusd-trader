@@ -250,6 +250,34 @@ class ConfigValidator:
                 )
             )
 
+        # 5. Stability Guards (RISK_LIMITS.md 4.2)
+        if self.config.model_drift_threshold > 0.4:
+            self.errors.append(
+                ValidationError(
+                    "MODEL_DRIFT_THRESHOLD",
+                    f"Model drift threshold {self.config.model_drift_threshold} is dangerously high (Recommended: 0.3).",
+                    False,
+                )
+            )
+
+        if self.config.model_accuracy_floor < 0.45:
+            self.errors.append(
+                ValidationError(
+                    "MODEL_ACCURACY_FLOOR",
+                    f"Model accuracy floor {self.config.model_accuracy_floor} is too low (Min: 0.45).",
+                    True,
+                )
+            )
+
+        if self.config.model_win_rate_floor < 0.40:
+            self.errors.append(
+                ValidationError(
+                    "MODEL_WIN_RATE_FLOOR",
+                    f"Model win rate floor {self.config.model_win_rate_floor} is dangerously low (Min: 0.40).",
+                    True,
+                )
+            )
+
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
         # 1. LIVE mode restrictions

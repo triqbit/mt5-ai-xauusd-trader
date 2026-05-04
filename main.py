@@ -208,15 +208,22 @@ def run_live(
 
                 # 6. Risk approval gate
                 with profile("risk_check"):
-                    risk_approved = risk.approve(signal, signal_id=signal_id) if direction != 0 else False
+                    health = getattr(model, "get_health_metrics", lambda: None)()
+                    risk_approved = risk.approve(signal, signal_id=signal_id, model_health=health) if direction != 0 else False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
                 if risk_approved:
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
+                        # Model health retrieved in step 6
                         filter_decision = execution_filter.validate(
-                            signal, df_features, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
+                            signal,
+                            df_features,
+                            current_drawdown=drawdown,
+                            timestamp=datetime.now(timezone.utc),
+                            model_health=health,
+                            trade_logger=trade_logger,
                         )
                         if not filter_decision.is_approved:
                             log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
@@ -448,7 +455,8 @@ def main() -> int:
     monitor.start_metrics_server()
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
-        max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15
+        max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
+        config=cfg,
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
     regime_detector = RegimeDetector()
