@@ -168,7 +168,7 @@ class LSTMModel(BaseModel):
                 if model_path and Path(model_path).exists():
                     self.logger.info(f"Loading LSTM model from {model_path}")
                     self.model.load_state_dict(
-                        torch.load(model_path, map_location=self.device)
+                        torch.load(model_path, map_location=self.device, weights_only=True)
                     )
                     self.model.eval()
                 else:
