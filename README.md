@@ -123,6 +123,7 @@ python main.py --mode demo --symbol XAUUSD --algo ensemble
 | [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
 | [DATABASE_STANDARDS.md](./DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
+| [**SLO & Reliability Targets**](./docs/SLO_TARGETS.md) | **Measurable reliability standards and error budget framework.** |
 | [**Contributing Guide**](./docs/CONTRIBUTING.md) | **How to contribute safely and effectively.** |
 | [**Contribution Map**](./docs/CONTRIBUTION_MAP.md) | **Safe vs. Sensitive zone navigation.** |
 
