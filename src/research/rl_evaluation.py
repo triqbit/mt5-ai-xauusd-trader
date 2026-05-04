@@ -577,10 +577,9 @@ class RLEvaluator:
             for i in range(1, len(df)):
                 if positions[i-1] == 0 and positions[i] != 0:
                     entry_idx = i
-                elif positions[i-1] != 0 and positions[i] == 0:
-                    if regimes[entry_idx] == regime:
-                        pnl = balances[i] - balances[entry_idx - 1]
-                        regime_pnls.append(pnl)
+                elif positions[i-1] != 0 and positions[i] == 0 and regimes[entry_idx] == regime:
+                    pnl = balances[i] - balances[entry_idx - 1]
+                    regime_pnls.append(pnl)
 
             win_rate = len([p for p in regime_pnls if p > 0]) / len(regime_pnls) if regime_pnls else 0.0
 
