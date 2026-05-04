@@ -37,7 +37,7 @@ pydantic-settings==2.14.0
 optuna==4.8.0
 pytest==9.0.3
 pytest-cov==6.1.0
-python-telegram-bot
+python-telegram-bot==22.7
 fastapi>=0.115.0
 requests==2.33.1
 httpx==0.28.0

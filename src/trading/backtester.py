@@ -106,14 +106,21 @@ class BacktestEngine:
             step_size,
         )
 
-        n = len(data)
-        if n < train_window + test_window:
-            logger.error("Insufficient data for backtest: %d bars available", n)
-            return PerformanceReport()
-
         # Pre-calculate all possible features and technical indicators for efficiency
         logger.info("Pre-calculating features for the entire dataset...")
         df_features = self.fe.compute_features(data, drop_ohlcv=False)
+
+        if df_features.empty:
+            logger.error("Feature engineering returned empty DataFrame. Insufficient data?")
+            return PerformanceReport()
+
+        # Align data with features (FeatureEngineer drops rows with NaNs)
+        data = data.loc[df_features.index].copy()
+        n = len(data)
+
+        if n < train_window + test_window:
+            logger.error("Insufficient data for walk-forward after feature engineering: %d bars available", n)
+            return PerformanceReport()
 
         # Calculate ATR once for the whole dataset
         high_low = data["high"] - data["low"]
