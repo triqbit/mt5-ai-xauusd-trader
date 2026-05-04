@@ -168,11 +168,16 @@ class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
     def __init__(
-        self, df: pd.DataFrame, initial_balance: float = 10000.0, commission: float = 0.0002
+        self,
+        df: pd.DataFrame,
+        initial_balance: float = 10000.0,
+        commission: float = 0.0002,
+        bars_per_year: int = 252,
     ):
         self.df = df
         self.initial_balance = initial_balance
         self.commission = commission
+        self.bars_per_year = bars_per_year
         self.results: Dict[str, Any] = {}
 
     def evaluate_all(self, strategies: List[BenchmarkStrategy]) -> pd.DataFrame:
@@ -241,14 +246,14 @@ class BenchmarkEvaluator:
         sharpe = 0.0
         sortino = 0.0
         if np.std(daily_returns) > 0:
-            # Assuming 252 trading days for annualization
+            # Use bars_per_year for annualization
             avg_return = np.mean(daily_returns)
-            sharpe = avg_return / np.std(daily_returns) * np.sqrt(252)
+            sharpe = avg_return / np.std(daily_returns) * np.sqrt(self.bars_per_year)
 
             downside_returns = daily_returns[daily_returns < 0]
             downside_std = np.std(downside_returns) if len(downside_returns) > 0 else 0
             if downside_std > 0:
-                sortino = avg_return / downside_std * np.sqrt(252)
+                sortino = avg_return / downside_std * np.sqrt(self.bars_per_year)
 
         peak = np.maximum.accumulate(equity)
         drawdown = (peak - equity) / peak
