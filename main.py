@@ -618,7 +618,7 @@ def main() -> int:
                 max_positions=cfg.max_positions,
             )
 
-            report = engine.run_walk_forward(
+            bt_report = engine.run_walk_forward(
                 df_raw,
                 model,
                 train_window=args.train_window,
@@ -631,14 +631,14 @@ def main() -> int:
             perf_table.add_column("Metric", style="cyan")
             perf_table.add_column("Value", justify="right")
 
-            perf_table.add_row("Annualized Return", f"{report.annualized_return:.2%}")
-            perf_table.add_row("Sharpe Ratio", f"{report.sharpe_ratio:.2f}")
-            perf_table.add_row("Max Drawdown", f"{report.max_drawdown:.2%}")
-            perf_table.add_row("Profit Factor", f"{report.profit_factor:.2f}")
-            perf_table.add_row("Win Rate", f"{report.win_rate:.2%}")
-            perf_table.add_row("Total Trades", str(report.total_trades))
-            perf_table.add_row("MAE Avg", f"{report.mae_avg:.2f}")
-            perf_table.add_row("MFE Avg", f"{report.mfe_avg:.2f}")
+            perf_table.add_row("Annualized Return", f"{bt_report.annualized_return:.2%}")
+            perf_table.add_row("Sharpe Ratio", f"{bt_report.sharpe_ratio:.2f}")
+            perf_table.add_row("Max Drawdown", f"{bt_report.max_drawdown:.2%}")
+            perf_table.add_row("Profit Factor", f"{bt_report.profit_factor:.2f}")
+            perf_table.add_row("Win Rate", f"{bt_report.win_rate:.2%}")
+            perf_table.add_row("Total Trades", str(bt_report.total_trades))
+            perf_table.add_row("MAE Avg", f"{bt_report.mae_avg:.2f}")
+            perf_table.add_row("MFE Avg", f"{bt_report.mfe_avg:.2f}")
 
             console.print(Panel(perf_table, border_style="green"))
     finally:

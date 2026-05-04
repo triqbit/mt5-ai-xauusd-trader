@@ -9,9 +9,9 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -230,11 +230,15 @@ class BacktestEngine:
             # SL/TP Check
             exit_price = None
             if direction == 1:
-                if low <= signal.stop_loss: exit_price = signal.stop_loss
-                elif high >= signal.take_profit: exit_price = signal.take_profit
+                if low <= signal.stop_loss:
+                    exit_price = signal.stop_loss
+                elif high >= signal.take_profit:
+                    exit_price = signal.take_profit
             else:
-                if high >= signal.stop_loss: exit_price = signal.stop_loss
-                elif low <= signal.take_profit: exit_price = signal.take_profit
+                if high >= signal.stop_loss:
+                    exit_price = signal.stop_loss
+                elif low <= signal.take_profit:
+                    exit_price = signal.take_profit
 
             if exit_price:
                 self._record_trade(trade, exit_price, timestamp)
