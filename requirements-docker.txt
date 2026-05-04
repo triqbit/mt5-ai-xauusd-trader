@@ -59,7 +59,7 @@ tomli==2.4.1
 python-dateutil==2.9.0.post0
 pytz==2024.1
 click==8.3.3
-tabulate==0.9.0
+tabulate==0.10.0
 joblib==1.4.2
 
 # -- ML / RL (CPU-only torch; no CUDA wheels pulled) ---------------
