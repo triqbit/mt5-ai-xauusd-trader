@@ -45,7 +45,7 @@ tqdm==4.66.4
 
 # ── Dashboard / API ─────────────────────────────────────────
 fastapi==0.111.0
-uvicorn[standard]==0.29.0
+uvicorn[standard]==0.46.0
 dash==4.1.0
 plotly==5.22.0
 
