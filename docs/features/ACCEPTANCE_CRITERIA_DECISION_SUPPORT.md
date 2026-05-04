@@ -11,11 +11,12 @@
     - Handle signals for multiple symbols simultaneously (if applicable).
 - **Inputs/Outputs:**
     - **Inputs:** `SignalExplanation`, `RegimeInfo`, `RiskStatus`, and recent performance metrics (Sharpe, Win Rate, etc.).
-    - **Outputs:** `DecisionPacket` (JSON/Pydantic) and a formatted string for terminal display.
+    - **Outputs:** `DecisionPacket` (JSON/Pydantic) including `direction` and `consensus` fields, and a formatted string for terminal display.
 
 ## Technical Acceptance
 - **Test Coverage:**
     - Unit tests for `DecisionPacket` validation and status aggregation logic.
+    - Unit tests for `_calculate_consensus` logic covering Unanimous, Strong Majority, and Mixed states.
     - Integration tests for the `assemble_packet` method with mock component data.
     - Visual verification of the terminal output formatting (captured in logs or screenshots).
 - **Performance:**

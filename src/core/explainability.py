@@ -436,30 +436,143 @@ class SignalExplainer:
             return capture.get()
 
         except ImportError:
-            # Fallback to plain text
-            output = "=== TRADE SIGNAL EXPLANATION ===\n"
-            output += f"Symbol: {explanation.symbol} | Direction: {explanation.direction.name} | Conf: {explanation.total_confidence:.1%}\n"
-            output += f"Summary: {explanation.human_readable_summary}\n\n"
-            output += "Model Votes:\n"
+            return self._get_plain_text_explanation(explanation)
+
+    def get_renderable(self, explanation: SignalExplanation) -> Any:
+        """
+        Return a 'rich' Group containing the full breakdown.
+        Used for integration with larger dashboards.
+        """
+        try:
+            from rich import box
+            from rich.console import Group
+            from rich.panel import Panel
+            from rich.table import Table
+            from rich.text import Text
+
+            # 1. Model Votes Table
+            model_table = Table(title="Model Attribution", box=box.SIMPLE)
+            model_table.add_column("Model", style="cyan")
+            model_table.add_column("Vote", style="bold")
+            model_table.add_column("Weight", justify="right")
+            model_table.add_column("Confidence", justify="right")
+            model_table.add_column("Dominant", justify="center")
+
             for attr in explanation.model_attributions:
-                output += (
-                    f"  - {attr.model_name}: {attr.vote.name} (W={attr.weight:.1%}, "
-                    f"C={attr.confidence:.1%}) {'[DOMINANT]' if attr.is_dominant else ''}\n"
+                vote_color = (
+                    "green"
+                    if attr.vote == SignalDirection.BUY
+                    else "red"
+                    if attr.vote == SignalDirection.SELL
+                    else "white"
+                )
+                model_table.add_row(
+                    attr.model_name,
+                    f"[{vote_color}]{attr.vote.name}[/{vote_color}]",
+                    f"{attr.weight:.1%}",
+                    f"{attr.confidence:.1%}",
+                    "⭐" if attr.is_dominant else "",
                 )
 
+            # 2. Feature Contributions
+            feature_table = Table(title="Feature Cluster Contributions", box=box.SIMPLE)
+            feature_table.add_column("Cluster", style="magenta")
+            feature_table.add_column("Score", justify="right")
+            feature_table.add_column("Impact", justify="center")
+            feature_table.add_column("Summary")
+
+            for cont in explanation.feature_contributions:
+                impact_color = (
+                    "red"
+                    if cont.impact_level == "High"
+                    else "yellow"
+                    if cont.impact_level == "Medium"
+                    else "dim"
+                )
+                score_color = (
+                    "green"
+                    if cont.contribution_score > 0
+                    else "red"
+                    if cont.contribution_score < 0
+                    else "white"
+                )
+                feature_table.add_row(
+                    cont.cluster_name,
+                    f"[{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
+                    f"[{impact_color}]{cont.impact_level}[/{impact_color}]",
+                    cont.summary,
+                )
+
+            # 3. Execution and Risk
+            exec_table = Table(title="Execution Filters", box=box.SIMPLE, expand=True)
+            exec_table.add_column("Filter")
+            exec_table.add_column("Status", justify="center")
+            exec_table.add_column("Details")
+
+            for f in explanation.execution_summary.filters:
+                status = "[green]OK[/green]" if f.passed else "[red]FAIL[/red]"
+                details = f.message or f"Value: {f.value} (Thr: {f.threshold})"
+                exec_table.add_row(f.filter_name, status, details)
+
+            risk_status = (
+                "[bold green]PASSED[/bold green]"
+                if explanation.risk_assessment.passed
+                else "[bold red]REJECTED[/bold red]"
+            )
+            risk_info = (
+                f"Risk Gate: {risk_status}\n"
+                f"R:R Ratio: [bold]{explanation.risk_assessment.risk_reward_ratio:.2f}[/bold]\n"
+                f"Kelly Size: [bold]{explanation.risk_assessment.kelly_fraction:.2%}[/bold]\n"
+            )
+            if explanation.risk_assessment.rejection_reasons:
+                risk_info += f"Reasons: [dim]{', '.join(explanation.risk_assessment.rejection_reasons)}[/dim]"
+
+            regime_info = (
+                f"Market Regime: [bold cyan]{explanation.regime_context.regime_name}[/bold cyan]\n"
+                f"Volatility: [bold]{explanation.regime_context.volatility_state}[/bold]\n"
+                f"Favored: {'[green]YES[/green]' if explanation.regime_context.is_favorable else '[red]NO[/red]'}"
+            )
+
+            components = [model_table]
             if explanation.feature_contributions:
-                output += "\nFeature Contributions:\n"
-                for cont in explanation.feature_contributions:
-                    output += (
-                        f"  - {cont.cluster_name}: {cont.contribution_score:+.2f} "
-                        f"({cont.impact_level}) - {cont.summary}\n"
-                    )
-
+                components.append(feature_table)
             if explanation.execution_summary.filters:
-                output += f"\nExecution: {'PASSED' if explanation.execution_summary.passed else 'BLOCKED'}\n"
-                for f in explanation.execution_summary.filters:
-                    output += f"  - {f.filter_name}: {'OK' if f.passed else 'FAIL'} ({f.message or f.value})\n"
+                components.append(exec_table)
 
-            output += f"\nRisk Assessment: {'PASSED' if explanation.risk_assessment.passed else 'REJECTED'}\n"
-            output += f"Regime: {explanation.regime_context.regime_name} ({explanation.regime_context.volatility_state})\n"
-            return output
+            components.append(Panel(risk_info, title="Risk Assessment"))
+            components.append(Panel(regime_info, title="Market Context"))
+
+            return Group(*components)
+        except ImportError:
+            # We don't have a good fallback here as this returns a renderable
+            return None
+
+    def _get_plain_text_explanation(self, explanation: SignalExplanation) -> str:
+        """Fallback plain text formatter."""
+        output = "=== TRADE SIGNAL EXPLANATION ===\n"
+        output += f"Symbol: {explanation.symbol} | Direction: {explanation.direction.name} | Conf: {explanation.total_confidence:.1%}\n"
+        output += f"Summary: {explanation.human_readable_summary}\n\n"
+        output += "Model Votes:\n"
+        for attr in explanation.model_attributions:
+            output += (
+                f"  - {attr.model_name}: {attr.vote.name} (W={attr.weight:.1%}, "
+                f"C={attr.confidence:.1%}) {'[DOMINANT]' if attr.is_dominant else ''}\n"
+            )
+
+        if explanation.feature_contributions:
+            output += "\nFeature Contributions:\n"
+            for cont in explanation.feature_contributions:
+                output += (
+                    f"  - {cont.cluster_name}: {cont.contribution_score:+.2f} "
+                    f"({cont.impact_level}) - {cont.summary}\n"
+                )
+
+        if explanation.execution_summary.filters:
+            output += f"\nExecution: {'PASSED' if explanation.execution_summary.passed else 'BLOCKED'}\n"
+            for f in explanation.execution_summary.filters:
+                output += f"  - {f.filter_name}: {'OK' if f.passed else 'FAIL'} ({f.message or f.value})\n"
+
+        output += f"\nRisk Assessment: {'PASSED' if explanation.risk_assessment.passed else 'REJECTED'}\n"
+        output += f"Regime: {explanation.regime_context.regime_name} ({explanation.regime_context.volatility_state})\n"
+        return output
+

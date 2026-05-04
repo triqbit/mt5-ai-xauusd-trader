@@ -13,9 +13,10 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from src.core.explainability import SignalExplainer, SignalExplanation
+from src.core.constants import SignalDirection
+from src.core.explainability import ModelAttribution, SignalExplainer, SignalExplanation
 from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
@@ -38,8 +39,12 @@ class DecisionPacket(BaseModel):
     Aggregates all critical dimensions of a trading decision.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     symbol: str = Field(..., description="Target trading symbol")
+    direction: SignalDirection = Field(..., description="Final signal direction")
+    consensus: str = Field(..., description="Qualitative model consensus level")
     is_executable: bool = Field(False, description="Final decision on whether the trade should proceed")
     blocking_reasons: List[str] = Field(default_factory=list, description="List of reasons if the trade is blocked")
 
@@ -48,9 +53,6 @@ class DecisionPacket(BaseModel):
     regime: RegimeInfo = Field(..., description="Current market regime context")
     macro_risk: RiskStatus = Field(..., description="Macroeconomic event risk status")
     performance: PerformanceContext = Field(..., description="Recent performance context")
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class DecisionSupportSystem:
@@ -100,8 +102,13 @@ class DecisionSupportSystem:
             total_trades=int(performance_metrics.get("total_trades", 0)),
         )
 
+        # Calculate Consensus
+        consensus = self._calculate_consensus(explanation)
+
         return DecisionPacket(
             symbol=symbol,
+            direction=explanation.direction,
+            consensus=consensus,
             is_executable=is_executable,
             blocking_reasons=blocking_reasons,
             explanation=explanation,
@@ -110,29 +117,55 @@ class DecisionSupportSystem:
             performance=performance,
         )
 
+    def _calculate_consensus(self, explanation: SignalExplanation) -> str:
+        """
+        Determine the level of agreement among ensemble models.
+        """
+        if not explanation.model_attributions:
+            return "No Votes"
+
+        votes = [attr.vote for attr in explanation.model_attributions]
+        total_models = len(votes)
+
+        direction = explanation.direction
+        matching_votes = sum(1 for v in votes if v == direction)
+
+        agreement_pct = matching_votes / total_models
+
+        if agreement_pct >= 1.0:
+            return "Unanimous"
+        elif agreement_pct >= 0.66:
+            return "Strong Majority"
+        elif agreement_pct >= 0.5:
+            return "Mixed Confluence"
+        else:
+            return "Divided/Weak"
+
     def format_for_operator(self, packet: DecisionPacket, console: Optional[Any] = None) -> str:
         """
         Generate a human-readable, high-fidelity terminal dashboard.
+        Aggregates all dimensions of the decision into a single visual summary.
         """
         try:
             from rich import box
-            from rich.console import Console
+            from rich.console import Console, Group
             from rich.panel import Panel
             from rich.table import Table
             from rich.text import Text
-
-            console_provided = console is not None
-            if console is None:
-                console = Console(force_terminal=True)
 
             # 1. Header with Go/No-Go status
             status_color = "green" if packet.is_executable else "red"
             status_text = "EXECUTE" if packet.is_executable else "BLOCKED"
 
+            dir_color = "green" if packet.direction == SignalDirection.BUY else "red" if packet.direction == SignalDirection.SELL else "yellow"
+
             header_content = Text()
-            header_content.append(f"SYMBOL: {packet.symbol}\n", style="bold")
+            header_content.append(f"SYMBOL: {packet.symbol}  ", style="bold")
+            header_content.append(f"DIRECTION: {packet.direction.name}\n", style=f"bold {dir_color}")
             header_content.append("STATUS: ", style="bold")
             header_content.append(status_text, style=f"bold {status_color}")
+            header_content.append("  |  CONSENSUS: ", style="bold")
+            header_content.append(packet.consensus.upper(), style="bold cyan")
 
             if packet.blocking_reasons:
                 header_content.append("\n\nBLOCKING REASONS:\n", style="bold red")
@@ -193,25 +226,31 @@ class DecisionSupportSystem:
 
             macro_panel = Panel(macro_content, title="Macro Intelligence", border_style=macro_color)
 
-            # Bypass expensive capture if we are printing directly to a console
-            if console_provided and not getattr(console, "_record", False):
-                 console.print(header)
-                 console.print(overview_table)
-                 console.print(macro_panel)
+            # 4. Attribution Summary (Text)
+            attribution_summary = Panel(
+                Text(packet.explanation.human_readable_summary),
+                title="Signal Attribution Summary",
+                border_style="yellow",
+            )
 
-                 console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
-                 self.explainer.format_for_terminal(packet.explanation, console=console)
-                 return ""
+            # Assemble everything into a single group for output
+            dashboard = Group(
+                header,
+                overview_table,
+                macro_panel,
+                attribution_summary,
+                Text("\n[bold]DETAILED ATTRIBUTION BREAKDOWN[/bold]\n"),
+                self.explainer.get_renderable(packet.explanation)
+            )
 
-            with console.capture() as capture:
-                console.print(header)
-                console.print(overview_table)
-                console.print(macro_panel)
+            # Print to console if provided
+            if console:
+                console.print(dashboard)
 
-                # Integration with existing SignalExplainer output for the details
-                console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
-                console.print(self.explainer.format_for_terminal(packet.explanation))
-
+            # Return string representation
+            temp_console = Console(force_terminal=True, width=100)
+            with temp_console.capture() as capture:
+                temp_console.print(dashboard)
             return capture.get()
 
         except ImportError:
