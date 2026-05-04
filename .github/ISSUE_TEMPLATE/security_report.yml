@@ -19,14 +19,14 @@ body:
     id: impact
     attributes:
       label: Impact
-      description: What is the potential impact of this vulnerability? (e.g., Data exposure, Fund risk, RCE)
+      description: What is the potential impact? (e.g., Fund risk, Credential leakage, RCE)
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
       label: Proof of Concept / Reproduction
-      description: How can the vulnerability be reproduced?
+      description: How can the vulnerability be reproduced? (Do NOT include live secrets)
     validations:
       required: true
   - type: textarea

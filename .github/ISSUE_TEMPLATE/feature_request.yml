@@ -20,7 +20,20 @@ body:
     id: business-value
     attributes:
       label: Business Value / ROI
-      description: What is the expected benefit or value of this feature? (e.g., higher Sharpe ratio, reduced latency, improved observability)
+      description: What is the expected benefit or value? (e.g., higher Sharpe ratio, reduced latency, improved observability)
+    validations:
+      required: true
+  - type: dropdown
+    id: strategic-alignment
+    attributes:
+      label: Strategic Alignment
+      description: How does this align with the project's goals?
+      options:
+        - Risk Management / Safety
+        - Performance / Alpha
+        - Observability / Governance
+        - Developer Experience
+        - Infrastructure / Reliability
     validations:
       required: true
   - type: textarea

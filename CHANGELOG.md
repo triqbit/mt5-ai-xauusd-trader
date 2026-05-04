@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI Quality Gates:** Mandatory Mypy type enforcement and Docker dependency harmonization for enterprise stability.
 - **Versioning Policy:** Defined comprehensive SemVer criteria and automated release workflows in `docs/VERSIONING_POLICY.md`.
 - **Automated Changelog:** Integrated conventional commit-based changelog updates in `.github/workflows/changelog.yml`.
+- **Enterprise Contribution Governance:** Established comprehensive controls including `CODEOWNERS`, a robust PR template with quality gates, and structured issue forms for bugs, features, and security reports.
+- **Contributor Workflow:** Formally defined role-based governance and mandatory quality gates (85% coverage) in `docs/CONTRIBUTING.md`.
 
 ### Changed
 - Rebalanced the 6-layer execution filter in `src/trading/execution_filter.py` with refined trend angle thresholds.
