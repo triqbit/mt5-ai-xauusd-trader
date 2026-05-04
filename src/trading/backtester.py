@@ -127,7 +127,7 @@ class BacktestEngine:
         high_close = (data["high"] - data["close"].shift(1)).abs()
         low_close = (data["low"] - data["close"].shift(1)).abs()
         tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        data["atr"] = tr.reindex(data.index).rolling(14).mean()
+        data["atr"] = tr.rolling(14).mean()
 
         n = len(data)
         start = 0

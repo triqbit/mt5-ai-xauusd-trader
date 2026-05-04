@@ -9,6 +9,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import MagicMock
 
 from src.trading.backtester import BacktestEngine
 
@@ -41,8 +42,6 @@ def test_backtest_engine_initialization():
     assert engine.balance == 10000.0
     assert len(engine.trades) == 0
 
-
-from unittest.mock import MagicMock
 
 def test_backtest_run(sample_data):
     # Mocking FeatureEngineer and ExecutionFilter to avoid dependency issues in test env

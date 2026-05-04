@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Stabilized CI pipeline with `numpy < 2` pinning for TA-Lib compatibility.
 - Resolved coroutine awaiting issues in system monitoring tests.
+- Removed unused `pandas-ta` dependency to resolve version conflicts on Python 3.12.
 
 ## [1.1.0-rc2] - 2026-05-03
 

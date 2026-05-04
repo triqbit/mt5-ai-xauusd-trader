@@ -6,8 +6,8 @@
 
 # ── Core ML / RL ────────────────────────────────────────────
 torch==2.2.2
-torchvision==0.18.1
-stable-baselines3==2.8.0
+torchvision==0.17.2
+stable-baselines3==2.3.2
 gymnasium==0.29.1
 numpy==1.26.4
 scipy==1.13.0
@@ -21,7 +21,6 @@ einops==0.8.2
 
 # ── Technical Analysis ──────────────────────────────────────
 TA-Lib==0.4.28
-pandas-ta==0.4.71b0
 mplfinance==0.12.10b0
 
 # ── Data Acquisition ────────────────────────────────────────
