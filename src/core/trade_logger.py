@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional
 
 import numpy as np
 from sqlalchemy import (
     Boolean,
-    Column,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -23,9 +23,8 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
-    select,
-    CheckConstraint,
     func,
+    select,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -33,7 +32,6 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
     sessionmaker,
-    Session,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
+
     pass
 
 
@@ -56,10 +55,10 @@ class AuditMixin:
         onupdate=func.now(),
         nullable=False,
     )
-    created_by: Mapped[Optional[str]] = mapped_column(String(100))
-    updated_by: Mapped[Optional[str]] = mapped_column(String(100))
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    updated_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -81,7 +80,7 @@ class ModelSignal(Base, AuditMixin):
     confidence: Mapped[Optional[float]] = mapped_column(Float)
     volatility: Mapped[Optional[float]] = mapped_column(Float)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     # Relationship
@@ -104,9 +103,11 @@ class Trade(Base, AuditMixin):
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
     exit_price: Mapped[Optional[float]] = mapped_column(Float)
     lot_size: Mapped[float] = mapped_column(Float, nullable=False)
-    pnl: Mapped[float] = mapped_column(Float, default=0.0)
+    pnl: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     drawdown_impact: Mapped[Optional[float]] = mapped_column(Float)  # impact on total drawdown
-    status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
+    status: Mapped[str] = mapped_column(
+        String(20), default="OPEN", nullable=False, index=True
+    )  # OPEN, CLOSED, CANCELLED
 
     signal_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("model_signals.id"))
     signal: Mapped[Optional["ModelSignal"]] = relationship("ModelSignal", back_populates="trade")
@@ -122,7 +123,9 @@ class RiskEvent(Base, AuditMixin):
     description: Mapped[Optional[str]] = mapped_column(Text)
     symbol: Mapped[Optional[str]] = mapped_column(String(20))
 
-    signal_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("model_signals.id"), nullable=True)
+    signal_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("model_signals.id"), nullable=True
+    )
 
 
 class PerformanceMetric(Base, AuditMixin):
@@ -132,7 +135,7 @@ class PerformanceMetric(Base, AuditMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     sharpe_ratio: Mapped[Optional[float]] = mapped_column(Float)
     profit_factor: Mapped[Optional[float]] = mapped_column(Float)
