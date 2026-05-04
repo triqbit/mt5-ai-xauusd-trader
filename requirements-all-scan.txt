@@ -29,7 +29,7 @@
 # ── Technical Analysis ──────────────────────────────────────
 # ── Testing ─────────────────────────────────────────────────
 # ── Utilities ───────────────────────────────────────────────
-MetaTrader5==5.0.45; sys_platform == 'win32'
+MetaTrader5==5.0.5735; sys_platform == 'win32'
 aiohttp==3.13.4
 alembic==1.13.1
 black==26.3.1
