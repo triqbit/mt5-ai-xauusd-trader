@@ -115,14 +115,21 @@ class BacktestEngine:
         logger.info("Pre-calculating features for the entire dataset...")
         df_features = self.fe.compute_features(data, drop_ohlcv=False)
 
+        # Ensure data is aligned with computed features to avoid IndexErrors and alignment drift
+        if not df_features.empty:
+            data = data.loc[df_features.index].copy()
+        else:
+            logger.error("Feature engineering returned empty DataFrame. Backtest aborted.")
+            return PerformanceReport()
+
         # Calculate ATR once for the whole dataset
         high_low = data["high"] - data["low"]
         high_close = (data["high"] - data["close"].shift(1)).abs()
         low_close = (data["low"] - data["close"].shift(1)).abs()
         tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        data = data.copy()
-        data["atr"] = tr.rolling(14).mean()
+        data["atr"] = tr.reindex(data.index).rolling(14).mean()
 
+        n = len(data)
         start = 0
         active_trades: List[Dict[str, Any]] = []
 

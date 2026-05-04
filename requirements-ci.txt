@@ -14,11 +14,11 @@
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
-# numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
-numpy==2.2.6
+# numpy < 2.0 is required for compatibility with compiled modules in sandbox/CI
+numpy==1.26.4
 scipy==1.15.2
-scikit-learn==1.7.2
-pandas==2.3.3
+scikit-learn==1.6.1
+pandas==3.0.2
 
 # -- Technical Analysis --------------------------------------------
 # Python wrapper; C library (0.6.4) built from source in ci.yml
@@ -30,7 +30,7 @@ alembic==1.13.1
 redis==5.0.4
 
 # -- Pydantic / settings -------------------------------------------
-pydantic==2.13.3
+pydantic==2.10.6
 pydantic-settings==2.14.0
 
 # -- Testing -------------------------------------------------------

@@ -6,6 +6,7 @@ Verifies end-to-end integration across all system components.
 import time
 
 import numpy as np
+import pandas as pd
 import pytest
 
 try:
@@ -156,9 +157,21 @@ def test_backtest_initialization():
     # Based on audit, backtest.py is missing or stubbed.
     # We verify if the entry point in main.py correctly handles the missing component.
     from main import main
-    with patch("sys.argv", ["main.py", "--mode", "backtest"]), \
+
+    # Mock data for backtest
+    mock_data = pd.DataFrame({
+        "open": [2000.0] * 200,
+        "high": [2010.0] * 200,
+        "low": [1990.0] * 200,
+        "close": [2000.0] * 200,
+        "tick_volume": [100.0] * 200,
+        "time": pd.date_range("2023-01-01", periods=200, freq="1h")
+    })
+
+    with patch("sys.argv", ["main.py", "--mode", "backtest", "--start", "2023-01-01", "--end", "2023-01-02"]), \
          patch("src.trading.mt5_connector.MT5Connector.connect", return_value=True), \
          patch("src.trading.mt5_connector.MT5Connector.disconnect"), \
+         patch("src.trading.mt5_connector.MT5Connector.get_rates_range", return_value=mock_data), \
          patch("src.core.health.HealthChecker.get_full_report") as mock_health, \
          patch.dict(os.environ, {
              "MT5_LOGIN": "123456",

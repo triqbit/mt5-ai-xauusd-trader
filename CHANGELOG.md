@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0-rc3] - 2026-05-04
+
+### Added
+- **9-Layer Execution Filter:** Upgraded cascade in `src/trading/execution_filter.py` including Model Stability, Performance Floor, and Dynamic Confidence.
+- **Enterprise Monitoring:** Centralized metrics and alerting system with Prometheus and Telegram support in `src/core/monitor.py`.
+- **RL Evaluation Framework:** Institutional-grade performance metrics and regime-aware evaluation in `src/research/rl_evaluation.py`.
+- **Enterprise Audit Logging:** Persistent system-wide audit tracing for compliance and debugging in `src/core/audit_log.py`.
+- **Workflow Simplification:** Automated operational friction mapping and detailed automation designs in `docs/operations/WORKFLOW_SIMPLIFICATION_LOG.md`.
+
+### Fixed
+- Stabilized CI pipeline with `numpy < 2` pinning for TA-Lib compatibility.
+- Resolved coroutine awaiting issues in system monitoring tests.
+
+## [1.1.0-rc2] - 2026-05-03
+
 ### Added
 - **Institutional Capital Allocation:** Implemented a multi-strategy budget management system with concentration limits and performance-based scaling in `src/trading/capital_allocator.py`.
 - **Vectorized Backtesting v2:** Enhanced the walk-forward backtesting engine with vectorized trade execution and performance metrics in `src/research/hyperopt_walkforward.py`.

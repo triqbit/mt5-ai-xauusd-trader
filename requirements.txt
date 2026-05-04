@@ -5,14 +5,14 @@
 # ============================================================
 
 # ── Core ML / RL ────────────────────────────────────────────
-torch==2.3.1
+torch==2.2.2
 torchvision==0.18.1
 stable-baselines3==2.8.0
 gymnasium==0.29.1
-numpy==2.2.6
+numpy==1.26.4
 scipy==1.13.0
-scikit-learn==1.7.2
-pandas==2.3.3
+scikit-learn==1.6.1
+pandas==3.0.2
 
 # ── Deep Learning Extras ────────────────────────────────────
 transformers==5.0.0rc3
@@ -55,7 +55,7 @@ plotly==5.22.0
 
 # ── Configuration ───────────────────────────────────────────
 python-dotenv==1.2.2
-pydantic==2.13.3
+pydantic==2.10.6
 pydantic-settings==2.14.0
 tomli==2.4.1
 

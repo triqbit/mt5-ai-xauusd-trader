@@ -42,10 +42,14 @@ def test_backtest_engine_initialization():
     assert len(engine.trades) == 0
 
 
+from unittest.mock import MagicMock
+
 def test_backtest_run(sample_data):
     # Mocking FeatureEngineer and ExecutionFilter to avoid dependency issues in test env
     # though in a real CI they should be present.
-    engine = BacktestEngine(symbol="XAUUSD", max_positions=1)
+    mock_ef = MagicMock()
+    mock_ef.validate.return_value = MagicMock(is_approved=True)
+    engine = BacktestEngine(symbol="XAUUSD", max_positions=1, execution_filter=mock_ef)
 
     # We need to provide a model that predict Buy
     model = MockModel()
