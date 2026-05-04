@@ -28,7 +28,7 @@ The system correlates records from three database tables:
 |--------|-------------|
 | Slippage (Pips) | `(Actual Price - Signal Price) * Direction / PipSize` |
 | Latency (ms) | `Execution Time - Signal Time` |
-| Edge Capture | `(Exit - Entry) / (TakeProfit - SignalEntry)` |
+| Edge Capture | `(Realized PnL - 0.5 * Spread) / Theoretical PnL` |
 | Drift | Price movement N minutes after entry in the direction of the trade. |
 | Alpha Decay | Price movement between signal and execution. |
 | Slippage/Spread Ratio | Slippage relative to the prevailing spread. |

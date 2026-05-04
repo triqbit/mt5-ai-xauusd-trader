@@ -147,6 +147,18 @@ class RareEventSection(BaseModel):
     scenarios: List[RareEventSummary]
     insights: str
 
+class ExecutionMetric(BaseModel):
+    name: str
+    value: str
+    status: str
+
+class ExecutionQualitySection(BaseModel):
+    efficiency_score: float
+    metrics: List[ExecutionMetric]
+    opportunity_cost: str
+    trade_count: int
+    rejected_count: int
+
 # --- Full Report Model ---
 
 class ResearchReport(BaseModel):
@@ -165,6 +177,7 @@ class ResearchReport(BaseModel):
     benchmarks: Optional[BenchmarkSection] = None
     rl_evaluation: Optional[RLSection] = None
     rare_events: Optional[RareEventSection] = None
+    execution_quality: Optional[ExecutionQualitySection] = None
 
     conclusion: str
 
@@ -333,6 +346,18 @@ class ResearchReporter:
                 table.add_row(s.event_type, f"{s.peak_impact_pct:.2%}", f"{s.recovery_attained:.1%}")
             self.console.print(table)
 
+        if report.execution_quality:
+            self.console.print("\n[bold blue]10. Execution Quality & Alpha Decay[/]")
+            self.console.print(f"Efficiency Score: [bold]{report.execution_quality.efficiency_score:.1f}/100[/]")
+            self.console.print(f"Opportunity Cost (Blocked): [bold red]{report.execution_quality.opportunity_cost}[/]")
+            table = Table(box=None)
+            table.add_column("Metric")
+            table.add_column("Value")
+            table.add_column("Status")
+            for m in report.execution_quality.metrics:
+                table.add_row(m.name, m.value, m.status)
+            self.console.print(table)
+
         self.console.print("\n[bold]Conclusion[/]")
         self.console.print(report.conclusion)
         self.console.print("\n" + "="*50 + "\n")
@@ -369,6 +394,8 @@ class ResearchOrchestrator:
             self.report.rl_evaluation = section
         elif isinstance(section, RareEventSection):
             self.report.rare_events = section
+        elif isinstance(section, ExecutionQualitySection):
+            self.report.execution_quality = section
         else:
             raise ValueError(f"Unknown section type: {type(section)}")
 

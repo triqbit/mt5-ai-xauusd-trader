@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -83,6 +83,51 @@ class ExecutionSummary(BaseModel):
     execution_efficiency_score: float
     rejected_signal_count: int
     executed_trade_count: int
+
+    def to_report_section(self) -> Any:
+        """Convert to reporting model."""
+        from src.research.reporting import ExecutionMetric, ExecutionQualitySection
+
+        metrics = [
+            ExecutionMetric(
+                name="Avg Slippage",
+                value=f"{self.avg_slippage:.2f} pips",
+                status="OK" if abs(self.avg_slippage) < 1.0 else "WARNING",
+            ),
+            ExecutionMetric(
+                name="Avg Latency",
+                value=f"{self.avg_latency_ms:.0f}ms",
+                status="OK" if self.avg_latency_ms < 500 else "WARNING",
+            ),
+            ExecutionMetric(
+                name="Fill Quality",
+                value=f"{self.avg_fill_quality:.2%}",
+                status="OK" if self.avg_fill_quality > 0.8 else "WARNING",
+            ),
+            ExecutionMetric(
+                name="Edge Capture",
+                value=f"{self.avg_edge_capture:.2%}",
+                status="OK" if self.avg_edge_capture > 0.5 else "WARNING",
+            ),
+            ExecutionMetric(
+                name="Timing Efficiency",
+                value=f"{self.avg_timing_efficiency:.2%}",
+                status="OK",
+            ),
+            ExecutionMetric(
+                name="Alpha Decay",
+                value=f"{self.avg_alpha_decay:.2f} pips",
+                status="OK",
+            ),
+        ]
+
+        return ExecutionQualitySection(
+            efficiency_score=float(self.execution_efficiency_score * 100),
+            metrics=metrics,
+            opportunity_cost=f"${self.total_opportunity_cost:,.2f}",
+            trade_count=self.executed_trade_count,
+            rejected_count=self.rejected_signal_count,
+        )
 
 
 class ExecutionAnalyzer:
@@ -263,20 +308,31 @@ class ExecutionAnalyzer:
 
     def calculate_edge_capture(self, trade: Trade, signal: ModelSignal) -> float:
         """
-        Measure realized edge vs theoretical edge.
-        Edge = (Exit - Entry) / Volatility
+        Measure realized edge vs theoretical edge, adjusted for spread.
+        Edge Capture = (Realized PnL - Half Spread) / Theoretical PnL
         """
-        if not trade.exit_price or not signal.volatility or signal.volatility == 0:
+        if not trade.exit_price or not signal.take_profit:
             return 0.0
 
-        # Adjust for spread if possible
-        theoretical_edge = (signal.take_profit - signal.entry_price) * signal.direction
-        realized_edge = (trade.exit_price - trade.entry_price) * signal.direction
+        pip_size = self._get_pip_size(trade.symbol)
+        spread_info = self._get_execution_spread(trade)
+        half_spread_pips = spread_info["spread_pips"] / 2.0
 
-        if theoretical_edge == 0:
+        # Theoretical move from signal price to signal TP
+        theoretical_move = abs(signal.take_profit - signal.entry_price)
+
+        # Realized move from execution price to exit price
+        realized_move = (trade.exit_price - trade.entry_price) * trade.direction
+
+        if theoretical_move == 0:
             return 0.0
 
-        return float(realized_edge / theoretical_edge)
+        # Adjust realized move by subtracting the "cost" of the half-spread we'd ideally not pay
+        # This highlights how much of the available alpha we got AFTER friction
+        adjusted_realized = (realized_move / pip_size) - half_spread_pips
+        theoretical_pips = theoretical_move / pip_size
+
+        return float(np.clip(adjusted_realized / theoretical_pips, 0.0, 1.2))
 
     def _get_execution_spread(self, trade: Trade) -> Dict[str, float]:
         """Estimate spread at the time of execution."""
@@ -370,14 +426,27 @@ class ExecutionAnalyzer:
         if not self.connector:
             return None
 
-        # Fetch up to 100 bars after signal to see outcome
-        df = self.connector.get_rates(signal.symbol, "M15", 100)
+        # Ensure start_time is timezone-aware before any operations
+        start_time = signal.timestamp
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+
+        # Fetch data from signal time until 24 hours later or now
+        end_time = min(datetime.now(timezone.utc), start_time + timedelta(hours=24))
+
+        df = self.connector.get_rates_range(signal.symbol, "M5", start_time, end_time)
+        if df.empty:
+            # Fallback to get_rates if range returns nothing (e.g. connector issues)
+            df = self.connector.get_rates(signal.symbol, "M5", 200)
+
         if df.empty:
             return None
 
         # Filter bars that happened AFTER the signal
-        # Use a small buffer to account for clock drift
-        df = df[df["time"] >= signal.timestamp]
+        if df["time"].dt.tz is None:
+            df["time"] = df["time"].dt.tz_localize(timezone.utc)
+
+        df = df[df["time"] >= start_time]
         if df.empty:
             return None
 
