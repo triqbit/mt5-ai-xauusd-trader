@@ -26,7 +26,7 @@ def test_simulator_basic_structure(simulator):
     assert isinstance(df, pd.DataFrame)
     assert isinstance(result, RareEventResult)
     assert len(df) == 200
-    assert all(col in df.columns for col in ["open", "high", "low", "close", "tick_volume"])
+    assert all(col in df.columns for col in ["open", "high", "low", "close", "tick_volume", "spread"])
     assert not df.isnull().values.any()
 
 
@@ -68,8 +68,10 @@ def test_flash_crash_behavior(simulator):
     assert result.peak_impact_pct < -0.05
     assert result.recovery_attained > 0.5
 
-    # Check that volume is still reasonable
-    assert df["tick_volume"].mean() > 400
+    # Check volume spike
+    crash_vol = df["tick_volume"].iloc[result.start_index : result.start_index + 10].mean()
+    normal_vol = df["tick_volume"].iloc[:result.start_index].mean()
+    assert crash_vol > normal_vol * 2
 
 
 def test_liquidity_vacuum_behavior(simulator):
@@ -78,7 +80,12 @@ def test_liquidity_vacuum_behavior(simulator):
 
     # Should have some very low volume bars
     vacuum_df = df.iloc[result.start_index : result.end_index]
-    assert (vacuum_df["tick_volume"] < 20).all()
+    assert (vacuum_df["tick_volume"] < 10).all()
+
+    # Spreads should be high
+    normal_spread = df["spread"].iloc[:result.start_index].mean()
+    vacuum_spread = vacuum_df["spread"].mean()
+    assert vacuum_spread > normal_spread * 3
 
     # Volatility in vacuum should be higher
     returns = df["close"].pct_change().dropna()
@@ -136,3 +143,32 @@ def test_vol_cluster_behavior(simulator):
     # Volatility should not be constant
     rolling_std = returns.rolling(20).std().dropna()
     assert rolling_std.max() > rolling_std.min() * 3
+
+
+def test_multi_session_dislocation(simulator):
+    config = RareEventConfig(event_type=RareEventType.MULTI_SESSION_DISLOCATION, n_steps=600)
+    df, result = simulator.generate_scenario(config)
+
+    assert len(df) == 600
+    assert result.event_type == RareEventType.MULTI_SESSION_DISLOCATION
+
+    # Check that different sessions have different volatilities
+    returns = df["close"].pct_change().dropna()
+    session_size = 600 // 4
+    vol1 = returns.iloc[:session_size].std()
+    vol2 = returns.iloc[session_size:2*session_size].std()
+    vol4 = returns.iloc[3*session_size:].std()
+
+    assert vol2 > vol1 * 2
+    assert vol4 > vol2
+
+
+def test_generate_suite(simulator):
+    suite = simulator.generate_suite(n_steps=200, magnitude=1.5, seed=100)
+
+    assert len(suite) == len(RareEventType)
+    for event_type in RareEventType:
+        assert event_type.value in suite
+        df, result = suite[event_type.value]
+        assert len(df) == 200
+        assert result.config.event_magnitude == 1.5
