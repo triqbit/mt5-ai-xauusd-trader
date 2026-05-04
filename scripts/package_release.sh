@@ -6,10 +6,14 @@
 set -e
 
 # --- Configuration ---
-PROJECT_ROOT=$(pwd)
+# Identify project root relative to script location
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PYPROJECT_FILE="pyproject.toml"
 RELEASES_DIR="releases"
 IMAGE_NAME="mt5-ai-xauusd-trader"
+
+cd "$PROJECT_ROOT"
 
 # Portable sha256 function
 sha256_cmd() {
@@ -25,7 +29,7 @@ sha256_cmd() {
 
 # --- 1. Version Extraction ---
 if [ ! -f "$PYPROJECT_FILE" ]; then
-    echo "Error: $PYPROJECT_FILE not found. Run this script from the project root."
+    echo "Error: $PYPROJECT_FILE not found. Ensure you are in the project root."
     exit 1
 fi
 
@@ -41,16 +45,41 @@ echo "Packaging Release v${VERSION}..."
 echo "Target Path: ${RELEASE_PATH}"
 echo "--------------------------------------------------------"
 
-# --- 2. Directory Management ---
+# --- 2. Mandatory Validation Gates ---
+echo "Running Pre-Packaging Validation Gates..."
+
+echo "Checking environment template..."
+python3 scripts/validate_env.py
+
+echo "Verifying database migrations..."
+python3 scripts/verify_migrations.py
+
+echo "Validating release notes in CHANGELOG.md..."
+python3 scripts/check_release_notes.py
+
+# --- 3. Directory Management ---
 if [ -d "$RELEASE_PATH" ]; then
     echo "Warning: Release directory $RELEASE_PATH already exists. Re-creating..."
     rm -rf "$RELEASE_PATH"
 fi
 mkdir -p "$RELEASE_PATH"
 
-# --- 3. Artifact Collection ---
+# --- 4. Artifact Collection ---
 
-# A. Docker Info
+# A. Docker Image (Build and Save)
+echo "Building Docker Image..."
+# We use --load if using buildx, or just build for standard docker.
+# Added a check if buildx is being used.
+if docker buildx version >/dev/null 2>&1; then
+    docker buildx build --load -t "${IMAGE_NAME}:v${VERSION}" .
+else
+    docker build -t "${IMAGE_NAME}:v${VERSION}" .
+fi
+
+echo "Exporting Docker Image to tarball..."
+docker save "${IMAGE_NAME}:v${VERSION}" | gzip > "${RELEASE_PATH}/image.tar.gz"
+
+# B. Docker Info (Metadata)
 echo "Collecting Docker Information..."
 cat <<EOF > "${RELEASE_PATH}/docker_info.json"
 {
@@ -61,45 +90,29 @@ cat <<EOF > "${RELEASE_PATH}/docker_info.json"
 }
 EOF
 
-# B. Environment Template
+# C. Environment Template
 echo "Collecting Environment Template..."
-if [ -f ".env.example" ]; then
-    cp ".env.example" "${RELEASE_PATH}/"
-else
-    echo "Error: .env.example not found."
-    exit 1
-fi
+cp ".env.example" "${RELEASE_PATH}/"
 
-# C. Database Migrations
+# D. Database Migrations
 echo "Collecting Database Migrations..."
-if [ -d "migrations" ]; then
-    cp -r migrations "${RELEASE_PATH}/"
-else
-    echo "Error: migrations directory not found."
-    exit 1
-fi
+cp -r migrations "${RELEASE_PATH}/"
 
-# D. Configuration Documentation
+# E. Configuration Documentation
 echo "Generating Configuration Reference..."
 python3 scripts/generate_config_docs.py src/core/config.py "${RELEASE_PATH}/CONFIG_REFERENCE.md" "$VERSION"
 
-# E. Release Notes
+# F. Release Notes
 echo "Extracting Release Notes..."
-if [ -f "CHANGELOG.md" ]; then
-    # Improved extraction logic: find [Unreleased] section and stop at the next version header
-    # We use a more robust sed pattern to get content between [Unreleased] and the first versioned header
-    sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+# Improved extraction logic: find [Unreleased] section and stop at the next version header
+sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
 
-    if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ] || [ "$(grep -c "[a-zA-Z]" "${RELEASE_PATH}/RELEASE_NOTES.md")" -eq 0 ]; then
-         echo "Warning: RELEASE_NOTES.md is empty or only contains whitespace. Using fallback."
-         echo "Development Build - No specific release notes for v${VERSION}." > "${RELEASE_PATH}/RELEASE_NOTES.md"
-    fi
-else
-    echo "Error: CHANGELOG.md not found."
-    exit 1
+if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ] || [ "$(grep -c "[a-zA-Z]" "${RELEASE_PATH}/RELEASE_NOTES.md")" -eq 0 ]; then
+     echo "Warning: RELEASE_NOTES.md is empty or only contains whitespace. Using fallback."
+     echo "Development Build - No specific release notes for v${VERSION}." > "${RELEASE_PATH}/RELEASE_NOTES.md"
 fi
 
-# --- 4. Validation & Checksums ---
+# --- 5. Validation & Checksums ---
 
 echo "Generating Checksum Manifest..."
 (cd "${RELEASE_PATH}" && find . -type f ! -name "checksums.sha256" | sort | while read -r f; do
@@ -107,7 +120,7 @@ echo "Generating Checksum Manifest..."
 done)
 
 echo "Validating Artifact Completeness..."
-MANDATORY_FILES=("docker_info.json" ".env.example" "CONFIG_REFERENCE.md" "RELEASE_NOTES.md" "checksums.sha256" "migrations/env.py")
+MANDATORY_FILES=("image.tar.gz" "docker_info.json" ".env.example" "CONFIG_REFERENCE.md" "RELEASE_NOTES.md" "checksums.sha256" "migrations/env.py")
 
 for file in "${MANDATORY_FILES[@]}"; do
     if [ ! -f "${RELEASE_PATH}/${file}" ]; then
