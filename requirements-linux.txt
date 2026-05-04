@@ -17,7 +17,7 @@ pandas==2.2.2
 # ── Deep Learning Extras ────────────────────────────────────
 transformers==5.0.0rc3
 timm==0.9.16
-einops==0.7.0
+einops==0.8.2
 
 # ── Technical Analysis ──────────────────────────────────────
 TA-Lib==0.4.28
