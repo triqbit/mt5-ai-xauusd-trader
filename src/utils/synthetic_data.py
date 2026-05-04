@@ -237,7 +237,7 @@ class RiskScenarioBuilder:
     ) -> list[TradeSignal]:
         """Generates signals that, if lost, would breach the daily loss limit."""
         signals = []
-        for i in range(n_losses):
+        for _ in range(n_losses):
             signals.append(
                 TradeSignal(
                     symbol=symbol,
