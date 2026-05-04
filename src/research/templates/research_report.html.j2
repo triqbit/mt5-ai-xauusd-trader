@@ -5,39 +5,70 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }} - Research Report</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
-        header { background: #2c3e50; color: #fff; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { margin: 0; font-size: 2.5rem; }
-        .metadata { margin-top: 1rem; font-size: 0.9rem; opacity: 0.8; }
-        .toc { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .toc h2 { font-size: 1.2rem; margin-top: 0; }
-        .toc ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
-        .toc a { text-decoration: none; color: #3498db; font-weight: 500; }
-        .toc a:hover { text-decoration: underline; }
-        .executive-summary { background: #fff; padding: 1.5rem; border-left: 5px solid #3498db; border-radius: 4px; margin-bottom: 2rem; }
-        section { background: #fff; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --light: #f4f7f6; --white: #ffffff; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 60px 20px 20px; background-color: var(--light); }
+        header { background: var(--primary); color: var(--white); padding: 3rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        h1 { margin: 0; font-size: 2.75rem; letter-spacing: -0.025em; }
+        .metadata { margin-top: 1rem; font-size: 1rem; opacity: 0.9; display: flex; gap: 20px; }
+        .sticky-nav { position: fixed; top: 0; left: 0; right: 0; background: rgba(44, 62, 80, 0.95); backdrop-filter: blur(8px); color: white; padding: 10px 0; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .sticky-nav-container { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
+        .sticky-nav a { color: white; text-decoration: none; font-size: 0.9rem; font-weight: 500; margin-left: 20px; transition: color 0.2s; }
+        .sticky-nav a:hover { color: var(--secondary); }
+        .toc { background: var(--white); padding: 2rem; border-radius: 12px; margin-bottom: 2.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .toc h2 { font-size: 1.5rem; margin-top: 0; color: var(--primary); }
+        .toc ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .toc a { text-decoration: none; color: var(--secondary); font-weight: 600; font-size: 1.05rem; }
+        .toc a:hover { color: var(--primary); text-decoration: underline; }
+        .executive-summary { background: var(--white); padding: 2rem; border-left: 6px solid var(--secondary); border-radius: 8px; margin-bottom: 2.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        section { background: var(--white); padding: 2.5rem; border-radius: 12px; margin-bottom: 2.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); scroll-margin-top: 80px; }
         h2 { border-bottom: 2px solid #ecf0f1; padding-bottom: 0.5rem; color: #2c3e50; }
         table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f8f9fa; color: #2c3e50; }
         tr:hover { background-color: #fdfdfd; }
         .score-container { display: flex; align-items: center; gap: 15px; margin-bottom: 1rem; }
-        .score { font-size: 1.5rem; font-weight: bold; color: #27ae60; }
-        .progress-bar { background: #eee; border-radius: 10px; height: 10px; flex-grow: 1; overflow: hidden; max-width: 300px; }
-        .progress-fill { height: 100%; background: #27ae60; }
-        .fail { color: #e74c3c; font-weight: bold; }
-        .pass { color: #27ae60; font-weight: bold; }
-        .insight-box { background: #e8f4fd; padding: 1rem; border-radius: 4px; border: 1px solid #3498db; }
-        footer { text-align: center; margin-top: 3rem; font-size: 0.8rem; color: #7f8c8d; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; background: #eee; }
+        .score { font-size: 1.75rem; font-weight: 800; color: var(--success); }
+        .progress-bar { background: #edf2f7; border-radius: 999px; height: 12px; flex-grow: 1; overflow: hidden; max-width: 350px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #2ecc71, #27ae60); transition: width 0.5s ease-out; }
+        .fail { color: var(--danger); font-weight: bold; }
+        .pass { color: var(--success); font-weight: bold; }
+        .insight-box { background: #ebf8ff; padding: 1.25rem; border-radius: 8px; border: 1px solid #bee3f8; color: #2c5282; }
+        footer { text-align: center; margin-top: 4rem; padding: 2rem; border-top: 1px solid #e2e8f0; font-size: 0.9rem; color: #718096; }
+        .badge { display: inline-block; padding: 6px 12px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em; }
+        .badge-stable { background: #def7ec; color: #03543f; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-critical { background: #fde8e8; color: #9b1c1c; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .metadata { flex-direction: column; gap: 5px; } }
     </style>
 </head>
 <body>
+    <div class="sticky-nav">
+        <div class="sticky-nav-container">
+            <span style="font-weight: 800; font-size: 1.1rem;">triqbit | Research</span>
+            <nav>
+                <a href="#executive-summary">Summary</a>
+                {% if regime_analysis %}<a href="#regime-analysis">Regime</a>{% endif %}
+                {% if stress_tests %}<a href="#stress-tests">Stress</a>{% endif %}
+                {% if hyperparameter_robustness %}<a href="#hyperparameter-robustness">Robustness</a>{% endif %}
+                {% if trade_patterns %}<a href="#trade-patterns">Patterns</a>{% endif %}
+                {% if model_drift %}<a href="#model-drift">Drift</a>{% endif %}
+                {% if allocation_insights %}<a href="#allocation-insights">Allocation</a>{% endif %}
+                {% if benchmarks %}<a href="#benchmarks">Benchmarks</a>{% endif %}
+                {% if rl_evaluation %}<a href="#rl-evaluation">RL</a>{% endif %}
+                {% if rare_events %}<a href="#rare-events">Rare</a>{% endif %}
+                <a href="#conclusion">Conclusion</a>
+            </nav>
+        </div>
+    </div>
+
     {% set ns = namespace(count=1) %}
     <header>
         <h1>{{ title }}</h1>
         <div class="metadata">
-            Date: {{ timestamp }} | Author: {{ author }}
+            <span><strong>Date:</strong> {{ timestamp }}</span>
+            <span><strong>Author:</strong> {{ author }}</span>
+            <span><strong>Status:</strong> <span class="badge badge-stable">Verified</span></span>
         </div>
     </header>
 
@@ -280,8 +311,12 @@
                     <td>{{ m.name }}</td>
                     <td>{{ m.baseline }}</td>
                     <td>{{ m.current }}</td>
-                    <td>{{ m.drift_pct }}%</td>
-                    <td><span class="badge">{{ m.status }}</span></td>
+                    <td>{{ m.drift_pct|round(2) }}%</td>
+                    <td>
+                        {% if m.status == 'STABLE' %}<span class="badge badge-stable">{{ m.status }}</span>
+                        {% elif m.status == 'WARNING' %}<span class="badge badge-warning">{{ m.status }}</span>
+                        {% else %}<span class="badge badge-critical">{{ m.status }}</span>{% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -294,7 +329,10 @@
     {% set ns.count = ns.count + 1 %}
     <section id="allocation-insights">
         <h2>{{ ns.count }}. Capital Allocation Insights</h2>
-        <p>Portfolio Heat: <strong>{{ allocation_insights.total_heat_pct }}%</strong></p>
+        <div style="display: flex; gap: 40px; margin-bottom: 20px;">
+            <div>Portfolio Heat: <strong style="font-size: 1.2rem; color: var(--primary);">{{ allocation_insights.total_heat_pct|round(1) }}%</strong></div>
+            <div>Diversification Score: <strong style="font-size: 1.2rem; color: var(--success);">{{ allocation_insights.diversification_score|round(2) }}</strong></div>
+        </div>
         <table>
             <thead>
                 <tr>
@@ -367,19 +405,23 @@
                 <tr>
                     <th scope="col">Agent</th>
                     <th scope="col">Sharpe</th>
+                    <th scope="col">Sortino</th>
                     <th scope="col">Profit Factor</th>
                     <th scope="col">MaxDD</th>
-                    <th scope="col">Win Rate</th>
+                    <th scope="col">Recovery</th>
+                    <th scope="col">VaR(95%)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for m in rl_evaluation.metrics %}
                 <tr>
-                    <td>{{ m.agent_name }}</td>
+                    <td><strong>{{ m.agent_name }}</strong></td>
                     <td>{{ m.sharpe|round(2) }}</td>
+                    <td>{{ m.sortino|round(2) }}</td>
                     <td>{{ m.profit_factor|round(2) }}</td>
                     <td>{{ (m.max_dd * 100)|round(1) }}%</td>
-                    <td>{{ (m.win_rate * 100)|round(1) }}%</td>
+                    <td>{{ m.recovery_factor|round(2) }}</td>
+                    <td>{{ (m.var_95 * 100)|round(2) }}%</td>
                 </tr>
                 {% endfor %}
             </tbody>

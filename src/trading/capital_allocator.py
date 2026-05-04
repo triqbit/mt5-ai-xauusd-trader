@@ -207,6 +207,7 @@ class CapitalAllocator:
             total_heat_pct=float(self.get_total_heat() * 100),
             allocations=allocations,
             rejection_summary=rejection_history or self.rejection_history,
+            diversification_score=self.get_diversification_score(),
         )
 
     def _record_rejection(self, code: RejectionCode) -> None:

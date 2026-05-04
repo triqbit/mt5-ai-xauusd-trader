@@ -105,6 +105,7 @@ class AllocationSection(BaseModel):
     total_heat_pct: float
     allocations: List[AllocationEntry]
     rejection_summary: Dict[str, int]
+    diversification_score: float = 1.0
 
 class BenchmarkComparison(BaseModel):
     name: str
@@ -120,12 +121,15 @@ class BenchmarkSection(BaseModel):
 class RLMetric(BaseModel):
     agent_name: str
     sharpe: float
+    sortino: float = 0.0
     profit_factor: float
     max_dd: float
     win_rate: float
     calmar: float = 0.0
     stability_score: float = 0.0
     var_95: float = 0.0
+    cvar_95: float = 0.0
+    recovery_factor: float = 0.0
 
 class RLSection(BaseModel):
     comparison_summary: str
@@ -278,7 +282,7 @@ class ResearchReporter:
 
         if report.allocation_insights:
             self.console.print("\n[bold green]6. Capital Allocation[/]")
-            self.console.print(f"Total Heat: {report.allocation_insights.total_heat_pct}%")
+            self.console.print(f"Total Heat: {report.allocation_insights.total_heat_pct}% | Diversification: {report.allocation_insights.diversification_score:.2f}")
             table = Table(box=None)
             table.add_column("Target")
             table.add_column("Amount")
@@ -304,16 +308,18 @@ class ResearchReporter:
             table = Table(box=None)
             table.add_column("Agent")
             table.add_column("Sharpe")
+            table.add_column("Sortino")
             table.add_column("PF")
             table.add_column("MaxDD")
-            table.add_column("Win Rate")
+            table.add_column("VaR(95)")
             for m in report.rl_evaluation.metrics:
                 table.add_row(
                     m.agent_name,
                     f"{m.sharpe:.2f}",
+                    f"{m.sortino:.2f}",
                     f"{m.profit_factor:.2f}",
                     f"{m.max_dd:.2%}",
-                    f"{m.win_rate:.2%}",
+                    f"{m.var_95:.2%}",
                 )
             self.console.print(table)
 

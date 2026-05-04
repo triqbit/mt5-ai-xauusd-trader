@@ -86,6 +86,7 @@ class RLReport(BaseModel):
     """Final aggregate evaluation report for an RL agent."""
     agent_name: str
     total_steps: int
+    initial_balance: float
     stability: StabilityMetrics
     turnover: TurnoverMetrics
     drawdown: DrawdownMetrics
@@ -309,16 +310,23 @@ class RLEvaluator:
 
         metrics = []
         for report in comparison.agent_reports:
+            # Recovery Factor: Net PnL / Max Drawdown (in currency)
+            max_dd_currency = report.drawdown.max_drawdown * report.initial_balance
+            recovery_factor = report.reward_decomposition.net_pnl / (max_dd_currency + 1e-9)
+
             metrics.append(
                 RLMetric(
                     agent_name=report.agent_name,
                     sharpe=report.stability.sharpe_ratio,
+                    sortino=report.stability.sortino_ratio,
                     profit_factor=report.stability.profit_factor,
                     max_dd=report.drawdown.max_drawdown,
                     win_rate=report.overall_win_rate,
                     calmar=report.stability.calmar_ratio,
                     stability_score=report.stability.stability_score,
                     var_95=report.stability.var_95,
+                    cvar_95=report.stability.cvar_95,
+                    recovery_factor=float(recovery_factor),
                 )
             )
 
@@ -365,6 +373,7 @@ class RLEvaluator:
         return RLReport(
             agent_name=agent_name,
             total_steps=len(df),
+            initial_balance=float(df["balances"].iloc[0]),
             stability=stability,
             turnover=turnover,
             drawdown=drawdown,
