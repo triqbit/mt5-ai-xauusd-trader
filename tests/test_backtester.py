@@ -8,6 +8,8 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from unittest.mock import MagicMock
+
 import pytest
 
 from src.trading.backtester import BacktestEngine
@@ -21,12 +23,16 @@ class MockModel:
 @pytest.fixture
 def sample_data():
     dates = pd.date_range(start="2024-01-01", periods=1000, freq="5min")
+    # Create a trending price series to pass execution filters (EMA sequence, Trend angle)
+    base_price = 2000.0
+    trend = np.linspace(0, 100, 1000)
+    close = base_price + trend
     df = pd.DataFrame(
         {
-            "open": np.full(1000, 2000.0),
-            "high": np.full(1000, 2010.0),
-            "low": np.full(1000, 1990.0),
-            "close": np.full(1000, 2000.0),
+            "open": close - 1,
+            "high": close + 5,
+            "low": close - 5,
+            "close": close,
             "tick_volume": np.full(1000, 1000),
         },
         index=dates,
@@ -43,9 +49,11 @@ def test_backtest_engine_initialization():
 
 
 def test_backtest_run(sample_data):
-    # Mocking FeatureEngineer and ExecutionFilter to avoid dependency issues in test env
-    # though in a real CI they should be present.
-    engine = BacktestEngine(symbol="XAUUSD", max_positions=1)
+    # Mocking ExecutionFilter to always approve
+    mock_ef = MagicMock()
+    mock_ef.validate.return_value = type("Decision", (), {"is_approved": True})
+
+    engine = BacktestEngine(symbol="XAUUSD", max_positions=1, execution_filter=mock_ef)
 
     # We need to provide a model that predict Buy
     model = MockModel()
@@ -58,6 +66,6 @@ def test_backtest_run(sample_data):
         step_size=50
     )
 
-    assert report.total_trades >= 0
+    assert report.total_trades > 0
     assert isinstance(report.annualized_return, float)
     assert report.start_date is not None

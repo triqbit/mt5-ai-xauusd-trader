@@ -9,9 +9,11 @@ License: MIT
 from __future__ import annotations
 
 import asyncio
+import time
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Generator, Optional
 
 import psutil
 import structlog
@@ -69,6 +71,12 @@ class Monitor:
     """
 
     def __init__(self, config: TradingConfig) -> None:
+        """
+        Initialize the Monitor with configuration.
+
+        Args:
+            config: The trading configuration object.
+        """
         self.cfg = config
         self.equity_history: deque[Dict[str, Any]] = deque(maxlen=1000)
         self.bot: Optional[telegram.Bot] = None
@@ -148,22 +156,25 @@ class Monitor:
             logger.debug("Telegram bot not configured, message not sent: %s", text)
             return
 
+        async def _send():
+            try:
+                await self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
+                logger.info("Telegram message sent")
+            except Exception as e:
+                logger.error("Failed to send Telegram message", error=str(e))
+
         try:
             try:
                 loop = asyncio.get_running_loop()
                 # We are inside a running event loop, schedule task
-                task = loop.create_task(
-                    self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
-                )
+                task = loop.create_task(_send())
                 self._background_tasks.add(task)
                 task.add_done_callback(self._background_tasks.discard)
             except RuntimeError:
                 # No event loop is running, use asyncio.run (blocking)
-                asyncio.run(self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text))
-
-            logger.info("Telegram message sent")
+                asyncio.run(_send())
         except Exception as e:
-            logger.error("Failed to send Telegram message", error=str(e))
+            logger.error("send_message_error", error=str(e))
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger and update metrics."""
@@ -249,16 +260,61 @@ class Monitor:
         logger.warning("order_rejected", reason=reason)
 
     def log_model_performance(self, accuracy: float, drift_score: float) -> None:
-        """Log model performance metrics."""
+        """Log model performance metrics and send alerts if thresholds are breached."""
         MODEL_ACCURACY_GAUGE.set(accuracy * 100)
         MODEL_DRIFT_GAUGE.set(drift_score)
         logger.info("model_performance_logged", accuracy=accuracy, drift=drift_score)
 
+        if accuracy < self.cfg.model_accuracy_floor:
+            msg = (
+                f"⚠️ WARNING: Model Accuracy Below Floor\n"
+                f"Current: {accuracy:.2%}\n"
+                f"Floor: {self.cfg.model_accuracy_floor:.2%}"
+            )
+            self.send_message(msg)
+            logger.warning("model_accuracy_alert", accuracy=accuracy, floor=self.cfg.model_accuracy_floor)
+
+        if drift_score > self.cfg.model_drift_threshold:
+            msg = (
+                f"⚠️ WARNING: Model Drift Detected\n"
+                f"Current Score: {drift_score:.3f}\n"
+                f"Threshold: {self.cfg.model_drift_threshold:.3f}"
+            )
+            self.send_message(msg)
+            logger.warning("model_drift_alert", drift=drift_score, threshold=self.cfg.model_drift_threshold)
+
     def log_data_freshness(self, timestamp: datetime) -> None:
-        """Log data freshness metric."""
+        """
+        Log data freshness metric and alert if data is stale.
+
+        Args:
+            timestamp: The timestamp of the latest data point.
+        """
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
         age = (datetime.now(timezone.utc) - timestamp).total_seconds()
         DATA_FRESHNESS_GAUGE.set(age)
         logger.debug("data_freshness_logged", age_seconds=age)
+
+        if age > self.cfg.data_freshness_threshold:
+            msg = f"⚠️ WARNING: Data Stale!\nLast Data Point: {age / 60:.1f} minutes ago."
+            self.send_message(msg)
+            logger.warning("stale_data_alert", age_seconds=age)
+
+    @contextmanager
+    def track_block_duration(self, label: str) -> Generator[None, None, None]:
+        """Context manager to track the duration of a code block."""
+        start_time = time.perf_counter()
+        try:
+            yield
+        finally:
+            duration = time.perf_counter() - start_time
+            TRADING_BLOCK_DURATION.labels(block_label=label).observe(duration)
+            logger.debug("block_duration_tracked", label=label, duration=duration)
+
+    def get_equity_curve(self) -> list[dict[str, Any]]:
+        """Return the tracked equity curve history."""
+        return list(self.equity_history)
 
 
 __all__ = ["Monitor"]

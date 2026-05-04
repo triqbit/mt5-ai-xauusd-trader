@@ -2,6 +2,7 @@
 Tests for Monitor class.
 """
 import asyncio
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -25,6 +26,7 @@ from src.core.monitor import (
     SLIPPAGE_HISTOGRAM,
     SYSTEM_ERROR_COUNTER,
     TRADE_COUNTER,
+    TRADING_BLOCK_DURATION,
     WIN_RATE_GAUGE,
     Monitor,
 )
@@ -47,6 +49,14 @@ class TestMonitor(unittest.TestCase):
             self.assertEqual(len(self.monitor.equity_history), 1)
             self.assertEqual(self.monitor.equity_history[0]["equity"], 10500.0)
             mock_set.assert_called_once_with(10500.0)
+
+    def test_get_equity_curve(self):
+        self.monitor.log_equity(10000.0)
+        self.monitor.log_equity(10100.0)
+        curve = self.monitor.get_equity_curve()
+        self.assertEqual(len(curve), 2)
+        self.assertEqual(curve[0]["equity"], 10000.0)
+        self.assertEqual(curve[1]["equity"], 10100.0)
 
     @patch("asyncio.run")
     @patch("asyncio.get_running_loop")
@@ -214,19 +224,65 @@ class TestMonitor(unittest.TestCase):
             mock_inc.assert_called_once()
 
     def test_log_model_performance(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = MagicMock()
+        self.config.model_accuracy_floor = 0.5
+        self.config.model_drift_threshold = 0.3
+
         with patch.object(MODEL_ACCURACY_GAUGE, "set") as mock_acc, \
              patch.object(MODEL_DRIFT_GAUGE, "set") as mock_drift:
+            # Case 1: Healthy performance
             self.monitor.log_model_performance(0.85, 0.05)
-            mock_acc.assert_called_once_with(85.0)
-            mock_drift.assert_called_once_with(0.05)
+            mock_acc.assert_called_with(85.0)
+            mock_drift.assert_called_with(0.05)
+            self.assertFalse(self.monitor.bot.send_message.called)
+
+            # Case 2: Accuracy breach
+            self.monitor.log_model_performance(0.45, 0.05)
+            self.assertTrue(self.monitor.bot.send_message.called)
+            msg = self.monitor.bot.send_message.call_args[1]["text"]
+            self.assertIn("Accuracy Below Floor", msg)
+            self.monitor.bot.send_message.reset_mock()
+
+            # Case 3: Drift breach
+            self.monitor.log_model_performance(0.85, 0.4)
+            self.assertTrue(self.monitor.bot.send_message.called)
+            msg = self.monitor.bot.send_message.call_args[1]["text"]
+            self.assertIn("Model Drift Detected", msg)
 
     def test_log_data_freshness(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = MagicMock()
+        self.config.data_freshness_threshold = 300
+
         with patch.object(DATA_FRESHNESS_GAUGE, "set") as mock_set:
+            # Case 1: Fresh data
             now = datetime.now(timezone.utc)
             self.monitor.log_data_freshness(now)
-            mock_set.assert_called_once()
-            # age should be close to 0
+            mock_set.assert_called_with(mock_set.call_args[0][0])
             self.assertLess(mock_set.call_args[0][0], 1.0)
+            self.assertFalse(self.monitor.bot.send_message.called)
+
+            # Case 2: Stale data
+            stale_time = datetime.now(timezone.utc).timestamp() - 600
+            stale_dt = datetime.fromtimestamp(stale_time, tz=timezone.utc)
+            self.monitor.log_data_freshness(stale_dt)
+            self.assertTrue(self.monitor.bot.send_message.called)
+            msg = self.monitor.bot.send_message.call_args[1]["text"]
+            self.assertIn("Data Stale", msg)
+
+    def test_track_block_duration(self):
+        with patch.object(TRADING_BLOCK_DURATION, "labels") as mock_labels:
+            mock_hist = MagicMock()
+            mock_labels.return_value = mock_hist
+
+            with self.monitor.track_block_duration("test_block"):
+                time.sleep(0.1)
+
+            mock_labels.assert_called_once_with(block_label="test_block")
+            mock_hist.observe.assert_called_once()
+            duration = mock_hist.observe.call_args[0][0]
+            self.assertGreaterEqual(duration, 0.1)
 
 if __name__ == '__main__':
     unittest.main()
