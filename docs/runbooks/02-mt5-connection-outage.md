@@ -16,18 +16,25 @@ Execute the bot "doctor" script to identify connectivity and environment issues:
 python scripts/doctor.py
 ```
 
-### 2. Check Local MT5 Terminal (Windows Execution)
+### 2. Common Log Patterns
+Search for these patterns to pinpoint the failure:
+- `MT5 terminal not found`: Incorrect `MT5_PATH` or terminal not running.
+- `MT5 login failed`: Check `MT5_LOGIN` and `MT5_PASSWORD`.
+- `MetaAPI connection timeout`: Network issue or invalid `METAAPI_TOKEN`.
+- `Market closed`: Attempting to trade during weekends or holidays.
+
+### 3. Check Local MT5 Terminal (Windows Execution)
 1. Verify if the MT5 Terminal is running on the host machine.
-2. Check the `Journal` tab in the MT5 Terminal for broker-side authentication errors.
+2. Check the `Journal` tab in the MT5 Terminal for broker-side authentication errors (e.g., `Invalid account`).
 3. Verify account login status (green/blue icon in the bottom right corner).
 
-### 3. Verify Configuration
+### 4. Verify Configuration
 Check `.env` via `scripts/validate_env.py` to ensure credentials are correct:
 - `MT5_LOGIN`
 - `MT5_SERVER`
 - `MT5_PASSWORD`
 
-### 4. Network Connectivity
+### 5. Network Connectivity
 1. Ping the broker's server address (found in MT5 terminal properties).
 2. Verify that `MT5_PATH` in `src/core/config.py` correctly points to the `terminal64.exe`.
 

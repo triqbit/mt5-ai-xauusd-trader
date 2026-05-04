@@ -54,7 +54,7 @@ For every P0/P1 incident, a "Blameless Post-Mortem" must be conducted to update 
 
 ## Verification Commands
 - **Check Health API:** `curl http://localhost:8000/health/readiness`
-- **Review Audit Logs:** `sqlite3 trades.db "SELECT * FROM risk_events ORDER BY created_at DESC LIMIT 5;"`
+- **Review Audit Logs:** `sqlite3 trades.db "SELECT event_type, description, created_at FROM risk_events ORDER BY created_at DESC LIMIT 10;"`
 - **Prometheus Metrics:** `curl http://localhost:8000/metrics | grep trading_system_errors`
 
 ## Escalation Path

@@ -27,13 +27,13 @@ docker stop mt5-trader
 ### 1. Identify the Trigger Event
 Query the `risk_events` table in the database to find the timestamp and specific drawdown value that triggered the breaker:
 ```bash
-sqlite3 trades.db "SELECT * FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"
+sqlite3 trades.db "SELECT event_type, description, symbol, created_at FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"
 ```
 
 ### 2. Analyze Recent Trades
 Review the most recent trades that led to the drawdown:
 ```bash
-sqlite3 trades.db "SELECT * FROM trades ORDER BY created_at DESC LIMIT 10;"
+sqlite3 trades.db "SELECT ticket, symbol, direction, entry_price, exit_price, pnl, created_at FROM trades ORDER BY created_at DESC LIMIT 10;"
 ```
 - Was it a single large loss or a series of losses?
 - Did the stop-loss levels fail to execute?

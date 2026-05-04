@@ -20,13 +20,13 @@ This runbook provides procedures for recovering from failures in GitHub Actions 
 3. Commit and push the fixes.
 
 ### 2. Test & Coverage Failures (Pytest)
-**Symptom:** The `test` job fails due to failed assertions or coverage falling below the 80% gate.
+**Symptom:** The `test` job fails due to failed assertions or coverage falling below the 85% gate.
 **Resolution:**
 1. Run tests locally:
    ```bash
    python -m pytest tests/
    ```
-2. If coverage is below 80%, identify uncovered areas:
+2. If coverage is below 85%, identify uncovered areas:
    ```bash
    python -m pytest --cov=src tests/ --cov-report=term-missing
    ```
@@ -65,13 +65,13 @@ This runbook provides procedures for recovering from failures in GitHub Actions 
 
 ## Expected Outcomes
 - All GitHub Actions workflows show a green "Success" status.
-- The 80% coverage gate is satisfied.
+- The 85% coverage gate is satisfied (aligned with `EXCELLENCE_BLUEPRINT.md`).
 - No high-severity vulnerabilities or leaked secrets remain.
 
 ## Verification Commands
 - **Environment:** `python scripts/validate_env.py`
 - **Migrations:** `python scripts/verify_migrations.py`
-- **Tests:** `pytest tests/ --cov=src --cov-fail-under=80`
+- **Tests:** `pytest tests/ --cov=src --cov-fail-under=85`
 - **Security:** `pip-audit` and `gitleaks detect --verbose`
 
 ## Escalation Path
