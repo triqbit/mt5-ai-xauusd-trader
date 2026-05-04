@@ -41,19 +41,22 @@ def test_rl_evaluator_initialization(trading_env):
 
 
 def test_momentum_baseline_predict():
-    baseline = MomentumBaseline()
-    # Mock observation: [window_normalized_flattened, balance, position]
-    # n_features=5. last close is at -(5+2)+3 = -4
+    # Momentum: last > prev + 0.1
+    baseline = MomentumBaseline(window=1)
+    # n_features=5. last close is at -4. prev close is at -4 - (1*5) = -9
     obs_buy = np.zeros(52)
-    obs_buy[-4] = 0.6
+    obs_buy[-4] = 0.5
+    obs_buy[-9] = 0.3
     assert baseline.predict(obs_buy) == 1
 
     obs_sell = np.zeros(52)
-    obs_sell[-4] = -0.6
+    obs_sell[-4] = -0.5
+    obs_sell[-9] = -0.3
     assert baseline.predict(obs_sell) == 2
 
     obs_hold = np.zeros(52)
-    obs_hold[-4] = 0.1
+    obs_hold[-4] = 0.3
+    obs_hold[-9] = 0.3
     assert baseline.predict(obs_hold) == 0
 
 
@@ -61,15 +64,15 @@ def test_mean_reversion_baseline_predict():
     baseline = MeanReversionBaseline()
     # n_features=5. last close is at -4
     obs_buy = np.zeros(52)
-    obs_buy[-4] = -2.0  # Very oversold
+    obs_buy[-4] = -2.1  # Very oversold (< -2.0)
     assert baseline.predict(obs_buy) == 1
 
     obs_sell = np.zeros(52)
-    obs_sell[-4] = 2.0   # Very overbought
+    obs_sell[-4] = 2.1   # Very overbought (> 2.0)
     assert baseline.predict(obs_sell) == 2
 
     obs_hold = np.zeros(52)
-    obs_hold[-4] = 0.5
+    obs_hold[-4] = 1.5
     assert baseline.predict(obs_hold) == 0
 
 
@@ -86,7 +89,9 @@ def test_evaluate_runs_to_completion(trading_env):
 
     class SimpleAgent:
         def predict(self, observation):
-            return 1 if observation[-3] > 0 else 0
+            # observation format: [..., balance, position]
+            # balance is -2, position is -1
+            return 1 if observation[-2] > 0 else 0
 
     report = evaluator.evaluate(SimpleAgent(), agent_name="Test_Agent")
 
@@ -97,6 +102,9 @@ def test_evaluate_runs_to_completion(trading_env):
     assert hasattr(report.stability, "profit_factor")
     assert hasattr(report.stability, "expectancy")
     assert hasattr(report.stability, "calmar_ratio")
+    assert hasattr(report.stability, "ulcer_index")
+    assert hasattr(report.stability, "sqn")
+    assert hasattr(report.stability, "win_loss_ratio")
     assert hasattr(report.turnover, "total_trades")
     assert hasattr(report.drawdown, "max_drawdown")
     assert isinstance(report.regime_sensitivity, list)
@@ -264,3 +272,35 @@ def test_turnover_metrics():
     assert turnover.max_hold_time == 15
     assert turnover.min_hold_time == 5
     assert turnover.trade_frequency == (2/100) * 1000
+
+
+def test_ulcer_index():
+    evaluator = RLEvaluator(env=MagicMock())
+    # Equity curve with some drawdowns
+    df = pd.DataFrame({
+        "balances": [100, 100, 90, 80, 100, 110, 100]
+    })
+    # Peak 100, DDs: [0, 0, 0.1, 0.2, 0, 0, 0.0909]
+    # Squared DDs: [0, 0, 0.01, 0.04, 0, 0, 0.00826]
+    # Mean SQ DD: (0.01 + 0.04 + 0.00826) / 7 = 0.05826 / 7 approx 0.00832
+    # Ulcer Index = sqrt(0.00832) approx 0.091
+    metrics = evaluator._calculate_stability(df, [], 0.2)
+    assert metrics.ulcer_index > 0
+    assert metrics.ulcer_index == pytest.approx(np.sqrt((0.01 + 0.04 + (10/110)**2) / 7), rel=1e-3)
+
+
+def test_sqn_calculation():
+    evaluator = RLEvaluator(env=MagicMock())
+    trades = [
+        {"pnl": 10.0, "hold_time": 1},
+        {"pnl": 10.0, "hold_time": 1},
+        {"pnl": 10.0, "hold_time": 1},
+        {"pnl": 10.0, "hold_time": 1},
+    ]
+    # Mean PnL = 10, StdDev = 0. SQN = (10 / 1e-9) * sqrt(4) = very large
+    # Let's use more realistic trades
+    trades = [{"pnl": 10.0, "hold_time": 1}, {"pnl": -5.0, "hold_time": 1}]
+    # Mean = 2.5, Std = 7.5. SQN = (2.5 / 7.5) * sqrt(2) approx 0.33 * 1.41 = 0.47
+    df = pd.DataFrame({"balances": [100, 100, 105]})
+    metrics = evaluator._calculate_stability(df, trades, 0.0)
+    assert metrics.sqn == pytest.approx((2.5 / 7.5) * np.sqrt(2))

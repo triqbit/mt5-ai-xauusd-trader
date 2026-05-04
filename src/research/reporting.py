@@ -130,6 +130,9 @@ class RLMetric(BaseModel):
     var_95: float = 0.0
     cvar_95: float = 0.0
     recovery_factor: float = 0.0
+    ulcer_index: float = 0.0
+    sqn: float = 0.0
+    win_loss_ratio: float = 0.0
 
 class RLSection(BaseModel):
     comparison_summary: str
@@ -324,7 +327,8 @@ class ResearchReporter:
             table.add_column("Sortino")
             table.add_column("PF")
             table.add_column("MaxDD")
-            table.add_column("VaR(95)")
+            table.add_column("Ulcer")
+            table.add_column("SQN")
             for m in report.rl_evaluation.metrics:
                 table.add_row(
                     m.agent_name,
@@ -332,7 +336,8 @@ class ResearchReporter:
                     f"{m.sortino:.2f}",
                     f"{m.profit_factor:.2f}",
                     f"{m.max_dd:.2%}",
-                    f"{m.var_95:.2%}",
+                    f"{m.ulcer_index:.2f}",
+                    f"{m.sqn:.2f}",
                 )
             self.console.print(table)
 
