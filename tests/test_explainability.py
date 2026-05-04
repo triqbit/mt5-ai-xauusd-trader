@@ -255,6 +255,37 @@ def test_signal_explainer_feature_contributions():
     assert trend.contribution_score == 0.8
     assert trend.impact_level == "High"
 
+    # Check that high impact feature is in summary
+    assert "Key impacts: Trend: Strong bullish trend" in explanation.human_readable_summary
+
+    # Check machine attribution for features
+    assert "feature_impacts" in explanation.machine_attribution
+    assert explanation.machine_attribution["feature_impacts"]["Trend"] == 0.8
+
+
+def test_format_for_terminal_with_features():
+    """Test that terminal formatting includes feature contributions."""
+    explainer = SignalExplainer()
+    feature_impacts = [
+        {"cluster": "Trend", "score": 0.8, "impact": "High", "summary": "Strong bullish trend"},
+    ]
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.7,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        feature_impacts=feature_impacts,
+    )
+
+    formatted = explainer.format_for_terminal(explanation)
+    assert "Feature Cluster Contributions" in formatted or "Feature Contributions" in formatted
+    assert "Trend" in formatted
+    assert "Strong bullish trend" in formatted
+
 
 def test_signal_explainer_mixed_votes():
     """Test behavior when models have conflicting votes."""

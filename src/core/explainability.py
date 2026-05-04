@@ -144,6 +144,20 @@ class SignalExplainer:
     ) -> SignalExplanation:
         """
         Generate a comprehensive explanation for a trade signal.
+
+        Args:
+            symbol: Trading symbol (e.g., "XAUUSD").
+            direction: Numerical signal direction (1=Buy, -1=Sell, 0=Hold).
+            confidence: Aggregated ensemble confidence (0.0 to 1.0).
+            model_votes: Dictionary mapping model names to their actions (ModelAction index).
+            model_weights: Dictionary mapping model names to their ensemble weights.
+            risk_data: Raw risk assessment data (passed, rejection_reasons, risk_reward, etc.).
+            regime_info: Market regime data (name, confidence, volatility, etc.).
+            execution_data: Optional execution filter data (filters, summary, etc.).
+            feature_impacts: Optional list of dictionaries describing feature cluster impacts.
+
+        Returns:
+            A structured SignalExplanation object.
         """
         # 1. Execution Summary
         if not execution_data:
@@ -245,6 +259,12 @@ class SignalExplainer:
             reasoning += f"Primary driver(s): {', '.join(dominant_models)}. "
         reasoning += f"Market is currently in a {regime_context.regime_name} regime. "
 
+        # Add key feature impacts if available
+        high_impact_features = [c for c in contributions if c.impact_level == "High"]
+        if high_impact_features:
+            impact_summaries = [f"{c.cluster_name}: {c.summary}" for c in high_impact_features]
+            reasoning += f"Key impacts: {'; '.join(impact_summaries)}. "
+
         if not execution_summary.passed:
             reasoning += f"EXECUTION BLOCKED: {execution_summary.summary}. "
         elif not risk_assessment.passed:
@@ -259,6 +279,7 @@ class SignalExplainer:
             "execution_passed": execution_summary.passed,
             "regime_confluence": regime_context.confidence,
             "dominant_models": dominant_models,
+            "feature_impacts": {c.cluster_name: c.contribution_score for c in contributions},
         }
 
         return SignalExplanation(
@@ -331,7 +352,36 @@ class SignalExplainer:
                     "⭐" if attr.is_dominant else "",
                 )
 
-            # 3. Execution and Risk
+            # 3. Feature Contributions
+            feature_table = Table(title="Feature Cluster Contributions", box=box.SIMPLE)
+            feature_table.add_column("Cluster", style="magenta")
+            feature_table.add_column("Score", justify="right")
+            feature_table.add_column("Impact", justify="center")
+            feature_table.add_column("Summary")
+
+            for cont in explanation.feature_contributions:
+                impact_color = (
+                    "red"
+                    if cont.impact_level == "High"
+                    else "yellow"
+                    if cont.impact_level == "Medium"
+                    else "dim"
+                )
+                score_color = (
+                    "green"
+                    if cont.contribution_score > 0
+                    else "red"
+                    if cont.contribution_score < 0
+                    else "white"
+                )
+                feature_table.add_row(
+                    cont.cluster_name,
+                    f"[{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
+                    f"[{impact_color}]{cont.impact_level}[/{impact_color}]",
+                    cont.summary,
+                )
+
+            # 4. Execution and Risk
             exec_table = Table(title="Execution Filters", box=box.SIMPLE, expand=True)
             exec_table.add_column("Filter")
             exec_table.add_column("Status", justify="center")
@@ -363,17 +413,21 @@ class SignalExplainer:
 
             # Bypass expensive capture if we are printing directly to a console
             if console_provided and not getattr(console, "_record", False):
-                 console.print(header)
-                 console.print(model_table)
-                 if explanation.execution_summary.filters:
-                     console.print(exec_table)
-                 console.print(Panel(risk_info, title="Risk Assessment"))
-                 console.print(Panel(regime_info, title="Market Context"))
-                 return ""
+                console.print(header)
+                console.print(model_table)
+                if explanation.feature_contributions:
+                    console.print(feature_table)
+                if explanation.execution_summary.filters:
+                    console.print(exec_table)
+                console.print(Panel(risk_info, title="Risk Assessment"))
+                console.print(Panel(regime_info, title="Market Context"))
+                return ""
 
             with console.capture() as capture:
                 console.print(header)
                 console.print(model_table)
+                if explanation.feature_contributions:
+                    console.print(feature_table)
                 if explanation.execution_summary.filters:
                     console.print(exec_table)
                 console.print(Panel(risk_info, title="Risk Assessment"))
@@ -388,7 +442,18 @@ class SignalExplainer:
             output += f"Summary: {explanation.human_readable_summary}\n\n"
             output += "Model Votes:\n"
             for attr in explanation.model_attributions:
-                output += f"  - {attr.model_name}: {attr.vote.name} (W={attr.weight:.1%}, C={attr.confidence:.1%}) {'[DOMINANT]' if attr.is_dominant else ''}\n"
+                output += (
+                    f"  - {attr.model_name}: {attr.vote.name} (W={attr.weight:.1%}, "
+                    f"C={attr.confidence:.1%}) {'[DOMINANT]' if attr.is_dominant else ''}\n"
+                )
+
+            if explanation.feature_contributions:
+                output += "\nFeature Contributions:\n"
+                for cont in explanation.feature_contributions:
+                    output += (
+                        f"  - {cont.cluster_name}: {cont.contribution_score:+.2f} "
+                        f"({cont.impact_level}) - {cont.summary}\n"
+                    )
 
             if explanation.execution_summary.filters:
                 output += f"\nExecution: {'PASSED' if explanation.execution_summary.passed else 'BLOCKED'}\n"
