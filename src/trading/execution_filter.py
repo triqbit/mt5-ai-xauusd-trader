@@ -18,6 +18,8 @@ import pandas as pd
 from scipy import stats
 
 if TYPE_CHECKING:
+    from src.core.config import TradingConfig
+    from src.core.trade_logger import TradeLogger
     from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -35,13 +37,20 @@ class ExecutionDecision:
 
 class ExecutionFilter:
     """
-    Implements a 6-layer validation cascade for trading signals.
-    Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown.
+    Implements a 9-layer validation cascade for trading signals.
+    Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown,
+    Model Stability, Performance Floor, Confidence Threshold.
     """
 
-    def __init__(self, max_drawdown: float = 0.15, rsi_period: int = 14):
+    def __init__(
+        self,
+        max_drawdown: float = 0.15,
+        rsi_period: int = 14,
+        config: Optional[TradingConfig] = None,
+    ):
         self.max_drawdown = max_drawdown
         self.rsi_period = rsi_period
+        self.cfg = config
 
     def validate(
         self,
@@ -49,9 +58,11 @@ class ExecutionFilter:
         market_data: pd.DataFrame,
         current_drawdown: float,
         timestamp: Optional[datetime] = None,
+        model_health: Optional[Dict[str, float]] = None,
+        trade_logger: Optional[TradeLogger] = None,
     ) -> ExecutionDecision:
         """
-        Run the full 6-layer filter cascade.
+        Run the full 9-layer filter cascade.
         """
         timestamp = timestamp or signal.timestamp or datetime.utcnow()
 
@@ -79,7 +90,58 @@ class ExecutionFilter:
         if not self._check_drawdown_limit(current_drawdown):
             return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
 
+        # Layer 7: Model Stability Guard
+        if not self._check_model_stability(model_health):
+            return ExecutionDecision(signal, False, 0.0, "MODEL_STABILITY")
+
+        # Layer 8: Performance Floor
+        if not self._check_performance_floor(trade_logger):
+            return ExecutionDecision(signal, False, 0.0, "PERFORMANCE_FLOOR")
+
+        # Layer 9: Confidence Threshold
+        if not self._check_dynamic_confidence(signal.confidence):
+            return ExecutionDecision(signal, False, signal.confidence, "CONFIDENCE_THRESHOLD")
+
         return ExecutionDecision(signal, True, signal.confidence)
+
+    def _check_model_stability(self, health: Optional[Dict[str, float]]) -> bool:
+        """Blocks if aggregate model drift or accuracy breaches limits."""
+        if health is None or self.cfg is None:
+            return True
+
+        drift = health.get("drift", 0.0)
+        acc = health.get("accuracy", 1.0)
+
+        if drift > self.cfg.model_drift_threshold:
+            logger.warning("EXECUTION BLOCKED: Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold)
+            return False
+
+        if acc < self.cfg.model_accuracy_floor:
+            logger.warning("EXECUTION BLOCKED: Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor)
+            return False
+
+        return True
+
+    def _check_performance_floor(self, trade_logger: Optional[TradeLogger]) -> bool:
+        """Blocks if historical win rate drops below floor."""
+        if trade_logger is None or self.cfg is None:
+            return True
+
+        report = trade_logger.read_performance_report()
+        win_rate = report.get("win_rate", 1.0)
+        total_trades = report.get("total_trades", 0)
+
+        if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
+            logger.warning("EXECUTION BLOCKED: Win rate %.2f < %.2f", win_rate, self.cfg.model_win_rate_floor)
+            return False
+
+        return True
+
+    def _check_dynamic_confidence(self, confidence: float) -> bool:
+        """Enforces configured confidence threshold."""
+        if self.cfg is None:
+            return True
+        return confidence >= self.cfg.confidence_threshold
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""

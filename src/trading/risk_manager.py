@@ -83,14 +83,9 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(
-        self,
-        signal: TradeSignal,
-        signal_id: Optional[int] = None,
-        model_health: Optional[Dict[str, float]] = None,
-    ) -> bool:
+    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
-        Run the full 9-layer risk filter cascade.
+        Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -102,10 +97,6 @@ class RiskManager:
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_performance_floor():
-            rejection_reason = "Historical performance below floor"
-        elif not self._check_model_stability(model_health):
-            rejection_reason = "Model instability or drift detected"
         elif not self._check_minimum_confidence(signal.confidence):
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
@@ -217,49 +208,14 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(self, confidence: float) -> bool:
-        threshold = self.cfg.confidence_threshold
+    def _check_minimum_confidence(
+        self, confidence: float, threshold: float = 0.55
+    ) -> bool:
         if confidence < threshold:
-            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
-            return False
-        return True
-
-    def _check_model_stability(self, health: Optional[Dict[str, float]]) -> bool:
-        """Blocks trading if model drift or accuracy breaches enterprise limits."""
-        if health is None:
-            return True  # No health data available, fail-safe (continue)
-
-        drift = health.get("drift", 0.0)
-        acc = health.get("accuracy", 1.0)
-
-        if drift > self.cfg.model_drift_threshold:
-            logger.warning("MODEL DRIFT BREACH: %.2f > %.2f", drift, self.cfg.model_drift_threshold)
-            return False
-
-        if acc < self.cfg.model_accuracy_floor:
-            logger.warning("MODEL ACCURACY BREACH: %.2f < %.2f", acc, self.cfg.model_accuracy_floor)
-            return False
-
-        return True
-
-    def _check_performance_floor(self) -> bool:
-        """Blocks trading if aggregate win rate drops below critical floor."""
-        if not self.trade_logger:
-            return True
-
-        report = self.trade_logger.read_performance_report()
-        win_rate = report.get("win_rate", 1.0)
-        total_trades = report.get("total_trades", 0)
-
-        # Only enforce after a statistically relevant sample
-        if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
-            logger.warning(
-                "PERFORMANCE FLOOR BREACH: win_rate=%.2f (floor=%.2f)",
-                win_rate,
-                self.cfg.model_win_rate_floor,
+            logger.debug(
+                "Confidence %.2f below threshold %.2f", confidence, threshold
             )
             return False
-
         return True
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:

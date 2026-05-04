@@ -211,8 +211,14 @@ def run_live(
                 if risk_approved:
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
+                        # Model health retrieved in step 6
                         filter_decision = execution_filter.validate(
-                            signal, df_features, current_drawdown=drawdown, timestamp=datetime.now(timezone.utc)
+                            signal,
+                            df_features,
+                            current_drawdown=drawdown,
+                            timestamp=datetime.now(timezone.utc),
+                            model_health=health,
+                            trade_logger=trade_logger,
                         )
                         if not filter_decision.is_approved:
                             log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
@@ -440,7 +446,8 @@ def main() -> int:
     monitor.start_metrics_server()
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
-        max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15
+        max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
+        config=cfg,
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
     regime_detector = RegimeDetector()

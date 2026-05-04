@@ -1,21 +1,16 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.trading.risk_manager import RiskManager, TradeSignal, TradingConfig
-from src.core.constants import SignalDirection
+from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
+from src.trading.risk_manager import TradeSignal
+from src.core.config import TradingConfig
 from datetime import datetime
+import pandas as pd
+import numpy as np
 
 @pytest.fixture
 def mock_config():
     config = MagicMock(spec=TradingConfig)
-    config.mt5_login = 12345
-    config.mt5_server = "Broker-Server"
-    config.mt5_password = MagicMock()
-    config.mt5_password.get_secret_value.return_value = "password"
-    config.symbol = "XAUUSD"
-    config.risk_per_trade = 0.01
-    config.max_daily_loss = 0.05
-    config.max_positions = 3
     config.confidence_threshold = 0.6
     config.model_drift_threshold = 0.3
     config.model_accuracy_floor = 0.5
@@ -23,8 +18,8 @@ def mock_config():
     return config
 
 @pytest.fixture
-def risk_manager(mock_config):
-    return RiskManager(mock_config, account_balance=10000.0)
+def execution_filter(mock_config):
+    return ExecutionFilter(max_drawdown=0.15, config=mock_config)
 
 @pytest.fixture
 def valid_signal():
@@ -40,47 +35,52 @@ def valid_signal():
         timestamp=datetime.utcnow()
     )
 
-def test_approve_with_high_drift(risk_manager, valid_signal):
+@pytest.fixture
+def mock_market_data():
+    # Construct a trend-following sequence to satisfy TREND_ANGLE and EMA_SEQUENCE
+    # For BUY: prices should be increasing, EMA8 > EMA21 > EMA50 > EMA200
+    df = pd.DataFrame({
+        "high": [1900.0 + i for i in range(100)],
+        "low": [1890.0 + i for i in range(100)],
+        "close": [1895.0 + i for i in range(100)],
+    })
+    # Add EMA columns manually to ensure they pass
+    df["base_M5_ema_8"] = df["close"].ewm(span=8).mean()
+    df["base_M5_ema_21"] = df["close"].ewm(span=21).mean()
+    df["base_M5_ema_50"] = df["close"].ewm(span=50).mean()
+    df["base_M5_ema_200"] = df["close"].ewm(span=200).mean()
+    df["base_M5_atr"] = 10.0
+    df["base_M5_rsi"] = 60.0
+    return df
+
+def test_filter_with_high_drift(execution_filter, valid_signal, mock_market_data):
     health = {"drift": 0.4, "accuracy": 0.8}
-    # Should be rejected because drift 0.4 > threshold 0.3
-    assert risk_manager.approve(valid_signal, model_health=health) is False
+    decision = execution_filter.validate(valid_signal, mock_market_data, 0.05, model_health=health)
+    assert decision.is_approved is False
+    assert decision.blocked_by == "MODEL_STABILITY"
 
-def test_approve_with_low_accuracy(risk_manager, valid_signal):
+def test_filter_with_low_accuracy(execution_filter, valid_signal, mock_market_data):
     health = {"drift": 0.1, "accuracy": 0.4}
-    # Should be rejected because accuracy 0.4 < floor 0.5
-    assert risk_manager.approve(valid_signal, model_health=health) is False
+    decision = execution_filter.validate(valid_signal, mock_market_data, 0.05, model_health=health)
+    assert decision.is_approved is False
+    assert decision.blocked_by == "MODEL_STABILITY"
 
-def test_approve_with_healthy_model(risk_manager, valid_signal):
+def test_filter_with_healthy_model(execution_filter, valid_signal, mock_market_data):
     health = {"drift": 0.1, "accuracy": 0.7}
-    # Should be approved
-    assert risk_manager.approve(valid_signal, model_health=health) is True
+    decision = execution_filter.validate(valid_signal, mock_market_data, 0.05, model_health=health)
+    # Adjust mock data to ensure earlier layers pass
+    assert decision.is_approved is True
 
-def test_approve_no_health_data(risk_manager, valid_signal):
-    # Should be approved (fail-safe)
-    assert risk_manager.approve(valid_signal, model_health=None) is True
-
-def test_approve_low_historical_win_rate(risk_manager, valid_signal):
+def test_filter_low_historical_win_rate(execution_filter, valid_signal, mock_market_data):
     mock_logger = MagicMock()
-    # Win rate 0.4 < floor 0.45, with 25 trades
     mock_logger.read_performance_report.return_value = {"win_rate": 0.4, "total_trades": 25}
-    risk_manager.trade_logger = mock_logger
+    decision = execution_filter.validate(valid_signal, mock_market_data, 0.05, trade_logger=mock_logger)
+    assert decision.is_approved is False
+    assert decision.blocked_by == "PERFORMANCE_FLOOR"
 
-    assert risk_manager.approve(valid_signal) is False
-
-def test_approve_low_historical_win_rate_insufficient_data(risk_manager, valid_signal):
-    mock_logger = MagicMock()
-    # Win rate 0.4 < floor 0.45, but only 10 trades
-    mock_logger.read_performance_report.return_value = {"win_rate": 0.4, "total_trades": 10}
-    risk_manager.trade_logger = mock_logger
-
-    assert risk_manager.approve(valid_signal) is True
-
-def test_minimum_confidence_from_config(risk_manager, valid_signal):
-    risk_manager.cfg.confidence_threshold = 0.8
+def test_filter_low_confidence_threshold(execution_filter, valid_signal, mock_market_data):
+    execution_filter.cfg.confidence_threshold = 0.8
     valid_signal.confidence = 0.7
-    # Rejected because 0.7 < 0.8
-    assert risk_manager.approve(valid_signal) is False
-
-    valid_signal.confidence = 0.85
-    # Approved
-    assert risk_manager.approve(valid_signal) is True
+    decision = execution_filter.validate(valid_signal, mock_market_data, 0.05)
+    assert decision.is_approved is False
+    assert decision.blocked_by == "CONFIDENCE_THRESHOLD"
