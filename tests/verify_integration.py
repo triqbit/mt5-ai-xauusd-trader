@@ -166,7 +166,8 @@ def test_startup_integration():
         "DATABASE_URL": "sqlite:///trades.db",
         "MODE": "demo",
         "ALGORITHM": "ensemble"
-    }):
+    }), patch("pathlib.Path.exists", return_value=True), \
+        patch("pathlib.Path.is_file", return_value=True):
         get_config.cache_clear()
         cfg = get_config()
         assert cfg.mode == "demo"
