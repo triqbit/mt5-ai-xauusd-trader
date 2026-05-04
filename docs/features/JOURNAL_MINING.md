@@ -11,10 +11,10 @@ Detects overtrading and profitability decay across major global sessions:
 - **London**: 08:00 - 17:00 UTC
 - **New York**: 13:00 - 22:00 UTC
 
-Flags a session as "overtrading" if trade frequency exceeds 150% of the session average.
+Flags a session as "overtrading" if trade frequency exceeds 150% of the session average. Performance metrics and motifs are now session-aware, allowing the identification of regime-specific algorithm failures.
 
 ### 2. Multi-Dimensional Signal Motifs
-Analyzes AI signal reliability under different market conditions by binning historical volatility and confidence into regimes:
+Analyzes AI signal reliability under different market conditions by binning historical volatility, confidence, and **trading session** into regimes:
 - **Volatility Buckets**: Low, Normal, High, Extreme.
 - **Confidence Buckets**: Low (<0.4), Medium (<0.7), High (<0.9), Extreme.
 
@@ -28,14 +28,18 @@ Aggregates performance by:
 - **Symbol**: Asset-level performance (e.g., XAUUSD vs others).
 - **Algorithm**: Which AI model family is currently dominant.
 - **Hour of Day**: Identifying specific intraday windows of high edge.
+- **Day of Week**: Detecting cyclical edges or "Friday volatility" effects.
 
-### 5. Early Warning & Toxic Motif Tracking
+### 5. Trade Duration Analysis
+Calculates average win vs loss holding times in minutes. This reveals behavioral biases such as "cutting winners short and letting losers run," which is critical for XAUUSD risk management where volatility can quickly turn a small loss into a major drawdown.
+
+### 6. Early Warning & Toxic Motif Tracking
 Detects advanced behavioral risks:
 - **Toxic Motifs**: Recurring attribute combinations that show significantly lower win rates or high frequency within drawdown clusters.
 - **Pre-Drawdown Motifs**: Identification of signal combinations that frequently occur shortly before (default 6 hours) a drawdown cluster begins.
 - **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as being within 24h of a drawdown cluster).
 
-### 6. Risk Block Analysis
+### 7. Risk Block Analysis
 Summarizes recurring reasons why the `RiskManager` rejected AI signals (e.g., `MAX_DRAWDOWN`, `SPREAD_TOO_WIDE`). This reveals the "opportunity cost" of the current risk parameters.
 
 
