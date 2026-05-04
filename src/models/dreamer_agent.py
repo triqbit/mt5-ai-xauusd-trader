@@ -89,3 +89,12 @@ class DreamerAgent(BaseModel):
         """
         self.state = None
         self.logger.debug("DreamerAgent latent state reset.")
+
+    def save(self, path: Any) -> None:
+        """
+        Saves the Dreamer model (placeholder).
+
+        Args:
+            path: Target file path.
+        """
+        self.logger.info(f"DreamerAgent.save called (placeholder) for {path}")

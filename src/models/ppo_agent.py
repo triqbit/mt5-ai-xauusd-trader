@@ -91,12 +91,37 @@ class PPOAgent(BaseModel):
             )
 
         try:
-            # SB3 predict returns (action, states)
-            # deterministic=True is used for production/inference consistency
-            action, _states = self.model.predict(features, deterministic=True)
+            import torch
 
-            # Convert numpy action to native Python int for indexing/mapping
-            action_val = int(action)
+            # SB3 models expect (batch, ...) observations.
+            # If features is (window_size, n_features), add batch dim.
+            if features.ndim == 2:
+                obs = features[np.newaxis, ...]
+            else:
+                obs = features
+
+            # Use the policy to get action probabilities for confidence estimation
+            self.model.policy.set_training_mode(False)
+            with torch.no_grad():
+                # Convert to tensor and move to device
+                obs_tensor, _ = self.model.policy.obs_to_tensor(obs)
+                distribution = self.model.policy.get_distribution(obs_tensor)
+
+                # For Discrete action space, we extract probabilities
+                if hasattr(distribution.distribution, "probs"):
+                    probs = distribution.distribution.probs.cpu().numpy()[0]
+                else:
+                    # Fallback for other distributions (e.g. continuous)
+                    # For XAUUSD TradingEnv it is Discrete(3)
+                    action, _ = self.model.predict(obs, deterministic=True)
+                    return Signal(
+                        direction=ModelAction(int(action[0])).to_direction(),
+                        confidence=1.0,
+                        metadata={"policy_type": "fallback"},
+                    )
+
+            action_val = int(np.argmax(probs))
+            confidence = float(probs[action_val])
 
             # Map categorical action (0, 1, 2) to ModelAction enum
             try:
@@ -110,13 +135,14 @@ class PPOAgent(BaseModel):
                     metadata={"error": f"Invalid action index {action_val}"},
                 )
 
-            # In RL, confidence is often derived from the action probability (policy logit)
-            # For this stub, we use a placeholder or 1.0 since it's a deterministic policy choice
-            # A production implementation would query the policy distribution
             return Signal(
                 direction=direction,
-                confidence=1.0,
-                metadata={"raw_action": action_val, "policy_type": "deterministic"},
+                confidence=confidence,
+                metadata={
+                    "raw_action": action_val,
+                    "probabilities": probs.tolist(),
+                    "device": str(self.device),
+                },
             )
 
         except Exception as e:

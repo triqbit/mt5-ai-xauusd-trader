@@ -1,5 +1,5 @@
 import numpy as np
-
+import pandas as pd
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
 from src.models.dreamer_agent import DreamerAgent
@@ -22,22 +22,46 @@ def test_ppo_agent_stub():
     assert signal.confidence == 0.0
     assert "error" in signal.metadata
 
+    # Test with mock environment
+    df = pd.DataFrame(np.random.randn(100, 140))
+    env = TradingEnv(df=df)
+    agent_with_model = PPOAgent(env=env)
+    assert agent_with_model.model is not None
+
+    signal = agent_with_model.predict(obs)
+    assert isinstance(signal, Signal)
+    assert 0.0 <= signal.confidence <= 1.0
+    assert "probabilities" in signal.metadata
+    assert len(signal.metadata["probabilities"]) == 3
+
 def test_lstm_model_stub():
     """Test LSTMModel initialization and prediction behavior."""
-    agent = LSTMModel(input_dim=10)
-    # Even if torch is missing, it should handle gracefully (returning HOLD)
+    # Test with attention
+    agent_attn = LSTMModel(input_dim=10, use_attention=True)
     obs = np.zeros((20, 10))
-    signal = agent.predict(obs)
-    assert isinstance(signal, Signal)
-    if agent.model is not None:
-        assert signal.direction in [
+    signal_attn = agent_attn.predict(obs)
+    assert isinstance(signal_attn, Signal)
+    if agent_attn.model is not None:
+        from src.models.lstm_model import LSTMAttentionModel
+        assert isinstance(agent_attn.model, LSTMAttentionModel)
+        assert signal_attn.direction in [
             SignalDirection.BUY,
             SignalDirection.SELL,
             SignalDirection.HOLD,
         ]
-    else:
-        assert signal.direction == SignalDirection.HOLD
-        assert "error" in signal.metadata
+
+    # Test without attention
+    agent_simple = LSTMModel(input_dim=10, use_attention=False)
+    signal_simple = agent_simple.predict(obs)
+    assert isinstance(signal_simple, Signal)
+    if agent_simple.model is not None:
+        from src.models.lstm_model import LSTMPricePredictor
+        assert isinstance(agent_simple.model, LSTMPricePredictor)
+        assert signal_simple.direction in [
+            SignalDirection.BUY,
+            SignalDirection.SELL,
+            SignalDirection.HOLD,
+        ]
 
 def test_dreamer_agent_stub():
     """Test DreamerAgent initialization and placeholder behavior."""
@@ -57,7 +81,6 @@ def test_dreamer_agent_stub():
 def test_trading_env_skeleton():
     """Test TradingEnv compliance with Gymnasium 0.29+ API."""
     df = np.random.randn(100, 10)
-    import pandas as pd
     df_pd = pd.DataFrame(df)
 
     env = TradingEnv(df=df_pd, window_size=10)
