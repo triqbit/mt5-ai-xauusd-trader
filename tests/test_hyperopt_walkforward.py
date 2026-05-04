@@ -86,6 +86,10 @@ def test_full_optimization_run(sample_data):
     assert "slow_window" in result.best_params
     assert result.metrics.robustness_score is not None
     assert result.metrics.oos_sharpe_mean is not None
+    assert result.metrics.worst_window_sharpe is not None
+    assert 0 <= result.metrics.win_rate_consistency <= 1.0
+    assert 0 <= result.metrics.max_drawdown_consistency <= 1.0
+    assert len(result.oos_returns) > 0
 
     # Verify window results
     assert len(result.window_results) >= 3
