@@ -5,4 +5,14 @@ __author__ = "triqbit"
 __license__ = "MIT"
 
 # Lazy sub-package discovery to avoid early dependency loads during migrations/quality checks
-__all__: list[str] = ["core", "models", "trading", "utils"]
+__all__: list[str] = [
+    "analytics",
+    "core",
+    "data",
+    "environment",
+    "models",
+    "monitoring",
+    "research",
+    "trading",
+    "utils",
+]

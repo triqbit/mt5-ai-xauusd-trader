@@ -75,9 +75,7 @@ class TradingEnv(gym.Env):
         obs = self._get_observation()
         return obs, {}
 
-    def step(
-        self, action: int
-    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """
         Executes one step in the environment.
 

@@ -69,9 +69,7 @@ class PPOAgent(BaseModel):
                 self.logger.debug("PPOAgent initialized without model or environment.")
 
         except ImportError as e:
-            self.logger.warning(
-                f"Stable-Baselines3 not installed. PPOAgent will be limited: {e}"
-            )
+            self.logger.warning(f"Stable-Baselines3 not installed. PPOAgent will be limited: {e}")
 
     def predict(self, features: np.ndarray) -> Signal:
         """

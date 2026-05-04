@@ -1,10 +1,12 @@
 
-import pytest
-import pandas as pd
-import numpy as np
 from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pandas as pd
+
 from src.core.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
+
 
 def test_feature_engineer_profiling_blocks():
     """Verify that FeatureEngineer uses the granular profiling blocks."""
@@ -52,7 +54,7 @@ def test_ensemble_model_profiling_blocks():
 
 def test_feature_engineer_fallback_logic():
     """Verify that compute_features doesn't return empty DF if MTF data is short."""
-    fe = FeatureEngineer(base_timeframe="M5", timeframes=["H1"]) # MTF H1 needs 12 bars
+    FeatureEngineer(base_timeframe="M5", timeframes=["H1"]) # MTF H1 needs 12 bars
     # Provide only 5 bars
     df = pd.DataFrame({
         'open': np.random.randn(5),

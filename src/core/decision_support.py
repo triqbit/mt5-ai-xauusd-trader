@@ -40,11 +40,17 @@ class DecisionPacket(BaseModel):
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     symbol: str = Field(..., description="Target trading symbol")
-    is_executable: bool = Field(False, description="Final decision on whether the trade should proceed")
-    blocking_reasons: List[str] = Field(default_factory=list, description="List of reasons if the trade is blocked")
+    is_executable: bool = Field(
+        False, description="Final decision on whether the trade should proceed"
+    )
+    blocking_reasons: List[str] = Field(
+        default_factory=list, description="List of reasons if the trade is blocked"
+    )
 
     # Components
-    explanation: SignalExplanation = Field(..., description="ML signal attribution and explainability")
+    explanation: SignalExplanation = Field(
+        ..., description="ML signal attribution and explainability"
+    )
     regime: RegimeInfo = Field(..., description="Current market regime context")
     macro_risk: RiskStatus = Field(..., description="Macroeconomic event risk status")
     performance: PerformanceContext = Field(..., description="Recent performance context")
@@ -181,7 +187,9 @@ class DecisionSupportSystem:
             if not packet.macro_risk.active_events:
                 macro_content.append("No active macro events identified.", style="green")
             else:
-                macro_content.append(f"Active Events: {len(packet.macro_risk.active_events)}\n", style="bold")
+                macro_content.append(
+                    f"Active Events: {len(packet.macro_risk.active_events)}\n", style="bold"
+                )
                 for event in packet.macro_risk.active_events:
                     impact_color = "red" if event.impact >= 3 else "yellow"
                     macro_content.append(f" • {event.name} ", style="white")
@@ -195,13 +203,13 @@ class DecisionSupportSystem:
 
             # Bypass expensive capture if we are printing directly to a console
             if console_provided and not getattr(console, "_record", False):
-                 console.print(header)
-                 console.print(overview_table)
-                 console.print(macro_panel)
+                console.print(header)
+                console.print(overview_table)
+                console.print(macro_panel)
 
-                 console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
-                 self.explainer.format_for_terminal(packet.explanation, console=console)
-                 return ""
+                console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
+                self.explainer.format_for_terminal(packet.explanation, console=console)
+                return ""
 
             with console.capture() as capture:
                 console.print(header)

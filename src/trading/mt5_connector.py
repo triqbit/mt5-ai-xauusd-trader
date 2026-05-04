@@ -7,6 +7,7 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,6 +20,7 @@ import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -26,6 +28,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -108,23 +111,39 @@ class MT5Connector:
                     return True
                 else:
                     error_code, error_desc = mt5.last_error()
-                    logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
+                    logger.warning(
+                        "Native mt5.initialize failed: %s (code: %d)", error_desc, error_code
+                    )
 
                     # Troubleshooting guidance
                     if error_code == mt5.RES_E_NOT_FOUND:
-                        logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s", self.cfg.mt5_path)
+                        logger.info(
+                            "TIP: MT5 terminal not found. Check if MT5_PATH is correct: %s",
+                            self.cfg.mt5_path,
+                        )
                     elif error_code == mt5.RES_E_INVALID_PARAMS:
-                        logger.info("TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER.")
+                        logger.info(
+                            "TIP: Invalid credentials or server name. Check MT5_LOGIN and MT5_SERVER."
+                        )
                     elif error_code == mt5.RES_E_CONNECTION_FAILED:
-                        logger.info("TIP: Connection failed. Check your internet or if the broker server is reachable.")
+                        logger.info(
+                            "TIP: Connection failed. Check your internet or if the broker server is reachable."
+                        )
                     else:
-                        logger.info("TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options.")
+                        logger.info(
+                            "TIP: Ensure the MT5 terminal is open and 'Allow Algo Trading' is enabled in options."
+                        )
             except Exception as e:
-                logger.warning("Native MT5 initialization encountered an error: %s. Attempting fallback if available.", e)
+                logger.warning(
+                    "Native MT5 initialization encountered an error: %s. Attempting fallback if available.",
+                    e,
+                )
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
             if sys.platform == "win32":
-                logger.warning("Running on Windows but 'MetaTrader5' package is missing. Install with 'pip install MetaTrader5'.")
+                logger.warning(
+                    "Running on Windows but 'MetaTrader5' package is missing. Install with 'pip install MetaTrader5'."
+                )
             else:
                 logger.info("On Linux/Mac, use MetaAPI fallback by setting METAAPI_TOKEN.")
 
@@ -296,7 +315,9 @@ class MT5Connector:
             try:
                 tick = self.get_tick(signal.symbol)
             except MT5DataError as e:
-                raise MT5ExecutionError(f"Cannot place order due to tick retrieval failure: {e}") from e
+                raise MT5ExecutionError(
+                    f"Cannot place order due to tick retrieval failure: {e}"
+                ) from e
 
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 

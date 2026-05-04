@@ -10,13 +10,13 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-import pytest
 import psutil
+import pytest
 
 from src.core.config import get_config
+from src.core.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.trade_logger import RiskEvent, TradeLogger
-from src.core.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import RegimeDetector
 from src.research.benchmarks import EMACrossoverStrategy
@@ -141,7 +141,7 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
         ticket = mock_connector.place_order(signal)
         assert ticket == 999888
 
-        trade_id = trade_logger.log_trade(
+        trade_logger.log_trade(
             ticket=ticket,
             symbol="XAUUSD",
             direction=signal_out.direction,
@@ -309,7 +309,7 @@ def test_system_performance_and_resources(mock_cfg, trade_logger, sample_market_
         start = time.perf_counter()
 
         # Full stack logic (Inference + Filter)
-        signal_obj = model.predict(obs)
+        model.predict(obs)
         signal = TradeSignal("XAUUSD", 1, 2300, 2200, 2500, 0.1, "test", 0.8)
         exec_filter.validate(signal, df_for_filter, 0.0)
 

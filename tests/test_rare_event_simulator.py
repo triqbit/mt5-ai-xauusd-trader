@@ -2,15 +2,15 @@
 Tests for RareEventSimulator.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 
 from src.research.rare_event_simulator import (
     RareEventConfig,
+    RareEventResult,
     RareEventSimulator,
     RareEventType,
-    RareEventResult,
 )
 
 
@@ -137,7 +137,7 @@ def test_dislocation_behavior(simulator):
 
 def test_vol_cluster_behavior(simulator):
     config = RareEventConfig(event_type=RareEventType.VOL_CLUSTER, n_steps=500)
-    df, result = simulator.generate_scenario(config)
+    df, _result = simulator.generate_scenario(config)
 
     returns = df["close"].pct_change().dropna()
     # Volatility should not be constant

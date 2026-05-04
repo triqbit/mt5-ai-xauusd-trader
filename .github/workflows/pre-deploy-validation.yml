@@ -120,7 +120,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pytest pytest-cov
+          pip install pytest==9.0.3 pytest-asyncio==1.3.0 pytest-cov==6.1.0
           pip install -r requirements-ci.txt
 
       - name: Gate 7: Database Migration Reversibility Check

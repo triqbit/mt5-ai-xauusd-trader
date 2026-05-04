@@ -230,7 +230,9 @@ class EnsembleModel(BaseModel):
 
         logger.info(
             "Weights rebalanced: %s | Agg Health: acc=%.2f drift=%.2f",
-            self.weights, agg_acc, agg_drift
+            self.weights,
+            agg_acc,
+            agg_drift,
         )
 
     def get_health_metrics(self) -> Dict[str, float]:

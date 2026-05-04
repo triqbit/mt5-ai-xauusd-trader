@@ -1,31 +1,19 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
 # requirements-ci.txt -- Linux CI-safe dependencies
-#
-# Excludes:
-#   - MetaTrader5 (Windows-only, no Linux wheel)
-#   - torch/torchvision/transformers/timm (too heavy for unit tests)
-#   - stable-baselines3/gymnasium (pulls torch transitively)
-#   - pandas-ta (requires Python <3.11; runtime-only)
-#
-# TA-Lib C library is built from source in ci.yml (GitHub releases,
-# ta-lib 0.6.4). The Python wrapper TA-Lib>=0.6.4 is listed here
-# and requires numpy>=2.0 (listed below).
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
-# numpy>=2.0 is required by TA-Lib Python wrapper 0.6.x
 numpy==2.2.6
-scipy==1.15.2
-scikit-learn==1.7.2
-pandas==2.3.3
+scipy==1.17.1
+scikit-learn==1.6.1
+pandas==3.0.2
 
 # -- Technical Analysis --------------------------------------------
-# Python wrapper; C library (0.6.4) built from source in ci.yml
 TA-Lib==0.6.4
 
 # -- Database ------------------------------------------------------
-sqlalchemy==2.0.49
+sqlalchemy==2.0.30
 alembic==1.13.1
 redis==5.0.4
 
@@ -36,17 +24,18 @@ pydantic-settings==2.14.0
 # -- Testing -------------------------------------------------------
 optuna==4.8.0
 pytest==9.0.3
+pytest-asyncio==1.3.0
 pytest-cov==6.1.0
-python-telegram-bot
+python-telegram-bot==22.7
 fastapi>=0.115.0
 requests==2.33.1
 httpx==0.28.0
 structlog==25.5.0
 rich==15.0.0
-gymnasium==1.3.0
+gymnasium==0.29.1
 jinja2==3.1.6
 prometheus-client==0.25.0
-psutil
+psutil==7.2.2
 types-redis
 types-requests
 types-python-dateutil

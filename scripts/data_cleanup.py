@@ -100,7 +100,7 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
     return count
 
 
-def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = False) -> dict:
+def cleanup_database(db_url: str, audit_db_url: str | None = None, dry_run: bool = False) -> dict:
     """Purge old records from the database according to the retention policy."""
     engine = create_engine(db_url)
     Session = sessionmaker(bind=engine)
