@@ -141,6 +141,33 @@ def test_rare_event_reporting():
 
     assert "Rare Event Simulations" in html
     assert "flash_crash" in html
+    assert 'href="#rare-events"' in html
+    assert 'role="progressbar"' not in html # No stress tests here
+
+def test_html_dynamic_elements(sample_report):
+    """Verify TOC, dynamic numbering and progress bars in HTML."""
+    reporter = ResearchReporter()
+    html = reporter.generate_html(sample_report)
+
+    # TOC and Navigation
+    assert 'Table of Contents' in html
+    assert 'href="#executive-summary"' in html
+    assert 'href="#regime-analysis"' in html
+    assert 'href="#stress-tests"' in html
+
+    # Dynamic Numbering in TOC (Executive Summary is 1, Regime is 2, Stress is 3, Allocation is 4, Conclusion is 5)
+    assert '1. Executive Summary' in html
+    assert '2. Market Regime Analysis' in html
+    assert '3. Stress Test Outcomes' in html
+    assert '4. Capital Allocation Insights' in html
+    assert '5. Conclusion & Recommendations' in html
+
+    # Progress Bars (ARIA)
+    assert 'role="progressbar"' in html
+    assert 'aria-valuenow="85.5"' in html
+
+    # Accessibility
+    assert 'scope="col"' in html
 
 def test_trade_pattern_motifs():
     trade_section = TradePatternSection(

@@ -14,8 +14,12 @@ The institutional research reporting system automatically generates high-quality
     - **Benchmark Comparisons**: Statistical performance evaluation against baseline strategies (EMA Crossover, Momentum, Volatility Breakout, Mean Reversion).
 
 - **Flexible Output Formats**:
-    - **HTML**: Professional browser-viewable reports with CSS styling.
-    - **Markdown**: Structured, documentation-friendly reports generated via Jinja2 templates.
+    - **HTML**: Professional browser-viewable reports with:
+        - **Interactive TOC**: Anchor links for rapid navigation.
+        - **Dynamic Numbering**: Sequential numbering that adapts to omitted sections.
+        - **Visual Progress Bars**: ARIA-compliant visualizations for strategy health scores.
+        - **Accessibility**: Screen-reader optimized table structures and semantic HTML.
+    - **Markdown**: Structured, documentation-friendly reports generated via Jinja2 templates with dynamic numbering.
     - **Terminal**: Scannable, interactive dashboards using the `rich` library.
 
 ## Usage

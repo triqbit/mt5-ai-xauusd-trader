@@ -9,6 +9,11 @@
         header { background: #2c3e50; color: #fff; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h1 { margin: 0; font-size: 2.5rem; }
         .metadata { margin-top: 1rem; font-size: 0.9rem; opacity: 0.8; }
+        .toc { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .toc h2 { font-size: 1.2rem; margin-top: 0; }
+        .toc ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+        .toc a { text-decoration: none; color: #3498db; font-weight: 500; }
+        .toc a:hover { text-decoration: underline; }
         .executive-summary { background: #fff; padding: 1.5rem; border-left: 5px solid #3498db; border-radius: 4px; margin-bottom: 2rem; }
         section { background: #fff; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         h2 { border-bottom: 2px solid #ecf0f1; padding-bottom: 0.5rem; color: #2c3e50; }
@@ -16,7 +21,10 @@
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f8f9fa; color: #2c3e50; }
         tr:hover { background-color: #fdfdfd; }
+        .score-container { display: flex; align-items: center; gap: 15px; margin-bottom: 1rem; }
         .score { font-size: 1.5rem; font-weight: bold; color: #27ae60; }
+        .progress-bar { background: #eee; border-radius: 10px; height: 10px; flex-grow: 1; overflow: hidden; max-width: 300px; }
+        .progress-fill { height: 100%; background: #27ae60; }
         .fail { color: #e74c3c; font-weight: bold; }
         .pass { color: #27ae60; font-weight: bold; }
         .insight-box { background: #e8f4fd; padding: 1rem; border-radius: 4px; border: 1px solid #3498db; }
@@ -25,6 +33,7 @@
     </style>
 </head>
 <body>
+    {% set ns = namespace(count=1) %}
     <header>
         <h1>{{ title }}</h1>
         <div class="metadata">
@@ -32,22 +41,42 @@
         </div>
     </header>
 
-    <div class="executive-summary">
-        <h2>Executive Summary</h2>
+    <nav class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#executive-summary">{{ ns.count }}. Executive Summary</a></li>
+            {% set ns.count = ns.count + 1 %}
+            {% if regime_analysis %}<li><a href="#regime-analysis">{{ ns.count }}. Market Regime Analysis</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if stress_tests %}<li><a href="#stress-tests">{{ ns.count }}. Stress Test Outcomes</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if hyperparameter_robustness %}<li><a href="#hyperparameter-robustness">{{ ns.count }}. Hyperparameter Robustness</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if trade_patterns %}<li><a href="#trade-patterns">{{ ns.count }}. Trade Pattern Findings</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if model_drift %}<li><a href="#model-drift">{{ ns.count }}. Model Drift Observations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if allocation_insights %}<li><a href="#allocation-insights">{{ ns.count }}. Capital Allocation Insights</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if benchmarks %}<li><a href="#benchmarks">{{ ns.count }}. Benchmark Comparisons</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if rl_evaluation %}<li><a href="#rl-evaluation">{{ ns.count }}. RL Agent Evaluation</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if rare_events %}<li><a href="#rare-events">{{ ns.count }}. Rare Event Simulations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            <li><a href="#conclusion">{{ ns.count }}. Conclusion & Recommendations</a></li>
+        </ul>
+    </nav>
+
+    {% set ns.count = 1 %}
+    <div id="executive-summary" class="executive-summary">
+        <h2>{{ ns.count }}. Executive Summary</h2>
         <p>{{ executive_summary }}</p>
     </div>
 
     {% if regime_analysis %}
-    <section>
-        <h2>1. Market Regime Analysis</h2>
+    {% set ns.count = ns.count + 1 %}
+    <section id="regime-analysis">
+        <h2>{{ ns.count }}. Market Regime Analysis</h2>
         <p>{{ regime_analysis.summary }}</p>
         <table>
             <thead>
                 <tr>
-                    <th>Regime</th>
-                    <th>Frequency</th>
-                    <th>Avg Duration</th>
-                    <th>Profitability</th>
+                    <th scope="col">Regime</th>
+                    <th scope="col">Frequency</th>
+                    <th scope="col">Avg Duration</th>
+                    <th scope="col">Profitability</th>
                 </tr>
             </thead>
             <tbody>
@@ -69,17 +98,24 @@
     {% endif %}
 
     {% if stress_tests %}
-    <section>
-        <h2>2. Stress Test Outcomes</h2>
-        <p>Resilience Score: <span class="score">{{ stress_tests.resilience_score }}/100</span></p>
+    {% set ns.count = ns.count + 1 %}
+    <section id="stress-tests">
+        <h2>{{ ns.count }}. Stress Test Outcomes</h2>
+        <div class="score-container">
+            <span>Resilience Score:</span>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ stress_tests.resilience_score }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill" style="width: {{ stress_tests.resilience_score }}%;"></div>
+            </div>
+            <span class="score">{{ stress_tests.resilience_score }}/100</span>
+        </div>
         <table>
             <thead>
                 <tr>
-                    <th>Scenario</th>
-                    <th>Total Return</th>
-                    <th>Max Drawdown</th>
-                    <th>Sharpe</th>
-                    <th>Outcome</th>
+                    <th scope="col">Scenario</th>
+                    <th scope="col">Total Return</th>
+                    <th scope="col">Max Drawdown</th>
+                    <th scope="col">Sharpe</th>
+                    <th scope="col">Outcome</th>
                 </tr>
             </thead>
             <tbody>
@@ -124,16 +160,23 @@
     {% endif %}
 
     {% if hyperparameter_robustness %}
-    <section>
-        <h2>3. Hyperparameter Robustness</h2>
-        <p>Stability Score: <span class="score">{{ hyperparameter_robustness.stability_score }}/100</span></p>
+    {% set ns.count = ns.count + 1 %}
+    <section id="hyperparameter-robustness">
+        <h2>{{ ns.count }}. Hyperparameter Robustness</h2>
+        <div class="score-container">
+            <span>Stability Score:</span>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ hyperparameter_robustness.stability_score }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill" style="width: {{ hyperparameter_robustness.stability_score }}%;"></div>
+            </div>
+            <span class="score">{{ hyperparameter_robustness.stability_score }}/100</span>
+        </div>
         <table>
             <thead>
                 <tr>
-                    <th>Parameter</th>
-                    <th>Range Tested</th>
-                    <th>Optimal Value</th>
-                    <th>Sensitivity</th>
+                    <th scope="col">Parameter</th>
+                    <th scope="col">Range Tested</th>
+                    <th scope="col">Optimal Value</th>
+                    <th scope="col">Sensitivity</th>
                 </tr>
             </thead>
             <tbody>
@@ -155,18 +198,19 @@
     {% endif %}
 
     {% if trade_patterns %}
-    <section>
-        <h2>4. Trade Pattern Findings</h2>
+    {% set ns.count = ns.count + 1 %}
+    <section id="trade-patterns">
+        <h2>{{ ns.count }}. Trade Pattern Findings</h2>
         <p><strong>Key Insight:</strong> {{ trade_patterns.primary_insight }}</p>
 
         <h3>Profitable Concentrations</h3>
         <table>
             <thead>
                 <tr>
-                    <th>Attribute</th>
-                    <th>Value</th>
-                    <th>Win Rate</th>
-                    <th>Profit Factor</th>
+                    <th scope="col">Attribute</th>
+                    <th scope="col">Value</th>
+                    <th scope="col">Win Rate</th>
+                    <th scope="col">Profit Factor</th>
                 </tr>
             </thead>
             <tbody>
@@ -186,10 +230,10 @@
         <table>
             <thead>
                 <tr>
-                    <th>Algorithm</th>
-                    <th>Volatility</th>
-                    <th>Confidence</th>
-                    <th>Win Rate</th>
+                    <th scope="col">Algorithm</th>
+                    <th scope="col">Volatility</th>
+                    <th scope="col">Confidence</th>
+                    <th scope="col">Win Rate</th>
                 </tr>
             </thead>
             <tbody>
@@ -217,16 +261,17 @@
     {% endif %}
 
     {% if model_drift %}
-    <section>
-        <h2>5. Model Drift Observations</h2>
+    {% set ns.count = ns.count + 1 %}
+    <section id="model-drift">
+        <h2>{{ ns.count }}. Model Drift Observations</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Metric</th>
-                    <th>Baseline</th>
-                    <th>Current</th>
-                    <th>Drift</th>
-                    <th>Status</th>
+                    <th scope="col">Metric</th>
+                    <th scope="col">Baseline</th>
+                    <th scope="col">Current</th>
+                    <th scope="col">Drift</th>
+                    <th scope="col">Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -246,16 +291,17 @@
     {% endif %}
 
     {% if allocation_insights %}
-    <section>
-        <h2>6. Capital Allocation Insights</h2>
+    {% set ns.count = ns.count + 1 %}
+    <section id="allocation-insights">
+        <h2>{{ ns.count }}. Capital Allocation Insights</h2>
         <p>Portfolio Heat: <strong>{{ allocation_insights.total_heat_pct }}%</strong></p>
         <table>
             <thead>
                 <tr>
-                    <th>Symbol/Family</th>
-                    <th>Allocated</th>
-                    <th>Heat</th>
-                    <th>Multiplier</th>
+                    <th scope="col">Symbol/Family</th>
+                    <th scope="col">Allocated</th>
+                    <th scope="col">Heat</th>
+                    <th scope="col">Multiplier</th>
                 </tr>
             </thead>
             <tbody>
@@ -282,16 +328,17 @@
     {% endif %}
 
     {% if benchmarks %}
-    <section>
-    <h2>7. Benchmark Comparisons</h2>
+    {% set ns.count = ns.count + 1 %}
+    <section id="benchmarks">
+    <h2>{{ ns.count }}. Benchmark Comparisons</h2>
     <table>
         <thead>
             <tr>
-                <th>Strategy</th>
-                <th>Total Return</th>
-                <th>Sharpe Ratio</th>
-                <th>Max Drawdown</th>
-                <th>P-Value</th>
+                <th scope="col">Strategy</th>
+                <th scope="col">Total Return</th>
+                <th scope="col">Sharpe Ratio</th>
+                <th scope="col">Max Drawdown</th>
+                <th scope="col">P-Value</th>
             </tr>
         </thead>
         <tbody>
@@ -310,9 +357,40 @@
     </section>
     {% endif %}
 
+    {% if rl_evaluation %}
+    {% set ns.count = ns.count + 1 %}
+    <section id="rl-evaluation">
+        <h2>{{ ns.count }}. RL Agent Evaluation</h2>
+        <p><strong>Summary:</strong> {{ rl_evaluation.comparison_summary }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Agent</th>
+                    <th scope="col">Sharpe</th>
+                    <th scope="col">Profit Factor</th>
+                    <th scope="col">MaxDD</th>
+                    <th scope="col">Win Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in rl_evaluation.metrics %}
+                <tr>
+                    <td>{{ m.agent_name }}</td>
+                    <td>{{ m.sharpe|round(2) }}</td>
+                    <td>{{ m.profit_factor|round(2) }}</td>
+                    <td>{{ (m.max_dd * 100)|round(1) }}%</td>
+                    <td>{{ (m.win_rate * 100)|round(1) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
     {% if rare_events %}
-    <section>
-        <h2>8. Rare Event Simulations</h2>
+    {% set ns.count = ns.count + 1 %}
+    <section id="rare-events">
+        <h2>{{ ns.count }}. Rare Event Simulations</h2>
         <div class="insight-box">
             <strong>Insights:</strong><br>
             {{ rare_events.insights }}
@@ -320,10 +398,10 @@
         <table>
             <thead>
                 <tr>
-                    <th>Event Type</th>
-                    <th>Peak Impact</th>
-                    <th>Realized Volatility</th>
-                    <th>Recovery</th>
+                    <th scope="col">Event Type</th>
+                    <th scope="col">Peak Impact</th>
+                    <th scope="col">Realized Volatility</th>
+                    <th scope="col">Recovery</th>
                 </tr>
             </thead>
             <tbody>
@@ -340,8 +418,9 @@
     </section>
     {% endif %}
 
-    <section>
-        <h2>Conclusion & Recommendations</h2>
+    {% set ns.count = ns.count + 1 %}
+    <section id="conclusion">
+        <h2>{{ ns.count }}. Conclusion & Recommendations</h2>
         <p>{{ conclusion }}</p>
     </section>
 
