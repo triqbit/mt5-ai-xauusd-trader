@@ -16,6 +16,7 @@ The framework provides factory methods for common high-severity scenarios:
 1.  **Execution Hell**: Extreme execution friction with wide spreads (3x multiplier), significant slippage spikes (50 bps), and high latency (3 steps).
 2.  **Liquidity Crisis**: Fragmented liquidity simulation with 20% missing ticks, price noise, and frequent fake breakouts.
 3.  **Regime Shock**: Market structural instability with frequent (10% prob) regime flips and trend reversals.
+4.  **Flash Crash**: Violent price dislocation with sudden deep drops (5-10 ATRs) and extreme slippage (200 bps).
 
 ## Resilience Metrics
 
@@ -24,7 +25,7 @@ Strategies are evaluated on several robustness indicators:
 - **Composite Resilience Score**: A score from 0-100 indicating performance retention under stress.
 - **Max Slippage Experienced**: Tracks the single largest slippage event encountered.
 - **Execution Quality Score**: Measures the percentage of successfully executed signals despite service outages.
-- **Fragility Indicators**: Automated detection of non-linear performance degradation (e.g., drawdown doubling or Sharpe ratio halving under stress).
+- **Fragility Indicators**: Automated detection of non-linear performance degradation (e.g., drawdown doubling, Sharpe ratio halving, infrastructure delay sensitivity, or extreme slippage sensitivity under stress).
 
 ## Integration
 

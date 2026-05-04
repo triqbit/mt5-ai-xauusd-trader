@@ -11,12 +11,14 @@ StressLab is an adversarial testing framework designed to evaluate the robustnes
 - [x] **Choppy Fake Breakouts:** Must inject synthetic price spikes followed by immediate reversals.
 - [x] **Regime Transitions:** Must simulate sudden trend flips or volatility shocks.
 - [x] **Service Degradation:** Must support probabilistic blocking of signals (connectivity simulation).
+- [x] **Flash Crash Simulation:** Must simulate sudden deep price dislocations and partial recoveries.
 
 ## 2. Reporting & Analytics
 - [x] **Typed Metrics:** All results must be captured in `StressTestMetrics` Pydantic models.
 - [x] **Resilience Score:** A composite 0-100 score indicating performance retention under stress.
-- [x] **Fragility Indicators:** Automated detection of drawdown inflation or Sharpe ratio decay.
+- [x] **Fragility Indicators:** Automated detection of drawdown inflation, Sharpe ratio decay, infrastructure delay sensitivity, and extreme slippage sensitivity.
 - [x] **Failure Points:** Identification of specific scenarios where a strategy becomes unprofitable.
+- [x] **Standard Test Suite:** Support for running a standardized suite of high-severity stress tests.
 
 ## 3. Implementation Standards
 - [x] **Type Safety:** Full Pydantic v2 usage for configuration and reports.
