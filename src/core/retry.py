@@ -18,7 +18,7 @@ def with_retry(
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
     jitter: bool = True,
-):
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator for retrying a function with exponential backoff.
 
@@ -29,9 +29,10 @@ def with_retry(
         backoff_factor: Multiplier for the delay after each retry.
         jitter: Whether to add random jitter to the delay.
     """
-    def decorator(func: Callable):
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             delay = initial_delay
 
             for attempt in range(max_retries + 1):
