@@ -68,7 +68,11 @@ def classify_risk(files, title=""):
         "migrations/",
         "main.py",
         "alembic.ini",
-        "pyproject.toml"
+        "pyproject.toml",
+        "Dockerfile",
+        ".github/",
+        "Makefile",
+        "scripts/"
     ]
     medium_risk_patterns = [
         "src/research/",
@@ -203,10 +207,13 @@ def generate_report():
 
     report = report.replace("## 🔝 Top 3 Items That Matter Right Now\n\n", "## 🔝 Top 3 Items That Matter Right Now\n\n" + top_3_section + "\n")
 
+    new_triage_required = [pr for pr in classified_prs if pr['risk'] == "Triage Required" and pr['flag'] == "New"]
+
     report += "\n## 🛡️ Risk Classification Summary\n\n"
     report += f"- **High Risk (New):** {len(high_risk)} PRs\n"
     report += f"- **Medium Risk (New):** {len(medium_risk)} PRs\n"
     report += f"- **Safe Surface (New):** {len(safe_surface)} PRs\n"
+    report += f"- **Triage Required (New):** {len(new_triage_required)} PRs\n"
     report += f"- **Stale (Total):** {len([pr for pr in classified_prs if 'Stale' in pr['flag']])} PRs\n"
 
     report += "\n## ✨ Good Candidates for Review Today\n\n"
@@ -227,7 +234,9 @@ def generate_report():
 
     # Generate Merge-Readiness Checklist
     checklist = "# Merge-Readiness Checklist\n\n"
-    checklist += f"Generated on: {now}\n\n"
+    checklist += "> [!IMPORTANT]\n"
+    checklist += "> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules.\n\n"
+    checklist += f"Generated on: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
     checklist += "This checklist identifies top promising PRs for immediate review.\n\n"
 
     top_3 = (safe_surface + medium_risk)[:3]
