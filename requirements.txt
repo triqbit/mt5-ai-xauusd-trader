@@ -11,7 +11,7 @@ stable-baselines3==2.8.0
 gymnasium==0.29.1
 numpy==2.2.6
 scipy==1.13.0
-scikit-learn==1.6.1
+scikit-learn==1.7.2
 pandas==2.3.3
 
 # ── Deep Learning Extras ────────────────────────────────────
