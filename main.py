@@ -84,6 +84,7 @@ def run_live(
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
     console: Optional[Console] = None,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     explainer = SignalExplainer()
@@ -126,6 +127,16 @@ def run_live(
                     confidence = signal_obj.confidence
                     if monitor:
                         monitor.check_confidence_degradation(confidence)
+
+                    # Audit prediction
+                    if audit_logger:
+                        audit_logger.log_prediction(
+                            symbol=cfg.symbol,
+                            direction=direction,
+                            confidence=confidence,
+                            model_name=cfg.algorithm,
+                            metadata=signal_obj.metadata if hasattr(signal_obj, "metadata") else None
+                        )
 
                 log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
@@ -195,6 +206,12 @@ def run_live(
                         )
                         if not filter_decision.is_approved:
                             log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
+                            if audit_logger:
+                                audit_logger.log_blocked_trade(
+                                    symbol=cfg.symbol,
+                                    reason=filter_decision.blocked_by,
+                                    details=f"Confidence Score: {filter_decision.confidence_score:.2f}"
+                                )
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
@@ -309,6 +326,12 @@ def run_live(
                 time.sleep(poll_interval)
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
+                if audit_logger:
+                    audit_logger.log_operator_action(
+                        actor="operator",
+                        action="manual_shutdown",
+                        details="KeyboardInterrupt received"
+                    )
                 break
             except Exception as exc:
                 log.exception("Unhandled error in trading loop: %s", exc)
@@ -387,7 +410,20 @@ def main() -> int:
     database_url = cfg.database_url.get_secret_value()
     audit_db_url = database_url if "sqlite" in database_url else "sqlite:///audit.db"
     audit_logger = AuditLogger(db_url=audit_db_url)
-    audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
+
+    # Log deployment and configuration snapshot
+    try:
+        import tomllib
+        with open("pyproject.toml", "rb") as f:
+            version = tomllib.load(f)["project"]["version"]
+    except Exception:
+        version = "1.0.0"  # fallback
+
+    audit_logger.log_deployment(version=version, environment=cfg.mode)
+    audit_logger.log_config_snapshot(
+        config_dict=cfg.model_dump(exclude={"mt5_password", "metaapi_token", "database_url", "telegram_token"}),
+        reason="initial_startup"
+    )
 
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
@@ -493,6 +529,7 @@ def main() -> int:
                 trade_logger=trade_logger,
                 monitor=monitor,
                 console=console,
+                audit_logger=audit_logger,
             )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")

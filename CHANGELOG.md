@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI Quality Gates:** Mandatory Mypy type enforcement and Docker dependency harmonization for enterprise stability.
 - **Versioning Policy:** Defined comprehensive SemVer criteria and automated release workflows in `docs/VERSIONING_POLICY.md`.
 - **Automated Changelog:** Integrated conventional commit-based changelog updates in `.github/workflows/changelog.yml`.
+- **Enterprise Audit Trail:** Comprehensive decision traceability system capturing config snapshots, trade rejections, ML inference attribution, and full risk decision chains in `src/core/audit_log.py`.
 
 ### Changed
 - Rebalanced the 6-layer execution filter in `src/trading/execution_filter.py` with refined trend angle thresholds.
