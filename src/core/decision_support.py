@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.core.constants import SignalDirection
-from src.core.explainability import SignalExplainer, SignalExplanation
+from src.core.explainability import ModelAttribution, SignalExplainer, SignalExplanation
 from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
@@ -144,17 +144,14 @@ class DecisionSupportSystem:
     def format_for_operator(self, packet: DecisionPacket, console: Optional[Any] = None) -> str:
         """
         Generate a human-readable, high-fidelity terminal dashboard.
+        Aggregates all dimensions of the decision into a single visual summary.
         """
         try:
             from rich import box
-            from rich.console import Console
+            from rich.console import Console, Group
             from rich.panel import Panel
             from rich.table import Table
             from rich.text import Text
-
-            console_provided = console is not None
-            if console is None:
-                console = Console(force_terminal=True)
 
             # 1. Header with Go/No-Go status
             status_color = "green" if packet.is_executable else "red"
@@ -229,25 +226,31 @@ class DecisionSupportSystem:
 
             macro_panel = Panel(macro_content, title="Macro Intelligence", border_style=macro_color)
 
-            # Bypass expensive capture if we are printing directly to a console
-            if console_provided and not getattr(console, "_record", False):
-                 console.print(header)
-                 console.print(overview_table)
-                 console.print(macro_panel)
+            # 4. Attribution Summary (Text)
+            attribution_summary = Panel(
+                Text(packet.explanation.human_readable_summary),
+                title="Signal Attribution Summary",
+                border_style="yellow",
+            )
 
-                 console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
-                 self.explainer.format_for_terminal(packet.explanation, console=console)
-                 return ""
+            # Assemble everything into a single group for output
+            dashboard = Group(
+                header,
+                overview_table,
+                macro_panel,
+                attribution_summary,
+                Text("\n[bold]DETAILED ATTRIBUTION BREAKDOWN[/bold]\n"),
+                self.explainer.get_renderable(packet.explanation)
+            )
 
-            with console.capture() as capture:
-                console.print(header)
-                console.print(overview_table)
-                console.print(macro_panel)
+            # Print to console if provided
+            if console:
+                console.print(dashboard)
 
-                # Integration with existing SignalExplainer output for the details
-                console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
-                console.print(self.explainer.format_for_terminal(packet.explanation))
-
+            # Return string representation
+            temp_console = Console(force_terminal=True, width=100)
+            with temp_console.capture() as capture:
+                temp_console.print(dashboard)
             return capture.get()
 
         except ImportError:
