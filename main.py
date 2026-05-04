@@ -28,7 +28,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.core import get_config, profile
-from src.core.audit_log import AuditLogger, get_audit_logger
+from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
 from src.core.decision_support import DecisionSupportSystem
 from src.core.explainability import SignalExplainer
@@ -84,10 +84,10 @@ def run_live(
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
     console: Optional[Console] = None,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     explainer = SignalExplainer()
-    audit_logger = get_audit_logger()
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
@@ -122,19 +122,6 @@ def run_live(
                                 signal_obj = model.predict(obs)
                         except TypeError:
                             signal_obj = model.predict(obs)
-                    else:
-                        # Fallback for models without predict (unlikely but safe)
-                        from src.trading.risk_manager import TradeSignal as SignalStub
-                        signal_obj = SignalStub(
-                            symbol=cfg.symbol,
-                            direction=0,
-                            entry_price=0.0,
-                            stop_loss=0.0,
-                            take_profit=0.0,
-                            lot_size=0.0,
-                            algorithm=cfg.algorithm,
-                            confidence=0.0
-                        )
 
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
@@ -142,13 +129,14 @@ def run_live(
                         monitor.check_confidence_degradation(confidence)
 
                     # Audit prediction
-                    audit_logger.log_prediction(
-                        symbol=cfg.symbol,
-                        direction=direction,
-                        confidence=confidence,
-                        model_name=cfg.algorithm,
-                        metadata=signal_obj.metadata if hasattr(signal_obj, "metadata") else None
-                    )
+                    if audit_logger:
+                        audit_logger.log_prediction(
+                            symbol=cfg.symbol,
+                            direction=direction,
+                            confidence=confidence,
+                            model_name=cfg.algorithm,
+                            metadata=signal_obj.metadata if hasattr(signal_obj, "metadata") else None
+                        )
 
                 log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
@@ -218,11 +206,12 @@ def run_live(
                         )
                         if not filter_decision.is_approved:
                             log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
-                            audit_logger.log_blocked_trade(
-                                symbol=cfg.symbol,
-                                reason=filter_decision.blocked_by,
-                                details=f"Confidence Score: {filter_decision.confidence_score:.2f}"
-                            )
+                            if audit_logger:
+                                audit_logger.log_blocked_trade(
+                                    symbol=cfg.symbol,
+                                    reason=filter_decision.blocked_by,
+                                    details=f"Confidence Score: {filter_decision.confidence_score:.2f}"
+                                )
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
@@ -337,11 +326,12 @@ def run_live(
                 time.sleep(poll_interval)
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
-                audit_logger.log_operator_action(
-                    actor="operator",
-                    action="manual_shutdown",
-                    details="KeyboardInterrupt received"
-                )
+                if audit_logger:
+                    audit_logger.log_operator_action(
+                        actor="operator",
+                        action="manual_shutdown",
+                        details="KeyboardInterrupt received"
+                    )
                 break
             except Exception as exc:
                 log.exception("Unhandled error in trading loop: %s", exc)
@@ -431,10 +421,7 @@ def main() -> int:
 
     audit_logger.log_deployment(version=version, environment=cfg.mode)
     audit_logger.log_config_snapshot(
-        config_dict=cfg.model_dump(
-            mode="json",
-            exclude={"mt5_password", "metaapi_token", "database_url", "telegram_token"}
-        ),
+        config_dict=cfg.model_dump(exclude={"mt5_password", "metaapi_token", "database_url", "telegram_token"}),
         reason="initial_startup"
     )
 
@@ -542,6 +529,7 @@ def main() -> int:
                 trade_logger=trade_logger,
                 monitor=monitor,
                 console=console,
+                audit_logger=audit_logger,
             )
         elif cfg.mode == "backtest":
             log.info("Backtest mode - see scripts/backtest.py")

@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from sqlalchemy import (
-    DateTime,
     JSON,
+    DateTime,
     String,
     Text,
     create_engine,
@@ -58,7 +58,7 @@ class AuditLogger:
     _instance: Optional[AuditLogger] = None
     _initialized: bool = False
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> AuditLogger:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
