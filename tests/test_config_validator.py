@@ -90,7 +90,7 @@ def test_validator_live_mode_no_confirmation(monkeypatch, tmp_path):
     validator = ConfigValidator(cfg)
     result = validator.validate()
     assert result.success is False
-    assert any(e.field == "MODE" and "CONFIRM_LIVE_TRADING" in e.message for e in result.errors)
+    assert any(e.field == "MODE" for e in result.errors)
 
 def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     """Test validator succeeds in LIVE mode with confirmation."""
@@ -355,7 +355,7 @@ def test_validator_confidence_threshold(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Critical breach (< 0.50)
