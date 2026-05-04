@@ -11,6 +11,7 @@ This document outlines the disaster recovery procedures for the MT5 AI/ML Tradin
 | Data Type | Importance | Primary Location | Backup Frequency | Retention (Local) | Archival (Off-site) |
 |-----------|------------|------------------|------------------|-------------------|---------------------|
 | Trading Database (`trades.db`) | Critical | Root Directory | Every 1 hour | 30 Days | 7 Years (Compliance) |
+| Audit Database (`audit.db`) | Critical | Root Directory | Every 1 hour | 30 Days | 7 Years (Compliance) |
 | Operational Logs | High | `logs/` | Every 1 hour | 30 Days | 90 Days |
 | Performance Reports | High | `reports/` | Every 1 hour | 30 Days | 2 Years |
 | Model Weights | Medium | `src/models/` | On change/Release | N/A | Infinite (Git/Registry) |
@@ -45,22 +46,38 @@ The `backup_verify.sh` script automatically prunes local backups older than 30 d
 ### 6.1. Database Restoration (Scenario: Data Corruption)
 1. **Stop the bot:**
    ```bash
-   kill $(pgrep -f "python main.py")
+   # Find and kill the main application process
+   kill $(pgrep -f "python main.py") 2>/dev/null || true
    ```
 2. **Identify the latest healthy backup:**
-   List backups in `backups/db/` and choose the most recent.
+   List backups in `backups/db/` and choose the most recent files for `trades.db` and `audit.db`.
+   ```bash
+   ls -lh backups/db/
+   ```
 3. **Verify the checksum:**
    ```bash
    cd backups/db/
+   # Verify trades database
    sha256sum -c trades_YYYYMMDD_HHMMSS.db.sha256
+   # Verify audit database
+   sha256sum -c audit_YYYYMMDD_HHMMSS.db.sha256
    ```
-4. **Restore the file:**
+4. **Restore the files:**
    ```bash
-   cp trades_YYYYMMDD_HHMMSS.db ../../trades.db
+   # From the root directory:
+   cp backups/db/trades_YYYYMMDD_HHMMSS.db ./trades.db
+   cp backups/db/audit_YYYYMMDD_HHMMSS.db ./audit.db
    ```
 5. **Post-Restoration Integrity Check:**
+   Verify that the restored databases are healthy and contain data.
    ```bash
+   # Check integrity
    sqlite3 trades.db "PRAGMA integrity_check;"
+   sqlite3 audit.db "PRAGMA integrity_check;"
+
+   # Verify table existence (example)
+   sqlite3 trades.db "SELECT count(*) FROM trades;"
+   sqlite3 audit.db "SELECT count(*) FROM audit_log;"
    ```
 6. **Restart the bot.**
 
