@@ -276,18 +276,19 @@ class EventIntelligence:
             ):
                 is_active = True
                 # Stricter blocking for HIGH impact major events
-                if event.impact == EventImpact.CRITICAL:
-                    is_event_blocking = True
-                elif event.impact == EventImpact.HIGH:
-                    if event.category in [
+                if event.impact == EventImpact.CRITICAL or (
+                    event.impact == EventImpact.HIGH
+                    and event.category
+                    in [
                         EventCategory.FOMC,
                         EventCategory.NFP,
                         EventCategory.RATES,
-                    ]:
-                        if (event.timestamp - now) <= timedelta(minutes=60):
-                            is_event_blocking = True
-                    elif (event.timestamp - now) <= timedelta(minutes=30):
-                        is_event_blocking = True
+                    ]
+                    and (event.timestamp - now) <= timedelta(minutes=60)
+                ) or (event.impact == EventImpact.HIGH and (
+                    event.timestamp - now
+                ) <= timedelta(minutes=30)):
+                    is_event_blocking = True
 
             # Check post-event window
             elif (
@@ -299,18 +300,14 @@ class EventIntelligence:
             ):
                 is_active = True
                 # Critical events always block during cooldown
-                if event.impact == EventImpact.CRITICAL:
-                    is_event_blocking = True
-                # High impact major events block for the first hour of cooldown
-                elif event.impact == EventImpact.HIGH and event.category in [
+                if event.impact == EventImpact.CRITICAL or (event.impact == EventImpact.HIGH and event.category in [
                     EventCategory.FOMC,
                     EventCategory.NFP,
                     EventCategory.RATES,
-                ]:
-                    if (now - (event.end_timestamp or event.timestamp)) <= timedelta(
-                        minutes=60
-                    ):
-                        is_event_blocking = True
+                ] and (now - (event.end_timestamp or event.timestamp)) <= timedelta(
+                    minutes=60
+                )):
+                    is_event_blocking = True
 
             if is_active:
                 active_events.append(event)
