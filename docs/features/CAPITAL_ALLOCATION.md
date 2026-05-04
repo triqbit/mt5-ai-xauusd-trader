@@ -11,6 +11,9 @@ The `CapitalAllocator` is an institutional-grade capital management system desig
 - **Portfolio Diversification Scoring**: Provides a quantitative `diversification_score` (0.0 to 1.0) based on the normalized Herfindahl-Hirschman Index (HHI).
 - **Safety Limits**: Implements configurable limits for total portfolio heat, symbol-level risk, and model-family-level risk.
 - **Flexible Allocation Scaling**: Supports an `allow_scaling` mode that returns the maximum possible allocation within safety limits instead of a binary rejection.
+- **Batch Allocation & Routing**: Supports processing multiple simultaneous allocation requests, prioritizing strategies based on their performance multipliers to optimize capital utility.
+- **Diversification Guard (Soft Limits)**: Implements a "Diversification Guard" that begins linear scaling of requested risk when exposure approaches hard limits, providing a smoother risk reduction than binary rejections.
+- **Cooling-Off Periods**: Automatically enforces a cooling-off period (capping risk multipliers at 0.1) when a strategy hits a configurable consecutive loss threshold, preventing "tilt" and protecting capital during drawdown.
 - **Programmatic Rejection Codes**: Returns specific `RejectionCode` values (e.g., `TOTAL_HEAT_LIMIT`, `SYMBOL_CONCENTRATION_LIMIT`) and maintains a `rejection_history` for audit and reporting.
 - **Dynamic Risk Adaptation**: Automatically updates strategy multipliers based on PnL outcomes and decays them back to baseline (1.0) over time.
 
@@ -24,6 +27,7 @@ The `CapitalAllocator` is initialized with the following parameters:
 - `max_total_heat`: Maximum total percentage of budget that can be committed at once (default: 70%).
 - `performance_step`: The increment/decrement applied to the performance multiplier after each trade (default: 0.05).
 - `decay_rate`: The rate at which the multiplier returns to 1.0 periodically (default: 0.001).
+- `soft_limit_buffer`: Percentage of budget used as a buffer for the Diversification Guard (default: 10%).
 
 ### Strategy Configuration
 
@@ -35,6 +39,9 @@ Each strategy is registered using a `StrategyConfig` model:
 - `capital_cap`: Maximum absolute capital the strategy is allowed to use.
 - `performance_multiplier`: A multiplier (0.0 to 2.0) applied to the strategy's requested risk.
 - `historical_pnl`: Accumulated PnL for tracking long-term strategy health.
+- `win_count` / `loss_count`: Tracks historical trade outcomes.
+- `consecutive_losses`: Current streak of losing trades.
+- `max_consecutive_losses`: Threshold for triggering a cooling-off period (default: 5).
 
 ## Usage Example
 
