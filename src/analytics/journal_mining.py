@@ -8,8 +8,8 @@ License: MIT
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -62,7 +62,7 @@ class BlockReasonSummary(BaseModel):
 
     reason: str
     count: int
-    impacted_algorithms: List[str]
+    impacted_algorithms: list[str]
     weak_state_correlation: float = 0.0
 
 
@@ -82,14 +82,14 @@ class SignalMotif(BaseModel):
 class JournalReport(BaseModel):
     """Final analytical report from journal mining."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    session_analysis: List[SessionAnalysis]
-    volatility_patterns: List[VolatilityPattern]
-    drawdown_clusters: List[DrawdownCluster]
-    profitable_concentrations: List[PatternConcentration]
-    risk_block_summary: List[BlockReasonSummary]
-    recurring_motifs: List[SignalMotif] = Field(default_factory=list)
-    pre_drawdown_motifs: List[SignalMotif] = Field(default_factory=list)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    session_analysis: list[SessionAnalysis]
+    volatility_patterns: list[VolatilityPattern]
+    drawdown_clusters: list[DrawdownCluster]
+    profitable_concentrations: list[PatternConcentration]
+    risk_block_summary: list[BlockReasonSummary]
+    recurring_motifs: list[SignalMotif] = Field(default_factory=list)
+    pre_drawdown_motifs: list[SignalMotif] = Field(default_factory=list)
     avg_win_duration: float = 0.0
     avg_loss_duration: float = 0.0
 
@@ -199,7 +199,7 @@ class JournalMiner:
             "New York": (13, 22),
         }
 
-    def _get_session(self, dt: datetime) -> List[str]:
+    def _get_session(self, dt: datetime) -> list[str]:
         """Determine which trading sessions a given UTC time falls into."""
         hour = dt.hour
         active = []
@@ -212,7 +212,7 @@ class JournalMiner:
                     active.append(name)
         return active
 
-    def get_session_stats(self, trades_df: pd.DataFrame) -> List[SessionAnalysis]:
+    def get_session_stats(self, trades_df: pd.DataFrame) -> list[SessionAnalysis]:
         """Detect overtrading and performance per session."""
         if trades_df.empty:
             return []
@@ -263,7 +263,7 @@ class JournalMiner:
 
         return results
 
-    def analyze_volatility_patterns(self, signals_df: pd.DataFrame) -> List[VolatilityPattern]:
+    def analyze_volatility_patterns(self, signals_df: pd.DataFrame) -> list[VolatilityPattern]:
         """Analyze false positives under specific volatility conditions."""
         if signals_df.empty or "volatility" not in signals_df.columns:
             return []
@@ -311,7 +311,7 @@ class JournalMiner:
 
         return results
 
-    def detect_drawdown_clusters(self, trades_df: pd.DataFrame) -> List[DrawdownCluster]:
+    def detect_drawdown_clusters(self, trades_df: pd.DataFrame) -> list[DrawdownCluster]:
         """Detect clusters of 3+ consecutive losing trades."""
         if trades_df.empty:
             return []
@@ -348,7 +348,7 @@ class JournalMiner:
 
         return clusters
 
-    def find_profitable_patterns(self, trades_df: pd.DataFrame) -> List[PatternConcentration]:
+    def find_profitable_patterns(self, trades_df: pd.DataFrame) -> list[PatternConcentration]:
         """Find concentrations of profitable patterns by symbol, algorithm, hour, and day."""
         if trades_df.empty:
             return []
@@ -470,7 +470,7 @@ class JournalMiner:
 
     def analyze_risk_blocks(
         self, risk_events_df: pd.DataFrame, signals_df: pd.DataFrame
-    ) -> List[BlockReasonSummary]:
+    ) -> list[BlockReasonSummary]:
         """Summarize recurring risk block reasons."""
         if risk_events_df.empty:
             return []
@@ -521,7 +521,7 @@ class JournalMiner:
 
     def detect_pre_drawdown_motifs(
         self, signals_df: pd.DataFrame, trades_df: pd.DataFrame, window_hours: int = 6
-    ) -> List[SignalMotif]:
+    ) -> list[SignalMotif]:
         """
         Identify signal motifs that frequently occur shortly before a drawdown cluster.
         These are 'early warning' motifs that might indicate a strategy is about to fail.
@@ -554,7 +554,7 @@ class JournalMiner:
 
     def find_frequent_motifs(
         self, signals_df: pd.DataFrame, trades_df: pd.DataFrame = None
-    ) -> List[SignalMotif]:
+    ) -> list[SignalMotif]:
         """
         Find recurring motifs in signals, especially focusing on losing combinations.
         If trades_df is provided, it specifically highlights motifs found within drawdown clusters.
@@ -616,7 +616,7 @@ class JournalMiner:
 
         return sorted(results, key=lambda x: x.win_rate)
 
-    def analyze_trade_durations(self, trades_raw: List[Trade]) -> Dict[str, float]:
+    def analyze_trade_durations(self, trades_raw: list[Trade]) -> dict[str, float]:
         """Calculate average win vs loss holding times in minutes."""
         if not trades_raw:
             return {"avg_win_duration": 0.0, "avg_loss_duration": 0.0}
@@ -640,7 +640,7 @@ class JournalMiner:
 
     def analyze_strategy_state_correlation(
         self, risk_events_df: pd.DataFrame, trades_df: pd.DataFrame
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Detect if risk blocks increase during 'weak strategy states'.
         Weak state is defined as being within 24 hours of a drawdown cluster.

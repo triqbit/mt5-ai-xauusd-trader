@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import logging
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, Optional
 
 import redis
 from fastapi import APIRouter, FastAPI, HTTPException, status
@@ -45,13 +44,13 @@ class HealthStatus(str, Enum):
 class ComponentStatus(BaseModel):
     status: HealthStatus
     message: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class HealthReport(BaseModel):
     status: HealthStatus
-    components: Dict[str, ComponentStatus]
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    components: dict[str, ComponentStatus]
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class HealthChecker:
@@ -62,10 +61,10 @@ class HealthChecker:
     def __init__(
         self,
         config: TradingConfig,
-        connector: Optional[MT5Connector] = None,
-        trade_logger: Optional[TradeLogger] = None,
-        model: Optional[object] = None,
-        audit_logger: Optional[AuditLogger] = None,
+        connector: MT5Connector | None = None,
+        trade_logger: TradeLogger | None = None,
+        model: object | None = None,
+        audit_logger: AuditLogger | None = None,
     ) -> None:
         self.cfg = config
         self.connector = connector
@@ -346,7 +345,7 @@ class HealthChecker:
 router = APIRouter(prefix="/health", tags=["health"])
 
 # Global health checker instance - to be configured at startup
-_health_checker: Optional[HealthChecker] = None
+_health_checker: HealthChecker | None = None
 
 
 def get_health_checker() -> HealthChecker:
@@ -362,7 +361,7 @@ def init_health_checker(
     connector: MT5Connector,
     trade_logger: TradeLogger,
     model: object,
-    audit_logger: Optional[AuditLogger] = None,
+    audit_logger: AuditLogger | None = None,
 ) -> HealthChecker:
     global _health_checker
     _health_checker = HealthChecker(config, connector, trade_logger, model, audit_logger)

@@ -5,7 +5,7 @@ Placeholder DreamerV3 wrapper compatible with the ensemble interface.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 
@@ -25,7 +25,7 @@ class DreamerAgent(BaseModel):
         state: Optional latent state for the recurrent world model.
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
         """
         Initializes the DreamerAgent placeholder.
 
@@ -34,7 +34,7 @@ class DreamerAgent(BaseModel):
         """
         self.logger = logging.getLogger(__name__)
         self.config = config or {}
-        self.state: Optional[Any] = None
+        self.state: Any | None = None
         self.logger.info("DreamerAgent initialized in placeholder mode.")
 
     def predict(self, features: np.ndarray) -> Signal:

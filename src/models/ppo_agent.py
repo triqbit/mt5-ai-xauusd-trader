@@ -6,7 +6,7 @@ Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 
 import logging
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 
@@ -28,8 +28,8 @@ class PPOAgent(BaseModel):
 
     def __init__(
         self,
-        env: Optional[Any] = None,
-        model_path: Optional[Union[str, Path]] = None,
+        env: Any | None = None,
+        model_path: str | Path | None = None,
         device: str = "auto",
     ) -> None:
         """
@@ -127,7 +127,7 @@ class PPOAgent(BaseModel):
                 metadata={"error": str(e)},
             )
 
-    def save(self, path: Union[str, Path]) -> None:
+    def save(self, path: str | Path) -> None:
         """
         Saves the PPO model to the specified path.
 

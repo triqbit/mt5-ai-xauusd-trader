@@ -9,8 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, Field
@@ -28,7 +27,7 @@ class RegimeSummary(BaseModel):
 
 class RegimeSection(BaseModel):
     summary: str
-    regimes: List[RegimeSummary]
+    regimes: list[RegimeSummary]
     transition_insights: str
 
 class StressedMetric(BaseModel):
@@ -41,9 +40,9 @@ class StressedMetric(BaseModel):
 class StressTestSection(BaseModel):
     resilience_score: float
     baseline: StressedMetric
-    scenarios: List[StressedMetric]
-    fragility_indicators: List[str]
-    failure_points: List[str]
+    scenarios: list[StressedMetric]
+    fragility_indicators: list[str]
+    failure_points: list[str]
 
 class ParameterRobustness(BaseModel):
     name: str
@@ -53,7 +52,7 @@ class ParameterRobustness(BaseModel):
 
 class HyperparameterSection(BaseModel):
     stability_score: float
-    parameters: List[ParameterRobustness]
+    parameters: list[ParameterRobustness]
     insights: str
 
 class PatternConcentration(BaseModel):
@@ -78,9 +77,9 @@ class SignalMotif(BaseModel):
 
 class TradePatternSection(BaseModel):
     primary_insight: str
-    concentrations: List[PatternConcentration]
-    behavioral_risks: List[BehavioralRisk]
-    motifs: List[SignalMotif] = Field(default_factory=list)
+    concentrations: list[PatternConcentration]
+    behavioral_risks: list[BehavioralRisk]
+    motifs: list[SignalMotif] = Field(default_factory=list)
     avg_win_duration: float = 0.0
     avg_loss_duration: float = 0.0
 
@@ -92,7 +91,7 @@ class DriftMetric(BaseModel):
     status: str
 
 class ModelDriftSection(BaseModel):
-    metrics: List[DriftMetric]
+    metrics: list[DriftMetric]
     feature_shifts: str
 
 class AllocationEntry(BaseModel):
@@ -103,8 +102,8 @@ class AllocationEntry(BaseModel):
 
 class AllocationSection(BaseModel):
     total_heat_pct: float
-    allocations: List[AllocationEntry]
-    rejection_summary: Dict[str, int]
+    allocations: list[AllocationEntry]
+    rejection_summary: dict[str, int]
     diversification_score: float = 1.0
 
 class BenchmarkComparison(BaseModel):
@@ -115,7 +114,7 @@ class BenchmarkComparison(BaseModel):
     p_value: str
 
 class BenchmarkSection(BaseModel):
-    comparisons: List[BenchmarkComparison]
+    comparisons: list[BenchmarkComparison]
     statistical_summary: str
 
 class RLMetric(BaseModel):
@@ -135,7 +134,7 @@ class RLSection(BaseModel):
     comparison_summary: str
     best_agent: str
     performance_gap: float
-    metrics: List[RLMetric]
+    metrics: list[RLMetric]
 
 class RareEventSummary(BaseModel):
     event_type: str
@@ -144,7 +143,7 @@ class RareEventSummary(BaseModel):
     recovery_attained: float
 
 class RareEventSection(BaseModel):
-    scenarios: List[RareEventSummary]
+    scenarios: list[RareEventSummary]
     insights: str
 
 class ExecutionMetric(BaseModel):
@@ -154,7 +153,7 @@ class ExecutionMetric(BaseModel):
 
 class ExecutionQualitySection(BaseModel):
     efficiency_score: float
-    metrics: List[ExecutionMetric]
+    metrics: list[ExecutionMetric]
     opportunity_cost: str
     trade_count: int
     rejected_count: int
@@ -164,20 +163,20 @@ class ExecutionQualitySection(BaseModel):
 class ResearchReport(BaseModel):
     """Structured research report container."""
     title: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     author: str = "Jules Research"
     executive_summary: str
 
-    regime_analysis: Optional[RegimeSection] = None
-    stress_tests: Optional[StressTestSection] = None
-    hyperparameter_robustness: Optional[HyperparameterSection] = None
-    trade_patterns: Optional[TradePatternSection] = None
-    model_drift: Optional[ModelDriftSection] = None
-    allocation_insights: Optional[AllocationSection] = None
-    benchmarks: Optional[BenchmarkSection] = None
-    rl_evaluation: Optional[RLSection] = None
-    rare_events: Optional[RareEventSection] = None
-    execution_quality: Optional[ExecutionQualitySection] = None
+    regime_analysis: RegimeSection | None = None
+    stress_tests: StressTestSection | None = None
+    hyperparameter_robustness: HyperparameterSection | None = None
+    trade_patterns: TradePatternSection | None = None
+    model_drift: ModelDriftSection | None = None
+    allocation_insights: AllocationSection | None = None
+    benchmarks: BenchmarkSection | None = None
+    rl_evaluation: RLSection | None = None
+    rare_events: RareEventSection | None = None
+    execution_quality: ExecutionQualitySection | None = None
 
     conclusion: str
 
@@ -188,7 +187,7 @@ class ResearchReporter:
     Supports terminal display (rich) and Markdown export (jinja2).
     """
 
-    def __init__(self, template_dir: Optional[str] = None):
+    def __init__(self, template_dir: str | None = None):
         if not template_dir:
             # Default to relative path from this file
             base_dir = os.path.dirname(os.path.abspath(__file__))

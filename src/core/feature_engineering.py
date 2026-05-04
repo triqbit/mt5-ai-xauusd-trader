@@ -9,7 +9,6 @@ candle patterns, and volume profiles.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -29,7 +28,7 @@ class FeatureEngineer:
     def __init__(
         self,
         base_timeframe: str = "M5",
-        timeframes: Optional[List[str]] = None,
+        timeframes: list[str] | None = None,
         normalize: bool = True,
         method: str = "zscore",
     ):
@@ -46,13 +45,13 @@ class FeatureEngineer:
         self.timeframes = timeframes or ["M1", "M5", "M15", "H1", "H4", "D1"]
         self.normalize = normalize
         self.method = method
-        self.feature_columns: List[str] = []
+        self.feature_columns: list[str] = []
 
         # Normalization stats
-        self.means: Optional[pd.Series] = None
-        self.stds: Optional[pd.Series] = None
-        self.mins: Optional[pd.Series] = None
-        self.maxs: Optional[pd.Series] = None
+        self.means: pd.Series | None = None
+        self.stds: pd.Series | None = None
+        self.mins: pd.Series | None = None
+        self.maxs: pd.Series | None = None
 
     def compute_features(
         self, df: pd.DataFrame, drop_ohlcv: bool = True
@@ -336,7 +335,7 @@ class FeatureEngineer:
                 self.means = df.mean()
                 self.stds = df.std().replace(0, 1)
             return (df - self.means) / self.stds
-        elif self.method == "minmax":
+        if self.method == "minmax":
             if self.mins is None:
                 self.mins = df.min()
                 self.maxs = df.max()

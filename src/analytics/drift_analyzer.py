@@ -8,7 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel
@@ -27,8 +27,8 @@ class DriftMetric(BaseModel):
 class DriftAnalysisReport(BaseModel):
     """Aggregate model drift report."""
 
-    metrics: List[DriftMetric]
-    feature_importance_shifts: Dict[str, float]
+    metrics: list[DriftMetric]
+    feature_importance_shifts: dict[str, float]
     overall_drift_status: str
 
     def to_report_section(self) -> Any:

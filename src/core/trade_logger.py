@@ -9,8 +9,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 from sqlalchemy import (
@@ -36,12 +36,12 @@ class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
     created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+        DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True
     )
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
     is_deleted = Column(Boolean, default=False, index=True)
@@ -62,7 +62,7 @@ class ModelSignal(Base, AuditMixin):
     algorithm = Column(String(50))
     confidence = Column(Float)
     volatility = Column(Float)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationship
     trade = relationship("Trade", back_populates="signal", uselist=False)
@@ -107,7 +107,7 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
     sharpe_ratio = Column(Float)
     profit_factor = Column(Float)
     max_drawdown = Column(Float)
@@ -123,7 +123,7 @@ class TradeLogger:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def log_signal(self, signal_data: Dict[str, Any]) -> int:
+    def log_signal(self, signal_data: dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
         with self.Session() as session:
             signal = ModelSignal(
@@ -136,7 +136,7 @@ class TradeLogger:
                 algorithm=signal_data.get("algorithm"),
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
-                timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
+                timestamp=signal_data.get("timestamp", datetime.now(UTC)),
             )
             session.add(signal)
             session.commit()
@@ -149,7 +149,7 @@ class TradeLogger:
         direction: int,
         entry_price: float,
         lot_size: float,
-        signal_id: Optional[int] = None,
+        signal_id: int | None = None,
         status: str = "OPEN",
     ) -> int:
         """Log a trade execution."""
@@ -171,7 +171,7 @@ class TradeLogger:
         self,
         ticket: int,
         exit_price: float,
-        pnl: Optional[float] = None,
+        pnl: float | None = None,
         drawdown_impact: float = 0.0,
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
@@ -201,7 +201,7 @@ class TradeLogger:
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
 
-    def get_trade_by_ticket(self, ticket: int) -> Optional[Trade]:
+    def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
             return (
@@ -214,8 +214,8 @@ class TradeLogger:
         self,
         event_type: str,
         description: str,
-        symbol: Optional[str] = None,
-        signal_id: Optional[int] = None,
+        symbol: str | None = None,
+        signal_id: int | None = None,
     ) -> None:
         """Log a risk-related event."""
         with self.Session() as session:
@@ -228,7 +228,7 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
-    def read_performance_report(self) -> Dict[str, float]:
+    def read_performance_report(self) -> dict[str, float]:
         """
         Calculate key performance metrics from closed trades.
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.

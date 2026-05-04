@@ -292,7 +292,7 @@ def run_live(
                             # Optimization: Pass console to avoid redundant creation and captures
                             dss.format_for_operator(packet, console=console)
                         else:
-                            print(dss.format_for_operator(packet))
+                            log.info(dss.format_for_operator(packet))
 
                 if risk_approved and direction != 0:
                     with profile("execution"):

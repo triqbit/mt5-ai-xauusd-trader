@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -48,8 +48,8 @@ class AllocationResult(BaseModel):
     allocated_risk_pct: float
     requested_risk_pct: float
     is_allowed: bool
-    rejection_reason: Optional[str] = None
-    rejection_code: Optional[RejectionCode] = None
+    rejection_reason: str | None = None
+    rejection_code: RejectionCode | None = None
     was_capped: bool = False
     was_scaled: bool = False
 
@@ -77,9 +77,9 @@ class CapitalAllocator:
         self.performance_step = performance_step
         self.decay_rate = decay_rate
 
-        self.strategies: Dict[str, StrategyConfig] = {}
-        self.current_allocations: Dict[str, float] = {}  # strategy_id -> current allocated amount
-        self.rejection_history: Dict[str, int] = {code.value: 0 for code in RejectionCode}
+        self.strategies: dict[str, StrategyConfig] = {}
+        self.current_allocations: dict[str, float] = {}  # strategy_id -> current allocated amount
+        self.rejection_history: dict[str, int] = {code.value: 0 for code in RejectionCode}
 
     def add_strategy(self, config: StrategyConfig) -> None:
         """Register a new strategy for capital allocation."""
@@ -187,7 +187,7 @@ class CapitalAllocator:
         # Return 1 - normalized_hhi so that higher is better
         return max(0.0, min(1.0, 1.0 - normalized_hhi))
 
-    def to_report_section(self, rejection_history: Optional[Dict[str, int]] = None) -> Any:
+    def to_report_section(self, rejection_history: dict[str, int] | None = None) -> Any:
         """Convert current state to AllocationSection for ResearchReporter."""
         from src.research.reporting import AllocationEntry, AllocationSection
 

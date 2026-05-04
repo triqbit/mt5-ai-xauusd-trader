@@ -11,9 +11,10 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
+from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Any, Dict, Generator, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import psutil
 import structlog
@@ -78,8 +79,8 @@ class Monitor:
             config: The trading configuration object.
         """
         self.cfg = config
-        self.equity_history: deque[Dict[str, Any]] = deque(maxlen=1000)
-        self.bot: Optional[telegram.Bot] = None
+        self.equity_history: deque[dict[str, Any]] = deque(maxlen=1000)
+        self.bot: telegram.Bot | None = None
         self._server_started = False
         self._background_tasks: set[asyncio.Task] = set()
 
@@ -137,7 +138,7 @@ class Monitor:
 
     def log_equity(self, equity: float) -> None:
         """Record current equity and update Prometheus metrics."""
-        data = {"timestamp": datetime.now(timezone.utc), "equity": equity}
+        data = {"timestamp": datetime.now(UTC), "equity": equity}
         self.equity_history.append(data)
         EQUITY_GAUGE.set(equity)
         logger.debug("equity_logged", equity=equity)
@@ -189,7 +190,7 @@ class Monitor:
         # unless 'trades' is the increment.
         status = "PROFIT" if pnl >= 0 else "LOSS"
         msg = (
-            f"📅 Daily Summary - {datetime.now(timezone.utc).date()}\n"
+            f"📅 Daily Summary - {datetime.now(UTC).date()}\n"
             f"Status: {status}\n"
             f"Net P&L: {pnl:.2f}\n"
             f"Trades Today: {trades}"
@@ -291,8 +292,8 @@ class Monitor:
             timestamp: The timestamp of the latest data point.
         """
         if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=timezone.utc)
-        age = (datetime.now(timezone.utc) - timestamp).total_seconds()
+            timestamp = timestamp.replace(tzinfo=UTC)
+        age = (datetime.now(UTC) - timestamp).total_seconds()
         DATA_FRESHNESS_GAUGE.set(age)
         logger.debug("data_freshness_logged", age_seconds=age)
 

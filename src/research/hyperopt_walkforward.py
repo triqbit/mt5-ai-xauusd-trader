@@ -7,9 +7,10 @@ Disciplined Walk-Forward Optimization with Robustness Scoring.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import optuna
@@ -56,15 +57,15 @@ class RobustnessMetrics(BaseModel):
 class WindowResult(BaseModel):
     """Metrics for a single walk-forward window."""
     window_index: int
-    is_metrics: Dict[str, Any]
-    oos_metrics: Dict[str, Any]
+    is_metrics: dict[str, Any]
+    oos_metrics: dict[str, Any]
 
 class WalkForwardResult(BaseModel):
     """Result of a Walk-Forward Optimization run."""
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     metrics: RobustnessMetrics
-    window_results: List[WindowResult]
-    oos_returns: List[float] = Field(default_factory=list, description="Aggregated OOS returns")
+    window_results: list[WindowResult]
+    oos_returns: list[float] = Field(default_factory=list, description="Aggregated OOS returns")
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
     def to_report_section(self) -> Any:
@@ -117,7 +118,7 @@ class WalkForwardOptimizer:
         self,
         data: pd.DataFrame,
         strategy_factory: Callable[..., BenchmarkStrategy],
-        param_space: Callable[[optuna.Trial], Dict[str, Any]],
+        param_space: Callable[[optuna.Trial], dict[str, Any]],
         config: WalkForwardConfig = WalkForwardConfig(),
     ):
         """
@@ -140,7 +141,7 @@ class WalkForwardOptimizer:
             logger.info("Regime column missing, labeling history...")
             self.data = self.regime_detector.label_history(self.data)
 
-    def generate_windows(self) -> List[Tuple[pd.DataFrame, pd.DataFrame]]:
+    def generate_windows(self) -> list[tuple[pd.DataFrame, pd.DataFrame]]:
         """
         Generates rolling train/test splits.
 
@@ -163,7 +164,7 @@ class WalkForwardOptimizer:
 
         return windows
 
-    def _evaluate_strategy(self, data: pd.DataFrame, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_strategy(self, data: pd.DataFrame, params: dict[str, Any]) -> dict[str, Any]:
         """
         Evaluates a strategy with given parameters on a dataset.
 
@@ -183,7 +184,7 @@ class WalkForwardOptimizer:
         metrics = evaluator._calculate_metrics(strategy.predict(data), strategy.name)
         return metrics
 
-    def _calculate_stability_penalty(self, params: Dict[str, Any], data: pd.DataFrame) -> float:
+    def _calculate_stability_penalty(self, params: dict[str, Any], data: pd.DataFrame) -> float:
         """
         Calculates a penalty for parameter instability by perturbing continuous parameters.
 
@@ -225,7 +226,7 @@ class WalkForwardOptimizer:
         return float(np.std(perturbations))
 
     def _calculate_regime_consistency(
-        self, data: pd.DataFrame, strategy_params: Dict[str, Any]
+        self, data: pd.DataFrame, strategy_params: dict[str, Any]
     ) -> float:
         """
         Measures how consistent performance is across different detected regimes.
@@ -353,13 +354,13 @@ class WalkForwardOptimizer:
             # Select return value based on config
             if self.config.metric == OptimizationMetric.ROBUSTNESS_SCORE:
                 return float(robustness)
-            elif self.config.metric == OptimizationMetric.SHARPE:
+            if self.config.metric == OptimizationMetric.SHARPE:
                 return float(oos_mean)
-            elif self.config.metric == OptimizationMetric.SORTINO:
+            if self.config.metric == OptimizationMetric.SORTINO:
                 return float(np.mean(oos_sortinos))
-            elif self.config.metric == OptimizationMetric.PROFIT_FACTOR:
+            if self.config.metric == OptimizationMetric.PROFIT_FACTOR:
                 return float(np.mean(oos_pfs))
-            elif self.config.metric == OptimizationMetric.TOTAL_RETURN:
+            if self.config.metric == OptimizationMetric.TOTAL_RETURN:
                 return float(np.mean(oos_returns))
 
             return float(robustness)

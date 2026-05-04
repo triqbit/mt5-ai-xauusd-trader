@@ -7,7 +7,7 @@ Institutional-grade RL agent evaluation framework.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 import numpy as np
 import pandas as pd
@@ -90,7 +90,7 @@ class RLReport(BaseModel):
     stability: StabilityMetrics
     turnover: TurnoverMetrics
     drawdown: DrawdownMetrics
-    regime_sensitivity: List[RegimePerformance]
+    regime_sensitivity: list[RegimePerformance]
     reward_decomposition: RewardDecomposition
     overall_win_rate: float
 
@@ -98,7 +98,7 @@ class RLReport(BaseModel):
 class RLComparison(BaseModel):
     """Comparative report across multiple agents."""
     baseline_name: str
-    agent_reports: List[RLReport]
+    agent_reports: list[RLReport]
     performance_gap_pct: float = Field(..., description="Gap between best RL agent and baseline")
     best_agent: str
 
@@ -137,7 +137,7 @@ class MomentumBaseline:
         last_val = observation[last_close_idx]
         if last_val > 0.2:  # Reduced threshold for normalized values
             return 1  # Buy
-        elif last_val < -0.2:
+        if last_val < -0.2:
             return 2  # Sell
         return 0  # Hold
 
@@ -161,7 +161,7 @@ class MeanReversionBaseline:
         last_val = observation[last_close_idx]
         if last_val > 1.5:  # Overbought
             return 2  # Sell
-        elif last_val < -1.5:  # Oversold
+        if last_val < -1.5:  # Oversold
             return 1  # Buy
         return 0
 
@@ -199,7 +199,7 @@ class RLEvaluator:
     def __init__(
         self,
         env: Any,
-        regime_detector: Optional[RegimeDetector] = None,
+        regime_detector: RegimeDetector | None = None,
         annualization_factor: int = 252,
     ):
         self.env = env
@@ -273,7 +273,7 @@ class RLEvaluator:
         return self._generate_report(agent_name, df_history)
 
     def compare(
-        self, agents: List[Any], agent_names: List[str], baseline_name: str = "Momentum"
+        self, agents: list[Any], agent_names: list[str], baseline_name: str = "Momentum"
     ) -> RLComparison:
         """Compare multiple agents against a baseline."""
         reports = []
@@ -382,7 +382,7 @@ class RLEvaluator:
             overall_win_rate=win_rate,
         )
 
-    def _extract_trades(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+    def _extract_trades(self, df: pd.DataFrame) -> list[dict[str, Any]]:
         """
         Extract detailed trade information from history.
         Each trade contains: pnl, hold_time.
@@ -407,7 +407,7 @@ class RLEvaluator:
         return trades
 
     def _calculate_stability(
-        self, df: pd.DataFrame, trades: List[Dict[str, Any]], max_dd: float
+        self, df: pd.DataFrame, trades: list[dict[str, Any]], max_dd: float
     ) -> StabilityMetrics:
         """Assess the consistency and risk-adjusted returns with institutional metrics."""
         returns = df["balances"].pct_change().replace([np.inf, -np.inf], 0).fillna(0)
@@ -505,7 +505,7 @@ class RLEvaluator:
             max_consecutive_losses=int(max_consecutive_losses),
         )
 
-    def _calculate_turnover(self, df: pd.DataFrame, trades: List[Dict[str, Any]]) -> TurnoverMetrics:
+    def _calculate_turnover(self, df: pd.DataFrame, trades: list[dict[str, Any]]) -> TurnoverMetrics:
         """Assess trading activity and execution costs."""
         num_trades = len(trades)
         hold_times = [t["hold_time"] for t in trades]
@@ -560,7 +560,7 @@ class RLEvaluator:
             avg_drawdown=float(avg_dd)
         )
 
-    def _calculate_regime_sensitivity(self, df: pd.DataFrame) -> List[RegimePerformance]:
+    def _calculate_regime_sensitivity(self, df: pd.DataFrame) -> list[RegimePerformance]:
         """Performance metrics segmented by market regime with recovery analysis."""
         regime_stats = []
         unique_regimes = df["regimes"].unique()
@@ -619,7 +619,7 @@ class RLEvaluator:
 
         return regime_stats
 
-    def _calculate_reward_decomposition(self, df: pd.DataFrame, trades: List[Dict[str, Any]]) -> RewardDecomposition:
+    def _calculate_reward_decomposition(self, df: pd.DataFrame, trades: list[dict[str, Any]]) -> RewardDecomposition:
         """Breakdown of returns into gross profit and costs, with concentration analysis."""
         total_commissions = df["commissions"].iloc[-1] if len(df) > 0 else 0.0
         final_pnl = df["balances"].iloc[-1] - df["balances"].iloc[0] if len(df) > 0 else 0.0

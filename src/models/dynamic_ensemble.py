@@ -9,7 +9,6 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -38,7 +37,7 @@ class DynamicEnsemble:
 
     def __init__(
         self,
-        model_names: List[str],
+        model_names: list[str],
         smoothing_factor: float = 0.1,
         max_swing: float = 0.05,
         min_weight: float = 0.05,
@@ -68,10 +67,10 @@ class DynamicEnsemble:
 
     def update_weights(
         self,
-        metrics: Dict[str, Dict[str, float]],
-        regime_info: Optional[RegimeInfo] = None,
-        volatility_context: Optional[float] = None,
-    ) -> Dict[str, float]:
+        metrics: dict[str, dict[str, float]],
+        regime_info: RegimeInfo | None = None,
+        volatility_context: float | None = None,
+    ) -> dict[str, float]:
         """
         Update ensemble weights using a multi-factor scoring model and stability controls.
 
@@ -89,7 +88,7 @@ class DynamicEnsemble:
         if not metrics:
             return self.weights
 
-        raw_scores: Dict[str, float] = {}
+        raw_scores: dict[str, float] = {}
 
         regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
 
@@ -140,7 +139,7 @@ class DynamicEnsemble:
         new_targets = self._normalize_with_floor(raw_scores, self.min_weight)
 
         # Calculate adjustments with smoothing and stability controls
-        deltas: Dict[str, float] = {}
+        deltas: dict[str, float] = {}
         for name in self.model_names:
             target = new_targets[name]
             current = self.weights[name]
@@ -201,7 +200,7 @@ class DynamicEnsemble:
         logger.debug("Ensemble weights updated: %s", self.weights)
         return self.weights
 
-    def _normalize_with_floor(self, scores: Dict[str, float], floor: float) -> Dict[str, float]:
+    def _normalize_with_floor(self, scores: dict[str, float], floor: float) -> dict[str, float]:
         """Normalize scores to sum to 1.0 while respecting a minimum floor."""
         n = len(scores)
         if n * floor >= 1.0:
@@ -225,7 +224,7 @@ class DynamicEnsemble:
                 weights[name] += remaining / n
         return weights
 
-    def get_weights(self) -> Dict[str, float]:
+    def get_weights(self) -> dict[str, float]:
         """Return current ensemble weights."""
         return self.weights.copy()
 

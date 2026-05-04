@@ -6,7 +6,7 @@ LSTM sequence model using PyTorch for short-term price prediction.
 
 import logging
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import numpy as np
 
@@ -133,7 +133,7 @@ class LSTMModel(BaseModel):
         input_dim: int = 140,
         hidden_dim: int = 64,
         num_layers: int = 2,
-        model_path: Optional[Union[str, Path]] = None,
+        model_path: str | Path | None = None,
         device: str = "cpu",
     ) -> None:
         """
@@ -235,7 +235,7 @@ class LSTMModel(BaseModel):
                 metadata={"error": str(e)},
             )
 
-    def save(self, path: Union[str, Path]) -> None:
+    def save(self, path: str | Path) -> None:
         """
         Saves the model weights to the specified path.
 
