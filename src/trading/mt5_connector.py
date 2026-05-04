@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
-import pandas as pd
 import nest_asyncio
+import pandas as pd
 
 try:
     import MetaTrader5 as mt5
@@ -40,6 +39,7 @@ from src.core.exceptions import (
     MT5ExecutionError,
 )
 from src.core.retry import with_retry
+from src.trading.risk_manager import TradeSignal
 
 # Apply nest_asyncio to allow nested loops (MetaAPI SDK uses asyncio)
 nest_asyncio.apply()
@@ -208,6 +208,36 @@ class MT5Connector:
     def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         return self.get_rates(symbol, timeframe, n_bars)
 
+    def get_rates_range(
+        self, symbol: str, timeframe: str, date_from: datetime, date_to: datetime
+    ) -> pd.DataFrame:
+        """
+        Fetch historical OHLCV data for a specific time range.
+        """
+        if not self._is_initialized:
+            return pd.DataFrame()
+
+        tf = TIMEFRAME_MAP.get(timeframe, 5)
+
+        if not self.use_metaapi:
+            rates = mt5.copy_rates_range(symbol, tf, date_from, date_to)
+            if rates is None:
+                logger.error("Failed to copy rates range for %s: %s", symbol, mt5.last_error())
+                return pd.DataFrame()
+            df = pd.DataFrame(rates)
+            df["time"] = pd.to_datetime(df["time"], unit="s")
+            return df
+        else:
+            async def _get_range():
+                return await self.metaapi_connection.get_historical_candles(
+                    symbol, timeframe, date_from, date_to
+                )
+            candles = asyncio.run(_get_range())
+            df = pd.DataFrame(candles)
+            if not df.empty:
+                df["time"] = pd.to_datetime(df["time"])
+            return df
+
     @with_retry(MT5DataError, max_retries=2)
     def get_tick(self, symbol: str) -> dict[str, float]:
         """Retrieve latest symbol tick."""
@@ -221,7 +251,7 @@ class MT5Connector:
             return {"bid": tick.bid, "ask": tick.ask, "spread": tick.ask - tick.bid}
         else:
             async def _get_tick():
-                symbol_info = await self.metaapi_connection.get_symbol_specification(symbol)
+                await self.metaapi_connection.get_symbol_specification(symbol)
                 price = await self.metaapi_connection.get_symbol_price(symbol)
                 return {
                     "bid": price["bid"],
@@ -230,34 +260,43 @@ class MT5Connector:
                 }
             return asyncio.run(_get_tick())
 
-    def place_order(self, symbol: str, lot_size: float, direction: int,
-                    stop_loss: float | None = None, take_profit: float | None = None) -> int | None:
+    def place_order(self, signal: TradeSignal) -> int | None:
         """
-        Execute a market order.
-        direction: 1 for BUY, -1 for SELL.
+        Execute a market order based on a validated trade signal.
+
+        Args:
+            signal: Validated TradeSignal object.
+
+        Returns:
+            Order ticket ID if successful.
+
+        Raises:
+            MT5ExecutionError: If order placement fails.
         """
         if not self._is_initialized:
             raise MT5ConnectionError("MT5 connector not initialized.")
 
-        order_type = ORDER_TYPE_BUY if direction > 0 else ORDER_TYPE_SELL
+        order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
 
         if not self.use_metaapi:
-            tick = self.get_tick(symbol)
+            tick = self.get_tick(signal.symbol)
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
             request = {
                 "action": TRADE_ACTION_DEAL,
-                "symbol": symbol,
-                "volume": lot_size,
+                "symbol": signal.symbol,
+                "volume": signal.lot_size,
                 "type": order_type,
                 "price": price,
                 "magic": 20240419,
-                "comment": "AI_TRADER",
+                "comment": f"AI:{signal.algorithm}",
                 "type_time": ORDER_TIME_GTC,
                 "type_filling": ORDER_FILLING_IOC,
             }
-            if stop_loss: request["sl"] = stop_loss
-            if take_profit: request["tp"] = take_profit
+            if signal.stop_loss:
+                request["sl"] = signal.stop_loss
+            if signal.take_profit:
+                request["tp"] = signal.take_profit
 
             result = mt5.order_send(request)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
@@ -265,15 +304,17 @@ class MT5Connector:
             return int(result.order)
         else:
             async def _place_order():
-                action = 'BUY' if direction > 0 else 'SELL'
+                action = 'BUY' if signal.direction > 0 else 'SELL'
                 result = await self.metaapi_connection.create_market_order(
-                    symbol, action, lot_size, stop_loss, take_profit, {'comment': 'AI_TRADER'}
+                    signal.symbol, action, signal.lot_size, signal.stop_loss,
+                    signal.take_profit, {'comment': f'AI:{signal.algorithm}'}
                 )
                 return int(result['orderId'])
             return asyncio.run(_place_order())
 
     def get_account_info(self) -> dict[str, Any]:
-        if not self._is_initialized: return {}
+        if not self._is_initialized:
+            return {}
         if not self.use_metaapi:
             acc = mt5.account_info()
             return acc._asdict() if acc else {}
@@ -283,7 +324,8 @@ class MT5Connector:
             return asyncio.run(_get_acc())
 
     def get_positions(self, symbol: str | None = None) -> list[dict[str, Any]]:
-        if not self._is_initialized: return []
+        if not self._is_initialized:
+            return []
         if not self.use_metaapi:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
             return [p._asdict() for p in positions] if positions else []

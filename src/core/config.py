@@ -71,6 +71,7 @@ class TradingConfig(BaseSettings):
     margin_alert_pct: float = Field(default=0.70, description="Alert at 70% margin utilization")
     margin_halt_pct: float = Field(default=0.80, description="Halt trading at 80% margin utilization")
     margin_liquidation_pct: float = Field(default=0.90, description="Automatic close at 90% margin")
+    max_drawdown: float = Field(default=0.30, description="Max Equity Drawdown (30%)")
 
     # Daily Limits (Cascading)
     max_daily_loss: float = Field(

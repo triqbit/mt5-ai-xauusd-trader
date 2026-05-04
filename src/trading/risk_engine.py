@@ -13,10 +13,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
-from typing import Dict, Optional, Any
+from datetime import date
+from typing import Any, Optional
 
-import numpy as np
 import pandas as pd
 
 from src.core.config import TradingConfig
@@ -114,7 +113,7 @@ class RiskEngine:
         if ratio > self.cfg.volatility_extreme_threshold:
             logger.warning("Extreme volatility (%.2fx) - HALTING", ratio)
             return 0.0
-        elif ratio > self.cfg.volatility_very_high_threshold:
+        if ratio > self.cfg.volatility_very_high_threshold:
             multiplier = 0.5
         elif ratio > self.cfg.volatility_high_threshold:
             multiplier = 0.75
@@ -155,27 +154,30 @@ class RiskEngine:
     # -- Internal Breakers --------------------------------------------------
     def _check_drawdown_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.30: # Level 5: 30%
-            return False
-        return True
+        return drawdown < self.cfg.max_drawdown
 
     def _check_daily_loss_breaker(self) -> bool:
-        if self.daily.peak_equity <= 0: return True
+        if self.daily.peak_equity <= 0:
+            return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            return False
-        return True
+        return not (self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss)
 
     def get_daily_loss_level(self) -> int:
         """Returns cascading loss level 0-4."""
-        if self.daily.peak_equity <= 0: return 0
+        if self.daily.peak_equity <= 0:
+            return 0
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl >= 0: return 0
+        if self.daily.realised_pnl >= 0:
+            return 0
 
-        if loss_pct >= self.cfg.max_daily_loss: return 4
-        if loss_pct >= self.cfg.daily_loss_lvl3: return 3
-        if loss_pct >= self.cfg.daily_loss_lvl2: return 2
-        if loss_pct >= self.cfg.daily_loss_lvl1: return 1
+        if loss_pct >= self.cfg.max_daily_loss:
+            return 4
+        if loss_pct >= self.cfg.daily_loss_lvl3:
+            return 3
+        if loss_pct >= self.cfg.daily_loss_lvl2:
+            return 2
+        if loss_pct >= self.cfg.daily_loss_lvl1:
+            return 1
         return 0
 
 __all__ = ["RiskEngine", "RiskDecision", "DailyStats"]
