@@ -15,7 +15,7 @@ from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
-from src.core.explainability import SignalExplanation
+from src.core.explainability import SignalExplainer, SignalExplanation
 from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
@@ -60,7 +60,7 @@ class DecisionSupportSystem:
     """
 
     def __init__(self) -> None:
-        pass
+        self.explainer = SignalExplainer()
 
     def assemble_packet(
         self,
@@ -110,7 +110,7 @@ class DecisionSupportSystem:
             performance=performance,
         )
 
-    def format_for_operator(self, packet: DecisionPacket) -> str:
+    def format_for_operator(self, packet: DecisionPacket, console: Optional[Any] = None) -> str:
         """
         Generate a human-readable, high-fidelity terminal dashboard.
         """
@@ -121,7 +121,9 @@ class DecisionSupportSystem:
             from rich.table import Table
             from rich.text import Text
 
-            console = Console(force_terminal=True)
+            console_provided = console is not None
+            if console is None:
+                console = Console(force_terminal=True)
 
             # 1. Header with Go/No-Go status
             status_color = "green" if packet.is_executable else "red"
@@ -191,17 +193,24 @@ class DecisionSupportSystem:
 
             macro_panel = Panel(macro_content, title="Macro Intelligence", border_style=macro_color)
 
-            # Capture output
+            # Bypass expensive capture if we are printing directly to a console
+            if console_provided and not getattr(console, "_record", False):
+                 console.print(header)
+                 console.print(overview_table)
+                 console.print(macro_panel)
+
+                 console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
+                 self.explainer.format_for_terminal(packet.explanation, console=console)
+                 return ""
+
             with console.capture() as capture:
                 console.print(header)
                 console.print(overview_table)
                 console.print(macro_panel)
 
                 # Integration with existing SignalExplainer output for the details
-                from src.core.explainability import SignalExplainer
-                explainer = SignalExplainer()
                 console.print("\n[bold]SIGNAL ATTRIBUTION DETAILS[/bold]")
-                console.print(explainer.format_for_terminal(packet.explanation))
+                console.print(self.explainer.format_for_terminal(packet.explanation))
 
             return capture.get()
 
