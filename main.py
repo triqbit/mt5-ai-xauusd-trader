@@ -402,7 +402,8 @@ def main() -> int:
     monitor.start_metrics_server()
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
-        max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15
+        max_drawdown=cfg.circuit_breaker_threshold,
+        atr_multiplier=cfg.atr_multiplier,
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
     regime_detector = RegimeDetector()

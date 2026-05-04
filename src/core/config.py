@@ -104,6 +104,18 @@ class TradingConfig(BaseSettings):
     confidence_threshold: float = Field(
         default=0.6, ge=0.0, le=1.0, description="Minimum model confidence score required to execute a signal"
     )
+    circuit_breaker_threshold: float = Field(
+        default=0.15, ge=0.05, le=0.25, description="Maximum total drawdown before halting all trading"
+    )
+    min_risk_reward: float = Field(
+        default=1.5, ge=1.0, description="Minimum required reward-to-risk ratio for any trade"
+    )
+    atr_multiplier: float = Field(
+        default=3.0, ge=1.0, le=10.0, description="Volatility filter: max ATR multiple for entry"
+    )
+    consecutive_loss_limit: int = Field(
+        default=3, ge=1, le=10, description="Number of consecutive losses before daily halt"
+    )
 
     @field_validator("risk_per_trade")
     @classmethod

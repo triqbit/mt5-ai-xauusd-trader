@@ -250,6 +250,35 @@ class ConfigValidator:
                 )
             )
 
+        # 5. Circuit Breaker and R:R
+        if self.config.circuit_breaker_threshold > 0.20:
+             self.errors.append(
+                ValidationError(
+                    "CIRCUIT_BREAKER_THRESHOLD",
+                    f"Circuit breaker {self.config.circuit_breaker_threshold*100}% is too high (Max: 20%).",
+                    True,
+                )
+            )
+
+        if self.config.min_risk_reward < 1.0:
+            self.errors.append(
+                ValidationError(
+                    "MIN_RISK_REWARD",
+                    f"Minimum R:R {self.config.min_risk_reward} must be at least 1.0.",
+                    True,
+                )
+            )
+
+        # 6. Consecutive Loss Limit
+        if self.config.consecutive_loss_limit > 5:
+             self.errors.append(
+                ValidationError(
+                    "CONSECUTIVE_LOSS_LIMIT",
+                    f"Consecutive loss limit {self.config.consecutive_loss_limit} exceeds standard limit of 5.",
+                    False,
+                )
+            )
+
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
         # 1. LIVE mode restrictions
