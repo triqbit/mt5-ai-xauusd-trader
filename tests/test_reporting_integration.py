@@ -31,6 +31,9 @@ def mock_walk_forward_result():
         metrics=RobustnessMetrics(
             oos_sharpe_mean=1.5,
             oos_sharpe_std=0.2,
+            worst_window_sharpe=1.0,
+            win_rate_consistency=0.8,
+            max_drawdown_consistency=0.7,
             is_oos_gap=0.3,
             stability_penalty=0.1,
             regime_consistency=0.9,
