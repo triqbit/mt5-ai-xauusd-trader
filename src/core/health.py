@@ -15,9 +15,9 @@ from enum import Enum
 from typing import Dict, Optional
 
 import redis
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, FastAPI, HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from prometheus_client import Gauge
+from prometheus_client import Gauge, make_asgi_app
 from pydantic import BaseModel, Field
 
 from src.core.audit_log import AuditLogger
@@ -108,7 +108,7 @@ class HealthChecker:
         return res
 
     def check_mt5(self) -> ComponentStatus:
-        """Verify MT5 connection status."""
+        """Verify MT5 connection status with an active responsiveness check."""
         if not self.connector:
             res = ComponentStatus(
                 status=HealthStatus.FAILED, message="MT5Connector not initialized"
@@ -116,16 +116,32 @@ class HealthChecker:
             self._update_gauge("mt5", res.status)
             return res
 
-        if self.connector._is_initialized:
-            res = ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection alive")
-        else:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection down")
+        if not self.connector._is_initialized:
+            res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection not initialized")
+            self._update_gauge("mt5", res.status)
+            return res
+
+        try:
+            # Active check by attempting to fetch account info (lightweight call)
+            # For MetaAPI fallback, get_account_info currently returns {} as it's not implemented,
+            # so we only perform the active check for native MT5.
+            if getattr(self.connector, "use_metaapi", False):
+                res = ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection alive (MetaAPI fallback)")
+            else:
+                info = self.connector.get_account_info()
+                if info:
+                    res = ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection active and responding")
+                else:
+                    res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection failed to return account info")
+        except Exception as e:
+            logger.error("Health check - MT5 failure: %s", e)
+            res = ComponentStatus(status=HealthStatus.FAILED, message=f"MT5 API call failed: {e!s}")
 
         self._update_gauge("mt5", res.status)
         return res
 
     def check_models(self) -> ComponentStatus:
-        """Verify models are loaded in the ensemble."""
+        """Verify models are loaded in the ensemble or individual wrappers."""
         if not self.model:
             res = ComponentStatus(
                 status=HealthStatus.FAILED, message="Model orchestrator not initialized"
@@ -135,16 +151,23 @@ class HealthChecker:
 
         # Use hasattr/getattr to avoid strict type dependency on torch-heavy models
         loaded = []
+
+        # 1. Check for EnsembleModel composition
         if getattr(self.model, "_ppo_model", None) is not None:
-            loaded.append("PPO")
+            loaded.append("PPO (Ensemble)")
         if getattr(self.model, "lstm_model", None) is not None:
-            loaded.append("LSTM")
+            loaded.append("LSTM (Ensemble)")
         if getattr(self.model, "_dreamer_model", None) is not None:
-            loaded.append("Dreamer")
+            loaded.append("Dreamer (Ensemble)")
+
+        # 2. Check for individual model wrappers (PPOAgent, LSTMModel)
+        if not loaded and hasattr(self.model, "model") and getattr(self.model, "model", None) is not None:
+            class_name = self.model.__class__.__name__
+            loaded.append(f"{class_name} (Loaded)")
 
         if not loaded:
             res = ComponentStatus(
-                status=HealthStatus.FAILED, message="No models loaded in ensemble"
+                status=HealthStatus.FAILED, message="No models loaded in system"
             )
         else:
             res = ComponentStatus(
@@ -269,6 +292,42 @@ class HealthChecker:
 
         return HealthReport(status=overall_status, components=components)
 
+    def startup_gate(self) -> HealthReport:
+        """
+        Enforce a health check gate at startup.
+        Raises RuntimeError if critical health checks fail.
+
+        Returns:
+            The final HealthReport generated during the gate.
+        """
+        report = self.get_full_report()
+        if report.status == HealthStatus.FAILED:
+            failed_components = [
+                name for name, comp in report.components.items()
+                if comp.status == HealthStatus.FAILED
+            ]
+            msg = f"Startup health gate FAILED. Critical components: {', '.join(failed_components)}"
+            logger.critical(msg)
+            if self.audit_logger:
+                self.audit_logger.log("system", "startup_gate_failure", msg)
+            raise RuntimeError(msg)
+
+        if report.status == HealthStatus.DEGRADED:
+            warnings = [
+                name for name, comp in report.components.items()
+                if comp.status == HealthStatus.DEGRADED
+            ]
+            msg = f"Startup health gate PASSED with warnings in: {', '.join(warnings)}"
+            logger.warning(msg)
+            if self.audit_logger:
+                self.audit_logger.log("system", "startup_gate_warning", msg)
+        else:
+            logger.info("Startup health gate PASSED successfully")
+            if self.audit_logger:
+                self.audit_logger.log("system", "startup_gate_success", "All health checks passed")
+
+        return report
+
 
 # FastAPI Router implementation
 router = APIRouter(prefix="/health", tags=["health"])
@@ -295,6 +354,24 @@ def init_health_checker(
     global _health_checker
     _health_checker = HealthChecker(config, connector, trade_logger, model, audit_logger)
     return _health_checker
+
+
+def create_health_app() -> FastAPI:
+    """
+    Create a FastAPI application that includes health routes and Prometheus metrics.
+    """
+    app = FastAPI(
+        title="MT5 Trading Bot Health API",
+        description="Enterprise health monitoring and metrics for MT5 AI/ML Bot",
+        version="1.0.0",
+    )
+    app.include_router(router)
+
+    # Mount Prometheus metrics app
+    metrics_app = make_asgi_app()
+    app.mount("/metrics", metrics_app)
+
+    return app
 
 
 @router.get("/liveness", response_model=ComponentStatus)

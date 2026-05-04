@@ -4,10 +4,12 @@ tests/test_health.py
 Unit and integration tests for the health check system.
 """
 
+import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.core.config import TradingConfig
@@ -42,6 +44,7 @@ def mock_config():
 def mock_connector():
     connector = MagicMock()
     connector._is_initialized = True
+    connector.use_metaapi = False
     return connector
 
 @pytest.fixture
@@ -88,16 +91,35 @@ def test_check_database_failure(health_checker, mock_trade_logger):
     assert status.status == HealthStatus.FAILED
     assert "DB error" in status.message
 
-def test_check_mt5_success(health_checker):
+def test_check_mt5_success(health_checker, mock_connector):
+    mock_connector.get_account_info.return_value = {"balance": 1000}
     status = health_checker.check_mt5()
     assert status.status == HealthStatus.HEALTHY
-    assert "alive" in status.message
+    assert "active" in status.message
 
-def test_check_mt5_failure(health_checker, mock_connector):
+def test_check_mt5_not_initialized(health_checker, mock_connector):
     mock_connector._is_initialized = False
     status = health_checker.check_mt5()
     assert status.status == HealthStatus.FAILED
-    assert "down" in status.message
+    assert "not initialized" in status.message
+
+def test_check_mt5_no_info(health_checker, mock_connector):
+    mock_connector.get_account_info.return_value = {}
+    status = health_checker.check_mt5()
+    assert status.status == HealthStatus.FAILED
+    assert "failed to return account info" in status.message
+
+def test_check_mt5_api_error(health_checker, mock_connector):
+    mock_connector.get_account_info.side_effect = Exception("API error")
+    status = health_checker.check_mt5()
+    assert status.status == HealthStatus.FAILED
+    assert "API call failed" in status.message
+
+def test_check_mt5_metaapi_success(health_checker, mock_connector):
+    mock_connector.use_metaapi = True
+    status = health_checker.check_mt5()
+    assert status.status == HealthStatus.HEALTHY
+    assert "MetaAPI" in status.message
 
 def test_check_models_success(health_checker):
     status = health_checker.check_models()
@@ -118,8 +140,44 @@ def test_check_models_failed(health_checker, mock_model):
     mock_model._ppo_model = None
     mock_model.lstm_model = None
     mock_model._dreamer_model = None
+    mock_model.model = None  # Individual wrapper check
     status = health_checker.check_models()
     assert status.status == HealthStatus.FAILED
+
+def test_check_models_individual_wrapper(health_checker, mock_model):
+    mock_model._ppo_model = None
+    mock_model.lstm_model = None
+    mock_model._dreamer_model = None
+    mock_model.model = MagicMock()
+
+    # Using a real class for the wrapper to avoid brittle __class__.__name__ mocking
+    class PPOAgentWrapper:
+        def __init__(self, model):
+            self.model = model
+
+    health_checker.model = PPOAgentWrapper(mock_model.model)
+
+    status = health_checker.check_models()
+    assert status.status == HealthStatus.HEALTHY
+    assert "PPOAgentWrapper (Loaded)" in status.message
+
+def test_startup_gate_success(health_checker, mock_audit_logger):
+    with patch.object(HealthChecker, 'get_full_report') as mock_report:
+        mock_report.return_value = HealthReport(status=HealthStatus.HEALTHY, components={})
+        report = health_checker.startup_gate()
+        assert isinstance(report, HealthReport)
+        mock_audit_logger.log.assert_called_with("system", "startup_gate_success", "All health checks passed")
+
+def test_startup_gate_failed(health_checker, mock_audit_logger):
+    with patch.object(HealthChecker, 'get_full_report') as mock_report:
+        mock_report.return_value = HealthReport(
+            status=HealthStatus.FAILED,
+            components={"mt5": ComponentStatus(status=HealthStatus.FAILED, message="Down")}
+        )
+        with pytest.raises(RuntimeError) as exc:
+            health_checker.startup_gate()
+        assert "mt5" in str(exc.value)
+        mock_audit_logger.log.assert_called_with("system", "startup_gate_failure", unittest.mock.ANY)
 
 @patch("src.core.health.ConfigValidator")
 def test_check_config_success(mock_validator_class, health_checker):
@@ -176,9 +234,6 @@ def test_get_full_report(health_checker):
                     assert "audit_log" in report.components
 
 # --- FastAPI Endpoint Tests ---
-
-from fastapi import FastAPI
-
 
 @pytest.fixture
 def client(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger):

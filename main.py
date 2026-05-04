@@ -399,6 +399,9 @@ def main() -> int:
         db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
     )
     monitor = Monitor(cfg)
+    # Note: Monitor's start_metrics_server is legacy;
+    # Enterprise deployments use the FastAPI health app which includes /metrics.
+    # However, we keep it for backward compatibility or individual component runs.
     monitor.start_metrics_server()
     risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
@@ -445,7 +448,12 @@ def main() -> int:
     # Enterprise Health Gate
     health_checker = init_health_checker(cfg, connector, trade_logger, model, audit_logger=audit_logger)
     with console.status("[bold blue]Running health checks..."):
-        report = health_checker.get_full_report()
+        try:
+            report = health_checker.startup_gate()
+        except RuntimeError as exc:
+            log.critical(str(exc))
+            # Fetch report directly to show failure state in table
+            report = health_checker.get_full_report()
 
     table = Table(title="System Health", box=None)
     table.add_column("Component", style="cyan")
@@ -463,11 +471,8 @@ def main() -> int:
     console.print(table)
 
     if report.status == HealthStatus.FAILED:
-        log.critical("Startup HEALTH CHECK FAILED")
-        audit_logger.log("system", "startup_failed", "Critical health checks failed")
+        log.critical("Startup HEALTH CHECK FAILED - Aborting.")
         return 1
-
-    audit_logger.log("system", "startup_success", "All critical health checks passed")
 
     if args.check:
         log.info("Pre-flight check COMPLETE. System is healthy.")
