@@ -52,6 +52,9 @@ class StressScenario(BaseModel):
     # External service stress
     service_failure_prob: float = 0.0  # Probability of 'external service' being down
 
+    # Tail risk events
+    flash_crash_prob: float = 0.0  # Probability of a sudden deep price dislocation
+
 
 class StressTestMetrics(BaseModel):
     """Metrics captured during a stress test run."""
@@ -165,6 +168,34 @@ class StressLab:
             choppy_breakout_prob=0.05,
         )
 
+    @staticmethod
+    def create_flash_crash_scenario() -> StressScenario:
+        """Create a scenario with a violent flash crash event."""
+        return StressScenario(
+            name="Flash Crash",
+            description="Violent price dislocation: sudden deep drop and extreme slippage.",
+            severity=StressSeverity.CRITICAL,
+            flash_crash_prob=0.01,
+            slippage_bps=10.0,
+            slippage_spike_prob=0.2,
+            slippage_spike_magnitude_bps=200.0,
+            spread_multiplier=5.0,
+        )
+
+    def run_standard_suite(self, baseline_metrics: StressTestMetrics) -> ResilienceReport:
+        """Runs the full standard suite of stress tests and returns a report."""
+        scenarios = [
+            self.create_execution_hell_scenario(),
+            self.create_liquidity_crisis_scenario(),
+            self.create_regime_shock_scenario(),
+            self.create_flash_crash_scenario(),
+        ]
+
+        for scenario in scenarios:
+            self.run_scenario(scenario)
+
+        return self.generate_report(baseline_metrics)
+
     def run_scenario(self, scenario: StressScenario) -> StressTestMetrics:
         """
         Executes a specific stress scenario against the loaded strategy and data.
@@ -217,6 +248,10 @@ class StressLab:
                 failure_points.append(f"Strategy becomes unprofitable under {scenario_name}")
             if metrics.sharpe_ratio < baseline_metrics.sharpe_ratio * 0.5:
                 fragility.append(f"Sharpe ratio halved under {scenario_name}")
+            if metrics.latency_impact > 0.1:
+                fragility.append(f"High sensitivity to infrastructure delays in {scenario_name}")
+            if metrics.max_slippage_experienced > 100:
+                fragility.append(f"Extreme slippage sensitivity in {scenario_name}")
 
         return ResilienceReport(
             strategy_name=self.strategy.name,
@@ -328,6 +363,27 @@ class StressLab:
                 else:
                     i += 1
 
+        # 5. Flash Crash (Sudden deep drop and recovery)
+        if scenario.flash_crash_prob > 0:
+            i = 10
+            while i < len(df) - 10:
+                if rng.random() < scenario.flash_crash_prob:
+                    # Deep drop: 5-10 ATRs
+                    drop_size = atr.iloc[i] * rng.uniform(5.0, 10.0)
+                    df.at[df.index[i], "low"] -= drop_size
+                    df.at[df.index[i], "close"] -= drop_size * 0.8
+
+                    # Partial recovery in next 3 candles
+                    for j in range(1, 4):
+                        recovery = drop_size * rng.uniform(0.1, 0.2)
+                        df.at[df.index[i + j], "close"] += recovery
+                        df.at[df.index[i + j], "high"] = max(
+                            df.at[df.index[i + j], "high"], df.at[df.index[i + j], "close"] + 1.0
+                        )
+                    i += 5  # Skip ahead
+                else:
+                    i += 1
+
         return df
 
     def _backtest_with_stress(
@@ -388,28 +444,29 @@ class StressLab:
             if current_sig == 1 and position == 0:  # Buy
                 position = 1
                 entry_price = current_price + (spreads[i] / 2) + slippage
-                cash -= (spreads[i] / 2) + slippage  # Cost of entry
             elif current_sig == -1 and position == 1:  # Close Long
                 exit_price = current_price - (spreads[i] / 2) - slippage
-                trade_pnls.append(exit_price - entry_price)
-                cash += (exit_price - entry_price) - ((spreads[i] / 2) + slippage)  # Realized
+                pnl = exit_price - entry_price
+                trade_pnls.append(pnl)
+                cash += pnl
                 position = 0
             elif current_sig == -1 and position == 0:  # Short
                 position = -1
                 entry_price = current_price - (spreads[i] / 2) - slippage
-                cash -= (spreads[i] / 2) + slippage
             elif current_sig == 1 and position == -1:  # Close Short
                 exit_price = current_price + (spreads[i] / 2) + slippage
-                trade_pnls.append(entry_price - exit_price)
-                cash += (entry_price - exit_price) - ((spreads[i] / 2) + slippage)
+                pnl = entry_price - exit_price
+                trade_pnls.append(pnl)
+                cash += pnl
                 position = 0
 
-            # Update Equity
+            # Update Equity (Mark-to-Market including potential exit cost)
+            exit_cost = (spreads[i] / 2) + slippage
             if position == 1:
-                unrealized = current_price - entry_price
+                unrealized = (current_price - exit_cost) - entry_price
                 equity[i] = cash + unrealized
             elif position == -1:
-                unrealized = entry_price - current_price
+                unrealized = entry_price - (current_price + exit_cost)
                 equity[i] = cash + unrealized
             else:
                 equity[i] = cash
