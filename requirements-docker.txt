@@ -14,7 +14,7 @@
 numpy>=2.2.6,<3
 scipy==1.13.0
 scikit-learn==1.7.2
-pandas==2.2.2
+pandas==2.3.3
 
 # -- Technical Analysis --------------------------------------------
 # Python wrapper version must be compatible with C lib 0.6.4 built in Dockerfile

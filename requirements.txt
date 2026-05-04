@@ -12,7 +12,7 @@ gymnasium==0.29.1
 numpy==2.2.6
 scipy==1.13.0
 scikit-learn==1.6.1
-pandas==3.0.2
+pandas==2.3.3
 
 # ── Deep Learning Extras ────────────────────────────────────
 transformers==5.0.0rc3
