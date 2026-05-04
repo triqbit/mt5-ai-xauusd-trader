@@ -14,6 +14,7 @@ class ValidationError(NamedTuple):
     field: str
     message: str
     critical: bool
+    remedy: str = "N/A"
 
 
 class ValidationResult(NamedTuple):
@@ -49,8 +50,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MT5_LOGIN",
-                    "MT5 login must be a positive integer. Check your .env file.",
+                    "MT5 login must be a positive integer.",
                     True,
+                    "Set MT5_LOGIN in your .env file with your account number.",
                 )
             )
 
@@ -59,8 +61,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MT5_SERVER",
-                    "MT5 server name is missing or using placeholder. Provide your broker's server name.",
+                    "MT5 server name is missing or using placeholder.",
                     True,
+                    "Set MT5_SERVER in your .env (e.g., IC-Markets-Demo).",
                 )
             )
 
@@ -70,8 +73,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MT5_PASSWORD",
-                    "MT5 password is missing or using placeholder. Ensure your MT5 password is set.",
+                    "MT5 password is missing or using placeholder.",
                     True,
+                    "Set MT5_PASSWORD in your .env file.",
                 )
             )
 
@@ -82,8 +86,9 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         "MT5_PATH",
-                        f"MT5 terminal not found at: {mt5_path}. Verify MT5_PATH in .env.",
+                        f"MT5 terminal not found at: {mt5_path}.",
                         True,
+                        "Verify MT5_PATH in .env. Ensure it points to terminal64.exe.",
                     )
                 )
 
@@ -93,9 +98,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MODE",
-                    "LIVE mode detected but CONFIRM_LIVE_TRADING is not set to 'YES'. "
-                    "Safety gate: set CONFIRM_LIVE_TRADING=YES in your environment.",
+                    "LIVE mode detected but not confirmed.",
                     True,
+                    "Set CONFIRM_LIVE_TRADING=YES in your environment for live trading.",
                 )
             )
 
@@ -107,8 +112,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "DATABASE_URL",
-                    "Database URL is using default placeholder credentials. Update DATABASE_URL with a secure password.",
+                    "Database URL is using default placeholder credentials.",
                     True,
+                    "Update DATABASE_URL in .env with a secure password.",
                 )
             )
 
@@ -121,8 +127,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",
-                    "Telegram token contains placeholder text. Replace with your actual bot token.",
+                    "Telegram token contains placeholder text.",
                     True,
+                    "Replace with your actual BotFather token in .env.",
                 )
             )
 
@@ -132,8 +139,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_CHAT_ID",
-                    "Telegram chat ID contains placeholder text. Replace with your actual chat ID.",
+                    "Telegram chat ID contains placeholder text.",
                     True,
+                    "Replace with your actual chat ID in .env.",
                 )
             )
 
@@ -143,8 +151,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "METAAPI_TOKEN",
-                    "MetaAPI token contains placeholder text. Replace with your actual MetaAPI token.",
+                    "MetaAPI token contains placeholder text.",
                     True,
+                    "Replace with your actual MetaAPI token in .env.",
                 )
             )
 
@@ -154,8 +163,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "METAAPI_ACCOUNT_ID",
-                    "MetaAPI account ID contains placeholder text. Replace with your actual MetaAPI account ID.",
+                    "MetaAPI account ID contains placeholder text.",
                     True,
+                    "Replace with your actual MetaAPI account ID in .env.",
                 )
             )
 
@@ -167,9 +177,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MODEL_PATH",
-                    f"Model file not found at: {self.config.model_path}. "
-                    "Ensure the model is trained and path is correct.",
+                    f"Model file not found at: {self.config.model_path}.",
                     True,
+                    "Ensure the model is trained or point MODEL_PATH to a valid .pt file.",
                 )
             )
 
@@ -181,16 +191,18 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds the absolute maximum of 2%.",
+                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds 2%.",
                     True,
+                    "Reduce RISK_PER_TRADE to 0.02 (2%) or less.",
                 )
             )
         elif self.config.risk_per_trade > 0.01:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds the policy limit of 1%.",
+                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds policy limit of 1%.",
                     False,  # Non-critical warning
+                    "Consider reducing RISK_PER_TRADE to 0.01 (1%) for better risk parity.",
                 )
             )
 
@@ -200,16 +212,18 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds hard stop of 6%.",
+                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 6%.",
                     True,
+                    "Reduce MAX_DAILY_LOSS to 0.06 or less.",
                 )
             )
         elif self.config.max_daily_loss > 0.05:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds emergency stop limit of 5%.",
+                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% limit.",
                     False,
+                    "Set MAX_DAILY_LOSS to 0.05 for compliance with enterprise standards.",
                 )
             )
 
@@ -218,16 +232,18 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "CONFIDENCE_THRESHOLD",
-                    f"Confidence threshold {self.config.confidence_threshold} is dangerously low (Min: 0.50).",
+                    f"Confidence threshold {self.config.confidence_threshold} is dangerously low.",
                     True,
+                    "Set CONFIDENCE_THRESHOLD to at least 0.50.",
                 )
             )
         elif self.config.confidence_threshold < 0.55:
             self.errors.append(
                 ValidationError(
                     "CONFIDENCE_THRESHOLD",
-                    f"Confidence threshold {self.config.confidence_threshold} is below the recommended 0.55.",
+                    f"Confidence threshold {self.config.confidence_threshold} is below recommended 0.55.",
                     False,
+                    "Increase CONFIDENCE_THRESHOLD to 0.55 for better signal quality.",
                 )
             )
 
@@ -237,16 +253,18 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
-                    f"Maximum positions {self.config.max_positions} is strictly prohibited (Limit: 5).",
+                    f"Maximum positions {self.config.max_positions} is prohibited.",
                     True,
+                    "Set MAX_POSITIONS to 10 or less.",
                 )
             )
         elif self.config.max_positions > 5:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
-                    f"Maximum positions {self.config.max_positions} exceeds the standard policy limit of 5.",
+                    f"Maximum positions {self.config.max_positions} exceeds limit of 5.",
                     False,
+                    "Reduce MAX_POSITIONS to 5 or less for production safety.",
                 )
             )
 
@@ -255,8 +273,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MODEL_DRIFT_THRESHOLD",
-                    f"Model drift threshold {self.config.model_drift_threshold} is dangerously high (Recommended: 0.3).",
+                    f"Model drift threshold {self.config.model_drift_threshold} is too high.",
                     False,
+                    "Set MODEL_DRIFT_THRESHOLD to 0.3 or lower.",
                 )
             )
 
@@ -264,8 +283,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MODEL_ACCURACY_FLOOR",
-                    f"Model accuracy floor {self.config.model_accuracy_floor} is too low (Min: 0.45).",
+                    f"Model accuracy floor {self.config.model_accuracy_floor} is too low.",
                     True,
+                    "Set MODEL_ACCURACY_FLOOR to 0.45 or higher.",
                 )
             )
 
@@ -273,8 +293,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MODEL_WIN_RATE_FLOOR",
-                    f"Model win rate floor {self.config.model_win_rate_floor} is dangerously low (Min: 0.40).",
+                    f"Model win rate floor {self.config.model_win_rate_floor} is too low.",
                     True,
+                    "Set MODEL_WIN_RATE_FLOOR to 0.40 or higher.",
                 )
             )
 
@@ -285,8 +306,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "LOG_LEVEL",
-                    "DEBUG logging in LIVE mode can cause performance degradation and log flooding.",
+                    "DEBUG logging in LIVE mode is discouraged.",
                     False,
+                    "Set LOG_LEVEL=INFO for live trading to avoid performance issues.",
                 )
             )
 
@@ -294,8 +316,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
-                    "Maximum positions > 5 is strictly prohibited in LIVE mode for capital safety.",
+                    "Max positions > 5 is prohibited in LIVE mode.",
                     True,
+                    "Set MAX_POSITIONS to 5 or less for live mode.",
                 )
             )
 
@@ -304,8 +327,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "METAAPI_ACCOUNT_ID",
-                    "MetaAPI account ID is required when MetaAPI token is provided.",
+                    "MetaAPI account ID is missing.",
                     True,
+                    "Provide METAAPI_ACCOUNT_ID in .env alongside your token.",
                 )
             )
 
@@ -313,8 +337,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "METAAPI_TOKEN",
-                    "MetaAPI token is required when MetaAPI account ID is provided.",
+                    "MetaAPI token is missing.",
                     True,
+                    "Provide METAAPI_TOKEN in .env alongside your account ID.",
                 )
             )
 
@@ -323,8 +348,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_CHAT_ID",
-                    "Telegram chat ID is required when Telegram token is provided.",
+                    "Telegram chat ID is missing.",
                     True,
+                    "Provide TELEGRAM_CHAT_ID in .env alongside your bot token.",
                 )
             )
 
@@ -332,8 +358,9 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",
-                    "Telegram token is required when Telegram chat ID is provided.",
+                    "Telegram token is missing.",
                     True,
+                    "Provide TELEGRAM_TOKEN in .env alongside your chat ID.",
                 )
             )
 
@@ -342,7 +369,8 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",
-                    "Telegram notifications should be disabled in backtest mode to avoid spam.",
+                    "Telegram notifications are active in backtest mode.",
                     False,
+                    "Comment out TELEGRAM_TOKEN during backtests to avoid noise.",
                 )
             )

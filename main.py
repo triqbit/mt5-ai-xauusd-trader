@@ -404,23 +404,45 @@ def main() -> int:
     try:
         cfg = get_config()
     except Exception as exc:
-        log.critical("Failed to load configuration: %s", exc)
+        # Check if it's a Pydantic validation error (usually missing required fields)
+        if "validation error" in str(exc).lower():
+            console.print(Panel(
+                "[bold red]Configuration Error:[/]\n\n"
+                "One or more required environment variables are missing.\n"
+                "Please ensure you have a [bold].env[/] file in the project root.\n\n"
+                "Quick Fix:\n"
+                "1. Copy [cyan].env.example[/] to [cyan].env[/]\n"
+                "2. Fill in your [bold]MT5_PASSWORD[/] and [bold]MT5_SERVER[/]\n\n"
+                f"[dim]Technical details: {exc}[/]",
+                title="[bold red]Bootstrap Failure[/]",
+                border_style="red"
+            ))
+        else:
+            log.critical("Failed to load configuration: %s", exc)
         return 1
 
     # Validate configuration
     validator = ConfigValidator(cfg)
     result = validator.validate()
 
-    if not result.success:
-        log.critical("Startup validation FAILED")
-        for err in result.errors:
-            level = "CRITICAL" if err.critical else "WARNING"
-            log.error(f"  [{level}] {err.field}: {err.message}")
-        return 1
-
     if result.errors:
+        validation_table = Table(title="[bold yellow]Startup Configuration Validation[/]", box=None)
+        validation_table.add_column("Field", style="cyan")
+        validation_table.add_column("Status", justify="center")
+        validation_table.add_column("Message")
+        validation_table.add_column("Suggested Fix", style="green")
+
         for err in result.errors:
-            log.warning(f"  [WARNING] {err.field}: {err.message}")
+            status = "[bold red]CRITICAL[/]" if err.critical else "[bold yellow]WARNING[/]"
+            validation_table.add_row(err.field, status, err.message, err.remedy)
+
+        console.print(validation_table)
+
+        if not result.success:
+            log.critical("Startup validation FAILED - One or more critical configuration errors found.")
+            return 1
+        else:
+            log.warning("Startup validation passed with warnings.")
 
     # ── Startup Summary ────────────────────────────────────────────────────────
     summary = Table.grid(expand=True)
@@ -479,8 +501,8 @@ def main() -> int:
         )
     )
 
-    # Model Factory based on --algo flag
-    if args.algo == "ensemble":
+    # Model Factory based on configured algorithm
+    if cfg.algorithm == "ensemble":
         model = EnsembleModel(device="cpu")
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         lstm_path = args.model_dir / "lstm_xauusd.pt"
@@ -488,15 +510,16 @@ def main() -> int:
             model.load_ppo(ppo_path)
         if lstm_path.exists():
             model.load_lstm(lstm_path)
-    elif args.algo == "ppo":
+    elif cfg.algorithm == "ppo":
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
-    elif args.algo == "lstm":
+    elif cfg.algorithm == "lstm":
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
     else:
+        # This branch should rarely be hit if Literal choices are enforced by Pydantic
         log.warning(
-            f"Algorithm {args.algo} not fully supported in main.py, falling back to Ensemble"
+            f"Algorithm {cfg.algorithm} not fully supported in main.py factory, falling back to Ensemble"
         )
         model = EnsembleModel(device="cpu")
 
