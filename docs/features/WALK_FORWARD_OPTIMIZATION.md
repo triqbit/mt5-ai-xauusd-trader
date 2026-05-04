@@ -17,9 +17,11 @@ Rather than simply maximizing total return or Sharpe ratio, the framework uses a
 
 The Robustness Score is composed of:
 - **OOS Sharpe Mean:** The average Sharpe ratio across all out-of-sample windows.
+- **Worst Window Sharpe:** Performance in the single worst OOS window, ensuring "no blow-up" scenarios.
+- **Consistency Metrics:** Rewards stable win rates and drawdowns across windows.
 - **OOS Sharpe Std (Penalty):** Penalizes high variance in performance across windows.
 - **IS-OOS Gap (Penalty):** Penalizes significant performance drops between in-sample and out-of-sample data, a key indicator of overfitting.
-- **Stability Penalty:** Measures sensitivity to small parameter changes (continuous perturbation).
+- **Stability Penalty:** Measures sensitivity to small parameter changes (continuous perturbation) using disciplined training-only evaluation.
 - **Regime Consistency:** Rewards strategies that perform consistently across different detected market regimes (Trending, Ranging, Volatile, etc.).
 
 ### 3. Parameter Stability Analysis
@@ -37,6 +39,7 @@ The `WalkForwardConfig` model allows for granular control:
 | `min_windows` | Minimum required windows | 3 |
 | `metric` | Optimization target (e.g., `robustness_score`, `sharpe`) | `robustness_score` |
 | `n_trials` | Optuna trials per optimization | 50 |
+| `bars_per_year` | Bars per year for annualization | 252 |
 
 ## Usage Example
 

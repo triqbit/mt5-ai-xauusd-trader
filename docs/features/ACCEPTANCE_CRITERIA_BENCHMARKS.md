@@ -28,6 +28,7 @@ This document outlines the acceptance criteria and usage for the benchmarking fr
 - [x] Evaluator correctly calculates metrics from synthetic OHLCV data.
 - [x] Model adapters support rolling window lookbacks for sequence-dependent models.
 - [x] Comparison logic provides t-statistic and p-value for significance testing.
+- [x] Support for timeframe-specific annualization via `bars_per_year`.
 - [x] Documentation includes all advanced risk-adjusted metrics.
 - [x] Linting passes (Ruff).
 - [x] Unit tests in `tests/test_benchmarks.py` pass.
