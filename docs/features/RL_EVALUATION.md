@@ -11,10 +11,14 @@ The RL Evaluation Framework provides institutional-grade metrics to assess reinf
 - **Expectancy**: Expected profit per trade based on historical performance.
 - **Profit Factor**: Ratio of gross profit to gross loss.
 - **Stability Score (R-squared)**: Measures the linearity of the equity curve, indicating consistency of returns.
+- **Value at Risk (VaR 95%)**: Estimate of the maximum potential loss at a 95% confidence level.
+- **Conditional VaR (CVaR 95%)**: Average loss beyond the VaR threshold.
+- **Skewness & Kurtosis**: Higher-order moments of the return distribution to detect tail risk and asymmetry.
 
 ### 2. Turnover Analysis
 - **Trade Frequency**: Number of trades per 1000 steps.
 - **Average Hold Time**: Duration of positions in steps.
+- **Max/Min Hold Time**: Extreme durations of held positions.
 - **Turnover Ratio**: Total traded volume relative to initial balance.
 
 ### 3. Drawdown Behavior
@@ -30,6 +34,7 @@ The RL Evaluation Framework provides institutional-grade metrics to assess reinf
 - **Gross PnL**: Total profit before costs.
 - **Net PnL**: Profit after commissions.
 - **Commission Drag**: Percentage impact of execution costs on gross returns.
+- **Profit Concentration**: Ratio of the top 10% of trades to total net profit, identifying over-reliance on outlier trades.
 
 ## Usage
 

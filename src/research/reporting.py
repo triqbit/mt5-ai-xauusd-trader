@@ -120,6 +120,9 @@ class RLMetric(BaseModel):
     profit_factor: float
     max_dd: float
     win_rate: float
+    calmar: float = 0.0
+    stability_score: float = 0.0
+    var_95: float = 0.0
 
 class RLSection(BaseModel):
     comparison_summary: str
