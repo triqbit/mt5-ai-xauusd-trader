@@ -47,6 +47,7 @@ def test_check_flag_exits_early():
          patch("main.configure_logging"), \
          patch("src.trading.mt5_connector.MT5Connector.connect", return_value=True), \
          patch("src.trading.mt5_connector.MT5Connector.disconnect"), \
+         patch("src.core.config_validator.ConfigValidator.validate") as mock_validate, \
          patch("src.core.health.HealthChecker.get_full_report") as mock_report, \
          patch.dict(os.environ, {
              "MT5_LOGIN": "123456",
@@ -54,6 +55,9 @@ def test_check_flag_exits_early():
              "MT5_SERVER": "ValidServer",
              "DATABASE_URL": "postgresql://user:pass@localhost/db"
          }):
+
+        from src.core.config_validator import ValidationResult
+        mock_validate.return_value = ValidationResult(success=True, errors=[])
 
         from src.core.health import HealthReport, HealthStatus
         mock_report.return_value = HealthReport(

@@ -82,7 +82,8 @@ class EnsembleModel(BaseModel):
             logger.warning("PyTorch not found. Cannot load LSTM.")
             return
         model = LSTMAttentionModel(n_features=n_features).to(self.device)
-        state = torch.load(str(path), map_location=self.device)
+        # Security: use weights_only=True to prevent arbitrary code execution
+        state = torch.load(str(path), map_location=self.device, weights_only=True)
         model.load_state_dict(state)
         model.eval()
         self.lstm_model = model
