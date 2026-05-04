@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Report a bug to help us improve.
+description: Report a bug to help us improve system reliability.
 labels: ["bug", "triage"]
 body:
   - type: markdown
@@ -18,12 +18,12 @@ body:
     id: severity
     attributes:
       label: Severity
-      description: How critical is this issue to trading operations?
+      description: How critical is this issue to trading operations? (Aligned with SLO Targets)
       options:
-        - Critical (Trading blocked / Capital at risk)
-        - High (Core feature broken / Operational degradation)
-        - Medium (Non-critical feature broken)
-        - Low (UI/UX or minor issue)
+        - P0: Critical (Trading blocked / Capital at risk / Production outage)
+        - P1: High (Core feature broken / Significant operational degradation)
+        - P2: Medium (Non-critical feature broken / Performance degradation)
+        - P3: Low (UI/UX / Minor issue / Enhancement suggestion)
     validations:
       required: true
   - type: textarea
@@ -60,10 +60,9 @@ body:
       label: Steps to Reproduce
       description: Steps to reproduce the behavior.
       placeholder: |
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
+        1. Start the bot with `python main.py ...`
+        2. Wait for a trade signal...
+        3. Observe the error in the logs...
     validations:
       required: true
   - type: textarea
@@ -77,7 +76,7 @@ body:
     id: logs
     attributes:
       label: Relevant Log Output
-      description: Please provide relevant logs to help us diagnose the issue.
+      description: Please provide relevant logs (ensure secrets are redacted).
       render: shell
     validations:
       required: true
