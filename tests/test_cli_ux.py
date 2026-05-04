@@ -85,15 +85,18 @@ def test_mt5_connection_troubleshooting_tips(caplog):
     caplog.set_level(logging.INFO)
 
     with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), \
-         patch("src.trading.mt5_connector.mt5") as mock_mt5:
+         patch("src.trading.mt5_connector.mt5") as mock_mt5, \
+         patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False):
 
         # Simulate 'Terminal not found' error
         mock_mt5.initialize.return_value = False
         mock_mt5.last_error.return_value = (-5, "Terminal not found")
         mock_mt5.RES_E_NOT_FOUND = -5
 
+        from src.core.exceptions import MT5ConnectionError
         connector = MT5Connector(mock_cfg)
-        connector.initialize()
+        with pytest.raises(MT5ConnectionError):
+            connector.initialize()
 
         assert "TIP: MT5 terminal not found" in caplog.text
         assert "Check if MT5_PATH is correct" in caplog.text
