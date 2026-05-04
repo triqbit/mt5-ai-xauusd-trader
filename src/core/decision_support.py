@@ -13,8 +13,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from src.core.constants import SignalDirection
 from src.core.explainability import SignalExplainer, SignalExplanation
 from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo
@@ -38,8 +39,12 @@ class DecisionPacket(BaseModel):
     Aggregates all critical dimensions of a trading decision.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     symbol: str = Field(..., description="Target trading symbol")
+    direction: SignalDirection = Field(..., description="Final signal direction")
+    consensus: str = Field(..., description="Qualitative model consensus level")
     is_executable: bool = Field(False, description="Final decision on whether the trade should proceed")
     blocking_reasons: List[str] = Field(default_factory=list, description="List of reasons if the trade is blocked")
 
@@ -48,9 +53,6 @@ class DecisionPacket(BaseModel):
     regime: RegimeInfo = Field(..., description="Current market regime context")
     macro_risk: RiskStatus = Field(..., description="Macroeconomic event risk status")
     performance: PerformanceContext = Field(..., description="Recent performance context")
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class DecisionSupportSystem:
@@ -100,8 +102,13 @@ class DecisionSupportSystem:
             total_trades=int(performance_metrics.get("total_trades", 0)),
         )
 
+        # Calculate Consensus
+        consensus = self._calculate_consensus(explanation)
+
         return DecisionPacket(
             symbol=symbol,
+            direction=explanation.direction,
+            consensus=consensus,
             is_executable=is_executable,
             blocking_reasons=blocking_reasons,
             explanation=explanation,
@@ -109,6 +116,30 @@ class DecisionSupportSystem:
             macro_risk=macro_risk,
             performance=performance,
         )
+
+    def _calculate_consensus(self, explanation: SignalExplanation) -> str:
+        """
+        Determine the level of agreement among ensemble models.
+        """
+        if not explanation.model_attributions:
+            return "No Votes"
+
+        votes = [attr.vote for attr in explanation.model_attributions]
+        total_models = len(votes)
+
+        direction = explanation.direction
+        matching_votes = sum(1 for v in votes if v == direction)
+
+        agreement_pct = matching_votes / total_models
+
+        if agreement_pct >= 1.0:
+            return "Unanimous"
+        elif agreement_pct >= 0.66:
+            return "Strong Majority"
+        elif agreement_pct >= 0.5:
+            return "Mixed Confluence"
+        else:
+            return "Divided/Weak"
 
     def format_for_operator(self, packet: DecisionPacket, console: Optional[Any] = None) -> str:
         """
@@ -129,10 +160,15 @@ class DecisionSupportSystem:
             status_color = "green" if packet.is_executable else "red"
             status_text = "EXECUTE" if packet.is_executable else "BLOCKED"
 
+            dir_color = "green" if packet.direction == SignalDirection.BUY else "red" if packet.direction == SignalDirection.SELL else "yellow"
+
             header_content = Text()
-            header_content.append(f"SYMBOL: {packet.symbol}\n", style="bold")
+            header_content.append(f"SYMBOL: {packet.symbol}  ", style="bold")
+            header_content.append(f"DIRECTION: {packet.direction.name}\n", style=f"bold {dir_color}")
             header_content.append("STATUS: ", style="bold")
             header_content.append(status_text, style=f"bold {status_color}")
+            header_content.append("  |  CONSENSUS: ", style="bold")
+            header_content.append(packet.consensus.upper(), style="bold cyan")
 
             if packet.blocking_reasons:
                 header_content.append("\n\nBLOCKING REASONS:\n", style="bold red")

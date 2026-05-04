@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from src.core.decision_support import DecisionSupportSystem, DecisionPacket, PerformanceContext
-from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment
+from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment, ModelAttribution
 from src.core.constants import SignalDirection
 from src.models.regime_detector import RegimeInfo, MarketRegime
 from src.data.event_intelligence import RiskStatus, MacroEvent, EventCategory, EventImpact
@@ -75,6 +75,12 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
         "total_trades": 100
     }
 
+    # Setup some model attributions for consensus
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="PPO", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
+        ModelAttribution(model_name="LSTM", vote=SignalDirection.BUY, confidence=0.7, weight=0.5)
+    ]
+
     packet = dss.assemble_packet(
         symbol="XAUUSD",
         explanation=mock_explanation,
@@ -84,10 +90,49 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
     )
 
     assert packet.symbol == "XAUUSD"
+    assert packet.direction == SignalDirection.BUY
+    assert packet.consensus == "Unanimous"
     assert packet.is_executable is True
     assert len(packet.blocking_reasons) == 0
     assert packet.performance.sharpe_ratio == 1.5
     assert packet.performance.total_trades == 100
+
+
+def test_consensus_logic():
+    dss = DecisionSupportSystem()
+    mock_exp = MagicMock(spec=SignalExplanation)
+    mock_exp.direction = SignalDirection.BUY
+
+    # 1. Unanimous
+    mock_exp.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
+        ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.5)
+    ]
+    assert dss._calculate_consensus(mock_exp) == "Unanimous"
+
+    # 2. Strong Majority
+    mock_exp.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.33),
+        ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.33),
+        ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.33)
+    ]
+    assert dss._calculate_consensus(mock_exp) == "Strong Majority"
+
+    # 3. Mixed Confluence
+    mock_exp.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.5)
+    ]
+    assert dss._calculate_consensus(mock_exp) == "Mixed Confluence"
+
+    # 4. Divided/Weak
+    mock_exp.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.25),
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.25),
+        ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.25),
+        ModelAttribution(model_name="M4", vote=SignalDirection.HOLD, confidence=0.5, weight=0.25)
+    ]
+    assert dss._calculate_consensus(mock_exp) == "Divided/Weak"
 
 
 def test_assemble_packet_blocked_by_macro(mock_explanation, mock_regime, mock_macro_risk):
