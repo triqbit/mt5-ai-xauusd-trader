@@ -25,6 +25,7 @@ If using Docker Compose:
    ```bash
    docker pull triqbit/mt5-trader:v1.2.2
    docker stop mt5-trader
+   docker rm mt5-trader
    docker run -d --name mt5-trader --env-file .env triqbit/mt5-trader:v1.2.2
    ```
 

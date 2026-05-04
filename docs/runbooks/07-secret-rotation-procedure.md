@@ -19,7 +19,7 @@ This runbook describes the procedure for rotating critical secrets and API crede
 ### 1. MT5 Password Rotation
 1. Change the password in the Broker's client portal.
 2. Update the `.env` file on the production server.
-3. Validate the environment: `python scripts/validate_env.py`.
+3. Validate the environment for placeholder detection: `python scripts/validate_env.py`.
 4. Restart the bot: `docker restart mt5-trader`.
 
 ### 2. MetaAPI Token Rotation
