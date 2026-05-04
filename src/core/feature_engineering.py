@@ -153,12 +153,16 @@ class FeatureEngineer:
     def _get_technical_indicators(self, df: pd.DataFrame, prefix: str) -> pd.DataFrame:
         """Compute standard technical indicators."""
         indicators = {}
-        close = df["close"].values
-        high = df["high"].values
-        low = df["low"].values
+        close = df["close"].values.astype(np.float64)
+        high = df["high"].values.astype(np.float64)
+        low = df["low"].values.astype(np.float64)
+        volume = df["tick_volume"].values.astype(np.float64)
 
         # Momentum
         indicators[f"{prefix}_rsi"] = talib.RSI(close, timeperiod=14)
+        indicators[f"{prefix}_mfi"] = talib.MFI(high, low, close, volume, timeperiod=14)
+        indicators[f"{prefix}_cci"] = talib.CCI(high, low, close, timeperiod=14)
+        indicators[f"{prefix}_mom"] = talib.MOM(close, timeperiod=10)
 
         macd, macdsignal, macdhist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
         indicators[f"{prefix}_macd"] = macd
@@ -270,14 +274,18 @@ class FeatureEngineer:
         volume = df["tick_volume"]
 
         vol["vol_sma_20"] = volume / volume.rolling(window=20).mean().replace(0, 1e-8)
+        vol["rvol"] = vol["vol_sma_20"]  # Canonical RVOL
         vol["obv"] = talib.OBV(close.values, volume.values.astype(float))
 
         # VWAP Approximation (Rolling)
         typical_price = (high + low + close) / 3
-        vol["vwap_20"] = (typical_price * volume).rolling(window=20).sum() / volume.rolling(
-            window=20
-        ).sum().replace(0, 1e-8)
-        vol["dist_vwap_20"] = (close - vol["vwap_20"]) / vol["vwap_20"].replace(0, 1e-8)
+        for period in [20, 50, 100]:
+            vol[f"vwap_{period}"] = (typical_price * volume).rolling(
+                window=period
+            ).sum() / volume.rolling(window=period).sum().replace(0, 1e-8)
+            vol[f"dist_vwap_{period}"] = (close - vol[f"vwap_{period}"]) / vol[
+                f"vwap_{period}"
+            ].replace(0, 1e-8)
 
         # Volume Price Trend (VPT)
         vol["vpt"] = (volume * close.pct_change().fillna(0)).cumsum()

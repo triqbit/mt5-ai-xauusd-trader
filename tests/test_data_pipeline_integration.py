@@ -31,6 +31,9 @@ mock_talib.EMA.side_effect = default_talib_effect
 mock_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
 mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
 mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+mock_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+mock_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
 mock_talib.get_function_groups.return_value = {"Pattern Recognition": []}
 
 # Setup the system modules with our mocks BEFORE importing src components
@@ -75,6 +78,9 @@ def setup_mock_talib(m_talib):
     m_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
     m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
     m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+    m_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+    m_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
     m_talib.get_function_groups.return_value = {"Pattern Recognition": []}
 
 def test_data_to_model_inference_flow(data_generator, feature_engineer, mock_ensemble):
