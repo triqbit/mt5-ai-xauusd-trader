@@ -113,6 +113,9 @@ class TradingConfig(BaseSettings):
     model_win_rate_floor: float = Field(
         default=0.45, ge=0.4, le=0.7, description="Minimum allowed historical win rate before halting trades"
     )
+    data_freshness_threshold: int = Field(
+        default=300, ge=60, description="Maximum age of market data in seconds before alerting"
+    )
 
     @field_validator("risk_per_trade")
     @classmethod
