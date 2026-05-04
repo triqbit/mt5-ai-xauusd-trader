@@ -3,6 +3,7 @@ import sys
 
 import pytest
 
+from pydantic import ValidationError
 from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
 
@@ -377,3 +378,36 @@ def test_validator_confidence_threshold(monkeypatch, tmp_path):
     result = ConfigValidator(cfg).validate()
     assert result.success is True
     assert any(e.field == "CONFIDENCE_THRESHOLD" and not e.critical for e in result.errors)
+
+def test_validator_new_risk_params(monkeypatch, tmp_path):
+    """Test validator for newly added risk parameters."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Test circuit breaker too high (Pydantic level check)
+    monkeypatch.setenv("CIRCUIT_BREAKER_THRESHOLD", "0.26")
+    with pytest.raises(ValidationError):
+        TradingConfig()
+
+    # Test circuit breaker logic in ConfigValidator (if pydantic lets it through somehow,
+    # e.g. if we didn't have le=0.25 on the field but the validator has its own check)
+    # But since Pydantic has it, we just verify it raises.
+
+    monkeypatch.setenv("CIRCUIT_BREAKER_THRESHOLD", "0.15")
+    # Test R:R too low
+    monkeypatch.setenv("MIN_RISK_REWARD", "0.9")
+    with pytest.raises(ValidationError):
+        TradingConfig()
+
+    # Test consecutive loss limit warning
+    monkeypatch.setenv("MIN_RISK_REWARD", "1.5")
+    monkeypatch.setenv("CONSECUTIVE_LOSS_LIMIT", "6")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
+    assert any(e.field == "CONSECUTIVE_LOSS_LIMIT" and not e.critical for e in result.errors)

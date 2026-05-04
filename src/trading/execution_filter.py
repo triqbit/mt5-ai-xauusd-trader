@@ -39,9 +39,15 @@ class ExecutionFilter:
     Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown.
     """
 
-    def __init__(self, max_drawdown: float = 0.15, rsi_period: int = 14):
+    def __init__(
+        self,
+        max_drawdown: float = 0.15,
+        rsi_period: int = 14,
+        atr_multiplier: float = 3.0,
+    ):
         self.max_drawdown = max_drawdown
         self.rsi_period = rsi_period
+        self.atr_multiplier = atr_multiplier
 
     def validate(
         self,
@@ -81,8 +87,9 @@ class ExecutionFilter:
 
         return ExecutionDecision(signal, True, signal.confidence)
 
-    def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
+    def _check_atr_volatility(self, df: pd.DataFrame) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""
+        threshold = self.atr_multiplier
         if "base_M5_atr" not in df.columns:
             # Fallback calculation if not in DF
             high = df["high"]
