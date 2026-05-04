@@ -24,6 +24,7 @@ from src.research.benchmarks import (
     MomentumStrategy,
     NaiveDirectionalStrategy,
     PPOAdapter,
+    RandomStrategy,
     RiskFilteredBaseline,
     TransformerAdapter,
     VolatilityBreakoutStrategy,
@@ -222,3 +223,20 @@ def test_dreamer_adapter(sample_data):
     assert np.all(signals == -1.0)
     assert mock_agent.predict.call_count == len(sample_data)
     assert mock_agent.reset_state.called
+
+
+def test_random_strategy_signals(sample_data):
+    strategy = RandomStrategy(seed=42)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [-1, 0, 1]))
+
+    # Test reproducibility
+    s2 = RandomStrategy(seed=42)
+    signals2 = s2.predict(sample_data)
+    assert np.array_equal(signals, signals2)
+
+    # Test different seed
+    s3 = RandomStrategy(seed=43)
+    signals3 = s3.predict(sample_data)
+    assert not np.array_equal(signals, signals3)

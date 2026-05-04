@@ -164,6 +164,22 @@ class MeanReversionStrategy:
         return signals
 
 
+class RandomStrategy:
+    """Random signal baseline (Null Hypothesis)."""
+
+    def __init__(self, seed: int = 42):
+        self.seed = seed
+
+    @property
+    def name(self) -> str:
+        return f"Random_Baseline_seed_{self.seed}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        rng = np.random.default_rng(self.seed)
+        # Generate random signals: -1 (Sell), 0 (Hold), 1 (Buy)
+        return rng.choice([-1, 0, 1], size=len(df))
+
+
 class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
