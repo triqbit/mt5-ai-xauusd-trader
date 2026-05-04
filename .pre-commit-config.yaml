@@ -51,3 +51,10 @@ repos:
         name: pip-audit (dependency safety)
         args:
           - --requirement=requirements-ci.txt
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: []

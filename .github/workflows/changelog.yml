@@ -8,6 +8,7 @@ on:
       - 'CHANGELOG.md'
       - 'docs/**'
       - '*.md'
+      - '.jules/**'
 
 permissions:
   contents: write
@@ -27,8 +28,6 @@ jobs:
         uses: Conventional-Changelog/github-action-generate-changelog@v1
         with:
           path-to-changelog: CHANGELOG.md
-          # This action by default updates the Unreleased section if no tag is provided
-          # or appends to the top.
 
       - name: Commit and Push Changelog
         run: |
@@ -36,6 +35,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md
           if ! git diff --cached --quiet; then
+            # Use [skip ci] to avoid infinite loops
             git commit -m "docs: update CHANGELOG.md [skip ci]"
             git push origin main
           else

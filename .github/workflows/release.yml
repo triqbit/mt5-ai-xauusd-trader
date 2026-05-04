@@ -219,25 +219,34 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           DATE=$(date +%Y-%m-%d)
 
+          echo "Synchronizing version $VERSION across artifacts..."
+
           # Update pyproject.toml
           sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
 
-          # Update src/__init__.py if it exists
+          # Update src/__init__.py
           if [ -f "src/__init__.py" ]; then
             sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" src/__init__.py
           fi
 
-          # Transition [Unreleased] to Versioned in CHANGELOG.md
+          # Transition [Unreleased] to versioned entry in CHANGELOG.md
+          # This rotates the [Unreleased] section into a specific version header
           if grep -q "## \[Unreleased\]" CHANGELOG.md; then
             sed -i "s/## \[Unreleased\]/## [Unreleased]\n\n## [${VERSION}] - ${DATE}/" CHANGELOG.md
+          else
+            echo "::error::CHANGELOG.md is missing ## [Unreleased] header. Cannot automate release notes."
+            exit 1
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add pyproject.toml src/__init__.py CHANGELOG.md
+
           if ! git diff --cached --quiet; then
-            git commit -m "chore: release v${VERSION} [skip ci]"
+            git commit -m "chore: bump version to v${VERSION} [skip ci]"
             git push origin main
+          else
+            echo "No version changes detected in source files."
           fi
 
       - name: Create Git Tag (if manual)

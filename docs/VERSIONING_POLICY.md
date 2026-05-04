@@ -78,6 +78,8 @@ Indicate a breaking change by adding a `!` after the type/scope or by adding `BR
 | **New Strategy** | MINOR | `feat: add trend-following ensemble model` |
 | **Bug Fix** | PATCH | `fix: correct ATR calculation window` |
 | **Dependency Update** | PATCH | `chore(deps): bump ruff to 0.4.3` |
+| **Performance Gain** | PATCH | `perf: optimize signal processing loop` |
+| **Doc Improvement** | PATCH | `docs: update disaster recovery runbook` |
 
 ---
 **Policy Owner:** Jules03 (Release Reliability & Governance)

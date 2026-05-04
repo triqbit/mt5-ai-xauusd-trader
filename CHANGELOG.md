@@ -8,27 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Enterprise-grade semantic versioning policy (`docs/VERSIONING_POLICY.md`).
+- Automated changelog generation via GitHub Actions (`.github/workflows/changelog.yml`).
+- Version bump automation integrated into release orchestration.
 - **Enterprise Monitoring System:** Implemented real-time equity curve tracking, Prometheus metrics, and automated Telegram bot alerts for circuit breakers and model health in `src/core/monitor.py`.
 - **Institutional Capital Allocation:** Implemented a multi-strategy budget management system with concentration limits and performance-based scaling in `src/trading/capital_allocator.py`.
 - **Vectorized Backtesting v2:** Enhanced the walk-forward backtesting engine with vectorized trade execution and performance metrics in `src/research/hyperopt_walkforward.py`.
 - **Market Regime Detection:** Statistical market state classifier for XAUUSD (Trending, Ranging, News Shock, etc.) in `src/models/regime_detector.py`.
 - **Institutional Feature Engineering:** Scalable pipeline for 190+ technical indicators with multi-timeframe support in `src/core/feature_engineering.py`.
 - **CI Quality Gates:** Mandatory Mypy type enforcement and Docker dependency harmonization for enterprise stability.
-- **Versioning Policy:** Defined comprehensive SemVer criteria and automated release workflows in `docs/VERSIONING_POLICY.md`.
-- **Automated Changelog:** Integrated conventional commit-based changelog updates in `.github/workflows/changelog.yml`.
 - **Enterprise Contribution Governance:** Established comprehensive controls including `CODEOWNERS`, a robust PR template with quality gates, and structured issue forms for bugs, features, and security reports.
 - **Contributor Workflow:** Formally defined role-based governance and mandatory quality gates (85% coverage) in `docs/CONTRIBUTING.md`.
 
 ### Changed
 - Rebalanced the 6-layer execution filter in `src/trading/execution_filter.py` with refined trend angle thresholds.
 - Standardized `BaseModel` and `Signal` interfaces across all institutional models.
-- Enhanced release orchestration logic to automate version bumping and changelog transitions.
 
 ### Fixed
 - Resolved critical import errors and synchronized CI dependencies across 18 files.
-- Optimized rolling slope calculations and row access in benchmark adapters (2000x speedup).
-- Dependency conflict in CI by updating `gymnasium` version constraint.
-- Unused `Dict` imports in `src/models/lstm_model.py` and `src/models/ppo_agent.py`.
+- Optimized rolling slope calculations and row access in benchmark adapters.
 
 ## [1.1.0-rc1] - 2024-05-02
 ### Added
@@ -96,13 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Execution cost tracking (slippage + half-spread).
 - Automated timezone handling for accurate market data comparisons.
 - Comprehensive unit tests for execution quality in `tests/test_execution_quality.py`.
-
-### Changed
-- Refactored release orchestration to integrate automated versioning logic.
-
-### Fixed
-- Dependency conflict in CI by updating `gymnasium` version constraint.
-- Unused `Dict` imports in `src/models/lstm_model.py` and `src/models/ppo_agent.py`.
 
 ## [1.0.0] - 2024-05-24
 ### Added

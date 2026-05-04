@@ -1,0 +1,42 @@
+name: Conventional Commits Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    name: Validate Commit Message
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Conventional Commits Check
+        uses: amannn/action-semantic-pull-request@v5
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate Push Commits
+        if: github.event_name == 'push'
+        run: |
+          # Simple regex check for conventional commits on push to main
+          # format: type(scope): description or type: description
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -qE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)((\(.+\))?): .+" || echo "$COMMIT_MSG" | grep -q "\[skip ci\]"; then
+            echo "Commit message follows conventional commits or is a skip ci commit."
+          else
+            echo "Error: Commit message does not follow conventional commits."
+            echo "Message: $COMMIT_MSG"
+            echo "Expected format: <type>(<scope>): <description> or <type>: <description>"
+            exit 1
+          fi
