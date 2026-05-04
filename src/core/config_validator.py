@@ -161,16 +161,17 @@ class ConfigValidator:
 
     def _check_model_settings(self) -> None:
         """Verify model settings and path existence."""
-        if self.config.mode != "backtest":
-            if not self.config.model_path.exists() or not self.config.model_path.is_file():
-                self.errors.append(
-                    ValidationError(
-                        "MODEL_PATH",
-                        f"Model file not found at: {self.config.model_path}. "
-                        "Ensure the model is trained and path is correct.",
-                        True,
-                    )
+        if self.config.mode != "backtest" and (
+            not self.config.model_path.exists() or not self.config.model_path.is_file()
+        ):
+            self.errors.append(
+                ValidationError(
+                    "MODEL_PATH",
+                    f"Model file not found at: {self.config.model_path}. "
+                    "Ensure the model is trained and path is correct.",
+                    True,
                 )
+            )
 
     def _check_risk_parameters(self) -> None:
         """Verify risk parameters are within safe enterprise bounds (RISK_LIMITS.md)."""
