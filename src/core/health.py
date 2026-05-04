@@ -170,8 +170,21 @@ class HealthChecker:
                 status=HealthStatus.FAILED, message="No models loaded in system"
             )
         else:
+            # Check for model health/drift if available
+            health_msg = f"Models loaded: {', '.join(loaded)}"
+            if hasattr(self.model, "get_health_metrics"):
+                try:
+                    metrics = self.model.get_health_metrics()
+                    if metrics:
+                        drift = float(metrics.get("drift", 0.0))
+                        acc = float(metrics.get("accuracy", 1.0))
+                        health_msg += f" | Agg Health: acc={acc:.2f} drift={drift:.2f}"
+                except (TypeError, ValueError):
+                    # Handle cases where metrics might be MagicMocks in tests
+                    pass
+
             res = ComponentStatus(
-                status=HealthStatus.HEALTHY, message=f"Models loaded: {', '.join(loaded)}"
+                status=HealthStatus.HEALTHY, message=health_msg
             )
 
         self._update_gauge("models", res.status)
