@@ -374,6 +374,11 @@ def parse_args() -> argparse.Namespace:
         choices=["ppo", "dreamer", "lstm", "ensemble"],
         help="Trading algorithm",
     )
+    p.add_argument("--start", help="Start date for backtest (YYYY-MM-DD)")
+    p.add_argument("--end", help="End date for backtest (YYYY-MM-DD)")
+    p.add_argument("--train-window", type=int, default=500, help="Train window size for backtest")
+    p.add_argument("--test-window", type=int, default=100, help="Test window size for backtest")
+    p.add_argument("--step-size", type=int, default=100, help="Step size for backtest")
     p.add_argument("--symbol", help="Trading symbol (e.g. XAUUSD)")
     p.add_argument("--timeframe", help="Trading timeframe (e.g. M5)")
     p.add_argument("--model-dir", type=Path, default=Path("models/trained"), help="Directory for model weights")
@@ -573,7 +578,69 @@ def main() -> int:
                 console=console,
             )
         elif cfg.mode == "backtest":
-            log.info("Backtest mode - see scripts/backtest.py")
+            from src.trading.backtester import BacktestEngine
+
+            start_date = (
+                datetime.strptime(args.start, "%Y-%m-%d")
+                if args.start
+                else datetime(2023, 1, 1)
+            )
+            end_date = (
+                datetime.strptime(args.end, "%Y-%m-%d")
+                if args.end
+                else datetime.now()
+            )
+
+            log.info(
+                "Starting Backtest | symbol=%s range=%s to %s",
+                cfg.symbol,
+                start_date.date(),
+                end_date.date(),
+            )
+
+            with console.status("[bold green]Fetching historical data..."):
+                df_raw = connector.get_rates_range(
+                    cfg.symbol, cfg.timeframe, start_date, end_date
+                )
+
+            if df_raw.empty:
+                log.error("No data found for the specified range.")
+                return 1
+
+            log.info("Fetched %d bars of data", len(df_raw))
+            df_raw.set_index("time", inplace=True)
+
+            engine = BacktestEngine(
+                symbol=cfg.symbol,
+                initial_balance=10000.0,
+                feature_engineer=feature_engineer,
+                execution_filter=execution_filter,
+                max_positions=cfg.max_positions,
+            )
+
+            bt_report = engine.run_walk_forward(
+                df_raw,
+                model,
+                train_window=args.train_window,
+                test_window=args.test_window,
+                step_size=args.step_size,
+            )
+
+            # Display Report
+            perf_table = Table(title="Backtest Performance Report", box=None)
+            perf_table.add_column("Metric", style="cyan")
+            perf_table.add_column("Value", justify="right")
+
+            perf_table.add_row("Annualized Return", f"{bt_report.annualized_return:.2%}")
+            perf_table.add_row("Sharpe Ratio", f"{bt_report.sharpe_ratio:.2f}")
+            perf_table.add_row("Max Drawdown", f"{bt_report.max_drawdown:.2%}")
+            perf_table.add_row("Profit Factor", f"{bt_report.profit_factor:.2f}")
+            perf_table.add_row("Win Rate", f"{bt_report.win_rate:.2%}")
+            perf_table.add_row("Total Trades", str(bt_report.total_trades))
+            perf_table.add_row("MAE Avg", f"{bt_report.mae_avg:.2f}")
+            perf_table.add_row("MFE Avg", f"{bt_report.mfe_avg:.2f}")
+
+            console.print(Panel(perf_table, border_style="green"))
     finally:
         connector.disconnect()
     return 0
