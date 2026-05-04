@@ -38,7 +38,9 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
-    metaapi_token: SecretStr = Field(default="", description="Authentication token for MetaAPI cloud services")
+    metaapi_token: SecretStr = Field(
+        default=SecretStr(""), description="Authentication token for MetaAPI cloud services"
+    )
     metaapi_account_id: str = Field(default="", description="Unique account identifier for MetaAPI provisioning")
 
     # ── Trading parameters ─────────────────────────────────────────────────────
@@ -74,7 +76,7 @@ class TradingConfig(BaseSettings):
 
     # ── Database ────────────────────────────────────────────────────────────
     database_url: SecretStr = Field(
-        default="postgresql://trader:password@localhost:5432/mt5_trades",
+        default=SecretStr("postgresql://trader:password@localhost:5432/mt5_trades"),
         description="SQLAlchemy-compatible connection string for the primary database",
     )
     redis_url: str = Field(
@@ -93,7 +95,7 @@ class TradingConfig(BaseSettings):
         default="INFO", description="Granularity of application logs (DEBUG, INFO, WARNING, ERROR)"
     )
     telegram_token: SecretStr = Field(
-        default="", description="Access token for the Telegram Bot API for real-time alerts"
+        default=SecretStr(""), description="Access token for the Telegram Bot API for real-time alerts"
     )
     telegram_chat_id: str = Field(
         default="", description="Telegram Chat ID or Group ID where alerts will be sent"
@@ -137,7 +139,7 @@ class TradingConfig(BaseSettings):
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
     """Return singleton TradingConfig (cached after first call)."""
-    return TradingConfig()  # type: ignore[call-arg]
+    return TradingConfig()
 
 
 __all__ = ["TradingConfig", "get_config"]
