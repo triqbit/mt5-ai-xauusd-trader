@@ -15,7 +15,7 @@ jobs:
   # STAGE 1: Fast Fail - Quality, Secrets, Config, Release Notes
   # -----------------------------------------------------------
   fast-validation:
-    name: Fast Validation (Quality, Secrets, Config)
+    name: Fast Validation (Quality, Secrets, Config, Compliance)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -30,18 +30,18 @@ jobs:
 
       - name: Install Validation Tools
         run: |
-          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3
+          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses
 
       - name: Gate 1.1: Ruff Lint & Format Check
         run: |
           echo "Running Ruff checks..."
-          ruff check src/ main.py
-          ruff format --check src/ main.py
+          ruff check src/ main.py scripts/ tests/
+          ruff format --check src/ main.py scripts/ tests/
 
       - name: Gate 1.2: Mypy Type Check
         run: |
           echo "Running Mypy static analysis..."
-          mypy src/ main.py --ignore-missing-imports
+          mypy src/ main.py scripts/ --ignore-missing-imports
 
       - name: Gate 2: Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
@@ -63,6 +63,21 @@ jobs:
           echo "Scanning dependencies for vulnerabilities (CI & Prod)..."
           pip-audit --requirement requirements-ci.txt
           pip-audit --requirement requirements.txt
+
+      - name: Gate 6: License Compliance Check
+        run: |
+          echo "Verifying third-party licenses meet enterprise policy..."
+          # Install torch/torchvision from CPU index to save time/space for the check
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+          # Create a unified requirements file for scanning, excluding TA-Lib (requires C libs) and MetaTrader5 (Windows-only)
+          cat requirements.txt requirements-ci.txt | grep -v "TA-Lib" | grep -v "MetaTrader5" | sort | uniq > requirements-all-scan.txt
+          pip install -r requirements-all-scan.txt
+
+          pip-licenses \
+            --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python" \
+            --partial-match \
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
 
   # -----------------------------------------------------------
   # STAGE 2: Functional - Migrations, Tests & Coverage
@@ -108,15 +123,15 @@ jobs:
           pip install pytest pytest-cov
           pip install -r requirements-ci.txt
 
-      - name: Gate 6: Database Migration Reversibility Check
+      - name: Gate 7: Database Migration Reversibility Check
         run: |
           echo "Verifying database migrations (up/down/up cycle)..."
           python scripts/verify_migrations.py
 
-      - name: Gate 7: Run Tests with Coverage Gate (80%)
+      - name: Gate 8: Run Tests with Coverage Gate (85%)
         run: |
           echo "Running unit and integration tests..."
-          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80
+          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"
@@ -136,7 +151,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Gate 8: Build Docker Image
+      - name: Gate 9: Build Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -145,8 +160,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Gate 9: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@master
+      - name: Gate 10: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@v0.29.0
         with:
           image-ref: 'triqbit/mt5-ai-xauusd-trader:validation-${{ github.sha }}'
           format: 'table'
