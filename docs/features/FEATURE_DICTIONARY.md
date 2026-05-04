@@ -8,6 +8,9 @@ Calculated directly on the primary timeframe of the input data.
 
 ### Technical Indicators
 - **RSI (14)**: Relative Strength Index.
+- **MFI (14)**: Money Flow Index.
+- **CCI (14)**: Commodity Channel Index.
+- **MOM (10)**: Momentum.
 - **MACD**: Moving Average Convergence Divergence (12, 26, 9), including Signal and Histogram.
 - **ATR (14)**: Average True Range.
 - **Bollinger Bands (20, 2)**: Upper, Middle, and Lower bands, plus Band Width.
@@ -28,8 +31,11 @@ All TA-Lib Pattern Recognition functions, including but not limited to:
 - **Rolling Slopes**: Linear regression slopes for 5 and 20 period windows.
 
 ### Volume
-- **Relative Volume**: Current volume vs 20-period average.
+- **Relative Volume (RVOL)**: Current volume vs 20-period average.
+- **VWAP Stacks**: Volume Weighted Average Price for periods 20, 50, and 100.
+- **VWAP Distances**: Percentage distance from price to each VWAP.
 - **OBV**: On-Balance Volume.
+- **VPT**: Volume Price Trend.
 
 ## Multi-Timeframe (MTF) Features
 Data is resampled to higher timeframes, indicators are calculated, and then aligned with the base timeframe using a 1-period shift to prevent look-ahead bias.
