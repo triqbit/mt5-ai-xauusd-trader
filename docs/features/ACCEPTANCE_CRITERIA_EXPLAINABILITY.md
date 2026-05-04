@@ -7,7 +7,7 @@
     - Correct mapping of model votes to `SignalDirection` (Buy/Sell/Hold).
     - Accurate identification of the "dominant" model in an ensemble.
 - **Inputs/Outputs:**
-    - **Inputs:** Signal direction, confidence, model votes, risk data, and regime info.
+    - **Inputs:** Signal direction, confidence, model votes, risk data, regime info, and feature impacts.
     - **Outputs:** `SignalExplanation` Pydantic model and terminal-formatted output (Rich/Plain).
 
 ## Technical Acceptance

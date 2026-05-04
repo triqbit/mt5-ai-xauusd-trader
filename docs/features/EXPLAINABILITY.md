@@ -52,7 +52,8 @@ explanation = explainer.explain(
     model_votes={"ppo": 0, "lstm": 0},
     model_weights={"ppo": 0.7, "lstm": 0.3},
     risk_data={"passed": True, "risk_reward": 2.5, "summary": "Risk within limits"},
-    regime_info={"name": "Trending", "confidence": 0.9, "volatility": "Normal"}
+    regime_info={"name": "Trending", "confidence": 0.9, "volatility": "Normal"},
+    feature_impacts=[{"cluster": "Trend", "score": 0.8, "impact": "High", "summary": "Strong momentum"}]
 )
 ```
 
