@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any, Optional
+
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/exceptions.py
@@ -6,7 +10,7 @@ Centralized exception hierarchy for robust error handling and recovery.
 
 class TradingError(Exception):
     """Base exception for all trading-related errors."""
-    def __init__(self, message: str, details: dict = None):
+    def __init__(self, message: str, details: Optional[dict[str, Any]] = None):
         super().__init__(message)
         self.details = details or {}
 

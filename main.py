@@ -28,14 +28,14 @@ from rich.panel import Panel
 from rich.table import Table
 
 from src.core import get_config, profile
+from src.core.audit_log import AuditLogger
+from src.core.config_validator import ConfigValidator
+from src.core.decision_support import DecisionSupportSystem
 from src.core.exceptions import (
     MT5ConnectionError,
     MT5DataError,
     MT5ExecutionError,
 )
-from src.core.audit_log import AuditLogger
-from src.core.config_validator import ConfigValidator
-from src.core.decision_support import DecisionSupportSystem
 from src.core.explainability import SignalExplainer
 from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker

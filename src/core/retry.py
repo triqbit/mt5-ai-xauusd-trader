@@ -33,13 +33,11 @@ def with_retry(
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             delay = initial_delay
-            last_exception = None
 
             for attempt in range(max_retries + 1):
                 try:
                     return func(*args, **kwargs)
                 except exceptions as e:
-                    last_exception = e
                     if attempt == max_retries:
                         logger.error(
                             "Max retries (%d) reached for %s. Last error: %s",
