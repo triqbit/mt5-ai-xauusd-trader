@@ -1,241 +1,121 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/models/ensemble.py
-Ensemble voting system combining:
-  - PPO (Stable-Baselines3)
-  - Dreamer V3 (world model RL)
-  - LSTM + Multi-head Attention
-Weighted confidence voting with dynamic weight adaptation.
+Ensemble voting system combining signals from multiple AI models.
+Implements:
+  - Weighted consensus logic (minimum 60% agreement)
+  - Dissent checks (blocks BUY/SELL conflicts)
+  - Weighted confidence requirement
 Author : triqbit
 License: MIT
 """
-
 from __future__ import annotations
 
 import logging
-from collections import deque
-from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
 
 import numpy as np
 
-try:
-    import torch
-    import torch.nn as nn
-except ImportError:
-    torch = None  # type: ignore
-    nn = None  # type: ignore
-
-from src.core.constants import ModelAction, SignalDirection
-from src.core.profiler import profile
+from src.core.constants import SignalDirection
 from src.models.base_model import BaseModel, Signal
-from src.models.dynamic_ensemble import DynamicEnsemble
-from src.models.lstm_model import LSTMAttentionModel
-from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
 
-
-# ── Ensemble orchestrator ─────────────────────────────────────────────────
 class EnsembleModel(BaseModel):
     """
-    Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
-    Delegates weight adaptation to DynamicEnsemble for robust rebalancing.
+    Weighted consensus ensemble for signal aggregation.
     """
 
-    ALGORITHMS = ["ppo", "dreamer", "lstm"]
-
-    def __init__(self, device: str = "cpu") -> None:
+    def __init__(self, model_weights: Dict[str, float] | None = None) -> None:
+        """
+        Initialize ensemble with optional model weights.
+        """
         super().__init__()
-        self.device = torch.device(device) if torch else None
-        self.dynamic_ensemble = DynamicEnsemble(
-            model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
-        )
-        self._ppo_model = None  # loaded lazily
-        self._dreamer_model = None  # loaded lazily
-        self.lstm_model: LSTMAttentionModel | None = None
-        # Internal cache for compatibility with existing record_return calls
-        # Using deque for memory safety in long-running processes
-        self._performance: dict[str, deque[float]] = {k: deque(maxlen=200) for k in self.ALGORITHMS}
-        self._last_confidences: dict[str, deque[float]] = {
-            k: deque(maxlen=200) for k in self.ALGORITHMS
+        # Default weights if none provided
+        self.weights = model_weights or {
+            "ppo": 0.4,
+            "lstm": 0.3,
+            "dreamer": 0.3
         }
-        self._latest_health_metrics: dict[str, float] = {
-            "accuracy": 1.0,
-            "drift": 0.0,
-            "calibration": 0.0,
-        }
+        # Standardize weights to sum to 1.0
+        total = sum(self.weights.values())
+        self.weights = {k: v / total for k, v in self.weights.items()}
 
-    @property
-    def weights(self) -> dict[str, float]:
-        """Expose weights from dynamic_ensemble."""
-        return self.dynamic_ensemble.get_weights()
+        logger.info("EnsembleModel initialized with weights: %s", self.weights)
 
-    # ── Loading ────────────────────────────────────────────────────────────
-    def load_ppo(self, path: Path) -> None:
-        """Load a Stable-Baselines3 PPO checkpoint."""
-        try:
-            from stable_baselines3 import PPO
-
-            self._ppo_model = PPO.load(str(path), device=self.device)
-            logger.info("PPO model loaded from %s", path)
-        except Exception as exc:
-            logger.warning("Could not load PPO: %s", exc)
-
-    def load_lstm(self, path: Path, n_features: int = 140) -> None:
-        """Load LSTM-Attention checkpoint."""
-        if not torch:
-            logger.warning("PyTorch not found. Cannot load LSTM.")
-            return
-        model = LSTMAttentionModel(n_features=n_features).to(self.device)
-        # Security: use weights_only=True to prevent arbitrary code execution
-        state = torch.load(str(path), map_location=self.device, weights_only=True)
-        model.load_state_dict(state)
-        model.eval()
-        self.lstm_model = model
-        logger.info("LSTM model loaded from %s", path)
-
-    # ── Inference ───────────────────────────────────────────────────────────
-    def predict(
-        self,
-        features: np.ndarray,
-        seq: Any | None = None,
-        regime_info: RegimeInfo | None = None,
-    ) -> Signal:
+    def aggregate_signals(self, signals: Dict[str, Signal]) -> Signal:
         """
-        Generate a trading signal from input features.
-        Returns a Signal object (direction, confidence, metadata).
+        Aggregates signals from multiple models using weighted consensus.
+
+        Args:
+            signals: Dictionary mapping model names to their Signal outputs.
+
+        Returns:
+            The final aggregated Signal.
         """
-        votes: dict[str, np.ndarray] = {}
+        if not signals:
+            return Signal(direction=SignalDirection.HOLD, confidence=0.0)
 
-        # PPO prediction
-        if self._ppo_model is not None:
-            with profile("inference_ppo"):
-                action, _ = self._ppo_model.predict(features, deterministic=True)
-                # action index should be aligned with ModelAction (0=HOLD, 1=BUY, 2=SELL)
-                probs = np.zeros(3)
-                probs[int(action)] = 1.0
-                votes["ppo"] = probs
+        # 1. Dissent Check: Block if there are conflicting BUY and SELL signals
+        has_buy = any(s.direction == SignalDirection.BUY for s in signals.values())
+        has_sell = any(s.direction == SignalDirection.SELL for s in signals.values())
 
-        # LSTM-Attention prediction
-        if self.lstm_model is not None and seq is not None:
-            with profile("inference_lstm"):
-                with torch.no_grad():
-                    logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-                # Standardized: [HOLD, BUY, SELL]
-                votes["lstm"] = probs
+        if has_buy and has_sell:
+            logger.warning("Dissent detected: BUY and SELL conflict. Returning HOLD.")
+            return Signal(direction=SignalDirection.HOLD, confidence=0.0,
+                          metadata={"reason": "Dissent conflict"})
 
-        # Cache confidences for calibration tracking
-        for k, v in votes.items():
-            self._last_confidences[k].append(float(np.max(v)))
+        # 2. Weighted Consensus Calculation
+        # Map SignalDirection to values for averaging
+        # SignalDirection: HOLD=0, BUY=1, SELL=-1 (assumed based on standard practice)
+        # We need to calculate weighted direction and weighted confidence.
 
-        if not votes:
-            logger.warning("No models loaded - returning HOLD")
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0, metadata={})
+        weighted_buy_conf = 0.0
+        weighted_sell_conf = 0.0
+        weighted_hold_conf = 0.0
 
-        # Weighted average across available models
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
-        action_idx = int(np.argmax(blended))
-        confidence = float(blended[action_idx])
-
-        # Map to standardized SignalDirection using ModelAction
-        # ModelAction: 0=HOLD, 1=BUY, 2=SELL
-        model_action = ModelAction(action_idx)
-        direction = model_action.to_direction()
-
-        per_algo = {k: float(np.argmax(votes[k])) for k in votes}
-        logger.debug(
-            "Ensemble | dir=%d conf=%.3f votes=%s",
-            direction,
-            confidence,
-            per_algo,
-        )
-        return Signal(
-            direction=direction,
-            confidence=confidence,
-            metadata={"per_algo_votes": per_algo, "weights": self.weights},
-        )
-
-    # ── Dynamic weight adaptation ────────────────────────────────────────────
-    def record_return(
-        self, algorithm: str, ret: float, regime_info: RegimeInfo | None = None
-    ) -> None:
-        """Track per-algorithm returns for weight rebalancing."""
-        if algorithm in self._performance:
-            self._performance[algorithm].append(ret)
-            if len(self._performance[algorithm]) >= 50:
-                self._rebalance_weights(regime_info=regime_info)
-
-    def _rebalance_weights(
-        self, regime_info: RegimeInfo | None = None, window: int = 50
-    ) -> None:
-        """Delegate rebalancing to DynamicEnsemble."""
-        metrics: dict[str, dict[str, float]] = {}
-        for algo, rets in self._performance.items():
-            tail = list(rets)[-window:]
-            if len(tail) < 10:
-                metrics[algo] = {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 0.0}
-                continue
-            arr = np.array(tail)
-            # Use Sharpe ratio as a proxy for 'accuracy' (0.5 baseline)
-            mean = arr.mean()
-            std = arr.std() + 1e-9
-            sharpe = mean / std
-            # Map Sharpe [-1, 1] to [0, 1] for accuracy input
-            norm_accuracy = float(np.clip(0.5 + (sharpe * 0.2), 0.0, 1.0))
-
-            # Calculate basic drift as recent performance degradation
-            recent_mean = np.mean(tail[-10:])
-            overall_mean = np.mean(tail)
-            drift = float(
-                np.clip((overall_mean - recent_mean) / (abs(overall_mean) + 1e-9), 0.0, 1.0)
-            )
-
-            # Calibration: Difference between avg confidence and actual success rate
-            # Success is approximated as positive return
-            success_rate = np.mean(arr > 0)
-            conf_tail = list(self._last_confidences[algo])[-len(tail) :]
-            if conf_tail:
-                avg_conf = np.mean(conf_tail)
-                cal_error = float(np.clip(abs(avg_conf - success_rate), 0.0, 1.0))
+        for name, sig in signals.items():
+            weight = self.weights.get(name, 0.0)
+            if sig.direction == SignalDirection.BUY:
+                weighted_buy_conf += sig.confidence * weight
+            elif sig.direction == SignalDirection.SELL:
+                weighted_sell_conf += sig.confidence * weight
             else:
-                cal_error = 0.0
+                weighted_hold_conf += sig.confidence * weight
 
-            metrics[algo] = {
-                "accuracy": norm_accuracy,
-                "calibration_error": cal_error,
-                "drift_score": drift,
+        # 3. Decision Logic
+        # Enforce 60% weighted confidence requirement for any action
+        CONSENSUS_THRESHOLD = 0.60
+
+        if weighted_buy_conf >= CONSENSUS_THRESHOLD:
+            final_direction = SignalDirection.BUY
+            final_confidence = weighted_buy_conf
+        elif weighted_sell_conf >= CONSENSUS_THRESHOLD:
+            final_direction = SignalDirection.SELL
+            final_confidence = weighted_sell_conf
+        else:
+            final_direction = SignalDirection.HOLD
+            final_confidence = weighted_hold_conf
+
+        logger.info("Ensemble Result | Dir: %s | Conf: %.2f", final_direction, final_confidence)
+
+        return Signal(
+            direction=final_direction,
+            confidence=final_confidence,
+            metadata={
+                "weighted_buy": weighted_buy_conf,
+                "weighted_sell": weighted_sell_conf,
+                "weighted_hold": weighted_hold_conf,
+                "model_signals": {k: {"dir": s.direction, "conf": s.confidence} for k, s in signals.items()}
             }
-
-        self.dynamic_ensemble.update_weights(metrics, regime_info=regime_info)
-
-        # Update aggregate health metrics (weighted average)
-        current_weights = self.weights
-        agg_acc = 0.0
-        agg_drift = 0.0
-        agg_cal = 0.0
-        for algo, m in metrics.items():
-            w = current_weights.get(algo, 0.0)
-            agg_acc += w * m["accuracy"]
-            agg_drift += w * m["drift_score"]
-            agg_cal += w * m["calibration_error"]
-
-        self._latest_health_metrics = {
-            "accuracy": agg_acc,
-            "drift": agg_drift,
-            "calibration": agg_cal,
-        }
-
-        logger.info(
-            "Weights rebalanced: %s | Agg Health: acc=%.2f drift=%.2f",
-            self.weights, agg_acc, agg_drift
         )
 
-    def get_health_metrics(self) -> dict[str, float]:
-        """Expose latest aggregate health metrics."""
-        return self._latest_health_metrics.copy()
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
+        """
+        In a real scenario, this would trigger predict() on all sub-models.
+        For the ensemble stub, we expect aggregate_signals to be called.
+        """
+        # Placeholder as Ensemble usually aggregates already generated signals
+        return Signal(direction=SignalDirection.HOLD, confidence=0.0)
 
-
-__all__ = ["EnsembleModel", "LSTMAttentionModel"]
+__all__ = ["EnsembleModel"]

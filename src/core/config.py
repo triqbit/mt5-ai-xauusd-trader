@@ -29,9 +29,9 @@ class TradingConfig(BaseSettings):
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────
-    mt5_login: int = Field(default=0, description="MT5 account number for login")
-    mt5_password: SecretStr = Field(..., description="MT5 account password for authentication")
-    mt5_server: str = Field(..., description="MT5 broker server name (e.g., Broker-Demo)")
+    mt5_login: int = Field(default=0, description="MT5 account number for login", validation_alias="MT5_LOGIN")
+    mt5_password: SecretStr = Field(..., description="MT5 account password for authentication", validation_alias="MT5_PASSWORD")
+    mt5_server: str = Field(..., description="MT5 broker server name (e.g., Broker-Demo)", validation_alias="MT5_SERVER")
     mt5_path: str = Field(
         default="C:/Program Files/MetaTrader 5/terminal64.exe",
         description="Full path to the MT5 terminal executable (Windows only)",
@@ -42,20 +42,55 @@ class TradingConfig(BaseSettings):
     metaapi_account_id: str = Field(default="", description="Unique account identifier for MetaAPI provisioning")
 
     # ── Trading parameters ─────────────────────────────────────────────────────
-    symbol: str = Field(default="XAUUSD", description="The financial instrument to trade (e.g., XAUUSD)")
+    symbol: str = Field(default="XAUUSD", description="The financial instrument to trade (e.g., XAUUSD)", validation_alias="SYMBOL")
     timeframe: str = Field(default="M5", description="The chart timeframe for analysis (e.g., M5, H1)")
     mode: Literal["demo", "live", "backtest"] = Field(
-        default="demo", description="Execution mode: demo, live, or backtest"
+        default="demo", description="Execution mode: demo, live, or backtest", validation_alias="MODE"
     )
+
+    # ── Risk Parameters (per RISK_LIMITS.md) ──────────────────────────────────
     max_positions: int = Field(
-        default=3, ge=1, le=5, description="Maximum number of concurrent open positions permitted"
+        default=5, ge=1, le=10, description="Maximum number of concurrent open positions permitted"
     )
     risk_per_trade: float = Field(
         default=0.01, ge=0.001, le=0.02, description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)"
     )
-    max_daily_loss: float = Field(
-        default=0.05, ge=0.01, le=0.06, description="Maximum daily drawdown percentage before halting trading"
+    max_position_size_pct: float = Field(
+        default=0.10, description="Max Position Size: 10% of account equity per trade"
     )
+    min_lot_size: float = Field(
+        default=0.01, description="Min Position Size: 0.01 lot"
+    )
+    max_leverage: float = Field(
+        default=10.0, description="Max Leverage: 10:1"
+    )
+
+    # Exposure Limits
+    max_single_direction_pct: float = Field(default=0.30, description="Max 30% net long OR short")
+    max_total_notional_pct: float = Field(default=1.00, description="<100% of account equity")
+    margin_alert_pct: float = Field(default=0.70, description="Alert at 70% margin utilization")
+    margin_halt_pct: float = Field(default=0.80, description="Halt trading at 80% margin utilization")
+    margin_liquidation_pct: float = Field(default=0.90, description="Automatic close at 90% margin")
+
+    # Daily Limits (Cascading)
+    max_daily_loss: float = Field(
+        default=0.05, ge=0.01, le=0.06, description="Emergency Stop Level 4: 5% loss"
+    )
+    daily_loss_lvl1: float = Field(default=0.02, description="Level 1 (Yellow Alert): 2% loss")
+    daily_loss_lvl2: float = Field(default=0.03, description="Level 2 (Orange Alert): 3% loss")
+    daily_loss_lvl3: float = Field(default=0.04, description="Level 3 (Red Alert): 4% loss")
+    daily_loss_hard_stop: float = Field(default=0.06, description="Hard Stop: 6% loss")
+    daily_win_cap: float = Field(default=0.10, description="Daily Win Cap: 10%")
+    max_trades_per_day: int = Field(default=20, description="Max 20 trades per day")
+    max_losing_streak: int = Field(default=3, description="Halt trading after 3 consecutive losses")
+
+    # Volatility Thresholds
+    volatility_high_threshold: float = Field(default=1.5, description="High Volatility (>1.5x normal)")
+    volatility_very_high_threshold: float = Field(default=2.0, description="Very High Volatility (>2x normal)")
+    volatility_extreme_threshold: float = Field(default=3.0, description="Extreme Volatility (>3x normal)")
+
+    # Execution
+    max_slippage_pips: float = Field(default=1.0, description="Max Acceptable Slippage: 1.0 pip")
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
@@ -101,9 +136,15 @@ class TradingConfig(BaseSettings):
     confirm_live_trading: str = Field(
         default="", description="Explicit confirmation for LIVE trading (must be 'YES' to start in live mode)"
     )
-    confidence_threshold: float = Field(
-        default=0.6, ge=0.5, le=1.0, description="Minimum model confidence score required to execute a signal"
+
+    # Prediction Limits
+    min_confidence: float = Field(
+        default=0.55, ge=0.5, le=1.0, description="Minimum model confidence score required to execute a signal"
     )
+    consensus_threshold: float = Field(
+        default=0.60, ge=0.5, le=1.0, description="Need 60%+ agreement across ensemble"
+    )
+
     model_drift_threshold: float = Field(
         default=0.3, ge=0.05, le=0.5, description="Maximum allowed model drift score before halting trades"
     )
