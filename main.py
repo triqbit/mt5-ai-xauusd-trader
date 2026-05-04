@@ -208,8 +208,7 @@ def run_live(
 
                 # 6. Risk approval gate
                 with profile("risk_check"):
-                    health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = risk.approve(signal, signal_id=signal_id, model_health=health) if direction != 0 else False
+                    risk_approved = risk.approve(signal, signal_id=signal_id) if direction != 0 else False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -222,8 +221,6 @@ def run_live(
                             df_features,
                             current_drawdown=drawdown,
                             timestamp=datetime.now(timezone.utc),
-                            model_health=health,
-                            trade_logger=trade_logger,
                         )
                         if not filter_decision.is_approved:
                             log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
