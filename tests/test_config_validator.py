@@ -182,13 +182,10 @@ def test_validator_max_daily_loss(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Hard stop is 6%
+    # Hard stop is 6%. Pydantic catches 7%.
     monkeypatch.setenv("MAX_DAILY_LOSS", "0.07")
-    cfg = TradingConfig()
-    validator = ConfigValidator(cfg)
-    result = validator.validate()
-    assert result.success is False
-    assert any(e.field == "MAX_DAILY_LOSS" and e.critical for e in result.errors)
+    with pytest.raises(Exception):
+        TradingConfig()
 
     # Warning if > 5% (Emergency Stop)
     monkeypatch.setenv("MAX_DAILY_LOSS", "0.055")
@@ -207,15 +204,12 @@ def test_validator_incompatible_live_positions(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_SERVER", "Broker-Live")
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
-    monkeypatch.setenv("MAX_POSITIONS", "10")
+    monkeypatch.setenv("MAX_POSITIONS", "6")  # New limit is 5
     monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    cfg = TradingConfig()
-    validator = ConfigValidator(cfg)
-    result = validator.validate()
-    assert result.success is False
-    assert any(e.field == "MAX_POSITIONS" and e.critical for e in result.errors)
+    with pytest.raises(Exception):
+        TradingConfig()
 
 def test_validator_backtest_warning(monkeypatch, tmp_path):
     """Test validator gives a non-critical warning for Telegram in backtest."""
@@ -366,10 +360,8 @@ def test_validator_confidence_threshold(monkeypatch, tmp_path):
 
     # Critical breach (< 0.50)
     monkeypatch.setenv("CONFIDENCE_THRESHOLD", "0.45")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is False
-    assert any(e.field == "CONFIDENCE_THRESHOLD" and e.critical for e in result.errors)
+    with pytest.raises(Exception):
+        TradingConfig()
 
     # Warning (< 0.55)
     monkeypatch.setenv("CONFIDENCE_THRESHOLD", "0.52")

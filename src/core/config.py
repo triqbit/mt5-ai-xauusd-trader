@@ -48,13 +48,13 @@ class TradingConfig(BaseSettings):
         default="demo", description="Execution mode: demo, live, or backtest"
     )
     max_positions: int = Field(
-        default=3, ge=1, le=10, description="Maximum number of concurrent open positions permitted"
+        default=3, ge=1, le=5, description="Maximum number of concurrent open positions permitted"
     )
     risk_per_trade: float = Field(
-        default=0.01, ge=0.001, le=0.05, description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)"
+        default=0.01, ge=0.001, le=0.02, description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)"
     )
     max_daily_loss: float = Field(
-        default=0.05, ge=0.01, le=0.20, description="Maximum daily drawdown percentage before halting trading"
+        default=0.05, ge=0.01, le=0.06, description="Maximum daily drawdown percentage before halting trading"
     )
 
     # ── Model ──────────────────────────────────────────────────────────────────
@@ -102,16 +102,16 @@ class TradingConfig(BaseSettings):
         default="", description="Explicit confirmation for LIVE trading (must be 'YES' to start in live mode)"
     )
     confidence_threshold: float = Field(
-        default=0.6, ge=0.0, le=1.0, description="Minimum model confidence score required to execute a signal"
+        default=0.6, ge=0.5, le=1.0, description="Minimum model confidence score required to execute a signal"
     )
     model_drift_threshold: float = Field(
         default=0.3, ge=0.05, le=0.5, description="Maximum allowed model drift score before halting trades"
     )
     model_accuracy_floor: float = Field(
-        default=0.5, ge=0.4, le=0.9, description="Minimum allowed model accuracy score before halting trades"
+        default=0.5, ge=0.5, le=0.9, description="Minimum allowed model accuracy score before halting trades"
     )
     model_win_rate_floor: float = Field(
-        default=0.45, ge=0.3, le=0.7, description="Minimum allowed historical win rate before halting trades"
+        default=0.45, ge=0.4, le=0.7, description="Minimum allowed historical win rate before halting trades"
     )
 
     @field_validator("risk_per_trade")
