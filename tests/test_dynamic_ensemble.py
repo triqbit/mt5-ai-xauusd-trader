@@ -63,6 +63,33 @@ class TestDynamicEnsemble(unittest.TestCase):
 
         self.assertLess(w_high, w_low)
 
+    def test_explicit_volatility_context(self):
+        """Verify that volatility_context override works and slows down adaptation."""
+        metrics = {
+            "ppo": {"accuracy": 1.0, "calibration_error": 0.0, "drift_score": 0.0},
+            "lstm": {"accuracy": 0.0, "calibration_error": 0.0, "drift_score": 0.0},
+            "transformer": {"accuracy": 0.0, "calibration_error": 0.0, "drift_score": 0.0}
+        }
+        initial_ppo = self.ensemble.weights["ppo"]
+
+        # 1. Update with low volatility context
+        self.ensemble.update_weights(metrics, volatility_context=0.5)
+        w_low_vol = self.ensemble.weights["ppo"]
+        step_low = w_low_vol - initial_ppo
+
+        # Reset
+        self.ensemble.weights = dict.fromkeys(self.models, 1.0/3.0)
+        self.ensemble._target_weights = self.ensemble.weights.copy()
+        self.ensemble._prev_target_weights = self.ensemble.weights.copy()
+
+        # 2. Update with high volatility context
+        self.ensemble.update_weights(metrics, volatility_context=10.0)
+        w_high_vol = self.ensemble.weights["ppo"]
+        step_high = w_high_vol - initial_ppo
+
+        # Step size in high vol should be much smaller than in low vol due to vol_factor scaling alpha
+        self.assertLess(step_high, step_low)
+
     def test_swing_cap(self):
         # Extreme change in metrics
         metrics = {
