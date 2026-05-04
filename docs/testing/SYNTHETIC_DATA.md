@@ -12,8 +12,10 @@ Located in `src/utils/synthetic_data.py`, the `ScenarioGenerator` provides deter
 - **ranging**: Mean-reverting price action around a starting value.
 - **volatile**: Price with frequent high-variance spikes.
 - **gapping**: Price with occasional large percentage gaps (2%).
-- **whipsaw** (New): A bullish breakout followed by an immediate, sharp bearish reversal. Useful for testing trailing stop resilience and "fake-out" detection.
-- **stale** (New): Frozen price action (zero returns). Useful for testing system behavior during low liquidity or data feed freezes.
+- **whipsaw**: A bullish breakout followed by an immediate, sharp bearish reversal. Useful for testing trailing stop resilience and "fake-out" detection.
+- **stale**: Frozen price action (zero returns). Useful for testing system behavior during low liquidity or data feed freezes.
+- **flash_crash** (New): Extreme drop followed by partial recovery. Essential for validating circuit breaker response and emergency halt triggers.
+- **regime_shift** (New): Transition from a stable/ranging regime to a highly volatile one. Used for testing model adaptability and risk multiplier adjustments.
 - **malformed**: Data with intentional errors (NaNs, negative prices, High < Low) to test pipeline resilience.
 
 ## RiskScenarioBuilder
@@ -32,6 +34,12 @@ Located in `src/utils/synthetic_data.py`, the `RiskScenarioBuilder` generates de
   Generates a list of signals representing conflicting model votes (e.g., PPO BUY vs. LSTM SELL). This tests:
   - Ensemble voting logic
   - Signal validation gate behavior under high uncertainty
+
+- **daily_loss_breach(symbol, price, n_losses)** (New):
+  Generates a sequence of high-impact losing signals. Used to verify that the `RiskManager` correctly halts trading after the daily loss percentage floor is hit.
+
+- **drawdown_circuit_breaker(symbol, price)** (New):
+  Generates an extreme losing scenario designed to trigger the system-wide 15% drawdown circuit breaker, ensuring all execution is blocked until manual intervention.
 
 ## Usage in Tests
 

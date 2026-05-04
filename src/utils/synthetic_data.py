@@ -27,7 +27,9 @@ class ScenarioGenerator:
     def generate(
         self,
         n_steps: int = 100,
-        regime: Literal["trending", "ranging", "volatile", "gapping", "malformed", "whipsaw", "stale"] = "ranging",
+        regime: Literal[
+            "trending", "ranging", "volatile", "gapping", "malformed", "whipsaw", "stale", "flash_crash", "regime_shift"
+        ] = "ranging",
         start_price: float = 2300.0,
         trend_strength: float = 0.001,
         volatility: float = 0.002,
@@ -49,6 +51,10 @@ class ScenarioGenerator:
             return self._generate_whipsaw(n_steps, start_price, volatility)
         elif regime == "stale":
             return self._generate_stale(n_steps, start_price)
+        elif regime == "flash_crash":
+            return self._generate_flash_crash(n_steps, start_price, volatility)
+        elif regime == "regime_shift":
+            return self._generate_regime_shift(n_steps, start_price, volatility)
         else:
             raise ValueError(f"Unknown regime: {regime}")
 
@@ -118,6 +124,28 @@ class ScenarioGenerator:
     def _generate_stale(self, n_steps: int, start_price: float) -> pd.DataFrame:
         """Frozen price scenario."""
         returns = np.zeros(n_steps)
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_flash_crash(
+        self, n_steps: int, start_price: float, volatility: float
+    ) -> pd.DataFrame:
+        """Extreme drop followed by partial recovery."""
+        returns = self.rng.normal(0, volatility, n_steps)
+        mid = n_steps // 2
+        # Rapid crash
+        returns[mid : mid + 5] = -0.04  # -4% per step for 5 steps (~ -18% total)
+        # Partial recovery
+        returns[mid + 5 : mid + 10] = 0.02
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_regime_shift(
+        self, n_steps: int, start_price: float, volatility: float
+    ) -> pd.DataFrame:
+        """Transition from ranging to highly volatile."""
+        mid = n_steps // 2
+        returns_ranging = self.rng.normal(0, volatility, mid)
+        returns_volatile = self.rng.normal(0, volatility * 4, n_steps - mid)
+        returns = np.concatenate([returns_ranging, returns_volatile])
         return self._generate_base(n_steps, start_price, returns)
 
     def _generate_malformed(self, n_steps: int, start_price: float) -> pd.DataFrame:
@@ -199,4 +227,47 @@ class RiskScenarioBuilder:
                 algorithm="lstm",
                 confidence=0.8,
             ),
+        ]
+
+    def daily_loss_breach(
+        self,
+        symbol: str = "XAUUSD",
+        price: float = 2000.0,
+        n_losses: int = 3,
+    ) -> list[TradeSignal]:
+        """Generates signals that, if lost, would breach the daily loss limit."""
+        signals = []
+        for _ in range(n_losses):
+            signals.append(
+                TradeSignal(
+                    symbol=symbol,
+                    direction=1,
+                    entry_price=price,
+                    stop_loss=price - 50,  # Significant loss
+                    take_profit=price + 100,
+                    lot_size=1.0,  # Large lot to amplify PnL impact
+                    algorithm="ensemble",
+                    confidence=0.8,
+                )
+            )
+        return signals
+
+    def drawdown_circuit_breaker(
+        self,
+        symbol: str = "XAUUSD",
+        price: float = 2000.0,
+    ) -> list[TradeSignal]:
+        """Generates signals for testing the 15% peak-to-valley circuit breaker."""
+        # A single very large losing trade or multiple trades
+        return [
+            TradeSignal(
+                symbol=symbol,
+                direction=1,
+                entry_price=price,
+                stop_loss=price - 500,  # Massive stop loss
+                take_profit=price + 1000,
+                lot_size=2.0,
+                algorithm="ensemble",
+                confidence=0.9,
+            )
         ]

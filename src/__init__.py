@@ -4,6 +4,5 @@ __version__ = "1.0.0"
 __author__ = "triqbit"
 __license__ = "MIT"
 
-from . import core, models, trading
-
-__all__ = ["core", "models", "trading"]
+# Lazy sub-package discovery to avoid early dependency loads during migrations/quality checks
+__all__: list[str] = ["core", "models", "trading", "utils"]
