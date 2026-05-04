@@ -120,12 +120,13 @@ class LSTMPricePredictor(nn.Module if nn else object):
 
 class LSTMModel(BaseModel):
     """
-    Wrapper for LSTMPricePredictor implementing the BaseModel interface.
+    Wrapper for LSTM architectures implementing the BaseModel interface.
+    Supports both simple LSTM and Attention-based LSTM.
 
     Attributes:
         logger: Logger instance for monitoring model activity.
         device: Torch device (cpu or cuda).
-        model: LSTMPricePredictor instance.
+        model: Model instance (LSTMPricePredictor or LSTMAttentionModel).
     """
 
     def __init__(
@@ -133,6 +134,7 @@ class LSTMModel(BaseModel):
         input_dim: int = 140,
         hidden_dim: int = 64,
         num_layers: int = 2,
+        use_attention: bool = True,
         model_path: Optional[Union[str, Path]] = None,
         device: str = "cpu",
     ) -> None:
@@ -143,6 +145,7 @@ class LSTMModel(BaseModel):
             input_dim: Number of input features per time step.
             hidden_dim: Number of hidden units in LSTM layers.
             num_layers: Number of recurrent layers.
+            use_attention: Whether to use the LSTMAttentionModel architecture.
             model_path: Optional path to a pre-trained model checkpoint (.pt or .pth).
             device: Computing device to use ('cpu', 'cuda', 'auto').
         """
@@ -161,9 +164,16 @@ class LSTMModel(BaseModel):
 
         if torch:
             try:
-                self.model = LSTMPricePredictor(
-                    input_dim, hidden_dim, num_layers
-                ).to(self.device)
+                if use_attention:
+                    self.model = LSTMAttentionModel(
+                        n_features=input_dim,
+                        hidden_size=hidden_dim,
+                        num_layers=num_layers,
+                    ).to(self.device)
+                else:
+                    self.model = LSTMPricePredictor(
+                        input_dim, hidden_dim, num_layers
+                    ).to(self.device)
 
                 if model_path and Path(model_path).exists():
                     self.logger.info(f"Loading LSTM model from {model_path}")
