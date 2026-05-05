@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
-from src.trading.risk_manager import TradeSignal
+from src.core.types import TradeSignal
 from src.core.config import TradingConfig
 from datetime import datetime
 import pandas as pd

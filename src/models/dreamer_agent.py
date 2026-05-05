@@ -38,7 +38,7 @@ class DreamerAgent(BaseModel):
         self.state: Any | None = None
         self.logger.info("DreamerAgent initialized in placeholder mode.")
 
-    def predict(self, features: np.ndarray) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """
         Generates a trading signal using the Dreamer policy (placeholder).
 
@@ -47,6 +47,7 @@ class DreamerAgent(BaseModel):
 
         Args:
             features: Input features array.
+            **kwargs: Additional context.
 
         Returns:
             A Signal object (currently returns HOLD as placeholder).

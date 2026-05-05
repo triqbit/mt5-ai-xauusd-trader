@@ -112,6 +112,7 @@ class EnsembleModel(BaseModel):
         features: np.ndarray,
         seq: Any | None = None,
         regime_info: RegimeInfo | None = None,
+        **kwargs: Any,
     ) -> Signal:
         """
         Generate a trading signal from input features.

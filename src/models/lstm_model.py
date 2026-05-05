@@ -187,13 +187,14 @@ class LSTMModel(BaseModel):
         else:
             self.logger.warning("PyTorch not found. LSTMModel is disabled.")
 
-    def predict(self, features: np.ndarray) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """
         Predicts price direction using the LSTM network.
 
         Args:
             features: Input features array of shape (seq_len, n_features)
                       or (batch, seq_len, n_features).
+            **kwargs: Additional context (ignored by LSTM).
 
         Returns:
             A Signal object with direction, confidence, and probability distribution.

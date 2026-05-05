@@ -5,26 +5,18 @@ Base interface for all AI/ML models.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, NamedTuple
+from typing import Any
 
 import numpy as np
 
-from src.core.constants import SignalDirection
-
-
-class Signal(NamedTuple):
-    """Standardized model output."""
-
-    direction: SignalDirection
-    confidence: float
-    metadata: dict[str, Any] | None = None
+from src.core.types import Signal
 
 
 class BaseModel(ABC):
     """Abstract base class for all trading models."""
 
     @abstractmethod
-    def predict(self, features: np.ndarray) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """
         Generate a trading signal from input features.
 

@@ -139,19 +139,12 @@ def run_live(
 
                 # 3. Get model prediction
                 with profile("inference"):
-                    # Pass regime context to models that support it (e.g. Ensemble)
-                    if hasattr(model, "predict"):
-                        # Attempt to pass extra context if the model signature allows it
-                        try:
-                            # EnsembleModel takes seq and regime_info
-                            # For simple BaseModel, we just pass obs
-                            if isinstance(model, EnsembleModel) and torch:
-                                seq = torch.from_numpy(df_features.values[-60:]).float()
-                                signal_obj = model.predict(obs, seq=seq, regime_info=regime_info)
-                            else:
-                                signal_obj = model.predict(obs)
-                        except TypeError:
-                            signal_obj = model.predict(obs)
+                    # Institutional inference with extended context
+                    context = {"regime_info": regime_info}
+                    if torch:
+                        context["seq"] = torch.from_numpy(df_features.values[-60:]).float()
+
+                    signal_obj = model.predict(obs, **context)
 
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
