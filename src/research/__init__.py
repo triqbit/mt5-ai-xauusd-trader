@@ -26,6 +26,13 @@ from src.research.rare_event_simulator import (
     RareEventSimulator,
     RareEventType,
 )
+from src.research.rl_evaluation import (
+    MeanReversionBaseline,
+    MomentumBaseline,
+    RandomBaseline,
+    RLEvaluator,
+    RLReport,
+)
 from src.research.reporting import ResearchReport, ResearchReporter
 from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 
@@ -41,6 +48,11 @@ __all__ = [
     "RareEventResult",
     "RareEventSimulator",
     "RareEventType",
+    "RLEvaluator",
+    "RLReport",
+    "RandomBaseline",
+    "MomentumBaseline",
+    "MeanReversionBaseline",
     "ResearchReport",
     "ResearchReporter",
     "RiskFilteredBaseline",

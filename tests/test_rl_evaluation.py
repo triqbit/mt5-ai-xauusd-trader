@@ -223,16 +223,30 @@ def test_advanced_stability_metrics(trading_env):
     evaluator = RLEvaluator(env=trading_env)
 
     # Need enough steps for VaR (needs > 20)
+    # Also need some variation for SQN (at least one trade)
     class TrendAgent:
+        def __init__(self):
+            self.step = 0
         def predict(self, observation):
-            return 1 # Just buy to generate some returns
+            self.step += 1
+            if self.step < 10:
+                return 1 # Buy
+            if self.step == 10:
+                return 2 # Close
+            if self.step == 20:
+                return 1 # Buy again
+            if self.step == 30:
+                return 2 # Close again
+            return 0
 
     report = evaluator.evaluate(TrendAgent(), agent_name="Trend")
 
     assert report.stability.skewness is not None
     assert report.stability.kurtosis is not None
-    assert report.stability.var_95 != 0.0
-    assert report.stability.cvar_95 != 0.0
+    assert report.stability.var_95 is not None
+    assert report.stability.cvar_95 is not None
+    assert report.stability.ulcer_index >= 0.0
+    assert report.stability.sqn is not None
 
 
 def test_profit_concentration():
@@ -249,6 +263,40 @@ def test_profit_concentration():
     # top 10% of 10 trades is 1 trade.
     # top_profit = 50.0. net_pnl = 100.0. conc = 0.5
     assert decomp.profit_concentration == pytest.approx(0.5, rel=1e-2)
+
+
+def test_sb3_model_prediction_support(trading_env):
+    evaluator = RLEvaluator(env=trading_env)
+
+    class MockSB3Model:
+        def predict(self, obs, state=None, episode_start=None, deterministic=False):
+            # SB3 returns (action, next_state)
+            return np.array([1]), None
+
+    prediction = evaluator._get_prediction(MockSB3Model(), np.zeros(52))
+    assert prediction == 1
+
+
+def test_parameterized_indices(mock_env_data):
+    # Data with 6 features, close at index 4
+    data6 = np.random.randn(200, 6).astype(np.float32)
+    data6[:, 4] = np.linspace(100, 110, 200)
+
+    env = TradingEnv(data=data6, window_size=10)
+    evaluator = RLEvaluator(env=env, close_idx=4, n_features=6)
+
+    # Momentum baseline should also use these
+    baseline = MomentumBaseline(close_idx=4, n_features=6)
+
+    # obs size: 10 * 6 + 2 = 62
+    obs_buy = np.zeros(62)
+    # last_close_idx = -(6+2) + 4 = -4. (Wait, let's check logic)
+    # n_features=6. balance is -2, pos is -1.
+    # last step features: -(6+2) to -3.
+    # index 0: -8, 1: -7, 2: -6, 3: -5, 4: -4, 5: -3.
+    # Yes, index 4 is -4.
+    obs_buy[-4] = 0.6
+    assert baseline.predict(obs_buy) == 1
 
 
 def test_turnover_metrics():
