@@ -22,7 +22,6 @@ class BaseModel(ABC):
 
         Args:
             features: Input feature array (e.g., OHLCV + technical indicators).
-            **kwargs: Additional context (regime_info, sequences, etc.).
 
         Returns:
             A Signal object containing direction and confidence.
