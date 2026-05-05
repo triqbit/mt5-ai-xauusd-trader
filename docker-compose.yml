@@ -15,4 +15,11 @@ services:
     environment:
       - MODE=${MODE:-demo}
       - ALGO=${ALGO:-ensemble}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import src.core.config; print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
