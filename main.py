@@ -18,7 +18,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -258,7 +258,7 @@ def run_live(
                             signal,
                             df_features,
                             current_drawdown=drawdown,
-                            timestamp=datetime.now(timezone.utc),
+                            timestamp=datetime.now(UTC),
                             model_health=health,
                             trade_logger=trade_logger,
                         )
@@ -775,9 +775,15 @@ def main() -> int:
             from src.trading.backtester import BacktestEngine
 
             start_date = (
-                datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
+                datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=UTC)
+                if args.start
+                else datetime(2023, 1, 1, tzinfo=UTC)
             )
-            end_date = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
+            end_date = (
+                datetime.strptime(args.end, "%Y-%m-%d").replace(tzinfo=UTC)
+                if args.end
+                else datetime.now(UTC)
+            )
 
             log.info(
                 "Starting Backtest | symbol=%s range=%s to %s",
@@ -813,20 +819,36 @@ def main() -> int:
             )
 
             # Display Report
-            perf_table = Table(title="Backtest Performance Report", box=None)
+            perf_table = Table(
+                title=f"[bold green]Backtest Performance Report: {cfg.symbol}[/]",
+                box=None,
+                show_header=True,
+                header_style="bold cyan",
+            )
             perf_table.add_column("Metric", style="cyan")
             perf_table.add_column("Value", justify="right")
 
-            perf_table.add_row("Annualized Return", f"{bt_report.annualized_return:.2%}")
-            perf_table.add_row("Sharpe Ratio", f"{bt_report.sharpe_ratio:.2f}")
-            perf_table.add_row("Max Drawdown", f"{bt_report.max_drawdown:.2%}")
-            perf_table.add_row("Profit Factor", f"{bt_report.profit_factor:.2f}")
+            # Benchmark Metrics
+            perf_table.add_row("Annualized Return", f"[bold]{bt_report.annualized_return:.2%}[/]")
+            perf_table.add_row("Sharpe Ratio", f"[bold]{bt_report.sharpe_ratio:.2f}[/]")
+            perf_table.add_row("Max Drawdown", f"[bold red]{bt_report.max_drawdown:.2%}[/]")
+            perf_table.add_row("Profit Factor", f"[bold]{bt_report.profit_factor:.2f}[/]")
+
+            # Supplementary Metrics
+            perf_table.add_section()
             perf_table.add_row("Win Rate", f"{bt_report.win_rate:.2%}")
             perf_table.add_row("Total Trades", str(bt_report.total_trades))
-            perf_table.add_row("MAE Avg", f"{bt_report.mae_avg:.2f}")
-            perf_table.add_row("MFE Avg", f"{bt_report.mfe_avg:.2f}")
+            perf_table.add_row("Total Return", f"{bt_report.total_return:.2%}")
+            perf_table.add_row("MAE Avg (Points)", f"{bt_report.mae_avg:.2f}")
+            perf_table.add_row("MFE Avg (Points)", f"{bt_report.mfe_avg:.2f}")
 
-            console.print(Panel(perf_table, border_style="green"))
+            # Date range info
+            if bt_report.start_date and bt_report.end_date:
+                perf_table.add_section()
+                perf_table.add_row("Start Date", bt_report.start_date.strftime("%Y-%m-%d"))
+                perf_table.add_row("End Date", bt_report.end_date.strftime("%Y-%m-%d"))
+
+            console.print(Panel(perf_table, border_style="green", expand=False))
     finally:
         connector.disconnect()
     return 0

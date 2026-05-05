@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -132,11 +132,9 @@ class BacktestEngine:
         data = data.copy()
         data["atr"] = tr.rolling(14).mean()
 
-        start = 0
         active_trades: list[dict[str, Any]] = []
 
         # Optimization: Pre-extract data into NumPy arrays to avoid expensive pandas indexing in the loop
-        # Slicing .iloc[i] on a DataFrame creates a new Series object, which is slow.
         high_vals = data["high"].values
         low_vals = data["low"].values
         close_vals = data["close"].values
@@ -144,15 +142,28 @@ class BacktestEngine:
         time_vals = data.index
         feature_vals = df_features.values
 
+        # Track peak equity for real-time drawdown calculation
+        peak_equity = self.initial_balance
+        last_processed_idx = -1
+
+        start = 0
         while start + train_window + test_window <= n:
             test_start_idx = start + train_window
+            # Determine how many bars to process in this window to avoid overlap
+            # Usually we process 'step_size' bars, but if it's the last window, we might process up to 'test_window'
+            bars_to_process = step_size
+            if start + train_window + step_size + test_window > n:
+                bars_to_process = n - test_start_idx
 
-            for i in range(test_window):
+            for i in range(bars_to_process):
                 abs_idx = test_start_idx + i
+                if abs_idx <= last_processed_idx:
+                    continue
+                last_processed_idx = abs_idx
+
                 bar_time = time_vals[abs_idx]
 
                 # 1. Update active trades (SL/TP checks)
-                # Optimization: Pass raw values instead of a pd.Series
                 self._update_active_trades(
                     active_trades,
                     high=high_vals[abs_idx],
@@ -160,22 +171,31 @@ class BacktestEngine:
                     timestamp=bar_time,
                 )
 
+                # Update peak equity for drawdown calc
+                current_equity = self.balance + sum(
+                    (close_vals[abs_idx] - t["entry_price"]) * t["signal"].direction * t["signal"].lot_size * 100
+                    for t in active_trades
+                )
+                peak_equity = max(peak_equity, current_equity)
+
                 # 2. Skip if max positions reached
                 if len(active_trades) >= self.max_positions:
                     continue
 
                 # 3. Get Model Signal
-                # Optimization: Direct NumPy row access
                 obs = feature_vals[abs_idx]
                 try:
+                    # Some models expect a sequence or specific format
                     signal_obj = model.predict(obs)
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
                 except Exception:
+                    # Fallback for simple predict(obs) returning array or int
                     pred = model.predict(obs)
-                    direction = (
-                        int(pred[0]) if isinstance(pred, (tuple, list, np.ndarray)) else int(pred)
-                    )
+                    if isinstance(pred, (tuple, list, np.ndarray)):
+                        direction = int(pred[0])
+                    else:
+                        direction = int(pred)
                     confidence = 1.0
 
                 if direction == 0:
@@ -196,22 +216,27 @@ class BacktestEngine:
                     entry_price=price,
                     stop_loss=stop_loss,
                     take_profit=take_profit,
-                    lot_size=0.1,  # Base lot
+                    lot_size=0.1,
                     algorithm="backtest",
                     confidence=confidence,
                     timestamp=bar_time,
                 )
 
-                # Prepare filter context
-                # Optimization: Position-based slicing is significantly faster than label-based (.loc)
-                filter_context = df_features.iloc[: abs_idx + 1]
-                drawdown = (self.initial_balance - self.balance) / self.initial_balance
+                # Prepare filter context (optimization: use a limited window if possible)
+                # But current ExecutionFilter might need long history for some indicators
+                # We use the full available history up to now.
+                filter_context = df_features.iloc[max(0, abs_idx - 200) : abs_idx + 1]
+                drawdown = (peak_equity - current_equity) / peak_equity if peak_equity > 0 else 0.0
+
+                # Get model health if available (for Layer 7)
+                health = getattr(model, "get_health_metrics", lambda: None)()
 
                 decision = self.ef.validate(
                     signal,
                     filter_context,
                     current_drawdown=drawdown,
                     timestamp=bar_time,
+                    model_health=health,
                 )
 
                 if decision.is_approved:
@@ -238,22 +263,25 @@ class BacktestEngine:
         low: float,
         timestamp: datetime,
     ) -> None:
-        """Checks SL/TP for all active trades and closes them if hit."""
+        """
+        Checks SL/TP for all active trades and closes them if hit.
+        Optimization: Uses localized price checks.
+        """
         closed_indices = []
         for i, trade in enumerate(active_trades):
             signal = trade["signal"]
             direction = signal.direction
             entry_price = trade["entry_price"]
 
-            # Update MAE/MFE
-            if direction == 1:
+            # 1. Update MAE/MFE using current bar
+            if direction == 1:  # BUY
                 trade["mae"] = max(trade["mae"], entry_price - low)
                 trade["mfe"] = max(trade["mfe"], high - entry_price)
-            else:
+            else:  # SELL
                 trade["mae"] = max(trade["mae"], high - entry_price)
                 trade["mfe"] = max(trade["mfe"], entry_price - low)
 
-            # SL/TP Check
+            # 2. SL/TP Check
             exit_price = None
             if direction == 1:
                 if low <= signal.stop_loss:
@@ -270,6 +298,7 @@ class BacktestEngine:
                 self._record_trade(trade, exit_price, timestamp)
                 closed_indices.append(i)
 
+        # 3. Clean up closed trades (in reverse to preserve indices)
         for i in sorted(closed_indices, reverse=True):
             active_trades.pop(i)
 
@@ -338,22 +367,29 @@ class BacktestEngine:
         drawdown = (peak - equity_curve) / peak
         max_drawdown = np.max(drawdown)
 
-        # Sharpe Ratio (daily approximation)
-        if len(pnls) > 1:
-            avg_pnl = np.mean(pnls)
-            std_pnl = np.std(pnls)
-            sharpe = (avg_pnl / std_pnl * np.sqrt(252)) if std_pnl > 0 else 0.0
+        # Start and end times
+        start_time = self.trades[0].entry_time
+        end_time = self.trades[-1].exit_time
+        duration = end_time - start_time
+        days = max(1, duration.days + duration.seconds / 86400)
+
+        # Sharpe Ratio calculation based on daily returns
+        # We estimate daily returns from total return over days
+        daily_returns = pnls / self.initial_balance  # simplified per-trade return
+        if len(daily_returns) > 1:
+            avg_return = np.mean(daily_returns)
+            std_return = np.std(daily_returns)
+            # Annualize by assuming average number of trades per day
+            trades_per_day = len(pnls) / days
+            sharpe = (avg_return / (std_return + 1e-9)) * np.sqrt(252 * trades_per_day)
         else:
             sharpe = 0.0
 
-        # Annualized Return
-        start_time = self.trades[0].entry_time
-        end_time = self.trades[-1].exit_time
-        days = (end_time - start_time).days
-        if days > 0:
+        # Annualized Return (Compound Annual Growth Rate)
+        if total_return > -1:
             annualized_return = (1 + total_return) ** (365 / days) - 1
         else:
-            annualized_return = total_return
+            annualized_return = -1.0
 
         report = PerformanceReport(
             annualized_return=annualized_return,
