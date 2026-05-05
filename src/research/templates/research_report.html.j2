@@ -43,6 +43,16 @@
         .badge-warning { background: #fef3c7; color: #92400e; }
         .badge-critical { background: #fde8e8; color: #9b1c1c; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .kpi-dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 2.5rem; }
+        .kpi-card { background: var(--white); padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid var(--secondary); }
+        .kpi-value { font-size: 2rem; font-weight: 800; color: var(--primary); display: block; }
+        .kpi-label { font-size: 0.85rem; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.025em; }
+        .status-badge { padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; }
+        .status-verified { background: #def7ec; color: #03543f; }
+        .status-provisional { background: #fef3c7; color: #92400e; }
+        .status-rejected { background: #fde8e8; color: #9b1c1c; }
+        .recommendation-list { list-style: none; padding: 0; }
+        .recommendation-item { background: #f0fff4; border-left: 4px solid var(--success); padding: 1rem; margin-bottom: 10px; border-radius: 0 8px 8px 0; }
         .back-to-top { position: fixed; bottom: 30px; right: 30px; background: var(--primary); color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s, background 0.2s; z-index: 1000; font-weight: bold; }
         .back-to-top:hover { transform: translateY(-3px); background: var(--secondary); color: white; }
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .metadata { flex-direction: column; gap: 5px; } .back-to-top { bottom: 20px; right: 20px; width: 40px; height: 40px; } }
@@ -75,9 +85,40 @@
         <div class="metadata">
             <span><strong>Date:</strong> {{ timestamp }}</span>
             <span><strong>Author:</strong> {{ author }}</span>
-            <span><strong>Status:</strong> <span class="badge badge-stable">Verified</span></span>
+            <span><strong>Status:</strong>
+                <span class="status-badge {% if overall_status == 'VERIFIED' %}status-verified{% elif overall_status == 'REJECTED' %}status-rejected{% else %}status-provisional{% endif %}">
+                    {{ overall_status }}
+                </span>
+            </span>
         </div>
     </header>
+
+    <div class="kpi-dashboard">
+        {% if stress_tests %}
+        <div class="kpi-card" style="border-top-color: var(--danger);">
+            <span class="kpi-value">{{ stress_tests.resilience_score }}</span>
+            <span class="kpi-label">Resilience Score</span>
+        </div>
+        {% endif %}
+        {% if hyperparameter_robustness %}
+        <div class="kpi-card" style="border-top-color: var(--warning);">
+            <span class="kpi-value">{{ hyperparameter_robustness.stability_score }}</span>
+            <span class="kpi-label">Stability Score</span>
+        </div>
+        {% endif %}
+        {% if execution_quality %}
+        <div class="kpi-card" style="border-top-color: var(--secondary);">
+            <span class="kpi-value">{{ execution_quality.efficiency_score|round(1) }}</span>
+            <span class="kpi-label">Execution Efficiency</span>
+        </div>
+        {% endif %}
+        {% if allocation_insights %}
+        <div class="kpi-card" style="border-top-color: var(--success);">
+            <span class="kpi-value">{{ allocation_insights.diversification_score|round(2) }}</span>
+            <span class="kpi-label">Diversification</span>
+        </div>
+        {% endif %}
+    </div>
 
     <nav class="toc">
         <h2>Table of Contents</h2>
@@ -521,7 +562,19 @@
     {% set ns.count = ns.count + 1 %}
     <section id="conclusion">
         <h2>{{ ns.count }}. Conclusion & Recommendations</h2>
-        <p>{{ conclusion }}</p>
+        <div style="margin-bottom: 2rem;">
+            <h3>Strategic Conclusion</h3>
+            <p>{{ conclusion }}</p>
+        </div>
+
+        {% if recommendations %}
+        <h3>Actionable Recommendations</h3>
+        <ul class="recommendation-list">
+            {% for rec in recommendations %}
+            <li class="recommendation-item">{{ rec }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
     </section>
 
     <a href="#" class="back-to-top" title="Back to top" aria-label="Scroll back to top">↑</a>

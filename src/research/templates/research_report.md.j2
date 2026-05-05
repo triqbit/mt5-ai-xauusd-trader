@@ -4,6 +4,7 @@
 **Report Metadata**
 - **Date:** {{ timestamp }}
 - **Author:** {{ author }}
+- **Status:** {{ overall_status }}
 - **Scope:** Research and Strategy Audit
 ---
 
@@ -207,4 +208,12 @@
 
 ---
 ## Conclusion & Recommendations
+**Strategic Conclusion:**
 {{ conclusion }}
+
+{% if recommendations %}
+**Actionable Recommendations:**
+{% for rec in recommendations %}
+- {{ rec }}
+{% endfor %}
+{% endif %}

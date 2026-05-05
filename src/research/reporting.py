@@ -192,6 +192,7 @@ class ResearchReport(BaseModel):
     title: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     author: str = "Jules Research"
+    overall_status: str = "PROVISIONAL"
     executive_summary: str
 
     regime_analysis: RegimeSection | None = None
@@ -206,6 +207,7 @@ class ResearchReport(BaseModel):
     execution_quality: ExecutionQualitySection | None = None
 
     conclusion: str
+    recommendations: list[str] = Field(default_factory=list)
 
 
 class ResearchReporter:
@@ -247,9 +249,12 @@ class ResearchReporter:
 
     def format_for_terminal(self, report: ResearchReport) -> None:
         """Print a scannable version of the report to the terminal."""
+        status_color = "green" if report.overall_status == "VERIFIED" else "yellow"
         self.console.print(
             Panel(
-                f"[bold blue]{report.title}[/]\n[dim]Date: {report.timestamp} | Author: {report.author}[/]"
+                f"[bold blue]{report.title}[/]\n"
+                f"[dim]Date: {report.timestamp} | Author: {report.author}[/]\n"
+                f"Status: [{status_color}]{report.overall_status}[/]"
             )
         )
 
@@ -414,6 +419,12 @@ class ResearchReporter:
 
         self.console.print("\n[bold]Conclusion[/]")
         self.console.print(report.conclusion)
+
+        if report.recommendations:
+            self.console.print("\n[bold]Recommendations[/]")
+            for rec in report.recommendations:
+                self.console.print(f"- {rec}")
+
         self.console.print("\n" + "=" * 50 + "\n")
 
 
@@ -422,9 +433,20 @@ class ResearchOrchestrator:
     Automates the aggregation of research results into a unified report.
     """
 
-    def __init__(self, title: str, executive_summary: str, conclusion: str):
+    def __init__(
+        self,
+        title: str,
+        executive_summary: str,
+        conclusion: str,
+        overall_status: str = "PROVISIONAL",
+        recommendations: list[str] | None = None,
+    ):
         self.report = ResearchReport(
-            title=title, executive_summary=executive_summary, conclusion=conclusion
+            title=title,
+            executive_summary=executive_summary,
+            conclusion=conclusion,
+            overall_status=overall_status,
+            recommendations=recommendations or [],
         )
 
     def add_section(self, section: BaseModel) -> None:
@@ -451,6 +473,14 @@ class ResearchOrchestrator:
             self.report.execution_quality = section
         else:
             raise ValueError(f"Unknown section type: {type(section)}")
+
+    def set_status(self, status: str) -> None:
+        """Set the overall status of the report."""
+        self.report.overall_status = status
+
+    def add_recommendation(self, recommendation: str) -> None:
+        """Add a single recommendation to the report."""
+        self.report.recommendations.append(recommendation)
 
     def build(self) -> ResearchReport:
         """Return the finalized report."""
