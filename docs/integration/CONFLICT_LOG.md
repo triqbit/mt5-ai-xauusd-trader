@@ -75,3 +75,33 @@
 - **Impact**: High. Causes incorrect trade execution for transformer-based models.
 - **Resolution**: Refactor `TimeSeriesTransformer` and `TransformerAdapter` to align with `ModelAction`.
 - **Owner**: Jules05
+
+## [2026-05-05] - Type Fragmentation & Interface Inconsistency
+
+### 1. Enum Duplication (SignalDirection)
+- **Conflict**: `SignalDirection` is defined identically in both `src/core/constants.py` and `src/core/schemas.py`.
+- **Agents**: Jules01, Jules02
+- **Impact**: Medium. Leads to import confusion and potential type-check failures if different modules use different versions of the same enum.
+- **Resolution**: Centralize all core trading types and enums into `src/core/types.py`.
+- **Owner**: Jules05
+
+### 2. Signal Object Redundancy
+- **Conflict**: Three different representations of a "Signal" exist: `TradeSignal` (dataclass in `risk_manager.py`), `Signal` (NamedTuple in `base_model.py`), and `TradeSignalSchema` (Pydantic in `schemas.py`).
+- **Agents**: Jules01, Jules02
+- **Impact**: High. Fragmented data flow makes the pipeline hard to reason about and complicates testing.
+- **Resolution**: Harmonize on a single `TradeSignal` dataclass for logic and `TradeSignalSchema` for validation, moving both to `src/core/types.py`.
+- **Owner**: Jules05
+
+### 3. Interface Mismatch (BaseModel Extension)
+- **Conflict**: `BaseModel.predict` has a rigid signature `predict(self, features: np.ndarray)`, while `EnsembleModel` requires `seq` and `regime_info`. This forces `main.py` to use `isinstance` checks and `hasattr` hacks.
+- **Agents**: Jules01, Jules04, Jules05
+- **Impact**: Medium. Breaks polymorphism and makes adding new models difficult.
+- **Resolution**: Update `BaseModel.predict` to accept `**kwargs` and refactor `main.py` to pass context safely.
+- **Owner**: Jules05
+
+### 4. Overlapping Filter Logic
+- **Conflict**: `RiskManager` and `ExecutionFilter` both claim to implement multi-layer cascades (6-layer vs 9-layer), with overlapping checks (e.g., confidence).
+- **Agents**: Jules01, Jules02
+- **Impact**: Low (Technical Debt). Inefficient and confusing documentation.
+- **Resolution**: Standardize documentation and clarify the separation of concerns: `RiskManager` for capital/account-level risk, `ExecutionFilter` for technical/market-level signal vetting.
+- **Owner**: Jules05
