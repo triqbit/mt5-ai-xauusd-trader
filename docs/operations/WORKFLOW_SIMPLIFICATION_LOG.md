@@ -1,120 +1,92 @@
-# Workflow Simplification Log
+# ⚡ Workflow Simplification Log
 
-This document maps friction points in the current repository workflow and identifies automation opportunities to eliminate manual waiting, judgment, or repetitive review effort.
+This log identifies every point where the current repository workflow depends on manual waiting, judgment, or repetitive effort, and defines the automation required to eliminate human intervention while preserving enterprise safety.
 
 ---
 
-### Friction: Setup and installation
+### Friction: Setup and Installation
 **Current state:** Manual step-by-step installation following `SETUP_GUIDE.md` (estimated 30-45 mins).
-**Proposed automation:** `make init` command (One-command workflow) that handles virtual environment creation, OS-specific dependency installation (including TA-Lib compilation), and directory structure initialization in a single automated flow.
+**Proposed automation:** `make init` (One-command workflow) that automates environment creation, dependency resolution (including OS-specific TA-Lib builds), and credential templating.
 **Implementation owner:** Jules01
 **Risk level:** Low
-**Estimated time saved:** 25 minutes per occurrence
+**Estimated time saved:** 25 minutes per new environment
 
----
-
-### Friction: Configuration validation
-**Current state:** Manual `.env` creation and verification of parameter correctness against `src/core/config.py`.
-**Proposed automation:** `make validate-config` (Acceptance contract) that runs a Pydantic-based validation suite against the current environment and `.env`. This is integrated as a pre-commit hook and a CI merge gate to block invalid configs.
+### Friction: Configuration Validation
+**Current state:** Manual verification of `.env` correctness and parameter alignment (estimated 5-10 mins).
+**Proposed automation:** `make validate-config` (Acceptance contract) using Pydantic-based validation to verify all required secrets and parameters before startup. Integrated as a pre-commit hook and CI gate.
 **Implementation owner:** Jules02
 **Risk level:** Low
-**Estimated time saved:** 5 minutes per occurrence
+**Estimated time saved:** 10 minutes per configuration change
 
----
-
-### Friction: Starting a backtest
-**Current state:** Manual script invocation with varied parameters; lack of standardized entrypoint.
-**Proposed automation:** `make backtest` (One-command workflow) with sensible defaults (Symbol: XAUUSD, Timeframe: M5, Range: Last 3 months) and automated result archiving into `data/backtests/`.
+### Friction: Starting a Backtest
+**Current state:** Manual parameter tuning and execution of fragmented scripts (estimated 15 mins).
+**Proposed automation:** `make backtest` (One-command workflow) with standardized parameter templates (e.g., `make backtest-last-month`) and automated result archiving.
 **Implementation owner:** Jules01
 **Risk level:** Low
-**Estimated time saved:** 10 minutes per occurrence
+**Estimated time saved:** 10 minutes per backtest run
 
----
-
-### Friction: Running in demo/paper mode
-**Current state:** Manual setup of demo accounts and specific CLI flag combinations.
-**Proposed automation:** `make demo` (One-command workflow) target that auto-detects demo credentials and launches the bot with safety-first parameters (reduced position sizing, no live execution).
+### Friction: Running in Demo/Paper Mode
+**Current state:** Manual CLI flag configuration and demo account setup (estimated 5 mins).
+**Proposed automation:** `make demo` (One-command workflow) that auto-loads demo credentials and launches the bot with safety-hardened parameters.
 **Implementation owner:** Jules01
 **Risk level:** Low
-**Estimated time saved:** 2 minutes per occurrence
+**Estimated time saved:** 5 minutes per launch
 
----
-
-### Friction: Reviewing model performance
-**Current state:** Manual querying of `trades.db` or reading raw logs to assess strategy performance.
-**Proposed automation:** `make report` (Self-service dashboard) command that generates a standardized performance Markdown/HTML report including Sharpe Ratio, Max Drawdown, and Win Rate, served via a local temporary server or saved to `docs/reports/`.
+### Friction: Reviewing Model Performance
+**Current state:** Manual SQL querying of `trades.db` and spreadsheet-based analysis (estimated 30 mins).
+**Proposed automation:** `make report` (Self-service dashboard) that generates a standardized HTML/Markdown performance report with Sharpe, Drawdown, and Win Rate metrics.
 **Implementation owner:** Jules04
 **Risk level:** Low
-**Estimated time saved:** 15 minutes per review
+**Estimated time saved:** 25 minutes per review
 
----
-
-### Friction: Deploying to production
-**Current state:** Manual checklist verification (`docs/PREPROD_CHECKLIST.md`) and multi-step deployment execution.
-**Proposed automation:** Automated "Acceptance Contract" gate on PRs to `main`. If backtest metrics, test coverage (85%), or security scans fail, the merge is blocked. Successful merges to `main` trigger deterministic branch promotion to `production`.
+### Friction: Deploying to Production
+**Current state:** Manual checklist verification in `docs/PREPROD_CHECKLIST.md` (estimated 60 mins).
+**Proposed automation:** `Acceptance Contract` (Merge gate) on `main` branch. Merges to `production` are only permitted if automated backtests, 85% coverage, and security scans pass. Automated `Branch promotion logic` handles the deployment.
 **Implementation owner:** Jules03
-**Risk level:** Medium
-**Estimated time saved:** 30 minutes per release
+**Risk level:** High
+**Estimated time saved:** 50 minutes per release
 
----
-
-### Friction: Monitoring and alerting
-**Current state:** Dependence on manual checks of Telegram or Prometheus dashboards.
-**Proposed automation:** `make status` (Self-service dashboard) command providing a rich-text TUI summary of system health, active positions, recent signals, and connectivity status (MT5/DB/Redis).
+### Friction: Monitoring and Alerting
+**Current state:** Manual polling of Telegram or Grafana for system status (estimated 10 mins/hour).
+**Proposed automation:** `make status` (Self-service dashboard) for local health TUI, plus automated "Push" alerts for critical health failures or execution drift.
 **Implementation owner:** Jules02
-**Risk level:** Low
-**Estimated time saved:** 5 minutes per check
+**Risk level:** Medium
+**Estimated time saved:** 30 minutes per day
 
----
-
-### Friction: Incident response
-**Current state:** Manual intervention required in MT5 terminal or killing processes.
-**Proposed automation:** `make emergency-stop` (One-command workflow) command that immediately closes all open positions via the trading API and shuts down the bot process safely.
+### Friction: Incident Response
+**Current state:** Manual intervention in MT5 or killing processes during crises (estimated 5-10 mins).
+**Proposed automation:** `make emergency-stop` (One-command workflow) that immediately flattens all open positions and initiates a graceful system shutdown.
 **Implementation owner:** Jules03
 **Risk level:** Medium
-**Estimated time saved:** 10 minutes during a crisis
+**Estimated time saved:** 10 minutes during a crisis (critical for capital preservation)
 
----
-
-### Friction: Post-trade analysis
-**Current state:** Manual extraction of trade data for attribution analysis.
-**Proposed automation:** Automated post-trade attribution report (Self-service dashboard) generated daily, mapping trades to the specific model features and regime conditions that triggered them, stored in `docs/analytics/`.
+### Friction: Post-Trade Analysis
+**Current state:** Manual attribution of trades to model features and market regimes (estimated 45 mins).
+**Proposed automation:** `make analytics` (Self-service dashboard) that automatically maps trade outcomes to the specific features and regimes that triggered them.
 **Implementation owner:** Jules04
 **Risk level:** Low
-**Estimated time saved:** 20 minutes per analysis
+**Estimated time saved:** 40 minutes per session
 
----
-
-### Friction: Daily operator review
-**Current state:** Fragmented review of performance, logs, and system health.
-**Proposed automation:** `make daily-summary` (Self-service dashboard) that aggregates all operational data (health, trades, drift, coverage) into a single "Intelligence Briefing" generated by `generate_triage_report.py`.
+### Friction: Daily Operator Review
+**Current state:** Fragmented review of logs, performance, and health (estimated 20 mins).
+**Proposed automation:** `make daily-summary` (Self-service dashboard) that aggregates all operational data into a single "Intelligence Briefing" via `generate_triage_report.py`.
 **Implementation owner:** Jules05
 **Risk level:** Low
 **Estimated time saved:** 15 minutes per day
 
----
+### Friction: PR Triage and Review Effort
+**Current state:** Manual triage of a 380+ PR backlog (estimated 2 hours/day).
+**Proposed automation:** `Merge gates that replace manual review` (Acceptance contract) for "Safe Surface" PRs. Deterministic labeling via `scripts/generate_triage_report.py` identifies PRs eligible for auto-merge.
+**Implementation owner:** Jules05
+**Risk level:** Medium
+**Estimated time saved:** 90 minutes per day
 
-### Friction: PR Triage and Risk Labeling
-**Current state:** Manual triage of incoming PRs to determine risk and priority.
-**Proposed automation:** Automated labeling and risk classification (Merge gate/Template) using `generate_triage_report.py` logic. PRs are automatically tagged with `high-risk`, `medium-risk`, or `safe-surface` to guide reviewer focus.
+### Friction: Standardizing Feature/Bug Requests
+**Current state:** Ambiguous issue descriptions leading to back-and-forth (estimated 15 mins/issue).
+**Proposed automation:** `Templates that reduce decision paralysis` (Issue/PR Templates) that enforce mandatory fields (Acceptance Criteria, Risk Assessment, Test Plan) before submission.
 **Implementation owner:** Jules05
 **Risk level:** Low
-**Estimated time saved:** 10 minutes per PR
+**Estimated time saved:** 10 minutes per issue
 
 ---
-
-### Friction: Dependency Security Audits
-**Current state:** Manual execution of `pip-audit` or waiting for CI failures.
-**Proposed automation:** "Security Gate" (Acceptance contract) in the `pre-deploy-validation` workflow that blocks merges if new High/Critical vulnerabilities are introduced, providing immediate remediation instructions in PR comments.
-**Implementation owner:** Jules02
-**Risk level:** Low
-**Estimated time saved:** 15 minutes per dependency update
-
----
-
-### Friction: Database Migration Safety
-**Current state:** Manual verification of migration scripts.
-**Proposed automation:** `make verify-migrations` (Acceptance contract) integrated into CI that performs an up/down/up cycle on a temporary database for every PR touching `migrations/`.
-**Implementation owner:** Jules03
-**Risk level:** Medium
-**Estimated time saved:** 20 minutes per migration
+*Generated by Jules05 — Autonomous Product Steward.*
