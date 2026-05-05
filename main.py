@@ -96,6 +96,7 @@ def run_live(
     trade_logger: Optional[TradeLogger] = None,
     monitor: Optional[Monitor] = None,
     console: Optional[Console] = None,
+    audit_logger: Optional[AuditLogger] = None,
 ) -> None:
     log = logging.getLogger("main.live")
     explainer = SignalExplainer()
@@ -154,6 +155,15 @@ def run_live(
                     if monitor:
                         monitor.check_confidence_degradation(confidence)
 
+                    # Log prediction to audit trail
+                    if audit_logger:
+                        audit_logger.log_prediction(
+                            symbol=cfg.symbol,
+                            direction=direction,
+                            confidence=confidence,
+                            model_metadata=signal_obj.metadata if hasattr(signal_obj, "metadata") else None
+                        )
+
                 log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
 
                 signal_id = None
@@ -185,6 +195,12 @@ def run_live(
 
                     if not alloc_result.is_allowed:
                         log.warning("Allocation REJECTED | %s | Reason: %s", strat_id, alloc_result.rejection_reason)
+                        if audit_logger:
+                            audit_logger.log_blocked_trade(
+                                symbol=cfg.symbol,
+                                reason=f"Capital allocation rejected: {alloc_result.rejection_reason}",
+                                context={"strategy_id": strat_id}
+                            )
                         approved_risk = 0.0
                     else:
                         approved_risk = alloc_result.allocated_risk_pct
@@ -229,6 +245,11 @@ def run_live(
                         )
                         if not filter_decision.is_approved:
                             log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
+                            audit_logger.log_blocked_trade(
+                                symbol=cfg.symbol,
+                                reason=f"Execution filter blocked: {filter_decision.blocked_by}",
+                                context={"filter": filter_decision.blocked_by, "confidence": filter_decision.confidence_score}
+                            )
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
@@ -302,6 +323,12 @@ def run_live(
                             ticket = connector.place_order(signal)
                         except MT5ExecutionError as e:
                             log.error("Order execution FAILED: %s", e)
+                            if audit_logger:
+                                audit_logger.log_blocked_trade(
+                                    symbol=cfg.symbol,
+                                    reason=f"Order execution failure: {str(e)}",
+                                    context={"direction": direction, "lot_size": lot_size}
+                                )
                             ticket = None
 
                         if ticket:
@@ -352,6 +379,12 @@ def run_live(
                 time.sleep(poll_interval)
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
+                if audit_logger:
+                    audit_logger.log_operator_action(
+                        operator="user",
+                        action="shutdown",
+                        reason="KeyboardInterrupt"
+                    )
                 break
             except MT5ConnectionError as exc:
                 log.error("Critical connection failure: %s. Re-initializing...", exc)
@@ -469,6 +502,11 @@ def main() -> int:
     database_url = cfg.database_url.get_secret_value()
     audit_db_url = database_url if "sqlite" in database_url else "sqlite:///audit.db"
     audit_logger = AuditLogger(db_url=audit_db_url)
+
+    # Log sanitized configuration snapshot
+    audit_logger.log_config_snapshot(
+        cfg.model_dump(mode='json', exclude={'mt5_password', 'metaapi_token', 'metaapi_account_id', 'database_url', 'telegram_token'})
+    )
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
     connector = MT5Connector(cfg)
@@ -564,6 +602,9 @@ def main() -> int:
         log.info("Pre-flight check COMPLETE. System is healthy.")
         return 0
 
+    # Record successful deployment/startup
+    audit_logger.log_deployment(version="1.1.0", environment=cfg.mode)
+
     try:
         if cfg.mode in ("demo", "live"):
             run_live(
@@ -579,6 +620,7 @@ def main() -> int:
                 trade_logger=trade_logger,
                 monitor=monitor,
                 console=console,
+                audit_logger=audit_logger,
             )
         elif cfg.mode == "backtest":
             from src.trading.backtester import BacktestEngine
