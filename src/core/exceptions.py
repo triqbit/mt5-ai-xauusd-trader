@@ -10,9 +10,15 @@ Centralized exception hierarchy for robust error handling and recovery.
 
 class TradingError(Exception):
     """Base exception for all trading-related errors."""
-    def __init__(self, message: str, details: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        message: str,
+        details: dict[str, Any] | None = None,
+        retriable: bool = False,
+    ):
         super().__init__(message)
         self.details = details or {}
+        self.retriable = retriable
 
 
 class MT5Error(TradingError):
