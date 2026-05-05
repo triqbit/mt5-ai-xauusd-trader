@@ -73,25 +73,37 @@ mkdir -p "$RELEASE_PATH"
 # --- 4. Artifact Collection ---
 
 # A. Docker Image (Save)
-# Check if the image already exists (either as vX.X.X or raw version)
-if docker image inspect "${IMAGE_NAME}:v${VERSION}" >/dev/null 2>&1; then
-    echo "Docker Image ${IMAGE_NAME}:v${VERSION} already exists. Skipping build..."
-    IMAGE_TAG="v${VERSION}"
-elif docker image inspect "${IMAGE_NAME}:${VERSION}" >/dev/null 2>&1; then
-    echo "Docker Image ${IMAGE_NAME}:${VERSION} exists. Skipping build..."
-    IMAGE_TAG="${VERSION}"
-elif [ -n "$GITHUB_SHA" ] && docker image inspect "${IMAGE_NAME}:${GITHUB_SHA}" >/dev/null 2>&1; then
-    echo "Docker Image for SHA ${GITHUB_SHA} exists. Tagging as v${VERSION} and using..."
-    docker tag "${IMAGE_NAME}:${GITHUB_SHA}" "${IMAGE_NAME}:v${VERSION}"
-    IMAGE_TAG="v${VERSION}"
-else
-    echo "Building Docker Image..."
-    if docker buildx version >/dev/null 2>&1; then
-        docker buildx build --load -t "${IMAGE_NAME}:v${VERSION}" .
+if [ "$SKIP_DOCKER_BUILD" = "true" ]; then
+    echo "SKIP_DOCKER_BUILD is true. Skipping Docker build and using existing image."
+    if docker image inspect "${IMAGE_NAME}:v${VERSION}" >/dev/null 2>&1; then
+        IMAGE_TAG="v${VERSION}"
+    elif docker image inspect "${IMAGE_NAME}:${VERSION}" >/dev/null 2>&1; then
+        IMAGE_TAG="${VERSION}"
     else
-        docker build -t "${IMAGE_NAME}:v${VERSION}" .
+        echo "Error: SKIP_DOCKER_BUILD is true but no image found for ${IMAGE_NAME}:v${VERSION} or ${IMAGE_NAME}:${VERSION}."
+        exit 1
     fi
-    IMAGE_TAG="v${VERSION}"
+else
+    # Check if the image already exists (either as vX.X.X or raw version)
+    if docker image inspect "${IMAGE_NAME}:v${VERSION}" >/dev/null 2>&1; then
+        echo "Docker Image ${IMAGE_NAME}:v${VERSION} already exists. Skipping build..."
+        IMAGE_TAG="v${VERSION}"
+    elif docker image inspect "${IMAGE_NAME}:${VERSION}" >/dev/null 2>&1; then
+        echo "Docker Image ${IMAGE_NAME}:${VERSION} exists. Skipping build..."
+        IMAGE_TAG="${VERSION}"
+    elif [ -n "$GITHUB_SHA" ] && docker image inspect "${IMAGE_NAME}:${GITHUB_SHA}" >/dev/null 2>&1; then
+        echo "Docker Image for SHA ${GITHUB_SHA} exists. Tagging as v${VERSION} and using..."
+        docker tag "${IMAGE_NAME}:${GITHUB_SHA}" "${IMAGE_NAME}:v${VERSION}"
+        IMAGE_TAG="v${VERSION}"
+    else
+        echo "Building Docker Image..."
+        if docker buildx version >/dev/null 2>&1; then
+            docker buildx build --load -t "${IMAGE_NAME}:v${VERSION}" .
+        else
+            docker build -t "${IMAGE_NAME}:v${VERSION}" .
+        fi
+        IMAGE_TAG="v${VERSION}"
+    fi
 fi
 
 echo "Exporting Docker Image ${IMAGE_NAME}:${IMAGE_TAG} to tarball..."

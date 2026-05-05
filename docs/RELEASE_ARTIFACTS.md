@@ -62,4 +62,4 @@ If any file fails verification (indicated by `FAILED`), the artifact is consider
 
 ---
 **Standard Owner:** Jules03 (Release Reliability & Governance)
-**Last Updated:** May 2024
+**Last Updated:** 2024-05-24
