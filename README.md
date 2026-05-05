@@ -38,7 +38,7 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 
 ### 🛡️ Institutional Risk Management
 - **Ray Dalio All-Weather Allocation:** Scenario-based risk parity across multi-currency pairs.
-- **6-Layer Execution Filter:** Cascade validation using ATR, Trend Angle, Momentum, and EMA sequencing.
+- **9-Layer Execution Filter:** Cascade validation using ATR, Trend Angle, Momentum, EMA sequencing, Session time, Drawdown, Model Stability, Performance, and Confidence.
 - **Circuit Breakers:** Automated drawdown protection, per-session loss limits, and daily profit targets.
 
 ### ⚡ Production Infrastructure

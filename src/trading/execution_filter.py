@@ -157,7 +157,11 @@ class ExecutionFilter:
         self, df: pd.DataFrame, threshold: float = 3.0
     ) -> tuple[bool, dict[str, Any]]:
         """Blocks if current ATR is > threshold * average ATR."""
-        if "base_M5_atr" not in df.columns:
+        if "base_M5_atr" in df.columns:
+            atr = df["base_M5_atr"]
+        elif "atr" in df.columns:
+            atr = df["atr"]
+        else:
             # Fallback calculation if not in DF
             high = df["high"]
             low = df["low"]
@@ -166,8 +170,6 @@ class ExecutionFilter:
                 [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
             ).max(axis=1)
             atr = tr.rolling(window=14).mean()
-        else:
-            atr = df["base_M5_atr"]
 
         current_atr = float(atr.iloc[-1])
         avg_atr = float(atr.rolling(window=100).mean().iloc[-1])

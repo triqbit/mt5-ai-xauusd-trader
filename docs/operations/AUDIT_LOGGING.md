@@ -48,6 +48,11 @@ Manual overrides and system shutdowns are tracked.
 - **Action:** `operator_shutdown`
 - **Details:** Reason for the action (e.g., `KeyboardInterrupt`).
 
+### 7. Technical Execution Filter Decision
+The full technical trace of the 9-layer execution filter cascade is recorded.
+- **Action:** `execution_decision`
+- **Metadata:** Comprehensive metrics for each layer (ATR ratio, RSI value, EMA sequence status, etc.) providing institutional audibility for entry vetting.
+
 ## Forensic Querying
 Audit logs can be queried directly via SQL for troubleshooting or compliance reviews:
 

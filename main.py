@@ -752,9 +752,7 @@ def main() -> int:
         return 0
 
     # Record successful deployment/startup
-    from src import __version__ as app_version
-
-    audit_logger.log_deployment(version=app_version, environment=cfg.mode)
+    audit_logger.log_deployment(version="1.1.0", environment=cfg.mode)
 
     try:
         if cfg.mode in ("demo", "live"):

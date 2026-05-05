@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
 from src.trading.risk_manager import TradeSignal
 from src.core.audit_log import AuditLogger, AuditEntry
-from src.core.config import TradingConfig
 
 class MockConfig:
     def __init__(self):
@@ -50,6 +49,7 @@ def test_execution_filter_full_trace(execution_filter):
         confidence=0.8
     )
 
+    # We use UTC for the test to avoid deprecation warnings where possible
     decision = execution_filter.validate(
         signal=signal,
         market_data=df,
@@ -86,7 +86,8 @@ def test_audit_log_execution_decision(audit_logger):
     )
 
     with audit_logger.Session() as session:
-        entry = session.query(AuditEntry).filter(AuditEntry.action == "execution_decision").first()
+        from sqlalchemy import select
+        entry = session.execute(select(AuditEntry).where(AuditEntry.action == "execution_decision")).scalar_one_or_none()
         assert entry is not None
         assert entry.actor == "execution_filter"
         assert entry.metadata_json["symbol"] == "XAUUSD"
