@@ -19,6 +19,7 @@ def with_retry(
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
     jitter: bool = True,
+    retry_if: Callable[[Any], bool] | None = None,
 ):
     """
     Decorator for retrying a function with exponential backoff.
@@ -29,6 +30,7 @@ def with_retry(
         initial_delay: Initial delay between retries in seconds.
         backoff_factor: Multiplier for the delay after each retry.
         jitter: Whether to add random jitter to the delay.
+        retry_if: Optional callable that takes the exception and returns True if it should be retried.
     """
     def decorator(func: Callable):
         @functools.wraps(func)
@@ -39,6 +41,9 @@ def with_retry(
                 try:
                     return func(*args, **kwargs)
                 except exceptions as e:
+                    if retry_if and not retry_if(e):
+                        raise
+
                     if attempt == max_retries:
                         logger.error(
                             "Max retries (%d) reached for %s. Last error: %s",

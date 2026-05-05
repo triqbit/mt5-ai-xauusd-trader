@@ -301,7 +301,13 @@ def run_live(
                         try:
                             ticket = connector.place_order(signal)
                         except MT5ExecutionError as e:
-                            log.error("Order execution FAILED: %s", e)
+                            if getattr(e, "retriable", False):
+                                log.warning(
+                                    "Order execution REJECTED (transient): %s. Signal skipped.",
+                                    e,
+                                )
+                            else:
+                                log.error("Order execution FAILED (permanent): %s", e)
                             ticket = None
 
                         if ticket:

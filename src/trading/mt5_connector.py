@@ -177,7 +177,9 @@ class MT5Connector:
         finally:
             self.shutdown()
 
-    @with_retry(MT5DataError, max_retries=3)
+    @with_retry(
+        MT5DataError, max_retries=3, retry_if=lambda e: getattr(e, "retriable", True)
+    )
     def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
@@ -190,16 +192,37 @@ class MT5Connector:
         if not self.use_metaapi:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
-                raise MT5DataError(f"Failed to copy rates: {mt5.last_error()}")
+                error_code, error_desc = mt5.last_error()
+                # Most data errors in MT5 are transient (connection, busy)
+                retriable = error_code in [
+                    mt5.TRADE_RETCODE_CONNECTION,
+                    mt5.TRADE_RETCODE_TIMEOUT,
+                    -5,  # Not found might be transient if terminal is rebooting
+                ]
+                raise MT5DataError(
+                    f"Failed to copy rates: {error_desc} (code: {error_code})",
+                    retriable=retriable,
+                )
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
+
             async def _get_rates():
-                candles = await self.metaapi_connection.get_historical_candles(
-                    symbol, timeframe, None, n_bars
-                )
-                return candles
+                try:
+                    candles = await self.metaapi_connection.get_historical_candles(
+                        symbol, timeframe, None, n_bars
+                    )
+                    return candles
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    retriable = any(
+                        kw in error_msg
+                        for kw in ["timeout", "connection", "rate limit", "busy"]
+                    )
+                    raise MT5DataError(
+                        f"MetaAPI rates fetch failed: {e}", retriable=retriable
+                    ) from e
 
             candles = asyncio.run(_get_rates())
             df = pd.DataFrame(candles)
@@ -240,7 +263,9 @@ class MT5Connector:
                 df["time"] = pd.to_datetime(df["time"])
             return df
 
-    @with_retry(MT5DataError, max_retries=2)
+    @with_retry(
+        MT5DataError, max_retries=2, retry_if=lambda e: getattr(e, "retriable", True)
+    )
     def get_tick(self, symbol: str) -> dict[str, float]:
         """Retrieve latest symbol tick."""
         if not self._is_initialized:
@@ -249,22 +274,48 @@ class MT5Connector:
         if not self.use_metaapi:
             tick = mt5.symbol_info_tick(symbol)
             if tick is None:
-                raise MT5DataError(f"Failed to get tick: {mt5.last_error()}")
+                error_code, error_desc = mt5.last_error()
+                retriable = error_code in [
+                    mt5.TRADE_RETCODE_CONNECTION,
+                    mt5.TRADE_RETCODE_TIMEOUT,
+                ]
+                raise MT5DataError(
+                    f"Failed to get tick: {error_desc} (code: {error_code})",
+                    retriable=retriable,
+                )
             return {"bid": tick.bid, "ask": tick.ask, "spread": tick.ask - tick.bid}
         else:
+
             async def _get_tick():
-                await self.metaapi_connection.get_symbol_specification(symbol)
-                price = await self.metaapi_connection.get_symbol_price(symbol)
-                return {
-                    "bid": price["bid"],
-                    "ask": price["ask"],
-                    "spread": price["ask"] - price["bid"]
-                }
+                try:
+                    await self.metaapi_connection.get_symbol_specification(symbol)
+                    price = await self.metaapi_connection.get_symbol_price(symbol)
+                    return {
+                        "bid": price["bid"],
+                        "ask": price["ask"],
+                        "spread": price["ask"] - price["bid"],
+                    }
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    retriable = any(
+                        kw in error_msg
+                        for kw in ["timeout", "connection", "rate limit", "busy"]
+                    )
+                    raise MT5DataError(
+                        f"MetaAPI tick fetch failed: {e}", retriable=retriable
+                    ) from e
+
             return asyncio.run(_get_tick())
 
+    @with_retry(
+        MT5ExecutionError,
+        max_retries=2,
+        retry_if=lambda e: getattr(e, "retriable", False),
+    )
     def place_order(self, signal: TradeSignal) -> int | None:
         """
         Execute a market order based on a validated trade signal.
+        Retries on transient errors (requotes, price changes).
 
         Args:
             signal: Validated TradeSignal object.
@@ -273,7 +324,7 @@ class MT5Connector:
             Order ticket ID if successful.
 
         Raises:
-            MT5ExecutionError: If order placement fails.
+            MT5ExecutionError: If order placement fails permanently.
         """
         if not self._is_initialized:
             raise MT5ConnectionError("MT5 connector not initialized.")
@@ -302,16 +353,42 @@ class MT5Connector:
 
             result = mt5.order_send(request)
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                raise MT5ExecutionError(f"Order rejected: {result.comment}")
+                retriable = result.retcode in [
+                    mt5.TRADE_RETCODE_REQUOTE,
+                    mt5.TRADE_RETCODE_PRICE_CHANGED,
+                    mt5.TRADE_RETCODE_CONNECTION,
+                    mt5.TRADE_RETCODE_TIMEOUT,
+                    mt5.TRADE_RETCODE_PRICE_OFF,
+                ]
+                raise MT5ExecutionError(
+                    f"Order rejected: {result.comment} (code: {result.retcode})",
+                    retriable=retriable,
+                )
             return int(result.order)
         else:
+
             async def _place_order():
-                action = 'BUY' if signal.direction > 0 else 'SELL'
-                result = await self.metaapi_connection.create_market_order(
-                    signal.symbol, action, signal.lot_size, signal.stop_loss,
-                    signal.take_profit, {'comment': f'AI:{signal.algorithm}'}
-                )
-                return int(result['orderId'])
+                try:
+                    action = "BUY" if signal.direction > 0 else "SELL"
+                    result = await self.metaapi_connection.create_market_order(
+                        signal.symbol,
+                        action,
+                        signal.lot_size,
+                        signal.stop_loss,
+                        signal.take_profit,
+                        {"comment": f"AI:{signal.algorithm}"},
+                    )
+                    return int(result["orderId"])
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    retriable = any(
+                        kw in error_msg
+                        for kw in ["timeout", "connection", "rate limit", "busy"]
+                    )
+                    raise MT5ExecutionError(
+                        f"MetaAPI order failed: {e}", retriable=retriable
+                    ) from e
+
             return asyncio.run(_place_order())
 
     def get_account_info(self) -> dict[str, Any]:
