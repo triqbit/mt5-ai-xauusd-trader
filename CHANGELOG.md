@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hybrid MT5 Connector:** Dual-path connection architecture supporting native Windows MT5 SDK and MetaAPI cloud failover for cross-platform reliability in `src/trading/mt5_connector.py`.
 - **Institutional Risk Engine:** Comprehensive risk management system featuring ATR-based position sizing, cascading daily loss circuit breakers (Level 1-4), and hard drawdown safeguards in `src/trading/risk_engine.py`.
 - **Ensemble Consensus Layer:** Weighted signal aggregation engine with model dissent checks and institutional confidence thresholds in `src/models/ensemble.py`.
+- **Institutional Capital Allocation:** Enhanced `CapitalAllocator` with portfolio heat tracking, symbol/family concentration limits, linear 'Diversification Guard' scaling, and performance-based cooling-off periods in `src/trading/capital_allocator.py`.
 
 ### Changed
 - Refactored `EnsembleModel` to support weighted voting across PPO, Dreamer, and LSTM models with dynamic weight adaptation.

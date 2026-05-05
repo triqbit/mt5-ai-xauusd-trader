@@ -82,6 +82,31 @@ allocator.update_strategy_performance("gold_ppo_v1", 500.0) # Profitable trade
 allocator.update_allocation("gold_ppo_v1", 0.0) # Reset allocation
 ```
 
+### Batch Allocation Example
+
+```python
+from src.trading.capital_allocator import CapitalAllocator, AllocationRequest
+
+allocator = CapitalAllocator(total_budget=100000.0)
+# ... register multiple strategies (e.g., s1, s2, s3) ...
+
+# Create a batch of requests
+requests = [
+    AllocationRequest(strategy_id="s1", risk_pct=0.02, allow_scaling=True),
+    AllocationRequest(strategy_id="s2", risk_pct=0.015, allow_scaling=True),
+    AllocationRequest(strategy_id="s3", risk_pct=0.01, allow_scaling=False)
+]
+
+# Process the batch (prioritizes by performance_multiplier automatically)
+results = allocator.allocate_batch(requests)
+
+for res in results:
+    if res.is_allowed:
+        print(f"Strategy {res.strategy_id} allocated ${res.allocated_amount:.2f}")
+    else:
+        print(f"Strategy {res.strategy_id} rejected: {res.rejection_reason}")
+```
+
 ## Integration with Risk Engine
 
 The `CapitalAllocator` serves as a high-level capital router that works alongside the `RiskManager`. While the `RiskManager` handles per-trade validation (e.g., SL/TP, daily loss limits), the `CapitalAllocator` manages the broader distribution of capital across the entire trading system.
