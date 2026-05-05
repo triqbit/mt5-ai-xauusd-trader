@@ -2,9 +2,9 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
-from src.trading.risk_manager import TradeSignal
+from src.core.types import TradeSignalExecution as TradeSignal
 from src.core.config import TradingConfig
-from datetime import datetime
+from datetime import UTC, datetime
 import pandas as pd
 import numpy as np
 
@@ -32,7 +32,7 @@ def valid_signal():
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.7,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(UTC)
     )
 
 @pytest.fixture

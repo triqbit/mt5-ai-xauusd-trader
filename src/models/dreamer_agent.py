@@ -10,8 +10,8 @@ from typing import Any
 
 import numpy as np
 
-from src.core.constants import SignalDirection
-from src.models.base_model import BaseModel, Signal
+from src.core.types import SignalDirection, TradeSignal as Signal
+from src.models.base_model import BaseModel
 
 
 class DreamerAgent(BaseModel):

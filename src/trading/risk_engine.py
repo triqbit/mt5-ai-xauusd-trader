@@ -19,6 +19,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
+from src.core.audit_log import get_audit_logger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -68,39 +69,67 @@ class RiskEngine:
         logger.info("RiskEngine initialised | balance=%.2f", account_balance)
 
     def validate_signal(
-        self, signal: Any, market_data: pd.DataFrame, open_positions: list[dict[str, Any]]
+        self,
+        signal: Any,
+        market_data: pd.DataFrame,
+        open_positions: list[dict[str, Any]],
+        signal_id: Optional[int] = None,
     ) -> RiskDecision:
         """
         Validate a trade signal against all risk layers.
+        Logs the decision chain to the audit log for institutional traceability.
         """
-        # 1. Circuit Breakers
-        if not self._check_drawdown_breaker():
-            return RiskDecision(False, "Hard drawdown limit reached")
+        symbol = getattr(signal, "symbol", "UNKNOWN")
+        confidence = getattr(signal, "confidence", 0.0)
+        direction = getattr(signal, "direction", 0)
 
-        if not self._check_daily_loss_breaker():
-            return RiskDecision(False, "Daily loss limit reached (Level 4)")
+        decision_chain = {
+            "drawdown_breaker": self._check_drawdown_breaker(),
+            "daily_loss_breaker": self._check_daily_loss_breaker(),
+            "max_daily_trades": self.daily.trade_count < self.cfg.max_trades_per_day,
+            "max_consecutive_losses": self.daily.consecutive_losses < self.cfg.max_losing_streak,
+            "max_positions": len(open_positions) < self.cfg.max_positions,
+            "min_confidence": confidence >= self.cfg.min_confidence,
+        }
 
-        if self.daily.trade_count >= self.cfg.max_trades_per_day:
-            return RiskDecision(False, "Max daily trades reached")
+        # Sizing and additional filters
+        adjusted_lots = 0.0
+        if all(decision_chain.values()):
+            adjusted_lots = self.calculate_position_size(symbol, market_data)
+            decision_chain["min_lot_size"] = adjusted_lots >= self.cfg.min_lot_size
+        else:
+            decision_chain["min_lot_size"] = False
 
-        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
-            return RiskDecision(False, "Max consecutive losses reached")
+        passed = all(decision_chain.values())
 
-        # 2. Exposure Limits
-        if len(open_positions) >= self.cfg.max_positions:
-            return RiskDecision(False, "Max concurrent positions reached")
-
-        # 3. Sizing & Confidence
-        if signal.confidence < self.cfg.min_confidence:
-            return RiskDecision(
-                False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
+        # Log to Audit Trail
+        try:
+            audit = get_audit_logger()
+            audit.log_risk_decision(
+                symbol=symbol,
+                direction=direction,
+                decision_chain=decision_chain,
+                passed=passed,
             )
+        except (RuntimeError, ImportError):
+            logger.debug("AuditLogger not available for risk decision logging")
 
-        # ATR-based position sizing adjustment
-        adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
-
-        if adjusted_lots < self.cfg.min_lot_size:
-            return RiskDecision(False, f"Calculated lot size {adjusted_lots} below minimum")
+        if not passed:
+            rejection_reasons = [k for k, v in decision_chain.items() if not v]
+            reason_str = ", ".join(rejection_reasons)
+            logger.warning(
+                "Signal REJECTED | %s | Failed: %s",
+                symbol,
+                reason_str,
+            )
+            if self.trade_logger:
+                self.trade_logger.log_risk_event(
+                    event_type="SIGNAL_REJECTED",
+                    description=f"Failed filters: {reason_str}",
+                    symbol=symbol,
+                    signal_id=signal_id,
+                )
+            return RiskDecision(False, f"Failed: {reason_str}")
 
         return RiskDecision(True, "Approved", adjusted_lots)
 

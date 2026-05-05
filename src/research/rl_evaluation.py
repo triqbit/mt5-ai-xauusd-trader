@@ -14,7 +14,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 from scipy import stats
 
-from src.core.constants import SignalDirection
+from src.core.types import SignalDirection
 from src.models.regime_detector import MarketRegime, RegimeDetector
 
 logger = logging.getLogger(__name__)

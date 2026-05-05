@@ -2,7 +2,8 @@
 
 import contextlib
 
-from src.models.base_model import BaseModel, Signal
+from src.core.types import TradeSignal as Signal
+from src.models.base_model import BaseModel
 
 # Heavy AI dependencies are suppressed to allow CLI/Config functionality
 # in environments without torch/SB3 (e.g., some CI runners).
