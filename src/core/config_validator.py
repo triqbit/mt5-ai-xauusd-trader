@@ -46,6 +46,10 @@ class ConfigValidator:
 
     def _check_mt5_credentials(self) -> None:
         """Verify MT5 credentials are provided and formatted correctly."""
+        # Specific placeholders that shouldn't be used
+        full_match_placeholders = ["TEST", "PASSWORD", "CHANGE_ME", "SERVER_NAME", ""]
+        substring_placeholders = ["YOUR_SERVER_HERE", "YOUR_PASSWORD_HERE", "YOUR_TOKEN"]
+
         if self.config.mt5_login <= 0:
             self.errors.append(
                 ValidationError(
@@ -56,8 +60,12 @@ class ConfigValidator:
                 )
             )
 
-        mt5_placeholders = ["", "server_name", "test", "your_server_here", "change_me"]
-        if not self.config.mt5_server or self.config.mt5_server.lower() in mt5_placeholders:
+        mt5_server = self.config.mt5_server.upper() if self.config.mt5_server else ""
+        if (
+            not mt5_server
+            or mt5_server in full_match_placeholders
+            or any(p in mt5_server for p in substring_placeholders)
+        ):
             self.errors.append(
                 ValidationError(
                     "MT5_SERVER",
@@ -66,10 +74,23 @@ class ConfigValidator:
                     "Set MT5_SERVER in your .env (e.g., IC-Markets-Demo).",
                 )
             )
+        elif " " in self.config.mt5_server:
+            self.errors.append(
+                ValidationError(
+                    "MT5_SERVER",
+                    "MT5 server name contains spaces.",
+                    False,  # Warning
+                    "Remove spaces from MT5_SERVER (e.g., Use IC-Markets-Demo instead of IC Markets Demo).",
+                )
+            )
 
-        password_placeholders = ["", "password", "test", "your_password_here", "change_me"]
         mt5_password = self.config.mt5_password.get_secret_value()
-        if not mt5_password or mt5_password.lower() in password_placeholders:
+        mt5_password_up = mt5_password.upper()
+        if (
+            not mt5_password
+            or mt5_password_up in full_match_placeholders
+            or any(p in mt5_password_up for p in substring_placeholders)
+        ):
             self.errors.append(
                 ValidationError(
                     "MT5_PASSWORD",
@@ -166,8 +187,9 @@ class ConfigValidator:
                 )
             )
 
-        if self.config.metaapi_account_id and any(
-            p in str(self.config.metaapi_account_id).upper() for p in placeholders
+        metaapi_account_id = self.config.metaapi_account_id.get_secret_value()
+        if metaapi_account_id and any(
+            p in metaapi_account_id.upper() for p in placeholders
         ):
             self.errors.append(
                 ValidationError(
@@ -391,7 +413,10 @@ class ConfigValidator:
             )
 
         # 2. MetaAPI Consistency
-        if self.config.metaapi_token and not self.config.metaapi_account_id:
+        has_meta_token = bool(self.config.metaapi_token.get_secret_value())
+        has_meta_id = bool(self.config.metaapi_account_id.get_secret_value())
+
+        if has_meta_token and not has_meta_id:
             self.errors.append(
                 ValidationError(
                     "METAAPI_ACCOUNT_ID",
@@ -401,7 +426,7 @@ class ConfigValidator:
                 )
             )
 
-        if self.config.metaapi_account_id and not self.config.metaapi_token:
+        if has_meta_id and not has_meta_token:
             self.errors.append(
                 ValidationError(
                     "METAAPI_TOKEN",
@@ -412,7 +437,10 @@ class ConfigValidator:
             )
 
         # 3. Telegram Consistency
-        if self.config.telegram_token and not self.config.telegram_chat_id:
+        has_tele_token = bool(self.config.telegram_token.get_secret_value())
+        has_tele_chat = bool(self.config.telegram_chat_id)
+
+        if has_tele_token and not has_tele_chat:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_CHAT_ID",
@@ -422,7 +450,7 @@ class ConfigValidator:
                 )
             )
 
-        if self.config.telegram_chat_id and not self.config.telegram_token:
+        if has_tele_chat and not has_tele_token:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",
@@ -433,7 +461,7 @@ class ConfigValidator:
             )
 
         # 4. Mode-specific warnings
-        if self.config.mode == "backtest" and self.config.telegram_token:
+        if self.config.mode == "backtest" and has_tele_token:
             self.errors.append(
                 ValidationError(
                     "TELEGRAM_TOKEN",

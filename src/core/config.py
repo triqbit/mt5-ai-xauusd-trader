@@ -39,7 +39,7 @@ class TradingConfig(BaseSettings):
 
     # ── MetaAPI (cloud fallback) ─────────────────────────────────────────────────
     metaapi_token: SecretStr = Field(default="", description="Authentication token for MetaAPI cloud services")
-    metaapi_account_id: str = Field(default="", description="Unique account identifier for MetaAPI provisioning")
+    metaapi_account_id: SecretStr = Field(default="", description="Unique account identifier for MetaAPI provisioning")
 
     # ── Trading parameters ─────────────────────────────────────────────────────
     symbol: str = Field(default="XAUUSD", description="The financial instrument to trade (e.g., XAUUSD)", validation_alias="SYMBOL")
