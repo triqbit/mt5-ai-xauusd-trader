@@ -73,6 +73,9 @@ def test_flash_crash_behavior(simulator):
     normal_vol = df["tick_volume"].iloc[:result.start_index].mean()
     assert crash_vol > normal_vol * 2
 
+    # Verify peak impact calculation (it should be negative for a crash)
+    assert result.peak_impact_pct < 0
+
 
 def test_liquidity_vacuum_behavior(simulator):
     config = RareEventConfig(event_type=RareEventType.LIQUIDITY_VACUUM, n_steps=300)
@@ -92,6 +95,11 @@ def test_liquidity_vacuum_behavior(simulator):
     vacuum_returns = returns.iloc[result.start_index : result.end_index]
     normal_returns = returns.iloc[:result.start_index]
     assert vacuum_returns.std() > normal_returns.std() * 5
+
+    # Check high/low expansion in vacuum
+    vacuum_range = (df["high"] - df["low"]).iloc[result.start_index : result.end_index].mean()
+    normal_range = (df["high"] - df["low"]).iloc[:result.start_index].mean()
+    assert vacuum_range > normal_range * 2
 
 
 def test_gold_gap_behavior(simulator):
@@ -172,3 +180,20 @@ def test_generate_suite(simulator):
         df, result = suite[event_type.value]
         assert len(df) == 200
         assert result.config.event_magnitude == 1.5
+
+
+def test_custom_bars_per_day(simulator):
+    # Test M1 frequency (1440 bars per day)
+    config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=100, bars_per_day=1440)
+    df, result = simulator.generate_scenario(config)
+
+    # Frequency should be 60 seconds (1 minute)
+    freq = (df.index[1] - df.index[0]).total_seconds()
+    assert freq == 60
+
+    # Test H1 frequency (24 bars per day)
+    config_h1 = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=100, bars_per_day=24)
+    df_h1, result_h1 = simulator.generate_scenario(config_h1)
+
+    freq_h1 = (df_h1.index[1] - df_h1.index[0]).total_seconds()
+    assert freq_h1 == 3600

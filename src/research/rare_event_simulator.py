@@ -42,6 +42,7 @@ class RareEventConfig(BaseModel):
     recovery_factor: float = Field(
         0.5, ge=0, le=1.0, description="Proportion of event impact recovered"
     )
+    bars_per_day: int = Field(288, ge=1, description="Number of bars per trading day (default 5m)")
     seed: int | None = None
 
 
@@ -105,6 +106,8 @@ class RareEventSimulator:
         if config.seed is not None:
             self.rng = np.random.default_rng(config.seed)
 
+        self._current_config = config
+
         if config.event_type == RareEventType.FLASH_CRASH:
             return self._simulate_flash_crash(config)
         if config.event_type == RareEventType.LIQUIDITY_VACUUM:
@@ -130,6 +133,7 @@ class RareEventSimulator:
         gaps: np.ndarray | None = None,
         spread_multiplier: float = 1.0,
     ) -> pd.DataFrame:
+        config_ref = getattr(self, "_current_config", None)
         """
         Helper to convert a returns series into a valid OHLCV DataFrame.
         Ensures price continuity: open[i] = close[i-1] unless gap requested.
@@ -174,8 +178,14 @@ class RareEventSimulator:
             }
         )
 
-        # Add a dummy timestamp index
-        df.index = pd.date_range(start="2024-01-01", periods=n, freq="5min")
+        # Add a dummy timestamp index. Use freq relative to bars_per_day if possible.
+        # Defaulting to 1 day / bars_per_day
+        total_seconds = 24 * 60 * 60
+        seconds_per_bar = 300
+        if config_ref:
+            seconds_per_bar = total_seconds // config_ref.bars_per_day
+
+        df.index = pd.date_range(start="2024-01-01", periods=n, freq=f"{seconds_per_bar}s")
 
         return df
 
@@ -229,7 +239,7 @@ class RareEventSimulator:
             start_index=start_idx,
             end_index=min(n - 1, start_idx + crash_duration + recovery_duration),
             peak_impact_pct=peak_impact,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=float(recovered_total_pct / abs(impact)) if impact != 0 else 0,
         )
 
@@ -283,7 +293,7 @@ class RareEventSimulator:
             start_index=start_idx,
             end_index=start_idx + duration,
             peak_impact_pct=peak_impact,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=1.0,
         )
 
@@ -317,7 +327,7 @@ class RareEventSimulator:
             start_index=gap_idx,
             end_index=gap_idx + post_gap_duration,
             peak_impact_pct=gap_magnitude_pct,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
         )
         return df, result
@@ -358,7 +368,7 @@ class RareEventSimulator:
             start_index=reversal_idx,
             end_index=min(n - 1, reversal_idx + reversal_duration),
             peak_impact_pct=peak_impact,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
         )
         return df, result
@@ -396,7 +406,7 @@ class RareEventSimulator:
             start_index=dislocation_idx,
             end_index=n - 1,
             peak_impact_pct=peak_impact,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
         )
         return df, result
@@ -446,7 +456,7 @@ class RareEventSimulator:
             start_index=start_idx,
             end_index=n - 1,
             peak_impact_pct=peak_impact,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
         )
         return df, result
@@ -515,7 +525,7 @@ class RareEventSimulator:
             start_index=session_size,
             end_index=n - 1,
             peak_impact_pct=peak_impact,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
         )
         return df, result
