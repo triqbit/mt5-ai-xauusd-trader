@@ -5,13 +5,15 @@
 # ============================================================
 
 # --- Stage 1: builder ------------------------------------------
-FROM python:3.14-slim AS builder
+FROM python:3.11-slim AS builder
 
 ARG TARGETARCH
 WORKDIR /app
 
 # System dependencies for building TA-Lib and Python packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ make \
     libpq-dev \
     wget ca-certificates \
@@ -34,16 +36,19 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
     fi
 
 # Install Python dependencies into a separate prefix for easy copying
-RUN pip install --upgrade pip && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
-FROM python:3.14-slim AS runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Runtime system dependencies (libpq5 for PostgreSQL support)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Runtime system dependencies
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -51,6 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy TA-Lib shared libraries and headers from builder
 COPY --from=builder /usr/lib/libta_lib* /usr/lib/
 COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
+RUN ldconfig
 
 # Copy compiled Python packages from builder
 COPY --from=builder /install /usr/local

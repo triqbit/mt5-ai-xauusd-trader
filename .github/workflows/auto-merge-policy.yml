@@ -45,8 +45,6 @@ jobs:
             "src/trading/risk_manager.py"  # Risk parameters and position sizing
             "config/secrets.*"             # Credentials and secrets
             ".github/workflows/deploy.*"   # Deployment workflows
-            ".github/workflows/ci.yml"     # CI workflows affecting deployment
-            "Dockerfile"                   # Infrastructure control
             "migrations/.*"                # Database migrations
           )
 
