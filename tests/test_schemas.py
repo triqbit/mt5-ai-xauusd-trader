@@ -1,7 +1,9 @@
-
 import pytest
 from pydantic import ValidationError
-from src.core.schemas import TradeSignalSchema, SignalDirection
+
+from src.core.schemas import TradeSignalSchema
+from src.core.types import SignalDirection
+
 
 def test_trade_signal_schema_valid():
     """Verify that a valid signal data dictionary passes validation."""
@@ -13,7 +15,7 @@ def test_trade_signal_schema_valid():
         "take_profit": 2400.0,
         "lot_size": 0.1,
         "algorithm": "ensemble",
-        "confidence": 0.85
+        "confidence": 0.85,
     }
     signal = TradeSignalSchema(**data)
     assert signal.symbol == "XAUUSD"
@@ -21,29 +23,52 @@ def test_trade_signal_schema_valid():
     assert signal.entry_price == 2300.0
     assert signal.lot_size == 0.1
 
+
 def test_trade_signal_schema_enum_parsing():
     """Verify that integer directions are correctly parsed into SignalDirection enums."""
-    assert TradeSignalSchema(
-        symbol="XAUUSD", direction=1, entry_price=2300, stop_loss=2250,
-        take_profit=2400, lot_size=0.1, algorithm="test", confidence=0.9
-    ).direction == SignalDirection.BUY
+    assert (
+        TradeSignalSchema(
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2300,
+            stop_loss=2250,
+            take_profit=2400,
+            lot_size=0.1,
+            algorithm="test",
+            confidence=0.9,
+        ).direction
+        == SignalDirection.BUY
+    )
 
-    assert TradeSignalSchema(
-        symbol="XAUUSD", direction=-1, entry_price=2300, stop_loss=2350,
-        take_profit=2200, lot_size=0.1, algorithm="test", confidence=0.9
-    ).direction == SignalDirection.SELL
+    assert (
+        TradeSignalSchema(
+            symbol="XAUUSD",
+            direction=-1,
+            entry_price=2300,
+            stop_loss=2350,
+            take_profit=2200,
+            lot_size=0.1,
+            algorithm="test",
+            confidence=0.9,
+        ).direction
+        == SignalDirection.SELL
+    )
 
-@pytest.mark.parametrize("field, value", [
-    ("direction", 2),
-    ("direction", -2),
-    ("entry_price", -1.0),
-    ("entry_price", 0.0),
-    ("stop_loss", -50.0),
-    ("take_profit", 0.0),
-    ("lot_size", 0.005),
-    ("confidence", -0.1),
-    ("confidence", 1.1),
-])
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("direction", 2),
+        ("direction", -2),
+        ("entry_price", -1.0),
+        ("entry_price", 0.0),
+        ("stop_loss", -50.0),
+        ("take_profit", 0.0),
+        ("lot_size", 0.005),
+        ("confidence", -0.1),
+        ("confidence", 1.1),
+    ],
+)
 def test_trade_signal_schema_invalid_values(field, value):
     """Verify that invalid values raise ValidationError."""
     data = {
@@ -54,7 +79,7 @@ def test_trade_signal_schema_invalid_values(field, value):
         "take_profit": 2400.0,
         "lot_size": 0.1,
         "algorithm": "ensemble",
-        "confidence": 0.85
+        "confidence": 0.85,
     }
     data[field] = value
     with pytest.raises(ValidationError):

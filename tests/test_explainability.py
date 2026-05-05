@@ -125,7 +125,7 @@ def test_signal_explainer_execution_blocked():
         symbol="XAUUSD",
         direction=1,
         confidence=0.8,
-        model_votes={"ppo": 1}, # 1=buy
+        model_votes={"ppo": 1},  # 1=buy
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 2.0, "summary": "Risk OK"},
         regime_info={"name": "Bullish"},
@@ -171,7 +171,7 @@ def test_format_for_terminal_fallback():
         symbol="XAUUSD",
         direction=1,
         confidence=0.9,
-        model_votes={"ppo": 1}, # 1=buy
+        model_votes={"ppo": 1},  # 1=buy
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 3.0, "summary": "Ok"},
         regime_info={"name": "Bullish"},

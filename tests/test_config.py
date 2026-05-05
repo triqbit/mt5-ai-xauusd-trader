@@ -1,4 +1,5 @@
 """Tests for src.core.config module."""
+
 from unittest.mock import patch
 
 import pytest

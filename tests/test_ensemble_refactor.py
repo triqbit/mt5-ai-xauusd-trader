@@ -89,8 +89,6 @@ def test_ensemble_consensus_buy():
 
 def test_ensemble_no_consensus():
     ensemble = EnsembleModel(model_weights={"ppo": 1.0})
-    signals = {
-        "ppo": Signal(direction=SignalDirection.BUY, confidence=0.5)
-    }  # Below 0.6
+    signals = {"ppo": Signal(direction=SignalDirection.BUY, confidence=0.5)}  # Below 0.6
     result = ensemble.aggregate_signals(signals)
     assert result.direction == SignalDirection.HOLD

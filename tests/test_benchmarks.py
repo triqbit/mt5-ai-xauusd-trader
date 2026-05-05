@@ -2,18 +2,17 @@
 Unit tests for the benchmarking framework.
 """
 
-from unittest.mock import MagicMock
-
 import importlib.util
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.constants import SignalDirection
+from src.core.types import SignalDirection
 
 HAS_TORCH = importlib.util.find_spec("torch") is not None
-from src.models.base_model import Signal
+from src.core.types import TradeSignal as Signal
 from src.research.benchmarks import (
     BenchmarkEvaluator,
     DreamerAdapter,

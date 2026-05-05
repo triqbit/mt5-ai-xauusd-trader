@@ -1,6 +1,7 @@
 """
 Unit tests for the high-resolution profiler.
 """
+
 import time
 from unittest.mock import patch
 
@@ -19,6 +20,7 @@ def test_profile_logging():
         assert kwargs["label"] == "test_block"
         assert isinstance(kwargs["duration_ms"], float)
         assert kwargs["duration_ms"] >= 10.0
+
 
 def test_profile_exception_handling():
     """Verify that the profiler still logs even if an exception occurs."""

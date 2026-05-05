@@ -339,7 +339,9 @@ def test_diversification_score(allocator):
     assert allocator.get_diversification_score() == 1.0
 
     s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
-    s2 = StrategyConfig(strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0)
+    s2 = StrategyConfig(
+        strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0
+    )
     allocator.add_strategy(s1)
     allocator.add_strategy(s2)
 
@@ -444,7 +446,9 @@ def test_cooling_off_mechanism(allocator):
     # 4th loss -> stays floored
     allocator.update_strategy_performance("s1", -100.0)
     assert allocator.strategies["s1"].consecutive_losses == 4
-    assert allocator.strategies["s1"].performance_multiplier == 0.0  # multiplier can go below 0.1 if step continues
+    assert (
+        allocator.strategies["s1"].performance_multiplier == 0.0
+    )  # multiplier can go below 0.1 if step continues
 
     # Win -> resets consecutive losses
     allocator.update_strategy_performance("s1", 100.0)
