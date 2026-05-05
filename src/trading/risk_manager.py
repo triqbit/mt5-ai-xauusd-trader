@@ -216,4 +216,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]
