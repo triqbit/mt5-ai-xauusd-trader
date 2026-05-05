@@ -1,50 +1,56 @@
 # License Compliance Policy
 
 ## ⚖️ Overview
-This document defines the license compliance policy for the MT5 AI/ML Trading Bot. As an enterprise-grade trading system, ensuring all third-party dependencies adhere to permissive licensing is critical to avoid legal risks and intellectual property "pollution" from copyleft licenses.
+This document defines the formal license compliance policy for the MT5 AI/ML Trading Bot. Ensuring all third-party dependencies adhere to permissive licensing is critical for enterprise delivery, avoiding legal risks and intellectual property "pollution" from copyleft licenses.
 
-## 🏛️ Core Attribution
-This project integrates code and architectural patterns from multiple open-source repositories. **Formal attribution for these integrated components is maintained in [ATTRIBUTIONS.md](../ATTRIBUTIONS.md).**
-
-All developers must ensure that any direct code integration (vendoring) is documented in `ATTRIBUTIONS.md` with the corresponding license and source URL.
+## 🏛️ Attribution Requirements
+All third-party code integrated into this repository must be properly attributed.
+- **Direct Integration (Vendoring):** Any code copied directly from external sources must be documented in [ATTRIBUTIONS.md](../ATTRIBUTIONS.md).
+- **Dependency Attribution:** Runtime dependencies are automatically tracked in the [Dependency License Report](DEPENDENCY_LICENSES.md).
+- **Notices:** Preserve all original copyright notices and license files in integrated source code.
 
 ## ✅ Allowed Licenses (Permissive)
-The following licenses are pre-approved for use in this project:
+The following licenses are pre-approved for use. They allow for commercial use, modification, and distribution without requiring the source code of the bot itself to be released.
 - **MIT License**
 - **Apache License 2.0**
 - **BSD (2-Clause and 3-Clause)**
 - **PSF (Python Software Foundation)**
 - **Unlicense / Public Domain**
 - **ISC License**
-- **Mozilla Public License 2.0 (MPL 2.0)**
+- **Mozilla Public License 2.0 (MPL 2.0)** - (Files under MPL remain MPL, but the rest of the project is not affected).
 
 ## ⚠️ Restricted Licenses (Review Required)
 The following licenses are allowed but must be used as external dependencies only (dynamic linking):
-- **LGPL (v2.1, v3)** - Allowed as long as the library is used without modification and user-replaceability is maintained.
-- **Other/Proprietary** - Allowed only for specific, verified commercial SDKs (e.g., MetaAPI) where no open-source alternative exists.
+- **LGPL (v2.1, v3)** - Allowed as long as the library is used without modification.
+- **Other/Proprietary** - Allowed for specific commercial SDKs (e.g., MetaAPI, NVIDIA CUDA) where no open-source alternative exists.
 
 ## 🚫 Disallowed Licenses (Copyleft & Restricted)
-The following licenses are strictly prohibited unless a formal legal exception is granted:
-- **GPL (v2, v3)** - Due to "viral" copyleft requirements.
-- **AGPL (Affero GPL)** - Due to network-triggered copyleft.
-- **CC-BY-NC (Non-Commercial)** - Prohibited as this is an enterprise/commercial-ready tool.
+The following licenses are strictly prohibited to protect the project's intellectual property:
+- **GPL (v2, v3)** - Prohibited due to "viral" copyleft requirements.
+- **AGPL (Affero GPL)** - Prohibited due to network-triggered copyleft.
+- **CC-BY-NC (Non-Commercial)** - Prohibited as this is an enterprise-ready commercial tool.
 - **SSPL (Server Side Public License)**
-- **Proprietary/EULA** (without explicit purchase and legal sign-off).
+- **Proprietary/EULA** - Prohibited without explicit legal sign-off and purchase.
 
-## 🤖 Automated Enforcement
-The project uses GitHub Actions to enforce these rules on every Pull Request.
+## 🤖 Automated License Scanning
+License compliance is enforced automatically via CI to prevent accidental introduction of incompatible licenses.
 - **Tool:** `pip-licenses`
 - **Workflow:** `.github/workflows/license-check.yml`
-- **Action:** Failure to comply with the "Allowed" list will block the merge.
+- **Trigger:** Every Pull Request and push to `main`.
+- **Enforcement:** The CI job will fail if a dependency with a disallowed license is detected.
 
-## 📝 Dependency Reporting
-A full list of runtime dependencies and their detected licenses is available in [DEPENDENCY_LICENSES.md](DEPENDENCY_LICENSES.md). This report is updated automatically by the CI pipeline.
+## 📝 Dependency License Report
+The [DEPENDENCY_LICENSES.md](DEPENDENCY_LICENSES.md) file contains a comprehensive report of all current Python dependencies, their versions, licenses, and URLs. This report is regenerated during the release process and on every CI run.
 
-## 🚩 Handling Risky or Incompatible Licenses
-If a required dependency uses a disallowed or unknown license:
-1. **Identify Alternatives:** Search for a permissively licensed alternative.
-2. **Impact Assessment:** Determine if the library is optional or can be replaced by custom implementation.
-3. **Formal Exception:** If no alternative exists, escalate to the repository maintainer for a formal risk assessment. MetaAPI SDKs and certain verified "UNKNOWN" packages (e.g., `pandas-ta`) have been granted exceptions.
+## 🚩 Detection and Resolution of Risky Licenses
+If the automated scanner detects a risky or incompatible license:
+1. **Identify Alternatives:** Search for a permissively licensed replacement.
+2. **Impact Assessment:** Determine if the dependency is critical or can be removed.
+3. **Formal Exception:** If no alternative exists, a formal risk assessment must be performed. Current exceptions include:
+   - `MetaAPI` (Proprietary/Commercial)
+   - `pandas-ta` (UNKNOWN license, but verified as LGPL/MIT compatible for use).
+   - `NVIDIA CUDA` components (Proprietary).
 
 ---
 *Last Updated: 2024-05-22*
+*Owner: Jules03 (Release & Governance Lead)*
