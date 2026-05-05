@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
@@ -145,19 +146,30 @@ class JournalReport(BaseModel):
                 )
 
         # Problematic motifs (recurring losing combinations)
-        losing_motifs = [m for m in self.recurring_motifs if m.win_rate < 0.3 and m.frequency >= 3]
+        losing_motifs = [m for m in self.recurring_motifs if m.win_rate < 0.4 and m.frequency >= 2]
         if losing_motifs:
             m = losing_motifs[0]
             risks.append(
                 BehavioralRisk(
                     type="Toxic Motif",
-                    description=f"Recurring losses detected for {m.algorithm} {m.volatility_bucket} volatility (WR: {m.win_rate:.1%}).",
+                    description=f"Toxic pattern for {m.algorithm} in {m.session} session: {m.volatility_bucket} volatility, {m.confidence_bucket} confidence (WR: {m.win_rate:.1%}, Freq: {m.frequency}).",
+                )
+            )
+
+        # Early Warning Motifs
+        if self.pre_drawdown_motifs:
+            m = self.pre_drawdown_motifs[0]
+            risks.append(
+                BehavioralRisk(
+                    type="Early Warning",
+                    description=f"Pattern '{m.algorithm}' frequently precedes drawdowns (detected {m.frequency} times).",
                 )
             )
 
         primary_insight = "Strategy shows consistent performance across most sessions."
         if risks:
-            primary_insight = f"Behavioral risks identified: {risks[0].type}."
+            risk_types = sorted(list(set(r.type for r in risks)))
+            primary_insight = f"Critical behavioral risks identified: {', '.join(risk_types)}."
 
         # Convert SignalMotif internal models to Reporting SignalMotif
         reporting_motifs = []
@@ -466,17 +478,55 @@ class JournalMiner:
                 )
             )
 
+        # Multi-attribute: Algorithm + Session
+        if "algorithm" in trades_df.columns and "sessions" in trades_df.columns:
+            # We need to use the exploded version for sessions
+            exploded = trades_df.explode("sessions")
+            combos = exploded.groupby(["algorithm", "sessions"])
+            for (algo, sess), group in combos:
+                trade_count = len(group)
+                if trade_count < 2:
+                    continue
+                wins = group[group["pnl"] > 0]
+                losses = group[group["pnl"] < 0]
+                win_rate = len(wins) / trade_count
+                gross_profit = wins["pnl"].sum()
+                gross_loss = abs(losses["pnl"].sum())
+                profit_factor = (
+                    gross_profit / gross_loss
+                    if gross_loss > 0
+                    else (float("inf") if gross_profit > 0 else 0.0)
+                )
+
+                results.append(
+                    PatternConcentration(
+                        attribute="algo_session",
+                        value=f"{algo} @ {sess}",
+                        win_rate=win_rate,
+                        profit_factor=profit_factor,
+                        total_trades=trade_count,
+                    )
+                )
+
         return sorted(results, key=lambda x: x.profit_factor, reverse=True)
 
     def analyze_risk_blocks(
-        self, risk_events_df: pd.DataFrame, signals_df: pd.DataFrame
+        self,
+        risk_events_df: pd.DataFrame,
+        signals_df: pd.DataFrame,
+        trades_df: pd.DataFrame = None,
     ) -> list[BlockReasonSummary]:
-        """Summarize recurring risk block reasons."""
+        """Summarize recurring risk block reasons with weak state correlation."""
         if risk_events_df.empty:
             return []
 
         results = []
         counts = risk_events_df["event_type"].value_counts()
+
+        # Calculate weak state correlation if trades are provided
+        correlations = {}
+        if trades_df is not None and not trades_df.empty:
+            correlations = self.analyze_strategy_state_correlation(risk_events_df, trades_df)
 
         for reason, count in counts.items():
             # Find algorithms impacted by this reason if signal_id is present
@@ -489,7 +539,10 @@ class JournalMiner:
 
             results.append(
                 BlockReasonSummary(
-                    reason=str(reason), count=int(count), impacted_algorithms=impacted_algos
+                    reason=str(reason),
+                    count=int(count),
+                    impacted_algorithms=impacted_algos,
+                    weak_state_correlation=correlations.get(reason, 0.0),
                 )
             )
 
@@ -612,7 +665,11 @@ class JournalMiner:
                 )
             )
 
-        return sorted(results, key=lambda x: x.win_rate)
+        # Score motifs by toxic potential: low win rate * high frequency
+        def toxic_score(m: SignalMotif) -> float:
+            return (1.0 - m.win_rate) * np.log1p(m.frequency)
+
+        return sorted(results, key=toxic_score, reverse=True)
 
     def analyze_trade_durations(self, trades_raw: list[Trade]) -> dict[str, float]:
         """Calculate average win vs loss holding times in minutes."""
@@ -730,18 +787,16 @@ class JournalMiner:
                 ]
             )
 
-            # Analyze correlations
-            correlations = self.analyze_strategy_state_correlation(risk_df, trades_df)
-            risk_blocks = self.analyze_risk_blocks(risk_df, signals_df)
-            for block in risk_blocks:
-                block.weak_state_correlation = correlations.get(block.reason, 0.0)
+            # Ensure sessions are available for pattern concentration
+            if not trades_df.empty:
+                trades_df["sessions"] = trades_df["created_at"].apply(self._get_session)
 
             return JournalReport(
                 session_analysis=self.get_session_stats(trades_df),
                 volatility_patterns=self.analyze_volatility_patterns(signals_df),
                 drawdown_clusters=self.detect_drawdown_clusters(trades_df),
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
-                risk_block_summary=risk_blocks,
+                risk_block_summary=self.analyze_risk_blocks(risk_df, signals_df, trades_df),
                 recurring_motifs=self.find_frequent_motifs(signals_df, trades_df),
                 pre_drawdown_motifs=self.detect_pre_drawdown_motifs(signals_df, trades_df),
                 avg_win_duration=durations["avg_win_duration"],
