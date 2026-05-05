@@ -32,7 +32,7 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 - **Target**: Identify slow disk/network I/O
 - **Analysis**: Monitor open file descriptors
 - **Target**: <10ms for database queries
-- **Optimization**: Connection pooling, caching
+- **Optimization**: Connection pooling, caching, conditional persistence (only save metrics on trade close)
 
 ## 2. Data Pipeline Optimization
 
@@ -153,6 +153,8 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 ## 7. Code-Level Optimizations
 
 ### 7.1 Python Optimization
+- **Bypass Redundant Rendering**: In `DecisionSupportSystem.format_for_operator`, we bypass `rich.Console.capture()` when a console is already provided for direct printing. This eliminates expensive string rendering in the main loop.
+
 ```python
 # Bad: List comprehension with function call
 results = [calculate_result(x) for x in data]

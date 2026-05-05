@@ -415,6 +415,10 @@ def run_live(
                                     )
                             closed_tickets.append(symbol)
 
+                    if closed_tickets and trade_logger:
+                        # Persist performance metrics only when a trade is closed
+                        trade_logger.read_performance_report(persist=True)
+
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
