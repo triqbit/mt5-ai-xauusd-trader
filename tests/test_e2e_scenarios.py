@@ -26,7 +26,10 @@ def mock_cfg():
 
 @pytest.fixture
 def trade_logger():
-    return TradeLogger(db_url="sqlite:///:memory:")
+    logger = TradeLogger(db_url="sqlite:///:memory:")
+    from src.core.trade_logger import Base
+    Base.metadata.create_all(logger.engine)
+    return logger
 
 
 def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
