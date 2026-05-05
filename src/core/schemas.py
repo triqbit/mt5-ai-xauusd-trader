@@ -49,6 +49,6 @@ class TradeSignalSchema(BaseModel):
         if isinstance(v, int):
             try:
                 return SignalDirection(v)
-            except ValueError:
-                raise ValueError(f"Invalid direction: {v}. Must be 1, -1, or 0.")
+            except ValueError as err:
+                raise ValueError(f"Invalid direction: {v}. Must be 1, -1, or 0.") from err
         return v
