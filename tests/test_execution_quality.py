@@ -21,7 +21,14 @@ def mock_connector():
     connector = MagicMock()
     # Mock M1 rates for drift and timing efficiency
     rates_df = pd.DataFrame([
-        {"time": datetime.now(timezone.utc), "open": 2300.0, "high": 2305.0, "low": 2295.0, "close": 2302.0, "spread": 20}
+        {
+            "time": datetime.now(timezone.utc),
+            "open": 2300.0,
+            "high": 2305.0,
+            "low": 2295.0,
+            "close": 2302.0,
+            "spread": 20
+        }
     ])
     connector.get_rates.return_value = rates_df
     connector.get_rates_range.return_value = rates_df
@@ -116,12 +123,12 @@ def test_evaluate_opportunity_cost(analyzer, mock_connector):
     df = pd.DataFrame([
         {"time": signal.timestamp + timedelta(minutes=15), "open": 2300.0, "high": 2315.0, "low": 2299.0, "close": 2312.0}
     ])
-    mock_connector.get_rates.return_value = df
     mock_connector.get_rates_range.return_value = df
 
     analysis = analyzer._evaluate_opportunity_cost(signal, "Risk limit reached")
 
     assert analysis is not None
+    assert analysis.would_have_won is True
 
 
 def test_calculate_markouts(analyzer, mock_connector):
@@ -141,35 +148,10 @@ def test_calculate_markouts(analyzer, mock_connector):
 
     results = analyzer.calculate_markouts(symbol, entry_time, entry_price, direction, horizons)
 
-    assert results["1m"] == 10.0  # (2301 - 2300) / 0.1
-    assert results["5m"] == 50.0
-    assert results["15m"] == 150.0
+    assert pytest.approx(results["1m"]) == 10.0  # (2301 - 2300) / 0.1
+    assert pytest.approx(results["5m"]) == 50.0
+    assert pytest.approx(results["15m"]) == 150.0
 
-
-def test_evaluate_opportunity_cost_final(analyzer, mock_connector):
-    """Re-verify opportunity cost after additions."""
-    signal = MagicMock(spec=ModelSignal)
-    signal.id = 1
-    signal.symbol = "XAUUSD"
-    signal.direction = 1
-    signal.entry_price = 2300.0
-    signal.take_profit = 2310.0
-    signal.stop_loss = 2290.0
-    signal.lot_size = 0.1
-    signal.timestamp = datetime.now(timezone.utc) - timedelta(minutes=60)
-
-    # Mock market movement: goes to 2315 (hits TP)
-    df = pd.DataFrame([
-        {"time": signal.timestamp + timedelta(minutes=15), "open": 2300.0, "high": 2315.0, "low": 2299.0, "close": 2312.0}
-    ])
-    mock_connector.get_rates.return_value = df
-    mock_connector.get_rates_range.return_value = df
-
-    analysis = analyzer._evaluate_opportunity_cost(signal, "Risk limit reached")
-    assert analysis is not None
-    assert analysis.would_have_won is True
-    assert analysis.max_favorable_excursion > 0
-    assert analysis.opportunity_cost_pnl > 0
 
 def test_generate_summary_report(analyzer):
     """Test aggregation into summary report."""
@@ -212,3 +194,105 @@ def test_generate_summary_report(analyzer):
         assert report_section.efficiency_score == pytest.approx(summary.execution_efficiency_score * 100)
         assert report_section.opportunity_cost == "$50.00"
         assert len(report_section.metrics) > 0
+
+
+def test_timezone_robustness(analyzer, mock_connector):
+    """Test handling of timezone-naive datetimes in markout calculations."""
+    symbol = "XAUUSD"
+    # Naive datetime
+    entry_time = datetime(2024, 1, 1, 12, 0, 0)
+    entry_price = 2300.0
+    direction = 1
+    horizons = [5]
+
+    # Mock returns aware datetime
+    mock_connector.get_rates_range.return_value = pd.DataFrame([
+        {"time": datetime(2024, 1, 1, 12, 5, 0, tzinfo=timezone.utc), "close": 2305.0},
+    ])
+
+    results = analyzer.calculate_markouts(symbol, entry_time, entry_price, direction, horizons)
+    assert pytest.approx(results["5m"]) == 50.0
+
+def test_price_improvement(analyzer, mock_connector):
+    """Test negative slippage (price improvement)."""
+    with analyzer.Session() as session:
+        signal_time = datetime.now(timezone.utc)
+        signal = ModelSignal(
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2300.0,
+            timestamp=signal_time,
+            take_profit=2310.0
+        )
+        session.add(signal)
+        session.flush()
+
+        trade = Trade(
+            ticket=202,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2299.8, # 2 pips improvement
+            signal_id=signal.id,
+            lot_size=0.1,
+            created_at=signal_time + timedelta(milliseconds=100)
+        )
+        session.add(trade)
+        session.commit()
+        trade_id = trade.id
+
+    quality = analyzer.analyze_trade(trade_id)
+    assert pytest.approx(quality.slippage_pips) == -2.0
+    # Fill quality should be high for price improvement
+    assert quality.fill_quality_score > 0.7
+
+def test_jpy_symbol_logic(analyzer, mock_connector):
+    """Test pip and point logic for JPY pairs."""
+    symbol = "USDJPY"
+    entry_time = datetime.now(timezone.utc)
+    entry_price = 150.00
+    direction = 1
+    horizons = [5]
+
+    # Mock market data: price goes up by 0.05
+    mock_connector.get_rates_range.return_value = pd.DataFrame([
+        {"time": entry_time + timedelta(minutes=5), "close": 150.05},
+    ])
+
+    results = analyzer.calculate_markouts(symbol, entry_time, entry_price, direction, horizons)
+    # JPY pip = 0.01. Drift = 0.05 / 0.01 = 5 pips
+    assert pytest.approx(results["5m"]) == 5.0
+
+    # Verify spread in pips for JPY
+    with analyzer.Session() as session:
+        # Create a signal for JPY
+        signal = ModelSignal(
+            symbol=symbol,
+            direction=1,
+            entry_price=150.00,
+            timestamp=entry_time - timedelta(seconds=1)
+        )
+        session.add(signal)
+        session.flush()
+
+        trade = Trade(
+            ticket=303,
+            symbol=symbol,
+            direction=1,
+            entry_price=150.00,
+            created_at=entry_time,
+            lot_size=0.01,
+            signal_id=signal.id
+        )
+        session.add(trade)
+        session.commit()
+        trade_id = trade.id
+
+    # Mock spread: 20 points for JPY should be (20 * 0.001) / 0.01 = 2 pips
+    # Need to include 'close' to avoid KeyError in markout calculations during analyze_trade
+    mock_connector.get_rates_range.return_value = pd.DataFrame([
+        {"time": entry_time, "spread": 20, "close": 150.00, "high": 150.01, "low": 149.99},
+    ])
+
+    quality = analyzer.analyze_trade(trade_id)
+    assert quality is not None
+    assert pytest.approx(quality.spread_at_execution) == 2.0

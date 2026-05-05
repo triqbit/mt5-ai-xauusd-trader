@@ -24,13 +24,16 @@ logger = logging.getLogger(__name__)
 
 
 class TradeExecutionQuality(BaseModel):
-    """Execution metrics for a single executed trade."""
+    """
+    Execution metrics for a single executed trade.
+    Provides a granular breakdown of the costs and quality of a trade entry.
+    """
 
     trade_id: int
     ticket: int
     symbol: str
     slippage_pips: float = Field(
-        ..., description="Difference between signal price and execution price"
+        ..., description="Difference between signal price and execution price in pips"
     )
     execution_latency_ms: float = Field(..., description="Time between signal and execution in ms")
     fill_quality_score: float = Field(..., description="Normalized score 0-1 of fill quality")
@@ -38,7 +41,7 @@ class TradeExecutionQuality(BaseModel):
     post_entry_drift_5m: float = Field(..., description="Price drift 5 mins after entry")
     post_entry_drift_15m: float = Field(..., description="Price drift 15 mins after entry")
     timing_efficiency: float = Field(
-        ..., description="Score indicating if entry was at optimal time"
+        ..., description="Score indicating if entry was at optimal price within the entry candle"
     )
     spread_at_execution: float = Field(..., description="Spread in pips at time of execution")
     slippage_to_spread_ratio: float = Field(
@@ -56,7 +59,10 @@ class TradeExecutionQuality(BaseModel):
 
 
 class BlockedSignalQuality(BaseModel):
-    """Opportunity cost analysis for rejected signals."""
+    """
+    Opportunity cost analysis for rejected signals.
+    Measures the potential PnL and price movement of signals filtered by risk management.
+    """
 
     signal_id: int
     symbol: str
@@ -70,7 +76,10 @@ class BlockedSignalQuality(BaseModel):
 
 
 class ExecutionSummary(BaseModel):
-    """Aggregate execution analytics."""
+    """
+    Aggregate execution analytics for a specific period.
+    Consolidates individual trade metrics into institutional-grade KPIs.
+    """
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     avg_slippage: float
@@ -85,7 +94,12 @@ class ExecutionSummary(BaseModel):
     executed_trade_count: int
 
     def to_report_section(self) -> Any:
-        """Convert to reporting model."""
+        """
+        Convert summary metrics to a ResearchReporter-compatible section.
+
+        Returns:
+            ExecutionQualitySection for institutional reporting.
+        """
         from src.research.reporting import ExecutionMetric, ExecutionQualitySection
 
         metrics = [
@@ -134,6 +148,7 @@ class ExecutionAnalyzer:
     """
     Institutional-grade execution quality analyzer.
     Correlates trades, signals, and market data to measure alpha decay and execution drag.
+    Distinguishes strategy performance (alpha) from operational efficiency (execution).
     """
 
     def __init__(
@@ -141,23 +156,67 @@ class ExecutionAnalyzer:
         db_url: str = "sqlite:///trades.db",
         connector: MT5Connector | None = None,
     ) -> None:
+        """
+        Initialize the analyzer.
+
+        Args:
+            db_url: SQLAlchemy-compatible database URL.
+            connector: MT5Connector instance for fetching market data.
+        """
         self.engine = create_engine(db_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         self.connector = connector
 
     def _get_pip_size(self, symbol: str) -> float:
-        """Utility to get pip size for a symbol."""
-        if any(x in symbol for x in ["XAUUSD", "GOLD"]):
+        """
+        Utility to get pip size for a symbol.
+        Follows standard industry conventions for FX, Metals, and Indices.
+
+        Args:
+            symbol: Financial instrument symbol (e.g., 'XAUUSD', 'EURUSD').
+
+        Returns:
+            Pip size as a float.
+        """
+        s = symbol.upper()
+        if any(x in s for x in ["XAUUSD", "GOLD", "XAGUSD", "SILVER"]):
             return 0.1
-        if any(x in symbol for x in ["JPY", "HUF"]):
+        if any(x in s for x in ["JPY", "HUF", "BRL"]):
             return 0.01
+        if any(x in s for x in ["DE30", "GER30", "US30", "NAS100", "US500", "UK100", "CAC40"]):
+            return 1.0
         return 0.0001
+
+    def _get_point_size(self, symbol: str) -> float:
+        """
+        Determine point size for a symbol based on common conventions.
+
+        Args:
+            symbol: Financial instrument symbol.
+
+        Returns:
+            Point size as a float.
+        """
+        s = symbol.upper()
+        if any(x in s for x in ["JPY", "HUF", "BRL"]):
+            return 0.001
+        if any(x in s for x in ["XAUUSD", "GOLD", "XAGUSD", "SILVER"]):
+            return 0.01
+        if any(x in s for x in ["DE30", "GER30", "US30", "NAS100", "US500", "UK100", "CAC40"]):
+            return 0.1
+        return 0.00001
 
     def analyze_trade(self, trade_id: int) -> TradeExecutionQuality | None:
         """
         Analyze execution quality for a specific trade.
         Compares requested signal price vs actual execution price.
+
+        Args:
+            trade_id: Primary key of the trade in the database.
+
+        Returns:
+            TradeExecutionQuality object or None if trade not found.
         """
         with self.Session() as session:
             trade = session.query(Trade).filter(Trade.id == trade_id).first()
@@ -168,13 +227,22 @@ class ExecutionAnalyzer:
             signal = trade.signal
             symbol = trade.symbol
 
+            # Ensure timestamps are UTC aware
+            trade_created_at = trade.created_at
+            if trade_created_at.tzinfo is None:
+                trade_created_at = trade_created_at.replace(tzinfo=UTC)
+
+            signal_timestamp = signal.timestamp
+            if signal_timestamp.tzinfo is None:
+                signal_timestamp = signal_timestamp.replace(tzinfo=UTC)
+
             # 1. Slippage calculation (in pips)
             pip_size = self._get_pip_size(symbol)
             slippage_price = (trade.entry_price - signal.entry_price) * signal.direction
             slippage_pips = slippage_price / pip_size
 
             # 2. Latency calculation
-            latency_td = trade.created_at - signal.timestamp
+            latency_td = trade_created_at - signal_timestamp
             latency_ms = max(0.0, latency_td.total_seconds() * 1000.0)
 
             # 3. Spread calculation
@@ -194,7 +262,7 @@ class ExecutionAnalyzer:
             # 5. Drift and Edge Capture (requires market data)
             markout_horizons = [1, 5, 15, 30, 60]
             markouts = self.calculate_markouts(
-                symbol, trade.created_at, trade.entry_price, trade.direction, markout_horizons
+                symbol, trade_created_at, trade.entry_price, trade.direction, markout_horizons
             )
             edge_capture = self.calculate_edge_capture(trade, signal)
 
@@ -223,26 +291,6 @@ class ExecutionAnalyzer:
                 markout_pnls=markouts,
             )
 
-    def calculate_drift(
-        self, symbol: str, start_time: datetime, direction: int, minutes: int
-    ) -> float:
-        """Calculate price movement N minutes after entry."""
-        if not self.connector:
-            return 0.0
-
-        pip_size = self._get_pip_size(symbol)
-        end_time = start_time + timedelta(minutes=minutes + 1)
-
-        df = self.connector.get_rates_range(symbol, "M1", start_time, end_time)
-        if df.empty:
-            return 0.0
-
-        entry_price = df.iloc[0]["close"]
-        later_price = df.iloc[-1]["close"]
-
-        drift = (later_price - entry_price) * direction
-        return float(drift / pip_size)
-
     def calculate_markouts(
         self,
         symbol: str,
@@ -254,11 +302,26 @@ class ExecutionAnalyzer:
         """
         Calculate price drift at various horizons (in minutes) after entry.
         Markouts help distinguish alpha quality from execution quality.
+
+        Args:
+            symbol: Financial instrument symbol.
+            entry_time: Time of entry.
+            entry_price: Price at entry.
+            direction: Trade direction (1 for Buy, -1 for Sell).
+            horizons: List of minute horizons to calculate drift for.
+
+        Returns:
+            Dictionary mapping horizon labels (e.g., '5m') to pips drift.
         """
         if not self.connector or not horizons:
             return {}
 
         pip_size = self._get_pip_size(symbol)
+
+        # Ensure entry_time is UTC aware
+        if entry_time.tzinfo is None:
+            entry_time = entry_time.replace(tzinfo=UTC)
+
         max_horizon = max(horizons)
         # Fetch data once for all horizons
         end_time = entry_time + timedelta(minutes=max_horizon + 2)
@@ -267,15 +330,15 @@ class ExecutionAnalyzer:
         if df.empty:
             return {f"{h}m": 0.0 for h in horizons}
 
+        # Ensure df['time'] is UTC aware
+        if df["time"].dt.tz is None:
+            df["time"] = df["time"].dt.tz_localize(UTC)
+
         results = {}
         for h in horizons:
             target_time = entry_time + timedelta(minutes=h)
-            # Ensure target_time is timezone-aware if the dataframe is aware
-            if df["time"].dt.tz is not None and target_time.tzinfo is None:
-                target_time = target_time.replace(tzinfo=UTC)
 
             # Find the row closest to target_time
-            # Since we use M1, we can find it by index or by time comparison
             mask = df["time"] >= target_time
             if mask.any():
                 later_price = df[mask].iloc[0]["close"]
@@ -290,16 +353,31 @@ class ExecutionAnalyzer:
     def calculate_alpha_decay(self, trade: Trade, signal: ModelSignal) -> float:
         """
         Measure how much price moved against the signal direction between
-        signal timestamp and trade creation time.
+        signal timestamp and trade creation time (operational alpha loss).
+
+        Args:
+            trade: Executed trade object.
+            signal: Associated model signal.
+
+        Returns:
+            Alpha decay in pips.
         """
         if not self.connector:
             return 0.0
 
         pip_size = self._get_pip_size(trade.symbol)
+
+        # Ensure timestamps are UTC aware
+        trade_created_at = trade.created_at
+        if trade_created_at.tzinfo is None:
+            trade_created_at = trade_created_at.replace(tzinfo=UTC)
+
+        signal_timestamp = signal.timestamp
+        if signal_timestamp.tzinfo is None:
+            signal_timestamp = signal_timestamp.replace(tzinfo=UTC)
+
         # Movement between signal price and execution price that is NOT slippage
-        # In this context, let's define it as the price movement in the market
-        # during the latency period.
-        df = self.connector.get_rates_range(trade.symbol, "M1", signal.timestamp, trade.created_at)
+        df = self.connector.get_rates_range(trade.symbol, "M1", signal_timestamp, trade_created_at)
         if df.empty or len(df) < 2:
             return 0.0
 
@@ -310,6 +388,13 @@ class ExecutionAnalyzer:
         """
         Measure realized edge vs theoretical edge, adjusted for spread.
         Edge Capture = (Realized PnL - Half Spread) / Theoretical PnL
+
+        Args:
+            trade: Executed trade object.
+            signal: Associated model signal.
+
+        Returns:
+            Edge capture ratio (0.0 to 1.0+).
         """
         if not trade.exit_price or not signal.take_profit:
             return 0.0
@@ -328,28 +413,42 @@ class ExecutionAnalyzer:
             return 0.0
 
         # Adjust realized move by subtracting the "cost" of the half-spread we'd ideally not pay
-        # This highlights how much of the available alpha we got AFTER friction
         adjusted_realized = (realized_move / pip_size) - half_spread_pips
         theoretical_pips = theoretical_move / pip_size
 
-        return float(np.clip(adjusted_realized / theoretical_pips, 0.0, 1.2))
+        return float(np.clip(adjusted_realized / theoretical_pips, 0.0, 1.5))
 
     def _get_execution_spread(self, trade: Trade) -> dict[str, float]:
-        """Estimate spread at the time of execution."""
+        """
+        Estimate spread at the time of execution based on historical M1 data.
+
+        Args:
+            trade: Executed trade object.
+
+        Returns:
+            Dictionary containing 'spread_pips'.
+        """
         if not self.connector:
             return {"spread_pips": 0.0}
 
         pip_size = self._get_pip_size(trade.symbol)
+
+        # Ensure trade.created_at is UTC aware
+        trade_created_at = trade.created_at
+        if trade_created_at.tzinfo is None:
+            trade_created_at = trade_created_at.replace(tzinfo=UTC)
+
         # Fetch data around execution time
         df = self.connector.get_rates_range(
-            trade.symbol, "M1", trade.created_at - timedelta(minutes=1), trade.created_at
+            trade.symbol, "M1", trade_created_at - timedelta(minutes=1), trade_created_at
         )
 
         if df.empty:
-            return {"spread_pips": 2.0}  # Default for XAUUSD
+            # Default fallback for XAUUSD if no data
+            return {"spread_pips": 2.0 if "XAUUSD" in trade.symbol.upper() else 1.0}
 
         # MT5 'spread' in rates is in points
-        point_size = 0.01 if "XAUUSD" in trade.symbol else 0.00001
+        point_size = self._get_point_size(trade.symbol)
         avg_spread_points = df["spread"].mean()
         spread_pips = (avg_spread_points * point_size) / pip_size
 
@@ -359,13 +458,24 @@ class ExecutionAnalyzer:
         """
         Determine if entry was at a local extreme of the entry candle.
         Score 1.0 means we entered at the best possible price of that minute.
+
+        Args:
+            trade: Executed trade object.
+
+        Returns:
+            Timing efficiency score (0.0 to 1.0).
         """
         if not self.connector:
             return 0.5
 
+        # Ensure trade.created_at is UTC aware
+        trade_created_at = trade.created_at
+        if trade_created_at.tzinfo is None:
+            trade_created_at = trade_created_at.replace(tzinfo=UTC)
+
         # Fetch exactly the candle where the trade was created
         df = self.connector.get_rates_range(
-            trade.symbol, "M1", trade.created_at, trade.created_at + timedelta(seconds=59)
+            trade.symbol, "M1", trade_created_at, trade_created_at + timedelta(seconds=59)
         )
         if df.empty:
             return 0.5
@@ -390,7 +500,17 @@ class ExecutionAnalyzer:
         """
         Evaluate opportunity cost of signals rejected by risk management.
         Calculates what would have happened if the trade was taken.
+
+        Args:
+            start_time: Start time for analysis window.
+
+        Returns:
+            List of BlockedSignalQuality objects.
         """
+        # Ensure start_time is UTC aware
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=UTC)
+
         results = []
         with self.Session() as session:
             # Find signals that have a RiskEvent and NO Trade
@@ -422,11 +542,18 @@ class ExecutionAnalyzer:
     ) -> BlockedSignalQuality | None:
         """
         Calculate MFE, MAE, and potential PnL for a rejected signal.
+
+        Args:
+            signal: The model signal that was blocked.
+            reason: The reason for blocking.
+
+        Returns:
+            BlockedSignalQuality object or None if data unavailable.
         """
         if not self.connector:
             return None
 
-        # Ensure start_time is timezone-aware before any operations
+        # Ensure start_time is UTC aware
         start_time = signal.timestamp
         if start_time.tzinfo is None:
             start_time = start_time.replace(tzinfo=UTC)
@@ -436,13 +563,9 @@ class ExecutionAnalyzer:
 
         df = self.connector.get_rates_range(signal.symbol, "M5", start_time, end_time)
         if df.empty:
-            # Fallback to get_rates if range returns nothing (e.g. connector issues)
-            df = self.connector.get_rates(signal.symbol, "M5", 200)
-
-        if df.empty:
             return None
 
-        # Filter bars that happened AFTER the signal
+        # Ensure df['time'] is UTC aware
         if df["time"].dt.tz is None:
             df["time"] = df["time"].dt.tz_localize(UTC)
 
@@ -455,6 +578,9 @@ class ExecutionAnalyzer:
         highs = df["high"].values
         lows = df["low"].values
 
+        # Contract size heuristic: XAUUSD = 100
+        contract_size = 100.0 if "XAUUSD" in signal.symbol.upper() else 100000.0
+
         if signal.direction > 0:  # BUY
             mfe = np.max(highs) - signal.entry_price
             mae = signal.entry_price - np.min(lows)
@@ -462,14 +588,14 @@ class ExecutionAnalyzer:
             # Check if TP or SL would hit first
             would_win = False
             for h_val, l_val in zip(highs, lows, strict=False):
-                if h_val >= (signal.take_profit or float("inf")):
+                if signal.take_profit and h_val >= signal.take_profit:
                     would_win = True
                     break
-                if l_val <= (signal.stop_loss or float("-inf")):
+                if signal.stop_loss and l_val <= signal.stop_loss:
                     would_win = False
                     break
 
-            opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * 100  # XAUUSD
+            opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * contract_size
         else:  # SELL
             mfe = signal.entry_price - np.min(lows)
             mae = np.max(highs) - signal.entry_price
@@ -477,14 +603,14 @@ class ExecutionAnalyzer:
             # Check if TP or SL would hit first
             would_win = False
             for h_val, l_val in zip(highs, lows, strict=False):
-                if l_val <= (signal.take_profit or float("-inf")):
+                if signal.take_profit and l_val <= signal.take_profit:
                     would_win = True
                     break
-                if h_val >= (signal.stop_loss or float("inf")):
+                if signal.stop_loss and h_val >= signal.stop_loss:
                     would_win = False
                     break
 
-            opp_cost = (signal.entry_price - prices[-1]) * signal.lot_size * 100
+            opp_cost = (signal.entry_price - prices[-1]) * signal.lot_size * contract_size
 
         return BlockedSignalQuality(
             signal_id=signal.id,
@@ -497,9 +623,15 @@ class ExecutionAnalyzer:
         )
 
     def generate_summary_report(self, days: int = 7) -> ExecutionSummary:
-        """Aggregate execution quality metrics into a summary report."""
-        from datetime import timedelta
+        """
+        Aggregate execution quality metrics into a summary report.
 
+        Args:
+            days: Lookback period in days.
+
+        Returns:
+            ExecutionSummary report object.
+        """
         start_time = datetime.now(UTC) - timedelta(days=days)
 
         with self.Session() as session:
