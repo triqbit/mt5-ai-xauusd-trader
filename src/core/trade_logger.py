@@ -136,6 +136,8 @@ class TradeLogger:
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
         self.engine = create_engine(db_url)
+        # Create tables if they don't exist
+        Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
     def log_signal(self, signal_data: dict[str, Any]) -> int:
