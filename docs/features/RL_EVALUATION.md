@@ -10,6 +10,9 @@ The RL Evaluation Framework provides institutional-grade metrics to assess reinf
 - **Calmar Ratio**: Total return relative to maximum drawdown.
 - **Expectancy**: Expected profit per trade based on historical performance.
 - **Profit Factor**: Ratio of gross profit to gross loss.
+- **Recovery Factor**: Total PnL relative to dollar drawdown.
+- **Ulcer Index**: Measures the depth and duration of drawdowns (stress metric).
+- **System Quality Number (SQN)**: Van Tharp's metric for strategy reliability.
 - **Stability Score (R-squared)**: Measures the linearity of the equity curve, indicating consistency of returns.
 - **Value at Risk (VaR 95%)**: Estimate of the maximum potential loss at a 95% confidence level.
 - **Conditional VaR (CVaR 95%)**: Average loss beyond the VaR threshold.
