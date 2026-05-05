@@ -25,22 +25,12 @@ fi
 
 $PIP install --upgrade pip
 
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    echo "Linux detected. Installing CI/Linux compatible dependencies..."
-    # Attempt to install requirements.txt but skip MetaTrader5 which is Windows-only
-    if [ -f "requirements.txt" ]; then
-        grep -v "MetaTrader5" requirements.txt > requirements-linux.txt
-        $PIP install -r requirements-linux.txt
-        rm requirements-linux.txt
-    else
-        echo "requirements.txt not found, skipping installation."
-    fi
+if [ -f "requirements.txt" ]; then
+    echo "Installing from requirements.txt..."
+    # On Linux/macOS, MetaTrader5 and other win32-marked packages will be skipped automatically by pip
+    $PIP install -r requirements.txt
 else
-    if [ -f "requirements.txt" ]; then
-        $PIP install -r requirements.txt
-    else
-        echo "requirements.txt not found, skipping installation."
-    fi
+    echo "requirements.txt not found, skipping installation."
 fi
 
 # 4. Setup .env
