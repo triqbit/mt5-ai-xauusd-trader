@@ -106,9 +106,21 @@ class ConfigValidator:
 
     def _check_placeholder_secrets(self) -> None:
         """Detect default or placeholder values in secrets."""
+        # Common placeholder patterns
+        placeholders = [
+            "YOUR_TOKEN",
+            "CHANGE_ME",
+            "YOUR_ACCOUNT_ID",
+            "YOUR_CHAT_ID",
+            "123456789",
+            "YOUR_SERVER_HERE",
+            "YOUR_PASSWORD_HERE",
+        ]
+
         # Check database URL
         default_db = "postgresql://trader:password@localhost:5432/mt5_trades"
-        if self.config.database_url.get_secret_value() == default_db:
+        db_url = self.config.database_url.get_secret_value()
+        if db_url == default_db or any(p in db_url.upper() for p in placeholders):
             self.errors.append(
                 ValidationError(
                     "DATABASE_URL",
@@ -117,9 +129,6 @@ class ConfigValidator:
                     "Update DATABASE_URL in .env with a secure password.",
                 )
             )
-
-        # Common placeholder patterns
-        placeholders = ["YOUR_TOKEN", "CHANGE_ME", "YOUR_ACCOUNT_ID", "YOUR_CHAT_ID", "123456789"]
 
         # Check Telegram
         telegram_token = self.config.telegram_token.get_secret_value()
@@ -158,7 +167,7 @@ class ConfigValidator:
             )
 
         if self.config.metaapi_account_id and any(
-            p in self.config.metaapi_account_id.upper() for p in placeholders
+            p in str(self.config.metaapi_account_id).upper() for p in placeholders
         ):
             self.errors.append(
                 ValidationError(
@@ -228,22 +237,22 @@ class ConfigValidator:
             )
 
         # 3. Confidence Threshold (RISK_LIMITS.md 4.1)
-        if self.config.confidence_threshold < 0.50:
+        if self.config.min_confidence < 0.50:
             self.errors.append(
                 ValidationError(
-                    "CONFIDENCE_THRESHOLD",
-                    f"Confidence threshold {self.config.confidence_threshold} is dangerously low.",
+                    "MIN_CONFIDENCE",
+                    f"Confidence threshold {self.config.min_confidence} is dangerously low.",
                     True,
-                    "Set CONFIDENCE_THRESHOLD to at least 0.50.",
+                    "Set MIN_CONFIDENCE to at least 0.50.",
                 )
             )
-        elif self.config.confidence_threshold < 0.55:
+        elif self.config.min_confidence < 0.55:
             self.errors.append(
                 ValidationError(
-                    "CONFIDENCE_THRESHOLD",
-                    f"Confidence threshold {self.config.confidence_threshold} is below recommended 0.55.",
+                    "MIN_CONFIDENCE",
+                    f"Confidence threshold {self.config.min_confidence} is below recommended 0.55.",
                     False,
-                    "Increase CONFIDENCE_THRESHOLD to 0.55 for better signal quality.",
+                    "Increase MIN_CONFIDENCE to 0.55 for better signal quality.",
                 )
             )
 
@@ -268,7 +277,66 @@ class ConfigValidator:
                 )
             )
 
-        # 5. Stability Guards (RISK_LIMITS.md 4.2)
+        # 5. Leverage and Exposure (RISK_LIMITS.md 1.1)
+        if self.config.max_leverage > 20:
+            self.errors.append(
+                ValidationError(
+                    "MAX_LEVERAGE",
+                    f"Max leverage {self.config.max_leverage} is too high.",
+                    True,
+                    "Reduce MAX_LEVERAGE to 20 or less (Policy is 10:1).",
+                )
+            )
+        elif self.config.max_leverage > 10:
+            self.errors.append(
+                ValidationError(
+                    "MAX_LEVERAGE",
+                    f"Max leverage {self.config.max_leverage} exceeds policy limit of 10.",
+                    False,
+                    "Set MAX_LEVERAGE to 10 for enterprise compliance.",
+                )
+            )
+
+        if self.config.max_position_size_pct > 0.20:
+            self.errors.append(
+                ValidationError(
+                    "MAX_POSITION_SIZE_PCT",
+                    f"Max position size {self.config.max_position_size_pct*100}% is dangerously high.",
+                    True,
+                    "Reduce MAX_POSITION_SIZE_PCT to 0.20 or less.",
+                )
+            )
+        elif self.config.max_position_size_pct > 0.10:
+            self.errors.append(
+                ValidationError(
+                    "MAX_POSITION_SIZE_PCT",
+                    f"Max position size {self.config.max_position_size_pct*100}% exceeds 10% limit.",
+                    False,
+                    "Set MAX_POSITION_SIZE_PCT to 0.10 for compliance.",
+                )
+            )
+
+        # 6. Drawdown Limits (RISK_LIMITS.md 6.1)
+        if self.config.max_drawdown > 0.40:
+            self.errors.append(
+                ValidationError(
+                    "MAX_DRAWDOWN",
+                    f"Max drawdown {self.config.max_drawdown*100}% is unacceptable.",
+                    True,
+                    "Reduce MAX_DRAWDOWN to 0.40 or less.",
+                )
+            )
+        elif self.config.max_drawdown > 0.30:
+            self.errors.append(
+                ValidationError(
+                    "MAX_DRAWDOWN",
+                    f"Max drawdown {self.config.max_drawdown*100}% exceeds 30% policy limit.",
+                    False,
+                    "Set MAX_DRAWDOWN to 0.30 for enterprise standards.",
+                )
+            )
+
+        # 7. Stability Guards (RISK_LIMITS.md 4.2)
         if self.config.model_drift_threshold > 0.4:
             self.errors.append(
                 ValidationError(
