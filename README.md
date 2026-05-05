@@ -119,6 +119,7 @@ python main.py --mode demo --symbol XAUUSD --algo ensemble
 | Guide | Description |
 | :--- | :--- |
 | [**Architecture Quick-Start**](./docs/ARCHITECTURE_QUICK.md) | **Primary technical overview and system maturity map.** |
+| [**Pre-Production Checklist**](./docs/PREPROD_CHECKLIST.md) | **Mandatory deployment gate checklist for production releases.** |
 | [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
 | [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
