@@ -64,6 +64,13 @@ class MacroEvent(BaseModel):
             return self.timestamp <= now <= self.end_timestamp
         return False
 
+    def model_post_init(self, __context) -> None:
+        """Ensure timestamps are timezone-aware UTC."""
+        if self.timestamp.tzinfo is None:
+            self.timestamp = self.timestamp.replace(tzinfo=UTC)
+        if self.end_timestamp and self.end_timestamp.tzinfo is None:
+            self.end_timestamp = self.end_timestamp.replace(tzinfo=UTC)
+
 
 class RiskStatus(BaseModel):
     """Current risk status based on events."""
@@ -141,6 +148,7 @@ class MetaAPIEventProvider(BaseEventProvider):
             "low": EventImpact.LOW,
             "medium": EventImpact.MEDIUM,
             "high": EventImpact.HIGH,
+            "critical": EventImpact.CRITICAL,
         }
 
     def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
@@ -178,9 +186,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                         name=name,
                         category=category,
                         impact=impact,
-                        timestamp=ts.replace(
-                            tzinfo=None
-                        ),  # Keep internal datetimes naive UTC for consistency
+                        timestamp=ts,
                     )
                 )
             return macro_events
@@ -190,15 +196,22 @@ class MetaAPIEventProvider(BaseEventProvider):
             return []
 
     def _guess_category(self, name: str) -> EventCategory:
+        """Guesses the event category based on the event name."""
         name_upper = name.upper()
-        if "CPI" in name_upper or "INFLATION" in name_upper:
+        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE"]):
             return EventCategory.CPI
-        if "NON-FARM PAYROLL" in name_upper or "NFP" in name_upper:
+        if any(kw in name_upper for kw in ["NON-FARM PAYROLL", "NFP", "UNEMPLOYMENT", "EMPLOYMENT"]):
             return EventCategory.NFP
-        if "FOMC" in name_upper or "FED" in name_upper:
+        if any(kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE"]):
             return EventCategory.FOMC
-        if "RATE" in name_upper and "DECISION" in name_upper:
+        if any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"]) and any(
+            kw in name_upper for kw in ["DECISION", "STATEMENT", "MINUTES", "PRESS CONFERENCE"]
+        ):
             return EventCategory.RATES
+        if any(kw in name_upper for kw in ["WAR", "CONFLICT", "SANCTION", "GEOPOLITICAL", "ELECTION"]):
+            return EventCategory.GEOPOLITICAL
+        if any(kw in name_upper for kw in ["GDP", "PMI", "ISM", "RETAIL SALES", "CONSUMER CONFIDENCE"]):
+            return EventCategory.USD_MACRO
         if "USD" in name_upper:
             return EventCategory.USD
         return EventCategory.OTHER
@@ -217,6 +230,8 @@ class EventIntelligence:
         post_event_minutes: dict[EventImpact, int] | None = None,
     ):
         self.provider = provider
+        self._cached_events: list[MacroEvent] = []
+        self._last_successful_fetch: datetime | None = None
         # Default risk windows (minutes)
         self.pre_event_minutes = pre_event_minutes or {
             EventImpact.LOW: 5,
@@ -236,6 +251,8 @@ class EventIntelligence:
         Calculates the current risk status based on upcoming and recent events.
         """
         now = current_time or datetime.now(UTC)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=UTC)
 
         # Look ahead and behind based on max windows
         max_pre = max(self.pre_event_minutes.values())
@@ -245,14 +262,28 @@ class EventIntelligence:
         start_lookback = now - timedelta(minutes=max_post + 1440)  # +1 day for long events
         end_lookahead = now + timedelta(minutes=max_pre + 1440)
 
+        events: list[MacroEvent] = []
+        is_fallback = False
+
         try:
             events = self.provider.get_upcoming_events(start_lookback, end_lookahead)
+            # Update cache on success
+            self._cached_events = events
+            self._last_successful_fetch = now
         except Exception as e:
-            logger.error("Failed to fetch macro events: %s. Falling back to safe mode.", e)
-            # Enterprise fallback: if we can't get data, we return a status indicating unavailability.
-            # Upstream components can decide whether to block or allow based on this.
+            logger.error("Failed to fetch macro events: %s. Falling back to cached data.", e)
+            is_fallback = True
+            # Use cached events, filtering for the current relevant window
+            events = [
+                e
+                for e in self._cached_events
+                if (e.end_timestamp or e.timestamp) >= start_lookback and e.timestamp <= end_lookahead
+            ]
+
+        if not events and is_fallback:
+            # If no cached data is available, return safe-mode status.
             return RiskStatus(
-                is_blocked=False, risk_multiplier=1.0, reason="Event data unavailable"
+                is_blocked=False, risk_multiplier=1.0, reason="Event data unavailable (no cache)"
             )
 
         active_events = []

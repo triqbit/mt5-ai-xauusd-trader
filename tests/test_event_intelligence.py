@@ -1,7 +1,7 @@
 import pytest
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import patch, MagicMock
 from src.data.event_intelligence import (
     EventIntelligence,
@@ -15,7 +15,7 @@ from src.data.event_intelligence import (
 
 @pytest.fixture
 def now():
-    return datetime(2023, 1, 1, 12, 0, 0)
+    return datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 @pytest.fixture
 def mock_events(now):
@@ -109,7 +109,7 @@ def test_no_active_events(now):
     assert status.risk_multiplier == 1.0
     assert len(status.active_events) == 0
 
-def test_fallback_behavior(now):
+def test_fallback_behavior_no_cache(now):
     class BrokenProvider(MockEventProvider):
         def get_upcoming_events(self, start, end):
             raise Exception("API Down")
@@ -119,7 +119,40 @@ def test_fallback_behavior(now):
 
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
-    assert "Event data unavailable" in status.reason
+    assert "Event data unavailable (no cache)" in status.reason
+
+def test_fallback_behavior_with_cache(now):
+    class SometimesBrokenProvider(MockEventProvider):
+        def __init__(self, events):
+            super().__init__(events)
+            self.should_fail = False
+
+        def get_upcoming_events(self, start, end):
+            if self.should_fail:
+                raise Exception("API Down")
+            return super().get_upcoming_events(start, end)
+
+    event = MacroEvent(
+        name="Cached Event",
+        category=EventCategory.CPI,
+        impact=EventImpact.HIGH,
+        timestamp=now + timedelta(minutes=15)
+    )
+    provider = SometimesBrokenProvider([event])
+    intel = EventIntelligence(provider)
+
+    # First fetch to populate cache
+    status = intel.get_risk_status(now)
+    assert status.is_blocked is True
+    assert len(intel._cached_events) == 1
+
+    # Second fetch with failure
+    provider.should_fail = True
+    status = intel.get_risk_status(now)
+
+    assert status.is_blocked is True
+    assert "Cached Event" in status.reason
+    assert status.risk_multiplier == 0.5
 
 def test_ongoing_event(now):
     events = [
@@ -162,11 +195,15 @@ def test_json_provider(tmp_path, now):
 def test_metaapi_provider(mock_get, now):
     mock_response = MagicMock()
     mock_response.status_code = 200
+    # MetaAPI typically returns strings like "2023-01-01T12:30:00.000Z"
+    event_time = now + timedelta(minutes=30)
+    time_str = event_time.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
     mock_response.json.return_value = [
         {
             "event": "Core CPI m/m",
             "impact": "high",
-            "time": (now + timedelta(minutes=30)).isoformat() + "Z"
+            "time": time_str
         }
     ]
     mock_get.return_value = mock_response
