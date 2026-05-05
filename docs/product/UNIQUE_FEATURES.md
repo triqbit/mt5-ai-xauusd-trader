@@ -188,7 +188,42 @@ Generic bots rely on price-action lag (moving averages, RSI) or local order flow
 
 ---
 
+## 6. Trade Narrative Memory
+
+### What it is and why it matters
+**Trade Narrative Memory** is a structured, qualitative database of trade "stories" that goes beyond raw PnL and execution metrics. It captures the "Why" behind every trade's success or failure, combining quantitative data (regime, sentiment, signals) with a structured analysis of the trade's life cycle.
+
+In institutional environments, post-trade analysis is as important as the trade itself. Understanding why a trade failed (e.g., "Stop-loss hunted during low liquidity" vs. "Signal divergence from macro") allows for systematic strategy refinement. Narrative memory transforms a list of trades into a searchable knowledge base of market behaviors and model performance.
+
+### How it differentiates from generic trading bots
+Generic bots provide basic logs: "Buy @ 2000, Sell @ 2010, Profit $10". The MT5 AI Trader with Narrative Memory provides: *"This trade was a Buy during a High Volatility Bullish regime, supported by falling 10Y yields. The trade hit TP but experienced 40% more drawdown than expected due to an unexpected liquidity gap at the London open. This is the 3rd time this month this specific pattern has shown high slippage at this time."*
+
+### Architecture Outline
+1.  **Narrative Generator**: An LLM-enhanced or template-based service that synthesizes data from `TradeBriefing`, `ExecutionDecision`, and `TradeLogger` into a structured "Narrative Object".
+2.  **Market Context Snapshot**: Captures the state of the order book, macro indicators, and ensemble consensus at both entry and exit.
+3.  **Vector Store Integration**: Narratives are stored in a structured relational or document-based schema to allow for filtered search (e.g., "Show me all trades that failed during hawkish FOMC pivots").
+4.  **Feedback Loop**: A service that periodically mines these narratives to suggest parameter adjustments for the `ExecutionFilter` or `RiskManager` via `src/research/journal_mining.py`.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Automatically generate a "Trade Narrative" within 60 seconds of trade closure. |
+| **Functional** | Support for structured "Attribution Tags" (e.g., `LIQUIDITY_GAP`, `MACRO_DIVERGENCE`). |
+| **Technical** | Narratives must be stored in a structured format (JSON/JSONB) and linked to `trade_id`. |
+| **Operational** | Weekly "Alpha Discovery" report generated automatically from the Narrative Memory. |
+| **Release Readiness** | Integration tests must verify that narratives are correctly linked to historical market regimes. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on journal mining logic, narrative synthesis, and alpha discovery reports.
+*   **Jules05 (Integration Governor)**: Lead on defining the narrative schema and ensuring coherence with institutional reporting standards.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires the `TradeLogger` and `TradeBriefing` systems to be fully operational.
+*   **Constraints**: Storage for high-frequency trading narratives must be optimized to prevent database bloat.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Trade narrative memory** (Self-correcting memory of historical trades)
+- **Model confidence heatmaps over time**
 - **Adaptive position sizing based on regime stability**
 - **Institutional Liquidity Heatmap** (Identifying "Smart Money" resting orders)
