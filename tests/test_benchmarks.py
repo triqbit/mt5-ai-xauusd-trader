@@ -163,7 +163,7 @@ def test_ppo_adapter(sample_data):
 @pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
 def test_ensemble_adapter(sample_data):
     mock_model = MagicMock()
-    mock_model.predict.return_value = (SignalDirection.SELL, 0.8, {})
+    mock_model.predict.return_value = Signal(direction=SignalDirection.SELL, confidence=0.8)
 
     window_size = 10
     adapter = EnsembleAdapter(mock_model, window_size=window_size)
