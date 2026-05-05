@@ -72,6 +72,15 @@ In case of catastrophic trading behavior or risk limit breach:
 3. **Terminate Process:** Stop the Docker container: `docker stop trading-bot`.
 4. **Audit Log:** Document the event in the Audit Log using `scripts/data_cleanup.py` if necessary for archival.
 
+#### MT5 Emergency Kill-Switch
+If the automated trading bot cannot be stopped via Docker or if the MT5 terminal itself is misbehaving, follow these emergency steps:
+1. **Physical Disconnect:** If running on a local machine or dedicated VPS, disconnect the internet connection to prevent further order transmission.
+2. **Terminal Force Quit:**
+   - **Windows:** Press `Ctrl+Shift+Esc`, find `terminal.exe` or `metatrader.exe`, and click **End Task**.
+   - **Linux (Wine):** Run `pkill -9 terminal.exe` or `pkill -9 metatrader.exe`.
+3. **Password Change:** Immediately change the MT5 trading account password via the broker's web portal to invalidate existing sessions.
+4. **Account Disable:** If possible, use the broker's dashboard to set the account to "Read-Only" or "Disabled" status.
+
 ## 6. Disaster Recovery Integration
 
 In the event of database corruption during or after release:
