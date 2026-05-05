@@ -13,8 +13,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
-    DateTime,
     JSON,
+    DateTime,
     String,
     Text,
     create_engine,

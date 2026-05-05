@@ -326,7 +326,7 @@ def run_live(
                             if audit_logger:
                                 audit_logger.log_blocked_trade(
                                     symbol=cfg.symbol,
-                                    reason=f"Order execution failure: {str(e)}",
+                                    reason=f"Order execution failure: {e!s}",
                                     context={"direction": direction, "lot_size": lot_size}
                                 )
                             ticket = None
