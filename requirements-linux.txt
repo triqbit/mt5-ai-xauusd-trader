@@ -43,7 +43,7 @@ rich==15.0.0
 tqdm==4.67.1
 
 # ── Dashboard / API ─────────────────────────────────────────
-fastapi==0.115.2
+fastapi==0.136.1
 uvicorn[standard]==0.46.0
 dash==4.1.0
 plotly==5.22.0
