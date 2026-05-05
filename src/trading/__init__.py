@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.core.types import TradeSignalExecution as TradeSignal
 from src.trading.capital_allocator import (
     AllocationRequest,
     AllocationResult,
@@ -10,7 +11,6 @@ from src.trading.capital_allocator import (
 )
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import DailyStats, RiskManager
-from src.core.types import TradeSignalExecution as TradeSignal
 
 __all__ = [
     "AllocationRequest",

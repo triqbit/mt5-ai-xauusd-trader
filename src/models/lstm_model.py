@@ -18,9 +18,8 @@ except ImportError:
     nn = None
 
 from src.core.constants import ModelAction
-from src.core.types import SignalDirection
+from src.core.types import SignalDirection, TradeSignal as Signal
 from src.models.base_model import BaseModel
-from src.core.types import TradeSignal as Signal
 
 
 class LSTMAttentionModel(nn.Module if nn else object):
@@ -172,7 +171,9 @@ class LSTMModel(BaseModel):
                     ).to(self.device)
                 else:
                     self.logger.info("Initializing LSTMPricePredictor...")
-                    self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(self.device)
+                    self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(
+                        self.device
+                    )
 
                 if model_path and Path(model_path).exists():
                     self.logger.info(f"Loading LSTM model from {model_path}")

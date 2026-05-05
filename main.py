@@ -47,6 +47,7 @@ from src.core.health import HealthStatus, init_health_checker
 from src.core.log_config import get_masking_processor
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.types import TradeSignalExecution as TradeSignal
 from src.data.event_intelligence import RiskStatus
 from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
@@ -58,7 +59,6 @@ from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager
-from src.core.types import TradeSignalExecution as TradeSignal
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -593,21 +593,21 @@ def main() -> int:
 
     # Risk summary row
     risk_color = (
-        "red"
-        if cfg.risk_per_trade > 0.02
-        else "yellow"
-        if cfg.risk_per_trade > 0.01
-        else "green"
+        "red" if cfg.risk_per_trade > 0.02 else "yellow" if cfg.risk_per_trade > 0.01 else "green"
     )
     summary.add_row("Risk/Trade:  ", f"[{risk_color}]{cfg.risk_per_trade:.1%}[/]")
 
-    daily_loss_color = "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    daily_loss_color = (
+        "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    )
     summary.add_row("Daily Stop:  ", f"[{daily_loss_color}]{cfg.max_daily_loss:.1%}[/]")
 
     pos_color = "red" if cfg.max_positions > 10 else "yellow" if cfg.max_positions > 5 else "green"
     summary.add_row("Max Positions:  ", f"[{pos_color}]{cfg.max_positions}[/]")
 
-    conf_color = "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    conf_color = (
+        "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    )
     summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
 
     console.print(
