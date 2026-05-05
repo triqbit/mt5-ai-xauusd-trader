@@ -137,4 +137,5 @@ jobs:
         run: |
           # This enables GitHub's built-in auto-merge feature for this PR.
           # It will only merge once all other requirements (approvals, CI) are met.
-          gh pr merge $PR_NUMBER --auto --squash --delete-branch
+          # We catch errors to prevent job failure if auto-merge is disabled at the repository level.
+          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled (possibly disabled at the repository level). Skipping."
