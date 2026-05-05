@@ -28,8 +28,10 @@ class PerformanceContext(BaseModel):
 
     sharpe_ratio: float = Field(0.0, description="Recent Sharpe Ratio")
     profit_factor: float = Field(0.0, description="Recent Profit Factor")
-    max_drawdown: float = Field(0.0, description="Maximum drawdown observed")
+    recovery_factor: float = Field(0.0, description="Recent Recovery Factor")
     win_rate: float = Field(0.0, description="Recent win rate percentage")
+    win_loss_ratio: float = Field(0.0, description="Recent Win/Loss Ratio")
+    max_drawdown: float = Field(0.0, description="Maximum drawdown observed")
     total_trades: int = Field(0, description="Total trades in the analysis window")
 
 
@@ -103,8 +105,10 @@ class DecisionSupportSystem:
         performance = PerformanceContext(
             sharpe_ratio=performance_metrics.get("sharpe_ratio", 0.0),
             profit_factor=performance_metrics.get("profit_factor", 0.0),
-            max_drawdown=performance_metrics.get("max_drawdown", 0.0),
+            recovery_factor=performance_metrics.get("recovery_factor", 0.0),
             win_rate=performance_metrics.get("win_rate", 0.0),
+            win_loss_ratio=performance_metrics.get("win_loss_ratio", 0.0),
+            max_drawdown=performance_metrics.get("max_drawdown", 0.0),
             total_trades=int(performance_metrics.get("total_trades", 0)),
         )
 
@@ -125,18 +129,21 @@ class DecisionSupportSystem:
 
     def _calculate_consensus(self, explanation: SignalExplanation) -> str:
         """
-        Determine the level of agreement among ensemble models.
+        Determine the level of agreement among ensemble models using weighted votes.
         """
         if not explanation.model_attributions:
             return "No Votes"
 
-        votes = [attr.vote for attr in explanation.model_attributions]
-        total_models = len(votes)
-
         direction = explanation.direction
-        matching_votes = sum(1 for v in votes if v == direction)
+        total_weight = sum(attr.weight for attr in explanation.model_attributions)
+        if total_weight <= 0:
+            return "No Weight"
 
-        agreement_pct = matching_votes / total_models
+        weighted_votes = sum(
+            attr.weight for attr in explanation.model_attributions if attr.vote == direction
+        )
+
+        agreement_pct = weighted_votes / total_weight
 
         if agreement_pct >= 1.0:
             return "Unanimous"
@@ -211,7 +218,9 @@ class DecisionSupportSystem:
             perf_content = (
                 f"Sharpe: [bold]{packet.performance.sharpe_ratio:.2f}[/bold]\n"
                 f"Profit Factor: [bold]{packet.performance.profit_factor:.2f}[/bold]\n"
+                f"Recov. Factor: [bold]{packet.performance.recovery_factor:.2f}[/bold]\n"
                 f"Win Rate: [bold]{packet.performance.win_rate:.1%}[/bold]\n"
+                f"W/L Ratio: [bold]{packet.performance.win_loss_ratio:.2f}[/bold]\n"
                 f"Total Trades: {packet.performance.total_trades}"
             )
             perf_panel = Panel(perf_content, title="Recent Performance", border_style="magenta")
@@ -273,13 +282,23 @@ class DecisionSupportSystem:
             # Fallback to plain text
             res = f"=== DECISION PACKET: {packet.symbol} ===\n"
             res += f"STATUS: {'EXECUTE' if packet.is_executable else 'BLOCKED'}\n"
-            if packet.blocking_reasons:
-                res += "REASONS:\n"
-                for r in packet.blocking_reasons:
-                    res += f" - {r}\n"
+            res += f"DIRECTION: {packet.direction.name} | CONSENSUS: {packet.consensus}\n"
 
-            res += f"\nREGIME: {packet.regime.label.value} (Conf: {packet.regime.confidence:.1%})\n"
-            res += f"PERFORMANCE: Sharpe {packet.performance.sharpe_ratio:.2f}, PF {packet.performance.profit_factor:.2f}\n"
-            res += f"MACRO: {'Blocked' if packet.macro_risk.is_blocked else 'OK'} ({packet.macro_risk.reason})\n"
+            if packet.blocking_reasons:
+                res += "BLOCKING REASONS:\n"
+                for r in packet.blocking_reasons:
+                    res += f" • {r}\n"
+
+            res += f"\nREGIME: {packet.regime.label.value} (Confidence: {packet.regime.confidence:.1%}, Vol: {packet.regime.volatility_index:.2f})\n"
+            res += (
+                f"PERFORMANCE: Sharpe {packet.performance.sharpe_ratio:.2f} | "
+                f"PF {packet.performance.profit_factor:.2f} | "
+                f"RF {packet.performance.recovery_factor:.2f} | "
+                f"Win% {packet.performance.win_rate:.1%} | "
+                f"W/L {packet.performance.win_loss_ratio:.2f}\n"
+            )
+            res += f"MACRO: {'BLOCKED' if packet.macro_risk.is_blocked else 'OK'} (Insight: {packet.macro_risk.reason})\n"
+
+            res += f"\nATTRIBUTION SUMMARY:\n{packet.explanation.human_readable_summary}\n"
 
             return res

@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 
 from src.core.config import TradingConfig, get_config
+from src.core.decision_support import DecisionPacket, DecisionSupportSystem
 from src.core.monitor import Monitor
 from src.core.profiler import profile
 
@@ -18,4 +19,12 @@ else:
         raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
-__all__ = ["FeatureEngineer", "Monitor", "TradingConfig", "get_config", "profile"]
+__all__ = [
+    "DecisionPacket",
+    "DecisionSupportSystem",
+    "FeatureEngineer",
+    "Monitor",
+    "TradingConfig",
+    "get_config",
+    "profile",
+]
