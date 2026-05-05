@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Database Schema Hardening:** Implemented `CheckConstraint`s for `entry_price`, `lot_size`, and `confidence` at the database level to ensure data integrity.
+- **Enterprise Traceability:** Expanded `AuditMixin` with `created_by` and `updated_by` columns for comprehensive tracking of record lifecycle.
+- **Performance Optimization:** Added B-tree indices on `timestamp`, `symbol`, `status`, and `is_deleted` columns to speed up query execution and reporting.
 - **Enterprise Core Configuration:** Implemented Pydantic Settings V2 based configuration system with robust environment variable mapping and risk parameter validation in `src/core/config.py`.
 - **Hybrid MT5 Connector:** Dual-path connection architecture supporting native Windows MT5 SDK and MetaAPI cloud failover for cross-platform reliability in `src/trading/mt5_connector.py`.
 - **Institutional Risk Engine:** Comprehensive risk management system featuring ATR-based position sizing, cascading daily loss circuit breakers (Level 1-4), and hard drawdown safeguards in `src/trading/risk_engine.py`.
