@@ -7,96 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0-rc4] - 2026-05-05
+
 ### Added
+- **Docker Multi-Stage Infrastructure:** Refactored `Dockerfile` into a multi-stage build system for smaller, more secure, and multi-arch production images.
+- **Institutional Risk Engine:** Comprehensive risk management system featuring ATR-based position sizing, cascading daily loss circuit breakers (Level 1-4), and hard drawdown safeguards in `src/trading/risk_engine.py`.
+- **Audited Risk Management:** Introduced `AuditedRiskManager` and a dedicated `RiskEngine` to separate risk calculation logic from execution management.
 - **Production-Ready Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces, probability extraction, and architecture switching.
 - **Improved Trading Environment:** Refined `TradingEnv` with institutional reward skeleton and Gymnasium 1.0 compatibility fixes.
 - **Enterprise Core Configuration:** Implemented Pydantic Settings V2 based configuration system with robust environment variable mapping and risk parameter validation in `src/core/config.py`.
 - **Hybrid MT5 Connector:** Dual-path connection architecture supporting native Windows MT5 SDK and MetaAPI cloud failover for cross-platform reliability in `src/trading/mt5_connector.py`.
-- **Institutional Risk Engine:** Comprehensive risk management system featuring ATR-based position sizing, cascading daily loss circuit breakers (Level 1-4), and hard drawdown safeguards in `src/trading/risk_engine.py`.
 - **Ensemble Consensus Layer:** Weighted signal aggregation engine with model dissent checks and institutional confidence thresholds in `src/models/ensemble.py`.
 - **Institutional Capital Allocation:** Enhanced `CapitalAllocator` with portfolio heat tracking, symbol/family concentration limits, linear 'Diversification Guard' scaling, and performance-based cooling-off periods in `src/trading/capital_allocator.py`.
+- **Robustness Scoring:** Integrated Sharpe consistency and MDD preservation scoring into the walk-forward optimization framework in `src/research/hyperopt_walkforward.py`.
 
 ### Changed
+- **9-Layer Execution Filter (Finalized):** Standardized the entry filter cascade to include 9 distinct validation layers (ATR, Trend, EMA, Momentum, Session, Drawdown, Stability, Performance, Confidence).
+- **Temporal Standardization:** All temporal markers across the `src/` directory now use `datetime.now(timezone.utc)`.
+- **Core Type Consolidation:** Centralized core data structures (e.g. `TradeSignal`, `ExecutionDecision`) to resolve circular dependencies and improve systemic coherence.
 - Refactored `EnsembleModel` to support weighted voting across PPO, Dreamer, and LSTM models with dynamic weight adaptation.
 - Standardized `MT5Connector.place_order` signature to accept `TradeSignal` objects.
 
 ### Fixed
-- Linting errors and unused imports in core trading and model modules.
+- **Technical Debt Cleanup:** Resolved over 400 Ruff linting errors and standardized operational logs.
+- **Backtest Metrics:** Fixed IndexError in `BacktestEngine` and aligned historical price data with feature-engineered indices.
 - Restored missing `get_rates_range` functionality in MT5 connector.
 
-## [1.1.0-rc1] - 2024-05-02
-### Added
-- Refined the 6-layer execution filter in `src/trading/execution_filter.py` with EMA20 trend angle logic.
-- Comprehensive unit test suite for execution filters in `tests/test_execution_filter.py`.
-- Institutional-grade decision support system in `src/core/decision_support.py`.
-- Aggregation of signal explainability, market regime, macro-risk status, and recent performance into a unified `DecisionPacket`.
-- High-fidelity terminal reporting with `rich` dashboarding for operator oversight.
-- Go/No-Go logic integrating execution filters, risk management, and macro event blocks.
-- Comprehensive unit tests for decision support in `tests/test_decision_support.py`.
-- Enhanced `JournalMiner` in `src/analytics/journal_mining.py` with multi-dimensional motif detection (volatility, confidence).
-- Implemented `detect_pre_drawdown_motifs` for early warning pattern recognition.
-- Added symbol-based concentration analysis to `find_profitable_patterns`.
-- Integrated `cluster_frequency` tracking into `SignalMotif` to identify toxic signal combinations.
-- Comprehensive unit tests for new journal mining capabilities in `tests/test_journal_mining.py`.
-- Institutional-grade research reporting system in `src/research/reporting.py`.
-- Automated report aggregation via `ResearchOrchestrator` integrating regimes, stress tests, benchmarks, and rare events.
-- High-quality Jinja2 templates for Markdown and HTML research summaries.
-- Enhanced journal mining with signal motif reporting and behavioral risk identification.
-- Integrated rare event simulation metadata into standardized research reports.
-- Enterprise-grade trade signal explainability and attribution system in `src/core/explainability.py`.
-- Decomposition of signals into execution, model, regime, risk, and feature cluster contributions.
-- Standardized signal direction mapping (0=HOLD, 1=BUY, 2=SELL) across the explainer.
-- Robust handling of model confidence ties and dominant driver identification.
-- Support for human-readable terminal formatting (via `rich`) and machine-readable metadata.
-- Comprehensive unit tests for the explainability module in `tests/test_explainability.py`.
-- Standardized `BaseModel` interface and `Signal` output format in `src/models/base_model.py`.
-- Production-ready stubs for `PPOAgent`, `LSTMModel`, and `DreamerAgent` in `src/models/`.
-- Gymnasium-compatible `TradingEnv` skeleton for XAUUSD in `src/trading/trading_env.py`.
-- Comprehensive unit tests for model stubs and environment interface in `tests/test_models_stubs.py`.
-- Enterprise-grade feature engineering pipeline in `src/core/feature_engineering.py`.
-- Support for 190+ technical indicators, multi-timeframe analysis (M1-D1), and candle patterns.
-- Volume profile features (Rolling VWAP, VPT, OBV).
-- Vectorized rolling slope calculation for high-performance feature extraction.
-- Comprehensive unit tests in `tests/test_feature_engineering.py` using synthetic XAUUSD data.
-- Cascading 6-layer execution filter in `src/trading/execution_filter.py` validating ATR, Trend Angle, EMA sequence, Momentum, Session time, and Drawdown.
-- Enterprise-grade monitoring and alerting system in `src/core/monitor.py` with Prometheus integration and Telegram bot support.
-- Disciplined walk-forward optimization framework in `src/research/hyperopt_walkforward.py` with Optuna integration.
-- Robustness scoring logic (Sharpe consistency, MDD preservation, parameter stability).
-- Rolling and expanding window support for out-of-sample validation.
-- Comprehensive unit tests for walk-forward research in `tests/test_hyperopt_walkforward.py`.
-- Enterprise-grade health check system in `src/core/health.py`.
-- Mandatory startup health gate in `main.py` to prevent execution in invalid states.
-- FastAPI-compatible health endpoints for production monitoring.
-- Comprehensive unit and integration tests for the health check framework.
-- Semantic versioning policy (`docs/VERSIONING_POLICY.md`).
-- Automated changelog generation workflow (`.github/workflows/changelog.yml`).
-- High-impact macroeconomic event intelligence module in `src/data/event_intelligence.py`.
-- Support for CPI, NFP, FOMC, rate decisions, and geopolitical risk windows.
-- Event severity scoring and typed risk models using Pydantic.
-- Pre-event risk windows and post-event cooldown logic for XAUUSD.
-- Enterprise-safe fallback behavior for external event data feeds.
-- Comprehensive unit tests for event intelligence in `tests/test_event_intelligence.py`.
-- Institutional-grade rare event simulation framework in `src/research/rare_event_simulator.py`.
-- Support for Flash Crashes, Liquidity Vacuums, Gold Gaps, Violent Reversals, and Market Dislocations.
-- Statistical verification tests for synthetic black-swan scenario generation in `tests/test_rare_event_simulator.py`.
-- Institutional-grade dynamic ensemble weighting engine in `src/models/dynamic_ensemble.py`.
-- Stability controls for ensemble rebalancing including EMA decay, swing caps, and oscillation dampening.
-- Regime-aware scoring heuristics for XAUUSD (Trending, News Shock, Mean Reversion, etc.).
-- Integration of `DynamicEnsemble` into the core `EnsembleModel` in `src/models/ensemble.py`.
-- Comprehensive unit tests for dynamic weighting and stability in `tests/test_dynamic_ensemble.py`.
-- Institutional-grade execution quality analytics in `src/analytics/execution_quality.py`.
-- Multi-horizon markout (drift) tracking (1m, 5m, 15m, 30m, 60m).
-- Spread-relative sigmoid fill quality model.
-- Execution cost tracking (slippage + half-spread).
-- Automated timezone handling for accurate market data comparisons.
-- Comprehensive unit tests for execution quality in `tests/test_execution_quality.py`.
+## [1.1.0-rc3] - 2026-05-04
 
-### Changed
-- Refactored release orchestration to integrate automated versioning logic.
+### Added
+- **Enterprise Monitoring:** Centralized metrics and alerting system with Prometheus and Telegram support in `src/core/monitor.py`.
+- **RL Evaluation Framework:** Institutional-grade performance metrics and regime-aware evaluation in `src/research/rl_evaluation.py`.
+- **Enterprise Audit Logging:** Persistent system-wide audit tracing for compliance and debugging in `src/core/audit_log.py`.
+- **Workflow Simplification:** Automated operational friction mapping and detailed automation designs in `docs/operations/WORKFLOW_SIMPLIFICATION_LOG.md`.
 
 ### Fixed
-- Dependency conflict in CI by updating `gymnasium` version constraint.
-- Unused `Dict` imports in `src/models/lstm_model.py` and `src/models/ppo_agent.py`.
+- Stabilized CI pipeline with `numpy < 2` pinning for TA-Lib compatibility.
+- Resolved coroutine awaiting issues in system monitoring tests.
+- Removed unused `pandas-ta` dependency to resolve version conflicts on Python 3.12.
+
+## [1.1.0-rc2] - 2026-05-03
+
+### Added
+- **Institutional Capital Allocation:** Implemented a multi-strategy budget management system with concentration limits and performance-based scaling in `src/trading/capital_allocator.py`.
+- **Vectorized Backtesting v2:** Enhanced the walk-forward backtesting engine with vectorized trade execution and performance metrics in `src/research/hyperopt_walkforward.py`.
+- **Market Regime Detection:** Statistical market state classifier for XAUUSD (Trending, Ranging, News Shock, etc.) in `src/models/regime_detector.py`.
+- **Institutional Feature Engineering:** Scalable pipeline for 190+ technical indicators with multi-timeframe support in `src/core/feature_engineering.py`.
+- **CI Quality Gates:** Mandatory Mypy type enforcement and Docker dependency harmonization for enterprise stability.
+- **Versioning Policy:** Defined comprehensive SemVer criteria and automated release workflows in `docs/VERSIONING_POLICY.md`.
+- **Automated Changelog:** Integrated conventional commit-based changelog updates in `.github/workflows/changelog.yml`.
+
+### Changed
+- Standardized `BaseModel` and `Signal` interfaces across all institutional models.
+- Enhanced release orchestration logic to automate version bumping and changelog transitions.
+
+### Fixed
+- Resolved critical import errors and synchronized CI dependencies across 18 files.
+- Optimized rolling slope calculations and row access in benchmark adapters (2000x speedup).
+
+## [1.1.0-rc1] - 2026-05-02
+### Added
+- Refined the 6-layer execution filter in `src/trading/execution_filter.py` with EMA20 trend angle logic.
+- Institutional-grade decision support system in `src/core/decision_support.py`.
+- Go/No-Go logic integrating execution filters, risk management, and macro event blocks.
+- Enhanced `JournalMiner` with multi-dimensional motif detection (volatility, confidence).
+- Institutional-grade research reporting system in `src/research/reporting.py`.
+- Enterprise-grade trade signal explainability and attribution system in `src/core/explainability.py`.
+- High-impact macroeconomic event intelligence module in `src/data/event_intelligence.py`.
+- Institutional-grade rare event simulation framework in `src/research/rare_event_simulator.py`.
+- Institutional-grade dynamic ensemble weighting engine in `src/models/dynamic_ensemble.py`.
+- Institutional-grade execution quality analytics in `src/analytics/execution_quality.py`.
 
 ## [1.0.0] - 2024-05-24
 ### Added
