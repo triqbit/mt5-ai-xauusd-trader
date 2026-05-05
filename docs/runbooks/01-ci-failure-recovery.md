@@ -1,80 +1,77 @@
 # Runbook 01: CI Failure Recovery
 
 ## Overview
-This runbook provides procedures for recovering from failures in GitHub Actions workflows, including `ci.yml`, `release.yml`, and `pre-deploy-validation.yml`. These gates are mandatory for production releases.
+This runbook provides standardized procedures for recovering from failures in GitHub Actions workflows, including `ci.yml`, `release.yml`, and `pre-deploy-validation.yml`. These gates are mandatory "Quality Gates" that must pass for any code to reach production.
 
 ## Common Failures & Resolutions
 
 ### 1. Linting & Type Check Failures (Ruff / Mypy)
-**Symptom:** The `lint` or `type-check` job fails.
+**Symptom:** The `lint` or `type-check` job fails in the CI pipeline.
 **Resolution:**
-1. Run Ruff locally to identify and fix issues:
+1. **Ruff:** Identify linting errors in the CI logs. Run Ruff locally to fix:
    ```bash
    ruff check . --fix
    ruff format .
    ```
-2. Run Mypy to check for type inconsistencies:
+2. **Mypy:** Check for type inconsistencies. Run Mypy locally:
    ```bash
-   mypy src/ main.py
+   mypy src/ main.py scripts/
    ```
-3. Commit and push the fixes.
+3. Commit and push the fixes once local checks pass.
 
 ### 2. Test & Coverage Failures (Pytest)
-**Symptom:** The `test` job fails due to failed assertions or coverage falling below the 85% gate.
+**Symptom:** The `test` job fails due to failed assertions or coverage falling below the **85%** gate.
 **Resolution:**
-1. Run tests locally:
+1. **Identify Failures:** Review the Pytest output in GitHub Actions.
+2. **Run Locally:** Execute the test suite locally to reproduce:
    ```bash
    python -m pytest tests/
    ```
-2. If coverage is below 85%, identify uncovered areas:
+3. **Check Coverage:** If coverage is below 85%, generate a report to find uncovered lines:
    ```bash
    python -m pytest --cov=src tests/ --cov-report=term-missing
    ```
-3. Ensure no regression in `Migration Reversibility Check`.
+4. **Migration Reversibility:** Ensure no regression in the `verify_migrations.py` check.
 
 ### 3. Security Scan Failures (Trivy / pip-audit / Gitleaks)
 **Symptom:** `security-scan` or `dependency-audit` fails.
 **Resolution:**
 1. **Dependency Vulnerability (pip-audit):**
-   - Run `pip-audit` locally.
-   - Update the vulnerable package in `requirements.txt`.
+   - Run `pip-audit` locally to identify the vulnerable package.
+   - Update the package version in `requirements.txt`.
 2. **Secret Detection (Gitleaks):**
-   - If a secret is detected, **revoke the secret immediately**.
-   - Remove the secret from Git history using `git filter-repo`.
+   - **CRITICAL:** If a secret is detected, it is considered compromised.
+   - **Revoke** the secret immediately at the provider (MetaAPI, Telegram, etc.).
+   - Use `git filter-repo` or `BFG Repo-Cleaner` to purge the secret from Git history if pushed to a public/shared branch.
    - Rotate the secret across all environments.
-3. **Docker Image Vulnerabilities (Trivy):**
-   - Update the base image in `Dockerfile` or fix vulnerable OS packages.
+3. **Container Security (Trivy):**
+   - Check for OS-level vulnerabilities in the base image. Update the `Dockerfile` to a newer base image if necessary.
 
 ### 4. Validation Script Failures
 **Symptom:** Failures in `validate_env.py` or `verify_migrations.py`.
 **Resolution:**
-1. **Environment Validation (`validate_env.py`):**
-   - Check if `.env.example` is missing keys defined in `src/core/config.py`.
-   - Run: `python scripts/validate_env.py`
-2. **Migration Safety (`verify_migrations.py`):**
-   - Ensure migrations are reversible (upgrade -> downgrade -> upgrade).
-   - Check for schema inconsistencies in `migrations/versions/`.
-   - Run: `python scripts/verify_migrations.py`
-
-### 5. Release Readiness Failures
-**Symptom:** `release` workflow fails during version bumping or changelog checks.
-**Resolution:**
-1. Ensure `CHANGELOG.md` has a non-empty `## [Unreleased]` section.
-2. Run: `python scripts/check_release_notes.py`
-3. Verify that the commit message follows Conventional Commits.
+1. **Environment Validation:** Ensure `.env.example` contains all keys required by `Config`. Run:
+   ```bash
+   python scripts/validate_env.py
+   ```
+2. **Migration Safety:** Ensure migrations can be upgraded and downgraded cleanly. Run:
+   ```bash
+   python scripts/verify_migrations.py
+   ```
 
 ## Expected Outcomes
-- All GitHub Actions workflows show a green "Success" status.
-- The 85% coverage gate is satisfied (aligned with `EXCELLENCE_BLUEPRINT.md`).
-- No high-severity vulnerabilities or leaked secrets remain.
+- GitHub Actions workflows display a green "Success" status.
+- All code complies with `EXCELLENCE_BLUEPRINT.md` standards.
+- Test coverage meets or exceeds the 85% mandatory threshold.
 
 ## Verification Commands
 - **Environment:** `python scripts/validate_env.py`
 - **Migrations:** `python scripts/verify_migrations.py`
-- **Tests:** `pytest tests/ --cov=src --cov-fail-under=85`
-- **Security:** `pip-audit` and `gitleaks detect --verbose`
+- **Full Test Suite:** `pytest tests/ --cov=src --cov-fail-under=85`
+- **Linting:** `ruff check .`
+- **Security:** `pip-audit`
 
 ## Escalation Path
-1. **Level 1:** Release Engineer (Jules03).
+1. **Level 1:** Release Engineer (Jules03 - @andonly1348).
 2. **Level 2:** Quality Lead (@maintainer-quality).
-3. **Level 3:** Security Lead (if security-related).
+3. **Level 3:** Security Lead (if Gitleaks/Trivy related).
