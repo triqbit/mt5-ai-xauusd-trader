@@ -20,8 +20,15 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.trade_logger import Base
-target_metadata = Base.metadata
+from src.core.audit_log import Base as AuditBase
+from src.core.trade_logger import Base as TradeBase
+
+# Combine metadata from both Base classes for Alembic tracking
+from sqlalchemy import MetaData
+target_metadata = MetaData()
+for base in [TradeBase, AuditBase]:
+    for table in base.metadata.tables.values():
+        table.tometadata(target_metadata)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

@@ -6,7 +6,7 @@ from src.core.trade_logger import TradeLogger
 from src.core.constants import SignalDirection
 import os
 
-def test_decision_support_optimization(mocker):
+def test_decision_support_optimization():
     """Verify that format_for_operator returns early when console is provided."""
     dss = DecisionSupportSystem()
     mock_packet = MagicMock()

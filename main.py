@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -44,7 +45,7 @@ from src.core.exceptions import (
 from src.core.explainability import SignalExplainer
 from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
-from src.core.log_config import get_masking_processor
+from src.core.log_config import configure_logging, get_masking_processor
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.data.event_intelligence import RiskStatus
@@ -58,28 +59,6 @@ from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager, TradeSignal
-
-# -- Logging setup ---------------------------------------------------------
-
-
-def configure_logging(level: str = "INFO") -> None:
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.stdlib.add_log_level,
-            get_masking_processor(),
-            structlog.dev.ConsoleRenderer(),
-        ],
-        wrapper_class=structlog.BoundLogger,
-        context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
-    )
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-
 
 # -- Trading loop ----------------------------------------------------------
 
@@ -104,6 +83,8 @@ def run_live(
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
+        trace_id = str(uuid.uuid4())
+        structlog.contextvars.bind_contextvars(trace_id=trace_id)
         with profile("loop_total"):
             try:
                 # 1. Fetch latest market data
@@ -357,6 +338,17 @@ def run_live(
                         packet = dss.assemble_packet(
                             cfg.symbol, explanation, regime_info, macro_risk, perf_metrics
                         )
+
+                        # Structured logging of the decision packet
+                        log.info(
+                            "decision_packet_assembled",
+                            symbol=packet.symbol,
+                            direction=packet.direction.name,
+                            is_executable=packet.is_executable,
+                            consensus=packet.consensus,
+                            reasons=packet.blocking_reasons,
+                        )
+
                         # Render the institutional decision cockpit
                         if console:
                             # Optimization: Pass console to avoid redundant creation and captures
