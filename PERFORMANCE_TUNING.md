@@ -154,6 +154,7 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 
 ### 7.1 Python Optimization
 - **Bypass Redundant Rendering**: In `DecisionSupportSystem.format_for_operator`, we bypass `rich.Console.capture()` when a console is already provided for direct printing. This eliminates expensive string rendering in the main loop.
+- **Vectorized Backtest Loops**: In `BacktestEngine.run_walk_forward`, we pre-extract DataFrame columns into NumPy arrays. Accessing data via `high_vals[abs_idx]` is ~150x faster than `df.iloc[i]["high"]` because it avoids creating a new `pd.Series` object for every bar in the simulation.
 
 ```python
 # Bad: List comprehension with function call

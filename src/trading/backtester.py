@@ -146,7 +146,6 @@ class BacktestEngine:
 
         while start + train_window + test_window <= n:
             test_start_idx = start + train_window
-            test_end_idx = test_start_idx + test_window
 
             for i in range(test_window):
                 abs_idx = test_start_idx + i
