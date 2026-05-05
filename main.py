@@ -478,11 +478,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    configure_logging(args.log_level)
-    log, console = logging.getLogger("main"), Console()
 
-    # Dynamic CLI Override Mapping: CLI Arg -> Environment Variable
-    # This ensures CLI > ENV > .env precedence
+    # 1. Dynamic CLI Override Mapping: CLI Arg -> Environment Variable
+    # This ensures CLI > ENV > .env precedence.
     cli_overrides = {
         "mode": "MODE",
         "algo": "ALGORITHM",
@@ -492,25 +490,42 @@ def main() -> int:
         "log_level": "LOG_LEVEL",
     }
 
-    for arg_name, env_var in cli_overrides.items():
-        val = getattr(args, arg_name, None)
-        if val is not None:
-            if isinstance(val, bool):
-                if val:  # Only set if True for flags
-                    os.environ[env_var] = "YES" if arg_name == "confirm_live" else str(val)
-            else:
-                os.environ[env_var] = str(val)
+    # Identify explicitly provided arguments to avoid defaults overriding ENV/.env.
+    provided_dest = set()
+    temp_p = argparse.ArgumentParser(add_help=False)
+    temp_p.add_argument("--mode")
+    temp_p.add_argument("--algo")
+    temp_p.add_argument("--symbol")
+    temp_p.add_argument("--timeframe")
+    temp_p.add_argument("--confirm-live", action="store_true")
+    temp_p.add_argument("--log-level", dest="log_level")
 
-    # Ensure get_config() picks up the CLI-overridden environment variables
+    for action in temp_p._actions:
+        for opt in action.option_strings:
+            if opt in sys.argv:
+                provided_dest.add(action.dest)
+
+    for arg_name, env_var in cli_overrides.items():
+        if arg_name in provided_dest:
+            val = getattr(args, arg_name, None)
+            if val is not None:
+                if isinstance(val, bool):
+                    if val:  # Only set if True for flags
+                        os.environ[env_var] = "YES" if arg_name == "confirm_live" else str(val)
+                else:
+                    os.environ[env_var] = str(val)
+
+    # 2. Reset config cache before ANY component uses get_config()
     from src.core.config import get_config
 
     get_config.cache_clear()
 
+    # 3. Load configuration and initialize logging
     try:
         cfg = get_config()
-        get_masking_processor().update_secrets(cfg)
     except Exception as exc:
-        # Check if it's a Pydantic validation error (usually missing required fields)
+        # Preliminary check for missing required variables before logging is even ready
+        console = Console()
         if "validation error" in str(exc).lower():
             console.print(
                 Panel(
@@ -526,8 +541,16 @@ def main() -> int:
                 )
             )
         else:
-            log.critical("Failed to load configuration: %s", exc)
+            print(f"CRITICAL: Failed to load configuration: {exc}")
         return 1
+
+    configure_logging(cfg.log_level)
+    log, console = logging.getLogger("main"), Console()
+    get_masking_processor().update_secrets(cfg)
+
+    # Re-verify if it was a Pydantic validation error if we somehow got past get_config()
+    # (Pydantic 2.0+ usually raises on instantiation)
+    # Actually, we already handled it above.
 
     # Validate configuration
     validator = ConfigValidator(cfg)

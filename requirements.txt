@@ -48,7 +48,7 @@ tqdm==4.67.1
 
 # ── Dashboard / API ─────────────────────────────────────────
 jinja2==3.1.6
-fastapi==0.115.2
+fastapi==0.136.1
 uvicorn[standard]==0.46.0
 dash==4.1.0
 plotly==5.22.0
@@ -60,8 +60,8 @@ pydantic-settings==2.14.0
 tomli==2.4.1
 
 # ── Testing ─────────────────────────────────────────────────
-pytest==9.0.3
-pytest-asyncio==0.25.3
+pytest==8.3.4
+pytest-asyncio==0.21.1
 pytest-cov==5.0.0
 hypothesis==6.152.4
 
