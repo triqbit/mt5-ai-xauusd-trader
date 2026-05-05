@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
+from src.core.types import TradeSignal
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 
@@ -33,21 +34,6 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
     "USDJPY": 0.08,  # JPY - carry trade
     "EURJPY": 0.07,  # EUR/JPY cross
 }
-
-
-@dataclass
-class TradeSignal:
-    """Validated trading signal passed to order execution."""
-
-    symbol: str
-    direction: int  # +1 buy / -1 sell
-    entry_price: float
-    stop_loss: float
-    take_profit: float
-    lot_size: float
-    algorithm: str
-    confidence: float  # 0.0 - 1.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -230,4 +216,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager", "TradeSignal"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]

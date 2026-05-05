@@ -9,7 +9,6 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -17,22 +16,13 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from src.core.types import ExecutionDecision, TradeSignal
+
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.trade_logger import TradeLogger
-    from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ExecutionDecision:
-    """Result of the execution filter cascade."""
-
-    signal: TradeSignal
-    is_approved: bool
-    confidence_score: float
-    blocked_by: str | None = None
 
 
 class ExecutionFilter:
@@ -68,41 +58,64 @@ class ExecutionFilter:
 
         # Layer 1: ATR Volatility
         if not self._check_atr_volatility(market_data):
-            return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.0, blocked_by="ATR_VOLATILITY"
+            )
 
         # Layer 2: Trend Angle
         if not self._check_trend_angle(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.2, blocked_by="TREND_ANGLE"
+            )
 
         # Layer 3: EMA Sequence
         if not self._check_ema_sequence(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.3, blocked_by="EMA_SEQUENCE"
+            )
 
         # Layer 4: Momentum (RSI)
         if not self._check_momentum(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.4, blocked_by="MOMENTUM"
+            )
 
         # Layer 5: Session/Time
         if not self._check_session_time(timestamp):
-            return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.5, blocked_by="SESSION_TIME"
+            )
 
         # Layer 6: Drawdown
         if not self._check_drawdown_limit(current_drawdown):
-            return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.1, blocked_by="DRAWDOWN_LIMIT"
+            )
 
         # Layer 7: Model Stability Guard
         if not self._check_model_stability(model_health):
-            return ExecutionDecision(signal, False, 0.0, "MODEL_STABILITY")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.0, blocked_by="MODEL_STABILITY"
+            )
 
         # Layer 8: Performance Floor
         if not self._check_performance_floor(trade_logger):
-            return ExecutionDecision(signal, False, 0.0, "PERFORMANCE_FLOOR")
+            return ExecutionDecision(
+                signal=signal, is_approved=False, confidence_score=0.0, blocked_by="PERFORMANCE_FLOOR"
+            )
 
         # Layer 9: Confidence Threshold
         if not self._check_dynamic_confidence(signal.confidence):
-            return ExecutionDecision(signal, False, signal.confidence, "CONFIDENCE_THRESHOLD")
+            return ExecutionDecision(
+                signal=signal,
+                is_approved=False,
+                confidence_score=signal.confidence,
+                blocked_by="CONFIDENCE_THRESHOLD",
+            )
 
-        return ExecutionDecision(signal, True, signal.confidence)
+        return ExecutionDecision(
+            signal=signal, is_approved=True, confidence_score=signal.confidence
+        )
 
     def _check_model_stability(self, health: dict[str, float] | None) -> bool:
         """Blocks if aggregate model drift or accuracy breaches limits."""

@@ -51,13 +51,14 @@ from src.data.event_intelligence import RiskStatus
 from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
+from src.core.types import TradeSignal
 from src.models.ppo_agent import PPOAgent
 from src.models.regime_detector import RegimeDetector
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_manager import RiskManager
 
 # -- Logging setup ---------------------------------------------------------
 
