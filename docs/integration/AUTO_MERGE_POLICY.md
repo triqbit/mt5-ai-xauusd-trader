@@ -20,7 +20,7 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 Automatically **BLOCK** and **ESCALATE** if any of these are true:
 
 - 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py` or files interacting with MT5 order placement.
-- 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py` or `src/trading/risk_manager.py`.
+- 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py`, `src/trading/risk_engine.py`, or `src/trading/risk_manager.py`.
 - 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*` or credential handling.
 - 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
 - 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile` or container orchestration.
@@ -32,6 +32,7 @@ The following patterns trigger an automatic block and escalation:
 
 - `src/trading/executor.py`
 - `src/core/risk_engine.py`
+- `src/trading/risk_engine.py`
 - `src/trading/risk_manager.py`
 - `config/secrets.*`
 - `.github/workflows/deploy.*`
