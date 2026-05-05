@@ -8,13 +8,14 @@ Comprehensive integration testing was performed to verify that components develo
 ### Test: Full Trading Pipeline
 **Description:** Data ingestion → feature engineering → model inference → execution filter → risk engine → logging
 **Status:** ✅ Pass
-**Latency:** 0.63 ms (P50), 0.71 ms (P95), 0.85 ms (P99)
+**Latency:** 0.65 ms (P50), 0.76 ms (P95), 0.86 ms (P99)
 **Issues found:**
 - `TradeLogger` was not automatically creating database tables upon initialization, causing failures when using in-memory or fresh databases.
-- Legacy `datetime.utcnow()` calls were generating deprecation warnings.
+- Legacy `datetime.utcnow()` calls were generating deprecation warnings in several modules.
 **Follow-up required:**
 - [DONE] Applied automatic table creation in `TradeLogger.__init__`.
-- [DONE] Updated `RiskManager` and test suites to use `datetime.now(UTC)`.
+- [DONE] Updated `tests/test_model_stability_guard.py` to use `datetime.now(UTC)`.
+- [PENDING] `src/trading/risk_manager.py` still contains legacy `datetime.utcnow()` but is deferred for manual review due to high-risk classification.
 
 ### Test: System Startup & Configuration
 **Description:** Configuration loading → validation → trading mode selection → monitoring startup
@@ -47,8 +48,8 @@ Comprehensive integration testing was performed to verify that components develo
 ---
 
 ## Performance & Resource Audit
-- **P50 Latency:** 0.63 ms
-- **P95 Latency:** 0.71 ms
-- **P99 Latency:** 0.85 ms
+- **P50 Latency:** 0.65 ms
+- **P95 Latency:** 0.76 ms
+- **P99 Latency:** 0.86 ms
 - **Memory Growth:** 0.00 MB over 100 iterations (No leaks detected)
 - **Data Consistency:** Verified consistent `signal_id` propagation from model to execution and logging.
