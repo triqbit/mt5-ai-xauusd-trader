@@ -7,7 +7,12 @@ import pandas as pd
 import pytest
 
 from src.research.benchmarks import EMACrossoverStrategy
-from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer, OptimizationMetric
+from src.research.hyperopt_walkforward import (
+    WalkForwardConfig,
+    WalkForwardOptimizer,
+    OptimizationMetric,
+    RobustnessWeights,
+)
 
 
 @pytest.fixture
@@ -120,6 +125,29 @@ def test_metric_selection(sample_data):
     )
     result_tr = optimizer_tr.run_optimization()
     assert result_tr.metrics.robustness_score is not None
+
+def test_configurable_robustness_weights(sample_data):
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    # Custom weights that prioritize IS-OOS gap and stability
+    weights = RobustnessWeights(is_oos_gap=1.0, stability=1.0, oos_mean=0.1)
+    config = WalkForwardConfig(
+        n_trials=2,
+        train_size=100,
+        test_size=20,
+        step_size=50,
+        robustness_weights=weights
+    )
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config
+    )
+
+    result = optimizer.run_optimization()
+    assert result.metrics.robustness_score is not None
 
 def test_insufficient_data(sample_data):
     config = WalkForwardConfig(train_size=1000, test_size=200)
