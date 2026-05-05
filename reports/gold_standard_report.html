@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - Research Report</title>
+    <title>Institutional Strategy Audit - Q1 2025 - Research Report</title>
     <style>
         :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --light: #f4f7f6; --white: #ffffff; }
         html { scroll-behavior: smooth; }
@@ -64,92 +64,92 @@
             <span style="font-weight: 800; font-size: 1.1rem;">triqbit | Research</span>
             <nav>
                 <a href="#executive-summary">Summary</a>
-                {% if regime_analysis %}<a href="#regime-analysis">Regime</a>{% endif %}
-                {% if stress_tests %}<a href="#stress-tests">Stress</a>{% endif %}
-                {% if hyperparameter_robustness %}<a href="#hyperparameter-robustness">Robustness</a>{% endif %}
-                {% if trade_patterns %}<a href="#trade-patterns">Patterns</a>{% endif %}
-                {% if model_drift %}<a href="#model-drift">Drift</a>{% endif %}
-                {% if allocation_insights %}<a href="#allocation-insights">Allocation</a>{% endif %}
-                {% if benchmarks %}<a href="#benchmarks">Benchmarks</a>{% endif %}
-                {% if rl_evaluation %}<a href="#rl-evaluation">RL</a>{% endif %}
-                {% if rare_events %}<a href="#rare-events">Rare</a>{% endif %}
-                {% if execution_quality %}<a href="#execution-quality">Execution</a>{% endif %}
+                <a href="#regime-analysis">Regime</a>
+                <a href="#stress-tests">Stress</a>
+                <a href="#hyperparameter-robustness">Robustness</a>
+                <a href="#trade-patterns">Patterns</a>
+                <a href="#model-drift">Drift</a>
+                <a href="#allocation-insights">Allocation</a>
+                <a href="#benchmarks">Benchmarks</a>
+                <a href="#rl-evaluation">RL</a>
+                <a href="#rare-events">Rare</a>
+                <a href="#execution-quality">Execution</a>
                 <a href="#conclusion">Conclusion</a>
             </nav>
         </div>
     </div>
 
-    {% set ns = namespace(count=1) %}
+
     <header>
-        <h1>{{ title }}</h1>
+        <h1>Institutional Strategy Audit - Q1 2025</h1>
         <div class="metadata">
-            <span><strong>Date:</strong> {{ timestamp }}</span>
-            <span><strong>Author:</strong> {{ author }}</span>
+            <span><strong>Date:</strong> 2026-05-05 17:47:31.898244+00:00</span>
+            <span><strong>Author:</strong> Jules Research</span>
             <span><strong>Status:</strong>
-                <span class="status-badge {% if overall_status == 'VERIFIED' %}status-verified{% elif overall_status == 'REJECTED' %}status-rejected{% else %}status-provisional{% endif %}">
-                    {{ overall_status }}
+                <span class="status-badge status-verified">
+                    VERIFIED
                 </span>
             </span>
         </div>
     </header>
 
     <div class="kpi-dashboard">
-        {% if stress_tests %}
+
         <div class="kpi-card" style="border-top-color: var(--danger);">
-            <span class="kpi-value">{{ stress_tests.resilience_score }}</span>
+            <span class="kpi-value">88.4</span>
             <span class="kpi-label">Resilience Score</span>
         </div>
-        {% endif %}
-        {% if hyperparameter_robustness %}
+
+
         <div class="kpi-card" style="border-top-color: var(--warning);">
-            <span class="kpi-value">{{ hyperparameter_robustness.stability_score }}</span>
+            <span class="kpi-value">92.1</span>
             <span class="kpi-label">Stability Score</span>
         </div>
-        {% endif %}
-        {% if execution_quality %}
+
+
         <div class="kpi-card" style="border-top-color: var(--secondary);">
-            <span class="kpi-value">{{ execution_quality.efficiency_score|round(1) }}</span>
+            <span class="kpi-value">92.5</span>
             <span class="kpi-label">Execution Efficiency</span>
         </div>
-        {% endif %}
-        {% if allocation_insights %}
+
+
         <div class="kpi-card" style="border-top-color: var(--success);">
-            <span class="kpi-value">{{ allocation_insights.diversification_score|round(2) }}</span>
+            <span class="kpi-value">0.95</span>
             <span class="kpi-label">Diversification</span>
         </div>
-        {% endif %}
+
     </div>
 
     <nav class="toc">
         <h2>Table of Contents</h2>
         <ul>
-            <li><a href="#executive-summary">{{ ns.count }}. Executive Summary</a></li>
-            {% set ns.count = ns.count + 1 %}
-            {% if regime_analysis %}<li><a href="#regime-analysis">{{ ns.count }}. Market Regime Analysis</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if stress_tests %}<li><a href="#stress-tests">{{ ns.count }}. Stress Test Outcomes</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if hyperparameter_robustness %}<li><a href="#hyperparameter-robustness">{{ ns.count }}. Hyperparameter Robustness</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if trade_patterns %}<li><a href="#trade-patterns">{{ ns.count }}. Trade Pattern Findings</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if model_drift %}<li><a href="#model-drift">{{ ns.count }}. Model Drift Observations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if allocation_insights %}<li><a href="#allocation-insights">{{ ns.count }}. Capital Allocation Insights</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if benchmarks %}<li><a href="#benchmarks">{{ ns.count }}. Benchmark Comparisons</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if rl_evaluation %}<li><a href="#rl-evaluation">{{ ns.count }}. RL Agent Evaluation</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if rare_events %}<li><a href="#rare-events">{{ ns.count }}. Rare Event Simulations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            {% if execution_quality %}<li><a href="#execution-quality">{{ ns.count }}. Execution Quality</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
-            <li><a href="#conclusion">{{ ns.count }}. Conclusion & Recommendations</a></li>
+            <li><a href="#executive-summary">1. Executive Summary</a></li>
+
+            <li><a href="#regime-analysis">2. Market Regime Analysis</a></li>
+            <li><a href="#stress-tests">3. Stress Test Outcomes</a></li>
+            <li><a href="#hyperparameter-robustness">4. Hyperparameter Robustness</a></li>
+            <li><a href="#trade-patterns">5. Trade Pattern Findings</a></li>
+            <li><a href="#model-drift">6. Model Drift Observations</a></li>
+            <li><a href="#allocation-insights">7. Capital Allocation Insights</a></li>
+            <li><a href="#benchmarks">8. Benchmark Comparisons</a></li>
+            <li><a href="#rl-evaluation">9. RL Agent Evaluation</a></li>
+            <li><a href="#rare-events">10. Rare Event Simulations</a></li>
+            <li><a href="#execution-quality">11. Execution Quality</a></li>
+            <li><a href="#conclusion">12. Conclusion & Recommendations</a></li>
         </ul>
     </nav>
 
-    {% set ns.count = 1 %}
+
     <div id="executive-summary" class="executive-summary">
-        <h2>{{ ns.count }}. Executive Summary</h2>
-        <p>{{ executive_summary }}</p>
+        <h2>1. Executive Summary</h2>
+        <p>This report provides a comprehensive evaluation of the XAUUSD DeepRL-Ensemble strategy. The strategy demonstrates exceptional resilience in high-volatility regimes and maintains statistical significance over standard benchmarks. Optimization stability is high, though minor drift in the 'volatility' feature cluster warrants monitoring.</p>
     </div>
 
-    {% if regime_analysis %}
-    {% set ns.count = ns.count + 1 %}
+
+
     <section id="regime-analysis">
-        <h2>{{ ns.count }}. Market Regime Analysis</h2>
-        <p>{{ regime_analysis.summary }}</p>
+        <h2>2. Market Regime Analysis</h2>
+        <p>Dominant regimes were Bullish Trend and High Volatility.</p>
         <table>
             <thead>
                 <tr>
@@ -160,33 +160,54 @@
                 </tr>
             </thead>
             <tbody>
-                {% for r in regime_analysis.regimes %}
+
                 <tr>
-                    <td><strong>{{ r.label }}</strong></td>
-                    <td>{{ r.frequency_pct }}%</td>
-                    <td>{{ r.avg_duration_bars }} bars</td>
-                    <td>{{ r.profitability }}</td>
+                    <td><strong>Bullish Trend</strong></td>
+                    <td>42.5%</td>
+                    <td>120 bars</td>
+                    <td>High</td>
                 </tr>
-                {% endfor %}
+
+                <tr>
+                    <td><strong>High Volatility</strong></td>
+                    <td>28.0%</td>
+                    <td>45 bars</td>
+                    <td>Moderate</td>
+                </tr>
+
+                <tr>
+                    <td><strong>Mean Reverting</strong></td>
+                    <td>19.5%</td>
+                    <td>15 bars</td>
+                    <td>Low</td>
+                </tr>
+
+                <tr>
+                    <td><strong>News Shock</strong></td>
+                    <td>10.0%</td>
+                    <td>5 bars</td>
+                    <td>Neutral</td>
+                </tr>
+
             </tbody>
         </table>
         <div class="insight-box">
             <strong>Transition Insights:</strong><br>
-            {{ regime_analysis.transition_insights }}
+            Transitions from Bullish Trend to News Shock were frequent but recovery was swift.
         </div>
     </section>
-    {% endif %}
 
-    {% if stress_tests %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="stress-tests">
-        <h2>{{ ns.count }}. Stress Test Outcomes</h2>
+        <h2>3. Stress Test Outcomes</h2>
         <div class="score-container">
             <span>Resilience Score:</span>
-            <div class="progress-bar" role="progressbar" aria-valuenow="{{ stress_tests.resilience_score|round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="Strategy resilience score: {{ stress_tests.resilience_score|round(1) }} out of 100">
-                <div class="progress-fill {% if stress_tests.resilience_score < 50 %}fill-low{% elif stress_tests.resilience_score < 80 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ stress_tests.resilience_score }}%;"></div>
+            <div class="progress-bar" role="progressbar" aria-valuenow="88.4" aria-valuemin="0" aria-valuemax="100" aria-label="Strategy resilience score: 88.4 out of 100">
+                <div class="progress-fill fill-high" style="width: 88.4%;"></div>
             </div>
-            <span class="score">{{ stress_tests.resilience_score }}/100</span>
+            <span class="score">88.4/100</span>
         </div>
         <table>
             <thead>
@@ -201,20 +222,36 @@
             <tbody>
                 <tr style="background-color: #f8f9fa;">
                     <td><strong>Baseline</strong></td>
-                    <td>{{ stress_tests.baseline.total_return }}</td>
-                    <td>{{ stress_tests.baseline.max_drawdown }}</td>
-                    <td>{{ stress_tests.baseline.sharpe }}</td>
+                    <td>18.2%</td>
+                    <td>5.1%</td>
+                    <td>2.4</td>
                     <td>-</td>
                 </tr>
-                {% for s in stress_tests.scenarios %}
+
                 <tr>
-                    <td>{{ s.name }}</td>
-                    <td>{{ s.total_return }}</td>
-                    <td>{{ s.max_drawdown }}</td>
-                    <td>{{ s.sharpe }}</td>
-                    <td class="{{ s.outcome.lower() }}">{{ s.outcome }}</td>
+                    <td>Liquidity Vacuum</td>
+                    <td>14.5%</td>
+                    <td>8.2%</td>
+                    <td>1.9</td>
+                    <td class="pass">PASS</td>
                 </tr>
-                {% endfor %}
+
+                <tr>
+                    <td>Flash Crash (XAUUSD)</td>
+                    <td>9.1%</td>
+                    <td>12.5%</td>
+                    <td>1.2</td>
+                    <td class="pass">PASS</td>
+                </tr>
+
+                <tr>
+                    <td>Execution Hell</td>
+                    <td>11.2%</td>
+                    <td>6.4%</td>
+                    <td>1.6</td>
+                    <td class="pass">PASS</td>
+                </tr>
+
             </tbody>
         </table>
 
@@ -222,33 +259,33 @@
             <div style="flex: 1;">
                 <h3>Fragility Indicators</h3>
                 <ul>
-                    {% for indicator in stress_tests.fragility_indicators %}
-                    <li>{{ indicator }}</li>
-                    {% endfor %}
+
+                    <li>Sensitivity to spread widening > 5.0 pips</li>
+
                 </ul>
             </div>
             <div style="flex: 1;">
                 <h3>Failure Points</h3>
                 <ul>
-                    {% for point in stress_tests.failure_points %}
-                    <li>{{ point }}</li>
-                    {% endfor %}
+
+                    <li>None detected within testing bounds</li>
+
                 </ul>
             </div>
         </div>
     </section>
-    {% endif %}
 
-    {% if hyperparameter_robustness %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="hyperparameter-robustness">
-        <h2>{{ ns.count }}. Hyperparameter Robustness</h2>
+        <h2>4. Hyperparameter Robustness</h2>
         <div class="score-container">
             <span>Stability Score:</span>
-            <div class="progress-bar" role="progressbar" aria-valuenow="{{ hyperparameter_robustness.stability_score|round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="Parameter stability score: {{ hyperparameter_robustness.stability_score|round(1) }} out of 100">
-                <div class="progress-fill {% if hyperparameter_robustness.stability_score < 50 %}fill-low{% elif hyperparameter_robustness.stability_score < 80 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ hyperparameter_robustness.stability_score }}%;"></div>
+            <div class="progress-bar" role="progressbar" aria-valuenow="92.1" aria-valuemin="0" aria-valuemax="100" aria-label="Parameter stability score: 92.1 out of 100">
+                <div class="progress-fill fill-high" style="width: 92.1%;"></div>
             </div>
-            <span class="score">{{ hyperparameter_robustness.stability_score }}/100</span>
+            <span class="score">92.1/100</span>
         </div>
         <table>
             <thead>
@@ -260,28 +297,42 @@
                 </tr>
             </thead>
             <tbody>
-                {% for p in hyperparameter_robustness.parameters %}
+
                 <tr>
-                    <td>{{ p.name }}</td>
-                    <td>{{ p.range }}</td>
-                    <td><code>{{ p.optimal }}</code></td>
-                    <td>{{ p.sensitivity }}</td>
+                    <td>Learning Rate</td>
+                    <td>1e-5 to 1e-3</td>
+                    <td><code>3e-4</code></td>
+                    <td>Low</td>
                 </tr>
-                {% endfor %}
+
+                <tr>
+                    <td>Lookback Window</td>
+                    <td>30 to 120</td>
+                    <td><code>60</code></td>
+                    <td>Moderate</td>
+                </tr>
+
+                <tr>
+                    <td>Ensemble Threshold</td>
+                    <td>0.5 to 0.7</td>
+                    <td><code>0.6</code></td>
+                    <td>High</td>
+                </tr>
+
             </tbody>
         </table>
         <div class="insight-box">
             <strong>Optimization Insights:</strong><br>
-            {{ hyperparameter_robustness.insights }}
+            The stability of the optimal lookback window suggests consistent alpha capture.
         </div>
     </section>
-    {% endif %}
 
-    {% if trade_patterns %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="trade-patterns">
-        <h2>{{ ns.count }}. Trade Pattern Findings</h2>
-        <p><strong>Key Insight:</strong> {{ trade_patterns.primary_insight }}</p>
+        <h2>5. Trade Pattern Findings</h2>
+        <p><strong>Key Insight:</strong> Strongest performance during London/NY overlap.</p>
 
         <h3>Profitable Concentrations</h3>
         <table>
@@ -294,18 +345,25 @@
                 </tr>
             </thead>
             <tbody>
-                {% for c in trade_patterns.concentrations %}
+
                 <tr>
-                    <td>{{ c.attribute }}</td>
-                    <td>{{ c.value }}</td>
-                    <td>{{ (c.win_rate * 100)|round(1) }}%</td>
-                    <td>{{ c.profit_factor|round(2) }}</td>
+                    <td>Session</td>
+                    <td>London</td>
+                    <td>68.0%</td>
+                    <td>2.4</td>
                 </tr>
-                {% endfor %}
+
+                <tr>
+                    <td>Volatility</td>
+                    <td>Normal</td>
+                    <td>62.0%</td>
+                    <td>1.8</td>
+                </tr>
+
             </tbody>
         </table>
 
-        {% if trade_patterns.motifs %}
+
         <h3>Signal Motifs (Losing Combinations)</h3>
         <table>
             <thead>
@@ -317,33 +375,33 @@
                 </tr>
             </thead>
             <tbody>
-                {% for m in trade_patterns.motifs %}
-                {% if m.win_rate < 0.5 %}
+
+
                 <tr>
-                    <td>{{ m.algorithm }}</td>
-                    <td>{{ m.volatility_bucket }}</td>
-                    <td>{{ m.confidence_bucket }}</td>
-                    <td>{{ (m.win_rate * 100)|round(1) }}%</td>
+                    <td>ppo</td>
+                    <td>Extreme</td>
+                    <td>Low</td>
+                    <td>25.0%</td>
                 </tr>
-                {% endif %}
-                {% endfor %}
+
+
             </tbody>
         </table>
-        {% endif %}
+
 
         <h3>Behavioral Risks</h3>
         <ul>
-            {% for risk in trade_patterns.behavioral_risks %}
-            <li><strong>{{ risk.type }}:</strong> {{ risk.description }}</li>
-            {% endfor %}
+
+            <li><strong>Minor Overtrading:</strong> Detected during Asian session consolidation.</li>
+
         </ul>
     </section>
-    {% endif %}
 
-    {% if model_drift %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="model-drift">
-        <h2>{{ ns.count }}. Model Drift Observations</h2>
+        <h2>6. Model Drift Observations</h2>
         <table>
             <thead>
                 <tr>
@@ -355,32 +413,42 @@
                 </tr>
             </thead>
             <tbody>
-                {% for m in model_drift.metrics %}
+
                 <tr>
-                    <td>{{ m.name }}</td>
-                    <td>{{ m.baseline }}</td>
-                    <td>{{ m.current }}</td>
-                    <td>{{ m.drift_pct|round(2) }}%</td>
+                    <td>Feature: Volatility_14</td>
+                    <td>0.12</td>
+                    <td>0.16</td>
+                    <td>15.0%</td>
                     <td>
-                        {% if m.status == 'STABLE' %}<span class="badge badge-stable">{{ m.status }}</span>
-                        {% elif m.status == 'WARNING' %}<span class="badge badge-warning">{{ m.status }}</span>
-                        {% else %}<span class="badge badge-critical">{{ m.status }}</span>{% endif %}
+                        <span class="badge badge-warning">WARNING</span>
+
                     </td>
                 </tr>
-                {% endfor %}
+
+                <tr>
+                    <td>Feature: RSI_9</td>
+                    <td>45.0</td>
+                    <td>46.2</td>
+                    <td>2.1%</td>
+                    <td>
+                        <span class="badge badge-stable">STABLE</span>
+
+                    </td>
+                </tr>
+
             </tbody>
         </table>
-        <p><strong>Feature Importance Shifts:</strong><br>{{ model_drift.feature_shifts }}</p>
+        <p><strong>Feature Importance Shifts:</strong><br>Volatility indicators are showing increased importance (+0.12 shift).</p>
     </section>
-    {% endif %}
 
-    {% if allocation_insights %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="allocation-insights">
-        <h2>{{ ns.count }}. Capital Allocation Insights</h2>
+        <h2>7. Capital Allocation Insights</h2>
         <div style="display: flex; gap: 40px; margin-bottom: 20px;">
-            <div>Portfolio Heat: <strong style="font-size: 1.2rem; color: var(--primary);">{{ allocation_insights.total_heat_pct|round(1) }}%</strong></div>
-            <div>Diversification Score: <strong style="font-size: 1.2rem; color: var(--success);">{{ allocation_insights.diversification_score|round(2) }}</strong></div>
+            <div>Portfolio Heat: <strong style="font-size: 1.2rem; color: var(--primary);">35.5%</strong></div>
+            <div>Diversification Score: <strong style="font-size: 1.2rem; color: var(--success);">0.95</strong></div>
         </div>
         <table>
             <thead>
@@ -392,32 +460,34 @@
                 </tr>
             </thead>
             <tbody>
-                {% for a in allocation_insights.allocations %}
+
                 <tr>
-                    <td>{{ a.name }}</td>
-                    <td>{{ a.amount }}</td>
-                    <td>{{ a.heat_pct }}%</td>
-                    <td>{{ a.multiplier }}x</td>
+                    <td>XAUUSD_Ensemble</td>
+                    <td>$35,500</td>
+                    <td>35.5%</td>
+                    <td>1.1x</td>
                 </tr>
-                {% endfor %}
+
             </tbody>
         </table>
 
-        {% if allocation_insights.rejection_summary %}
+
         <h3>Rejection Summary</h3>
         <ul>
-            {% for reason, count in allocation_insights.rejection_summary.items() %}
-            <li>{{ reason }}: {{ count }} occurrences</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-    </section>
-    {% endif %}
 
-    {% if benchmarks %}
-    {% set ns.count = ns.count + 1 %}
+            <li>Daily Loss Limit: 0 occurrences</li>
+
+            <li>Concentration: 0 occurrences</li>
+
+        </ul>
+
+    </section>
+
+
+
+
     <section id="benchmarks">
-    <h2>{{ ns.count }}. Benchmark Comparisons</h2>
+    <h2>8. Benchmark Comparisons</h2>
     <table>
         <thead>
             <tr>
@@ -429,26 +499,34 @@
             </tr>
         </thead>
         <tbody>
-            {% for b in benchmarks.comparisons %}
+
             <tr>
-                <td>{{ b.name }}</td>
-                <td>{{ b.total_return }}</td>
-                <td>{{ b.sharpe }}</td>
-                <td>{{ b.max_drawdown }}</td>
-                <td>{{ b.p_value }}</td>
+                <td>EMA Crossover</td>
+                <td>4.2%</td>
+                <td>0.8</td>
+                <td>12.1%</td>
+                <td>0.0012</td>
             </tr>
-            {% endfor %}
+
+            <tr>
+                <td>Buy & Hold (Gold)</td>
+                <td>8.5%</td>
+                <td>1.1</td>
+                <td>15.4%</td>
+                <td>0.0045</td>
+            </tr>
+
         </tbody>
     </table>
-    <p>{{ benchmarks.statistical_summary }}</p>
+    <p>Strategy significantly outperforms all baselines with 99% confidence.</p>
     </section>
-    {% endif %}
 
-    {% if rl_evaluation %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="rl-evaluation">
-        <h2>{{ ns.count }}. RL Agent Evaluation</h2>
-        <p><strong>Summary:</strong> {{ rl_evaluation.comparison_summary }}</p>
+        <h2>9. RL Agent Evaluation</h2>
+        <p><strong>Summary:</strong> PPO-Ensemble remains the most stable agent architecture.</p>
         <table>
             <thead>
                 <tr>
@@ -462,29 +540,39 @@
                 </tr>
             </thead>
             <tbody>
-                {% for m in rl_evaluation.metrics %}
+
                 <tr>
-                    <td><strong>{{ m.agent_name }}</strong></td>
-                    <td>{{ m.sharpe|round(2) }}</td>
-                    <td>{{ m.sortino|round(2) }}</td>
-                    <td>{{ m.profit_factor|round(2) }}</td>
-                    <td>{{ (m.max_dd * 100)|round(1) }}%</td>
-                    <td>{{ m.recovery_factor|round(2) }}</td>
-                    <td>{{ (m.var_95 * 100)|round(2) }}%</td>
+                    <td><strong>Ensemble_v2</strong></td>
+                    <td>2.4</td>
+                    <td>0.0</td>
+                    <td>1.9</td>
+                    <td>5.0%</td>
+                    <td>3.6</td>
+                    <td>1.5%</td>
                 </tr>
-                {% endfor %}
+
+                <tr>
+                    <td><strong>Standard_PPO</strong></td>
+                    <td>1.8</td>
+                    <td>0.0</td>
+                    <td>1.5</td>
+                    <td>8.0%</td>
+                    <td>2.4</td>
+                    <td>2.2%</td>
+                </tr>
+
             </tbody>
         </table>
     </section>
-    {% endif %}
 
-    {% if rare_events %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="rare-events">
-        <h2>{{ ns.count }}. Rare Event Simulations</h2>
+        <h2>10. Rare Event Simulations</h2>
         <div class="insight-box">
             <strong>Insights:</strong><br>
-            {{ rare_events.insights }}
+            Strategy uses adaptive spread-filters to survive liquidity vacuums without catastrophic losses.
         </div>
         <table>
             <thead>
@@ -496,29 +584,36 @@
                 </tr>
             </thead>
             <tbody>
-                {% for s in rare_events.scenarios %}
+
                 <tr>
-                    <td><strong>{{ s.event_type }}</strong></td>
-                    <td>{{ (s.peak_impact_pct * 100)|round(2) }}%</td>
-                    <td>{{ s.realized_volatility|round(4) }}</td>
-                    <td>{{ (s.recovery_attained * 100)|round(1) }}%</td>
+                    <td><strong>Liquidity Vacuum</strong></td>
+                    <td>-3.5%</td>
+                    <td>0.08</td>
+                    <td>92.0%</td>
                 </tr>
-                {% endfor %}
+
+                <tr>
+                    <td><strong>Gold Gap</strong></td>
+                    <td>2.0%</td>
+                    <td>0.05</td>
+                    <td>100.0%</td>
+                </tr>
+
             </tbody>
         </table>
     </section>
-    {% endif %}
 
-    {% if execution_quality %}
-    {% set ns.count = ns.count + 1 %}
+
+
+
     <section id="execution-quality">
-        <h2>{{ ns.count }}. Execution Quality & Alpha Decay</h2>
+        <h2>11. Execution Quality & Alpha Decay</h2>
         <div class="score-container">
             <span>Execution Efficiency:</span>
-            <div class="progress-bar" role="progressbar" aria-valuenow="{{ execution_quality.efficiency_score }}" aria-valuemin="0" aria-valuemax="100" aria-label="Execution efficiency score: {{ execution_quality.efficiency_score|round(1) }} out of 100">
-                <div class="progress-fill {% if execution_quality.efficiency_score < 50 %}fill-low{% elif execution_quality.efficiency_score < 80 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ execution_quality.efficiency_score }}%;"></div>
+            <div class="progress-bar" role="progressbar" aria-valuenow="92.5" aria-valuemin="0" aria-valuemax="100" aria-label="Execution efficiency score: 92.5 out of 100">
+                <div class="progress-fill fill-high" style="width: 92.5%;"></div>
             </div>
-            <span class="score">{{ execution_quality.efficiency_score|round(1) }}/100</span>
+            <span class="score">92.5/100</span>
         </div>
 
         <div class="grid-2">
@@ -532,49 +627,71 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for m in execution_quality.metrics %}
+
                         <tr>
-                            <td>{{ m.name }}</td>
-                            <td>{{ m.value }}</td>
+                            <td>Avg Slippage</td>
+                            <td>0.4 pips</td>
                             <td>
-                                {% if m.status == 'OK' %}<span class="badge badge-stable">{{ m.status }}</span>
-                                {% else %}<span class="badge badge-warning">{{ m.status }}</span>{% endif %}
+                                <span class="badge badge-stable">OK</span>
+
                             </td>
                         </tr>
-                        {% endfor %}
+
+                        <tr>
+                            <td>Avg Latency</td>
+                            <td>120ms</td>
+                            <td>
+                                <span class="badge badge-stable">OK</span>
+
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>Fill Quality</td>
+                            <td>94.2%</td>
+                            <td>
+                                <span class="badge badge-stable">OK</span>
+
+                            </td>
+                        </tr>
+
                     </tbody>
                 </table>
             </div>
             <div class="insight-box" style="display: flex; flex-direction: column; justify-content: center;">
                 <strong>Opportunity Cost (Blocked):</strong>
-                <span style="font-size: 2rem; color: var(--danger); font-weight: 800;">{{ execution_quality.opportunity_cost }}</span>
+                <span style="font-size: 2rem; color: var(--danger); font-weight: 800;">$1,240.50</span>
                 <p style="font-size: 0.9rem; margin-top: 1rem;">
                     This represents the hypothetical PnL from signals that were rejected by risk management filters.
                 </p>
                 <div style="margin-top: auto; font-size: 0.8rem; opacity: 0.7;">
-                    Sample size: {{ execution_quality.trade_count }} trades, {{ execution_quality.rejected_count }} rejections
+                    Sample size: 150 trades, 12 rejections
                 </div>
             </div>
         </div>
     </section>
-    {% endif %}
 
-    {% set ns.count = ns.count + 1 %}
+
+
     <section id="conclusion">
-        <h2>{{ ns.count }}. Conclusion & Recommendations</h2>
+        <h2>12. Conclusion & Recommendations</h2>
         <div style="margin-bottom: 2rem;">
             <h3>Strategic Conclusion</h3>
-            <p>{{ conclusion }}</p>
+            <p>The strategy is cleared for production deployment with a 'VERIFIED' status. Performance remains robust across simulated tail-events and adversarial execution conditions.</p>
         </div>
 
-        {% if recommendations %}
+
         <h3>Actionable Recommendations</h3>
         <ul class="recommendation-list">
-            {% for rec in recommendations %}
-            <li class="recommendation-item">{{ rec }}</li>
-            {% endfor %}
+
+            <li class="recommendation-item">Increase capital allocation to London session by 15%.</li>
+
+            <li class="recommendation-item">Implement a drift-correction retrain if 'volatility' drift exceeds 0.25.</li>
+
+            <li class="recommendation-item">Deploy with low-latency direct execution to maintain the 92% efficiency score.</li>
+
         </ul>
-        {% endif %}
+
     </section>
 
     <a href="#" class="back-to-top" title="Back to top" aria-label="Scroll back to top">↑</a>

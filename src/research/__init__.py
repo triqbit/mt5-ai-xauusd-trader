@@ -26,7 +26,7 @@ from src.research.rare_event_simulator import (
     RareEventSimulator,
     RareEventType,
 )
-from src.research.reporting import ResearchReport, ResearchReporter
+from src.research.reporting import ResearchOrchestrator, ResearchReport, ResearchReporter
 from src.research.rl_evaluation import (
     MeanReversionBaseline,
     MomentumBaseline,
@@ -53,6 +53,7 @@ __all__ = [
     "RareEventResult",
     "RareEventSimulator",
     "RareEventType",
+    "ResearchOrchestrator",
     "ResearchReport",
     "ResearchReporter",
     "RiskFilteredBaseline",
