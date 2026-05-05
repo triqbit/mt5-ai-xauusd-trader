@@ -47,7 +47,6 @@ from src.core.health import HealthStatus, init_health_checker
 from src.core.log_config import get_masking_processor
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
-from src.core.types import TradeSignal
 from src.data.event_intelligence import RiskStatus
 from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
@@ -58,7 +57,7 @@ from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager
+from src.trading.risk_manager import RiskManager, TradeSignal
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -140,19 +139,12 @@ def run_live(
 
                 # 3. Get model prediction
                 with profile("inference"):
-                    # Pass regime context to models that support it (e.g. Ensemble)
-                    if hasattr(model, "predict"):
-                        # Attempt to pass extra context if the model signature allows it
-                        try:
-                            # EnsembleModel takes seq and regime_info
-                            # For simple BaseModel, we just pass obs
-                            if isinstance(model, EnsembleModel) and torch:
-                                seq = torch.from_numpy(df_features.values[-60:]).float()
-                                signal_obj = model.predict(obs, seq=seq, regime_info=regime_info)
-                            else:
-                                signal_obj = model.predict(obs)
-                        except TypeError:
-                            signal_obj = model.predict(obs)
+                    # Institutional inference with extended context
+                    context = {"regime_info": regime_info}
+                    if torch:
+                        context["seq"] = torch.from_numpy(df_features.values[-60:]).float()
+
+                    signal_obj = model.predict(obs, **context)
 
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
