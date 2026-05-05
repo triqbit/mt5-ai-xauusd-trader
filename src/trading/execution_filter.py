@@ -65,28 +65,35 @@ class ExecutionFilter:
 
             # Layer 1: ATR Volatility
             if not self._check_atr_volatility(market_data):
+                logger.info("Signal BLOCKED | %s | Reason: ATR_VOLATILITY", signal.symbol)
                 return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
 
             # Layer 2: Trend Angle
             if not self._check_trend_angle(market_data, signal.direction):
+                logger.info("Signal BLOCKED | %s | Reason: TREND_ANGLE", signal.symbol)
                 return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
 
             # Layer 3: EMA Sequence
             if not self._check_ema_sequence(market_data, signal.direction):
+                logger.info("Signal BLOCKED | %s | Reason: EMA_SEQUENCE", signal.symbol)
                 return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
 
             # Layer 4: Momentum (RSI)
             if not self._check_momentum(market_data, signal.direction):
+                logger.info("Signal BLOCKED | %s | Reason: MOMENTUM", signal.symbol)
                 return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
 
             # Layer 5: Session/Time
             if not self._check_session_time(timestamp):
+                logger.info("Signal BLOCKED | %s | Reason: SESSION_TIME", signal.symbol)
                 return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
 
             # Layer 6: Drawdown
             if not self._check_drawdown_limit(current_drawdown):
+                logger.info("Signal BLOCKED | %s | Reason: DRAWDOWN_LIMIT", signal.symbol)
                 return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
 
+            logger.info("Signal APPROVED | %s %d | conf=%.2f", signal.symbol, signal.direction, signal.confidence)
             return ExecutionDecision(signal, True, signal.confidence)
         except Exception as e:
             logger.error("Execution filter error: %s", e)
