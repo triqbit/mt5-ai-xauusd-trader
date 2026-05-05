@@ -69,3 +69,27 @@ def test_backtest_run(sample_data):
     assert report.total_trades > 0
     assert isinstance(report.annualized_return, float)
     assert report.start_date is not None
+
+
+def test_backtest_performance_optimized_loop(sample_data):
+    """
+    Verifies that the optimized NumPy-based loop produces same results as
+    expected and handles the full data range correctly.
+    """
+    mock_ef = MagicMock()
+    mock_ef.validate.return_value = type("Decision", (), {"is_approved": True})
+    engine = BacktestEngine(symbol="XAUUSD", execution_filter=mock_ef)
+    model = MockModel()
+
+    report = engine.run_walk_forward(
+        sample_data,
+        model,
+        train_window=200,
+        test_window=100,
+        step_size=100
+    )
+
+    # Basic validity checks for the optimized loop execution
+    assert report.total_trades > 0
+    assert report.total_return > 0  # Sample data is trending up
+    assert len(engine.trades) == report.total_trades

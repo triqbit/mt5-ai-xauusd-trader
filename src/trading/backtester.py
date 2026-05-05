@@ -135,32 +135,44 @@ class BacktestEngine:
         start = 0
         active_trades: list[dict[str, Any]] = []
 
+        # Optimization: Pre-extract data into NumPy arrays to avoid expensive pandas indexing in the loop
+        # Slicing .iloc[i] on a DataFrame creates a new Series object, which is slow.
+        high_vals = data["high"].values
+        low_vals = data["low"].values
+        close_vals = data["close"].values
+        atr_vals = data["atr"].values
+        time_vals = data.index
+        feature_vals = df_features.values
+
         while start + train_window + test_window <= n:
             test_start_idx = start + train_window
-            test_end_idx = test_start_idx + test_window
 
-            test_data = data.iloc[test_start_idx:test_end_idx]
-            test_features = df_features.iloc[test_start_idx:test_end_idx]
-
-            for i in range(len(test_data)):
-                bar_idx = test_data.index[i]
-                current_bar = test_data.iloc[i]
+            for i in range(test_window):
+                abs_idx = test_start_idx + i
+                bar_time = time_vals[abs_idx]
 
                 # 1. Update active trades (SL/TP checks)
-                self._update_active_trades(active_trades, current_bar, bar_idx)
+                # Optimization: Pass raw values instead of a pd.Series
+                self._update_active_trades(
+                    active_trades,
+                    high=high_vals[abs_idx],
+                    low=low_vals[abs_idx],
+                    timestamp=bar_time,
+                )
 
                 # 2. Skip if max positions reached
                 if len(active_trades) >= self.max_positions:
                     continue
 
                 # 3. Get Model Signal
-                obs = test_features.iloc[i]
+                # Optimization: Direct NumPy row access
+                obs = feature_vals[abs_idx]
                 try:
-                    signal_obj = model.predict(obs.values)
+                    signal_obj = model.predict(obs)
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
                 except Exception:
-                    pred = model.predict(obs.values)
+                    pred = model.predict(obs)
                     direction = (
                         int(pred[0]) if isinstance(pred, (tuple, list, np.ndarray)) else int(pred)
                     )
@@ -170,8 +182,8 @@ class BacktestEngine:
                     continue
 
                 # 4. Prepare Signal and Validate with Execution Filter
-                price = current_bar["close"]
-                atr = current_bar["atr"]
+                price = close_vals[abs_idx]
+                atr = atr_vals[abs_idx]
                 if np.isnan(atr):
                     continue
 
@@ -187,18 +199,19 @@ class BacktestEngine:
                     lot_size=0.1,  # Base lot
                     algorithm="backtest",
                     confidence=confidence,
-                    timestamp=bar_idx,
+                    timestamp=bar_time,
                 )
 
                 # Prepare filter context
-                filter_context = df_features.loc[:bar_idx]
+                # Optimization: Position-based slicing is significantly faster than label-based (.loc)
+                filter_context = df_features.iloc[: abs_idx + 1]
                 drawdown = (self.initial_balance - self.balance) / self.initial_balance
 
                 decision = self.ef.validate(
                     signal,
                     filter_context,
                     current_drawdown=drawdown,
-                    timestamp=bar_idx,
+                    timestamp=bar_time,
                 )
 
                 if decision.is_approved:
@@ -207,7 +220,7 @@ class BacktestEngine:
             start += step_size
 
         # Close any remaining trades at the end of data
-        self._close_all_trades(active_trades, data.iloc[-1])
+        self._close_all_trades(active_trades, last_close=close_vals[-1], last_time=time_vals[-1])
 
         return self._calculate_performance()
 
@@ -219,14 +232,17 @@ class BacktestEngine:
         )
 
     def _update_active_trades(
-        self, active_trades: list[dict[str, Any]], current_bar: pd.Series, timestamp: datetime
+        self,
+        active_trades: list[dict[str, Any]],
+        high: float,
+        low: float,
+        timestamp: datetime,
     ) -> None:
         """Checks SL/TP for all active trades and closes them if hit."""
         closed_indices = []
         for i, trade in enumerate(active_trades):
             signal = trade["signal"]
             direction = signal.direction
-            high, low = current_bar["high"], current_bar["low"]
             entry_price = trade["entry_price"]
 
             # Update MAE/MFE
@@ -257,10 +273,12 @@ class BacktestEngine:
         for i in sorted(closed_indices, reverse=True):
             active_trades.pop(i)
 
-    def _close_all_trades(self, active_trades: list[dict[str, Any]], last_bar: pd.Series) -> None:
+    def _close_all_trades(
+        self, active_trades: list[dict[str, Any]], last_close: float, last_time: datetime
+    ) -> None:
         """Force close all remaining trades."""
         for trade in active_trades:
-            self._record_trade(trade, last_bar["close"], last_bar.name)
+            self._record_trade(trade, last_close, last_time)
         active_trades.clear()
 
     def _record_trade(self, trade: dict[str, Any], exit_price: float, exit_time: datetime) -> None:
