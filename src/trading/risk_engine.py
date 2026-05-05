@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,21 +25,26 @@ from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class RiskDecision:
     """Decision details from the RiskEngine."""
+
     is_approved: bool
     reason: str = ""
     adjusted_lot_size: float = 0.0
 
+
 @dataclass
 class DailyStats:
     """Intraday PnL tracker reset each trading day."""
+
     date: date = field(default_factory=date.today)
     realised_pnl: float = 0.0
     trade_count: int = 0
     peak_equity: float = 0.0
     consecutive_losses: int = 0
+
 
 class RiskEngine:
     """
@@ -61,8 +67,9 @@ class RiskEngine:
         self.monitor = monitor
         logger.info("RiskEngine initialised | balance=%.2f", account_balance)
 
-    def validate_signal(self, signal: Any, market_data: pd.DataFrame,
-                        open_positions: list[dict[str, Any]]) -> RiskDecision:
+    def validate_signal(
+        self, signal: Any, market_data: pd.DataFrame, open_positions: list[dict[str, Any]]
+    ) -> RiskDecision:
         """
         Validate a trade signal against all risk layers.
         """
@@ -85,7 +92,9 @@ class RiskEngine:
 
         # 3. Sizing & Confidence
         if signal.confidence < self.cfg.min_confidence:
-            return RiskDecision(False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}")
+            return RiskDecision(
+                False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
+            )
 
         # ATR-based position sizing adjustment
         adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
@@ -105,7 +114,7 @@ class RiskEngine:
             return self.cfg.min_lot_size
 
         current_atr = market_data["atr"].iloc[-1]
-        avg_atr = market_data["atr"].tail(8640).mean() # Approx 30 days of M5 data
+        avg_atr = market_data["atr"].tail(8640).mean()  # Approx 30 days of M5 data
 
         multiplier = 1.0
         ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
@@ -179,5 +188,6 @@ class RiskEngine:
         if loss_pct >= self.cfg.daily_loss_lvl1:
             return 1
         return 0
+
 
 __all__ = ["RiskEngine", "RiskDecision", "DailyStats"]

@@ -46,8 +46,12 @@ class EnsembleModel(BaseModel):
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
 
-    def __init__(self, device: str = "cpu", consensus_threshold: float = 0.60,
-                 model_weights: Dict[str, float] | None = None) -> None:
+    def __init__(
+        self,
+        device: str = "cpu",
+        consensus_threshold: float = 0.60,
+        model_weights: Dict[str, float] | None = None,
+    ) -> None:
         super().__init__()
         self.device = torch.device(device) if torch is not None else None
         self.dynamic_ensemble = DynamicEnsemble(
@@ -156,8 +160,11 @@ class EnsembleModel(BaseModel):
 
         if has_buy and has_sell:
             logger.warning("Dissent detected: BUY and SELL conflict. Returning HOLD.")
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0,
-                          metadata={"reason": "Dissent conflict", "model_signals": model_signals})
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"reason": "Dissent conflict", "model_signals": model_signals},
+            )
 
         # 2. Weighted Consensus Calculation
         total_weight = sum(self.weights[k] for k in votes)
@@ -188,9 +195,11 @@ class EnsembleModel(BaseModel):
                 "weighted_sell": weighted_sell_conf,
                 "weighted_hold": weighted_hold_conf,
                 "weights": self.weights,
-                "model_signals": {k: {"dir": s.direction, "conf": s.confidence} for k, s in model_signals.items()},
-                "per_algo_votes": {k: s.direction for k, s in model_signals.items()}
-            }
+                "model_signals": {
+                    k: {"dir": s.direction, "conf": s.confidence} for k, s in model_signals.items()
+                },
+                "per_algo_votes": {k: s.direction for k, s in model_signals.items()},
+            },
         )
 
     def aggregate_signals(self, signals: Dict[str, Signal]) -> Signal:
@@ -204,8 +213,11 @@ class EnsembleModel(BaseModel):
         has_sell = any(s.direction == SignalDirection.SELL for s in signals.values())
 
         if has_buy and has_sell:
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0,
-                          metadata={"reason": "Dissent conflict"})
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"reason": "Dissent conflict"},
+            )
 
         weighted_buy_conf = 0.0
         weighted_sell_conf = 0.0
@@ -237,9 +249,7 @@ class EnsembleModel(BaseModel):
             if len(self._performance[algorithm]) >= 50:
                 self._rebalance_weights(regime_info=regime_info)
 
-    def _rebalance_weights(
-        self, regime_info: RegimeInfo | None = None, window: int = 50
-    ) -> None:
+    def _rebalance_weights(self, regime_info: RegimeInfo | None = None, window: int = 50) -> None:
         """Delegate rebalancing to DynamicEnsemble."""
         metrics: dict[str, dict[str, float]] = {}
         for algo, rets in self._performance.items():
@@ -293,7 +303,9 @@ class EnsembleModel(BaseModel):
 
         logger.info(
             "Weights rebalanced: %s | Agg Health: acc=%.2f drift=%.2f",
-            self.weights, agg_acc, agg_drift
+            self.weights,
+            agg_acc,
+            agg_drift,
         )
 
     def get_health_metrics(self) -> dict[str, float]:

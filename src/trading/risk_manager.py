@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,6 +17,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, Optional
 
+from src.core.audit_log import get_audit_logger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
@@ -83,7 +85,12 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None, model_health: Optional[dict] = None) -> bool:
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        model_health: Optional[dict] = None,
+    ) -> bool:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
@@ -102,13 +109,12 @@ class RiskManager:
 
         # Log to Audit Trail
         try:
-            from src.core.audit_log import get_audit_logger
             audit = get_audit_logger()
             audit.log_risk_decision(
                 symbol=signal.symbol,
                 direction=signal.direction,
                 decision_chain=decision_chain,
-                passed=passed
+                passed=passed,
             )
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
@@ -174,9 +180,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -220,13 +224,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 

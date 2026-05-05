@@ -40,7 +40,11 @@ class SecretMaskingProcessor:
                     self.secrets.add(val)
 
         # Also specifically check database_url for embedded passwords
-        db_url = config.database_url.get_secret_value() if hasattr(config.database_url, "get_secret_value") else str(config.database_url)
+        db_url = (
+            config.database_url.get_secret_value()
+            if hasattr(config.database_url, "get_secret_value")
+            else str(config.database_url)
+        )
         if db_url and "@" in db_url:
             # Mask the password part of the URL specifically
             # postgresql://user:password@host:port/db

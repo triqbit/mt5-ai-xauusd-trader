@@ -3,7 +3,9 @@ Unit tests for specialized AuditLogger methods and traceability.
 """
 
 import pytest
-from src.core.audit_log import AuditLogger, AuditEntry
+
+from src.core.audit_log import AuditEntry, AuditLogger
+
 
 @pytest.fixture
 def audit_logger():

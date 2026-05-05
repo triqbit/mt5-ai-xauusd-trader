@@ -59,13 +59,17 @@ class RiskAssessment(BaseModel):
 class RegimeContext(BaseModel):
     """Market regime context at the time of signal generation."""
 
-    regime_name: str = Field("Unknown", description="Detected market regime (e.g., Trending, Ranging)")
+    regime_name: str = Field(
+        "Unknown", description="Detected market regime (e.g., Trending, Ranging)"
+    )
     confidence: float = Field(0.0, description="Regime detection confidence")
     volatility_state: str = Field(
         "Normal", description="Current volatility level (Low, Normal, High, Extreme)"
     )
     is_favorable: bool = Field(True, description="Whether the regime is favorable for the strategy")
-    summary: str = Field("Market state stable", description="Contextual summary of the market state")
+    summary: str = Field(
+        "Market state stable", description="Contextual summary of the market state"
+    )
 
 
 class FilterResult(BaseModel):
@@ -295,7 +299,9 @@ class SignalExplainer:
             machine_attribution=machine_attr,
         )
 
-    def format_for_terminal(self, explanation: SignalExplanation, console: Any | None = None) -> str:
+    def format_for_terminal(
+        self, explanation: SignalExplanation, console: Any | None = None
+    ) -> str:
         """
         Format the explanation for terminal display.
         Uses 'rich' for pretty printing if available, otherwise returns plain text.
@@ -567,11 +573,14 @@ class SignalExplainer:
                 )
 
         if explanation.execution_summary.filters:
-            output += f"\nExecution: {'PASSED' if explanation.execution_summary.passed else 'BLOCKED'}\n"
+            output += (
+                f"\nExecution: {'PASSED' if explanation.execution_summary.passed else 'BLOCKED'}\n"
+            )
             for f in explanation.execution_summary.filters:
                 output += f"  - {f.filter_name}: {'OK' if f.passed else 'FAIL'} ({f.message or f.value})\n"
 
-        output += f"\nRisk Assessment: {'PASSED' if explanation.risk_assessment.passed else 'REJECTED'}\n"
+        output += (
+            f"\nRisk Assessment: {'PASSED' if explanation.risk_assessment.passed else 'REJECTED'}\n"
+        )
         output += f"Regime: {explanation.regime_context.regime_name} ({explanation.regime_context.volatility_state})\n"
         return output
-

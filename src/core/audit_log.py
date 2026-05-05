@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """SQLAlchemy 2.0 DeclarativeBase."""
+
     pass
 
 
@@ -34,6 +35,7 @@ class AuditEntry(Base):
     Audit log entry for recording system actions and events.
     Aligned with enterprise traceability requirements.
     """
+
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -55,6 +57,7 @@ class AuditLogger:
     """
     Singleton AuditLogger for managing system audit traces.
     """
+
     _instance: AuditLogger | None = None
     _initialized: bool = False
 
@@ -76,7 +79,13 @@ class AuditLogger:
         self._initialized = True
         logger.info("AuditLogger initialized with database: %s", db_url)
 
-    def log(self, actor: str, action: str, details: str | None = None, metadata: dict[str, Any] | None = None) -> int:
+    def log(
+        self,
+        actor: str,
+        action: str,
+        details: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
         """
         Record a new audit entry.
         """
@@ -97,10 +106,16 @@ class AuditLogger:
             actor="system",
             action="config_snapshot",
             details=f"Configuration snapshot: {reason}",
-            metadata=config_data
+            metadata=config_data,
         )
 
-    def log_prediction(self, symbol: str, direction: int, confidence: float, model_metadata: dict[str, Any] | None = None) -> int:
+    def log_prediction(
+        self,
+        symbol: str,
+        direction: int,
+        confidence: float,
+        model_metadata: dict[str, Any] | None = None,
+    ) -> int:
         """Log a model prediction and its confidence."""
         return self.log(
             actor="model",
@@ -110,11 +125,13 @@ class AuditLogger:
                 "symbol": symbol,
                 "direction": direction,
                 "confidence": confidence,
-                "model_context": model_metadata
-            }
+                "model_context": model_metadata,
+            },
         )
 
-    def log_risk_decision(self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool) -> int:
+    def log_risk_decision(
+        self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool
+    ) -> int:
         """Log the full risk engine decision chain."""
         return self.log(
             actor="risk_engine",
@@ -124,30 +141,30 @@ class AuditLogger:
                 "symbol": symbol,
                 "direction": direction,
                 "decision_chain": decision_chain,
-                "passed": passed
-            }
+                "passed": passed,
+            },
         )
 
-    def log_blocked_trade(self, symbol: str, reason: str, context: dict[str, Any] | None = None) -> int:
+    def log_blocked_trade(
+        self, symbol: str, reason: str, context: dict[str, Any] | None = None
+    ) -> int:
         """Log when a trade is blocked by filters or risk management."""
         return self.log(
             actor="system",
             action="trade_blocked",
             details=f"Trade blocked for {symbol}: {reason}",
-            metadata={
-                "symbol": symbol,
-                "reason": reason,
-                "context": context
-            }
+            metadata={"symbol": symbol, "reason": reason, "context": context},
         )
 
-    def log_operator_action(self, operator: str, action: str, reason: str, metadata: dict[str, Any] | None = None) -> int:
+    def log_operator_action(
+        self, operator: str, action: str, reason: str, metadata: dict[str, Any] | None = None
+    ) -> int:
         """Log manual operator actions like emergency halts."""
         return self.log(
             actor=operator,
             action=f"operator_{action}",
             details=f"Operator action: {action}. Reason: {reason}",
-            metadata=metadata
+            metadata=metadata,
         )
 
     def log_deployment(self, version: str, environment: str, status: str = "success") -> int:
@@ -156,11 +173,7 @@ class AuditLogger:
             actor="system",
             action="deployment",
             details=f"Deployment {version} to {environment}: {status}",
-            metadata={
-                "version": version,
-                "environment": environment,
-                "status": status
-            }
+            metadata={"version": version, "environment": environment, "status": status},
         )
 
     @classmethod
