@@ -226,10 +226,13 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
-    def read_performance_report(self) -> dict[str, float]:
+    def read_performance_report(self, persist: bool = False) -> dict[str, float]:
         """
         Calculate key performance metrics from closed trades.
         Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
+
+        Args:
+            persist: Whether to save the calculated metrics to the database.
         """
         with self.Session() as session:
             # Optimized: only fetch pnl column for active closed trades
@@ -277,14 +280,15 @@ class TradeLogger:
             }
 
             # Optionally log these metrics to DB
-            metric_record = PerformanceMetric(
-                sharpe_ratio=metrics["sharpe_ratio"],
-                profit_factor=metrics["profit_factor"],
-                max_drawdown=metrics["max_drawdown"],
-                total_trades=metrics["total_trades"],
-                win_rate=metrics["win_rate"],
-            )
-            session.add(metric_record)
-            session.commit()
+            if persist:
+                metric_record = PerformanceMetric(
+                    sharpe_ratio=metrics["sharpe_ratio"],
+                    profit_factor=metrics["profit_factor"],
+                    max_drawdown=metrics["max_drawdown"],
+                    total_trades=metrics["total_trades"],
+                    win_rate=metrics["win_rate"],
+                )
+                session.add(metric_record)
+                session.commit()
 
             return metrics

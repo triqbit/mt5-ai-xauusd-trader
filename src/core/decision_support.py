@@ -261,6 +261,7 @@ class DecisionSupportSystem:
             # Print to console if provided
             if console:
                 console.print(dashboard)
+                return ""
 
             # Return string representation
             temp_console = Console(force_terminal=True, width=100)
