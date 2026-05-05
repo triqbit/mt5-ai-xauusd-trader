@@ -1,23 +1,15 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
 # requirements-docker.txt -- Linux Docker-safe dependencies
-#
-# Excludes:
-#   - MetaTrader5 (Windows-only, no Linux wheel)
-#   - metaapi-cloud-sdk (Windows-only dependency chain)
-#   - pandas-ta (requires Python <3.11; runtime-only)
-#   - transformers/timm/einops (too heavy for base image)
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
-# numpy>=2 required by TA-Lib 0.6.x
 numpy>=2.2.6,<3
 scipy==1.13.0
 scikit-learn==1.7.2
 pandas==2.3.3
 
 # -- Technical Analysis --------------------------------------------
-# Python wrapper version must be compatible with C lib 0.6.4 built in Dockerfile
 TA-Lib>=0.6.4
 mplfinance==0.12.10b0
 
@@ -37,14 +29,13 @@ redis==5.0.4
 prometheus-client==0.25.0
 structlog==25.5.0
 rich==15.0.0
-tqdm==4.66.4
+tqdm==4.67.1
 
 # -- Notifications -------------------------------------------------
-# 21.x supports httpx>=0.27
 python-telegram-bot==22.7
 
 # -- Dashboard / API -----------------------------------------------
-fastapi==0.111.0
+fastapi==0.115.2
 uvicorn[standard]==0.46.0
 dash==4.1.0
 plotly==5.22.0
