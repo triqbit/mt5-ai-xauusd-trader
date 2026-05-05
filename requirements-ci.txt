@@ -27,7 +27,8 @@ optuna==4.8.0
 pytest==9.0.3
 pytest-cov==5.0.0
 python-telegram-bot==22.7
-fastapi==0.115.2
+fastapi==0.136.1
+starlette==1.0.0
 requests==2.33.1
 httpx==0.28.0
 structlog==25.5.0
