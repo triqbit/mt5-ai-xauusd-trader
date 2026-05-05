@@ -76,6 +76,7 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 - **Accuracy Floor**: If accuracy <50%, halt trading
 - **Win Rate Floor**: If win rate <45%, reduce position size to 25%
 - **Drift Threshold**: If model drift >0.3, retrain immediately
+- **Calibration Error Floor**: If calibration error >0.25, halt trading
 - **Daily Retraining**: Update model daily with latest data
 
 ### 4.3 Prediction Diversity

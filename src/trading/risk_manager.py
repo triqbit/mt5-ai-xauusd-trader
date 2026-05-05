@@ -58,6 +58,7 @@ class DailyStats:
     realised_pnl: float = 0.0
     trade_count: int = 0
     peak_equity: float = 0.0
+    consecutive_losses: int = 0
 
 
 class RiskManager:
@@ -83,9 +84,14 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        model_health: Optional[dict] = None,
+    ) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full 8-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -93,6 +99,8 @@ class RiskManager:
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
+        elif not self._check_losing_streak():
+            rejection_reason = "Max losing streak reached"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
@@ -101,6 +109,8 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_model_health(model_health):
+            rejection_reason = "Model health breach"
 
         passed = rejection_reason == ""
         if not passed:
@@ -155,9 +165,13 @@ class RiskManager:
             self.daily.peak_equity = current_equity
 
     def record_pnl(self, pnl: float) -> None:
-        """Accumulate intraday realised PnL."""
+        """Accumulate intraday realised PnL and track streaks."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+        if pnl < 0:
+            self.daily.consecutive_losses += 1
+        elif pnl > 0:
+            self.daily.consecutive_losses = 0
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -171,7 +185,7 @@ class RiskManager:
     # -- Private filter layers ----------------------------------------------
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
+        if drawdown >= self.cfg.max_drawdown:
             logger.critical(
                 "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
                 drawdown * 100,
@@ -208,12 +222,12 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
-        if confidence < threshold:
+    def _check_minimum_confidence(self, confidence: float) -> bool:
+        if confidence < self.cfg.min_confidence:
             logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
+                "Confidence %.2f below threshold %.2f",
+                confidence,
+                self.cfg.min_confidence,
             )
             return False
         return True
@@ -227,6 +241,40 @@ class RiskManager:
         if rr < min_rr:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
             return False
+        return True
+
+    def _check_losing_streak(self) -> bool:
+        """Halt if consecutive losses reach the limit."""
+        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
+            logger.warning(
+                "Losing streak limit hit: %d", self.daily.consecutive_losses
+            )
+            return False
+        return True
+
+    def _check_model_health(self, health: Optional[dict]) -> bool:
+        """Halt if model drift, accuracy, or calibration breach thresholds."""
+        if not health:
+            return True
+
+        drift = health.get("drift", 0.0)
+        acc = health.get("accuracy", 1.0)
+        cal = health.get("calibration", 0.0)
+
+        if drift > self.cfg.model_drift_threshold:
+            logger.warning("Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold)
+            return False
+        if acc < self.cfg.model_accuracy_floor:
+            logger.warning(
+                "Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor
+            )
+            return False
+        if cal > self.cfg.model_calibration_threshold:
+            logger.warning(
+                "Model calibration %.2f > %.2f", cal, self.cfg.model_calibration_threshold
+            )
+            return False
+
         return True
 
 

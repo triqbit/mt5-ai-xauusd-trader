@@ -387,6 +387,16 @@ class ConfigValidator:
                 )
             )
 
+        if self.config.model_calibration_threshold > 0.4:
+            self.errors.append(
+                ValidationError(
+                    "MODEL_CALIBRATION_THRESHOLD",
+                    f"Model calibration threshold {self.config.model_calibration_threshold} is too high.",
+                    False,
+                    "Set MODEL_CALIBRATION_THRESHOLD to 0.3 or lower.",
+                )
+            )
+
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
         # 1. LIVE mode restrictions

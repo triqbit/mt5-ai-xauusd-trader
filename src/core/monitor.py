@@ -62,6 +62,9 @@ TRADING_BLOCK_DURATION = Histogram(
 CONFIDENCE_GAUGE = Gauge("trading_model_confidence", "Latest model prediction confidence")
 MODEL_ACCURACY_GAUGE = Gauge("trading_model_accuracy", "Model prediction accuracy")
 MODEL_DRIFT_GAUGE = Gauge("trading_model_drift_score", "Statistical drift from baseline")
+MODEL_CALIBRATION_GAUGE = Gauge(
+    "trading_model_calibration_error", "Model calibration error (lower is better)"
+)
 
 # 5. Data Quality Metrics
 DATA_FRESHNESS_GAUGE = Gauge(
@@ -276,11 +279,19 @@ class Monitor:
         REJECTED_ORDER_COUNTER.inc()
         logger.warning("order_rejected", reason=reason)
 
-    def log_model_performance(self, accuracy: float, drift_score: float) -> None:
+    def log_model_performance(
+        self, accuracy: float, drift_score: float, calibration_error: float = 0.0
+    ) -> None:
         """Log model performance metrics and send alerts if thresholds are breached."""
         MODEL_ACCURACY_GAUGE.set(accuracy * 100)
         MODEL_DRIFT_GAUGE.set(drift_score)
-        logger.info("model_performance_logged", accuracy=accuracy, drift=drift_score)
+        MODEL_CALIBRATION_GAUGE.set(calibration_error)
+        logger.info(
+            "model_performance_logged",
+            accuracy=accuracy,
+            drift=drift_score,
+            calibration=calibration_error,
+        )
 
         if accuracy < self.cfg.model_accuracy_floor:
             msg = (
@@ -302,6 +313,19 @@ class Monitor:
             self.send_message(msg)
             logger.warning(
                 "model_drift_alert", drift=drift_score, threshold=self.cfg.model_drift_threshold
+            )
+
+        if calibration_error > self.cfg.model_calibration_threshold:
+            msg = (
+                f"⚠️ WARNING: Model Calibration Breach\n"
+                f"Current Error: {calibration_error:.3f}\n"
+                f"Threshold: {self.cfg.model_calibration_threshold:.3f}"
+            )
+            self.send_message(msg)
+            logger.warning(
+                "model_calibration_alert",
+                calibration=calibration_error,
+                threshold=self.cfg.model_calibration_threshold,
             )
 
     def log_data_freshness(self, timestamp: datetime) -> None:

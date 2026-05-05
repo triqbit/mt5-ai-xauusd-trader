@@ -1,7 +1,8 @@
 # Acceptance Criteria: Hardened Risk Management
 
 ## Functional Acceptance Criteria
-- **Behavior:** Enforce strict risk limits including max positions, risk per trade, and daily drawdown circuit breakers.
+- **Behavior:** Enforce strict risk limits including max positions, risk per trade, consecutive losing streaks, and daily drawdown circuit breakers.
+- **Model Stability:** Integration with model health metrics (drift, accuracy, calibration) to halt trading during performance degradation.
 - **Edge Cases:**
     - Handle scenarios where the account balance cannot be retrieved (fail-safe: lock trading).
     - Handle multi-position risk correlation (e.g., gold vs. silver).
