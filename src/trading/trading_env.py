@@ -87,12 +87,24 @@ class TradingEnv(gym.Env):
         """
         self.current_step += 1
 
-        # Reward logic - Placeholder for now
-        # In a real env, this would calculate profit/loss, sharpe, etc.
+        # Reward logic - Placeholder skeleton
+        # In a production env, this would use realized/unrealized P&L,
+        # transaction costs, and potentially risk-adjusted metrics like Sharpe.
         reward = 0.0
+        if self._data is not None and self.current_step < len(self._data):
+            # Example: Simple price change reward for BUY/SELL
+            current_price = self._data[self.current_step, 3]  # Assuming index 3 is Close
+            prev_price = self._data[self.current_step - 1, 3]
+            price_change = current_price - prev_price
+
+            if action == 1:  # BUY
+                reward = float(price_change)
+            elif action == 2:  # SELL
+                reward = float(-price_change)
+            # action == 0 (HOLD) -> reward = 0
 
         terminated = False
-        if self.df is not None and self.current_step >= len(self.df) - 1:
+        if self._data is not None and self.current_step >= len(self._data) - 1:
             terminated = True
 
         truncated = False

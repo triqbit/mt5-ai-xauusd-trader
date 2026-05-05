@@ -133,6 +133,7 @@ class LSTMModel(BaseModel):
         num_layers: int = 2,
         model_path: str | Path | None = None,
         device: str = "cpu",
+        use_attention: bool = False,
     ) -> None:
         """
         Initializes the LSTMModel wrapper.
@@ -143,6 +144,7 @@ class LSTMModel(BaseModel):
             num_layers: Number of recurrent layers.
             model_path: Optional path to a pre-trained model checkpoint (.pt or .pth).
             device: Computing device to use ('cpu', 'cuda', 'auto').
+            use_attention: Whether to use the Attention-based LSTM architecture.
         """
         self.logger = logging.getLogger(__name__)
 
@@ -159,7 +161,16 @@ class LSTMModel(BaseModel):
 
         if torch:
             try:
-                self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(self.device)
+                if use_attention:
+                    self.logger.info("Initializing LSTMAttentionModel...")
+                    self.model = LSTMAttentionModel(
+                        n_features=input_dim,
+                        hidden_size=hidden_dim,
+                        num_layers=num_layers,
+                    ).to(self.device)
+                else:
+                    self.logger.info("Initializing LSTMPricePredictor...")
+                    self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(self.device)
 
                 if model_path and Path(model_path).exists():
                     self.logger.info(f"Loading LSTM model from {model_path}")

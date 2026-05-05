@@ -5,6 +5,7 @@ Placeholder DreamerV3 wrapper compatible with the ensemble interface.
 """
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -89,3 +90,12 @@ class DreamerAgent(BaseModel):
         """
         self.state = None
         self.logger.debug("DreamerAgent latent state reset.")
+
+    def save(self, path: str | Path) -> None:
+        """
+        Saves the Dreamer model to the specified path (placeholder).
+
+        Args:
+            path: Target file path.
+        """
+        self.logger.info(f"DreamerAgent.save called for {path} (placeholder).")
