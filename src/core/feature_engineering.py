@@ -157,7 +157,16 @@ class FeatureEngineer:
             return features_only
 
     def _get_technical_indicators(self, df: pd.DataFrame, prefix: str) -> pd.DataFrame:
-        """Compute standard technical indicators."""
+        """
+        Compute standard technical indicators including momentum, volatility, and trend.
+
+        Args:
+            df: Input DataFrame with OHLCV data.
+            prefix: Prefix to prepend to all indicator column names.
+
+        Returns:
+            DataFrame containing computed technical indicators.
+        """
         indicators = {}
         close = df["close"].values.astype(np.float64)
         high = df["high"].values.astype(np.float64)
@@ -194,6 +203,14 @@ class FeatureEngineer:
         # ADX
         indicators[f"{prefix}_adx"] = talib.ADX(high, low, close, timeperiod=14)
 
+        # Williams %R
+        indicators[f"{prefix}_willr"] = talib.WILLR(high, low, close, timeperiod=14)
+
+        # Ultimate Oscillator
+        indicators[f"{prefix}_ultosc"] = talib.ULTOSC(
+            high, low, close, timeperiod1=7, timeperiod2=14, timeperiod3=28
+        )
+
         # Stochastic
         slowk, slowd = talib.STOCH(
             high,
@@ -208,24 +225,47 @@ class FeatureEngineer:
         indicators[f"{prefix}_stoch_k"] = slowk
         indicators[f"{prefix}_stoch_d"] = slowd
 
+        # Hilbert Transform
+        indicators[f"{prefix}_ht_trendline"] = talib.HT_TRENDLINE(close)
+        indicators[f"{prefix}_ht_dcperiod"] = talib.HT_DCPERIOD(close)
+
         return pd.DataFrame(indicators, index=df.index)
 
-    def _get_candle_patterns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute all TA-Lib candle patterns."""
-        op = df["open"].values
-        hi = df["high"].values
-        lo = df["low"].values
-        cl = df["close"].values
+    def _get_candle_patterns(self, df: pd.DataFrame, prefix: str = "") -> pd.DataFrame:
+        """
+        Compute all TA-Lib candle patterns.
+
+        Args:
+            df: Input DataFrame.
+            prefix: Optional prefix for pattern column names.
+
+        Returns:
+            DataFrame of candle patterns.
+        """
+        op = df["open"].values.astype(np.float64)
+        hi = df["high"].values.astype(np.float64)
+        lo = df["low"].values.astype(np.float64)
+        cl = df["close"].values.astype(np.float64)
 
         patterns = {}
         pattern_list = talib.get_function_groups()["Pattern Recognition"]
+        col_prefix = f"{prefix}_" if prefix else "pattern_"
+
         for pattern in pattern_list:
-            patterns[f"pattern_{pattern.lower()}"] = getattr(talib, pattern)(op, hi, lo, cl)
+            patterns[f"{col_prefix}{pattern.lower()}"] = getattr(talib, pattern)(op, hi, lo, cl)
 
         return pd.DataFrame(patterns, index=df.index)
 
     def _get_price_action_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute custom price action features."""
+        """
+        Compute custom price action features such as returns, range, and slope.
+
+        Args:
+            df: Input DataFrame with OHLCV data.
+
+        Returns:
+            DataFrame containing custom price action features.
+        """
         pa = {}
         close = df["close"]
 
@@ -242,37 +282,22 @@ class FeatureEngineer:
             0, 1e-8
         )
 
-        # Vectorized Slope (Linear Regression) - ~2500x faster than rolling().apply(linregress)
-        pa["slope_5"] = self._calculate_rolling_slope(close, window=5)
-        pa["slope_20"] = self._calculate_rolling_slope(close, window=20)
+        # Linear Regression Slopes (Institutional-grade TA-Lib implementation)
+        pa["slope_5"] = talib.LINEARREG_SLOPE(close.values.astype(np.float64), timeperiod=5)
+        pa["slope_20"] = talib.LINEARREG_SLOPE(close.values.astype(np.float64), timeperiod=20)
 
         return pd.DataFrame(pa, index=df.index)
 
-    def _calculate_rolling_slope(self, series: pd.Series, window: int) -> pd.Series:
-        """
-        Compute linear regression slope over a rolling window using vectorized operations.
-        Formula: Slope = (sum(i*y) - x_bar * sum(y)) / SS_xx
-        """
-        n = window
-        if len(series) < n:
-            return pd.Series(0.0, index=series.index)
-
-        x_idx = np.arange(len(series))
-        sum_y = series.rolling(window=n).sum()
-        sum_iy_abs = (series * x_idx).rolling(window=n).sum()
-
-        # Convert absolute index sum to relative window index sum
-        # sum(i*y) where i is 0 to n-1
-        sum_iy_rel = sum_iy_abs - (x_idx - n + 1) * sum_y
-
-        x_bar = (n - 1) / 2
-        ss_xx = n * (n**2 - 1) / 12
-
-        slope = (sum_iy_rel - x_bar * sum_y) / ss_xx
-        return slope
-
     def _get_volume_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute volume-based features including rolling VWAP and VPT."""
+        """
+        Compute volume-based features including rolling VWAP, OBV, and VPT.
+
+        Args:
+            df: Input DataFrame with OHLCV data.
+
+        Returns:
+            DataFrame containing volume-based features.
+        """
         vol = {}
         close = df["close"]
         high = df["high"]
@@ -302,6 +327,13 @@ class FeatureEngineer:
         """
         Resample data to a different timeframe and compute features.
         Ensures no look-ahead bias by shifting.
+
+        Args:
+            df: Input DataFrame.
+            tf: Timeframe string (e.g., 'M15', 'H1').
+
+        Returns:
+            DataFrame of resampled indicators.
         """
         # Map MT5-style timeframe strings to Pandas frequency strings
         tf_map = {
@@ -332,30 +364,53 @@ class FeatureEngineer:
             .dropna()
         )
 
-        # Compute indicators on resampled data
+        # 1. Compute indicators on resampled data
         mtf_indicators = self._get_technical_indicators(resampled, prefix=f"mtf_{tf}")
+
+        # 2. Compute candle patterns on resampled data
+        mtf_patterns = self._get_candle_patterns(resampled, prefix=f"mtf_{tf}")
+
+        # Combine them
+        combined_mtf = pd.concat([mtf_indicators, mtf_patterns], axis=1)
 
         # Reindex to original DataFrame using forward fill to handle frequency misalignment.
         # We then shift by 1 to ensure that at any time T, we only use MTF data
         # from periods that have completely closed.
-        mtf_indicators = mtf_indicators.reindex(df.index, method="ffill").shift(1)
+        combined_mtf = combined_mtf.reindex(df.index, method="ffill").shift(1)
 
-        return mtf_indicators
+        return combined_mtf
 
     def _normalize_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize the feature matrix."""
+        """
+        Normalize the feature matrix using the specified method.
+
+        Args:
+            df: Feature DataFrame to normalize.
+
+        Returns:
+            Normalized DataFrame.
+        """
         if self.method == "zscore":
             if self.means is None:
                 self.means = df.mean()
-                self.stds = df.std().replace(0, 1)
+                # Use 1.0 for constant features to avoid division by zero
+                self.stds = df.std().replace(0, 1.0).fillna(1.0)
             return (df - self.means) / self.stds
+
         if self.method == "minmax":
             if self.mins is None:
                 self.mins = df.min()
                 self.maxs = df.max()
-            return (df - self.mins) / (self.maxs - self.mins).replace(0, 1)
+            denom = (self.maxs - self.mins).replace(0, 1.0).fillna(1.0)
+            return (df - self.mins) / denom
+
         return df
 
     def get_feature_count(self) -> int:
-        """Return the number of engineered features."""
+        """
+        Return the number of engineered features.
+
+        Returns:
+            Total count of feature columns.
+        """
         return len(self.feature_columns)
