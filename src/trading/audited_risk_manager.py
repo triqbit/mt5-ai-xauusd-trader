@@ -30,17 +30,19 @@ class AuditedRiskManager(RiskManager):
         model_health: Optional[dict] = None,
     ) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full 8-layer risk filter cascade.
         Returns True only if ALL layers pass.
         Logs the full decision chain to the audit log.
         """
         decision_chain = {
             "circuit_breaker": self._check_circuit_breaker(),
             "daily_loss": self._check_daily_loss(),
+            "losing_streak": self._check_losing_streak(),
             "max_positions": self._check_max_positions(),
             "symbol_allocation": self._check_symbol_allocation(signal.symbol),
             "min_confidence": self._check_minimum_confidence(signal.confidence),
             "risk_reward": self._check_risk_reward(signal),
+            "model_health": self._check_model_health(model_health),
         }
 
         passed = all(decision_chain.values())

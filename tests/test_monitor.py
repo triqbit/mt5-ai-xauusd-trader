@@ -228,27 +228,39 @@ class TestMonitor(unittest.TestCase):
         self.monitor.bot.send_message = MagicMock()
         self.config.model_accuracy_floor = 0.5
         self.config.model_drift_threshold = 0.3
+        self.config.model_calibration_threshold = 0.25
+
+        from src.core.monitor import MODEL_CALIBRATION_GAUGE
 
         with patch.object(MODEL_ACCURACY_GAUGE, "set") as mock_acc, \
-             patch.object(MODEL_DRIFT_GAUGE, "set") as mock_drift:
+             patch.object(MODEL_DRIFT_GAUGE, "set") as mock_drift, \
+             patch.object(MODEL_CALIBRATION_GAUGE, "set") as mock_cal:
             # Case 1: Healthy performance
-            self.monitor.log_model_performance(0.85, 0.05)
+            self.monitor.log_model_performance(0.85, 0.05, 0.1)
             mock_acc.assert_called_with(85.0)
             mock_drift.assert_called_with(0.05)
+            mock_cal.assert_called_with(0.1)
             self.assertFalse(self.monitor.bot.send_message.called)
 
             # Case 2: Accuracy breach
-            self.monitor.log_model_performance(0.45, 0.05)
+            self.monitor.log_model_performance(0.45, 0.05, 0.1)
             self.assertTrue(self.monitor.bot.send_message.called)
             msg = self.monitor.bot.send_message.call_args[1]["text"]
             self.assertIn("Accuracy Below Floor", msg)
             self.monitor.bot.send_message.reset_mock()
 
             # Case 3: Drift breach
-            self.monitor.log_model_performance(0.85, 0.4)
+            self.monitor.log_model_performance(0.85, 0.4, 0.1)
             self.assertTrue(self.monitor.bot.send_message.called)
             msg = self.monitor.bot.send_message.call_args[1]["text"]
             self.assertIn("Model Drift Detected", msg)
+            self.monitor.bot.send_message.reset_mock()
+
+            # Case 4: Calibration breach
+            self.monitor.log_model_performance(0.85, 0.05, 0.3)
+            self.assertTrue(self.monitor.bot.send_message.called)
+            msg = self.monitor.bot.send_message.call_args[1]["text"]
+            self.assertIn("Model Calibration Breach", msg)
 
     def test_log_data_freshness(self):
         self.monitor.bot = MagicMock()
