@@ -169,6 +169,27 @@ def test_html_dynamic_elements(sample_report):
     # Accessibility
     assert 'scope="col"' in html
 
+def test_html_ux_enhancements(sample_report):
+    """Verify smooth scroll, back-to-top and color coding in HTML."""
+    reporter = ResearchReporter()
+    html = reporter.generate_html(sample_report)
+
+    # Smooth scroll
+    assert 'scroll-behavior: smooth;' in html
+
+    # Back to top button
+    assert 'class="back-to-top"' in html
+    assert 'aria-label="Scroll back to top"' in html
+
+    # Color coding classes
+    assert '.fill-low' in html
+    assert '.fill-medium' in html
+    assert '.fill-high' in html
+
+    # Resilience score is 85.5 -> should have fill-high
+    assert 'fill-high' in html
+    assert 'aria-label="Strategy resilience score: 85.5 out of 100"' in html
+
 def test_trade_pattern_motifs():
     trade_section = TradePatternSection(
         primary_insight="Insight",
