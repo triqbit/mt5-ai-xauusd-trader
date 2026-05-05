@@ -5,6 +5,7 @@ Unit tests for the CapitalAllocator system.
 import pytest
 
 from src.trading.capital_allocator import (
+    AllocationRequest,
     CapitalAllocator,
     RejectionCode,
     StrategyConfig,
@@ -91,6 +92,11 @@ def test_capital_cap(allocator):
 
 
 def test_total_heat_limit(allocator):
+    # Disable soft buffer to test hard limit rejection directly
+    allocator.soft_limit_buffer = 0.0
+    allocator.max_symbol_risk = 1.0
+    allocator.max_family_risk = 1.0
+
     config = StrategyConfig(
         strategy_id="s1",
         symbol="XAUUSD",
@@ -111,6 +117,8 @@ def test_total_heat_limit(allocator):
 
 
 def test_symbol_concentration_limit(allocator):
+    # Disable soft buffer to test hard limit rejection directly
+    allocator.soft_limit_buffer = 0.0
     s1_config = StrategyConfig(
         strategy_id="s1",
         symbol="XAUUSD",
@@ -138,6 +146,9 @@ def test_symbol_concentration_limit(allocator):
 
 
 def test_family_concentration_limit(allocator):
+    # Disable soft buffer to test hard limit rejection directly
+    allocator.soft_limit_buffer = 0.0
+
     s1_config = StrategyConfig(
         strategy_id="s1",
         symbol="XAUUSD",
@@ -354,6 +365,9 @@ def test_diversification_score(allocator):
 
 
 def test_request_allocation_with_scaling(allocator):
+    # Disable soft buffer to test explicit scaling
+    allocator.soft_limit_buffer = 0.0
+
     config = StrategyConfig(
         strategy_id="s1",
         symbol="XAUUSD",
@@ -399,3 +413,106 @@ def test_allocation_result_flags(allocator):
     assert result_cap.was_scaled is True
     assert result_cap.was_capped is True
     assert result_cap.allocated_risk_pct == 0.05
+
+
+def test_cooling_off_mechanism(allocator):
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+        max_consecutive_losses=3,
+    )
+    allocator.add_strategy(config)
+
+    # 1st loss
+    allocator.update_strategy_performance("s1", -100.0)
+    assert allocator.strategies["s1"].performance_multiplier == 0.9
+    assert allocator.strategies["s1"].consecutive_losses == 1
+
+    # 2nd loss
+    allocator.update_strategy_performance("s1", -100.0)
+    assert allocator.strategies["s1"].performance_multiplier == 0.8
+    assert allocator.strategies["s1"].consecutive_losses == 2
+
+    # 3rd loss -> hits threshold
+    allocator.update_strategy_performance("s1", -100.0)
+    assert allocator.strategies["s1"].consecutive_losses == 3
+    # multiplier was 0.8, should have become 0.7 then floored to 0.1
+    assert allocator.strategies["s1"].performance_multiplier == 0.1
+
+    # 4th loss -> stays floored
+    allocator.update_strategy_performance("s1", -100.0)
+    assert allocator.strategies["s1"].consecutive_losses == 4
+    assert allocator.strategies["s1"].performance_multiplier == 0.0  # multiplier can go below 0.1 if step continues
+
+    # Win -> resets consecutive losses
+    allocator.update_strategy_performance("s1", 100.0)
+    assert allocator.strategies["s1"].consecutive_losses == 0
+    assert allocator.strategies["s1"].performance_multiplier == 0.1  # 0.0 + 0.1 step
+
+
+def test_diversification_guard_scaling(allocator):
+    # Total Heat limit 0.7, soft limit buffer 0.1 -> buffer zone [0.6, 0.7]
+    # Increase other limits so they don't interfere
+    allocator.max_symbol_risk = 1.0
+    allocator.max_family_risk = 1.0
+
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=100000.0,
+    )
+    allocator.add_strategy(config)
+
+    # Commit 65% of budget. We are halfway through the buffer zone.
+    # Scale = (0.7 - 0.65) / 0.1 = 0.5
+    allocator.update_allocation("s1", 65000.0)
+
+    # Request 10% risk. Should be scaled by 0.5 -> 5%
+    result = allocator.request_allocation("s1", 0.1)
+
+    assert result.is_allowed is True
+    assert result.allocated_risk_pct == pytest.approx(0.05)
+    assert result.was_scaled is True
+
+
+def test_allocate_batch(allocator):
+    s1 = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=100000.0,
+        performance_multiplier=1.5,
+    )
+    s2 = StrategyConfig(
+        strategy_id="s2",
+        symbol="EURUSD",
+        model_family="LSTM",
+        capital_cap=100000.0,
+        performance_multiplier=1.2,
+    )
+    allocator.add_strategy(s1)
+    allocator.add_strategy(s2)
+
+    # Batch request
+    requests = [
+        AllocationRequest(strategy_id="s2", risk_pct=0.1),
+        AllocationRequest(strategy_id="s1", risk_pct=0.1),
+    ]
+
+    # s1 has higher multiplier (1.5), so it should be processed first
+    # Total heat limit is 0.7
+    # s1: 0.1 * 1.5 = 0.15 allocated. Remaining heat = 0.7 - 0.15 = 0.55
+    # s2: 0.1 * 1.2 = 0.12 allocated. Remaining heat = 0.55 - 0.12 = 0.43
+
+    results = allocator.allocate_batch(requests)
+
+    # Check order in results (s1 should be first because it was prioritized)
+    assert results[0].strategy_id == "s1"
+    assert results[0].allocated_risk_pct == pytest.approx(0.15)
+    assert results[1].strategy_id == "s2"
+    assert results[1].allocated_risk_pct == pytest.approx(0.12)
+
+    assert allocator.get_total_heat() == pytest.approx(0.27)

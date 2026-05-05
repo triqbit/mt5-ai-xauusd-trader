@@ -38,6 +38,20 @@ class StrategyConfig(BaseModel):
         default=1.0, ge=0.0, le=2.0, description="Multiplier based on recent performance."
     )
     historical_pnl: float = Field(default=0.0, description="Accumulated PnL for this strategy.")
+    consecutive_losses: int = Field(
+        default=0, description="Current streak of consecutive losing trades."
+    )
+    max_consecutive_losses: int = Field(
+        default=5, description="Threshold for cooling-off mechanism."
+    )
+
+
+class AllocationRequest(BaseModel):
+    """Request for capital allocation."""
+
+    strategy_id: str
+    risk_pct: float
+    allow_scaling: bool = False
 
 
 class AllocationResult(BaseModel):
@@ -69,6 +83,7 @@ class CapitalAllocator:
         max_total_heat: float = 0.7,  # Max 70% of budget committed at once
         performance_step: float = 0.05,  # Adjustment step for performance multiplier
         decay_rate: float = 0.001,  # Rate at which multiplier returns to 1.0
+        soft_limit_buffer: float = 0.1,  # Buffer for diversification guard
     ):
         self.total_budget = total_budget
         self.max_symbol_risk = max_symbol_risk
@@ -76,6 +91,7 @@ class CapitalAllocator:
         self.max_total_heat = max_total_heat
         self.performance_step = performance_step
         self.decay_rate = decay_rate
+        self.soft_limit_buffer = soft_limit_buffer
 
         self.strategies: dict[str, StrategyConfig] = {}
         self.current_allocations: dict[str, float] = {}  # strategy_id -> current allocated amount
@@ -97,6 +113,7 @@ class CapitalAllocator:
         """
         Adjust performance multiplier based on trade outcome.
         Positive PnL increases multiplier, negative PnL decreases it.
+        Implements cooling-off mechanism based on consecutive losses.
         """
         if strategy_id not in self.strategies:
             return
@@ -105,19 +122,31 @@ class CapitalAllocator:
         config.historical_pnl += pnl
 
         if pnl > 0:
+            config.consecutive_losses = 0
             config.performance_multiplier = min(
                 2.0, config.performance_multiplier + self.performance_step
             )
         elif pnl < 0:
+            config.consecutive_losses += 1
             config.performance_multiplier = max(
                 0.0, config.performance_multiplier - self.performance_step
             )
 
+            # Cooling-off mechanism: Floor multiplier if too many losses
+            if config.consecutive_losses >= config.max_consecutive_losses:
+                logger.warning(
+                    "Strategy %s hit max consecutive losses (%d). Applying cooling-off floor.",
+                    strategy_id,
+                    config.consecutive_losses,
+                )
+                config.performance_multiplier = min(config.performance_multiplier, 0.1)
+
         logger.debug(
-            "Strategy %s multiplier updated to %.2f | PnL: %.2f",
+            "Strategy %s multiplier updated to %.2f | PnL: %.2f | Consecutive Losses: %d",
             strategy_id,
             config.performance_multiplier,
             pnl,
+            config.consecutive_losses,
         )
 
     def decay_performance_multipliers(self) -> None:
@@ -216,6 +245,34 @@ class CapitalAllocator:
         """Increment the counter for a specific rejection reason."""
         self.rejection_history[code.value] += 1
 
+    def allocate_batch(self, requests: list[AllocationRequest]) -> list[AllocationResult]:
+        """
+        Process a batch of allocation requests with prioritization.
+        Prioritizes strategies based on their performance multipliers.
+        Useful for multi-strategy portfolios or model ensembles.
+        """
+        # Sort requests by strategy performance multiplier (descending)
+        sorted_requests = sorted(
+            requests,
+            key=lambda r: self.strategies.get(r.strategy_id).performance_multiplier
+            if r.strategy_id in self.strategies
+            else 0.0,
+            reverse=True,
+        )
+
+        results = []
+        for req in sorted_requests:
+            res = self.request_allocation(
+                req.strategy_id, req.risk_pct, allow_scaling=req.allow_scaling
+            )
+            results.append(res)
+            # If allowed, we update the current allocation so subsequent requests
+            # in the same batch see the updated heat.
+            if res.is_allowed:
+                self.update_allocation(res.strategy_id, res.allocated_amount)
+
+        return results
+
     def request_allocation(
         self, strategy_id: str, risk_pct: float, allow_scaling: bool = False
     ) -> AllocationResult:
@@ -274,9 +331,47 @@ class CapitalAllocator:
                     rejection_code=RejectionCode.CAPITAL_CAP_REACHED,
                 )
 
-        # 3. Check Total Portfolio Heat
-        # Use the final adjusted_risk_pct (scaled and capped) for safety checks.
+        # 3. Diversification Guard: Linear scaling as limits are approached
+        # This scales down the requested risk before hard limits are hit.
         current_total_heat = self.get_total_heat()
+        symbol_heat = self.get_symbol_heat(config.symbol)
+        family_heat = self.get_family_heat(config.model_family)
+
+        def _calculate_soft_scale(current: float, limit: float, buffer: float) -> float:
+            """Linearly scale down if within the buffer zone of a limit."""
+            soft_limit = limit - buffer
+            if current <= soft_limit:
+                return 1.0
+            if current >= limit:
+                return 0.0
+            # Linear decay from 1.0 to 0.0 across the buffer
+            return (limit - current) / buffer
+
+        heat_scale = _calculate_soft_scale(
+            current_total_heat, self.max_total_heat, self.soft_limit_buffer
+        )
+        symbol_scale = _calculate_soft_scale(
+            symbol_heat, self.max_symbol_risk, self.soft_limit_buffer
+        )
+        family_scale = _calculate_soft_scale(
+            family_heat, self.max_family_risk, self.soft_limit_buffer
+        )
+
+        overall_soft_scale = min(heat_scale, symbol_scale, family_scale)
+        if overall_soft_scale < 1.0:
+            target_risk_pct *= overall_soft_scale
+            was_scaled = True
+            logger.debug(
+                "Diversification Guard applied scaling: %.2f (Heat: %.2f, Symbol: %.2f, Family: %.2f)",
+                overall_soft_scale,
+                heat_scale,
+                symbol_scale,
+                family_scale,
+            )
+
+        # 4. Hard Safety Limits: Final check of scaled amount against absolute limits
+        # Use the final target_risk_pct for safety checks.
+
         if current_total_heat + target_risk_pct > self.max_total_heat:
             if allow_scaling:
                 target_risk_pct = max(0.0, self.max_total_heat - current_total_heat)
@@ -293,8 +388,6 @@ class CapitalAllocator:
                     rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
                 )
 
-        # 4. Check Symbol Concentration
-        symbol_heat = self.get_symbol_heat(config.symbol)
         if symbol_heat + target_risk_pct > self.max_symbol_risk:
             if allow_scaling:
                 target_risk_pct = max(0.0, self.max_symbol_risk - symbol_heat)
@@ -311,8 +404,6 @@ class CapitalAllocator:
                     rejection_code=RejectionCode.SYMBOL_CONCENTRATION_LIMIT,
                 )
 
-        # 5. Check Model Family Concentration
-        family_heat = self.get_family_heat(config.model_family)
         if family_heat + target_risk_pct > self.max_family_risk:
             if allow_scaling:
                 target_risk_pct = max(0.0, self.max_family_risk - family_heat)
@@ -358,4 +449,10 @@ class CapitalAllocator:
         )
 
 
-__all__ = ["AllocationResult", "CapitalAllocator", "RejectionCode", "StrategyConfig"]
+__all__ = [
+    "AllocationRequest",
+    "AllocationResult",
+    "CapitalAllocator",
+    "RejectionCode",
+    "StrategyConfig",
+]
