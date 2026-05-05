@@ -156,9 +156,23 @@ def test_backtest_initialization():
     # Based on audit, backtest.py is missing or stubbed.
     # We verify if the entry point in main.py correctly handles the missing component.
     from main import main
+    # Mock data for get_rates_range
+    import pandas as pd
+    mock_data = pd.DataFrame({
+        "time": [datetime.now()],
+        "open": [2000.0],
+        "high": [2010.0],
+        "low": [1990.0],
+        "close": [2005.0],
+        "tick_volume": [100],
+        "spread": [1],
+        "real_volume": [100]
+    })
+
     with patch("sys.argv", ["main.py", "--mode", "backtest"]), \
          patch("src.trading.mt5_connector.MT5Connector.connect", return_value=True), \
          patch("src.trading.mt5_connector.MT5Connector.disconnect"), \
+         patch("src.trading.mt5_connector.MT5Connector.get_rates_range", return_value=mock_data), \
          patch("src.core.health.HealthChecker.get_full_report") as mock_health, \
          patch.dict(os.environ, {
              "MT5_LOGIN": "123456",
