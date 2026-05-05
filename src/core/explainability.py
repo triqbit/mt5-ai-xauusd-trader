@@ -145,6 +145,7 @@ class SignalExplainer:
         regime_info: dict[str, Any],
         execution_data: dict[str, Any] | None = None,
         feature_impacts: list[dict[str, Any]] | None = None,
+        model_confidences: dict[str, float] | None = None,
     ) -> SignalExplanation:
         """
         Generate a comprehensive explanation for a trade signal.
@@ -159,6 +160,7 @@ class SignalExplainer:
             regime_info: Market regime data (name, confidence, volatility, etc.).
             execution_data: Optional execution filter data (filters, summary, etc.).
             feature_impacts: Optional list of dictionaries describing feature cluster impacts.
+            model_confidences: Optional dictionary mapping model names to their individual confidence scores.
 
         Returns:
             A structured SignalExplanation object.
@@ -192,14 +194,17 @@ class SignalExplainer:
         attributions = []
         dominant_models = []
         max_weighted_conf = -1.0
+        model_confidences = model_confidences or {}
 
         for name, vote_idx in model_votes.items():
             vote_dir = ModelAction(int(vote_idx)).to_direction()
             weight = model_weights.get(name, 0.0)
 
-            # Individual model confidence is either the ensemble confidence (if aligned)
-            # or a neutral 0.5 (if not aligned).
-            model_conf = confidence if vote_dir.value == direction else 0.5
+            # Individual model confidence: use provided value, or fallback to ensemble
+            # confidence (if aligned) or neutral 0.5 (if not aligned).
+            model_conf = model_confidences.get(name)
+            if model_conf is None:
+                model_conf = confidence if vote_dir.value == direction else 0.5
 
             weighted_conf = weight * model_conf
             if weighted_conf > max_weighted_conf:
@@ -280,7 +285,12 @@ class SignalExplainer:
         machine_attr = {
             "model_confidence": confidence,
             "risk_passed": risk_assessment.passed,
+            "risk_reward_ratio": risk_assessment.risk_reward_ratio,
+            "risk_rejection_reasons": risk_assessment.rejection_reasons,
             "execution_passed": execution_summary.passed,
+            "failed_execution_filters": [
+                f.filter_name for f in execution_filters if not f.passed
+            ],
             "regime_confluence": regime_context.confidence,
             "dominant_models": dominant_models,
             "feature_impacts": {c.cluster_name: c.contribution_score for c in contributions},

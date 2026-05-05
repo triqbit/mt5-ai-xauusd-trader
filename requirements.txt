@@ -60,7 +60,7 @@ pydantic-settings==2.14.0
 tomli==2.4.1
 
 # ── Testing ─────────────────────────────────────────────────
-pytest==9.0.3
+pytest==8.4.2
 pytest-asyncio==0.25.3
 pytest-cov==5.0.0
 hypothesis==6.152.4

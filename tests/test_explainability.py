@@ -263,6 +263,64 @@ def test_signal_explainer_feature_contributions():
     assert explanation.machine_attribution["feature_impacts"]["Trend"] == 0.8
 
 
+def test_signal_explainer_with_individual_confidences():
+    """Test that SignalExplainer respects individual model confidences."""
+    explainer = SignalExplainer()
+    model_confidences = {"ppo": 0.95, "lstm": 0.4}
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.7,
+        model_votes={"ppo": 1, "lstm": 1},
+        model_weights={"ppo": 0.5, "lstm": 0.5},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        model_confidences=model_confidences,
+    )
+
+    ppo_attr = next(a for a in explanation.model_attributions if a.model_name == "ppo")
+    lstm_attr = next(a for a in explanation.model_attributions if a.model_name == "lstm")
+
+    assert ppo_attr.confidence == 0.95
+    assert lstm_attr.confidence == 0.4
+    assert ppo_attr.is_dominant is True
+    assert lstm_attr.is_dominant is False
+
+
+def test_signal_explainer_expanded_machine_attribution():
+    """Test that expanded machine attribution fields are present."""
+    explainer = SignalExplainer()
+    risk_data = {
+        "passed": False,
+        "rejection_reasons": ["Risk limit exceeded"],
+        "risk_reward": 1.5,
+    }
+    execution_data = {
+        "passed": False,
+        "filters": [{"name": "Spread", "passed": False, "value": 5.0, "threshold": 1.0}],
+        "summary": "High spread",
+    }
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data=risk_data,
+        regime_info={"name": "Trending"},
+        execution_data=execution_data,
+    )
+
+    attr = explanation.machine_attribution
+    assert attr["risk_passed"] is False
+    assert attr["risk_reward_ratio"] == 1.5
+    assert "Risk limit exceeded" in attr["risk_rejection_reasons"]
+    assert attr["execution_passed"] is False
+    assert "Spread" in attr["failed_execution_filters"]
+
+
 def test_format_for_terminal_with_features():
     """Test that terminal formatting includes feature contributions."""
     explainer = SignalExplainer()
