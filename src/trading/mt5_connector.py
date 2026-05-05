@@ -193,12 +193,18 @@ class MT5Connector:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
                 error_code, error_desc = mt5.last_error()
-                # Most data errors in MT5 are transient (connection, busy)
+                # Most data errors in MT5 are transient (connection, busy, or timeout)
+                # Code 2 is common for transient network issues.
                 retriable = error_code in [
+                    2,
                     mt5.TRADE_RETCODE_CONNECTION,
                     mt5.TRADE_RETCODE_TIMEOUT,
                     -5,  # Not found might be transient if terminal is rebooting
                 ]
+                # Default to retriable for data fetch as it's safe and likely transient
+                if error_code == 0:
+                    retriable = True
+
                 raise MT5DataError(
                     f"Failed to copy rates: {error_desc} (code: {error_code})",
                     retriable=retriable,
@@ -275,10 +281,15 @@ class MT5Connector:
             tick = mt5.symbol_info_tick(symbol)
             if tick is None:
                 error_code, error_desc = mt5.last_error()
+                # Transient network/timeout or symbol busy
                 retriable = error_code in [
+                    2,
                     mt5.TRADE_RETCODE_CONNECTION,
                     mt5.TRADE_RETCODE_TIMEOUT,
                 ]
+                if error_code == 0:
+                    retriable = True
+
                 raise MT5DataError(
                     f"Failed to get tick: {error_desc} (code: {error_code})",
                     retriable=retriable,

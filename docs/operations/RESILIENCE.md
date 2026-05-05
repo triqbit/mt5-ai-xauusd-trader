@@ -4,7 +4,7 @@ This document outlines the resilience and error-handling standards for the MT5 A
 
 ## Exception Hierarchy
 
-All custom exceptions inherit from `TradingError` in `src/core/exceptions.py`.
+All custom exceptions inherit from `TradingError` in `src/core/exceptions.py`. Each exception carries a `retriable` boolean flag to indicate if a recovery attempt is appropriate.
 
 - `TradingError`: Base exception.
 - `MT5Error`: Base for MT5-specific issues.
@@ -22,6 +22,7 @@ Used to wrap functions that interact with external services. Features include:
 - **Exponential Backoff**: Delay increases after each failure.
 - **Jitter**: Random noise added to delays to prevent thundering herd problems.
 - **Max Retries**: Configurable limit (default: 3).
+- **Conditional Retries**: Supports a `retry_if` predicate to decide whether to retry based on the specific exception instance (e.g., only if `retriable=True`).
 
 ### Application
 
@@ -33,4 +34,4 @@ Used to wrap functions that interact with external services. Features include:
 The main trading loop in `main.py` is hardened against crashes:
 - Catching `MT5DataError` skips the current iteration and waits for the next cycle.
 - Catching `MT5ConnectionError` triggers an active reconnection attempt.
-- Critical execution errors are logged but don't halt the entire system.
+- Catching `MT5ExecutionError` distinguishes between transient (retriable) and permanent failures to inform operator logging and recovery flow.
