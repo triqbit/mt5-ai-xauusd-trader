@@ -33,6 +33,21 @@ class OptimizationMetric(str, Enum):
     ROBUSTNESS_SCORE = "robustness_score"
 
 
+class RobustnessWeights(BaseModel):
+    """Weights for the robustness score calculation."""
+
+    oos_mean: float = Field(0.4, description="Weight for mean OOS Sharpe Ratio")
+    worst_oos: float = Field(0.2, description="Weight for worst window OOS Sharpe Ratio")
+    win_rate_consistency: float = Field(0.1, description="Weight for win rate consistency (1-CV)")
+    drawdown_consistency: float = Field(
+        0.1, description="Weight for max drawdown consistency (1-CV)"
+    )
+    oos_std: float = Field(0.3, description="Penalty weight for OOS Sharpe standard deviation")
+    is_oos_gap: float = Field(0.2, description="Penalty weight for IS-OOS Sharpe gap")
+    stability: float = Field(0.3, description="Penalty weight for parameter instability")
+    regime_consistency: float = Field(0.1, description="Weight for consistency across regimes")
+
+
 class WalkForwardConfig(BaseModel):
     """Configuration for Walk-Forward Optimization."""
 
@@ -41,6 +56,7 @@ class WalkForwardConfig(BaseModel):
     step_size: int = Field(50, description="Step size for rolling windows")
     min_windows: int = Field(3, description="Minimum number of windows required")
     metric: OptimizationMetric = OptimizationMetric.ROBUSTNESS_SCORE
+    robustness_weights: RobustnessWeights = Field(default_factory=RobustnessWeights)
     n_trials: int = Field(50, description="Number of trials per window")
     seed: int = 42
     commission: float = 0.0002
@@ -306,6 +322,7 @@ class WalkForwardOptimizer:
             oos_win_rates = []
             oos_max_drawdowns = []
 
+            regime_cons_list = []
             for train_data, test_data in windows:
                 is_metrics = self._evaluate_strategy(train_data, params)
                 oos_metrics = self._evaluate_strategy(test_data, params)
@@ -318,6 +335,9 @@ class WalkForwardOptimizer:
                 oos_pfs.append(oos_metrics.get("Profit Factor", 0.0))
                 oos_win_rates.append(oos_metrics.get("Win Rate", 0.0))
                 oos_max_drawdowns.append(oos_metrics.get("Max Drawdown", 0.0))
+
+                # Track regime consistency across windows
+                regime_cons_list.append(self._calculate_regime_consistency(train_data, params))
 
             # Basic metrics
             oos_mean = np.mean(oos_sharpes)
@@ -334,21 +354,22 @@ class WalkForwardOptimizer:
             # Use only the first train window for stability check during optimization for speed
             # or use entire data. To be safe and disciplined, use the first window's training data.
             stability = self._calculate_stability_penalty(params, windows[0][0])
-            # Use current train window for regime consistency to maintain discipline
-            regime_cons = self._calculate_regime_consistency(train_data, params)
+            # Average regime consistency across all windows
+            regime_cons = float(np.mean(regime_cons_list))
 
             # Calculate Robustness Score
             # Reward: high OOS Sharpe, worst-case Sharpe, consistency
             # Penalize: high OOS Variance, high IS/OOS Gap, High parameter sensitivity, Low regime consistency
+            w = self.config.robustness_weights
             robustness = (
-                (0.4 * oos_mean)
-                + (0.2 * worst_oos)
-                + (0.1 * wr_cons)
-                + (0.1 * dd_cons)
-                - (0.3 * oos_std)
-                - (0.2 * gap)
-                - (0.3 * stability)
-                + (0.1 * regime_cons)
+                (w.oos_mean * oos_mean)
+                + (w.worst_oos * worst_oos)
+                + (w.win_rate_consistency * wr_cons)
+                + (w.drawdown_consistency * dd_cons)
+                - (w.oos_std * oos_std)
+                - (w.is_oos_gap * gap)
+                - (w.stability * stability)
+                + (w.regime_consistency * regime_cons)
             )
 
             trial.set_user_attr("oos_mean", float(oos_mean))

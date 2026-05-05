@@ -21,6 +21,11 @@ from src.research.rare_event_simulator import (
     RareEventSimulator,
     RareEventType,
 )
+from src.research.hyperopt_walkforward import (
+    WalkForwardConfig,
+    WalkForwardOptimizer,
+    WalkForwardResult,
+)
 from src.research.reporting import ResearchReport, ResearchReporter
 from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 
@@ -43,4 +48,7 @@ __all__ = [
     "StressScenario",
     "StressTestMetrics",
     "VolatilityBreakoutStrategy",
+    "WalkForwardConfig",
+    "WalkForwardOptimizer",
+    "WalkForwardResult",
 ]
