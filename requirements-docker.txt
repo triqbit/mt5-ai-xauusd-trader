@@ -56,7 +56,7 @@ joblib==1.5.3
 # -- ML / RL (CPU-only torch; no CUDA wheels pulled) ---------------
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.7.1
-torchvision==0.18.0+cpu
+torchvision==0.18.0
 stable-baselines3==2.8.0
 gymnasium==1.2.3
 optuna==4.8.0
