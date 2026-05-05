@@ -41,6 +41,8 @@ class StabilityMetrics(BaseModel):
     var_95: float = Field(default=0.0, description="Value at Risk (95%)")
     cvar_95: float = Field(default=0.0, description="Conditional Value at Risk (95%)")
     max_consecutive_losses: int = Field(default=0, description="Max sequence of losing trades")
+    ulcer_index: float = Field(default=0.0, description="Ulcer Index (Drawdown stress metric)")
+    sqn: float = Field(default=0.0, description="System Quality Number")
 
 
 class TurnoverMetrics(BaseModel):
@@ -118,8 +120,10 @@ class RLComparison(BaseModel):
 class MomentumBaseline:
     """Rule-based momentum baseline for RL comparison."""
 
-    def __init__(self, window: int = 14):
+    def __init__(self, window: int = 14, close_idx: int = 3, n_features: int = 5):
         self.window = window
+        self.close_idx = close_idx
+        self.n_features = n_features
 
     def predict(self, observation: np.ndarray) -> int:
         """
@@ -139,9 +143,8 @@ class MomentumBaseline:
         # If n_features=5 (OHLCV), close is 4th feature (index 3).
         # So last close is at -(5+2) + 3 = -4.
 
-        # Let's use a more robust way: assume 5 features if not specified.
-        n_features = 5
-        last_close_idx = -(n_features + 2) + 3
+        # Observation format from TradingEnv: [window_normalized_flattened, balance, position]
+        last_close_idx = -(self.n_features + 2) + self.close_idx
 
         if len(observation) < abs(last_close_idx):
             return 0
@@ -157,15 +160,16 @@ class MomentumBaseline:
 class MeanReversionBaseline:
     """Rule-based Mean Reversion baseline for RL comparison."""
 
-    def __init__(self, window: int = 14):
+    def __init__(self, window: int = 14, close_idx: int = 3, n_features: int = 5):
         self.window = window
+        self.close_idx = close_idx
+        self.n_features = n_features
 
     def predict(self, observation: np.ndarray) -> int:
         # Simplified RSI-like logic on normalized values
         # Normalized values already represent distance from mean.
         # If last close is very high relative to window mean, sell.
-        n_features = 5
-        last_close_idx = -(n_features + 2) + 3
+        last_close_idx = -(self.n_features + 2) + self.close_idx
 
         if len(observation) < abs(last_close_idx):
             return 0
@@ -213,10 +217,14 @@ class RLEvaluator:
         env: Any,
         regime_detector: RegimeDetector | None = None,
         annualization_factor: int = 252,
+        close_idx: int = 3,
+        n_features: int = 5,
     ):
         self.env = env
         self.regime_detector = regime_detector or RegimeDetector()
         self.annualization_factor = annualization_factor
+        self.close_idx = close_idx
+        self.n_features = n_features
 
     def evaluate(self, agent: RLModel, agent_name: str = "RL_Agent") -> RLReport:
         """
@@ -247,7 +255,7 @@ class RLEvaluator:
             if hasattr(self.env, "data") and hasattr(self.env, "current_step"):
                 data = self.env.data
                 current_step = self.env.current_step
-                current_price = data[current_step - 1, 3]  # Close price
+                current_price = data[current_step - 1, self.close_idx]  # Close price
 
                 if current_step >= 100:
                     df_slice = pd.DataFrame(
@@ -343,6 +351,8 @@ class RLEvaluator:
                     var_95=report.stability.var_95,
                     cvar_95=report.stability.cvar_95,
                     recovery_factor=float(recovery_factor),
+                    ulcer_index=report.stability.ulcer_index,
+                    sqn=report.stability.sqn,
                 )
             )
 
@@ -362,6 +372,14 @@ class RLEvaluator:
     def _get_prediction(self, agent: Any, obs: np.ndarray) -> int:
         """Translate agent prediction (int or Signal) into environment action."""
         prediction = agent.predict(obs)
+
+        # Handle StableBaselines3 models (returns tuple (action, states))
+        if isinstance(prediction, tuple) and len(prediction) == 2:
+            prediction = prediction[0]
+
+        # If prediction is a numpy array (common in SB3/Gym), get the scalar
+        if isinstance(prediction, np.ndarray):
+            prediction = prediction.item()
 
         # Handle Signal objects (standardized model output)
         if hasattr(prediction, "direction"):
@@ -409,16 +427,26 @@ class RLEvaluator:
         positions = df["positions"].values
 
         entry_idx = 0
+        in_position = False
         for i in range(1, len(df)):
             # Entry detected
             if positions[i - 1] == 0 and positions[i] != 0:
                 entry_idx = i
+                in_position = True
             # Exit detected
             elif positions[i - 1] != 0 and positions[i] == 0:
                 # PnL is the change in MtM equity from the step BEFORE entry to the exit step
                 pnl = balances[i] - balances[entry_idx - 1]
                 hold_time = i - entry_idx
                 trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
+                in_position = False
+
+        # Handle final open position
+        if in_position:
+            i = len(df) - 1
+            pnl = balances[i] - balances[entry_idx - 1]
+            hold_time = i - entry_idx
+            trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
 
         return trades
 
@@ -502,6 +530,20 @@ class RLEvaluator:
             else:
                 current_consecutive_losses = 0
 
+        # Ulcer Index: square root of the mean of squared drawdowns
+        balances = df["balances"].values
+        peak = np.maximum.accumulate(balances)
+        drawdowns = (peak - balances) / (peak + 1e-9)
+        ulcer_index = np.sqrt(np.mean(np.square(drawdowns)))
+
+        # SQN: sqrt(N) * mean_pnl / std_pnl
+        sqn = 0.0
+        if len(trade_pnls) > 0:
+            avg_pnl = np.mean(trade_pnls)
+            std_pnl = np.std(trade_pnls)
+            if std_pnl > 0:
+                sqn = np.sqrt(len(trade_pnls)) * avg_pnl / std_pnl
+
         return StabilityMetrics(
             sharpe_ratio=float(sharpe),
             sortino_ratio=float(sortino),
@@ -515,6 +557,8 @@ class RLEvaluator:
             var_95=float(var_95),
             cvar_95=float(cvar_95),
             max_consecutive_losses=int(max_consecutive_losses),
+            ulcer_index=float(ulcer_index),
+            sqn=float(sqn),
         )
 
     def _calculate_turnover(
