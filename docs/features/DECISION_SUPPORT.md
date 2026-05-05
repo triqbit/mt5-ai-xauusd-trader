@@ -19,7 +19,7 @@ The DSS summarizes the following dimensions:
 - **Signal Attribution:** Detailed breakdown of which models drove the signal and which features contributed most (provided by `SignalExplainer`).
 - **Market Regime:** Contextual awareness of the current market state (Trending, Volatile, Ranging) and its favorability.
 - **Macro Risk:** Real-time awareness of macroeconomic events (CPI, FOMC, NFP) and their impact on execution safety.
-- **Performance Context:** Recent strategy performance metrics (Sharpe Ratio, Win Rate, Profit Factor) to provide historical perspective.
+- **Performance Context:** Recent strategy performance metrics (Sharpe Ratio, Win Rate, Profit Factor, Recovery Factor, and Win/Loss Ratio) to provide historical perspective.
 
 ### 3. Decision Dashboard
 For human operators, the DSS generates a high-fidelity terminal dashboard using the `rich` library. This dashboard provides:
@@ -29,11 +29,11 @@ For human operators, the DSS generates a high-fidelity terminal dashboard using 
 - Full signal attribution details with model votes and feature impacts.
 
 ## Consensus Logic
-The system calculates model consensus based on the alignment of votes within the ensemble:
-- **Unanimous:** 100% of models agree on the direction.
-- **Strong Majority:** At least 66% of models agree.
-- **Mixed Confluence:** At least 50% of models agree.
-- **Divided/Weak:** Less than 50% agreement (high risk of noise).
+The system calculates model consensus based on the weighted alignment of votes within the ensemble:
+- **Unanimous:** 100% of weighted models agree on the direction.
+- **Strong Majority:** At least 66% of weighted votes agree.
+- **Mixed Confluence:** At least 50% of weighted votes agree.
+- **Divided/Weak:** Less than 50% weighted agreement (high risk of noise).
 
 ## Technical Implementation
 The system is implemented in `src/core/decision_support.py` and integrates with:
