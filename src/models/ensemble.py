@@ -188,7 +188,8 @@ class EnsembleModel(BaseModel):
                 "weighted_sell": weighted_sell_conf,
                 "weighted_hold": weighted_hold_conf,
                 "weights": self.weights,
-                "model_signals": {k: {"dir": s.direction, "conf": s.confidence} for k, s in model_signals.items()}
+                "model_signals": {k: {"dir": s.direction, "conf": s.confidence} for k, s in model_signals.items()},
+                "per_algo_votes": {k: s.direction for k, s in model_signals.items()}
             }
         )
 

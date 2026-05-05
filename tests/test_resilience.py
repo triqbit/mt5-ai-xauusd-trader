@@ -63,7 +63,22 @@ def test_connector_initialize_dual_path_success(mock_mt5, mk_config):
 
     # Mock MetaAPI to avoid event loop issues
     with patch("src.trading.mt5_connector.MetaApi") as mock_metaapi:
+        # Properly mock the async methods
+        mock_api_instance = mock_metaapi.return_value
+        mock_acc_api = mock_api_instance.metatrader_account_api
+
+        async def mock_async_none(*args, **kwargs): return None
+        async def mock_async_acc(*args, **kwargs):
+            m_acc = MagicMock()
+            m_acc.wait_connected.side_effect = mock_async_none
+            m_acc.get_rpc_connection.return_value.connect.side_effect = mock_async_none
+            m_acc.get_rpc_connection.return_value.wait_synchronized.side_effect = mock_async_none
+            return m_acc
+
+        mock_acc_api.get_account.side_effect = mock_async_acc
+
         mk_config.metaapi_token.get_secret_value.return_value = "fake-token"
+        mk_config.metaapi_account_id = "fake-acc-id"
         connector = MT5Connector(mk_config)
 
         with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), \
@@ -71,6 +86,7 @@ def test_connector_initialize_dual_path_success(mock_mt5, mk_config):
 
             # Native fails
             mock_mt5.initialize.return_value = False
+            mock_mt5.last_error.return_value = (1, "error")
 
             # MetaAPI succeeds
             res = connector.initialize()

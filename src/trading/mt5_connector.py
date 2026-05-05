@@ -113,6 +113,8 @@ class MT5Connector:
                     return True
                 error_code, error_desc = mt5.last_error()
                 logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
+                if error_code == getattr(mt5, "RES_E_NOT_FOUND", -5):
+                    logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct.")
             except Exception as e:
                 logger.warning("Native MT5 initialization encountered an error: %s", e)
         else:
@@ -322,6 +324,11 @@ class MT5Connector:
             async def _get_acc():
                 return await self.metaapi_connection.get_account_information()
             return asyncio.run(_get_acc())
+
+    def get_account_balance(self) -> float:
+        """Retrieve current account balance."""
+        info = self.get_account_info()
+        return float(info.get("balance", 0.0))
 
     def get_positions(self, symbol: str | None = None) -> list[dict[str, Any]]:
         if not self._is_initialized:
