@@ -64,6 +64,8 @@ def test_trade_logger_persistence_flag():
         os.remove(db_path)
 
     logger = TradeLogger(db_url=f"sqlite:///{db_path}")
+    from src.core.trade_logger import Base
+    Base.metadata.create_all(logger.engine)
 
     # Need some trades to calculate metrics
     logger.log_trade(1, "XAUUSD", 1, 2000.0, 0.1)
