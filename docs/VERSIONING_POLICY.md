@@ -45,7 +45,13 @@ To enable automated changelog generation and version bumping, all commits to the
 Indicate a breaking change by adding a `!` after the type/scope or by adding `BREAKING CHANGE:` in the footer of the commit message. This triggers a **MAJOR** version bump.
 *Example*: `feat!: overhaul risk management engine`
 
-## 3. Tagging & Release Strategy
+## 3. Pull Request Labels (Optional)
+While Conventional Commits are the primary driver, PR labels can be used to override or supplement automation:
+- `release:major`: Forces a MAJOR version bump.
+- `release:minor`: Forces a MINOR version bump.
+- `release:patch`: Forces a PATCH version bump.
+
+## 4. Tagging & Release Strategy
 
 ### Stable Releases
 - **Branch**: `main`
@@ -61,16 +67,18 @@ Indicate a breaking change by adding a `!` after the type/scope or by adding `BR
 - **Tag Format**: `vMAJOR.MINOR.PATCH-alpha.N` or `vMAJOR.MINOR.PATCH-beta.N`
 - **Use Case**: Early testing of experimental features.
 
-## 4. Automated Workflow
+## 5. Automated Workflow
 
 1. **Automated Changelog**: Every push to `main` triggers the `changelog.yml` workflow, which appends new conventional commits to the `CHANGELOG.md` file under the `[Unreleased]` section.
-2. **Version Bump Automation**: The `Release Orchestration` (`release.yml`) workflow:
-   - Calculates the next version based on commit history if not manually provided.
+2. **Commit Validation**: Every Pull Request is checked by the `commit-check.yml` workflow to ensure it meets Conventional Commit standards.
+3. **Local Enforcement**: A pre-commit hook ensures that local commits adhere to the standard before they are even pushed.
+4. **Version Bump Automation**: The `Release Orchestration` (`release.yml`) workflow:
+   - Calculates the next version based on commit history.
    - Updates `pyproject.toml` and `src/__init__.py`.
    - Transitions `[Unreleased]` content in `CHANGELOG.md` to a new versioned header.
    - Creates a new Git tag and GitHub Release.
 
-## 5. Guidance for Version Bumping
+## 6. Guidance for Version Bumping
 
 | Change Type | Version Component | Example Commit |
 | :--- | :--- | :--- |

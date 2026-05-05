@@ -1,0 +1,36 @@
+name: Commit Message Check
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+
+permissions:
+  pull-requests: read
+
+jobs:
+  main:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Configure which types are allowed.
+          types: |
+            feat
+            fix
+            perf
+            docs
+            refactor
+            style
+            test
+            chore
+            ci
+          # Configure that a scope must be always lowercase.
+          subjectPattern: ^(?![A-Z]).+$
+          # If the PR title contains a breaking change (!), it must be at the end of the type.
+          # e.g. "feat!: breaking change"

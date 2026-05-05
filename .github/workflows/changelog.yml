@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'CHANGELOG.md'
-      - 'docs/**'
-      - '*.md'
+    paths:
+      - 'src/**'
+      - 'main.py'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
 
 permissions:
   contents: write
@@ -27,8 +28,6 @@ jobs:
         uses: Conventional-Changelog/github-action-generate-changelog@v1
         with:
           path-to-changelog: CHANGELOG.md
-          # This action by default updates the Unreleased section if no tag is provided
-          # or appends to the top.
 
       - name: Commit and Push Changelog
         run: |
