@@ -1,13 +1,15 @@
 # Disaster Recovery Plan (DRP)
 
 ## 1. Overview
-This document outlines the disaster recovery procedures for the MT5 AI/ML Trading Bot, focusing on the preservation and restoration of the trading database (`trades.db`), operational logs, and critical performance data.
+This document outlines the disaster recovery procedures for the MT5 AI/ML Trading Bot, focusing on the preservation and restoration of the trading database (`trades.db`), operational logs, and critical performance data. This plan is designed to ensure business continuity and regulatory compliance in the event of system failure, data corruption, or site-level disasters.
 
 ## 2. Recovery Objectives
 - **Recovery Point Objective (RPO):** 1 hour (Maximum data loss allowed).
 - **Recovery Time Objective (RTO):** 15 minutes (Maximum time to restore service after a disaster).
 
 ## 3. Data Classification and Retention
+The following table summarizes the backup and retention strategy for all critical system components, aligned with the [Data Retention Policy](DATA_RETENTION_POLICY.md).
+
 | Data Type | Importance | Primary Location | Backup Frequency | Retention (Local) | Archival (Off-site) |
 |-----------|------------|------------------|------------------|-------------------|---------------------|
 | Trading Database (`trades.db`) | Critical | Root Directory | Every 1 hour | 30 Days | 7 Years (Compliance) |
@@ -17,103 +19,79 @@ This document outlines the disaster recovery procedures for the MT5 AI/ML Tradin
 | Model Weights | Medium | `src/models/` | On change/Release | N/A | Infinite (Git/Registry) |
 | Configuration (`.env`) | Critical | Root Directory | Manual | N/A | Secure Vault |
 
-*Note: Retention periods are governed by the [Data Retention Policy](DATA_RETENTION_POLICY.md). All backups must be encrypted at rest in off-site storage.*
+*Note: All backups must be encrypted at rest in off-site storage.*
 
 ## 4. Archival Policy
-To ensure long-term data durability and compliance, the following archival procedures are implemented:
-- **Off-site Sync**: Backups from the local `backups/` directory are synchronized to secure off-site storage (e.g., AWS S3 with Glacier Instant Retrieval) daily.
-- **Performance Reports**: Aggregated monthly performance reports are archived in the enterprise research repository and preserved for 2 years.
-- **Audit Trail**: Trade logs and audit events are exported to compressed Parquet format annually and stored in Immutable Storage for 7 years to meet regulatory requirements.
-- **Checksum Verification**: Off-site archives must have their checksums verified quarterly against the original backup records.
+To ensure long-term data durability and compliance:
+- **Daily Off-site Sync**: Backups from the local `backups/` directory are synchronized to secure off-site storage (e.g., AWS S3 with Glacier Instant Retrieval) daily.
+- **Compliance Archival**: Trade records and audit logs are exported to compressed Parquet/CSV format annually and stored in Immutable Storage for 7 years.
+- **Archival Integrity**: Off-site archives must have their SHA256 checksums verified quarterly against the original backup records.
 
 ## 5. Backup Strategy
 
 ### 5.1. Automated Backup Process
-- **Tool:** `scripts/backup_verify.sh`
-- **Schedule:** Recommended to run via cron every hour:
-  ```cron
-  0 * * * * /path/to/scripts/backup_verify.sh >> /var/log/mt5_backup.log 2>&1
-  ```
-- **Integrity Checks:**
-  - **Checksums:** Every backup artifact generates a SHA256 checksum.
-  - **Restoration Dry-run:** The script performs a `PRAGMA integrity_check` on the backup database file to ensure it is not corrupt.
+The primary tool for backups is `scripts/backup_verify.sh`. It should be scheduled to run every hour via cron:
+```cron
+0 * * * * /path/to/scripts/backup_verify.sh >> /var/log/mt5_backup.log 2>&1
+```
 
-### 5.2. Local Retention Enforcement
-The `backup_verify.sh` script automatically prunes local backups older than 30 days to manage disk space. This includes both the backup artifacts and their associated `.sha256` checksum files.
+### 5.2. Backup Integrity Checks
+The automated script performs the following checks for every backup:
+1. **SQLite Integrity Check**: Runs `PRAGMA integrity_check;` on the backup file.
+2. **Schema Validation**: Attempts to query critical tables (e.g., `trades`, `audit_log`) to ensure the backup is functional.
+3. **Checksum Generation**: Creates a `.sha256` manifest for each artifact.
+4. **Archive Verification**: Tests the integrity of compressed log and report archives using `tar -tf`.
 
 ## 6. Restoration Procedures
 
 ### 6.1. Database Restoration (Scenario: Data Corruption)
-1. **Stop the bot:**
+1. **Stop the Bot**:
    ```bash
-   # Find and kill the main application process
    kill $(pgrep -f "python main.py") 2>/dev/null || true
    ```
-2. **Identify the latest healthy backup:**
-   List backups in `backups/db/` and choose the most recent files for `trades.db` and `audit.db`.
+2. **Identify Latest Healthy Backup**:
    ```bash
    ls -lh backups/db/
    ```
-3. **Verify the checksum:**
+3. **Verify Checksum**:
    ```bash
    cd backups/db/
-   # Verify trades database
    sha256sum -c trades_YYYYMMDD_HHMMSS.db.sha256
-   # Verify audit database
-   sha256sum -c audit_YYYYMMDD_HHMMSS.db.sha256
    ```
-4. **Restore the files:**
+4. **Restore Database File**:
    ```bash
-   # From the root directory:
-   cp backups/db/trades_YYYYMMDD_HHMMSS.db ./trades.db
-   cp backups/db/audit_YYYYMMDD_HHMMSS.db ./audit.db
+   cp trades_YYYYMMDD_HHMMSS.db ../../trades.db
+   cd ../..
    ```
-5. **Post-Restoration Integrity Check:**
-   Verify that the restored databases are healthy and contain data.
+5. **Verify Restoration**:
    ```bash
-   # Check integrity
    sqlite3 trades.db "PRAGMA integrity_check;"
-   sqlite3 audit.db "PRAGMA integrity_check;"
-
-   # Verify table existence (example)
    sqlite3 trades.db "SELECT count(*) FROM trades;"
-   sqlite3 audit.db "SELECT count(*) FROM audit_log;"
    ```
-6. **Restart the bot.**
 
 ### 6.2. Log and Report Restoration
-1. **Locate the archive:**
-   Backups are stored in `backups/logs/` or `backups/reports/`.
-2. **Verify Archive Integrity:**
+1. **Locate and Verify Archive**:
    ```bash
    tar -tzf backups/logs/logs_YYYYMMDD_HHMMSS.tar.gz > /dev/null
    ```
-3. **Extract the archive:**
+2. **Extract Archive**:
    ```bash
    tar -xzf backups/logs/logs_YYYYMMDD_HHMMSS.tar.gz -C ./logs/
    ```
 
 ### 6.3. Complete System Loss
-1. **Provision a new environment** (Docker/VPS).
-2. **Clone the repository.**
-3. **Restore `.env`** from secure storage (Secrets Manager/Vault).
-4. **Restore latest `trades.db`** from off-site/cloud backup.
-5. **Deploy:**
-   ```bash
-   docker-compose up -d
-   ```
+1. Provision a new environment.
+2. Clone the repository and install dependencies.
+3. Restore `.env` from secure storage.
+4. Restore latest `trades.db` and `audit.db` from off-site backup.
+5. Verify health: `python3 scripts/doctor.py`.
+6. Restart services: `docker-compose up -d`.
 
-## 7. Verification and Drills
-- **Continuous Verification:** The `scripts/backup_verify.sh` script provides immediate feedback on backup health, performing database integrity checks and archive validation on every run.
-- **Quarterly Restore Drill:** A formal restoration drill must be conducted every quarter.
-    - **Drill Steps:**
-        1. Restore `trades.db` to a staging environment.
-        2. Verify database schema using `alembic current`.
-        3. Extract sample logs and reports.
-        4. Validate that the application can start and connect to the restored database.
-    - **Documentation:** Results must be recorded in `docs/audits/DR_DRILL_YYYY_QX.md`.
-- **Audit Logging:** Every successful backup and verification is logged to `logs/backup.log`.
+## 7. Disaster Recovery Drills
+To ensure the effectiveness of this plan, the following drills are mandated:
+- **Quarterly Full Restore**: Once every quarter, the latest backup must be restored to a non-production environment and verified for full functionality.
+- **Drill Documentation**: Results of the drill, including any issues found and corrective actions taken, must be logged in `docs/audits/DR_DRILL_YYYY_QX.md`.
 
-## 8. Escalation
-- **Primary:** Jules03 (Release Reliability & Governance)
-- **Secondary:** Jules02 (Security & Hardening)
+## 8. Escalation Path
+1. **Primary**: Jules03 (Release Reliability & Governance) - `@andonly1348`
+2. **Secondary**: Jules02 (Security & CI Lead) - `@xnessom`
