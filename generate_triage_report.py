@@ -84,12 +84,14 @@ def classify_risk(files, title=""):
 
     safe_keywords = ["docs", "readme", "lint", "typo", "cleanup", "chore", "dx:"]
 
+    # Heuristic based on title (useful if no files due to rate limit)
+    t_lower = title.lower()
+    is_likely_safe = any(kw in t_lower for kw in safe_keywords)
+
     if not files:
-        # Heuristic based on title if no files (rate limit)
-        t_lower = title.lower()
-        if any(kw in t_lower for kw in safe_keywords):
+        if is_likely_safe:
             return "Safe Surface", "Heuristic: Title matches safe keywords."
-        return "Unknown", "No files found or unable to fetch files."
+        return "Triage Required", "No files found or unable to fetch files."
 
     for f in files:
         for p in high_risk_patterns:
@@ -182,14 +184,15 @@ def generate_report():
             'flag': status_flag
         })
 
-    # Determine Top 3
+    # Determine Top 3 (Prioritize "New" PRs over "Stale")
     top_3_items = []
     if turbulence_reasons:
         top_3_items.append(f"**Address Turbulence:** {turbulence_reasons[0]}")
 
-    safe_surface = [pr for pr in classified_prs if pr['risk'] == "Safe Surface" and pr['flag'] == "New"]
-    medium_risk = [pr for pr in classified_prs if pr['risk'] == "Medium Risk" and pr['flag'] == "New"]
-    high_risk = [pr for pr in classified_prs if pr['risk'] == "High Risk" and pr['flag'] == "New"]
+    new_prs = [pr for pr in classified_prs if pr['flag'] == "New"]
+    safe_surface = [pr for pr in new_prs if pr['risk'] == "Safe Surface"]
+    medium_risk = [pr for pr in new_prs if pr['risk'] == "Medium Risk"]
+    high_risk = [pr for pr in new_prs if pr['risk'] == "High Risk"]
 
     if safe_surface:
         top_3_items.append(f"**Quick Win:** Review Safe PR #{safe_surface[0]['number']} ({safe_surface[0]['title']})")
@@ -245,12 +248,14 @@ def generate_report():
     else:
         for i, c in enumerate(top_3):
             checklist += f"## {i+1}. PR #{c['number']}: {c['title']}\n"
-            checklist += "- **Status**: Ready for detailed review\n"
+            checklist += f"- **Scope**: {c['risk']} update\n"
+            checklist += f"- **Status**: Ready for detailed review (CI: {c['ci_status']})\n"
             checklist += f"- **Risk**: {c['risk']}\n"
-            checklist += f"- **Why**: Improved {c['risk'].lower()} candidate\n"
-            checklist += "- **Verification**: See PR for CI status.\n\n"
+            checklist += f"- **Why**: {c['reason']}\n"
+            checklist += "- **Missing Items**: None identified from triage heuristics.\n"
+            checklist += "- **Recommendation**: Jules05 or human review candidate.\n\n"
 
-    checklist += "---\n*Prepared by Jules06 (qufuwan) for Jules05 and human review.*"
+    checklist += "---\n*Prepared by Jules06 (qufuwan) for Jules05 and human review.*\n"
 
     with open("docs/status/MERGE_READY_CHECKLIST.md", "w") as f:
         f.write(checklist)
