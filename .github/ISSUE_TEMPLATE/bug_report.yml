@@ -18,7 +18,7 @@ body:
     id: severity
     attributes:
       label: Severity
-      description: How critical is this issue to trading operations? (Aligned with SLO Targets)
+      description: How critical is this issue to trading operations? (Aligned with SLO Targets in docs/SLO_TARGETS.md)
       options:
         - P0: Critical (Trading blocked / Capital at risk / Production outage)
         - P1: High (Core feature broken / Significant operational degradation)

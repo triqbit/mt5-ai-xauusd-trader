@@ -2,21 +2,21 @@
 # This file defines mandatory reviewers for specific modules.
 # Reviewers are notified automatically when a PR touches their area.
 
-# Global Governance & Quality Oversight
+# Global Governance & Quality Oversight (Jules03, Jules06)
 * @andonly1348 @maintainer-quality
 
-# Core Infrastructure & Configuration
+# Core Infrastructure & Configuration (Jules03, Jules06)
 /src/core/ @andonly1348 @maintainer-quality
 /main.py @andonly1348
 /pyproject.toml @andonly1348 @maintainer-quality
 /alembic.ini @andonly1348
 /.env.example @andonly1348 @xnessom
 
-# Trading & Risk Management (Highest Sensitivity)
+# Trading & Risk Management (Highest Sensitivity) (Jules01, Jules03)
 /src/trading/ @maintainer-trading @andonly1348
 /src/analytics/ @maintainer-trading
 
-# AI/ML Model Architectures & Research
+# AI/ML Model Architectures & Research (Jules04)
 /src/models/ @maintainer-models
 /src/research/ @maintainer-models
 /src/environment/ @maintainer-models

@@ -51,7 +51,10 @@ Please provide evidence of testing and verification.
 - [ ] `python3 -m pytest tests/` (All tests passed)
 - [ ] `mypy src/` (Zero type errors)
 - [ ] `ruff check .` (Zero linting errors)
+- [ ] `pip-audit` (Zero known vulnerabilities)
 - [ ] **Code Coverage: ≥ 85%** (Statement coverage verified)
+- [ ] **Documentation updated** (Reflecting all source changes)
+- [ ] **Backward compatibility verified** (No unintended breaking changes)
 
 ### Testing Evidence
 - [ ] Test output attached/pasted below.

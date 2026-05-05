@@ -12,7 +12,8 @@ We use a role-based governance model where specific leads oversee different doma
 - **Jules02 (Security & CI Lead) — `@xnessom`:** Manages dependency security, CI/CD hardening, and Docker infrastructure.
 - **Jules03 (Release & Governance Lead) — `@andonly1348`:** Final sign-off on releases, production readiness, and governance policy.
 - **Jules04 (ML/Quant Lead) — `@maintainer-models`:** Responsible for model architectures, feature engineering, and research.
-- **Jules05 (Product Steward) — `@maintainer-quality`:** Orchestrates roadmaps, product coherence, and PR triage.
+- **Jules05 (Product Lead) — `@andonly1348`:** Oversees product strategy, business logic, and enterprise delivery.
+- **Jules06 (Quality Lead) — `@maintainer-quality`:** Ensures testing rigour, code standards, and observability compliance.
 
 ---
 
@@ -24,14 +25,22 @@ We use a role-based governance model where specific leads oversee different doma
 - **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models).
 
 ### 2. Implementation
+- **Branching Strategy:** Use descriptive branch names prefixed by type:
+  - `feature/` for new features (e.g., `feature/ppo-optim-v2`)
+  - `bugfix/` for bug fixes (e.g., `bugfix/mt5-conn-leak`)
+  - `hotfix/` for emergency production fixes
+  - `docs/` for documentation-only changes
 - **Conventional Commits:** We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`).
 - **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](../ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
 - **Quality Gates:** Your code must pass all local quality gates before submission.
 
-### 3. Pull Request Submission
+### 3. Pull Request Submission & Lifecycle
 - **Target Branch:** All PRs should target the `develop` branch unless they are critical hotfixes for `main`.
+- **Draft PRs:** Open a Draft PR early to get feedback on architectural direction.
 - **Complete the PR Template:** Use the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) and fill out every section, including the **Rollback Strategy**.
 - **Evidence:** Attach test logs, coverage reports, and backtest evidence (if applicable).
+- **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required. Address all comments and re-request review.
+- **Merge Criteria:** Once all CI gates pass and approval is received, Jules03 or the module lead will merge the PR.
 
 ---
 
