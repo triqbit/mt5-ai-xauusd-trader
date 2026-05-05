@@ -42,3 +42,13 @@
 - **Backward Compatibility:** Must support the existing `TradeSignal` schema.
 - **Migration:** No data migration; logic-only enhancement.
 - **Sign-off:** Requires approval from the Core Development Lead (Jules01).
+
+## Implementation Status
+- [x] ATR Volatility Filter
+- [x] Trend Angle Filter (EMA 21)
+- [x] EMA Sequence Filter (8/21/50/200)
+- [x] Momentum Filter (RSI)
+- [x] Session/Time Filter
+- [x] Drawdown Circuit Breaker
+- [x] Typed ExecutionDecision output
+- [x] Unit tests for all layers

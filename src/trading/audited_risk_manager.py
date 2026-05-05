@@ -27,7 +27,6 @@ class AuditedRiskManager(RiskManager):
         self,
         signal: TradeSignal,
         signal_id: Optional[int] = None,
-        model_health: Optional[dict] = None,
     ) -> bool:
         """
         Run the full 6-layer risk filter cascade.

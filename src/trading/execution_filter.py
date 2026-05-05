@@ -19,7 +19,6 @@ from scipy import stats
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
-    from src.core.trade_logger import TradeLogger
     from src.trading.risk_manager import TradeSignal
 
 logger = logging.getLogger(__name__)
@@ -37,9 +36,8 @@ class ExecutionDecision:
 
 class ExecutionFilter:
     """
-    Implements a 9-layer validation cascade for trading signals.
-    Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown,
-    Model Stability, Performance Floor, Confidence Threshold.
+    Implements a 6-layer validation cascade for trading signals.
+    Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown.
     """
 
     def __init__(
@@ -58,99 +56,53 @@ class ExecutionFilter:
         market_data: pd.DataFrame,
         current_drawdown: float,
         timestamp: datetime | None = None,
-        model_health: dict[str, float] | None = None,
-        trade_logger: TradeLogger | None = None,
     ) -> ExecutionDecision:
         """
-        Run the full 9-layer filter cascade.
+        Run the 6-layer filter cascade.
         """
-        timestamp = timestamp or signal.timestamp or datetime.now(UTC)
+        try:
+            timestamp = timestamp or signal.timestamp or datetime.now(UTC)
 
-        # Layer 1: ATR Volatility
-        if not self._check_atr_volatility(market_data):
-            return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
+            # Layer 1: ATR Volatility
+            if not self._check_atr_volatility(market_data):
+                logger.info("Signal BLOCKED | %s | Reason: ATR_VOLATILITY", signal.symbol)
+                return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
 
-        # Layer 2: Trend Angle
-        if not self._check_trend_angle(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
+            # Layer 2: Trend Angle
+            if not self._check_trend_angle(market_data, signal.direction):
+                logger.info("Signal BLOCKED | %s | Reason: TREND_ANGLE", signal.symbol)
+                return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
 
-        # Layer 3: EMA Sequence
-        if not self._check_ema_sequence(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
+            # Layer 3: EMA Sequence
+            if not self._check_ema_sequence(market_data, signal.direction):
+                logger.info("Signal BLOCKED | %s | Reason: EMA_SEQUENCE", signal.symbol)
+                return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
 
-        # Layer 4: Momentum (RSI)
-        if not self._check_momentum(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
+            # Layer 4: Momentum (RSI)
+            if not self._check_momentum(market_data, signal.direction):
+                logger.info("Signal BLOCKED | %s | Reason: MOMENTUM", signal.symbol)
+                return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
 
-        # Layer 5: Session/Time
-        if not self._check_session_time(timestamp):
-            return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
+            # Layer 5: Session/Time
+            if not self._check_session_time(timestamp):
+                logger.info("Signal BLOCKED | %s | Reason: SESSION_TIME", signal.symbol)
+                return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
 
-        # Layer 6: Drawdown
-        if not self._check_drawdown_limit(current_drawdown):
-            return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
+            # Layer 6: Drawdown
+            if not self._check_drawdown_limit(current_drawdown):
+                logger.info("Signal BLOCKED | %s | Reason: DRAWDOWN_LIMIT", signal.symbol)
+                return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
 
-        # Layer 7: Model Stability Guard
-        if not self._check_model_stability(model_health):
-            return ExecutionDecision(signal, False, 0.0, "MODEL_STABILITY")
+            logger.info("Signal APPROVED | %s %d | conf=%.2f", signal.symbol, signal.direction, signal.confidence)
+            return ExecutionDecision(signal, True, signal.confidence)
+        except Exception as e:
+            logger.error("Execution filter error: %s", e)
+            return ExecutionDecision(signal, False, 0.0, f"FILTER_ERROR: {e}")
 
-        # Layer 8: Performance Floor
-        if not self._check_performance_floor(trade_logger):
-            return ExecutionDecision(signal, False, 0.0, "PERFORMANCE_FLOOR")
-
-        # Layer 9: Confidence Threshold
-        if not self._check_dynamic_confidence(signal.confidence):
-            return ExecutionDecision(signal, False, signal.confidence, "CONFIDENCE_THRESHOLD")
-
-        return ExecutionDecision(signal, True, signal.confidence)
-
-    def _check_model_stability(self, health: dict[str, float] | None) -> bool:
-        """Blocks if aggregate model drift or accuracy breaches limits."""
-        if health is None or self.cfg is None:
-            return True
-
-        drift = health.get("drift", 0.0)
-        acc = health.get("accuracy", 1.0)
-
-        if drift > self.cfg.model_drift_threshold:
-            logger.warning(
-                "EXECUTION BLOCKED: Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold
-            )
-            return False
-
-        if acc < self.cfg.model_accuracy_floor:
-            logger.warning(
-                "EXECUTION BLOCKED: Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor
-            )
-            return False
-
-        return True
-
-    def _check_performance_floor(self, trade_logger: TradeLogger | None) -> bool:
-        """Blocks if historical win rate drops below floor."""
-        if trade_logger is None or self.cfg is None:
-            return True
-
-        report = trade_logger.read_performance_report()
-        win_rate = report.get("win_rate", 1.0)
-        total_trades = report.get("total_trades", 0)
-
-        if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
-            logger.warning(
-                "EXECUTION BLOCKED: Win rate %.2f < %.2f", win_rate, self.cfg.model_win_rate_floor
-            )
-            return False
-
-        return True
-
-    def _check_dynamic_confidence(self, confidence: float) -> bool:
-        """Enforces configured confidence threshold."""
-        if self.cfg is None:
-            return True
-        return confidence >= self.cfg.confidence_threshold
-
-    def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
+    def _check_atr_volatility(self, df: pd.DataFrame) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""
+        threshold = self.cfg.volatility_extreme_threshold if self.cfg else 3.0
+
         if "base_M5_atr" not in df.columns:
             # Fallback calculation if not in DF
             high = df["high"]
@@ -162,6 +114,9 @@ class ExecutionFilter:
             atr = tr.rolling(window=14).mean()
         else:
             atr = df["base_M5_atr"]
+
+        if len(atr) < 100:
+            return True # Not enough data for average
 
         current_atr = atr.iloc[-1]
         avg_atr = atr.rolling(window=100).mean().iloc[-1]
@@ -251,4 +206,5 @@ class ExecutionFilter:
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
         """Blocks if account drawdown exceeds limit."""
-        return current_drawdown < self.max_drawdown
+        limit = self.cfg.max_drawdown if self.cfg else self.max_drawdown
+        return current_drawdown < limit
