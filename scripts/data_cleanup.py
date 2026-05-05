@@ -1,13 +1,18 @@
 """
 MT5 AI/ML Trading Bot - Data Cleanup Script
 Automates the purging of old operational data based on the Data Retention Policy.
+Includes archival of audit-critical data before deletion.
 """
 
 import argparse
+import csv
+import hashlib
 import logging
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any, List
 
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import sessionmaker
@@ -36,6 +41,62 @@ RETENTION_PERFORMANCE_METRICS = 2 * 365
 RETENTION_TRADES = 7 * 365
 RETENTION_AUDIT_LOG = 7 * 365
 RETENTION_BACKTESTS = 365
+
+# Archival directory
+ARCHIVE_DIR = Path(__file__).resolve().parents[1] / "archives"
+
+
+def generate_checksum(filepath: Path) -> str:
+    """Generate SHA256 checksum for a file."""
+    sha256_hash = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        # Read in chunks to handle large files
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+
+    checksum = sha256_hash.hexdigest()
+    checksum_file = filepath.with_suffix(filepath.suffix + ".sha256")
+    checksum_file.write_text(checksum, encoding="utf-8")
+    logger.info(f"Generated checksum for {filepath.name}: {checksum}")
+    return checksum
+
+
+def archive_records(records: List[Any], table_name: str, archive_dir: Path) -> bool:
+    """Export a list of SQLAlchemy model instances to a CSV file. Returns True if successful."""
+    if not records:
+        return True
+
+    if not archive_dir.exists():
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = archive_dir / f"archive_{table_name}_{timestamp}.csv"
+
+    logger.info(f"Archiving {len(records)} records from {table_name} to {filepath}...")
+
+    try:
+        with open(filepath, "w", newline="", encoding="utf-8") as f:
+            # Get columns from the first record
+            first_obj = records[0]
+            fieldnames = [c.name for c in first_obj.__table__.columns]
+
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+
+            for obj in records:
+                row = {name: getattr(obj, name) for name in fieldnames}
+                # Handle datetime serialization
+                for key, value in row.items():
+                    if isinstance(value, datetime):
+                        row[key] = value.isoformat()
+                writer.writerow(row)
+
+        # Generate checksum for the new archive
+        generate_checksum(filepath)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to archive {table_name}: {e}")
+        return False
 
 
 def cleanup_logs(logs_dir: Path, dry_run: bool = False) -> int:
@@ -100,9 +161,13 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
     return count
 
 
-def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = False) -> dict:
+def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR) -> dict:
     """Purge old records from the database according to the retention policy."""
     engine = create_engine(db_url)
+    # Ensure tables exist (especially for SQLite)
+    from src.core.trade_logger import Base as TradeBase
+    TradeBase.metadata.create_all(engine)
+
     Session = sessionmaker(bind=engine)
     results = {
         "model_signals": 0,
@@ -123,71 +188,98 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         linked_signal_ids = select(Trade.signal_id).where(Trade.signal_id.is_not(None))
 
         unlinked_signals_query = (
-            select(ModelSignal.id)
+            select(ModelSignal)
             .where(ModelSignal.created_at < signal_cutoff)
             .where(ModelSignal.id.not_in(linked_signal_ids))
         )
 
-        unlinked_ids = session.execute(unlinked_signals_query).scalars().all()
-        results["model_signals"] = len(unlinked_ids)
+        unlinked_records = session.execute(unlinked_signals_query).scalars().all()
+        results["model_signals"] = len(unlinked_records)
 
-        if unlinked_ids:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_ids)} unlinked signals older than {signal_cutoff.date()}")
+        if unlinked_records:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_records)} unlinked signals older than {signal_cutoff.date()}")
             if not dry_run:
-                session.execute(delete(ModelSignal).where(ModelSignal.id.in_(unlinked_ids)))
+                # No archival for unlinked signals as per policy (ephemeral)
+                for obj in unlinked_records:
+                    session.delete(obj)
 
         # 2. Cleanup Risk Events (older than 2 years)
         risk_cutoff = now - timedelta(days=RETENTION_RISK_EVENTS)
-        risk_query = select(RiskEvent.id).where(RiskEvent.created_at < risk_cutoff)
-        risk_ids = session.execute(risk_query).scalars().all()
-        results["risk_events"] = len(risk_ids)
+        risk_query = select(RiskEvent).where(RiskEvent.created_at < risk_cutoff)
+        risk_records = session.execute(risk_query).scalars().all()
+        results["risk_events"] = len(risk_records)
 
-        if risk_ids:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_ids)} risk events older than {risk_cutoff.date()}")
+        if risk_records:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_records)} risk events older than {risk_cutoff.date()}")
             if not dry_run:
-                session.execute(delete(RiskEvent).where(RiskEvent.id.in_(risk_ids)))
+                # Archiving risk events (Audit 2-year category, archived before purge)
+                if archive_records(risk_records, "risk_events", archive_dir):
+                    for obj in risk_records:
+                        session.delete(obj)
+                else:
+                    logger.error("Skipping deletion of risk events due to archival failure.")
 
         # 3. Cleanup Performance Metrics (older than 2 years)
         perf_cutoff = now - timedelta(days=RETENTION_PERFORMANCE_METRICS)
-        perf_query = select(PerformanceMetric.id).where(PerformanceMetric.created_at < perf_cutoff)
-        perf_ids = session.execute(perf_query).scalars().all()
-        results["performance_metrics"] = len(perf_ids)
+        perf_query = select(PerformanceMetric).where(PerformanceMetric.created_at < perf_cutoff)
+        perf_records = session.execute(perf_query).scalars().all()
+        results["performance_metrics"] = len(perf_records)
 
-        if perf_ids:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_ids)} performance metrics older than {perf_cutoff.date()}")
+        if perf_records:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_records)} performance metrics older than {perf_cutoff.date()}")
             if not dry_run:
-                session.execute(delete(PerformanceMetric).where(PerformanceMetric.id.in_(perf_ids)))
+                for obj in perf_records:
+                    session.delete(obj)
 
         # 4. Cleanup Trades (older than 7 years)
-        # Note: This also enables cleanup of linked signals in the next run after 7 years
         trade_cutoff = now - timedelta(days=RETENTION_TRADES)
-        trade_query = select(Trade.id).where(Trade.created_at < trade_cutoff)
-        trade_ids = session.execute(trade_query).scalars().all()
-        results["trades"] = len(trade_ids)
+        trade_query = select(Trade).where(Trade.created_at < trade_cutoff)
+        trade_records = session.execute(trade_query).scalars().all()
+        results["trades"] = len(trade_records)
 
-        if trade_ids:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_ids)} trade records older than {trade_cutoff.date()}")
+        if trade_records:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_records)} trade records older than {trade_cutoff.date()}")
             if not dry_run:
-                session.execute(delete(Trade).where(Trade.id.in_(trade_ids)))
+                # Mandatory archival for Compliance data
+                if archive_records(trade_records, "trades", archive_dir):
+                    # Also archive associated signals before deleting trades
+                    signal_ids = [t.signal_id for t in trade_records if t.signal_id]
+                    if signal_ids:
+                        signals_to_archive = session.execute(select(ModelSignal).where(ModelSignal.id.in_(signal_ids))).scalars().all()
+                        archive_records(signals_to_archive, "linked_signals", archive_dir)
+
+                    for obj in trade_records:
+                        session.delete(obj)
+                else:
+                    logger.error("Skipping deletion of trades due to archival failure.")
 
         if not dry_run:
             session.commit()
 
     # 5. Cleanup Audit Log (older than 7 years)
-    # Handle potentially separate audit database
     audit_engine = create_engine(audit_db_url) if audit_db_url and audit_db_url != db_url else engine
+
+    # Ensure audit tables exist
+    from src.core.audit_log import Base as AuditBase
+    AuditBase.metadata.create_all(audit_engine)
+
     AuditSession = sessionmaker(bind=audit_engine)
 
     with AuditSession() as session:
         audit_cutoff = now - timedelta(days=RETENTION_AUDIT_LOG)
-        audit_query = select(AuditEntry.id).where(AuditEntry.created_at < audit_cutoff)
-        audit_ids = session.execute(audit_query).scalars().all()
-        results["audit_log"] = len(audit_ids)
+        audit_query = select(AuditEntry).where(AuditEntry.created_at < audit_cutoff)
+        audit_records = session.execute(audit_query).scalars().all()
+        results["audit_log"] = len(audit_records)
 
-        if audit_ids:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(audit_ids)} audit log entries older than {audit_cutoff.date()}")
+        if audit_records:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(audit_records)} audit log entries older than {audit_cutoff.date()}")
             if not dry_run:
-                session.execute(delete(AuditEntry).where(AuditEntry.id.in_(audit_ids)))
+                # Mandatory archival for Audit data
+                if archive_records(audit_records, "audit_log", archive_dir):
+                    for obj in audit_records:
+                        session.delete(obj)
+                else:
+                    logger.error("Skipping deletion of audit logs due to archival failure.")
 
         if not dry_run:
             session.commit()
@@ -202,8 +294,15 @@ def main():
     parser.add_argument("--audit-db-url", help="Override the audit database URL.")
     parser.add_argument("--logs-dir", help="Override the logs directory from config.")
     parser.add_argument("--backtest-dir", help="Override the backtest results directory.")
+    parser.add_argument("--archive-dir", help="Directory where archived data will be stored.")
 
     args = parser.parse_args()
+
+    # Ensure mandatory config for TradingConfig is present to avoid validation errors
+    # these are not actually used by the cleanup script logic but required by Pydantic
+    os.environ.setdefault("MT5_PASSWORD", "dummy_for_cleanup")
+    os.environ.setdefault("MT5_SERVER", "dummy_for_cleanup")
+
     cfg = get_config()
 
     # Determine DB URLs mirroring main.py logic
@@ -228,6 +327,7 @@ def main():
 
     logs_dir = Path(args.logs_dir) if args.logs_dir else cfg.logs_dir
     backtest_dir = Path(args.backtest_dir) if args.backtest_dir else Path(__file__).resolve().parents[1] / "backtest_results"
+    archive_dir = Path(args.archive_dir) if args.archive_dir else ARCHIVE_DIR
 
     logger.info(f"Starting data cleanup (dry_run={args.dry_run})")
 
@@ -240,7 +340,7 @@ def main():
     logger.info(f"Backtest cleanup complete. Total files processed: {backtest_count}")
 
     # Database cleanup
-    db_results = cleanup_database(db_url, audit_db_url=audit_db_url, dry_run=args.dry_run)
+    db_results = cleanup_database(db_url, audit_db_url=audit_db_url, dry_run=args.dry_run, archive_dir=archive_dir)
     logger.info("Database cleanup complete.")
     for table, count in db_results.items():
         logger.info(f"  - {table}: {count} records {'identified' if args.dry_run else 'purged'}")

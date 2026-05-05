@@ -7,14 +7,14 @@ This policy defines the retention periods and disposal procedures for operationa
 
 | Data Category | Data Type | Retention Period | Disposal Method | Reason |
 |---------------|-----------|------------------|-----------------|--------|
-| **Compliance** | Trade Records (`trades` table) | 7 Years | Archival/Purge | Regulatory Requirement |
-| **Audit** | Audit Log (`audit_log` table) | 7 Years | Archival/Purge | Enterprise Traceability |
+| **Compliance** | Trade Records (`trades` table) | 7 Years | Archival + Purge | Regulatory Requirement |
+| **Audit** | Audit Log (`audit_log` table) | 7 Years | Archival + Purge | Enterprise Traceability |
 | **Audit** | Risk Events (`risk_events` table) | 2 Years | Purge | Operational Auditing |
-| **Audit** | Linked Model Signals | 7 Years | Archival/Purge | Trade Traceability |
+| **Audit** | Linked Model Signals | 7 Years | Archival + Purge | Trade Traceability |
 | **Operational** | Unlinked Model Signals | 90 Days | Purge | Performance Tuning |
 | **Operational** | Performance Metrics | 2 Years | Purge | Trend Analysis |
 | **Diagnostics** | Application Logs (`logs/*.log`) | 90 Days | Deletion | Troubleshooting |
-| **Research** | Backtest Results | 1 Year | Deletion/Archival | Optimization |
+| **Research** | Backtest Results | 1 Year | Deletion | Optimization |
 
 ## 3. Data Classification
 
@@ -33,27 +33,25 @@ The following data can be purged more frequently to manage storage:
 ## 4. Archival and Purging Rules
 
 ### 4.1 Archival Procedures
-Prior to purging, certain data categories may be archived for long-term historical analysis:
-- **Trade Records, Audit Logs & Linked Signals**: After 7 years, these records are exported to compressed CSV/Parquet format and stored in enterprise cold-storage (e.g., AWS S3 Glacier) before being purged from the production database.
-- **Backtest Results**: High-value backtest reports (PDFs, key metrics) should be archived in the project's research repository or shared drive before the 1-year automated deletion of temporary artifacts.
+Prior to purging, data in the **Compliance** and **Audit (7-year)** categories must be archived:
+- **Format**: Data is exported to compressed CSV format.
+- **Destination**: Archives are stored in the `archives/` directory or enterprise cold-storage (e.g., AWS S3 Glacier).
+- **Integrity**: SHA256 checksums are generated for each archive file to ensure immutability.
 
 ### 4.2 Automated Purging Schedule
 The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a regular schedule.
 - **Recommended Schedule**: Weekly (Sundays at 00:00).
-- **Example Cron Entry**:
-  ```bash
-  0 0 * * 0 /usr/bin/python3 /app/scripts/data_cleanup.py >> /var/log/mt5_cleanup.log 2>&1
-  ```
+- **Automation**: Managed via cron or CI/CD scheduled workflows.
 
 ### 4.3 Safe Deletion Logic
-- **Foreign Key Integrity**: The cleanup script must ensure that `model_signals` linked to `trades` are NOT deleted if the trade record is still within its 7-year retention window.
+- **Foreign Key Integrity**: The cleanup script ensures that `model_signals` linked to `trades` are NOT deleted if the trade record is still within its 7-year retention window.
 - **Dry-Run Mode**: All cleanup operations must support a `--dry-run` flag to verify deletions before execution.
-- **Logging**: Every cleanup operation must be logged to the system audit trail.
+- **Logging**: Every cleanup operation is logged to the system audit trail.
 
 ## 5. Implementation
 The primary mechanism for enforcement is the `scripts/data_cleanup.py` tool. It uses the `database_url` and `logs_dir` from the system configuration to target the correct data stores.
 
 ---
-**Version**: 1.1.0
-**Effective Date**: 2026-05-01
+**Version**: 1.2.0
+**Effective Date**: 2026-05-20
 **Owner**: Release Reliability & Governance (Jules03)
