@@ -292,3 +292,14 @@ def test_run_standard_suite(sample_data):
     assert len(report.scenario_results) == 4
     assert "Flash Crash" in report.scenario_results
     assert report.resilience_score >= 0
+
+
+def test_metrics_new_fields(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+    scenario = StressScenario(name="Normal", description="test")
+    metrics = lab.run_scenario(scenario)
+
+    assert hasattr(metrics, "recovery_factor")
+    assert hasattr(metrics, "profit_factor")
+    assert metrics.profit_factor >= 0

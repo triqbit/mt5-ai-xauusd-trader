@@ -64,6 +64,8 @@ class StressTestMetrics(BaseModel):
     sharpe_ratio: float
     win_rate: float
     num_trades: int
+    recovery_factor: float = 0.0
+    profit_factor: float = 0.0
     execution_quality_score: float  # 0.0 to 1.0
     latency_impact: float  # Percentage impact of delays
     max_slippage_experienced: float = 0.0  # Max bps of slippage seen
@@ -477,7 +479,8 @@ class StressLab:
             daily_returns[i] = (equity[i] - equity[i - 1]) / (equity[i - 1] + 1e-9)
 
         # Final Metrics
-        total_return = (equity[-1] - initial_balance) / initial_balance
+        net_pnl = equity[-1] - initial_balance
+        total_return = net_pnl / initial_balance
         peak = np.maximum.accumulate(equity)
         drawdown = (peak - equity) / (peak + 1e-9)
         max_drawdown = float(np.max(drawdown))
@@ -488,12 +491,22 @@ class StressLab:
 
         win_rate = len([p for p in trade_pnls if p > 0]) / (len(trade_pnls) + 1e-9)
 
+        # Profit Factor
+        gross_profit = sum([p for p in trade_pnls if p > 0])
+        gross_loss = abs(sum([p for p in trade_pnls if p < 0]))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else (10.0 if gross_profit > 0 else 0.0)
+
+        # Recovery Factor
+        recovery_factor = net_pnl / (max_drawdown * initial_balance) if max_drawdown > 0 else (5.0 if net_pnl > 0 else 0.0)
+
         return StressTestMetrics(
             total_return=total_return,
             max_drawdown=max_drawdown,
             sharpe_ratio=sharpe,
             win_rate=win_rate,
             num_trades=len(trade_pnls),
+            recovery_factor=recovery_factor,
+            profit_factor=profit_factor,
             execution_quality_score=1.0 - (latency_hits / n),
             latency_impact=latency_hits / n,
             max_slippage_experienced=max_slippage,
