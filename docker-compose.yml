@@ -10,7 +10,7 @@ services:
       - "8000:8000"  # Prometheus metrics / API
       - "8050:8050"  # Dash dashboard
     volumes:
-      - .env:/app/.env:ro
+      - ./.env:/app/.env:ro
       - ./logs:/app/logs
     environment:
       - MODE=${MODE:-demo}
