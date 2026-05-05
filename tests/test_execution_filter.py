@@ -36,8 +36,8 @@ def bullish_data(base_data):
     df["high"] = df["close"] + 5
     df["low"] = df["close"] - 5
 
-    # Pre-calculate EMAs to avoid fallback logic testing only
-    for p in [8, 20, 21, 50, 200]:
+    # Pre-calculate EMAs
+    for p in [8, 21, 50, 200]:
         df[f"base_M5_ema_{p}"] = df["close"].ewm(span=p, adjust=False).mean()
 
     # Pre-calculate RSI in bullish zone (60)
@@ -58,7 +58,7 @@ def bearish_data(base_data):
     df["low"] = df["close"] - 5
 
     # Pre-calculate EMAs
-    for p in [8, 20, 21, 50, 200]:
+    for p in [8, 21, 50, 200]:
         df[f"base_M5_ema_{p}"] = df["close"].ewm(span=p, adjust=False).mean()
 
     # Pre-calculate RSI in bearish zone (40)
@@ -109,10 +109,12 @@ def test_atr_volatility_pass(filter_engine, base_data):
 def test_atr_volatility_fail(filter_engine, base_data):
     # Spiking volatility
     df = base_data.copy()
-    df["base_M5_atr"] = [1.0] * 199 + [10.0]
+    # Need 100 rows for avg
+    atr_vals = [1.0] * 199 + [10.0]
+    df["base_M5_atr"] = atr_vals
     assert filter_engine._check_atr_volatility(df) is False
 
-# --- Layer 2: Trend Angle (EMA20) ---
+# --- Layer 2: Trend Angle (EMA21) ---
 def test_trend_angle_buy_pass(filter_engine, bullish_data):
     assert filter_engine._check_trend_angle(bullish_data, direction=1) is True
 
@@ -124,12 +126,6 @@ def test_trend_angle_sell_pass(filter_engine, bearish_data):
 
 def test_trend_angle_sell_fail(filter_engine, bullish_data):
     assert filter_engine._check_trend_angle(bullish_data, direction=-1) is False
-
-def test_trend_angle_fallback(filter_engine, base_data):
-    # Test without pre-calculated EMA20 column
-    df = base_data.copy()
-    df["close"] = np.linspace(1700, 1900, 200) # Uptrend
-    assert filter_engine._check_trend_angle(df, direction=1) is True
 
 # --- Layer 3: EMA Sequence ---
 def test_ema_sequence_buy_pass(filter_engine, bullish_data):
