@@ -74,6 +74,7 @@ mypy==1.20.2
 
 # ── Utilities ───────────────────────────────────────────────
 python-dateutil==2.9.0.post0
+nest-asyncio==1.6.0
 pytz==2024.1
 click==8.3.3
 tabulate==0.10.0

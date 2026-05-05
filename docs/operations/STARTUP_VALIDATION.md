@@ -16,11 +16,14 @@ At startup, the `ConfigValidator` performs the following checks:
 - **LIVE Mode**: If `MODE` is set to `live`, the environment variable `CONFIRM_LIVE_TRADING` must be explicitly set to `YES`. This acts as a safety switch to prevent accidental production execution.
 
 ### 3. Secrets & Placeholders
-- **DATABASE_URL**: Cannot use the default placeholder credentials (`postgresql://trader:password@localhost:5432/mt5_trades`).
-- **TELEGRAM_TOKEN**: Cannot contain placeholder text like "YOUR_TOKEN" or "CHANGE_ME".
-- **TELEGRAM_CHAT_ID**: Cannot contain placeholder text like "YOUR_CHAT_ID" or "CHANGE_ME".
-- **METAAPI_TOKEN**: Cannot contain placeholder text like "YOUR_TOKEN" or "CHANGE_ME".
-- **METAAPI_ACCOUNT_ID**: Cannot contain placeholder text like "YOUR_ACCOUNT_ID" or "CHANGE_ME".
+Detects default values or placeholder patterns (`YOUR_TOKEN`, `CHANGE_ME`, `YOUR_ACCOUNT_ID`, `YOUR_CHAT_ID`, `123456789`, `YOUR_SERVER_HERE`, `YOUR_PASSWORD_HERE`) in the following fields:
+- **DATABASE_URL**
+- **TELEGRAM_TOKEN**
+- **TELEGRAM_CHAT_ID**
+- **METAAPI_TOKEN**
+- **METAAPI_ACCOUNT_ID**
+- **MT5_SERVER**
+- **MT5_PASSWORD**
 
 ### 4. Model Settings
 - **MODEL_PATH**: For non-backtest modes, the model file must exist and be a valid file.
@@ -29,7 +32,10 @@ At startup, the `ConfigValidator` performs the following checks:
 - **RISK_PER_TRADE**: Strictly prohibited if greater than 2% (0.02). Warning if > 1%.
 - **MAX_DAILY_LOSS**: Strictly prohibited if greater than 6% (0.06). Warning if > 5%.
 - **MAX_POSITIONS**: Strictly prohibited if greater than 10 always.
-- **CONFIDENCE_THRESHOLD**: Strictly prohibited if less than 0.50. Warning if < 0.55.
+- **MIN_CONFIDENCE**: Strictly prohibited if less than 0.50. Warning if < 0.55.
+- **MAX_LEVERAGE**: Strictly prohibited if greater than 20. Warning if > 10.
+- **MAX_POSITION_SIZE_PCT**: Strictly prohibited if greater than 20%. Warning if > 10%.
+- **MAX_DRAWDOWN**: Strictly prohibited if greater than 40%. Warning if > 30%.
 - **MODEL_DRIFT_THRESHOLD**: Warning if set greater than 0.4 (Recommended: 0.3).
 - **MODEL_ACCURACY_FLOOR**: Strictly prohibited if less than 0.45.
 - **MODEL_WIN_RATE_FLOOR**: Strictly prohibited if less than 0.40.
