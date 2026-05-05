@@ -89,12 +89,22 @@ class PPOAgent(BaseModel):
             )
 
         try:
+            # Ensure features have a batch dimension for SB3 (usually (1, window_size, n_features))
+            obs = features
+            if obs.ndim == 1:
+                # Add batch and window dimensions if only features provided
+                obs = np.expand_dims(np.expand_dims(obs, axis=0), axis=0)
+            elif obs.ndim == 2:
+                # Add batch dimension if window x features provided
+                obs = np.expand_dims(obs, axis=0)
+
             # SB3 predict returns (action, states)
             # deterministic=True is used for production/inference consistency
-            action, _states = self.model.predict(features, deterministic=True)
+            action, _states = self.model.predict(obs, deterministic=True)
 
             # Convert numpy action to native Python int for indexing/mapping
-            action_val = int(action)
+            # SB3 might return a batch of actions even for a single observation
+            action_val = int(action[0]) if action.ndim > 0 else int(action)
 
             # Map categorical action (0, 1, 2) to ModelAction enum
             try:
@@ -108,13 +118,35 @@ class PPOAgent(BaseModel):
                     metadata={"error": f"Invalid action index {action_val}"},
                 )
 
-            # In RL, confidence is often derived from the action probability (policy logit)
-            # For this stub, we use a placeholder or 1.0 since it's a deterministic policy choice
-            # A production implementation would query the policy distribution
+            # Extract probabilities for confidence
+            confidence = 1.0
+            probabilities = []
+            try:
+                import torch
+
+                # Convert observation to torch tensor for the policy
+                obs_tensor = torch.as_tensor(obs).to(self.model.device)
+
+                # Get the distribution from the policy
+                with torch.no_grad():
+                    # For Discrete action spaces, this returns a Categorical distribution
+                    distribution = self.model.policy.get_distribution(obs_tensor)
+                    # distribution.distribution.probs has shape (batch, n_actions)
+                    probs_batch = distribution.distribution.probs.cpu().numpy()
+                    probs = probs_batch[0]  # Get probabilities for the first (and only) observation
+                    probabilities = probs.tolist()
+                    confidence = float(probs[action_val])
+            except Exception as prob_err:
+                self.logger.debug(f"Could not extract probabilities from policy: {prob_err}")
+
             return Signal(
                 direction=direction,
-                confidence=1.0,
-                metadata={"raw_action": action_val, "policy_type": "deterministic"},
+                confidence=confidence,
+                metadata={
+                    "raw_action": action_val,
+                    "policy_type": "deterministic",
+                    "probabilities": probabilities,
+                },
             )
 
         except Exception as e:
