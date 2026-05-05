@@ -211,5 +211,43 @@ class TestDynamicEnsemble(unittest.TestCase):
         # But it shouldn't jump to the target (0.9+) immediately due to smoothing (EMA) and swing cap
         self.assertLess(w2, 0.8)
 
+    def test_initial_weights_custom(self):
+        initial = {"ppo": 0.6, "lstm": 0.2, "transformer": 0.2}
+        ensemble = DynamicEnsemble(model_names=self.models, initial_weights=initial)
+        weights = ensemble.get_weights()
+        for name in self.models:
+            self.assertAlmostEqual(weights[name], initial[name])
+
+    def test_initial_weights_normalization(self):
+        initial = {"ppo": 6.0, "lstm": 2.0, "transformer": 2.0}
+        ensemble = DynamicEnsemble(model_names=self.models, initial_weights=initial)
+        weights = ensemble.get_weights()
+        self.assertAlmostEqual(weights["ppo"], 0.6)
+        self.assertAlmostEqual(weights["lstm"], 0.2)
+        self.assertAlmostEqual(weights["transformer"], 0.2)
+
+    def test_initial_weights_min_respect(self):
+        initial = {"ppo": 0.98, "lstm": 0.01, "transformer": 0.01}
+        # min_weight=0.05
+        ensemble = DynamicEnsemble(model_names=self.models, min_weight=0.05, initial_weights=initial)
+        weights = ensemble.get_weights()
+        self.assertGreaterEqual(weights["lstm"], 0.05)
+        self.assertGreaterEqual(weights["transformer"], 0.05)
+        self.assertAlmostEqual(sum(weights.values()), 1.0)
+
+    def test_input_validation(self):
+        with self.assertRaises(ValueError):
+            DynamicEnsemble(model_names=[], smoothing_factor=0.1)
+        with self.assertRaises(ValueError):
+            DynamicEnsemble(model_names=self.models, smoothing_factor=-0.1)
+        with self.assertRaises(ValueError):
+            DynamicEnsemble(model_names=self.models, smoothing_factor=1.1)
+        with self.assertRaises(ValueError):
+            DynamicEnsemble(model_names=self.models, max_swing=0.0)
+        with self.assertRaises(ValueError):
+            DynamicEnsemble(model_names=self.models, min_weight=-0.1)
+        with self.assertRaises(ValueError):
+            DynamicEnsemble(model_names=self.models, min_weight=0.4)  # 3 * 0.4 = 1.2 > 1.0
+
 if __name__ == '__main__':
     unittest.main()
