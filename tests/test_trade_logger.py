@@ -14,6 +14,8 @@ def logger():
     if os.path.exists(db_path):
         os.remove(db_path)
     logger = TradeLogger(db_url=f"sqlite:///{db_path}")
+    from src.core.trade_logger import Base
+    Base.metadata.create_all(logger.engine)
     yield logger
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -65,3 +67,30 @@ def test_log_risk_event(logger):
         from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
+
+def test_audit_columns(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    })
+    with logger.Session() as session:
+        from src.core.trade_logger import ModelSignal
+        signal = session.get(ModelSignal, signal_id)
+        assert signal.created_at is not None
+        assert signal.updated_at is not None
+        assert signal.is_deleted is False
+
+def test_constraints(logger):
+    from sqlalchemy.exc import IntegrityError
+    # Test price constraint
+    with pytest.raises(IntegrityError):
+        with logger.Session() as session:
+            from src.core.trade_logger import ModelSignal
+            bad_signal = ModelSignal(
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=-10.0 # Should fail
+            )
+            session.add(bad_signal)
+            session.commit()
