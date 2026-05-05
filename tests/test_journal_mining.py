@@ -286,3 +286,42 @@ def test_find_frequent_motifs_with_clusters(miner):
     motifs = miner.find_frequent_motifs(signals, trades)
     assert len(motifs) == 1
     assert motifs[0].cluster_frequency == 2
+
+def test_profitable_patterns_multi_attribute(miner, sample_trades):
+    # Add symbol and algorithm to sample_trades
+    df = sample_trades.copy()
+    df["symbol"] = "XAUUSD"
+    # sessions will be added by run_mining or manually for testing find_profitable_patterns
+    df["sessions"] = df["created_at"].apply(miner._get_session)
+
+    patterns = miner.find_profitable_patterns(df)
+
+    # Check for algo_session attribute
+    algo_sess = [p for p in patterns if p.attribute == "algo_session"]
+    assert len(algo_sess) > 0
+    # ensemble @ London (10, 11) -> 2 trades
+    ensemble_london = next(p for p in algo_sess if p.value == "ensemble @ London")
+    assert ensemble_london.total_trades == 2
+
+def test_toxic_motif_sorting(miner):
+    # Motif A: 10% win rate, 10 trades
+    # Motif B: 0% win rate, 2 trades
+    signals = pd.DataFrame([
+        {"id": i, "algorithm": "A", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -1, "win": False, "created_at": datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)}
+        for i in range(10)
+    ])
+    # Give Motif A some wins to make WR 10%
+    signals.loc[0, "win"] = True
+
+    signals_b = pd.DataFrame([
+        {"id": i+10, "algorithm": "B", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -1, "win": False, "created_at": datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)}
+        for i in range(2)
+    ])
+
+    all_signals = pd.concat([signals, signals_b])
+    motifs = miner.find_frequent_motifs(all_signals)
+
+    # Motif A toxic score: (1-0.1) * log(11) = 0.9 * 2.39 = 2.15
+    # Motif B toxic score: (1-0) * log(3) = 1 * 1.09 = 1.09
+    # A should be first because it has higher frequency and still low win rate
+    assert motifs[0].algorithm == "A"
