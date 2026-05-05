@@ -12,7 +12,8 @@ This document defines the mandatory gates that must be satisfied and verified be
 - [ ] **7. Release Notes:** Release notes prepared and reviewed in `CHANGELOG.md`.
 - [ ] **8. Bug Audit:** No open critical or high-severity bugs impacting the release.
 - [ ] **9. Documentation Updates:** Documentation updated (README, runbooks, API docs).
-- [ ] **10. Stakeholder Sign-off:** Stakeholder sign-off obtained from Trading and DevOps leads.
+- [ ] **10. SLO Compliance:** Verification that current performance meets [SLO Targets](SLO_TARGETS.md) for the last 30 days.
+- [ ] **11. Stakeholder Sign-off:** Stakeholder sign-off obtained from Trading and DevOps leads.
 
 ---
 **Verified By:** ____________________

@@ -8,9 +8,9 @@ Uptime is measured during active market hours (XAUUSD: Monday 00:00 - Friday 23:
 
 | Metric | Target | Measurement Method |
 |--------|--------|--------------------|
-| **System Uptime (Live Mode)** | 99.5% | `/health/readiness` probe success rate via uptime monitor. |
-| **API Availability** | 99.9% | Percentage of successful 200 OK responses on the FastAPI router. |
-| **MT5 Connectivity** | 99.0% | Percentage of time `MT5Connector.is_initialized` is True during market hours. |
+| **System Uptime (Live Mode)** | 99.5% | `/health/readiness` probe success rate (Prometheus: `up{job="mt5-bot"}`). |
+| **API Availability** | 99.9% | Percentage of 2xx/3xx responses (Prometheus: `http_requests_total`). |
+| **MT5 Connectivity** | 99.0% | `MT5Connector.is_initialized` status during market hours (Audit Log). |
 
 **Acceptable Downtime:** ~3.6 hours per 30-day rolling window.
 
@@ -20,8 +20,8 @@ Ensuring high engineering standards and stable delivery pipelines.
 
 | Metric | Target | Measurement Method |
 |--------|--------|--------------------|
-| **CI Pipeline Success Rate** | 95.0% | Percentage of GitHub Action runs on `main` and `develop` that finish with "Success". |
-| **Test Coverage (Core)** | > 85% | `pytest-cov` statement coverage on `src/core/` and `src/trading/`. |
+| **CI Pipeline Success Rate** | 95.0% | Ratio of "Success" vs "Failure" in GitHub Actions `ci.yml` on protected branches. |
+| **Test Coverage (Core)** | > 85% | Automated `pytest-cov` report uploaded to CI artifacts for each PR. |
 | **Static Analysis Compliance** | 100% | Zero critical/high issues from `ruff`, `mypy`, and `bandit` in PRs. |
 
 ## 3. Performance & Latency SLOs
@@ -39,12 +39,12 @@ Measured via `src/core/profiler.py` and exported to Prometheus.
 
 Response expectations for the Jules-led operations team, aligned with `docs/runbooks/06-monitoring-alert-triage.md`.
 
-| Severity | Target Response | Target Resolution | Description |
-|----------|-----------------|-------------------|-------------|
-| **P0 (Critical)** | < 5 mins | < 1 hour | Trading halted, circuit breaker triggered, or critical balance mismatch. |
-| **P1 (High)** | < 15 mins | < 4 hours | Degraded performance, broker connection lost, or database corruption. |
-| **P2 (Medium)** | < 2 hours | < 24 hours | Non-blocking bugs, model drift detected, or high latency warnings. |
-| **P3 (Low)** | < 24 hours | 1 Week | Documentation updates, minor refactors, or feature requests. |
+| Severity | Target Response | Target Resolution | Measurement Method |
+|----------|-----------------|-------------------|--------------------|
+| **P0 (Critical)** | < 5 mins | < 1 hour | Telegram notification timestamp to `ack` command. |
+| **P1 (High)** | < 15 mins | < 4 hours | Prometheus `ALERTS{alertstate="firing"}` duration. |
+| **P2 (Medium)** | < 2 hours | < 24 hours | Issue creation time to first maintainer response in GitHub. |
+| **P3 (Low)** | < 24 hours | 1 Week | Triage labels applied to GitHub issues. |
 
 ## 5. Incident Recovery (RTO/RPO)
 
