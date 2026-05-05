@@ -58,18 +58,19 @@ class EMACrossoverStrategy:
 class MomentumStrategy:
     """Momentum-based (ROC) baseline."""
 
-    def __init__(self, window: int = 14):
+    def __init__(self, window: int = 14, threshold: float = 0.0):
         self.window = window
+        self.threshold = threshold
 
     @property
     def name(self) -> str:
-        return f"Momentum_ROC_{self.window}"
+        return f"Momentum_ROC_{self.window}_T{self.threshold}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         roc = df["close"].pct_change(periods=self.window)
         signals = np.zeros(len(df))
-        signals[roc > 0] = 1
-        signals[roc < 0] = -1
+        signals[roc > self.threshold] = 1
+        signals[roc < -self.threshold] = -1
         return signals
 
 
@@ -293,6 +294,14 @@ class BenchmarkEvaluator:
             expectancy = (avg_win * win_rate) - (avg_loss * loss_rate)
 
         calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
+        volatility = np.std(daily_returns) * np.sqrt(self.bars_per_year)
+
+        sqn = 0.0
+        if len(trade_pnls) > 0:
+            avg_pnl = np.mean(trade_pnls)
+            std_pnl = np.std(trade_pnls)
+            if std_pnl > 0:
+                sqn = np.sqrt(len(trade_pnls)) * avg_pnl / std_pnl
 
         # Store daily returns for statistical testing
         self.results[name + "_returns"] = daily_returns
@@ -302,10 +311,13 @@ class BenchmarkEvaluator:
             "Sharpe Ratio": sharpe,
             "Sortino Ratio": sortino,
             "Calmar Ratio": calmar,
+            "Recovery Factor": calmar,  # Alias for Calmar in this context
+            "Volatility": volatility,
             "Max Drawdown": max_drawdown,
             "Win Rate": win_rate,
             "Profit Factor": profit_factor,
             "Expectancy": expectancy,
+            "SQN": sqn,
             "Num Trades": len(trade_pnls),
         }
 
@@ -432,9 +444,9 @@ class EnsembleAdapter:
             )
             seq = torch.from_numpy(seq_data).float()
 
-            # EnsembleModel.predict returns (direction, confidence, per_algo)
-            direction, _, _ = self.model.predict(obs, seq=seq)
-            signals[i] = float(direction)
+            # EnsembleModel.predict returns a Signal object
+            signal = self.model.predict(obs, seq=seq)
+            signals[i] = float(signal.direction)
 
         return signals
 
