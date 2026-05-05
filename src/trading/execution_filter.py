@@ -60,33 +60,37 @@ class ExecutionFilter:
         """
         Run the 6-layer filter cascade.
         """
-        timestamp = timestamp or signal.timestamp or datetime.now(UTC)
+        try:
+            timestamp = timestamp or signal.timestamp or datetime.now(UTC)
 
-        # Layer 1: ATR Volatility
-        if not self._check_atr_volatility(market_data):
-            return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
+            # Layer 1: ATR Volatility
+            if not self._check_atr_volatility(market_data):
+                return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
 
-        # Layer 2: Trend Angle
-        if not self._check_trend_angle(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
+            # Layer 2: Trend Angle
+            if not self._check_trend_angle(market_data, signal.direction):
+                return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
 
-        # Layer 3: EMA Sequence
-        if not self._check_ema_sequence(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
+            # Layer 3: EMA Sequence
+            if not self._check_ema_sequence(market_data, signal.direction):
+                return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
 
-        # Layer 4: Momentum (RSI)
-        if not self._check_momentum(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
+            # Layer 4: Momentum (RSI)
+            if not self._check_momentum(market_data, signal.direction):
+                return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
 
-        # Layer 5: Session/Time
-        if not self._check_session_time(timestamp):
-            return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
+            # Layer 5: Session/Time
+            if not self._check_session_time(timestamp):
+                return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
 
-        # Layer 6: Drawdown
-        if not self._check_drawdown_limit(current_drawdown):
-            return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
+            # Layer 6: Drawdown
+            if not self._check_drawdown_limit(current_drawdown):
+                return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
 
-        return ExecutionDecision(signal, True, signal.confidence)
+            return ExecutionDecision(signal, True, signal.confidence)
+        except Exception as e:
+            logger.error("Execution filter error: %s", e)
+            return ExecutionDecision(signal, False, 0.0, f"FILTER_ERROR: {e}")
 
     def _check_atr_volatility(self, df: pd.DataFrame) -> bool:
         """Blocks if current ATR is > threshold * average ATR."""
