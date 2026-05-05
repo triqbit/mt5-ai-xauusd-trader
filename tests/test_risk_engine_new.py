@@ -28,6 +28,7 @@ def test_validate_signal_rejection(risk_engine):
     class MockSignal:
         def __init__(self):
             self.symbol = "XAUUSD"
+            self.direction = 1
             self.confidence = 0.4 # Below default 0.55
 
     data = pd.DataFrame({"atr": [1.0], "close": [2300.0]})

@@ -104,6 +104,11 @@ class TradingConfig(BaseSettings):
     daily_win_cap: float = Field(default=0.10, description="Daily Win Cap: 10%")
     max_trades_per_day: int = Field(default=20, description="Max 20 trades per day")
     max_losing_streak: int = Field(default=3, description="Halt trading after 3 consecutive losses")
+    max_winning_streak: int = Field(default=5, description="Alert after 5 consecutive wins")
+
+    # Weekly/Monthly Limits
+    max_weekly_loss: float = Field(default=0.10, description="Max Weekly Loss: 10% of account")
+    max_monthly_loss: float = Field(default=0.15, description="Max Monthly Loss: 15% of account")
 
     # Volatility Thresholds
     volatility_high_threshold: float = Field(
@@ -118,6 +123,10 @@ class TradingConfig(BaseSettings):
 
     # Execution
     max_slippage_pips: float = Field(default=1.0, description="Max Acceptable Slippage: 1.0 pip")
+    min_spread_pips: float = Field(default=0.5, description="Min Bid-Ask Spread: <0.5 pips")
+    spread_alert_pips: float = Field(default=1.0, description="Alert if spread >1.0 pip")
+    spread_reduce_pips: float = Field(default=1.5, description="Reduce if spread >1.5 pips")
+    spread_halt_pips: float = Field(default=2.0, description="Halt if spread >2.0 pips")
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(

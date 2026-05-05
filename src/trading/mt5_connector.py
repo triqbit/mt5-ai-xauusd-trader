@@ -91,15 +91,19 @@ class MT5Connector:
     def initialize(self) -> bool:
         """
         Establish connection to MT5 terminal or MetaAPI cloud.
-        Follows a dual-path strategy: Native SDK first, then MetaAPI fallback.
+
+        Follows a dual-path strategy:
+        1. Native SDK: Attempt direct connection (Windows only).
+        2. MetaAPI Cloud: Fallback for Linux/Mac or remote deployments.
 
         Returns:
-            True if connection established.
+            bool: True if connection established successfully.
 
         Raises:
-            MT5ConnectionError: If all connection paths fail.
+            MT5ConnectionError: If all connection paths fail after retries.
         """
         logger.info("Initializing MT5 connector | mode=%s", self.cfg.mode)
+        self.use_metaapi = False  # Reset state
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
@@ -114,6 +118,7 @@ class MT5Connector:
                     self.use_metaapi = False
                     self._is_initialized = True
                     return True
+
                 error_code, error_desc = mt5.last_error()
                 logger.warning(
                     "Native mt5.initialize failed: %s (code: %d)", error_desc, error_code
@@ -126,15 +131,18 @@ class MT5Connector:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
-        metaapi_token = self.cfg.metaapi_token.get_secret_value()
+        metaapi_token = self.cfg.metaapi_token.get_secret_value() if self.cfg.metaapi_token else ""
         if METAAPI_AVAILABLE and metaapi_token and self.cfg.metaapi_account_id:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
                 self.metaapi = MetaApi(metaapi_token)
 
                 async def _init_metaapi():
+                    account_id = self.cfg.metaapi_account_id
+                    if hasattr(account_id, "get_secret_value"):
+                        account_id = account_id.get_secret_value()
                     self.metaapi_account = await self.metaapi.metatrader_account_api.get_account(
-                        self.cfg.metaapi_account_id
+                        account_id
                     )
                     await self.metaapi_account.wait_connected()
                     self.metaapi_connection = self.metaapi_account.get_rpc_connection()
@@ -150,7 +158,7 @@ class MT5Connector:
                 logger.error("MetaAPI initialization failed: %s", e)
                 raise MT5ConnectionError(f"MetaAPI initialization failed: {e}") from e
 
-        msg = "All MT5 connection paths failed."
+        msg = "All MT5 connection paths failed. Check credentials and platform availability."
         logger.error(msg)
         raise MT5ConnectionError(msg)
 
@@ -272,21 +280,31 @@ class MT5Connector:
 
             return asyncio.run(_get_tick())
 
+    @with_retry(MT5ExecutionError, max_retries=2)
     def place_order(self, signal: TradeSignal) -> int | None:
         """
         Execute a market order based on a validated trade signal.
 
         Args:
-            signal: Validated TradeSignal object.
+            signal: Validated TradeSignal object containing direction, lot size, etc.
 
         Returns:
-            Order ticket ID if successful.
+            Optional[int]: Order ticket ID if successful.
 
         Raises:
-            MT5ExecutionError: If order placement fails.
+            MT5ConnectionError: If the connector is not initialized.
+            MT5ExecutionError: If the order is rejected by the broker or MetaAPI.
         """
         if not self._is_initialized:
             raise MT5ConnectionError("MT5 connector not initialized.")
+
+        logger.info(
+            "Placing order | symbol=%s | direction=%d | lots=%.2f | algo=%s",
+            signal.symbol,
+            signal.direction,
+            signal.lot_size,
+            signal.algorithm,
+        )
 
         order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
 
@@ -306,29 +324,41 @@ class MT5Connector:
                 "type_filling": ORDER_FILLING_IOC,
             }
             if signal.stop_loss:
-                request["sl"] = signal.stop_loss
+                request["sl"] = float(signal.stop_loss)
             if signal.take_profit:
-                request["tp"] = signal.take_profit
+                request["tp"] = float(signal.take_profit)
 
             result = mt5.order_send(request)
+            if result is None:
+                raise MT5ExecutionError(f"Order send failed (None result): {mt5.last_error()}")
+
             if result.retcode != mt5.TRADE_RETCODE_DONE:
-                raise MT5ExecutionError(f"Order rejected: {result.comment}")
+                error_msg = f"Order rejected: {result.comment} (code: {result.retcode})"
+                logger.error(error_msg)
+                raise MT5ExecutionError(error_msg)
+
+            logger.info("Order executed successfully | ticket=%d", result.order)
             return int(result.order)
         else:
 
             async def _place_order():
                 action = "BUY" if signal.direction > 0 else "SELL"
-                result = await self.metaapi_connection.create_market_order(
-                    signal.symbol,
-                    action,
-                    signal.lot_size,
-                    signal.stop_loss,
-                    signal.take_profit,
-                    {"comment": f"AI:{signal.algorithm}"},
-                )
-                return int(result["orderId"])
+                try:
+                    result = await self.metaapi_connection.create_market_order(
+                        signal.symbol,
+                        action,
+                        signal.lot_size,
+                        signal.stop_loss,
+                        signal.take_profit,
+                        {"comment": f"AI:{signal.algorithm}"},
+                    )
+                    return int(result["orderId"])
+                except Exception as e:
+                    raise MT5ExecutionError(f"MetaAPI order placement failed: {e}") from e
 
-            return asyncio.run(_place_order())
+            ticket = asyncio.run(_place_order())
+            logger.info("MetaAPI order executed successfully | ticket=%d", ticket)
+            return ticket
 
     def get_account_info(self) -> dict[str, Any]:
         if not self._is_initialized:

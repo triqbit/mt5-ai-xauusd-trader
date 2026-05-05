@@ -326,8 +326,8 @@ Features to generate:
 
 ## Next Steps
 
-1. Fork & analyze the 25 reference repositories
-2. Begin Phase 1 component extraction
-3. Set up development environment
-4. Create data collection scripts
-5. Start with PPO baseline model
+1. ✅ Scaffold core enterprise-grade package structure.
+2. ✅ Implement dual-path MT5 connector (Native + MetaAPI).
+3. ✅ Implement institutional RiskEngine with ATR sizing and circuit breakers.
+4. ✅ Implement weighted signal ensemble logic.
+5. Begin Phase 3 data collection and feature engineering.

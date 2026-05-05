@@ -114,89 +114,121 @@ class EnsembleModel(BaseModel):
         regime_info: RegimeInfo | None = None,
     ) -> Signal:
         """
-        Generate a trading signal from input features.
+        Generate a trading signal from input features using a weighted ensemble of models.
+
+        Args:
+            features (np.ndarray): Input feature vector for model inference.
+            seq (Optional[Any]): Sequence data for LSTM models.
+            regime_info (Optional[RegimeInfo]): Current market regime information.
+
+        Returns:
+            Signal: The aggregated ensemble signal (BUY, SELL, or HOLD).
         """
         votes: dict[str, np.ndarray] = {}
 
-        # PPO prediction
+        # 1. PPO prediction
         if self._ppo_model is not None:
             with profile("inference_ppo"):
                 action, _ = self._ppo_model.predict(features, deterministic=True)
+                # action: 0=HOLD, 1=BUY, 2=SELL (ModelAction mapping)
                 probs = np.zeros(3)
                 probs[int(action)] = 1.0
                 votes["ppo"] = probs
 
-        # LSTM-Attention prediction
+        # 2. LSTM-Attention prediction
         if self.lstm_model is not None and seq is not None and torch is not None:
             with profile("inference_lstm"):
                 with torch.no_grad():
+                    # Expected input: [batch, seq_len, features]
                     logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                     probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
                 votes["lstm"] = probs
 
-        # Cache confidences for calibration tracking
-        for k, v in votes.items():
-            self._last_confidences[k].append(float(np.max(v)))
+        # TODO: Add Dreamer V3 prediction path when integrated
 
         if not votes:
             logger.warning("No models loaded - returning HOLD")
             return Signal(direction=SignalDirection.HOLD, confidence=0.0)
 
-        # 1. Dissent Check: Block if there are conflicting BUY and SELL signals
-        has_buy = False
-        has_sell = False
-        model_signals: Dict[str, Signal] = {}
+        # Cache confidences for calibration tracking
+        for k, v in votes.items():
+            self._last_confidences[k].append(float(np.max(v)))
 
+        # 3. Model Consensus & Dissent Check
+        model_signals: Dict[str, Signal] = {}
         for name, probs in votes.items():
             action_idx = int(np.argmax(probs))
             conf = float(probs[action_idx])
             direction = ModelAction(action_idx).to_direction()
             model_signals[name] = Signal(direction=direction, confidence=conf)
 
-            if direction == SignalDirection.BUY:
-                has_buy = True
-            elif direction == SignalDirection.SELL:
-                has_sell = True
+        # Dissent Check: Block if there are conflicting BUY and SELL signals
+        has_buy = any(s.direction == SignalDirection.BUY for s in model_signals.values())
+        has_sell = any(s.direction == SignalDirection.SELL for s in model_signals.values())
 
         if has_buy and has_sell:
             logger.warning("Dissent detected: BUY and SELL conflict. Returning HOLD.")
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
-                metadata={"reason": "Dissent conflict", "model_signals": model_signals},
+                metadata={
+                    "reason": "Dissent conflict",
+                    "model_signals": {
+                        k: {"dir": s.direction.name, "conf": s.confidence}
+                        for k, s in model_signals.items()
+                    },
+                    "per_algo_votes": {k: s.direction for k, s in model_signals.items()},
+                },
             )
 
-        # 2. Weighted Consensus Calculation
-        total_weight = sum(self.weights[k] for k in votes)
-        blended = sum(self.weights[k] / total_weight * votes[k] for k in votes)
+        # 4. Weighted Aggregation
+        # Normalize weights for the models that actually voted
+        total_active_weight = sum(self.weights.get(k, 0.0) for k in votes)
+        if total_active_weight <= 0:
+            logger.error("Total active weight is zero.")
+            return Signal(direction=SignalDirection.HOLD, confidence=0.0)
 
-        # 3. Decision Logic with configurable threshold
-        weighted_buy_conf = float(blended[int(ModelAction.BUY)])
-        weighted_sell_conf = float(blended[int(ModelAction.SELL)])
-        weighted_hold_conf = float(blended[int(ModelAction.HOLD)])
+        blended_probs = np.zeros(3)
+        for name, probs in votes.items():
+            weight = self.weights.get(name, 0.0) / total_active_weight
+            blended_probs += weight * probs
 
-        if weighted_buy_conf >= self.consensus_threshold:
+        # 5. Threshold Validation
+        # blended_probs order: [HOLD, BUY, SELL] per ModelAction indices
+        buy_conf = blended_probs[int(ModelAction.BUY)]
+        sell_conf = blended_probs[int(ModelAction.SELL)]
+        hold_conf = blended_probs[int(ModelAction.HOLD)]
+
+        if buy_conf >= self.consensus_threshold:
             final_direction = SignalDirection.BUY
-            final_confidence = weighted_buy_conf
-        elif weighted_sell_conf >= self.consensus_threshold:
+            final_confidence = buy_conf
+        elif sell_conf >= self.consensus_threshold:
             final_direction = SignalDirection.SELL
-            final_confidence = weighted_sell_conf
+            final_confidence = sell_conf
         else:
             final_direction = SignalDirection.HOLD
-            final_confidence = weighted_hold_conf
+            final_confidence = hold_conf
 
-        logger.info("Ensemble Result | Dir: %s | Conf: %.2f", final_direction, final_confidence)
+        logger.info(
+            "Ensemble Result | Dir: %s | Conf: %.2f | Active Algos: %s",
+            final_direction,
+            final_confidence,
+            list(votes.keys()),
+        )
 
         return Signal(
             direction=final_direction,
             confidence=final_confidence,
             metadata={
-                "weighted_buy": weighted_buy_conf,
-                "weighted_sell": weighted_sell_conf,
-                "weighted_hold": weighted_hold_conf,
+                "weighted_probs": {
+                    "BUY": buy_conf,
+                    "SELL": sell_conf,
+                    "HOLD": hold_conf,
+                },
                 "weights": self.weights,
                 "model_signals": {
-                    k: {"dir": s.direction, "conf": s.confidence} for k, s in model_signals.items()
+                    k: {"dir": s.direction.name, "conf": s.confidence}
+                    for k, s in model_signals.items()
                 },
                 "per_algo_votes": {k: s.direction for k, s in model_signals.items()},
             },
@@ -207,7 +239,11 @@ class EnsembleModel(BaseModel):
         Manually aggregate pre-calculated signals using weighted consensus.
         """
         if not signals:
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0)
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"per_algo_votes": {}, "weights": self.weights},
+            )
 
         has_buy = any(s.direction == SignalDirection.BUY for s in signals.values())
         has_sell = any(s.direction == SignalDirection.SELL for s in signals.values())
@@ -216,7 +252,14 @@ class EnsembleModel(BaseModel):
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
-                metadata={"reason": "Dissent conflict"},
+                metadata={
+                    "reason": "Dissent conflict",
+                    "model_signals": {
+                        k: {"dir": s.direction.name, "conf": s.confidence}
+                        for k, s in signals.items()
+                    },
+                    "per_algo_votes": {k: s.direction for k, s in signals.items()},
+                },
             )
 
         weighted_buy_conf = 0.0
@@ -232,12 +275,28 @@ class EnsembleModel(BaseModel):
             else:
                 weighted_hold_conf += sig.confidence * weight
 
+        metadata = {
+            "weighted_probs": {
+                "BUY": weighted_buy_conf,
+                "SELL": weighted_sell_conf,
+                "HOLD": weighted_hold_conf,
+            },
+            "weights": self.weights,
+            "per_algo_votes": {k: s.direction for k, s in signals.items()},
+        }
+
         if weighted_buy_conf >= self.consensus_threshold:
-            return Signal(direction=SignalDirection.BUY, confidence=weighted_buy_conf)
+            return Signal(
+                direction=SignalDirection.BUY, confidence=weighted_buy_conf, metadata=metadata
+            )
         elif weighted_sell_conf >= self.consensus_threshold:
-            return Signal(direction=SignalDirection.SELL, confidence=weighted_sell_conf)
+            return Signal(
+                direction=SignalDirection.SELL, confidence=weighted_sell_conf, metadata=metadata
+            )
         else:
-            return Signal(direction=SignalDirection.HOLD, confidence=weighted_hold_conf)
+            return Signal(
+                direction=SignalDirection.HOLD, confidence=weighted_hold_conf, metadata=metadata
+            )
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(
