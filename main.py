@@ -53,6 +53,7 @@ from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
 from src.models.regime_detector import RegimeDetector
+from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
@@ -597,7 +598,7 @@ def main() -> int:
     # Enterprise deployments use the FastAPI health app which includes /metrics.
     # However, we keep it for backward compatibility or individual component runs.
     monitor.start_metrics_server()
-    risk = RiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
