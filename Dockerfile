@@ -62,7 +62,7 @@ COPY main.py .
 COPY alembic.ini .
 
 # Create log directory with proper permissions
-RUN mkdir -p /app/logs && chmod 777 /app/logs
+RUN mkdir -p /app/logs && chmod 755 /app/logs
 
 # Setup non-root user for production security
 RUN useradd -m -u 1000 trader && \

@@ -44,6 +44,7 @@ from src.core.exceptions import (
 from src.core.explainability import SignalExplainer
 from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
+from src.core.log_config import get_masking_processor
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.data.event_intelligence import RiskStatus
@@ -65,6 +66,7 @@ def configure_logging(level: str = "INFO") -> None:
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
+            get_masking_processor(),
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.BoundLogger,
@@ -408,6 +410,7 @@ def main() -> int:
 
     try:
         cfg = get_config()
+        get_masking_processor().update_secrets(cfg)
     except Exception as exc:
         # Check if it's a Pydantic validation error (usually missing required fields)
         if "validation error" in str(exc).lower():
