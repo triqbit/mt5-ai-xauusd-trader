@@ -4,9 +4,9 @@
 This runbook details the response procedure for connection failures between the trading bot and the MetaTrader 5 (MT5) terminal or MetaAPI cloud gateway.
 
 ## Symptoms
-- Telegram Alert: `Broker Connection Lost` (P0/P1)
-- Logs: `MT5 connection failed`, `Terminal not found`, or `MetaAPI connection timeout`.
-- Health Check: `/health/readiness` returns 503 or `MT5: FAILED`.
+- **Telegram Alert:** `Broker Connection Lost` (P0/P1)
+- **Logs:** `MT5 connection failed`, `Terminal not found`, or `MetaAPI connection timeout`.
+- **Health Check:** `/health/readiness` returns 503 or `MT5: FAILED`.
 
 ## Diagnostic Steps
 
@@ -23,25 +23,19 @@ Search for these patterns to pinpoint the failure:
 - `MetaAPI connection timeout`: Network issue or invalid `METAAPI_TOKEN`.
 - `Market closed`: Attempting to trade during weekends or holidays.
 
-### 3. Check Local MT5 Terminal (Windows Execution)
-1. Verify if the MT5 Terminal is running on the host machine.
-2. Check the `Journal` tab in the MT5 Terminal for broker-side authentication errors (e.g., `Invalid account`).
-3. Verify account login status (green/blue icon in the bottom right corner).
-
-### 4. Verify Configuration
-Check `.env` via `scripts/validate_env.py` to ensure credentials are correct:
-- `MT5_LOGIN`
-- `MT5_SERVER`
-- `MT5_PASSWORD`
-
-### 5. Network Connectivity
-1. Ping the broker's server address (found in MT5 terminal properties).
-2. Verify that `MT5_PATH` in `src/core/config.py` correctly points to the `terminal64.exe`.
+### 3. Check MT5 Terminal Status
+- **Local Mode (Windows):**
+  1. Verify if the MT5 Terminal is running on the host machine.
+  2. Check the `Journal` tab in the MT5 Terminal for broker-side authentication errors.
+  3. Verify account login status (green/blue icon in the bottom right corner).
+- **Cloud Mode (MetaAPI):**
+  1. Check [MetaAPI Status Page](https://status.metaapi.cloud/).
+  2. Verify that the MetaAPI account is in "CONNECTED" status in the MetaAPI Dashboard.
 
 ## Recovery Procedures
 
 ### Scenario A: Local Terminal Crash
-1. Restart the MT5 Terminal:
+1. **Restart the MT5 Terminal:**
    ```powershell
    # On Windows
    Stop-Process -Name "terminal64" -ErrorAction SilentlyContinue
@@ -49,21 +43,24 @@ Check `.env` via `scripts/validate_env.py` to ensure credentials are correct:
    ```
 2. The bot should automatically attempt to reconnect on the next heartbeat.
 
-### Scenario B: MetaAPI Gateway Issue (Cloud Mode)
-1. Check [MetaAPI Status Page](https://status.metaapi.cloud/).
-2. Force a reconnect by restarting the container:
+### Scenario B: MetaAPI Gateway Issue
+1. Force a reconnect by restarting the bot container:
    ```bash
    docker restart mt5-trader
    ```
+2. If issues persist, verify the `METAAPI_TOKEN` and `METAAPI_ACCOUNT_ID` in the `.env` file.
 
 ### Scenario C: Broker Maintenance
 1. Check the broker's website or portal for scheduled maintenance.
-2. If maintenance is confirmed, set `MODE=backtest` or shut down the bot to prevent logic errors.
+2. If maintenance is confirmed, the bot should be allowed to stay in a retry loop, or shut down to prevent logic errors.
 
 ## Fallback Protocol
 If MT5 remains unreachable for >15 minutes during market hours:
 1. **Manual Intervention:** Use the MT5 mobile app to monitor and manage open positions.
 2. **Emergency Stop:** Stop the bot process to prevent unintended execution if the connection flickers.
+   ```bash
+   docker stop mt5-trader
+   ```
 
 ## Expected Outcomes
 - `scripts/doctor.py` shows all connectivity checks as `PASSED`.
@@ -72,10 +69,10 @@ If MT5 remains unreachable for >15 minutes during market hours:
 
 ## Verification Commands
 - **Check Health API:** `curl http://localhost:8000/health/readiness`
-- **Tail Logs:** `tail -f logs/trading_bot.log | grep -E "MT5|MetaAPI"`
 - **Verify Connections:** `python scripts/doctor.py`
+- **Tail Logs:** `docker logs -f mt5-trader | grep -E "MT5|MetaAPI"`
 
 ## Escalation Path
 1. **Level 1:** Trading Operations (@maintainer-trading).
-2. **Level 2:** Infrastructure / Release Reliability (Jules03).
+2. **Level 2:** Release Reliability Engineer (Jules03 - @andonly1348).
 3. **Level 3:** Broker Support.
