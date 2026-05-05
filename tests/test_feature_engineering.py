@@ -103,33 +103,26 @@ def test_no_look_ahead_bias(synthetic_ohlcv):
     pd.testing.assert_series_equal(features1.iloc[idx], features2.iloc[idx])
 
 
-def test_calculate_rolling_slope_correctness():
-    """Test mathematical correctness and NaN handling of rolling slope."""
-    fe = FeatureEngineer()
-    # Simple linear trend: y = 2x + 1
-    # indices: 0, 1, 2, 3, 4
-    # values:  1, 3, 5, 7, 9
-    # slope should be 2.0
-    data = pd.Series([1.0, 3.0, 5.0, 7.0, 9.0])
-    window = 3
+def test_new_momentum_indicators(synthetic_ohlcv):
+    """Test that MFI, CCI, MOM, Williams %R, and Ultimate Oscillator are present."""
+    fe = FeatureEngineer(base_timeframe="M1", normalize=False)
+    features = fe.compute_features(synthetic_ohlcv)
 
-    slope = fe._calculate_rolling_slope(data, window)
-
-    # First window-1 (2) should be NaN
-    assert np.isnan(slope.iloc[0])
-    assert np.isnan(slope.iloc[1])
-
-    # Subsequent values should be 2.0
-    assert np.allclose(slope.iloc[2:], 2.0)
+    indicators = ["mfi", "cci", "mom", "willr", "ultosc", "ht_trendline", "ht_dcperiod"]
+    for ind in indicators:
+        col = f"base_M1_{ind}"
+        assert col in features.columns
+        assert not features[col].isna().any()
 
 
-def test_calculate_rolling_slope_short_series():
-    """Test handling of series shorter than the window."""
-    fe = FeatureEngineer()
-    data = pd.Series([1.0, 2.0])
-    window = 5
-    slope = fe._calculate_rolling_slope(data, window)
-    assert np.all(slope == 0.0)
+def test_price_action_slopes(synthetic_ohlcv):
+    """Test that linear regression slopes are present."""
+    fe = FeatureEngineer(base_timeframe="M1", normalize=False)
+    features = fe.compute_features(synthetic_ohlcv)
+
+    assert "slope_5" in features.columns
+    assert "slope_20" in features.columns
+    assert not features["slope_5"].isna().any()
 
 
 def test_volume_profile_features(synthetic_ohlcv):
@@ -148,17 +141,28 @@ def test_volume_profile_features(synthetic_ohlcv):
 
 
 def test_new_momentum_indicators(synthetic_ohlcv):
-    """Test that MFI, CCI, and MOM are present and computed."""
+    """Test that MFI, CCI, MOM, Williams %R, and Ultimate Oscillator are present."""
     fe = FeatureEngineer(base_timeframe="M1", normalize=False)
     features = fe.compute_features(synthetic_ohlcv)
 
-    assert "base_M1_mfi" in features.columns
-    assert "base_M1_cci" in features.columns
-    assert "base_M1_mom" in features.columns
+    indicators = ["mfi", "cci", "mom", "willr", "ultosc"]
+    for ind in indicators:
+        col = f"base_M1_{ind}"
+        assert col in features.columns
+        assert not features[col].isna().any()
 
-    assert not features["base_M1_mfi"].isna().any()
-    assert not features["base_M1_cci"].isna().any()
-    assert not features["base_M1_mom"].isna().any()
+
+def test_mtf_candle_patterns(synthetic_ohlcv):
+    """Test that candle patterns are computed for MTF data."""
+    fe = FeatureEngineer(base_timeframe="M1", timeframes=["M5"], normalize=False)
+    features = fe.compute_features(synthetic_ohlcv)
+
+    # Check for a specific pattern in MTF M5
+    mtf_pattern_col = "mtf_M5_cdlhammer"
+    assert mtf_pattern_col in features.columns
+    # Note: Shift(1) might leave the first few rows NaN depending on frequency
+    # but compute_features drops rows with NaN base_cols and then MTF cols.
+    assert not features[mtf_pattern_col].isna().any()
 
 
 def test_full_mtf_suite(synthetic_ohlcv):

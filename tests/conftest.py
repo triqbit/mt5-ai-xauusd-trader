@@ -23,6 +23,11 @@ mock_talib.OBV.side_effect = lambda c, v: np.zeros(len(c))
 mock_talib.MFI.side_effect = lambda h, l, c, v, **kwargs: np.zeros(len(c))
 mock_talib.CCI.side_effect = lambda h, l, c, **kwargs: np.zeros(len(c))
 mock_talib.MOM.side_effect = lambda c, **kwargs: np.zeros(len(c))
+mock_talib.WILLR.side_effect = lambda h, l, c, **kwargs: np.zeros(len(c))
+mock_talib.ULTOSC.side_effect = lambda h, l, c, **kwargs: np.zeros(len(c))
+mock_talib.LINEARREG_SLOPE.side_effect = lambda x, **kwargs: np.zeros(len(x))
+mock_talib.HT_TRENDLINE.side_effect = lambda x: np.zeros(len(x))
+mock_talib.HT_DCPERIOD.side_effect = lambda x: np.zeros(len(x))
 
 # Mock candle patterns
 pattern_list = [

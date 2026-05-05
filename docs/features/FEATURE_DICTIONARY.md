@@ -17,10 +17,13 @@ Calculated directly on the primary timeframe of the input data.
 - **EMA Stacks**: Exponential Moving Averages for periods 8, 21, 50, and 200.
 - **EMA Distances**: Percentage distance from price to each EMA.
 - **ADX (14)**: Average Directional Index.
+- **Williams %R (14)**: Percentage price oscillator.
+- **Ultimate Oscillator (7, 14, 28)**: Combined momentum indicator.
 - **Stochastic**: Slow K and Slow D (5, 3, 3).
+- **Hilbert Transform**: HT_TRENDLINE and HT_DCPERIOD for trend and cycle analysis.
 
 ### Candle Patterns (60+)
-All TA-Lib Pattern Recognition functions, including but not limited to:
+All TA-Lib Pattern Recognition functions computed for both base and MTF data, including but not limited to:
 - Doji, Engulfing, Hammer, Morning Star, Shooting Star, etc.
 
 ### Price Action
