@@ -38,8 +38,24 @@ The `WalkForwardConfig` model allows for granular control:
 | `step_size` | Rolling step for windows | 50 |
 | `min_windows` | Minimum required windows | 3 |
 | `metric` | Optimization target (e.g., `robustness_score`, `sharpe`) | `robustness_score` |
+| `robustness_weights` | Configurable weights for score calculation | `RobustnessWeights()` |
 | `n_trials` | Optuna trials per optimization | 50 |
 | `bars_per_year` | Bars per year for annualization | 252 |
+
+### Robustness Weights
+
+The scoring can be customized via the `RobustnessWeights` model:
+
+| Weight | Description | Default |
+|--------|-------------|---------|
+| `oos_mean` | Mean OOS Sharpe Ratio | 0.4 |
+| `worst_oos` | Worst window OOS Sharpe | 0.2 |
+| `win_rate_consistency` | Win rate (1-CV) | 0.1 |
+| `drawdown_consistency` | Max drawdown (1-CV) | 0.1 |
+| `oos_std` | Sharpe variance penalty | 0.3 |
+| `is_oos_gap` | IS-OOS gap penalty | 0.2 |
+| `stability` | Parameter sensitivity penalty | 0.3 |
+| `regime_consistency` | Consistency across regimes | 0.1 |
 
 ## Usage Example
 
