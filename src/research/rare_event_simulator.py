@@ -71,16 +71,36 @@ class RareEventResult(BaseModel):
 class RareEventSimulator:
     """
     Generates synthetic market data representing rare but plausible 'black-swan' events.
-    Designed to test XAUUSD strategy resilience beyond historical distributions.
+
+    Designed to test XAUUSD strategy resilience beyond historical distributions by
+    simulating various adversarial market conditions such as flash crashes,
+    liquidity vacuums, and regime dislocations.
     """
 
     def __init__(self, seed: int | None = None):
+        """
+        Initialize the RareEventSimulator.
+
+        Args:
+            seed: Optional random seed for reproducibility.
+        """
         self.rng = np.random.default_rng(seed)
 
     def generate_scenario(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """
         Generates a synthetic OHLCV DataFrame containing the specified rare event.
-        Returns both the DataFrame and the metadata about the event.
+
+        Args:
+            config: Configuration for the rare event to be simulated.
+
+        Returns:
+            A tuple containing:
+                - pd.DataFrame: OHLCV data with columns ['open', 'high', 'low', 'close',
+                  'tick_volume', 'spread'].
+                - RareEventResult: Metadata about the generated event.
+
+        Raises:
+            ValueError: If the event_type in config is unknown.
         """
         if config.seed is not None:
             self.rng = np.random.default_rng(config.seed)
@@ -198,7 +218,10 @@ class RareEventSimulator:
         crash_mask = (np.arange(n) >= start_idx) & (np.arange(n) < start_idx + crash_duration)
         df.loc[crash_mask, "tick_volume"] *= int(3 * config.event_magnitude)
 
-        peak_impact = float(df["close"].iloc[start_idx:].min() / df["close"].iloc[start_idx] - 1)
+        # Peak impact is the max percentage deviation from the price before the crash
+        event_prices = df["close"].iloc[start_idx : start_idx + crash_duration + recovery_duration]
+        start_price = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        peak_impact = float((event_prices / start_price - 1).min())
 
         result = RareEventResult(
             event_type=RareEventType.FLASH_CRASH,
@@ -206,7 +229,7 @@ class RareEventSimulator:
             start_index=start_idx,
             end_index=min(n - 1, start_idx + crash_duration + recovery_duration),
             peak_impact_pct=peak_impact,
-            realized_volatility=float(np.std(returns) * np.sqrt(288)),  # Period volatility
+            realized_volatility=float(np.std(returns) * np.sqrt(288)),
             recovery_attained=float(recovered_total_pct / abs(impact)) if impact != 0 else 0,
         )
 
@@ -241,19 +264,25 @@ class RareEventSimulator:
         # Volume drops significantly
         df.loc[vacuum_mask, "tick_volume"] = self.rng.integers(1, 5, np.sum(vacuum_mask))
 
-        # Spreads widen significantly
-        df.loc[vacuum_mask, "spread"] *= 5.0 * config.event_magnitude
+        # Spreads widen significantly: e.g. for XAUUSD spreads can jump from 0.2 to 2.0+
+        df.loc[vacuum_mask, "spread"] *= 8.0 * config.event_magnitude
 
         # In a vacuum, the range (high-low) is much larger than the open-close move
-        df.loc[vacuum_mask, "high"] *= 1 + 0.003 * config.event_magnitude
-        df.loc[vacuum_mask, "low"] *= 1 - 0.003 * config.event_magnitude
+        # We add extra volatility to the high/low of each candle relative to base volatility
+        noise_magnitude = df.loc[vacuum_mask, "open"] * config.base_volatility * 5.0 * config.event_magnitude
+        df.loc[vacuum_mask, "high"] += noise_magnitude
+        df.loc[vacuum_mask, "low"] -= noise_magnitude
+
+        event_prices = df["close"].iloc[start_idx : start_idx + duration]
+        start_price = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        peak_impact = float(np.max(np.abs(event_prices / start_price - 1)))
 
         result = RareEventResult(
             event_type=RareEventType.LIQUIDITY_VACUUM,
             config=config,
             start_index=start_idx,
             end_index=start_idx + duration,
-            peak_impact_pct=float(np.max(np.abs(returns[start_idx : start_idx + duration]))),
+            peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(288)),
             recovery_attained=1.0,
         )
@@ -318,15 +347,17 @@ class RareEventSimulator:
             config.start_price, returns, config.base_volatility, config.base_volume
         )
 
-        peak_price = df["high"].max()
-        end_price = df["close"].iloc[min(n - 1, reversal_idx + reversal_duration)]
+        # Peak impact is the reversal magnitude from the peak reached during the trend
+        peak_price = df["high"].iloc[start_idx:reversal_idx].max()
+        min_price_after = df["low"].iloc[reversal_idx : reversal_idx + reversal_duration].min()
+        peak_impact = float(min_price_after / peak_price - 1)
 
         result = RareEventResult(
             event_type=RareEventType.VIOLENT_REVERSAL,
             config=config,
             start_index=reversal_idx,
             end_index=min(n - 1, reversal_idx + reversal_duration),
-            peak_impact_pct=float(end_price / peak_price - 1),
+            peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(288)),
             recovery_attained=0.0,
         )
@@ -355,12 +386,16 @@ class RareEventSimulator:
             config.start_price, returns, config.base_volatility, config.base_volume
         )
 
+        event_prices = df["close"].iloc[dislocation_idx:]
+        start_price = df["close"].iloc[dislocation_idx - 1] if dislocation_idx > 0 else df["close"].iloc[0]
+        peak_impact = float((event_prices / start_price - 1).min())
+
         result = RareEventResult(
             event_type=RareEventType.DISLOCATION,
             config=config,
             start_index=dislocation_idx,
             end_index=n - 1,
-            peak_impact_pct=-0.03 * config.event_magnitude,
+            peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(288)),
             recovery_attained=0.0,
         )
@@ -399,12 +434,18 @@ class RareEventSimulator:
             config.start_price, returns, config.base_volatility, config.base_volume
         )
 
+        # For Vol Cluster, peak impact is the max absolute price deviation from start
+        start_idx = shock_indices[0]
+        event_prices = df["close"].iloc[start_idx:]
+        start_price = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        peak_impact = float(np.max(np.abs(event_prices / start_price - 1)))
+
         result = RareEventResult(
             event_type=RareEventType.VOL_CLUSTER,
             config=config,
-            start_index=shock_indices[0],
+            start_index=start_idx,
             end_index=n - 1,
-            peak_impact_pct=float(np.max(vols) / config.base_volatility),
+            peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(288)),
             recovery_attained=0.0,
         )
@@ -463,12 +504,17 @@ class RareEventSimulator:
             config.start_price, returns, config.base_volatility, config.base_volume
         )
 
+        # Max percentage deviation from the very beginning of the multi-session event
+        event_prices = df["close"].iloc[session_size:]
+        start_price_val = df["close"].iloc[session_size - 1] if session_size > 0 else df["close"].iloc[0]
+        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
+
         result = RareEventResult(
             event_type=RareEventType.MULTI_SESSION_DISLOCATION,
             config=config,
             start_index=session_size,
             end_index=n - 1,
-            peak_impact_pct=float(np.max(vols) / config.base_volatility),
+            peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(288)),
             recovery_attained=0.0,
         )
