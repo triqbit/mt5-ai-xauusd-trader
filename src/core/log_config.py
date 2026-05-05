@@ -8,8 +8,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import SecretStr
-
 from src.core.config import TradingConfig
 
 

@@ -34,7 +34,6 @@ from rich.table import Table
 
 from src.core import profile
 from src.core.audit_log import AuditLogger
-from src.core.log_config import get_masking_processor
 from src.core.config_validator import ConfigValidator
 from src.core.decision_support import DecisionSupportSystem
 from src.core.exceptions import (
@@ -45,6 +44,7 @@ from src.core.exceptions import (
 from src.core.explainability import SignalExplainer
 from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
+from src.core.log_config import get_masking_processor
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
 from src.data.event_intelligence import RiskStatus
