@@ -65,6 +65,17 @@ The `SignalExplainer` utilizes the `rich` library to produce formatted dashboard
 print(explainer.format_for_terminal(explanation))
 ```
 
-## Machine-Readable Attribution
+## Advanced Attribution Features
+
+### Individual Model Confidences
+The `SignalExplainer.explain` method supports an optional `model_confidences` dictionary. This allows the ensemble to provide specific confidence scores for each constituent model, enabling more precise attribution and dominance calculation than the standard ensemble-level fallback.
+
+### Granular Machine Attribution
+The `machine_attribution` field provides high-fidelity metrics for post-trade analysis, including:
+- **`risk_reward_ratio`**: The realized R:R for the trade.
+- **`risk_rejection_reasons`**: Structured list of reasons if a signal was blocked by the risk engine.
+- **`failed_execution_filters`**: Identification of specific execution gates (e.g., Spread, Timing) that prevented a trade.
+
+## Institutional Analysis
 
 For post-trade analysis and backtesting, the `SignalExplanation` object includes a `machine_attribution` dictionary containing normalized metrics for automated evaluation of model and risk performance.

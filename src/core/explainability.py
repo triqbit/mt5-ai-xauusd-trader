@@ -206,7 +206,9 @@ class SignalExplainer:
             if model_conf is None:
                 model_conf = confidence if vote_dir.value == direction else 0.5
 
-            weighted_conf = weight * model_conf
+            # Only models aligned with the final direction can be dominant
+            weighted_conf = weight * model_conf if vote_dir.value == direction else 0.0
+
             if weighted_conf > max_weighted_conf:
                 max_weighted_conf = weighted_conf
                 dominant_models = [name]
