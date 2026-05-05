@@ -188,30 +188,46 @@ def run_live(
                         approved_risk = alloc_result.allocated_risk_pct
 
                 # Calculate lot size based on approved institutional risk
-                lot_size = risk.size_position(
-                    cfg.symbol,
-                    win_rate=0.58,
-                    avg_win=4 * atr,
-                    avg_loss=2 * atr,
-                ) if approved_risk > 0 else 0.0
+                lot_size = 0.0
+                if approved_risk > 0:
+                    lot_size = risk.size_position(
+                        cfg.symbol,
+                        win_rate=0.58,
+                        avg_win=4 * atr,
+                        avg_loss=2 * atr,
+                    )
 
-                signal = TradeSignal(
-                    symbol=cfg.symbol,
-                    direction=direction,
-                    entry_price=price,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    lot_size=lot_size,
-                    algorithm=cfg.algorithm,
-                    confidence=confidence,
-                )
+                # 6. Create and Validate TradeSignal
+                signal = None
+                risk_approved = False
+                health = getattr(model, "get_health_metrics", lambda: None)()
 
-                # 6. Risk approval gate
-                with profile("risk_check"):
-                    health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = risk.approve(signal, signal_id=signal_id, model_health=health) if direction != 0 else False
+                if direction != 0:
+                    try:
+                        signal = TradeSignal(
+                            symbol=cfg.symbol,
+                            direction=direction,
+                            entry_price=price,
+                            stop_loss=stop_loss,
+                            take_profit=take_profit,
+                            lot_size=lot_size,
+                            algorithm=cfg.algorithm,
+                            confidence=confidence,
+                        )
+                        # 7. Risk approval gate
+                        with profile("risk_check"):
+                            risk_approved = risk.approve(signal, signal_id=signal_id, model_health=health)
+                    except Exception as e:
+                        log.error("Signal validation FAILED: %s", e)
+                        if trade_logger:
+                            trade_logger.log_risk_event(
+                                event_type="VALIDATION_ERROR",
+                                description=str(e),
+                                symbol=cfg.symbol,
+                                signal_id=signal_id,
+                            )
 
-                # 7. Execution Filter Cascade
+                # 8. Execution Filter Cascade
                 filter_decision = None
                 if risk_approved:
                     with profile("execution_filter"):
@@ -229,7 +245,7 @@ def run_live(
                             log.warning("Filter BLOCKED | %s | Reason: %s", cfg.symbol, filter_decision.blocked_by)
                             risk_approved = False
 
-                # 8. Decision Support System (Cockpit)
+                # 9. Decision Support System (Cockpit)
                 if direction != 0:
                     with profile("decision_support"):
                         # Prepare data for explainer
@@ -314,7 +330,7 @@ def run_live(
                                     lot_size=lot_size,
                                     signal_id=signal_id,
                                 )
-                # 6. Check for closed positions to update logger
+                # 10. Check for closed positions to update logger
                 with profile("closed_positions_check"):
                     current_positions = connector.get_positions(cfg.symbol)
                     current_tickets = {p["ticket"] for p in current_positions}
@@ -340,7 +356,7 @@ def run_live(
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
-                # 7. Update equity
+                # 11. Update equity
                 with profile("account_updates"):
                     balance = connector.get_account_balance()
                     risk.update_equity(balance)

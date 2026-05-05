@@ -174,31 +174,34 @@ class BacktestEngine:
                 stop_loss = price - (direction * 2 * atr)
                 take_profit = price + (direction * 4 * atr)
 
-                signal = TradeSignal(
-                    symbol=self.symbol,
-                    direction=direction,
-                    entry_price=price,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    lot_size=0.1,  # Base lot
-                    algorithm="backtest",
-                    confidence=confidence,
-                    timestamp=bar_idx,
-                )
+                try:
+                    signal = TradeSignal(
+                        symbol=self.symbol,
+                        direction=direction,
+                        entry_price=price,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        lot_size=0.1,  # Base lot
+                        algorithm="backtest",
+                        confidence=confidence,
+                        timestamp=bar_idx,
+                    )
 
-                # Prepare filter context
-                filter_context = df_features.loc[:bar_idx]
-                drawdown = (self.initial_balance - self.balance) / self.initial_balance
+                    # Prepare filter context
+                    filter_context = df_features.loc[:bar_idx]
+                    drawdown = (self.initial_balance - self.balance) / self.initial_balance
 
-                decision = self.ef.validate(
-                    signal,
-                    filter_context,
-                    current_drawdown=drawdown,
-                    timestamp=bar_idx,
-                )
+                    decision = self.ef.validate(
+                        signal,
+                        filter_context,
+                        current_drawdown=drawdown,
+                        timestamp=bar_idx,
+                    )
 
-                if decision.is_approved:
-                    self._open_trade(active_trades, signal)
+                    if decision.is_approved:
+                        self._open_trade(active_trades, signal)
+                except Exception as e:
+                    logger.debug("Backtest signal skipped due to validation: %s", e)
 
             start += step_size
 
