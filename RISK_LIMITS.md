@@ -258,8 +258,8 @@ END IF
 These hard limits and circuit breakers are CRITICAL for survival in algorithmic trading. They must be:
 
 ✓ Non-negotiable (rarely override)
-✓ Programmatically enforced via `TradeSignal` Pydantic schema
-✓ Automatically monitored
+✓ Automatically enforced
+✓ Transparently monitored
 ✓ Regularly stress-tested
 ✓ Conservative by default
 

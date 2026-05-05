@@ -13,10 +13,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Dict, Optional
-
-from pydantic import BaseModel, Field, field_validator
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -37,33 +35,19 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
 }
 
 
-class TradeSignal(BaseModel):
-    """
-    Enterprise-grade validated trading signal.
-    Enforces strict schema and value constraints for institutional safety.
-    """
+@dataclass
+class TradeSignal:
+    """Validated trading signal passed to order execution."""
 
-    symbol: str = Field(..., description="The financial instrument symbol (e.g., XAUUSD)")
-    direction: int = Field(..., description="+1 for BUY, -1 for SELL, 0 for HOLD")
-    entry_price: float = Field(..., gt=0, description="The target entry price for the trade")
-    stop_loss: float = Field(..., gt=0, description="The mandatory protective stop loss price")
-    take_profit: float = Field(..., gt=0, description="The target profit taking price")
-    lot_size: float = Field(..., ge=0.01, description="The position size in lots (minimum 0.01)")
-    algorithm: str = Field(..., description="The name of the algorithm that generated this signal")
-    confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="The model's confidence score (0.0 to 1.0)"
-    )
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
-        description="The UTC timestamp when the signal was generated",
-    )
-
-    @field_validator("direction")
-    @classmethod
-    def validate_direction(cls, v: int) -> int:
-        if v not in (-1, 0, 1):
-            raise ValueError("Direction must be -1 (SELL), 0 (HOLD), or 1 (BUY)")
-        return v
+    symbol: str
+    direction: int  # +1 buy / -1 sell
+    entry_price: float
+    stop_loss: float
+    take_profit: float
+    lot_size: float
+    algorithm: str
+    confidence: float  # 0.0 - 1.0
+    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 
 @dataclass
@@ -99,33 +83,24 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(
-        self,
-        signal: TradeSignal,
-        signal_id: Optional[int] = None,
-        model_health: Optional[Dict] = None,
-    ) -> bool:
+    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
         """
         Run the full 6-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
-        try:
-            if not self._check_circuit_breaker():
-                rejection_reason = "Circuit breaker active"
-            elif not self._check_daily_loss():
-                rejection_reason = "Daily loss limit reached"
-            elif not self._check_max_positions():
-                rejection_reason = "Max positions reached"
-            elif not self._check_symbol_allocation(signal.symbol):
-                rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-            elif not self._check_minimum_confidence(signal.confidence):
-                rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-            elif not self._check_risk_reward(signal):
-                rejection_reason = "Risk-Reward ratio too low"
-        except Exception as e:
-            rejection_reason = f"Internal risk engine error: {e}"
-            logger.exception("RiskManager.approve failed unexpectedly")
+        if not self._check_circuit_breaker():
+            rejection_reason = "Circuit breaker active"
+        elif not self._check_daily_loss():
+            rejection_reason = "Daily loss limit reached"
+        elif not self._check_max_positions():
+            rejection_reason = "Max positions reached"
+        elif not self._check_symbol_allocation(signal.symbol):
+            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
+        elif not self._check_minimum_confidence(signal.confidence):
+            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
+        elif not self._check_risk_reward(signal):
+            rejection_reason = "Risk-Reward ratio too low"
 
         passed = rejection_reason == ""
         if not passed:
