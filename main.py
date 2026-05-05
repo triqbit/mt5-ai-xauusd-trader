@@ -47,11 +47,11 @@ from src.core.health import HealthStatus, init_health_checker
 from src.core.log_config import get_masking_processor
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.types import TradeSignal
 from src.data.event_intelligence import RiskStatus
 from src.models.base_model import BaseModel
 from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
-from src.core.types import TradeSignal
 from src.models.ppo_agent import PPOAgent
 from src.models.regime_detector import RegimeDetector
 from src.trading.audited_risk_manager import AuditedRiskManager

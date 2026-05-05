@@ -8,7 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
-from src.core.types import SignalDirection, TradeSignal
+from src.core.types import TradeSignal
 
 # Backward compatibility alias
 TradeSignalSchema = TradeSignal

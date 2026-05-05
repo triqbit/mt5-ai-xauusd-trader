@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
-from src.core.types import TradeSignal
 from src.core.monitor import Monitor
 from src.core.trade_logger import TradeLogger
+from src.core.types import TradeSignal
 
 logger = logging.getLogger(__name__)
 
