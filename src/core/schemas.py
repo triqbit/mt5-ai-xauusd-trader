@@ -9,16 +9,10 @@ License: MIT
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from enum import IntEnum
 
 from pydantic import BaseModel, Field, field_validator
 
-
-class SignalDirection(IntEnum):
-    """Standardized signal directions for schema enforcement."""
-    BUY = 1
-    SELL = -1
-    HOLD = 0
+from src.core.types import SignalDirection
 
 
 class TradeSignalSchema(BaseModel):

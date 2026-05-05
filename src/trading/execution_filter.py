@@ -20,7 +20,7 @@ from scipy import stats
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.trade_logger import TradeLogger
-    from src.trading.risk_manager import TradeSignal
+    from src.core.types import TradeSignalExecution as TradeSignal
 
 logger = logging.getLogger(__name__)
 

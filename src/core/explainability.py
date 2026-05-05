@@ -15,7 +15,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.core.constants import ModelAction, SignalDirection
+from src.core.constants import ModelAction
+from src.core.types import SignalDirection
 
 logger = logging.getLogger(__name__)
 

@@ -57,7 +57,8 @@ from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_manager import RiskManager
+from src.core.types import TradeSignalExecution as TradeSignal
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -541,7 +542,7 @@ def main() -> int:
                 )
             )
         else:
-            print(f"CRITICAL: Failed to load configuration: {exc}")
+            logging.getLogger("main").error("CRITICAL: Failed to load configuration: %s", exc)
         return 1
 
     configure_logging(cfg.log_level)

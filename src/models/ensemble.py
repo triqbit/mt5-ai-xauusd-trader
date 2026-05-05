@@ -26,9 +26,11 @@ except ImportError:
     torch = None  # type: ignore
     nn = None  # type: ignore
 
-from src.core.constants import ModelAction, SignalDirection
+from src.core.constants import ModelAction
+from src.core.types import SignalDirection
 from src.core.profiler import profile
-from src.models.base_model import BaseModel, Signal
+from src.models.base_model import BaseModel
+from src.core.types import TradeSignal as Signal
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMAttentionModel
 from src.models.regime_detector import RegimeInfo

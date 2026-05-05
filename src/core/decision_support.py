@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.core.constants import SignalDirection
+from src.core.types import SignalDirection
 from src.core.explainability import SignalExplainer, SignalExplanation
 from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo

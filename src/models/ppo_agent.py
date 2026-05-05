@@ -10,8 +10,10 @@ from typing import Any
 
 import numpy as np
 
-from src.core.constants import ModelAction, SignalDirection
-from src.models.base_model import BaseModel, Signal
+from src.core.constants import ModelAction
+from src.core.types import SignalDirection
+from src.models.base_model import BaseModel
+from src.core.types import TradeSignal as Signal
 
 
 class PPOAgent(BaseModel):

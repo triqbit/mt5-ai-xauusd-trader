@@ -1,17 +1,17 @@
+from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
+
 try:
     import torch
 except ImportError:
     torch = None
-import pytest
 
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
-from unittest.mock import MagicMock
-
-import numpy as np
-
 # Use the standardized SignalDirection from constants
-from src.core.constants import SignalDirection
+from src.core.types import SignalDirection, TradeSignal as Signal
 from src.models.ensemble import EnsembleModel, LSTMAttentionModel
 
 
@@ -22,7 +22,8 @@ def test_lstm_attention_model_output_shape():
     # Batch size 2, Sequence length 10, Features 140
     x = torch.randn(2, 10, n_features)
     output = model(x)
-    assert output.shape == (2, 3) # [buy, sell, hold] logits
+    assert output.shape == (2, 3)  # [buy, sell, hold] logits
+
 
 def test_ensemble_model_standardized_direction():
     """Verify EnsembleModel maps Action indices to standard SignalDirection."""
@@ -34,7 +35,7 @@ def test_ensemble_model_standardized_direction():
     mock_ppo.predict.return_value = (0, None)
     ensemble._ppo_model = mock_ppo
 
-    obs = np.random.rand(5) # Mock observation
+    obs = np.random.rand(5)  # Mock observation
     # Adjust ModelAction to ensure prediction is BUY
     # ModelAction.BUY is 1. PPO returns action index.
     mock_ppo.predict.return_value = (1, None)
@@ -43,6 +44,7 @@ def test_ensemble_model_standardized_direction():
     assert isinstance(signal.direction, SignalDirection)
     assert signal.direction == SignalDirection.BUY
     assert signal.metadata["per_algo_votes"]["ppo"] == 1.0
+
 
 def test_ensemble_record_return_rebalance():
     """Verify weight rebalancing logic triggers correctly."""
@@ -64,3 +66,31 @@ def test_ensemble_record_return_rebalance():
     new_weights = ensemble.weights
     assert new_weights["ppo"] > initial_weights["ppo"]
     assert new_weights["lstm"] < initial_weights["lstm"]
+
+
+def test_ensemble_dissent():
+    ensemble = EnsembleModel()
+    signals = {
+        "ppo": Signal(direction=SignalDirection.BUY, confidence=0.9),
+        "lstm": Signal(direction=SignalDirection.SELL, confidence=0.9),
+    }
+    result = ensemble.aggregate_signals(signals)
+    assert result.direction == SignalDirection.HOLD
+    assert result.metadata["reason"] == "Dissent conflict"
+
+
+def test_ensemble_consensus_buy():
+    ensemble = EnsembleModel(model_weights={"ppo": 1.0})
+    signals = {"ppo": Signal(direction=SignalDirection.BUY, confidence=0.7)}
+    result = ensemble.aggregate_signals(signals)
+    assert result.direction == SignalDirection.BUY
+    assert result.confidence == 0.7
+
+
+def test_ensemble_no_consensus():
+    ensemble = EnsembleModel(model_weights={"ppo": 1.0})
+    signals = {
+        "ppo": Signal(direction=SignalDirection.BUY, confidence=0.5)
+    }  # Below 0.6
+    result = ensemble.aggregate_signals(signals)
+    assert result.direction == SignalDirection.HOLD

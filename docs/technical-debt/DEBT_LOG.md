@@ -2,6 +2,50 @@
 
 This log tracks architectural drift, code quality degradation, and fragmented logic introduced during multi-agent development.
 
+## Resolved Debt Items (May 2026 Cleanup)
+
+### Debt Item: Fragmented Signal and Direction types
+**Category:** Fragmentation | Naming
+**Impact:** High
+**Effort:** M
+**Resolution plan:** Created `src/core/types.py` to centralize `SignalDirection`, `TradeSignal` (NamedTuple), and `TradeSignalExecution` (dataclass).
+**Owner:** Jules05 (Resolved)
+
+### Debt Item: Redundant Risk Management implementations
+**Category:** Duplication | Fragmentation
+**Impact:** High
+**Effort:** M
+**Resolution plan:** Migrated institutional audit logging from `AuditedRiskManager` into `RiskEngine`. Centralized risk logic in `RiskEngine`.
+**Owner:** Jules05 (Resolved)
+
+### Debt Item: Redundant and fragmented test files
+**Category:** Duplication | Dead Code
+**Impact:** Medium
+**Effort:** S
+**Resolution plan:** Merged `tests/test_config_new.py` into `tests/test_config.py` and `tests/test_ensemble_new.py` into `tests/test_ensemble_refactor.py`. Removed redundant files.
+**Owner:** Jules05 (Resolved)
+
+### Debt Item: Legacy temporal markers (datetime.utcnow)
+**Category:** Quality
+**Impact:** Medium
+**Effort:** S
+**Resolution plan:** Replaced `datetime.utcnow()` with `datetime.now(UTC)` in `tests/test_model_stability_guard.py` to align with enterprise standards.
+**Owner:** Jules05 (Resolved)
+
+### Debt Item: Residual print statements in core paths
+**Category:** Quality
+**Impact:** Low
+**Effort:** S
+**Resolution plan:** Replaced raw `print()` with `logger.error()` in `main.py` bootstrap sequence.
+**Owner:** Jules05 (Resolved)
+
+### Debt Item: Duplicate SignalDirection definitions
+**Category:** Duplication
+**Impact:** Medium
+**Effort:** S
+**Resolution plan:** Removed redundant `SignalDirection` definitions from `src/core/schemas.py` and `src/core/constants.py`, delegating to `src/core/types.py`.
+**Owner:** Jules05 (Resolved)
+
 ## Active Debt Items
 
 ### Debt Item: Legacy Temporal Markers

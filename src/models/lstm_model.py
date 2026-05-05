@@ -17,8 +17,10 @@ except ImportError:
     torch = None
     nn = None
 
-from src.core.constants import ModelAction, SignalDirection
-from src.models.base_model import BaseModel, Signal
+from src.core.constants import ModelAction
+from src.core.types import SignalDirection
+from src.models.base_model import BaseModel
+from src.core.types import TradeSignal as Signal
 
 
 class LSTMAttentionModel(nn.Module if nn else object):

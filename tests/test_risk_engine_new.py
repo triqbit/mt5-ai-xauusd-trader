@@ -33,4 +33,4 @@ def test_validate_signal_rejection(risk_engine):
     data = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
     decision = risk_engine.validate_signal(MockSignal(), data, [])
     assert not decision.is_approved
-    assert "Confidence" in decision.reason
+    assert "min_confidence" in decision.reason

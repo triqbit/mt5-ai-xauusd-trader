@@ -6,13 +6,7 @@ Centralized constants and enums to ensure system-wide consistency.
 
 from enum import IntEnum
 
-
-class SignalDirection(IntEnum):
-    """Standardized signal directions across all models and environments."""
-
-    BUY = 1
-    SELL = -1
-    HOLD = 0
+from src.core.types import SignalDirection
 
 
 class ModelAction(IntEnum):

@@ -12,7 +12,8 @@ import logging
 from typing import Optional
 
 from src.core.audit_log import get_audit_logger
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.trading.risk_manager import RiskManager
+from src.core.types import TradeSignalExecution as TradeSignal
 
 logger = logging.getLogger(__name__)
 
