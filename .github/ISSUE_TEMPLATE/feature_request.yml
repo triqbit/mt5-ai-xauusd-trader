@@ -49,6 +49,13 @@ body:
       label: Alternatives Considered
       description: A clear and concise description of any alternative solutions or features you've considered.
   - type: textarea
+    id: risk-assessment
+    attributes:
+      label: Risk Assessment
+      description: Does this feature introduce new risks (e.g., higher latency, dependency bloat, capital risk)?
+    validations:
+      required: true
+  - type: textarea
     id: additional-context
     attributes:
       label: Additional Context
