@@ -72,6 +72,6 @@ python-dateutil==2.9.0.post0
 pytz==2024.1
 click==8.3.3
 tabulate==0.10.0
-joblib==1.4.2
+joblib==1.5.3
 python-telegram-bot==22.7
 psutil==7.2.2
