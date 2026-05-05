@@ -13,6 +13,9 @@ The `RareEventSimulator` is an institutional-grade tool designed to generate syn
 - **Multi-Session Dislocation**: A sequence of regime shifts across multiple trading sessions to test long-term strategy adaptability.
 
 ## Key Features
+- **Standardized Metrics**: `peak_impact_pct` represents the maximum percentage price deviation from the event start, providing a consistent measure across all scenario types.
+- **Configurable Data Frequency**: Supports arbitrary timeframes (e.g., M1, M5, H1) via the `bars_per_day` configuration, adjusting dummy timestamps and realized volatility annualization accordingly.
+- **Asset Generality**: High/low price expansion in scenarios like `Liquidity Vacuum` is volatility-relative, making the simulator suitable for various assets beyond XAUUSD.
 - **Spread Support**: Generates a high-fidelity `spread` column, essential for realistic execution stress testing in `StressLab`.
 - **Configurable Severity**: All scenarios are scaled by an `event_magnitude` parameter.
 - **Suite Generation**: The `generate_suite()` method produces a standardized set of adversarial scenarios for bulk resilience auditing.

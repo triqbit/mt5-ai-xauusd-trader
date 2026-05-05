@@ -15,6 +15,12 @@ from src.research.benchmarks import (
     RiskFilteredBaseline,
     VolatilityBreakoutStrategy,
 )
+from src.research.rare_event_simulator import (
+    RareEventConfig,
+    RareEventResult,
+    RareEventSimulator,
+    RareEventType,
+)
 from src.research.reporting import ResearchReport, ResearchReporter
 from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 
@@ -26,6 +32,10 @@ __all__ = [
     "MomentumStrategy",
     "NaiveDirectionalStrategy",
     "RandomStrategy",
+    "RareEventConfig",
+    "RareEventResult",
+    "RareEventSimulator",
+    "RareEventType",
     "ResearchReport",
     "ResearchReporter",
     "RiskFilteredBaseline",
