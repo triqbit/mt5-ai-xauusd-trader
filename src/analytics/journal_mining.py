@@ -168,7 +168,7 @@ class JournalReport(BaseModel):
 
         primary_insight = "Strategy shows consistent performance across most sessions."
         if risks:
-            risk_types = sorted(list(set(r.type for r in risks)))
+            risk_types = sorted({r.type for r in risks})
             primary_insight = f"Critical behavioral risks identified: {', '.join(risk_types)}."
 
         # Convert SignalMotif internal models to Reporting SignalMotif

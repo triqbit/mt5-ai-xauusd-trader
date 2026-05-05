@@ -35,7 +35,7 @@ Calculates average win vs loss holding times in minutes. This reveals behavioral
 
 ### 6. Early Warning & Toxic Motif Tracking
 Detects advanced behavioral risks:
-- **Toxic Motifs**: Recurring attribute combinations that show significantly lower win rates or high frequency within drawdown clusters.
+- **Toxic Motifs**: Recurring attribute combinations that show significantly lower win rates or high frequency within drawdown clusters. Motifs are ranked using a toxic score: `(1.0 - win_rate) * log1p(frequency)`, prioritizing high-confidence failures.
 - **Pre-Drawdown Motifs**: Identification of signal combinations that frequently occur shortly before (default 6 hours) a drawdown cluster begins.
 - **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as being within 24h of a drawdown cluster).
 
