@@ -472,6 +472,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--log-level", default="INFO", help="Logging level")
     p.add_argument("--check", action="store_true", help="Perform pre-flight health checks and exit")
+    p.add_argument("--confirm-live", action="store_true", help="Explicitly confirm live trading")
     return p.parse_args()
 
 
@@ -480,15 +481,25 @@ def main() -> int:
     configure_logging(args.log_level)
     log, console = logging.getLogger("main"), Console()
 
-    # Override config from CLI: CLI > ENV > .env defaults
-    if args.mode:
-        os.environ["MODE"] = args.mode
-    if args.algo:
-        os.environ["ALGORITHM"] = args.algo
-    if args.symbol:
-        os.environ["SYMBOL"] = args.symbol
-    if args.timeframe:
-        os.environ["TIMEFRAME"] = args.timeframe
+    # Dynamic CLI Override Mapping: CLI Arg -> Environment Variable
+    # This ensures CLI > ENV > .env precedence
+    cli_overrides = {
+        "mode": "MODE",
+        "algo": "ALGORITHM",
+        "symbol": "SYMBOL",
+        "timeframe": "TIMEFRAME",
+        "confirm_live": "CONFIRM_LIVE_TRADING",
+        "log_level": "LOG_LEVEL",
+    }
+
+    for arg_name, env_var in cli_overrides.items():
+        val = getattr(args, arg_name, None)
+        if val is not None:
+            if isinstance(val, bool):
+                if val:  # Only set if True for flags
+                    os.environ[env_var] = "YES" if arg_name == "confirm_live" else str(val)
+            else:
+                os.environ[env_var] = str(val)
 
     # Ensure get_config() picks up the CLI-overridden environment variables
     from src.core.config import get_config
@@ -556,6 +567,25 @@ def main() -> int:
         "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite",
     )
 
+    # Risk summary row
+    risk_color = (
+        "red"
+        if cfg.risk_per_trade > 0.02
+        else "yellow"
+        if cfg.risk_per_trade > 0.01
+        else "green"
+    )
+    summary.add_row("Risk/Trade:  ", f"[{risk_color}]{cfg.risk_per_trade:.1%}[/]")
+
+    daily_loss_color = "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    summary.add_row("Daily Stop:  ", f"[{daily_loss_color}]{cfg.max_daily_loss:.1%}[/]")
+
+    pos_color = "red" if cfg.max_positions > 10 else "yellow" if cfg.max_positions > 5 else "green"
+    summary.add_row("Max Positions:  ", f"[{pos_color}]{cfg.max_positions}[/]")
+
+    conf_color = "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
+
     console.print(
         Panel(
             summary,
@@ -591,6 +621,23 @@ def main() -> int:
         try:
             connector.connect()
         except MT5ConnectionError as exc:
+            # Enhanced connection diagnostics
+            diag = Table.grid(expand=True)
+            diag.add_column(style="cyan", justify="right")
+            diag.add_column(style="white", justify="left")
+            diag.add_row("Server:  ", cfg.mt5_server)
+            diag.add_row("Login:  ", str(cfg.mt5_login))
+            diag.add_row("Path:  ", cfg.mt5_path)
+            diag.add_row("Platform:  ", sys.platform)
+
+            console.print(
+                Panel(
+                    diag,
+                    title="[bold red]Connection Diagnostics[/]",
+                    subtitle="Sanitized connection settings",
+                    border_style="red",
+                )
+            )
             log.critical("Cannot connect to MT5 terminal: %s. Aborting.", exc)
             return 1
     balance = connector.get_account_balance()
