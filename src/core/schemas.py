@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class SignalDirection(IntEnum):
     """Standardized signal directions for schema enforcement."""
+
     BUY = 1
     SELL = -1
     HOLD = 0
@@ -28,7 +29,9 @@ class TradeSignalSchema(BaseModel):
     """
 
     symbol: str = Field(..., description="The financial instrument symbol (e.g., XAUUSD)")
-    direction: SignalDirection = Field(..., description="Signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)")
+    direction: SignalDirection = Field(
+        ..., description="Signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)"
+    )
     entry_price: float = Field(..., gt=0, description="The target entry price for the trade")
     stop_loss: float = Field(..., gt=0, description="The mandatory protective stop loss price")
     take_profit: float = Field(..., gt=0, description="The target profit taking price")
@@ -49,6 +52,6 @@ class TradeSignalSchema(BaseModel):
         if isinstance(v, int):
             try:
                 return SignalDirection(v)
-            except ValueError:
-                raise ValueError(f"Invalid direction: {v}. Must be 1, -1, or 0.")
+            except ValueError as e:
+                raise ValueError(f"Invalid direction: {v}. Must be 1, -1, or 0.") from e
         return v

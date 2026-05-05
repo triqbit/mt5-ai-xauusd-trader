@@ -9,6 +9,7 @@ Enterprise risk management engine implementing:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -176,9 +177,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -193,7 +192,7 @@ class RiskManager:
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit {self.cfg.max_drawdown * 100:.1f}% limit",
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
@@ -246,9 +245,7 @@ class RiskManager:
     def _check_losing_streak(self) -> bool:
         """Halt if consecutive losses reach the limit."""
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
-            logger.warning(
-                "Losing streak limit hit: %d", self.daily.consecutive_losses
-            )
+            logger.warning("Losing streak limit hit: %d", self.daily.consecutive_losses)
             return False
         return True
 
@@ -265,9 +262,7 @@ class RiskManager:
             logger.warning("Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold)
             return False
         if acc < self.cfg.model_accuracy_floor:
-            logger.warning(
-                "Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor
-            )
+            logger.warning("Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor)
             return False
         if cal > self.cfg.model_calibration_threshold:
             logger.warning(

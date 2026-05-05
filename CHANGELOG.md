@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linting errors and unused imports in core trading and model modules.
 - Restored missing `get_rates_range` functionality in MT5 connector.
 
+### Security & Risk
+- **8-Layer Risk Approval Cascade**: Hardened the trade entry gate in `RiskManager` by adding mandatory Losing Streak and Model Health (drift, accuracy, calibration) validation layers.
+- **Model Calibration Monitoring**: Integrated real-time calibration tracking in `Monitor` with Prometheus metrics and automated Telegram alerting for performance degradation.
+- **Institutional Guardrails**: Harmonized risk thresholds across the engine to strictly enforce centralized policy limits from `TradingConfig`.
+
 ## [1.1.0-rc1] - 2024-05-02
 ### Added
 - Refined the 6-layer execution filter in `src/trading/execution_filter.py` with EMA20 trend angle logic.
