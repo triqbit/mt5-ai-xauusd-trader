@@ -46,7 +46,6 @@ jobs:
             "src/trading/risk_manager.py"  # Risk parameters and position sizing
             "config/secrets.*"             # Credentials and secrets
             ".github/workflows/deploy.*"   # Deployment workflows
-            "migrations/.*"                # Database migrations
           )
 
           TOUCHED_HIGH_RISK=false

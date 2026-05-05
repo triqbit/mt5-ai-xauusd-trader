@@ -371,7 +371,13 @@ EXECUTE FUNCTION audit_trigger_func();
 
 ---
 
-**Last Updated**: January 2026
-**Version**: 1.0
+**Last Updated**: May 2026
+**Version**: 1.1
 **Maintained By**: Infrastructure Team
 **Review Frequency**: Quarterly
+
+### Implementation Note (v1.1)
+The trade logging system has been implemented in `src/core/trade_logger.py` using SQLAlchemy 2.0 and Alembic. It enforces the following:
+- Mandatory audit columns via `AuditMixin`.
+- SQLite compatibility using `render_as_batch=True`.
+- Automated performance reporting (Sharpe, Profit Factor, Max Drawdown).

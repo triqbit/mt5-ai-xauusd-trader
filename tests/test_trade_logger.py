@@ -14,6 +14,8 @@ def logger():
     if os.path.exists(db_path):
         os.remove(db_path)
     logger = TradeLogger(db_url=f"sqlite:///{db_path}")
+    from src.core.trade_logger import Base
+    Base.metadata.create_all(logger.engine)
     yield logger
     if os.path.exists(db_path):
         os.remove(db_path)
