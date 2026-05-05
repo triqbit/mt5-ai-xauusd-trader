@@ -6,7 +6,7 @@ from src.core.trade_logger import TradeLogger
 from src.core.constants import SignalDirection
 import os
 
-def test_decision_support_optimization(mocker):
+def test_decision_support_optimization():
     """Verify that format_for_operator returns early when console is provided."""
     dss = DecisionSupportSystem()
     mock_packet = MagicMock()
@@ -24,7 +24,9 @@ def test_decision_support_optimization(mocker):
 
     mock_packet.performance.sharpe_ratio = 2.0
     mock_packet.performance.profit_factor = 1.5
+    mock_packet.performance.recovery_factor = 1.2
     mock_packet.performance.win_rate = 0.6
+    mock_packet.performance.win_loss_ratio = 1.1
     mock_packet.performance.total_trades = 100
 
     mock_packet.macro_risk.active_events = []

@@ -70,8 +70,10 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
     performance_metrics = {
         "sharpe_ratio": 1.5,
         "profit_factor": 2.1,
+        "recovery_factor": 3.2,
         "max_drawdown": 0.05,
         "win_rate": 0.6,
+        "win_loss_ratio": 1.8,
         "total_trades": 100
     }
 
@@ -95,6 +97,8 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
     assert packet.is_executable is True
     assert len(packet.blocking_reasons) == 0
     assert packet.performance.sharpe_ratio == 1.5
+    assert packet.performance.recovery_factor == 3.2
+    assert packet.performance.win_loss_ratio == 1.8
     assert packet.performance.total_trades == 100
 
 
@@ -103,36 +107,38 @@ def test_consensus_logic():
     mock_exp = MagicMock(spec=SignalExplanation)
     mock_exp.direction = SignalDirection.BUY
 
-    # 1. Unanimous
+    # 1. Unanimous (Weight: 0.5 + 0.5 = 1.0)
     mock_exp.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
         ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.5)
     ]
     assert dss._calculate_consensus(mock_exp) == "Unanimous"
 
-    # 2. Strong Majority
+    # 2. Strong Majority (Weight: 0.4 + 0.3 = 0.7 >= 0.66)
     mock_exp.model_attributions = [
-        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.33),
-        ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.33),
-        ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.33)
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.4),
+        ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.3),
+        ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.3)
     ]
     assert dss._calculate_consensus(mock_exp) == "Strong Majority"
 
-    # 3. Mixed Confluence
+    # 3. Mixed Confluence (Weight: 0.51 >= 0.5)
     mock_exp.model_attributions = [
-        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
-        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.5)
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.51),
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.49)
     ]
     assert dss._calculate_consensus(mock_exp) == "Mixed Confluence"
 
-    # 4. Divided/Weak
+    # 4. Divided/Weak (Weight: 0.49 < 0.5)
     mock_exp.model_attributions = [
-        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.25),
-        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.25),
-        ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.25),
-        ModelAttribution(model_name="M4", vote=SignalDirection.HOLD, confidence=0.5, weight=0.25)
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.49),
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.51)
     ]
     assert dss._calculate_consensus(mock_exp) == "Divided/Weak"
+
+    # 5. No votes
+    mock_exp.model_attributions = []
+    assert dss._calculate_consensus(mock_exp) == "No Votes"
 
 
 def test_assemble_packet_blocked_by_macro(mock_explanation, mock_regime, mock_macro_risk):
