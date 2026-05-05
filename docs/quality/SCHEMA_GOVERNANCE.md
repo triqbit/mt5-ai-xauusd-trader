@@ -19,6 +19,13 @@ Trading signals are the most critical data structures in the system. To ensure t
 2. **Standardized Enums**: `SignalDirection` IntEnum ensures consistent direction handling across models and adapters.
 3. **Fail-Fast**: Invalid data triggers a `ValidationError` immediately, preventing malformed signals from propagating through the risk engine.
 
-## 3. Implementation Details
+## 3. Database Schema Integrity
 
-The centralized schema is located at `src/core/schemas.py`. All new models or adapters generating signals should utilize this schema to ensure compliance with institutional safety standards.
+To prevent runtime failures and data corruption, the system enforces database-level integrity:
+- **Alembic Check**: CI pipelines include `alembic check` to ensure all model changes are accompanied by migrations.
+- **Index Optimization**: Critical columns (`timestamp`, `symbol`, `status`, `is_deleted`) are backed by B-tree indices for query performance.
+- **Check Constraints**: Database-level constraints enforce valid ranges for prices, lots, and confidence scores.
+
+## 4. Implementation Details
+
+The centralized schema is located at `src/core/schemas.py`. All new models or adapters generating signals should utilize this schema to ensure compliance with institutional safety standards. Database migrations are managed via Alembic in the `migrations/` directory.

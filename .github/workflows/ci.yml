@@ -89,6 +89,8 @@ jobs:
           sudo ldconfig
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
+      - name: Alembic Schema Check
+        run: alembic check
       - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
