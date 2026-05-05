@@ -14,7 +14,11 @@ The audit logs are stored in the `audit_log` table within the configured audit d
 | actor | String | The system component or user performing the action |
 | action | String | The specific action performed (e.g., `prediction`, `risk_decision`) |
 | details | Text | Human-readable summary of the event |
+| trace_id | String | Unique identifier (UUID) correlating all logs for a single trading cycle |
 | metadata_json | JSON | Structured context data (decision chains, model parameters, etc.) |
+
+## Trace Correlation
+The system uses `trace_id` to link audit entries with structured application logs. This allows operators to reconstruct the entire decision flow—from data fetch to final execution—using a single identifier.
 
 ## Tracked Events
 
