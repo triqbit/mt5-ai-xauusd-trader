@@ -22,16 +22,20 @@ from src.research.benchmarks import BenchmarkEvaluator, BenchmarkStrategy
 
 logger = logging.getLogger(__name__)
 
+
 class OptimizationMetric(str, Enum):
     """Available metrics for optimization."""
+
     SHARPE = "sharpe"
     SORTINO = "sortino"
     PROFIT_FACTOR = "profit_factor"
     TOTAL_RETURN = "total_return"
     ROBUSTNESS_SCORE = "robustness_score"
 
+
 class WalkForwardConfig(BaseModel):
     """Configuration for Walk-Forward Optimization."""
+
     train_size: int = Field(250, description="Number of candles for training/optimization")
     test_size: int = Field(50, description="Number of candles for out-of-sample testing")
     step_size: int = Field(50, description="Step size for rolling windows")
@@ -40,10 +44,14 @@ class WalkForwardConfig(BaseModel):
     n_trials: int = Field(50, description="Number of trials per window")
     seed: int = 42
     commission: float = 0.0002
-    bars_per_year: int = Field(252, description="Bars per year for annualization (e.g. 252 for Daily)")
+    bars_per_year: int = Field(
+        252, description="Bars per year for annualization (e.g. 252 for Daily)"
+    )
+
 
 class RobustnessMetrics(BaseModel):
     """Structured robustness metrics."""
+
     oos_sharpe_mean: float
     oos_sharpe_std: float
     worst_window_sharpe: float
@@ -54,14 +62,18 @@ class RobustnessMetrics(BaseModel):
     regime_consistency: float
     robustness_score: float
 
+
 class WindowResult(BaseModel):
     """Metrics for a single walk-forward window."""
+
     window_index: int
     is_metrics: dict[str, Any]
     oos_metrics: dict[str, Any]
 
+
 class WalkForwardResult(BaseModel):
     """Result of a Walk-Forward Optimization run."""
+
     best_params: dict[str, Any]
     metrics: RobustnessMetrics
     window_results: list[WindowResult]
@@ -105,6 +117,7 @@ class WalkForwardResult(BaseModel):
             parameters=params,
             insights=insights,
         )
+
 
 class WalkForwardOptimizer:
     """
@@ -177,9 +190,7 @@ class WalkForwardOptimizer:
         """
         strategy = self.strategy_factory(**params)
         evaluator = BenchmarkEvaluator(
-            data,
-            commission=self.config.commission,
-            bars_per_year=self.config.bars_per_year
+            data, commission=self.config.commission, bars_per_year=self.config.bars_per_year
         )
         metrics = evaluator._calculate_metrics(strategy.predict(data), strategy.name)
         return metrics
@@ -240,9 +251,7 @@ class WalkForwardOptimizer:
         """
         strategy = self.strategy_factory(**strategy_params)
         evaluator = BenchmarkEvaluator(
-            data,
-            commission=self.config.commission,
-            bars_per_year=self.config.bars_per_year
+            data, commission=self.config.commission, bars_per_year=self.config.bars_per_year
         )
         signals = strategy.predict(data)
 
@@ -275,12 +284,13 @@ class WalkForwardOptimizer:
         """
         windows = self.generate_windows()
         if len(windows) < self.config.min_windows:
-            raise ValueError(f"Insufficient data for {self.config.min_windows} windows. "
-                             f"Have {len(windows)}, need {self.config.min_windows}.")
+            raise ValueError(
+                f"Insufficient data for {self.config.min_windows} windows. "
+                f"Have {len(windows)}, need {self.config.min_windows}."
+            )
 
         study = optuna.create_study(
-            direction="maximize",
-            sampler=optuna.samplers.TPESampler(seed=self.config.seed)
+            direction="maximize", sampler=optuna.samplers.TPESampler(seed=self.config.seed)
         )
 
         def objective(trial: optuna.Trial) -> float:
@@ -395,7 +405,7 @@ class WalkForwardOptimizer:
             evaluator = BenchmarkEvaluator(
                 test_data,
                 commission=self.config.commission,
-                bars_per_year=self.config.bars_per_year
+                bars_per_year=self.config.bars_per_year,
             )
             oos_metrics = evaluator._calculate_metrics(strategy.predict(test_data), strategy.name)
 
@@ -403,43 +413,48 @@ class WalkForwardOptimizer:
             returns = evaluator.results.get(strategy.name + "_returns", np.zeros(len(test_data)))
             all_oos_returns.extend(returns.tolist())
 
-            window_results.append(WindowResult(
-                window_index=i,
-                is_metrics=is_metrics,
-                oos_metrics=oos_metrics
-            ))
+            window_results.append(
+                WindowResult(window_index=i, is_metrics=is_metrics, oos_metrics=oos_metrics)
+            )
 
         return WalkForwardResult(
             best_params=best_params,
             metrics=metrics,
             window_results=window_results,
-            oos_returns=all_oos_returns
+            oos_returns=all_oos_returns,
         )
+
 
 if __name__ == "__main__":
     # Example usage / test harness
     from src.research.benchmarks import EMACrossoverStrategy
 
-    df = pd.DataFrame({
-        "open": np.random.randn(1000) + 2000,
-        "high": np.random.randn(1000) + 2005,
-        "low": np.random.randn(1000) + 1995,
-        "close": np.random.randn(1000) + 2000,
-        "tick_volume": np.random.randint(100, 1000, 1000)
-    })
+    df = pd.DataFrame(
+        {
+            "open": np.random.randn(1000) + 2000,
+            "high": np.random.randn(1000) + 2005,
+            "low": np.random.randn(1000) + 1995,
+            "close": np.random.randn(1000) + 2000,
+            "tick_volume": np.random.randint(100, 1000, 1000),
+        }
+    )
 
     def ema_param_space(trial):
         return {
             "fast_window": trial.suggest_int("fast_window", 5, 20),
-            "slow_window": trial.suggest_int("slow_window", 21, 50)
+            "slow_window": trial.suggest_int("slow_window", 21, 50),
         }
 
     optimizer = WalkForwardOptimizer(
         data=df,
         strategy_factory=EMACrossoverStrategy,
         param_space=ema_param_space,
-        config=WalkForwardConfig(n_trials=5, train_size=200, test_size=50, step_size=50)
+        config=WalkForwardConfig(n_trials=5, train_size=200, test_size=50, step_size=50),
     )
 
     result = optimizer.run_optimization()
-    logger.info("Optimization complete", best_params=result.best_params, score=result.metrics.robustness_score)
+    logger.info(
+        "Optimization complete",
+        best_params=result.best_params,
+        score=result.metrics.robustness_score,
+    )

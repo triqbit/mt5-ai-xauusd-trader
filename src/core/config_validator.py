@@ -188,9 +188,7 @@ class ConfigValidator:
             )
 
         metaapi_account_id = self.config.metaapi_account_id.get_secret_value()
-        if metaapi_account_id and any(
-            p in metaapi_account_id.upper() for p in placeholders
-        ):
+        if metaapi_account_id and any(p in metaapi_account_id.upper() for p in placeholders):
             self.errors.append(
                 ValidationError(
                     "METAAPI_ACCOUNT_ID",

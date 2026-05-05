@@ -621,8 +621,6 @@ class DreamerAdapter:
             # Update latent state if supported by the agent (for recurrent models)
             if hasattr(self.agent, "update_state"):
                 # We use placeholder reward=0.0 and is_terminal=False for pure inference
-                self.agent.update_state(
-                    obs, action=int(direction), reward=0.0, is_terminal=False
-                )
+                self.agent.update_state(obs, action=int(direction), reward=0.0, is_terminal=False)
 
         return signals

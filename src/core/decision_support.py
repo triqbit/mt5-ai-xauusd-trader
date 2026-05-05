@@ -45,11 +45,17 @@ class DecisionPacket(BaseModel):
     symbol: str = Field(..., description="Target trading symbol")
     direction: SignalDirection = Field(..., description="Final signal direction")
     consensus: str = Field(..., description="Qualitative model consensus level")
-    is_executable: bool = Field(False, description="Final decision on whether the trade should proceed")
-    blocking_reasons: list[str] = Field(default_factory=list, description="List of reasons if the trade is blocked")
+    is_executable: bool = Field(
+        False, description="Final decision on whether the trade should proceed"
+    )
+    blocking_reasons: list[str] = Field(
+        default_factory=list, description="List of reasons if the trade is blocked"
+    )
 
     # Components
-    explanation: SignalExplanation = Field(..., description="ML signal attribution and explainability")
+    explanation: SignalExplanation = Field(
+        ..., description="ML signal attribution and explainability"
+    )
     regime: RegimeInfo = Field(..., description="Current market regime context")
     macro_risk: RiskStatus = Field(..., description="Macroeconomic event risk status")
     performance: PerformanceContext = Field(..., description="Recent performance context")
@@ -156,11 +162,19 @@ class DecisionSupportSystem:
             status_color = "green" if packet.is_executable else "red"
             status_text = "EXECUTE" if packet.is_executable else "BLOCKED"
 
-            dir_color = "green" if packet.direction == SignalDirection.BUY else "red" if packet.direction == SignalDirection.SELL else "yellow"
+            dir_color = (
+                "green"
+                if packet.direction == SignalDirection.BUY
+                else "red"
+                if packet.direction == SignalDirection.SELL
+                else "yellow"
+            )
 
             header_content = Text()
             header_content.append(f"SYMBOL: {packet.symbol}  ", style="bold")
-            header_content.append(f"DIRECTION: {packet.direction.name}\n", style=f"bold {dir_color}")
+            header_content.append(
+                f"DIRECTION: {packet.direction.name}\n", style=f"bold {dir_color}"
+            )
             header_content.append("STATUS: ", style="bold")
             header_content.append(status_text, style=f"bold {status_color}")
             header_content.append("  |  CONSENSUS: ", style="bold")
@@ -213,7 +227,9 @@ class DecisionSupportSystem:
             if not packet.macro_risk.active_events:
                 macro_content.append("No active macro events identified.", style="green")
             else:
-                macro_content.append(f"Active Events: {len(packet.macro_risk.active_events)}\n", style="bold")
+                macro_content.append(
+                    f"Active Events: {len(packet.macro_risk.active_events)}\n", style="bold"
+                )
                 for event in packet.macro_risk.active_events:
                     impact_color = "red" if event.impact >= 3 else "yellow"
                     macro_content.append(f" • {event.name} ", style="white")
@@ -239,7 +255,7 @@ class DecisionSupportSystem:
                 macro_panel,
                 attribution_summary,
                 Text("\n[bold]DETAILED ATTRIBUTION BREAKDOWN[/bold]\n"),
-                self.explainer.get_renderable(packet.explanation)
+                self.explainer.get_renderable(packet.explanation),
             )
 
             # Print to console if provided

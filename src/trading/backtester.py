@@ -119,7 +119,9 @@ class BacktestEngine:
         n = len(data)
 
         if n < train_window + test_window:
-            logger.error("Insufficient data for walk-forward after feature engineering: %d bars available", n)
+            logger.error(
+                "Insufficient data for walk-forward after feature engineering: %d bars available", n
+            )
             return PerformanceReport()
 
         # Calculate ATR once for the whole dataset
@@ -137,8 +139,8 @@ class BacktestEngine:
             test_start_idx = start + train_window
             test_end_idx = test_start_idx + test_window
 
-            test_data = data.iloc[test_start_idx : test_end_idx]
-            test_features = df_features.iloc[test_start_idx : test_end_idx]
+            test_data = data.iloc[test_start_idx:test_end_idx]
+            test_features = df_features.iloc[test_start_idx:test_end_idx]
 
             for i in range(len(test_data)):
                 bar_idx = test_data.index[i]
@@ -159,7 +161,9 @@ class BacktestEngine:
                     confidence = signal_obj.confidence
                 except Exception:
                     pred = model.predict(obs.values)
-                    direction = int(pred[0]) if isinstance(pred, (tuple, list, np.ndarray)) else int(pred)
+                    direction = (
+                        int(pred[0]) if isinstance(pred, (tuple, list, np.ndarray)) else int(pred)
+                    )
                     confidence = 1.0
 
                 if direction == 0:
@@ -210,14 +214,13 @@ class BacktestEngine:
     def _open_trade(self, active_trades: list[dict[str, Any]], signal: TradeSignal) -> None:
         """Opens a new trade and adds it to the active list."""
         execution_price = signal.entry_price + (signal.direction * self.spread / 2)
-        active_trades.append({
-            "signal": signal,
-            "entry_price": execution_price,
-            "mae": 0.0,
-            "mfe": 0.0
-        })
+        active_trades.append(
+            {"signal": signal, "entry_price": execution_price, "mae": 0.0, "mfe": 0.0}
+        )
 
-    def _update_active_trades(self, active_trades: list[dict[str, Any]], current_bar: pd.Series, timestamp: datetime) -> None:
+    def _update_active_trades(
+        self, active_trades: list[dict[str, Any]], current_bar: pd.Series, timestamp: datetime
+    ) -> None:
         """Checks SL/TP for all active trades and closes them if hit."""
         closed_indices = []
         for i, trade in enumerate(active_trades):
@@ -269,7 +272,12 @@ class BacktestEngine:
         exit_price_adj = exit_price - (direction * self.spread / 2)
 
         contract_multiplier = 100 if "XAU" in self.symbol else 1
-        raw_pnl = (exit_price_adj - trade["entry_price"]) * direction * signal.lot_size * contract_multiplier
+        raw_pnl = (
+            (exit_price_adj - trade["entry_price"])
+            * direction
+            * signal.lot_size
+            * contract_multiplier
+        )
         commission = signal.lot_size * self.commission_per_lot
         final_pnl = raw_pnl - commission
 

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class EventImpact(IntEnum):
     """Normalized event impact scores."""
+
     LOW = 1
     MEDIUM = 2
     HIGH = 3
@@ -28,6 +29,7 @@ class EventImpact(IntEnum):
 
 class EventCategory(Enum):
     """Categories of macro events relevant to XAUUSD."""
+
     CPI = "CPI"
     NFP = "NFP"
     FOMC = "FOMC"
@@ -90,7 +92,8 @@ class MockEventProvider(BaseEventProvider):
 
     def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
         return [
-            e for e in self.events
+            e
+            for e in self.events
             if (e.end_timestamp or e.timestamp) >= start_time and e.timestamp <= end_time
         ]
 
@@ -116,7 +119,9 @@ class JSONEventProvider(BaseEventProvider):
             events = []
             for item in data:
                 event = MacroEvent(**item)
-                if (event.end_timestamp or event.timestamp) >= start_time and event.timestamp <= end_time:
+                if (
+                    event.end_timestamp or event.timestamp
+                ) >= start_time and event.timestamp <= end_time:
                     events.append(event)
             return events
         except Exception as e:
@@ -135,7 +140,7 @@ class MetaAPIEventProvider(BaseEventProvider):
         self._impact_map = {
             "low": EventImpact.LOW,
             "medium": EventImpact.MEDIUM,
-            "high": EventImpact.HIGH
+            "high": EventImpact.HIGH,
         }
 
     def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
@@ -148,7 +153,7 @@ class MetaAPIEventProvider(BaseEventProvider):
         url = "https://calendar.metaapi.cloud/events"
         params = {
             "startTime": start_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "endTime": end_time.strftime("%Y-%m-%d %H:%M:%S")
+            "endTime": end_time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         headers = {"auth-token": self.token}
 
@@ -168,12 +173,16 @@ class MetaAPIEventProvider(BaseEventProvider):
                 # MetaAPI uses UTC ISO strings
                 ts = datetime.fromisoformat(item["time"].replace("Z", "+00:00"))
 
-                macro_events.append(MacroEvent(
-                    name=name,
-                    category=category,
-                    impact=impact,
-                    timestamp=ts.replace(tzinfo=None) # Keep internal datetimes naive UTC for consistency
-                ))
+                macro_events.append(
+                    MacroEvent(
+                        name=name,
+                        category=category,
+                        impact=impact,
+                        timestamp=ts.replace(
+                            tzinfo=None
+                        ),  # Keep internal datetimes naive UTC for consistency
+                    )
+                )
             return macro_events
 
         except Exception as e:
@@ -270,11 +279,34 @@ class EventIntelligence:
                     is_event_blocking = True
 
             # Check pre-event window
-            elif event.timestamp > now and (event.timestamp - now) <= timedelta(
-                minutes=pre_window
-            ):
+            elif event.timestamp > now and (event.timestamp - now) <= timedelta(minutes=pre_window):
                 is_active = True
                 # Stricter blocking for HIGH impact major events
+                if (
+                    event.impact == EventImpact.CRITICAL
+                    or (
+                        event.impact == EventImpact.HIGH
+                        and event.category
+                        in [
+                            EventCategory.FOMC,
+                            EventCategory.NFP,
+                            EventCategory.RATES,
+                        ]
+                        and (event.timestamp - now) <= timedelta(minutes=60)
+                    )
+                    or (
+                        event.impact == EventImpact.HIGH
+                        and (event.timestamp - now) <= timedelta(minutes=30)
+                    )
+                ):
+                    is_event_blocking = True
+
+            # Check post-event window
+            elif (event.end_timestamp or event.timestamp) <= now and (
+                now - (event.end_timestamp or event.timestamp)
+            ) <= timedelta(minutes=post_window):
+                is_active = True
+                # Critical events always block during cooldown
                 if event.impact == EventImpact.CRITICAL or (
                     event.impact == EventImpact.HIGH
                     and event.category
@@ -283,29 +315,8 @@ class EventIntelligence:
                         EventCategory.NFP,
                         EventCategory.RATES,
                     ]
-                    and (event.timestamp - now) <= timedelta(minutes=60)
-                ) or (event.impact == EventImpact.HIGH and (
-                    event.timestamp - now
-                ) <= timedelta(minutes=30)):
-                    is_event_blocking = True
-
-            # Check post-event window
-            elif (
-                event.end_timestamp or event.timestamp
-            ) <= now and (
-                now - (event.end_timestamp or event.timestamp)
-            ) <= timedelta(
-                minutes=post_window
-            ):
-                is_active = True
-                # Critical events always block during cooldown
-                if event.impact == EventImpact.CRITICAL or (event.impact == EventImpact.HIGH and event.category in [
-                    EventCategory.FOMC,
-                    EventCategory.NFP,
-                    EventCategory.RATES,
-                ] and (now - (event.end_timestamp or event.timestamp)) <= timedelta(
-                    minutes=60
-                )):
+                    and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
+                ):
                     is_event_blocking = True
 
             if is_active:

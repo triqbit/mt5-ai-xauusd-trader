@@ -39,7 +39,9 @@ WIN_RATE_GAUGE = Gauge("trading_win_rate", "Trading win rate percentage")
 EXECUTION_LATENCY_HISTOGRAM = Histogram(
     "trading_execution_latency_seconds", "Time from signal to execution"
 )
-SLIPPAGE_HISTOGRAM = Histogram("trading_slippage_pips", "Difference between expected and actual price")
+SLIPPAGE_HISTOGRAM = Histogram(
+    "trading_slippage_pips", "Difference between expected and actual price"
+)
 FILL_RATE_GAUGE = Gauge("trading_fill_rate", "Percentage of orders filled at intended price")
 REJECTED_ORDER_COUNTER = Counter("trading_orders_rejected_total", "Total number of rejected orders")
 
@@ -62,7 +64,9 @@ MODEL_ACCURACY_GAUGE = Gauge("trading_model_accuracy", "Model prediction accurac
 MODEL_DRIFT_GAUGE = Gauge("trading_model_drift_score", "Statistical drift from baseline")
 
 # 5. Data Quality Metrics
-DATA_FRESHNESS_GAUGE = Gauge("trading_data_freshness_seconds", "Age of latest data point in seconds")
+DATA_FRESHNESS_GAUGE = Gauge(
+    "trading_data_freshness_seconds", "Age of latest data point in seconds"
+)
 
 
 class Monitor:
@@ -240,7 +244,12 @@ class Monitor:
             f"Difference: {diff_pct:.2f}%"
         )
         self.send_message(msg)
-        logger.error("balance_mismatch_detected", broker=broker_balance, local=local_balance, diff_pct=diff_pct)
+        logger.error(
+            "balance_mismatch_detected",
+            broker=broker_balance,
+            local=local_balance,
+            diff_pct=diff_pct,
+        )
 
     def alert_margin_call(self, margin_ratio: float) -> None:
         """Send critical alert for low margin ratio."""
@@ -248,12 +257,19 @@ class Monitor:
         self.send_message(msg)
         logger.error("margin_call_warning", margin_ratio=margin_ratio)
 
-    def log_execution_quality(self, latency_ms: float, slippage_pips: float, fill_rate: float) -> None:
+    def log_execution_quality(
+        self, latency_ms: float, slippage_pips: float, fill_rate: float
+    ) -> None:
         """Log execution quality metrics to Prometheus."""
         EXECUTION_LATENCY_HISTOGRAM.observe(latency_ms / 1000.0)
         SLIPPAGE_HISTOGRAM.observe(slippage_pips)
         FILL_RATE_GAUGE.set(fill_rate * 100)
-        logger.debug("execution_quality_logged", latency_ms=latency_ms, slippage=slippage_pips, fill_rate=fill_rate)
+        logger.debug(
+            "execution_quality_logged",
+            latency_ms=latency_ms,
+            slippage=slippage_pips,
+            fill_rate=fill_rate,
+        )
 
     def record_rejection(self, reason: str) -> None:
         """Record a rejected order."""
@@ -273,7 +289,9 @@ class Monitor:
                 f"Floor: {self.cfg.model_accuracy_floor:.2%}"
             )
             self.send_message(msg)
-            logger.warning("model_accuracy_alert", accuracy=accuracy, floor=self.cfg.model_accuracy_floor)
+            logger.warning(
+                "model_accuracy_alert", accuracy=accuracy, floor=self.cfg.model_accuracy_floor
+            )
 
         if drift_score > self.cfg.model_drift_threshold:
             msg = (
@@ -282,7 +300,9 @@ class Monitor:
                 f"Threshold: {self.cfg.model_drift_threshold:.3f}"
             )
             self.send_message(msg)
-            logger.warning("model_drift_alert", drift=drift_score, threshold=self.cfg.model_drift_threshold)
+            logger.warning(
+                "model_drift_alert", drift=drift_score, threshold=self.cfg.model_drift_threshold
+            )
 
     def log_data_freshness(self, timestamp: datetime) -> None:
         """

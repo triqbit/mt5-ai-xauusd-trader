@@ -28,7 +28,15 @@ class ScenarioGenerator:
         self,
         n_steps: int = 100,
         regime: Literal[
-            "trending", "ranging", "volatile", "gapping", "malformed", "whipsaw", "stale", "flash_crash", "regime_shift"
+            "trending",
+            "ranging",
+            "volatile",
+            "gapping",
+            "malformed",
+            "whipsaw",
+            "stale",
+            "flash_crash",
+            "regime_shift",
         ] = "ranging",
         start_price: float = 2300.0,
         trend_strength: float = 0.001,

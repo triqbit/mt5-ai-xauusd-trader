@@ -53,9 +53,7 @@ class FeatureEngineer:
         self.mins: pd.Series | None = None
         self.maxs: pd.Series | None = None
 
-    def compute_features(
-        self, df: pd.DataFrame, drop_ohlcv: bool = True
-    ) -> pd.DataFrame:
+    def compute_features(self, df: pd.DataFrame, drop_ohlcv: bool = True) -> pd.DataFrame:
         """
         Compute all features for the given OHLCV DataFrame.
 
@@ -101,7 +99,11 @@ class FeatureEngineer:
 
             # Optimization: Be selective with dropna to avoid losing all data if MTF fails
             # We identify base features and MTF features
-            base_cols = [c for c in full_df.columns if c.startswith(f"base_{self.base_timeframe}") or c.startswith("pattern_")]
+            base_cols = [
+                c
+                for c in full_df.columns
+                if c.startswith(f"base_{self.base_timeframe}") or c.startswith("pattern_")
+            ]
             mtf_cols = [c for c in full_df.columns if c.startswith("mtf_")]
 
             # First, drop rows where base features are NaN
@@ -113,7 +115,9 @@ class FeatureEngineer:
             if not full_df.empty and mtf_cols:
                 # Check if MTF columns are entirely NaN for the remaining rows
                 if full_df[mtf_cols].isna().all().all():
-                    logger.warning("MTF features are entirely NaN due to insufficient data history. Falling back to base features.")
+                    logger.warning(
+                        "MTF features are entirely NaN due to insufficient data history. Falling back to base features."
+                    )
                     # Keep rows, but MTF features will be NaN or we can drop the columns
                     # To be safe for models, we might need to fill with 0 or drop columns.
                     # Here we choose to drop columns to maintain model input integrity if expected.
@@ -121,9 +125,9 @@ class FeatureEngineer:
                     # Better to drop rows and see if any remain.
                     temp_df = full_df.dropna(subset=mtf_cols)
                     if temp_df.empty:
-                         logger.error("Insufficient data for MTF features. Row count dropped to 0.")
+                        logger.error("Insufficient data for MTF features. Row count dropped to 0.")
                     else:
-                         full_df = temp_df
+                        full_df = temp_df
                 else:
                     full_df = full_df.dropna(subset=mtf_cols)
 
@@ -133,7 +137,9 @@ class FeatureEngineer:
 
             # Remove original OHLCV columns for the final feature matrix if requested
             if drop_ohlcv:
-                features_only = full_df.drop(columns=["open", "high", "low", "close", "tick_volume"])
+                features_only = full_df.drop(
+                    columns=["open", "high", "low", "close", "tick_volume"]
+                )
             else:
                 features_only = full_df
 
@@ -332,7 +338,7 @@ class FeatureEngineer:
         # Reindex to original DataFrame using forward fill to handle frequency misalignment.
         # We then shift by 1 to ensure that at any time T, we only use MTF data
         # from periods that have completely closed.
-        mtf_indicators = mtf_indicators.reindex(df.index, method='ffill').shift(1)
+        mtf_indicators = mtf_indicators.reindex(df.index, method="ffill").shift(1)
 
         return mtf_indicators
 

@@ -35,9 +35,7 @@ logger = logging.getLogger(__name__)
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True
-    )
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(UTC),
@@ -237,9 +235,7 @@ class TradeLogger:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
-                    select(Trade.pnl).where(
-                        Trade.status == "CLOSED", Trade.is_deleted.is_(False)
-                    )
+                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
                 )
                 .scalars()
                 .all()

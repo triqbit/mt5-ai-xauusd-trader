@@ -13,6 +13,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
 def with_retry(
     exceptions: type[Exception] | tuple[type[Exception], ...],
     max_retries: int = 3,
@@ -30,6 +31,7 @@ def with_retry(
         backoff_factor: Multiplier for the delay after each retry.
         jitter: Whether to add random jitter to the delay.
     """
+
     def decorator(func: Callable):
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
@@ -42,20 +44,27 @@ def with_retry(
                     if attempt == max_retries:
                         logger.error(
                             "Max retries (%d) reached for %s. Last error: %s",
-                            max_retries, func.__name__, e
+                            max_retries,
+                            func.__name__,
+                            e,
                         )
                         raise
 
                     current_delay = delay
                     if jitter:
-                        current_delay *= (0.5 + random.random())
+                        current_delay *= 0.5 + random.random()
 
                     logger.warning(
                         "Attempt %d/%d failed for %s: %s. Retrying in %.2fs...",
-                        attempt + 1, max_retries, func.__name__, e, current_delay
+                        attempt + 1,
+                        max_retries,
+                        func.__name__,
+                        e,
+                        current_delay,
                     )
                     time.sleep(current_delay)
                     delay *= backoff_factor
 
         return wrapper
+
     return decorator

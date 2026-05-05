@@ -7,6 +7,7 @@ Dual-path MT5 connector:
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +21,7 @@ import pandas as pd
 
 try:
     import MetaTrader5 as mt5
+
     MT5_AVAILABLE = True
 except ImportError:
     MT5_AVAILABLE = False
@@ -27,6 +29,7 @@ except ImportError:
 
 try:
     from metaapi_cloud_sdk import MetaApi
+
     METAAPI_AVAILABLE = True
 except ImportError:
     METAAPI_AVAILABLE = False
@@ -112,7 +115,9 @@ class MT5Connector:
                     self._is_initialized = True
                     return True
                 error_code, error_desc = mt5.last_error()
-                logger.warning("Native mt5.initialize failed: %s (code: %d)", error_desc, error_code)
+                logger.warning(
+                    "Native mt5.initialize failed: %s (code: %d)", error_desc, error_code
+                )
                 if error_code == getattr(mt5, "RES_E_NOT_FOUND", -5):
                     logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct.")
             except Exception as e:
@@ -195,6 +200,7 @@ class MT5Connector:
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
+
             async def _get_rates():
                 candles = await self.metaapi_connection.get_historical_candles(
                     symbol, timeframe, None, n_bars
@@ -230,10 +236,12 @@ class MT5Connector:
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
+
             async def _get_range():
                 return await self.metaapi_connection.get_historical_candles(
                     symbol, timeframe, date_from, date_to
                 )
+
             candles = asyncio.run(_get_range())
             df = pd.DataFrame(candles)
             if not df.empty:
@@ -252,14 +260,16 @@ class MT5Connector:
                 raise MT5DataError(f"Failed to get tick: {mt5.last_error()}")
             return {"bid": tick.bid, "ask": tick.ask, "spread": tick.ask - tick.bid}
         else:
+
             async def _get_tick():
                 await self.metaapi_connection.get_symbol_specification(symbol)
                 price = await self.metaapi_connection.get_symbol_price(symbol)
                 return {
                     "bid": price["bid"],
                     "ask": price["ask"],
-                    "spread": price["ask"] - price["bid"]
+                    "spread": price["ask"] - price["bid"],
                 }
+
             return asyncio.run(_get_tick())
 
     def place_order(self, signal: TradeSignal) -> int | None:
@@ -305,13 +315,19 @@ class MT5Connector:
                 raise MT5ExecutionError(f"Order rejected: {result.comment}")
             return int(result.order)
         else:
+
             async def _place_order():
-                action = 'BUY' if signal.direction > 0 else 'SELL'
+                action = "BUY" if signal.direction > 0 else "SELL"
                 result = await self.metaapi_connection.create_market_order(
-                    signal.symbol, action, signal.lot_size, signal.stop_loss,
-                    signal.take_profit, {'comment': f'AI:{signal.algorithm}'}
+                    signal.symbol,
+                    action,
+                    signal.lot_size,
+                    signal.stop_loss,
+                    signal.take_profit,
+                    {"comment": f"AI:{signal.algorithm}"},
                 )
-                return int(result['orderId'])
+                return int(result["orderId"])
+
             return asyncio.run(_place_order())
 
     def get_account_info(self) -> dict[str, Any]:
@@ -321,8 +337,10 @@ class MT5Connector:
             acc = mt5.account_info()
             return acc._asdict() if acc else {}
         else:
+
             async def _get_acc():
                 return await self.metaapi_connection.get_account_information()
+
             return asyncio.run(_get_acc())
 
     def get_account_balance(self) -> float:
@@ -337,8 +355,10 @@ class MT5Connector:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
             return [p._asdict() for p in positions] if positions else []
         else:
+
             async def _get_pos():
                 return await self.metaapi_connection.get_positions()
+
             return asyncio.run(_get_pos())
 
 

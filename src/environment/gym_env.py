@@ -22,6 +22,7 @@ class TradingEnv(gym.Env):
     Actions: 0=Hold, 1=Buy, 2=Sell
     Reward: Risk-adjusted PnL (normalized)
     """
+
     metadata = {"render_modes": ["human"]}
 
     def __init__(
@@ -58,7 +59,9 @@ class TradingEnv(gym.Env):
 
         self.reset()
 
-    def reset(self, seed: int | None = None, options: dict | None = None) -> tuple[np.ndarray, dict]:
+    def reset(
+        self, seed: int | None = None, options: dict | None = None
+    ) -> tuple[np.ndarray, dict]:
         super().reset(seed=seed)
         self.balance = self.initial_balance
         self.position = 0.0  # Current position in lots
@@ -133,5 +136,5 @@ class TradingEnv(gym.Env):
             "Step: %d | Balance: $%.2f | Position: %.1f",
             self.current_step,
             self.balance,
-            self.position
+            self.position,
         )

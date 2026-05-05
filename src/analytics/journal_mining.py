@@ -569,9 +569,7 @@ class JournalMiner:
             if "confidence" in df.columns
             else "Unknown"
         )
-        df["session"] = df["created_at"].apply(
-            lambda x: (self._get_session(x) or ["Unknown"])[0]
-        )
+        df["session"] = df["created_at"].apply(lambda x: (self._get_session(x) or ["Unknown"])[0])
         df["win"] = df["pnl"] > 0
 
         # Identify signals in drawdown clusters if trades_df is provided

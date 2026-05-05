@@ -74,7 +74,11 @@ class HealthChecker:
 
     def _update_gauge(self, component: str, status: HealthStatus) -> None:
         """Helper to update Prometheus health gauge."""
-        val = 1.0 if status == HealthStatus.HEALTHY else (0.5 if status == HealthStatus.DEGRADED else 0.0)
+        val = (
+            1.0
+            if status == HealthStatus.HEALTHY
+            else (0.5 if status == HealthStatus.DEGRADED else 0.0)
+        )
         HEALTH_GAUGES.labels(component=component).set(val)
 
     def check_liveness(self) -> ComponentStatus:
@@ -86,9 +90,7 @@ class HealthChecker:
     def check_database(self) -> ComponentStatus:
         """Verify database reachability."""
         if not self.trade_logger:
-            res = ComponentStatus(
-                status=HealthStatus.FAILED, message="TradeLogger not initialized"
-            )
+            res = ComponentStatus(status=HealthStatus.FAILED, message="TradeLogger not initialized")
             self._update_gauge("database", res.status)
             return res
 
@@ -116,7 +118,9 @@ class HealthChecker:
             return res
 
         if not self.connector._is_initialized:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection not initialized")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED, message="MT5 connection not initialized"
+            )
             self._update_gauge("mt5", res.status)
             return res
 
@@ -125,13 +129,20 @@ class HealthChecker:
             # For MetaAPI fallback, get_account_info currently returns {} as it's not implemented,
             # so we only perform the active check for native MT5.
             if getattr(self.connector, "use_metaapi", False):
-                res = ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection alive (MetaAPI fallback)")
+                res = ComponentStatus(
+                    status=HealthStatus.HEALTHY, message="MT5 connection alive (MetaAPI fallback)"
+                )
             else:
                 info = self.connector.get_account_info()
                 if info:
-                    res = ComponentStatus(status=HealthStatus.HEALTHY, message="MT5 connection active and responding")
+                    res = ComponentStatus(
+                        status=HealthStatus.HEALTHY, message="MT5 connection active and responding"
+                    )
                 else:
-                    res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection failed to return account info")
+                    res = ComponentStatus(
+                        status=HealthStatus.FAILED,
+                        message="MT5 connection failed to return account info",
+                    )
         except Exception as e:
             logger.error("Health check - MT5 failure: %s", e)
             res = ComponentStatus(status=HealthStatus.FAILED, message=f"MT5 API call failed: {e!s}")
@@ -160,14 +171,16 @@ class HealthChecker:
             loaded.append("Dreamer (Ensemble)")
 
         # 2. Check for individual model wrappers (PPOAgent, LSTMModel)
-        if not loaded and hasattr(self.model, "model") and getattr(self.model, "model", None) is not None:
+        if (
+            not loaded
+            and hasattr(self.model, "model")
+            and getattr(self.model, "model", None) is not None
+        ):
             class_name = self.model.__class__.__name__
             loaded.append(f"{class_name} (Loaded)")
 
         if not loaded:
-            res = ComponentStatus(
-                status=HealthStatus.FAILED, message="No models loaded in system"
-            )
+            res = ComponentStatus(status=HealthStatus.FAILED, message="No models loaded in system")
         else:
             # Check for model health/drift if available
             health_msg = f"Models loaded: {', '.join(loaded)}"
@@ -182,9 +195,7 @@ class HealthChecker:
                     # Handle cases where metrics might be MagicMocks in tests
                     pass
 
-            res = ComponentStatus(
-                status=HealthStatus.HEALTHY, message=health_msg
-            )
+            res = ComponentStatus(status=HealthStatus.HEALTHY, message=health_msg)
 
         self._update_gauge("models", res.status)
         return res
@@ -247,7 +258,9 @@ class HealthChecker:
         Non-blocking: returns DEGRADED instead of FAILED if not configured or unreachable.
         """
         if not self.cfg.redis_url:
-            res = ComponentStatus(status=HealthStatus.DEGRADED, message="Redis URL not configured (Optional)")
+            res = ComponentStatus(
+                status=HealthStatus.DEGRADED, message="Redis URL not configured (Optional)"
+            )
             self._update_gauge("redis", res.status)
             return res
 
@@ -272,9 +285,13 @@ class HealthChecker:
             return res
 
         if self.audit_logger._initialized:
-            res = ComponentStatus(status=HealthStatus.HEALTHY, message="AuditLogger initialized and active")
+            res = ComponentStatus(
+                status=HealthStatus.HEALTHY, message="AuditLogger initialized and active"
+            )
         else:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="AuditLogger not properly initialized")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED, message="AuditLogger not properly initialized"
+            )
 
         self._update_gauge("audit_log", res.status)
         return res
@@ -315,7 +332,8 @@ class HealthChecker:
         report = self.get_full_report()
         if report.status == HealthStatus.FAILED:
             failed_components = [
-                name for name, comp in report.components.items()
+                name
+                for name, comp in report.components.items()
                 if comp.status == HealthStatus.FAILED
             ]
             msg = f"Startup health gate FAILED. Critical components: {', '.join(failed_components)}"
@@ -326,7 +344,8 @@ class HealthChecker:
 
         if report.status == HealthStatus.DEGRADED:
             warnings = [
-                name for name, comp in report.components.items()
+                name
+                for name, comp in report.components.items()
                 if comp.status == HealthStatus.DEGRADED
             ]
             msg = f"Startup health gate PASSED with warnings in: {', '.join(warnings)}"
