@@ -339,6 +339,9 @@ latency_histogram.observe(45.2)
 
 Proactive monitoring and intelligent alerting are critical for maintaining a high-performance trading bot. Regular review of alerts, tuning of thresholds, and continuous improvement of observability ensure reliable operations 24/7.
 
+---
+**Implementation Note (2026-05-05):** The core monitoring system has been implemented in `src/core/monitor.py`, including real-time equity curve tracking, Telegram integration, and critical alerting logic for circuit breakers and model health.
+
 ## 11. Exposed Metrics (Prometheus)
 
 The following metrics are exposed by the `Monitor` module:

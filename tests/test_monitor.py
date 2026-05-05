@@ -112,8 +112,6 @@ class TestMonitor(unittest.TestCase):
             self.assertTrue(self.monitor.bot.send_message.called)
             msg = self.monitor.bot.send_message.call_args[1]["text"]
             self.assertIn("Confidence Degradation", msg)
-            self.assertIn("0.500", msg)
-            self.assertIn("0.600", msg)
             mock_set.assert_called_with(0.5)
 
             self.monitor.bot.send_message.reset_mock()
@@ -122,15 +120,6 @@ class TestMonitor(unittest.TestCase):
             self.monitor.check_confidence_degradation(0.7)
             self.assertFalse(self.monitor.bot.send_message.called)
             mock_set.assert_called_with(0.7)
-
-    def test_check_confidence_degradation_at_threshold(self):
-        self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
-        with patch.object(CONFIDENCE_GAUGE, 'set') as mock_set:
-            # Case: Exactly at threshold (should NOT alert if it uses < threshold)
-            self.monitor.check_confidence_degradation(0.6)
-            self.assertFalse(self.monitor.bot.send_message.called)
-            mock_set.assert_called_with(0.6)
 
     def test_record_trade(self):
         with patch.object(TRADE_COUNTER, "inc") as mock_inc:

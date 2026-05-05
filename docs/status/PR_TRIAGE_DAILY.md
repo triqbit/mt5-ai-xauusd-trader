@@ -1,24 +1,36 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-05-04 13:42:19 UTC
+**Date:** 2026-05-05 13:26:20 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (372)
+- High number of open PRs (382)
 
 ---
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Address Turbulence:** High number of open PRs (372)
+1. **Address Turbulence:** High number of open PRs (382)
 2. **Quick Win:** Review Safe PR #597 (chore(deps)(deps): bump ruff from 0.4.3 to 0.15.12)
-3. **Core Progress:** Review Medium Risk PR #539 (Institutional Feature Engineering Pipeline with MTF and TA-Lib Integration)
+3. **Core Progress:** Review Medium Risk PR #635 (Enhance RL Evaluation Framework with Institutional Metrics)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|-----------|------------|-------------|
-| [623](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/623) | Implement Institutional Strategy Benchmarking Framework | saysgrok | `feature/strategy-benchmarking-framework-9285714277882560630` | pending | High Risk | New |
+| [679](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/679) | Implement 6-layer execution filter cascade | triqbit | `main-11897965318201135755` | pending | High Risk | New |
+| [677](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/677) | Resolve CI Failures and Repair Package Imports | triqbit | `fix-ci-and-imports-18340016623805067441` | pending | High Risk | New |
+| [671](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/671) | 📡 Jules02: Observability improvement — Trace correlation and structured decision logging | xnessom | `jules02-observability-trace-correlation-4412286391252496586` | pending | High Risk | New |
+| [669](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/669) | 🔁 Jules02: CI quality gate improvement — automated schema drift detection | xnessom | `ci-quality-gate-alembic-check-16227452023196123444` | pending | High Risk | New |
+| [665](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/665) | 🗄️ Jules02: Database reliability improvement — Harden schema with constraints and indices | xnessom | `jules-db-harden-schema-17020265077597966395` | pending | High Risk | New |
+| [659](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/659) | 🛡️ Jules02: Risk control and drift monitoring — 8-layer safety gate | xnessom | `jules/risk-drift-hardening-12741481022099876693` | pending | High Risk | New |
+| [656](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/656) | 🛠️ Jules02: Resilience improvement — Granular error classification and conditional retries | xnessom | `jules/resilience-improvement-5696228263120657988` | pending | High Risk | New |
+| [646](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/646) | 🗺️ Atlas: [release-readiness improvement] semantic versioning and automated changelog | andonly1348 | `feature/semantic-versioning-automation-16897123911114220192` | pending | High Risk | New |
+| [645](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/645) | 🗺️ Atlas: Structured Audit Traceability & Startup Snapshots | andonly1348 | `atlas-structured-audit-traceability-16092515227154492166` | pending | High Risk | New |
+| [640](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/640) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-15424065726604275366` | pending | High Risk | New |
+| [636](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/636) | 🚀 Jules05: Release candidate v1.1.0-rc3 composition | yxynoty | `jules05-release-candidate-v1-1-0-rc3-composition-1901614359877343652` | pending | High Risk | New |
+| [635](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/635) | Enhance RL Evaluation Framework with Institutional Metrics | saysgrok | `rl-evaluation-framework-enhancement-1213898009252086213` | pending | Medium Risk | New |
+| [630](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/630) | 🤖 Jules05: Auto-merge policy update | yxynoty | `yxynoty/auto-merge-policy-update-6277512515235727028` | pending | High Risk | New |
 | [622](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/622) | Implement Enterprise Trade Logging System | triqbit | `feature/trade-logging-system-4235461279000191749` | pending | High Risk | New |
 | [621](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/621) | Production-Ready Model Stubs for RL and Sequence Models | triqbit | `feat/production-ready-model-stubs-4958351952458528388` | pending | High Risk | New |
 | [617](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/617) | Implement 6-layer execution filter cascade | triqbit | `implement-6-layer-execution-filter-7455756755056821811` | pending | High Risk | New |
@@ -26,18 +38,17 @@
 | [610](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/610) | 🔁 Jules02: CI quality gate improvement — enable and harden mypy type checking | xnessom | `jules02-ci-mypy-harden-8180845914223901542` | pending | High Risk | New |
 | [606](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/606) | 🗄️ Jules02: Database reliability improvement — Hardening schema and optimized indexing | xnessom | `jules02-db-hardening-indexing-12257169954074584938` | pending | High Risk | New |
 | [597](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/597) | chore(deps)(deps): bump ruff from 0.4.3 to 0.15.12 | dependabot[bot] | `dependabot/pip/ruff-0.15.12` | pending | Safe Surface | New |
-| [589](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/589) | chore(deps)(deps): bump joblib from 1.4.2 to 1.5.3 | dependabot[bot] | `dependabot/pip/joblib-1.5.3` | pending | Safe Surface | New |
-| [580](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/580) | Implement Comprehensive Enterprise Audit Trail | andonly1348 | `feat/audit-trail-traceability-11655795334712331200` | pending | High Risk | New |
-| [577](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/577) | 📘 Jules02: Documentation and schema governance — Hardening risk configuration and signal validation | xnessom | `main-9080511879036191314` | pending | High Risk | New |
-| [566](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/566) | Scaffold Enterprise Core & Institutional Risk Engine | triqbit | `scaffold-enterprise-core-5480812409823157506` | pending | High Risk | New |
-| [565](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/565) | 🗺️ Atlas: [release-readiness improvement] Enterprise Structured Audit Logging & Traceability | andonly1348 | `atlas/audit-traceability-improvement-5173992966306719056` | pending | High Risk | New |
-| [562](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/562) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-coherence-improvements-8046256859215155084` | pending | High Risk | New |
-| [553](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/553) | Implement Vectorized Walk-Forward Backtesting Engine | triqbit | `feature/backtester-engine-implementation-1215394928531445670` | pending | High Risk | New |
-| [550](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/550) | Refactor Docker environment and enable multi-arch CI support | triqbit | `feature/docker-refactor-multi-arch-11699283514801860661` | pending | High Risk | New |
-| [548](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/548) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05/auto-merge-policy-update-10082516963154558143` | pending | High Risk | New |
-| [542](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/542) | Implement Enterprise Trade Logging System | triqbit | `feature/trade-logger-enterprise-standards-12095589433892550217` | pending | High Risk | New |
-| [539](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/539) | Institutional Feature Engineering Pipeline with MTF and TA-Lib Integration | triqbit | `feature-engineering-pipeline-7579800350118622268` | pending | Medium Risk | New |
-| [535](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/535) | Fix CI Failures and Import Errors | triqbit | `fix-ci-and-imports-12240891966680375670` | pending | High Risk | New |
+| [580](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/580) | Implement Comprehensive Enterprise Audit Trail | andonly1348 | `feat/audit-trail-traceability-11655795334712331200` | unknown | Triage Required | New |
+| [577](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/577) | 📘 Jules02: Documentation and schema governance — Hardening risk configuration and signal validation | xnessom | `main-9080511879036191314` | unknown | Triage Required | New |
+| [566](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/566) | Scaffold Enterprise Core & Institutional Risk Engine | triqbit | `scaffold-enterprise-core-5480812409823157506` | unknown | Triage Required | New |
+| [565](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/565) | 🗺️ Atlas: [release-readiness improvement] Enterprise Structured Audit Logging & Traceability | andonly1348 | `atlas/audit-traceability-improvement-5173992966306719056` | unknown | Triage Required | New |
+| [562](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/562) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-coherence-improvements-8046256859215155084` | unknown | Triage Required | New |
+| [553](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/553) | Implement Vectorized Walk-Forward Backtesting Engine | triqbit | `feature/backtester-engine-implementation-1215394928531445670` | unknown | Triage Required | New |
+| [550](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/550) | Refactor Docker environment and enable multi-arch CI support | triqbit | `feature/docker-refactor-multi-arch-11699283514801860661` | unknown | Triage Required | New |
+| [548](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/548) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05/auto-merge-policy-update-10082516963154558143` | unknown | Triage Required | New |
+| [542](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/542) | Implement Enterprise Trade Logging System | triqbit | `feature/trade-logger-enterprise-standards-12095589433892550217` | unknown | Triage Required | New |
+| [539](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/539) | Institutional Feature Engineering Pipeline with MTF and TA-Lib Integration | triqbit | `feature-engineering-pipeline-7579800350118622268` | unknown | Triage Required | New |
+| [535](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/535) | Fix CI Failures and Import Errors | triqbit | `fix-ci-and-imports-12240891966680375670` | unknown | Triage Required | New |
 | [532](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/532) | ⚡ Bolt: Vectorize row access in Benchmark Adapters | triqbit | `bolt-vectorize-benchmark-adapters-7970088729794148970` | unknown | Triage Required | New |
 | [530](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/530) | 🔁 Jules02: CI quality gate improvement — Enable and enforce Mypy | xnessom | `jules02-ci-quality-mypy-enforcement-13107669412525356373` | unknown | Triage Required | New |
 | [527](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/527) | Institutional Market Regime Detection for XAUUSD | saysgrok | `regime-detector-implementation-813110743689190159` | unknown | Triage Required | New |
@@ -82,7 +93,6 @@
 | [412](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/412) | Integrate multi-PR sequence (#370, #372, #368, #360) | candiansource | `integration-resolution-14752551201055895667` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [411](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/411) | 🔧 Jules05: Resolve cross-agent conflict [Institutional Component Harmonization] | yxynoty | `jules05-institutional-harmonization-16826606755164112144` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [409](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/409) | Implement Vectorized Walk-Forward Backtester and 140+ Feature Pipeline | triqbit | `feat/vectorized-backtester-engine-2507153487072586691-229851346506917575` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
-| [385](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/385) | chore(docker)(deps): bump python from 3.11-slim to 3.14-slim | dependabot[bot] | `dependabot/docker/python-3.14-slim` | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [381](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/381) | chore(actions)(deps): bump actions/cache from 4 to 5 | dependabot[bot] | `dependabot/github_actions/actions/cache-5` | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [375](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/375) | Implement model stubs and base interface | triqbit | `implement-model-stubs-11387061741357092186` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [373](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/373) | 🚀 Jules05: Release candidate v1.1.0 composition | yxynoty | `release/v1.1.0-2506536362439602818` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
@@ -393,18 +403,18 @@
 
 ## 🛡️ Risk Classification Summary
 
-- **High Risk (New):** 17 PRs
+- **High Risk (New):** 18 PRs
 - **Medium Risk (New):** 1 PRs
-- **Safe Surface (New):** 5 PRs
-- **Triage Required (New):** 33 PRs
-- **Stale (Total):** 316 PRs
+- **Safe Surface (New):** 4 PRs
+- **Triage Required (New):** 44 PRs
+- **Stale (Total):** 315 PRs
 
 ## ✨ Good Candidates for Review Today
 
 - **PR #597**: chore(deps)(deps): bump ruff from 0.4.3 to 0.15.12 (dependabot[bot]) [CI: pending] - *Safe Surface*
-- **PR #589**: chore(deps)(deps): bump joblib from 1.4.2 to 1.5.3 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #491**: 🧹 Jules05: Technical debt cleanup — architectural harmonization (yxynoty) - *Safe Surface*
 - **PR #473**: DX: Daily PR Triage and Risk Dashboard [2026-05-02] (triqbit) - *Safe Surface*
+- **PR #460**: Fix CI failures, linting, and import errors (triqbit) - *Safe Surface*
 
 ---
 *Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths and heuristics.*
