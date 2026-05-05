@@ -39,6 +39,7 @@ Detects default values or placeholder patterns (`YOUR_TOKEN`, `CHANGE_ME`, `YOUR
 - **MODEL_DRIFT_THRESHOLD**: Warning if set greater than 0.4 (Recommended: 0.3).
 - **MODEL_ACCURACY_FLOOR**: Strictly prohibited if less than 0.45.
 - **MODEL_WIN_RATE_FLOOR**: Strictly prohibited if less than 0.40.
+- **MODEL_CALIBRATION_THRESHOLD**: Warning if set greater than 0.4 (Recommended: 0.25).
 
 ### 6. Incompatible Settings & Consistency
 - **LOG_LEVEL**: Warning if set to `DEBUG` in `live` mode.
