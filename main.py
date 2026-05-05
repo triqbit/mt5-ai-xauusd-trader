@@ -472,34 +472,60 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--log-level", default="INFO", help="Logging level")
     p.add_argument("--check", action="store_true", help="Perform pre-flight health checks and exit")
+    p.add_argument("--confirm-live", action="store_true", help="Explicitly confirm live trading")
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    configure_logging(args.log_level)
-    log, console = logging.getLogger("main"), Console()
 
-    # Override config from CLI: CLI > ENV > .env defaults
-    if args.mode:
-        os.environ["MODE"] = args.mode
-    if args.algo:
-        os.environ["ALGORITHM"] = args.algo
-    if args.symbol:
-        os.environ["SYMBOL"] = args.symbol
-    if args.timeframe:
-        os.environ["TIMEFRAME"] = args.timeframe
+    # 1. Dynamic CLI Override Mapping: CLI Arg -> Environment Variable
+    # This ensures CLI > ENV > .env precedence.
+    cli_overrides = {
+        "mode": "MODE",
+        "algo": "ALGORITHM",
+        "symbol": "SYMBOL",
+        "timeframe": "TIMEFRAME",
+        "confirm_live": "CONFIRM_LIVE_TRADING",
+        "log_level": "LOG_LEVEL",
+    }
 
-    # Ensure get_config() picks up the CLI-overridden environment variables
+    # Identify explicitly provided arguments to avoid defaults overriding ENV/.env.
+    provided_dest = set()
+    temp_p = argparse.ArgumentParser(add_help=False)
+    temp_p.add_argument("--mode")
+    temp_p.add_argument("--algo")
+    temp_p.add_argument("--symbol")
+    temp_p.add_argument("--timeframe")
+    temp_p.add_argument("--confirm-live", action="store_true")
+    temp_p.add_argument("--log-level", dest="log_level")
+
+    for action in temp_p._actions:
+        for opt in action.option_strings:
+            if opt in sys.argv:
+                provided_dest.add(action.dest)
+
+    for arg_name, env_var in cli_overrides.items():
+        if arg_name in provided_dest:
+            val = getattr(args, arg_name, None)
+            if val is not None:
+                if isinstance(val, bool):
+                    if val:  # Only set if True for flags
+                        os.environ[env_var] = "YES" if arg_name == "confirm_live" else str(val)
+                else:
+                    os.environ[env_var] = str(val)
+
+    # 2. Reset config cache before ANY component uses get_config()
     from src.core.config import get_config
 
     get_config.cache_clear()
 
+    # 3. Load configuration and initialize logging
     try:
         cfg = get_config()
-        get_masking_processor().update_secrets(cfg)
     except Exception as exc:
-        # Check if it's a Pydantic validation error (usually missing required fields)
+        # Preliminary check for missing required variables before logging is even ready
+        console = Console()
         if "validation error" in str(exc).lower():
             console.print(
                 Panel(
@@ -515,8 +541,16 @@ def main() -> int:
                 )
             )
         else:
-            log.critical("Failed to load configuration: %s", exc)
+            print(f"CRITICAL: Failed to load configuration: {exc}")
         return 1
+
+    configure_logging(cfg.log_level)
+    log, console = logging.getLogger("main"), Console()
+    get_masking_processor().update_secrets(cfg)
+
+    # Re-verify if it was a Pydantic validation error if we somehow got past get_config()
+    # (Pydantic 2.0+ usually raises on instantiation)
+    # Actually, we already handled it above.
 
     # Validate configuration
     validator = ConfigValidator(cfg)
@@ -556,6 +590,25 @@ def main() -> int:
         "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite",
     )
 
+    # Risk summary row
+    risk_color = (
+        "red"
+        if cfg.risk_per_trade > 0.02
+        else "yellow"
+        if cfg.risk_per_trade > 0.01
+        else "green"
+    )
+    summary.add_row("Risk/Trade:  ", f"[{risk_color}]{cfg.risk_per_trade:.1%}[/]")
+
+    daily_loss_color = "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    summary.add_row("Daily Stop:  ", f"[{daily_loss_color}]{cfg.max_daily_loss:.1%}[/]")
+
+    pos_color = "red" if cfg.max_positions > 10 else "yellow" if cfg.max_positions > 5 else "green"
+    summary.add_row("Max Positions:  ", f"[{pos_color}]{cfg.max_positions}[/]")
+
+    conf_color = "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
+
     console.print(
         Panel(
             summary,
@@ -591,6 +644,23 @@ def main() -> int:
         try:
             connector.connect()
         except MT5ConnectionError as exc:
+            # Enhanced connection diagnostics
+            diag = Table.grid(expand=True)
+            diag.add_column(style="cyan", justify="right")
+            diag.add_column(style="white", justify="left")
+            diag.add_row("Server:  ", cfg.mt5_server)
+            diag.add_row("Login:  ", str(cfg.mt5_login))
+            diag.add_row("Path:  ", cfg.mt5_path)
+            diag.add_row("Platform:  ", sys.platform)
+
+            console.print(
+                Panel(
+                    diag,
+                    title="[bold red]Connection Diagnostics[/]",
+                    subtitle="Sanitized connection settings",
+                    border_style="red",
+                )
+            )
             log.critical("Cannot connect to MT5 terminal: %s. Aborting.", exc)
             return 1
     balance = connector.get_account_balance()

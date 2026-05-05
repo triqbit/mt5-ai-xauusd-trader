@@ -121,7 +121,7 @@ class ConfigValidator:
                     "MODE",
                     "LIVE mode detected but not confirmed.",
                     True,
-                    "Set CONFIRM_LIVE_TRADING=YES in your environment for live trading.",
+                    "Use --confirm-live flag or set CONFIRM_LIVE_TRADING=YES in your environment.",
                 )
             )
 

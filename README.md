@@ -110,6 +110,9 @@ python main.py --check
 
 # Start trading in demo mode (CLI flags override .env)
 python main.py --mode demo --symbol XAUUSD --algo ensemble
+
+# Start live trading (requires explicit confirmation)
+python main.py --mode live --confirm-live
 ```
 
 ---
