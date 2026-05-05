@@ -16,7 +16,7 @@ from src.research.benchmarks import (
     VolatilityBreakoutStrategy,
 )
 from src.research.reporting import ResearchReport, ResearchReporter
-from src.research.stress_lab import StressLab
+from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 
 __all__ = [
     "BenchmarkEvaluator",
@@ -30,5 +30,7 @@ __all__ = [
     "ResearchReporter",
     "RiskFilteredBaseline",
     "StressLab",
+    "StressScenario",
+    "StressTestMetrics",
     "VolatilityBreakoutStrategy",
 ]
