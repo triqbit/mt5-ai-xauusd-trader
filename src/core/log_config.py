@@ -5,8 +5,12 @@ src/core/log_config.py
 
 from __future__ import annotations
 
+import logging
 import re
+import sys
 from typing import Any
+
+import structlog
 
 from src.core.config import TradingConfig
 
@@ -72,3 +76,37 @@ _masking_processor = SecretMaskingProcessor()
 def get_masking_processor() -> SecretMaskingProcessor:
     """Retrieve the global masking processor instance."""
     return _masking_processor
+
+
+def configure_logging(level: str = "INFO") -> None:
+    """
+    Centralized logging configuration for the MT5 Trading Bot.
+    Uses structlog for structured logging and standard logging for compatibility.
+    """
+    processors: list[Any] = [
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        get_masking_processor(),
+    ]
+
+    # In a production environment without a TTY, use JSON logging
+    if not sys.stdout.isatty():
+        processors.append(structlog.processors.JSONRenderer())
+    else:
+        processors.append(structlog.dev.ConsoleRenderer())
+
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    # Configure standard logging to redirect to structlog-compatible output
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format="%(message)s",
+        stream=sys.stdout,
+    )

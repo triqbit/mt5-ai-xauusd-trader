@@ -12,6 +12,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -50,6 +51,7 @@ class AuditEntry(Base):
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
@@ -85,15 +87,22 @@ class AuditLogger:
         action: str,
         details: str | None = None,
         metadata: dict[str, Any] | None = None,
+        trace_id: str | None = None,
     ) -> int:
         """
         Record a new audit entry.
+        Automatically captures trace_id from structlog context if not provided.
         """
+        if not trace_id:
+            ctx = structlog.contextvars.get_contextvars()
+            trace_id = ctx.get("trace_id")
+
         with self.Session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
                 details=details,
+                trace_id=trace_id,
                 metadata_json=metadata,
             )
             session.add(entry)
