@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 from sqlalchemy import (
     Boolean,
-    Column,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -25,24 +25,32 @@ from sqlalchemy import (
     create_engine,
     select,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
-Base = declarative_base()
 logger = logging.getLogger(__name__)
+
+
+class Base(DeclarativeBase):
+    """Base class for SQLAlchemy models."""
+    pass
 
 
 class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True)
-    updated_at = Column(
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
-    is_deleted = Column(Boolean, default=False, index=True)
+    created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -50,20 +58,25 @@ class ModelSignal(Base, AuditMixin):
 
     __tablename__ = "model_signals"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False, index=True)
-    direction = Column(Integer, nullable=False)  # +1 buy, -1 sell, 0 hold
-    entry_price = Column(Float, nullable=False)
-    stop_loss = Column(Float)
-    take_profit = Column(Float)
-    lot_size = Column(Float)
-    algorithm = Column(String(50))
-    confidence = Column(Float)
-    volatility = Column(Float)
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    direction: Mapped[int] = mapped_column(nullable=False)  # +1 buy, -1 sell, 0 hold
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    stop_loss: Mapped[float | None] = mapped_column(Float)
+    take_profit: Mapped[float | None] = mapped_column(Float)
+    lot_size: Mapped[float | None] = mapped_column(Float)
+    algorithm: Mapped[str | None] = mapped_column(String(50))
+    confidence: Mapped[float | None] = mapped_column(Float)
+    volatility: Mapped[float | None] = mapped_column(Float)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationship
-    trade = relationship("Trade", back_populates="signal", uselist=False)
+    trade: Mapped["Trade"] = relationship("Trade", back_populates="signal", uselist=False)
+
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_signal_entry_price_positive"),
+        CheckConstraint("lot_size >= 0", name="check_signal_lot_size_non_negative"),
+    )
 
 
 class Trade(Base, AuditMixin):
@@ -71,19 +84,24 @@ class Trade(Base, AuditMixin):
 
     __tablename__ = "trades"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    ticket = Column(Integer, unique=True, index=True)
-    symbol = Column(String(20), nullable=False, index=True)
-    direction = Column(Integer, nullable=False)
-    entry_price = Column(Float, nullable=False)
-    exit_price = Column(Float)
-    lot_size = Column(Float, nullable=False)
-    pnl = Column(Float, default=0.0)
-    drawdown_impact = Column(Float)  # impact on total drawdown
-    status = Column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ticket: Mapped[int] = mapped_column(unique=True, index=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    direction: Mapped[int] = mapped_column(nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    exit_price: Mapped[float | None] = mapped_column(Float)
+    lot_size: Mapped[float] = mapped_column(Float, nullable=False)
+    pnl: Mapped[float] = mapped_column(Float, default=0.0)
+    drawdown_impact: Mapped[float | None] = mapped_column(Float)  # impact on total drawdown
+    status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
-    signal_id = Column(Integer, ForeignKey("model_signals.id"))
-    signal = relationship("ModelSignal", back_populates="trade")
+    signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"))
+    signal: Mapped["ModelSignal"] = relationship("ModelSignal", back_populates="trade")
+
+    __table_args__ = (
+        CheckConstraint("entry_price > 0", name="check_trade_entry_price_positive"),
+        CheckConstraint("lot_size > 0", name="check_trade_lot_size_positive"),
+    )
 
 
 class RiskEvent(Base, AuditMixin):
@@ -91,12 +109,12 @@ class RiskEvent(Base, AuditMixin):
 
     __tablename__ = "risk_events"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    event_type = Column(String(50), nullable=False)
-    description = Column(Text)
-    symbol = Column(String(20))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    symbol: Mapped[str | None] = mapped_column(String(20))
 
-    signal_id = Column(Integer, ForeignKey("model_signals.id"), nullable=True)
+    signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"), nullable=True)
 
 
 class PerformanceMetric(Base, AuditMixin):
@@ -104,13 +122,13 @@ class PerformanceMetric(Base, AuditMixin):
 
     __tablename__ = "performance_metrics"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
-    sharpe_ratio = Column(Float)
-    profit_factor = Column(Float)
-    max_drawdown = Column(Float)
-    total_trades = Column(Integer)
-    win_rate = Column(Float)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    sharpe_ratio: Mapped[float | None] = mapped_column(Float)
+    profit_factor: Mapped[float | None] = mapped_column(Float)
+    max_drawdown: Mapped[float | None] = mapped_column(Float)
+    total_trades: Mapped[int | None] = mapped_column(Integer)
+    win_rate: Mapped[float | None] = mapped_column(Float)
 
 
 class TradeLogger:
@@ -118,6 +136,8 @@ class TradeLogger:
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
         self.engine = create_engine(db_url)
+        # In a real production system, we would use Alembic migrations instead of create_all.
+        # But for development/testing, this ensures the tables exist.
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
