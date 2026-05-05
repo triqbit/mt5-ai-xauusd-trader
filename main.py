@@ -262,19 +262,19 @@ def run_live(
                             model_health=health,
                             trade_logger=trade_logger,
                         )
+                        if audit_logger:
+                            audit_logger.log_execution_decision(
+                                symbol=cfg.symbol,
+                                direction=signal.direction,
+                                trace=filter_decision.trace,
+                                is_approved=filter_decision.is_approved,
+                            )
+
                         if not filter_decision.is_approved:
                             log.warning(
                                 "Filter BLOCKED | %s | Reason: %s",
                                 cfg.symbol,
                                 filter_decision.blocked_by,
-                            )
-                            audit_logger.log_blocked_trade(
-                                symbol=cfg.symbol,
-                                reason=f"Execution filter blocked: {filter_decision.blocked_by}",
-                                context={
-                                    "filter": filter_decision.blocked_by,
-                                    "confidence": filter_decision.confidence_score,
-                                },
                             )
                             risk_approved = False
 
@@ -752,7 +752,9 @@ def main() -> int:
         return 0
 
     # Record successful deployment/startup
-    audit_logger.log_deployment(version="1.1.0", environment=cfg.mode)
+    from src import __version__ as app_version
+
+    audit_logger.log_deployment(version=app_version, environment=cfg.mode)
 
     try:
         if cfg.mode in ("demo", "live"):

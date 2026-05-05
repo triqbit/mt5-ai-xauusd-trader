@@ -145,6 +145,28 @@ class AuditLogger:
             },
         )
 
+    def log_execution_decision(
+        self,
+        symbol: str,
+        direction: int,
+        trace: dict[str, Any],
+        is_approved: bool,
+    ) -> int:
+        """
+        Log the technical execution filter decision and its full trace.
+        """
+        return self.log(
+            actor="execution_filter",
+            action="execution_decision",
+            details=f"Execution decision for {symbol} {direction}: {'PASSED' if is_approved else 'FAILED'}",
+            metadata={
+                "symbol": symbol,
+                "direction": direction,
+                "trace": trace,
+                "is_approved": is_approved,
+            },
+        )
+
     def log_blocked_trade(
         self, symbol: str, reason: str, context: dict[str, Any] | None = None
     ) -> int:

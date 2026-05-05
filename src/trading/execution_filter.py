@@ -9,9 +9,9 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -33,6 +33,7 @@ class ExecutionDecision:
     is_approved: bool
     confidence_score: float
     blocked_by: str | None = None
+    trace: dict[str, Any] = field(default_factory=dict)
 
 
 class ExecutionFilter:
@@ -63,93 +64,98 @@ class ExecutionFilter:
     ) -> ExecutionDecision:
         """
         Run the full 9-layer filter cascade.
+        Evaluates all layers without short-circuiting to capture a full audit trace.
         """
         timestamp = timestamp or signal.timestamp or datetime.now(UTC)
+        trace: dict[str, Any] = {}
 
         # Layer 1: ATR Volatility
-        if not self._check_atr_volatility(market_data):
-            return ExecutionDecision(signal, False, 0.0, "ATR_VOLATILITY")
+        atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(market_data)
+        trace["atr_volatility"] = {"passed": atr_passed, **atr_metrics}
 
         # Layer 2: Trend Angle
-        if not self._check_trend_angle(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.2, "TREND_ANGLE")
+        trend_passed, trend_metrics = self._check_trend_angle_with_metrics(
+            market_data, signal.direction
+        )
+        trace["trend_angle"] = {"passed": trend_passed, **trend_metrics}
 
         # Layer 3: EMA Sequence
-        if not self._check_ema_sequence(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.3, "EMA_SEQUENCE")
+        ema_passed, ema_metrics = self._check_ema_sequence_with_metrics(
+            market_data, signal.direction
+        )
+        trace["ema_sequence"] = {"passed": ema_passed, **ema_metrics}
 
         # Layer 4: Momentum (RSI)
-        if not self._check_momentum(market_data, signal.direction):
-            return ExecutionDecision(signal, False, 0.4, "MOMENTUM")
+        momentum_passed, momentum_metrics = self._check_momentum_with_metrics(
+            market_data, signal.direction
+        )
+        trace["momentum"] = {"passed": momentum_passed, **momentum_metrics}
 
         # Layer 5: Session/Time
-        if not self._check_session_time(timestamp):
-            return ExecutionDecision(signal, False, 0.5, "SESSION_TIME")
+        session_passed = self._check_session_time(timestamp)
+        trace["session_time"] = {"passed": session_passed, "timestamp": timestamp.isoformat()}
 
         # Layer 6: Drawdown
-        if not self._check_drawdown_limit(current_drawdown):
-            return ExecutionDecision(signal, False, 0.1, "DRAWDOWN_LIMIT")
+        drawdown_passed = self._check_drawdown_limit(current_drawdown)
+        trace["drawdown_limit"] = {
+            "passed": drawdown_passed,
+            "current_drawdown": current_drawdown,
+            "max_drawdown": self.max_drawdown,
+        }
 
         # Layer 7: Model Stability Guard
-        if not self._check_model_stability(model_health):
-            return ExecutionDecision(signal, False, 0.0, "MODEL_STABILITY")
+        stability_passed, stability_metrics = self._check_model_stability_with_metrics(model_health)
+        trace["model_stability"] = {"passed": stability_passed, **stability_metrics}
 
         # Layer 8: Performance Floor
-        if not self._check_performance_floor(trade_logger):
-            return ExecutionDecision(signal, False, 0.0, "PERFORMANCE_FLOOR")
+        perf_passed, perf_metrics = self._check_performance_floor_with_metrics(trade_logger)
+        trace["performance_floor"] = {"passed": perf_passed, **perf_metrics}
 
         # Layer 9: Confidence Threshold
-        if not self._check_dynamic_confidence(signal.confidence):
-            return ExecutionDecision(signal, False, signal.confidence, "CONFIDENCE_THRESHOLD")
+        conf_passed = self._check_dynamic_confidence(signal.confidence)
+        trace["confidence_threshold"] = {
+            "passed": conf_passed,
+            "confidence": signal.confidence,
+            "threshold": self.cfg.confidence_threshold if self.cfg else 0.0,
+        }
 
-        return ExecutionDecision(signal, True, signal.confidence)
+        # Determine final approval
+        is_approved = all(t["passed"] for t in trace.values())
+        blocked_by = None
+        if not is_approved:
+            # Identify first failure for backward compatibility in blocked_by field
+            failure_order = [
+                "atr_volatility",
+                "trend_angle",
+                "ema_sequence",
+                "momentum",
+                "session_time",
+                "drawdown_limit",
+                "model_stability",
+                "performance_floor",
+                "confidence_threshold",
+            ]
+            for layer in failure_order:
+                if not trace[layer]["passed"]:
+                    blocked_by = layer.upper()
+                    break
 
-    def _check_model_stability(self, health: dict[str, float] | None) -> bool:
-        """Blocks if aggregate model drift or accuracy breaches limits."""
-        if health is None or self.cfg is None:
-            return True
-
-        drift = health.get("drift", 0.0)
-        acc = health.get("accuracy", 1.0)
-
-        if drift > self.cfg.model_drift_threshold:
-            logger.warning(
-                "EXECUTION BLOCKED: Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold
-            )
-            return False
-
-        if acc < self.cfg.model_accuracy_floor:
-            logger.warning(
-                "EXECUTION BLOCKED: Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor
-            )
-            return False
-
-        return True
-
-    def _check_performance_floor(self, trade_logger: TradeLogger | None) -> bool:
-        """Blocks if historical win rate drops below floor."""
-        if trade_logger is None or self.cfg is None:
-            return True
-
-        report = trade_logger.read_performance_report()
-        win_rate = report.get("win_rate", 1.0)
-        total_trades = report.get("total_trades", 0)
-
-        if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
-            logger.warning(
-                "EXECUTION BLOCKED: Win rate %.2f < %.2f", win_rate, self.cfg.model_win_rate_floor
-            )
-            return False
-
-        return True
-
-    def _check_dynamic_confidence(self, confidence: float) -> bool:
-        """Enforces configured confidence threshold."""
-        if self.cfg is None:
-            return True
-        return confidence >= self.cfg.confidence_threshold
+        return ExecutionDecision(
+            signal=signal,
+            is_approved=is_approved,
+            confidence_score=signal.confidence,
+            blocked_by=blocked_by,
+            trace=trace,
+        )
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
+        """Original method - now delegates to metrics version."""
+        passed, _ = self._check_atr_volatility_with_metrics(df, threshold)
+        return passed
+
+    def _check_atr_volatility_with_metrics(
+        self, df: pd.DataFrame, threshold: float = 3.0
+    ) -> tuple[bool, dict[str, Any]]:
         """Blocks if current ATR is > threshold * average ATR."""
         if "base_M5_atr" not in df.columns:
             # Fallback calculation if not in DF
@@ -163,40 +169,57 @@ class ExecutionFilter:
         else:
             atr = df["base_M5_atr"]
 
-        current_atr = atr.iloc[-1]
-        avg_atr = atr.rolling(window=100).mean().iloc[-1]
+        current_atr = float(atr.iloc[-1])
+        avg_atr = float(atr.rolling(window=100).mean().iloc[-1])
 
         if np.isnan(current_atr) or np.isnan(avg_atr):
-            return True  # Not enough data, pass
+            return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
 
-        return bool(current_atr <= threshold * avg_atr)
+        ratio = current_atr / avg_atr if avg_atr > 0 else 0.0
+        passed = ratio <= threshold
+        return passed, {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": ratio}
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
+        """Original method - now delegates to metrics version."""
+        passed, _ = self._check_trend_angle_with_metrics(df, direction, window)
+        return passed
+
+    def _check_trend_angle_with_metrics(
+        self, df: pd.DataFrame, direction: int, window: int = 20
+    ) -> tuple[bool, dict[str, Any]]:
         """Validates that the price trend matches signal direction using regression slope of EMA21."""
-        # Align with FeatureEngineer default EMA stack (8, 21, 50, 200)
         ema_col = "base_M5_ema_21"
         if ema_col in df.columns:
             ema_series = df[ema_col]
         elif "close" in df.columns:
             ema_series = df["close"].ewm(span=21, adjust=False).mean()
         else:
-            logger.warning("Trend angle check failed: No EMA21 or close price available")
-            return True  # Pass by default if data is missing to avoid blocking valid trades
+            return True, {"slope": 0.0, "reason": "No EMA data"}
 
         target_ema = ema_series.iloc[-window:]
         if len(target_ema) < window:
-            return True  # Not enough data to be sure, pass
+            return True, {"slope": 0.0, "reason": "Insufficient data"}
 
         x = np.arange(len(target_ema))
         slope, _, _, _, _ = stats.linregress(x, target_ema.values)
 
         if direction > 0:  # BUY
-            return bool(slope > 0)
-        if direction < 0:  # SELL
-            return bool(slope < 0)
-        return False
+            passed = bool(slope > 0)
+        elif direction < 0:  # SELL
+            passed = bool(slope < 0)
+        else:
+            passed = False
+
+        return passed, {"slope": float(slope), "direction": direction}
 
     def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
+        """Original method - now delegates to metrics version."""
+        passed, _ = self._check_ema_sequence_with_metrics(df, direction)
+        return passed
+
+    def _check_ema_sequence_with_metrics(
+        self, df: pd.DataFrame, direction: int
+    ) -> tuple[bool, dict[str, Any]]:
         """Verifies EMA stack (8 > 21 > 50 > 200 for BUY)."""
         periods = [8, 21, 50, 200]
         emas = {}
@@ -204,36 +227,119 @@ class ExecutionFilter:
         for p in periods:
             col = f"base_M5_ema_{p}"
             if col in df.columns:
-                emas[p] = df[col].iloc[-1]
+                emas[p] = float(df[col].iloc[-1])
             else:
-                emas[p] = df["close"].ewm(span=p, adjust=False).mean().iloc[-1]
+                emas[p] = float(df["close"].ewm(span=p, adjust=False).mean().iloc[-1])
 
         if direction > 0:  # BUY
-            return bool(emas[8] > emas[21] > emas[50] > emas[200])
-        if direction < 0:  # SELL
-            return bool(emas[8] < emas[21] < emas[50] < emas[200])
-        return False
+            passed = bool(emas[8] > emas[21] > emas[50] > emas[200])
+        elif direction < 0:  # SELL
+            passed = bool(emas[8] < emas[21] < emas[50] < emas[200])
+        else:
+            passed = False
+
+        return passed, {"emas": emas, "direction": direction}
 
     def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
+        """Original method - now delegates to metrics version."""
+        passed, _ = self._check_momentum_with_metrics(df, direction)
+        return passed
+
+    def _check_momentum_with_metrics(
+        self, df: pd.DataFrame, direction: int
+    ) -> tuple[bool, dict[str, Any]]:
         """Validates RSI is in a healthy momentum zone."""
         col = "base_M5_rsi"
         if col in df.columns:
-            rsi = df[col].iloc[-1]
+            rsi = float(df[col].iloc[-1])
         else:
             delta = df["close"].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
             rs = gain / (loss + 1e-8)
-            rsi = 100 - (100 / (1 + rs)).iloc[-1]
+            rsi = float(100 - (100 / (1 + rs)).iloc[-1])
 
         if np.isnan(rsi):
-            return True
+            return True, {"rsi": 0.0}
 
         if direction > 0:  # BUY
-            return bool(50 <= rsi <= 75)
-        if direction < 0:  # SELL
-            return bool(25 <= rsi <= 50)
-        return False
+            passed = bool(50 <= rsi <= 75)
+        elif direction < 0:  # SELL
+            passed = bool(25 <= rsi <= 50)
+        else:
+            passed = False
+
+        return passed, {"rsi": rsi, "direction": direction}
+
+    def _check_model_stability(self, health: dict[str, float] | None) -> bool:
+        """Original method - now delegates to metrics version."""
+        passed, _ = self._check_model_stability_with_metrics(health)
+        return passed
+
+    def _check_model_stability_with_metrics(
+        self, health: dict[str, float] | None
+    ) -> tuple[bool, dict[str, Any]]:
+        """Blocks if aggregate model drift or accuracy breaches limits."""
+        if health is None or self.cfg is None:
+            return True, {"drift": 0.0, "accuracy": 1.0}
+
+        drift = float(health.get("drift", 0.0))
+        acc = float(health.get("accuracy", 1.0))
+
+        passed = True
+        if drift > self.cfg.model_drift_threshold:
+            logger.warning(
+                "EXECUTION BLOCKED: Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold
+            )
+            passed = False
+
+        if acc < self.cfg.model_accuracy_floor:
+            logger.warning(
+                "EXECUTION BLOCKED: Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor
+            )
+            passed = False
+
+        return passed, {
+            "drift": drift,
+            "accuracy": acc,
+            "drift_threshold": self.cfg.model_drift_threshold,
+            "accuracy_floor": self.cfg.model_accuracy_floor,
+        }
+
+    def _check_performance_floor(self, trade_logger: TradeLogger | None) -> bool:
+        """Original method - now delegates to metrics version."""
+        passed, _ = self._check_performance_floor_with_metrics(trade_logger)
+        return passed
+
+    def _check_performance_floor_with_metrics(
+        self, trade_logger: TradeLogger | None
+    ) -> tuple[bool, dict[str, Any]]:
+        """Blocks if historical win rate drops below floor."""
+        if trade_logger is None or self.cfg is None:
+            return True, {"win_rate": 1.0, "total_trades": 0}
+
+        report = trade_logger.read_performance_report()
+        win_rate = float(report.get("win_rate", 1.0))
+        total_trades = int(report.get("total_trades", 0))
+
+        passed = True
+        if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
+            logger.warning(
+                "EXECUTION BLOCKED: Win rate %.2f < %.2f", win_rate, self.cfg.model_win_rate_floor
+            )
+            passed = False
+
+        return passed, {
+            "win_rate": win_rate,
+            "total_trades": total_trades,
+            "win_rate_floor": self.cfg.model_win_rate_floor,
+        }
+
+    def _check_dynamic_confidence(self, confidence: float) -> bool:
+        """Enforces configured confidence threshold."""
+        if self.cfg is None:
+            return True
+        return confidence >= self.cfg.confidence_threshold
 
     def _check_session_time(self, timestamp: datetime) -> bool:
         """Blocks outside institutional trading hours (Sun 17:00 - Fri 16:00 GMT)."""
