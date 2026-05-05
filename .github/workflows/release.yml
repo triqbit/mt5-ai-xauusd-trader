@@ -77,8 +77,15 @@ jobs:
       - name: Mypy Check
         run: mypy src/ --ignore-missing-imports
 
+      - name: Secret Scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Dependency Audit
-        run: pip-audit --requirement requirements-ci.txt
+        run: |
+          pip-audit --requirement requirements.txt
+          pip-audit --requirement requirements-ci.txt
 
       - name: License Compliance Check
         run: |
@@ -219,10 +226,10 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           DATE=$(date +%Y-%m-%d)
 
-          # Update pyproject.toml
+          # Update version strings using a shared variable
+          echo "Updating version to ${VERSION} in pyproject.toml and src/__init__.py"
           sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
 
-          # Update src/__init__.py if it exists
           if [ -f "src/__init__.py" ]; then
             sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" src/__init__.py
           fi
