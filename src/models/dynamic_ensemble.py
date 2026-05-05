@@ -41,27 +41,58 @@ class DynamicEnsemble:
         smoothing_factor: float = 0.1,
         max_swing: float = 0.05,
         min_weight: float = 0.05,
+        initial_weights: dict[str, float] | None = None,
     ) -> None:
         """
         Initialize the dynamic ensemble engine.
 
         Args:
             model_names: List of model identifiers.
-            smoothing_factor: EMA decay factor for weight updates.
-            max_swing: Maximum allowed weight change per update.
-            min_weight: Minimum weight floor for any single model.
+            smoothing_factor: EMA decay factor for weight updates (0.0 to 1.0).
+            max_swing: Maximum allowed weight change per update (> 0.0).
+            min_weight: Minimum weight floor for any single model (>= 0.0).
+            initial_weights: Optional initial weight distribution.
         """
         if not model_names:
             raise ValueError("model_names cannot be empty")
+
+        if not (0.0 <= smoothing_factor <= 1.0):
+            raise ValueError("smoothing_factor must be between 0.0 and 1.0")
+
+        if max_swing <= 0.0:
+            raise ValueError("max_swing must be greater than 0.0")
+
+        if min_weight < 0.0:
+            raise ValueError("min_weight must be non-negative")
+
+        if len(model_names) * min_weight > 1.0:
+            raise ValueError("min_weight is too high for the number of models")
 
         self.model_names = model_names
         self.smoothing_factor = smoothing_factor  # EMA decay
         self.max_swing = max_swing  # Cap on abrupt changes
         self.min_weight = min_weight  # Floor per model
 
-        # Initialize equal weights
-        n = len(model_names)
-        self.weights = dict.fromkeys(model_names, 1.0 / n)
+        if initial_weights:
+            # Validate initial weights
+            if not all(m in initial_weights for m in model_names):
+                raise ValueError("initial_weights must contain all model_names")
+
+            total = sum(initial_weights.values())
+            if abs(total - 1.0) > 1e-6:
+                # Normalize if not summing to 1
+                self.weights = {m: initial_weights[m] / total for m in model_names}
+            else:
+                self.weights = {m: initial_weights[m] for m in model_names}
+
+            # Ensure min_weight is respected
+            if any(w < min_weight for w in self.weights.values()):
+                self.weights = self._normalize_with_floor(self.weights, min_weight)
+        else:
+            # Initialize equal weights
+            n = len(model_names)
+            self.weights = dict.fromkeys(model_names, 1.0 / n)
+
         self._target_weights = self.weights.copy()
         self._prev_target_weights = self.weights.copy()
 
@@ -106,6 +137,7 @@ class DynamicEnsemble:
             drift = m.get("drift_score", 0.0)
 
             # Core scoring formula: High weight on accuracy, penalized by drift and miscalibration.
+            # Institutional weightings: accuracy (1.0x), calibration (0.3x penalty), drift (0.4x penalty)
             score = acc - (0.3 * cal) - (0.4 * drift)
 
             # Regime-based adjustments (XAUUSD heuristics)

@@ -11,6 +11,7 @@ The `DynamicEnsemble` class implements an adaptive weighting engine that adjusts
 - **Stability Controls**:
     - **EMA Smoothing**: Prevents erratic jumps in weights.
     - **Weight Swing Caps**: Limits the maximum change in any single update.
+- **Initial Weight Support**: Allows setting custom starting weight distributions.
     - **Oscillation Dampening**: Detects and slows down adaptation when target weights flip-flop across the current mean.
 - **Regime & Volatility Awareness**: Weights are adjusted based on the current `RegimeInfo`, including `MarketRegime` (e.g., penalizing drift during news shocks) and a `volatility_index` which modulates the adaptation speed.
 - **XAUUSD Heuristics**: Specific scoring logic tailored for gold market behaviors:
