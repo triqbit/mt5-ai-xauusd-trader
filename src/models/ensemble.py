@@ -177,6 +177,7 @@ class EnsembleModel(BaseModel):
                         k: {"dir": s.direction.name, "conf": s.confidence}
                         for k, s in model_signals.items()
                     },
+                    "per_algo_votes": {k: s.direction for k, s in model_signals.items()},
                 },
             )
 
@@ -229,6 +230,7 @@ class EnsembleModel(BaseModel):
                     k: {"dir": s.direction.name, "conf": s.confidence}
                     for k, s in model_signals.items()
                 },
+                "per_algo_votes": {k: s.direction for k, s in model_signals.items()},
             },
         )
 
@@ -237,7 +239,11 @@ class EnsembleModel(BaseModel):
         Manually aggregate pre-calculated signals using weighted consensus.
         """
         if not signals:
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0)
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"per_algo_votes": {}, "weights": self.weights},
+            )
 
         has_buy = any(s.direction == SignalDirection.BUY for s in signals.values())
         has_sell = any(s.direction == SignalDirection.SELL for s in signals.values())
@@ -252,6 +258,7 @@ class EnsembleModel(BaseModel):
                         k: {"dir": s.direction.name, "conf": s.confidence}
                         for k, s in signals.items()
                     },
+                    "per_algo_votes": {k: s.direction for k, s in signals.items()},
                 },
             )
 
@@ -268,12 +275,28 @@ class EnsembleModel(BaseModel):
             else:
                 weighted_hold_conf += sig.confidence * weight
 
+        metadata = {
+            "weighted_probs": {
+                "BUY": weighted_buy_conf,
+                "SELL": weighted_sell_conf,
+                "HOLD": weighted_hold_conf,
+            },
+            "weights": self.weights,
+            "per_algo_votes": {k: s.direction for k, s in signals.items()},
+        }
+
         if weighted_buy_conf >= self.consensus_threshold:
-            return Signal(direction=SignalDirection.BUY, confidence=weighted_buy_conf)
+            return Signal(
+                direction=SignalDirection.BUY, confidence=weighted_buy_conf, metadata=metadata
+            )
         elif weighted_sell_conf >= self.consensus_threshold:
-            return Signal(direction=SignalDirection.SELL, confidence=weighted_sell_conf)
+            return Signal(
+                direction=SignalDirection.SELL, confidence=weighted_sell_conf, metadata=metadata
+            )
         else:
-            return Signal(direction=SignalDirection.HOLD, confidence=weighted_hold_conf)
+            return Signal(
+                direction=SignalDirection.HOLD, confidence=weighted_hold_conf, metadata=metadata
+            )
 
     # ── Dynamic weight adaptation ────────────────────────────────────────────
     def record_return(

@@ -106,13 +106,13 @@ class RiskEngine:
         if len(open_positions) >= self.cfg.max_positions:
             return RiskDecision(False, "Max concurrent positions reached")
 
+        # Net Directional Exposure (Max 30% per direction)
+        if not self._check_directional_exposure(signal, open_positions):
+            return RiskDecision(False, "Max directional exposure reached (30%)")
+
         # Total Notional (< 100% of equity)
         if not self._check_total_notional(signal, open_positions, market_data):
             return RiskDecision(False, "Total notional exposure exceeds equity")
-
-        # Net Directional Exposure (Max 30% per direction)
-        if not self._check_directional_exposure(signal, open_positions, market_data):
-            return RiskDecision(False, "Max directional exposure reached (30%)")
 
         # 4. Prediction Limits
         if signal.confidence < self.cfg.min_confidence:
@@ -130,7 +130,7 @@ class RiskEngine:
         return RiskDecision(True, "Approved", adjusted_lots)
 
     def _check_directional_exposure(
-        self, signal: Any, open_positions: list[dict[str, Any]], market_data: pd.DataFrame
+        self, signal: Any, open_positions: list[dict[str, Any]]
     ) -> bool:
         """
         Enforce max 30% net long OR short exposure.
@@ -155,10 +155,7 @@ class RiskEngine:
         # (Net Lots * Price * 100) / Balance
         # For gold at 2300: 0.1 lots = 10oz = $23,000. Balance 100k -> 23%
         # We cap net notional at 30%
-        price_estimate = 2300.0
-        if not market_data.empty:
-            price_estimate = market_data["close"].iloc[-1]
-
+        price_estimate = 2300.0  # Placeholder, should ideally use latest price
         notional = abs(net_lots) * price_estimate * 100
         exposure_pct = notional / self.balance if self.balance > 0 else 1.0
 

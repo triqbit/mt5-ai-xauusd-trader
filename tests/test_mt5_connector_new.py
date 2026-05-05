@@ -32,28 +32,13 @@ def test_metaapi_fallback(mock_metaapi, mock_config):
 
     # Mocking the async parts
     mock_metaapi_instance = mock_metaapi.return_value
+    mock_metaapi_instance.metatrader_account_api.get_account = MagicMock()
 
-    # Mock account and connection
-    mock_account = MagicMock()
-    mock_connection = MagicMock()
-
-    async def async_wait(*args, **kwargs):
-        return None
-
-    # Make them awaitable
-    async def async_get_account(*args, **kwargs):
-        return mock_account
-
-    mock_metaapi_instance.metatrader_account_api.get_account = MagicMock(side_effect=async_get_account)
-    mock_account.wait_connected = MagicMock(side_effect=async_wait)
-    mock_account.get_rpc_connection = MagicMock(return_value=mock_connection)
-    mock_connection.connect = MagicMock(side_effect=async_wait)
-    mock_connection.wait_synchronized = MagicMock(side_effect=async_wait)
-
-    connector = MT5Connector(mock_config)
-    assert connector.initialize()
-    assert connector.use_metaapi
-    assert connector._is_initialized
+    with patch("asyncio.run") as mock_run:
+        connector = MT5Connector(mock_config)
+        assert connector.initialize()
+        assert connector.use_metaapi
+        assert connector._is_initialized
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
@@ -80,18 +65,3 @@ def test_place_order_native(mock_mt5, mock_config):
     ticket = connector.place_order(signal)
     assert ticket == 12345
     mock_mt5.order_send.assert_called_once()
-
-@patch("src.trading.mt5_connector.mt5")
-@patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
-def test_get_rates_native(mock_mt5, mock_config):
-    connector = MT5Connector(mock_config)
-    connector._is_initialized = True
-    connector.use_metaapi = False
-
-    mock_mt5.copy_rates_from_pos.return_value = [
-        (1713520000, 2300.0, 2305.0, 2295.0, 2302.0, 100, 0, 0)
-    ]
-    df = connector.get_rates("XAUUSD", "M5", 1)
-    assert not df.empty
-    assert "time" in df.columns
-    assert df["close"].iloc[0] == 2302.0

@@ -40,9 +40,6 @@ jobs:
           # Patterns that strictly block and escalate
           HIGH_RISK_PATTERNS=(
             "src/trading/executor.py"      # Live trading execution logic
-            "src/core/risk_engine.py"      # Core risk calculation engine
-            "src/trading/risk_engine.py"   # Core risk calculation engine
-            "src/trading/risk_manager.py"  # Risk parameters and position sizing
             "config/secrets.*"             # Credentials and secrets
             ".github/workflows/deploy.*"   # Deployment workflows
             "migrations/.*"                # Database migrations

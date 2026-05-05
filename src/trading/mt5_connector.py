@@ -87,18 +87,6 @@ class MT5Connector:
         self.metaapi_connection: Any | None = None
         self._is_initialized: bool = False
 
-    def _run_coro(self, coro: Any) -> Any:
-        """
-        Helper to run coroutines from synchronous methods safely.
-        Uses the current event loop, supporting nested loops via nest_asyncio.
-        """
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(coro)
-
     @with_retry(MT5ConnectionError, max_retries=3)
     def initialize(self) -> bool:
         """
@@ -115,17 +103,11 @@ class MT5Connector:
             MT5ConnectionError: If all connection paths fail after retries.
         """
         logger.info("Initializing MT5 connector | mode=%s", self.cfg.mode)
+        self.use_metaapi = False  # Reset state
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
             try:
-                # Check if already initialized to avoid re-init overhead
-                if mt5.terminal_info() is not None:
-                    logger.info("Native MT5 SDK already initialized.")
-                    self.use_metaapi = False
-                    self._is_initialized = True
-                    return True
-
                 if mt5.initialize(
                     path=self.cfg.mt5_path,
                     login=self.cfg.mt5_login,
@@ -167,7 +149,7 @@ class MT5Connector:
                     await self.metaapi_connection.connect()
                     await self.metaapi_connection.wait_synchronized()
 
-                self._run_coro(_init_metaapi())
+                asyncio.run(_init_metaapi())
                 self.use_metaapi = True
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured and connected.")
@@ -190,7 +172,7 @@ class MT5Connector:
             if not self.use_metaapi and MT5_AVAILABLE:
                 mt5.shutdown()
             elif self.use_metaapi and self.metaapi_connection:
-                self._run_coro(self.metaapi_connection.close())
+                asyncio.run(self.metaapi_connection.close())
             logger.info("MT5 connector shutdown complete.")
             self._is_initialized = False
 
@@ -223,15 +205,7 @@ class MT5Connector:
             if rates is None:
                 raise MT5DataError(f"Failed to copy rates: {mt5.last_error()}")
             df = pd.DataFrame(rates)
-            if not df.empty:
-                # MT5 returns a structured array which might not have 'time' as a column label
-                # if passed directly to DataFrame constructor in some environments.
-                # Usually it has fields like 'time', 'open', etc.
-                if "time" in df.columns:
-                    df["time"] = pd.to_datetime(df["time"], unit="s")
-                elif 0 in df.columns:  # it's a list of tuples
-                    df.columns = ["time", "open", "high", "low", "close", "tick_volume", "spread", "real_volume"]
-                    df["time"] = pd.to_datetime(df["time"], unit="s")
+            df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
         else:
 
@@ -241,7 +215,7 @@ class MT5Connector:
                 )
                 return candles
 
-            candles = self._run_coro(_get_rates())
+            candles = asyncio.run(_get_rates())
             df = pd.DataFrame(candles)
             if not df.empty:
                 df["time"] = pd.to_datetime(df["time"])
@@ -276,7 +250,7 @@ class MT5Connector:
                     symbol, timeframe, date_from, date_to
                 )
 
-            candles = self._run_coro(_get_range())
+            candles = asyncio.run(_get_range())
             df = pd.DataFrame(candles)
             if not df.empty:
                 df["time"] = pd.to_datetime(df["time"])
@@ -304,7 +278,7 @@ class MT5Connector:
                     "spread": price["ask"] - price["bid"],
                 }
 
-            return self._run_coro(_get_tick())
+            return asyncio.run(_get_tick())
 
     @with_retry(MT5ExecutionError, max_retries=2)
     def place_order(self, signal: TradeSignal) -> int | None:
@@ -382,7 +356,7 @@ class MT5Connector:
                 except Exception as e:
                     raise MT5ExecutionError(f"MetaAPI order placement failed: {e}") from e
 
-            ticket = self._run_coro(_place_order())
+            ticket = asyncio.run(_place_order())
             logger.info("MetaAPI order executed successfully | ticket=%d", ticket)
             return ticket
 
@@ -397,7 +371,7 @@ class MT5Connector:
             async def _get_acc():
                 return await self.metaapi_connection.get_account_information()
 
-            return self._run_coro(_get_acc())
+            return asyncio.run(_get_acc())
 
     def get_account_balance(self) -> float:
         """Retrieve current account balance."""
@@ -415,7 +389,7 @@ class MT5Connector:
             async def _get_pos():
                 return await self.metaapi_connection.get_positions()
 
-            return self._run_coro(_get_pos())
+            return asyncio.run(_get_pos())
 
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]

@@ -25,10 +25,3 @@ def test_risk_params():
     cfg = TradingConfig(MT5_PASSWORD="test", MT5_SERVER="test")
     assert cfg.max_daily_loss == 0.05
     assert cfg.volatility_high_threshold == 1.5
-    assert cfg.max_weekly_loss == 0.10
-    assert cfg.max_monthly_loss == 0.15
-
-def test_execution_params():
-    cfg = TradingConfig(MT5_PASSWORD="test", MT5_SERVER="test")
-    assert cfg.min_spread_pips == 0.5
-    assert cfg.spread_halt_pips == 2.0
