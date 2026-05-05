@@ -15,9 +15,10 @@ The institutional research reporting system automatically generates high-quality
 
 - **Flexible Output Formats**:
     - **HTML**: Professional browser-viewable reports with:
-        - **Interactive TOC**: Anchor links for rapid navigation.
+        - **Interactive TOC**: Anchor links with smooth-scroll navigation.
         - **Dynamic Numbering**: Sequential numbering that adapts to omitted sections.
-        - **Visual Progress Bars**: ARIA-compliant visualizations for strategy health scores.
+        - **Visual Progress Bars**: ARIA-compliant visualizations for strategy health scores with dynamic color-coding (Red/Yellow/Green) based on thresholds.
+        - **Easy Navigation**: Floating 'Back to Top' button for efficient long-report review.
         - **Accessibility**: Screen-reader optimized table structures and semantic HTML.
     - **Markdown**: Structured, documentation-friendly reports generated via Jinja2 templates with dynamic numbering.
     - **Terminal**: Scannable, interactive dashboards using the `rich` library.

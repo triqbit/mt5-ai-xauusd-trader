@@ -6,6 +6,7 @@
     <title>{{ title }} - Research Report</title>
     <style>
         :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --light: #f4f7f6; --white: #ffffff; }
+        html { scroll-behavior: smooth; }
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 60px 20px 20px; background-color: var(--light); }
         header { background: var(--primary); color: var(--white); padding: 3rem 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
         h1 { margin: 0; font-size: 2.75rem; letter-spacing: -0.025em; }
@@ -30,6 +31,9 @@
         .score { font-size: 1.75rem; font-weight: 800; color: var(--success); }
         .progress-bar { background: #edf2f7; border-radius: 999px; height: 12px; flex-grow: 1; overflow: hidden; max-width: 350px; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #2ecc71, #27ae60); transition: width 0.5s ease-out; }
+        .fill-low { background: linear-gradient(90deg, #f56565, #e53e3e); }
+        .fill-medium { background: linear-gradient(90deg, #ecc94b, #d69e2e); }
+        .fill-high { background: linear-gradient(90deg, #48bb78, #2f855a); }
         .fail { color: var(--danger); font-weight: bold; }
         .pass { color: var(--success); font-weight: bold; }
         .insight-box { background: #ebf8ff; padding: 1.25rem; border-radius: 8px; border: 1px solid #bee3f8; color: #2c5282; }
@@ -39,7 +43,9 @@
         .badge-warning { background: #fef3c7; color: #92400e; }
         .badge-critical { background: #fde8e8; color: #9b1c1c; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .metadata { flex-direction: column; gap: 5px; } }
+        .back-to-top { position: fixed; bottom: 30px; right: 30px; background: var(--primary); color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s, background 0.2s; z-index: 1000; font-weight: bold; }
+        .back-to-top:hover { transform: translateY(-3px); background: var(--secondary); color: white; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .metadata { flex-direction: column; gap: 5px; } .back-to-top { bottom: 20px; right: 20px; width: 40px; height: 40px; } }
     </style>
 </head>
 <body>
@@ -136,8 +142,8 @@
         <h2>{{ ns.count }}. Stress Test Outcomes</h2>
         <div class="score-container">
             <span>Resilience Score:</span>
-            <div class="progress-bar" role="progressbar" aria-valuenow="{{ stress_tests.resilience_score }}" aria-valuemin="0" aria-valuemax="100">
-                <div class="progress-fill" style="width: {{ stress_tests.resilience_score }}%;"></div>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ stress_tests.resilience_score|round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="Strategy resilience score: {{ stress_tests.resilience_score|round(1) }} out of 100">
+                <div class="progress-fill {% if stress_tests.resilience_score < 50 %}fill-low{% elif stress_tests.resilience_score < 80 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ stress_tests.resilience_score }}%;"></div>
             </div>
             <span class="score">{{ stress_tests.resilience_score }}/100</span>
         </div>
@@ -198,8 +204,8 @@
         <h2>{{ ns.count }}. Hyperparameter Robustness</h2>
         <div class="score-container">
             <span>Stability Score:</span>
-            <div class="progress-bar" role="progressbar" aria-valuenow="{{ hyperparameter_robustness.stability_score }}" aria-valuemin="0" aria-valuemax="100">
-                <div class="progress-fill" style="width: {{ hyperparameter_robustness.stability_score }}%;"></div>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ hyperparameter_robustness.stability_score|round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="Parameter stability score: {{ hyperparameter_robustness.stability_score|round(1) }} out of 100">
+                <div class="progress-fill {% if hyperparameter_robustness.stability_score < 50 %}fill-low{% elif hyperparameter_robustness.stability_score < 80 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ hyperparameter_robustness.stability_score }}%;"></div>
             </div>
             <span class="score">{{ hyperparameter_robustness.stability_score }}/100</span>
         </div>
@@ -468,8 +474,8 @@
         <h2>{{ ns.count }}. Execution Quality & Alpha Decay</h2>
         <div class="score-container">
             <span>Execution Efficiency:</span>
-            <div class="progress-bar" role="progressbar" aria-valuenow="{{ execution_quality.efficiency_score }}" aria-valuemin="0" aria-valuemax="100">
-                <div class="progress-fill" style="width: {{ execution_quality.efficiency_score }}%;"></div>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ execution_quality.efficiency_score }}" aria-valuemin="0" aria-valuemax="100" aria-label="Execution efficiency score: {{ execution_quality.efficiency_score|round(1) }} out of 100">
+                <div class="progress-fill {% if execution_quality.efficiency_score < 50 %}fill-low{% elif execution_quality.efficiency_score < 80 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ execution_quality.efficiency_score }}%;"></div>
             </div>
             <span class="score">{{ execution_quality.efficiency_score|round(1) }}/100</span>
         </div>
@@ -517,6 +523,8 @@
         <h2>{{ ns.count }}. Conclusion & Recommendations</h2>
         <p>{{ conclusion }}</p>
     </section>
+
+    <a href="#" class="back-to-top" title="Back to top" aria-label="Scroll back to top">↑</a>
 
     <footer>
         &copy; 2024-2025 Triqbit MT5 Research. All rights reserved. Generated by ResearchReporter.
