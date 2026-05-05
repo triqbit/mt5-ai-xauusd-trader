@@ -22,7 +22,8 @@ def test_lstm_attention_model_output_shape():
     # Batch size 2, Sequence length 10, Features 140
     x = torch.randn(2, 10, n_features)
     output = model(x)
-    assert output.shape == (2, 3) # [buy, sell, hold] logits
+    assert output.shape == (2, 3)  # [buy, sell, hold] logits
+
 
 def test_ensemble_model_standardized_direction():
     """Verify EnsembleModel maps Action indices to standard SignalDirection."""
@@ -34,7 +35,7 @@ def test_ensemble_model_standardized_direction():
     mock_ppo.predict.return_value = (0, None)
     ensemble._ppo_model = mock_ppo
 
-    obs = np.random.rand(5) # Mock observation
+    obs = np.random.rand(5)  # Mock observation
     # Adjust ModelAction to ensure prediction is BUY
     # ModelAction.BUY is 1. PPO returns action index.
     mock_ppo.predict.return_value = (1, None)
@@ -43,6 +44,7 @@ def test_ensemble_model_standardized_direction():
     assert isinstance(signal.direction, SignalDirection)
     assert signal.direction == SignalDirection.BUY
     assert signal.metadata["per_algo_votes"]["ppo"] == 1.0
+
 
 def test_ensemble_record_return_rebalance():
     """Verify weight rebalancing logic triggers correctly."""

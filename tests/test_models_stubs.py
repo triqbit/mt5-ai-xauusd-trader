@@ -22,6 +22,7 @@ def test_ppo_agent_stub():
     assert signal.confidence == 0.0
     assert "error" in signal.metadata
 
+
 def test_lstm_model_stub():
     """Test LSTMModel initialization and prediction behavior."""
     agent = LSTMModel(input_dim=10)
@@ -39,6 +40,7 @@ def test_lstm_model_stub():
         assert signal.direction == SignalDirection.HOLD
         assert "error" in signal.metadata
 
+
 def test_dreamer_agent_stub():
     """Test DreamerAgent initialization and placeholder behavior."""
     agent = DreamerAgent()
@@ -54,10 +56,12 @@ def test_dreamer_agent_stub():
     agent.reset_state()
     assert agent.state is None
 
+
 def test_trading_env_skeleton():
     """Test TradingEnv compliance with Gymnasium 0.29+ API."""
     df = np.random.randn(100, 10)
     import pandas as pd
+
     df_pd = pd.DataFrame(df)
 
     env = TradingEnv(df=df_pd, window_size=10)

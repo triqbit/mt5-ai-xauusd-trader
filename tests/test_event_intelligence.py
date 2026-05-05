@@ -1,21 +1,24 @@
-import pytest
 import json
-import os
-from datetime import datetime, timedelta, UTC
-from unittest.mock import patch, MagicMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from src.data.event_intelligence import (
-    EventIntelligence,
-    MockEventProvider,
-    JSONEventProvider,
-    MetaAPIEventProvider,
-    MacroEvent,
     EventCategory,
-    EventImpact
+    EventImpact,
+    EventIntelligence,
+    JSONEventProvider,
+    MacroEvent,
+    MetaAPIEventProvider,
+    MockEventProvider,
 )
+
 
 @pytest.fixture
 def now():
     return datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
+
 
 @pytest.fixture
 def mock_events(now):
@@ -24,27 +27,28 @@ def mock_events(now):
             name="CPI Data",
             category=EventCategory.CPI,
             impact=EventImpact.HIGH,
-            timestamp=now + timedelta(minutes=15)
+            timestamp=now + timedelta(minutes=15),
         ),
         MacroEvent(
             name="FOMC Meeting",
             category=EventCategory.FOMC,
             impact=EventImpact.CRITICAL,
-            timestamp=now + timedelta(hours=1)
+            timestamp=now + timedelta(hours=1),
         ),
         MacroEvent(
             name="Past NFP",
             category=EventCategory.NFP,
             impact=EventImpact.HIGH,
-            timestamp=now - timedelta(minutes=10)
+            timestamp=now - timedelta(minutes=10),
         ),
         MacroEvent(
             name="Minor Event",
             category=EventCategory.OTHER,
             impact=EventImpact.LOW,
-            timestamp=now + timedelta(minutes=2)
-        )
+            timestamp=now + timedelta(minutes=2),
+        ),
     ]
+
 
 def test_risk_status_blocking(now):
     events = [
@@ -52,7 +56,7 @@ def test_risk_status_blocking(now):
             name="CPI Data",
             category=EventCategory.CPI,
             impact=EventImpact.HIGH,
-            timestamp=now + timedelta(minutes=15)
+            timestamp=now + timedelta(minutes=15),
         )
     ]
     provider = MockEventProvider(events)
@@ -64,13 +68,14 @@ def test_risk_status_blocking(now):
     assert "CPI Data" in status.reason
     assert status.risk_multiplier == 0.5
 
+
 def test_risk_status_critical_blocking(now):
     events = [
         MacroEvent(
             name="FOMC Meeting",
             category=EventCategory.FOMC,
             impact=EventImpact.CRITICAL,
-            timestamp=now + timedelta(minutes=30)
+            timestamp=now + timedelta(minutes=30),
         )
     ]
     provider = MockEventProvider(events)
@@ -80,6 +85,7 @@ def test_risk_status_critical_blocking(now):
     assert status.is_blocked is True
     assert status.risk_multiplier == 0.0
 
+
 def test_risk_status_cooldown(now):
     # Past NFP was 10 mins ago, HIGH impact major event has 180 mins cooldown
     # and it blocks for the first 60 mins.
@@ -88,7 +94,7 @@ def test_risk_status_cooldown(now):
             name="Past NFP",
             category=EventCategory.NFP,
             impact=EventImpact.HIGH,
-            timestamp=now - timedelta(minutes=10)
+            timestamp=now - timedelta(minutes=10),
         )
     ]
     provider = MockEventProvider(events)
@@ -100,6 +106,7 @@ def test_risk_status_cooldown(now):
     assert len(status.active_events) == 1
     assert status.active_events[0].name == "Past NFP"
 
+
 def test_no_active_events(now):
     provider = MockEventProvider([])
     intel = EventIntelligence(provider)
@@ -108,6 +115,7 @@ def test_no_active_events(now):
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
     assert len(status.active_events) == 0
+
 
 def test_fallback_behavior_no_cache(now):
     class BrokenProvider(MockEventProvider):
@@ -120,6 +128,7 @@ def test_fallback_behavior_no_cache(now):
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
     assert "Event data unavailable (no cache)" in status.reason
+
 
 def test_fallback_behavior_with_cache(now):
     class SometimesBrokenProvider(MockEventProvider):
@@ -136,7 +145,7 @@ def test_fallback_behavior_with_cache(now):
         name="Cached Event",
         category=EventCategory.CPI,
         impact=EventImpact.HIGH,
-        timestamp=now + timedelta(minutes=15)
+        timestamp=now + timedelta(minutes=15),
     )
     provider = SometimesBrokenProvider([event])
     intel = EventIntelligence(provider)
@@ -154,6 +163,7 @@ def test_fallback_behavior_with_cache(now):
     assert "Cached Event" in status.reason
     assert status.risk_multiplier == 0.5
 
+
 def test_ongoing_event(now):
     events = [
         MacroEvent(
@@ -161,7 +171,7 @@ def test_ongoing_event(now):
             category=EventCategory.GEOPOLITICAL,
             impact=EventImpact.HIGH,
             timestamp=now - timedelta(hours=1),
-            end_timestamp=now + timedelta(hours=1)
+            end_timestamp=now + timedelta(hours=1),
         )
     ]
     provider = MockEventProvider(events)
@@ -172,13 +182,14 @@ def test_ongoing_event(now):
     assert status.risk_multiplier == 0.5
     assert any(e.name == "Geopolitical Crisis" for e in status.active_events)
 
+
 def test_json_provider(tmp_path, now):
     event_data = [
         {
             "name": "JSON Event",
             "category": "USD",
             "impact": 3,
-            "timestamp": (now + timedelta(minutes=10)).isoformat()
+            "timestamp": (now + timedelta(minutes=10)).isoformat(),
         }
     ]
     file_path = tmp_path / "events.json"
@@ -191,6 +202,7 @@ def test_json_provider(tmp_path, now):
     assert events[0].name == "JSON Event"
     assert events[0].impact == EventImpact.HIGH
 
+
 @patch("requests.get")
 def test_metaapi_provider(mock_get, now):
     mock_response = MagicMock()
@@ -200,11 +212,7 @@ def test_metaapi_provider(mock_get, now):
     time_str = event_time.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     mock_response.json.return_value = [
-        {
-            "event": "Core CPI m/m",
-            "impact": "high",
-            "time": time_str
-        }
+        {"event": "Core CPI m/m", "impact": "high", "time": time_str}
     ]
     mock_get.return_value = mock_response
 
@@ -216,6 +224,7 @@ def test_metaapi_provider(mock_get, now):
     assert events[0].category == EventCategory.CPI
     assert events[0].impact == EventImpact.HIGH
 
+
 def test_major_event_extended_window(now):
     # NFP in 90 minutes. Normal HIGH impact pre-window is 60m.
     # Major events like NFP should have 120m pre-window.
@@ -224,14 +233,14 @@ def test_major_event_extended_window(now):
             name="NFP",
             category=EventCategory.NFP,
             impact=EventImpact.HIGH,
-            timestamp=now + timedelta(minutes=90)
+            timestamp=now + timedelta(minutes=90),
         )
     ]
     provider = MockEventProvider(events)
     intel = EventIntelligence(provider)
 
     status = intel.get_risk_status(now)
-    assert status.is_blocked is False # Blocks at 60m for HIGH major event
+    assert status.is_blocked is False  # Blocks at 60m for HIGH major event
     assert len(status.active_events) == 1
     assert status.risk_multiplier == 0.5
 

@@ -3,11 +3,11 @@ Security hardening tests for MT5 AI Trading Bot.
 tests/test_security_hardening.py
 """
 
-import pytest
+import json
+from io import StringIO
+
 import structlog
 from pydantic import SecretStr
-from io import StringIO
-import json
 
 from src.core.config import TradingConfig
 from src.core.log_config import SecretMaskingProcessor
@@ -24,7 +24,7 @@ def test_secret_masking_processor(monkeypatch):
         mt5_login=12345,
         mt5_password=SecretStr("supersecretpassword123"),
         mt5_server="DemoServer",
-        database_url=SecretStr("postgresql://trader:dbpassword456@localhost:5432/db")
+        database_url=SecretStr("postgresql://trader:dbpassword456@localhost:5432/db"),
     )
 
     # 2. Initialize processor
@@ -34,7 +34,7 @@ def test_secret_masking_processor(monkeypatch):
     test_event = {
         "message": "Connecting with supersecretpassword123",
         "db": "Using password dbpassword456 for connection",
-        "safe": "This is a safe message"
+        "safe": "This is a safe message",
     }
 
     processed = processor(None, "info", test_event)
@@ -56,19 +56,14 @@ def test_structlog_integration(monkeypatch):
 
     # Custom config for testing
     config = TradingConfig(
-        mt5_login=12345,
-        mt5_password=SecretStr("loggingsecret789"),
-        mt5_server="DemoServer"
+        mt5_login=12345, mt5_password=SecretStr("loggingsecret789"), mt5_server="DemoServer"
     )
 
     masker = SecretMaskingProcessor(config=config)
 
     structlog.configure(
-        processors=[
-            masker,
-            structlog.processors.JSONRenderer()
-        ],
-        logger_factory=structlog.PrintLoggerFactory(output)
+        processors=[masker, structlog.processors.JSONRenderer()],
+        logger_factory=structlog.PrintLoggerFactory(output),
     )
 
     logger = structlog.get_logger()

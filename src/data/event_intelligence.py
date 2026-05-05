@@ -200,7 +200,9 @@ class MetaAPIEventProvider(BaseEventProvider):
         name_upper = name.upper()
         if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE"]):
             return EventCategory.CPI
-        if any(kw in name_upper for kw in ["NON-FARM PAYROLL", "NFP", "UNEMPLOYMENT", "EMPLOYMENT"]):
+        if any(
+            kw in name_upper for kw in ["NON-FARM PAYROLL", "NFP", "UNEMPLOYMENT", "EMPLOYMENT"]
+        ):
             return EventCategory.NFP
         if any(kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE"]):
             return EventCategory.FOMC
@@ -208,9 +210,13 @@ class MetaAPIEventProvider(BaseEventProvider):
             kw in name_upper for kw in ["DECISION", "STATEMENT", "MINUTES", "PRESS CONFERENCE"]
         ):
             return EventCategory.RATES
-        if any(kw in name_upper for kw in ["WAR", "CONFLICT", "SANCTION", "GEOPOLITICAL", "ELECTION"]):
+        if any(
+            kw in name_upper for kw in ["WAR", "CONFLICT", "SANCTION", "GEOPOLITICAL", "ELECTION"]
+        ):
             return EventCategory.GEOPOLITICAL
-        if any(kw in name_upper for kw in ["GDP", "PMI", "ISM", "RETAIL SALES", "CONSUMER CONFIDENCE"]):
+        if any(
+            kw in name_upper for kw in ["GDP", "PMI", "ISM", "RETAIL SALES", "CONSUMER CONFIDENCE"]
+        ):
             return EventCategory.USD_MACRO
         if "USD" in name_upper:
             return EventCategory.USD
@@ -277,7 +283,8 @@ class EventIntelligence:
             events = [
                 e
                 for e in self._cached_events
-                if (e.end_timestamp or e.timestamp) >= start_lookback and e.timestamp <= end_lookahead
+                if (e.end_timestamp or e.timestamp) >= start_lookback
+                and e.timestamp <= end_lookahead
             ]
 
         if not events and is_fallback:

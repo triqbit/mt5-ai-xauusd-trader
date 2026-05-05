@@ -4,12 +4,10 @@ Unit tests for the BacktestEngine.
 
 from __future__ import annotations
 
-from datetime import datetime
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock
-
 import pytest
 
 from src.trading.backtester import BacktestEngine
@@ -59,11 +57,7 @@ def test_backtest_run(sample_data):
     model = MockModel()
 
     report = engine.run_walk_forward(
-        sample_data,
-        model,
-        train_window=100,
-        test_window=50,
-        step_size=50
+        sample_data, model, train_window=100, test_window=50, step_size=50
     )
 
     assert report.total_trades > 0
@@ -82,11 +76,7 @@ def test_backtest_performance_optimized_loop(sample_data):
     model = MockModel()
 
     report = engine.run_walk_forward(
-        sample_data,
-        model,
-        train_window=200,
-        test_window=100,
-        step_size=100
+        sample_data, model, train_window=200, test_window=100, step_size=100
     )
 
     # Basic validity checks for the optimized loop execution

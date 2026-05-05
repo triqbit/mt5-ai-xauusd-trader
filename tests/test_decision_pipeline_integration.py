@@ -16,20 +16,28 @@ import pytest
 
 # Standardize mocks for use across all tests and imports
 mock_torch = MagicMock()
+
+
 # Scipy's array_api_compat checks issubclass(cls, torch.Tensor)
 # We need to provide a real class to avoid TypeError
-class MockTensor: pass
+class MockTensor:
+    pass
+
+
 mock_torch.Tensor = MockTensor
 
 mock_sb3 = MagicMock()
 mock_talib = MagicMock()
 
-with patch.dict("sys.modules", {
-    "torch": mock_torch,
-    "torch.nn": mock_torch.nn,
-    "stable_baselines3": mock_sb3,
-    "talib": mock_talib
-}):
+with patch.dict(
+    "sys.modules",
+    {
+        "torch": mock_torch,
+        "torch.nn": mock_torch.nn,
+        "stable_baselines3": mock_sb3,
+        "talib": mock_talib,
+    },
+):
     from src.core.config import get_config
     from src.core.constants import SignalDirection
     from src.core.decision_support import DecisionSupportSystem
@@ -42,48 +50,61 @@ with patch.dict("sys.modules", {
     from src.trading.risk_manager import RiskManager, TradeSignal
     from src.utils.synthetic_data import ScenarioGenerator
 
+
 @pytest.fixture
 def mock_cfg():
-    with patch.dict(os.environ, {
-        "MT5_PASSWORD": "test_password",
-        "MT5_SERVER": "test_server",
-        "TELEGRAM_TOKEN": "123:abc",
-        "TELEGRAM_CHAT_ID": "123456",
-        "MODE": "demo"
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "MT5_PASSWORD": "test_password",
+            "MT5_SERVER": "test_server",
+            "TELEGRAM_TOKEN": "123:abc",
+            "TELEGRAM_CHAT_ID": "123456",
+            "MODE": "demo",
+        },
+    ):
         get_config.cache_clear()
         return get_config()
+
 
 @pytest.fixture
 def data_generator():
     return ScenarioGenerator(seed=42)
 
+
 @pytest.fixture
 def ensemble_model():
-    with patch.object(ensemble, "torch", mock_torch), \
-         patch.object(ensemble, "LSTMAttentionModel", MagicMock()):
+    with (
+        patch.object(ensemble, "torch", mock_torch),
+        patch.object(ensemble, "LSTMAttentionModel", MagicMock()),
+    ):
         model = EnsembleModel(device="cpu")
         # Mock sub-models
         model._ppo_model = MagicMock()
-        model._ppo_model.predict.return_value = (1, None) # Default BUY
+        model._ppo_model.predict.return_value = (1, None)  # Default BUY
         return model
+
 
 @pytest.fixture
 def risk_manager(mock_cfg):
     # Mocking TradeLogger and Monitor to avoid DB/network side effects
     return RiskManager(mock_cfg, account_balance=10000.0, logger_db=None, monitor=None)
 
+
 @pytest.fixture
 def execution_filter():
     return ExecutionFilter(max_drawdown=0.15)
+
 
 @pytest.fixture
 def explainer():
     return SignalExplainer()
 
+
 @pytest.fixture
 def dss():
     return DecisionSupportSystem()
+
 
 def test_decision_pipeline_full_confluence(
     mock_cfg, data_generator, ensemble_model, risk_manager, execution_filter, explainer, dss
@@ -98,14 +119,11 @@ def test_decision_pipeline_full_confluence(
     df["base_M5_ema_21"] = df["close"].ewm(span=21).mean()
     df["base_M5_ema_50"] = df["close"].ewm(span=50).mean()
     df["base_M5_ema_200"] = df["close"].ewm(span=200).mean()
-    df["base_M5_rsi"] = 60.0 # Bullish momentum
+    df["base_M5_rsi"] = 60.0  # Bullish momentum
     df["base_M5_atr"] = 1.0
 
     regime_info = RegimeInfo(
-        label=MarketRegime.TRENDING,
-        confidence=0.9,
-        transition_score=0.1,
-        volatility_index=1.0
+        label=MarketRegime.TRENDING, confidence=0.9, transition_score=0.1, volatility_index=1.0
     )
 
     # 2. Model Inference
@@ -123,7 +141,7 @@ def test_decision_pipeline_full_confluence(
         take_profit=price + 20.0,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=signal_obj.confidence
+        confidence=signal_obj.confidence,
     )
 
     risk_approved = risk_manager.approve(signal)
@@ -140,20 +158,20 @@ def test_decision_pipeline_full_confluence(
         "passed": risk_approved,
         "rejection_reasons": [],
         "risk_reward": 2.0,
-        "summary": "Risk assessment passed"
+        "summary": "Risk assessment passed",
     }
 
     regime_data = {
         "name": regime_info.label.value,
         "confidence": regime_info.confidence,
         "volatility": "Normal",
-        "is_favorable": True
+        "is_favorable": True,
     }
 
     execution_data = {
         "passed": filter_decision.is_approved,
         "summary": "All filters passed",
-        "filters": [{"name": "CONFLUENCE", "passed": True}]
+        "filters": [{"name": "CONFLUENCE", "passed": True}],
     }
 
     explanation = explainer.explain(
@@ -164,26 +182,25 @@ def test_decision_pipeline_full_confluence(
         model_weights=signal_obj.metadata["weights"],
         risk_data=risk_data,
         regime_info=regime_data,
-        execution_data=execution_data
+        execution_data=execution_data,
     )
 
     # 6. Decision Support Packet
     macro_risk = RiskStatus(is_blocked=False, active_events=[], reason="No macro risk")
     perf_metrics = {"sharpe_ratio": 1.5, "win_rate": 0.6}
 
-    packet = dss.assemble_packet(
-        signal.symbol, explanation, regime_info, macro_risk, perf_metrics
-    )
+    packet = dss.assemble_packet(signal.symbol, explanation, regime_info, macro_risk, perf_metrics)
 
     assert packet.is_executable is True
     assert len(packet.blocking_reasons) == 0
     assert "BUY" in packet.explanation.human_readable_summary
 
+
 def test_decision_pipeline_risk_rejection(
     mock_cfg, data_generator, ensemble_model, risk_manager, execution_filter, explainer, dss
 ):
     """Case 2: Risk Rejection - Rejected due to low R:R."""
-    df = data_generator.generate(n_steps=10)
+    data_generator.generate(n_steps=10)
     price = 2300.0
 
     # Low R:R (0.5)
@@ -195,7 +212,7 @@ def test_decision_pipeline_risk_rejection(
         take_profit=price + 5.0,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.8
+        confidence=0.8,
     )
 
     risk_approved = risk_manager.approve(signal)
@@ -210,21 +227,25 @@ def test_decision_pipeline_risk_rejection(
         risk_data={
             "passed": False,
             "rejection_reasons": ["Risk-Reward ratio too low"],
-            "summary": "Rejected by RiskManager"
+            "summary": "Rejected by RiskManager",
         },
         regime_info={"name": "Trending", "confidence": 0.8},
-        execution_data={"passed": True, "summary": "Passed"}
+        execution_data={"passed": True, "summary": "Passed"},
     )
 
     packet = dss.assemble_packet(
-        signal.symbol, explanation,
-        RegimeInfo(label=MarketRegime.TRENDING, confidence=0.8, transition_score=0.1, volatility_index=1.0),
+        signal.symbol,
+        explanation,
+        RegimeInfo(
+            label=MarketRegime.TRENDING, confidence=0.8, transition_score=0.1, volatility_index=1.0
+        ),
         RiskStatus(is_blocked=False, risk_multiplier=1.0, active_events=[], reason="OK"),
-        {}
+        {},
     )
 
     assert packet.is_executable is False
     assert any("Risk: Risk-Reward ratio too low" in r for r in packet.blocking_reasons)
+
 
 def test_decision_pipeline_execution_block(
     mock_cfg, data_generator, ensemble_model, risk_manager, execution_filter, explainer, dss
@@ -236,13 +257,13 @@ def test_decision_pipeline_execution_block(
 
     signal = TradeSignal(
         symbol="XAUUSD",
-        direction=1, # BUY
+        direction=1,  # BUY
         entry_price=90.0,
         stop_loss=85.0,
         take_profit=100.0,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.7
+        confidence=0.7,
     )
 
     filter_decision = execution_filter.validate(signal, df, current_drawdown=0.0)
@@ -260,23 +281,25 @@ def test_decision_pipeline_execution_block(
         execution_data={
             "passed": False,
             "summary": "TREND_ANGLE",
-            "filters": [{"name": "TREND_ANGLE", "passed": False}]
-        }
+            "filters": [{"name": "TREND_ANGLE", "passed": False}],
+        },
     )
 
     packet = dss.assemble_packet(
-        signal.symbol, explanation,
-        RegimeInfo(label=MarketRegime.RANGING, confidence=0.5, transition_score=0.1, volatility_index=1.2),
+        signal.symbol,
+        explanation,
+        RegimeInfo(
+            label=MarketRegime.RANGING, confidence=0.5, transition_score=0.1, volatility_index=1.2
+        ),
         RiskStatus(is_blocked=False, risk_multiplier=1.0, active_events=[], reason="OK"),
-        {}
+        {},
     )
 
     assert packet.is_executable is False
     assert any("Execution: TREND_ANGLE" in r for r in packet.blocking_reasons)
 
-def test_decision_pipeline_macro_block(
-    mock_cfg, explainer, dss
-):
+
+def test_decision_pipeline_macro_block(mock_cfg, explainer, dss):
     """Case 4: Macro Block - Rejected due to active news events."""
     explanation = explainer.explain(
         symbol="XAUUSD",
@@ -286,16 +309,19 @@ def test_decision_pipeline_macro_block(
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "summary": "Passed"},
         regime_info={"name": "Trending", "confidence": 0.9},
-        execution_data={"passed": True, "summary": "Passed"}
+        execution_data={"passed": True, "summary": "Passed"},
     )
 
     macro_risk = RiskStatus(is_blocked=True, active_events=[], reason="Blocked by FOMC")
 
     packet = dss.assemble_packet(
-        "XAUUSD", explanation,
-        RegimeInfo(label=MarketRegime.TRENDING, confidence=0.9, transition_score=0.1, volatility_index=1.0),
+        "XAUUSD",
+        explanation,
+        RegimeInfo(
+            label=MarketRegime.TRENDING, confidence=0.9, transition_score=0.1, volatility_index=1.0
+        ),
         macro_risk,
-        {}
+        {},
     )
 
     assert packet.is_executable is False

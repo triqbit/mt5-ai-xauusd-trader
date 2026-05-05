@@ -1,9 +1,12 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from src.core.exceptions import MT5ConnectionError, MT5DataError
+
+import pytest
+
+from src.core.exceptions import MT5ConnectionError
 from src.core.retry import with_retry
 
 # --- Retry Decorator Tests ---
+
 
 def test_retry_success():
     mock_func = MagicMock(return_value="success")
@@ -16,6 +19,7 @@ def test_retry_success():
     assert result == "success"
     assert mock_func.call_count == 1
 
+
 def test_retry_eventual_success():
     mock_func = MagicMock(side_effect=[ValueError("fail"), ValueError("fail"), "success"])
 
@@ -26,6 +30,7 @@ def test_retry_eventual_success():
     result = decorated_func()
     assert result == "success"
     assert mock_func.call_count == 3
+
 
 def test_retry_max_retries_exceeded():
     mock_func = MagicMock(side_effect=ValueError("fail"))
@@ -39,11 +44,14 @@ def test_retry_max_retries_exceeded():
 
     assert mock_func.call_count == 3  # Initial + 2 retries
 
+
 # --- MT5Connector Resilience Tests ---
+
 
 @patch("src.trading.mt5_connector.mt5")
 def test_connector_initialize_native_fails_no_fallback(mock_mt5, mk_config):
     from src.trading.mt5_connector import MT5Connector
+
     connector = MT5Connector(mk_config)
 
     # Native fails, MetaAPI not available (METAAPI_TOKEN is empty in mk_config)
@@ -57,6 +65,7 @@ def test_connector_initialize_native_fails_no_fallback(mock_mt5, mk_config):
         # retried 3 times (max_retries=3)
         assert mock_mt5.initialize.call_count == 4
 
+
 @patch("src.trading.mt5_connector.mt5")
 def test_connector_initialize_dual_path_success(mock_mt5, mk_config):
     from src.trading.mt5_connector import MT5Connector
@@ -67,7 +76,9 @@ def test_connector_initialize_dual_path_success(mock_mt5, mk_config):
         mock_api_instance = mock_metaapi.return_value
         mock_acc_api = mock_api_instance.metatrader_account_api
 
-        async def mock_async_none(*args, **kwargs): return None
+        async def mock_async_none(*args, **kwargs):
+            return None
+
         async def mock_async_acc(*args, **kwargs):
             m_acc = MagicMock()
             m_acc.wait_connected.side_effect = mock_async_none
@@ -81,9 +92,10 @@ def test_connector_initialize_dual_path_success(mock_mt5, mk_config):
         mk_config.metaapi_account_id = "fake-acc-id"
         connector = MT5Connector(mk_config)
 
-        with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), \
-             patch("src.trading.mt5_connector.METAAPI_AVAILABLE", True):
-
+        with (
+            patch("src.trading.mt5_connector.MT5_AVAILABLE", True),
+            patch("src.trading.mt5_connector.METAAPI_AVAILABLE", True),
+        ):
             # Native fails
             mock_mt5.initialize.return_value = False
             mock_mt5.last_error.return_value = (1, "error")
@@ -96,9 +108,11 @@ def test_connector_initialize_dual_path_success(mock_mt5, mk_config):
             assert mock_mt5.initialize.call_count == 1
             mock_metaapi.assert_called_once()
 
+
 @patch("src.trading.mt5_connector.mt5")
 def test_connector_get_rates_retry(mock_mt5, mk_config):
     from src.trading.mt5_connector import MT5Connector
+
     connector = MT5Connector(mk_config)
     connector._is_initialized = True
 
@@ -110,6 +124,7 @@ def test_connector_get_rates_retry(mock_mt5, mk_config):
 
     assert not df.empty
     assert mock_mt5.copy_rates_from_pos.call_count == 3
+
 
 # Fixture for TradingConfig
 @pytest.fixture

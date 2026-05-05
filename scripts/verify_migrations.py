@@ -3,6 +3,7 @@ MT5 AI/ML Trading Bot - Migration Safety Script
 Automates the verification of Alembic migrations by performing
 an upgrade-downgrade-upgrade cycle on a temporary database.
 """
+
 import os
 import sys
 
@@ -41,12 +42,14 @@ def verify_migrations():
     except Exception as e:
         print(f"Error during migration verification: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
     finally:
         if os.path.exists(temp_db):
             os.remove(temp_db)
+
 
 if __name__ == "__main__":
     if not verify_migrations():

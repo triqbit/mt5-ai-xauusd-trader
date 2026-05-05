@@ -252,7 +252,7 @@ def test_backtest_pnl_accuracy(sample_data):
         name="Fixed Cost",
         description="test",
         spread_multiplier=1.0,
-        slippage_bps=10.0 # 0.1%
+        slippage_bps=10.0,  # 0.1%
     )
 
     # We want to manually trace one trade if possible

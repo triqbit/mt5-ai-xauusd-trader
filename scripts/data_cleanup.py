@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, List
 
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 # Add src to path to import models
@@ -114,7 +114,9 @@ def cleanup_logs(logs_dir: Path, dry_run: bool = False) -> int:
         try:
             mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
             if mtime < cutoff:
-                logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting old log file: {log_file.name} (mtime: {mtime})")
+                logger.info(
+                    f"{'[DRY RUN] ' if dry_run else ''}Deleting old log file: {log_file.name} (mtime: {mtime})"
+                )
                 if not dry_run:
                     log_file.unlink()
                 count += 1
@@ -141,7 +143,9 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
             try:
                 mtime = datetime.fromtimestamp(item.stat().st_mtime)
                 if mtime < cutoff:
-                    logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting old backtest file: {item.relative_to(backtest_dir)} (mtime: {mtime})")
+                    logger.info(
+                        f"{'[DRY RUN] ' if dry_run else ''}Deleting old backtest file: {item.relative_to(backtest_dir)} (mtime: {mtime})"
+                    )
                     if not dry_run:
                         item.unlink()
                     count += 1
@@ -152,7 +156,9 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
     for item in sorted(backtest_dir.rglob("*"), reverse=True):
         if item.is_dir() and item != backtest_dir and not any(item.iterdir()):
             try:
-                logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting empty backtest directory: {item.relative_to(backtest_dir)}")
+                logger.info(
+                    f"{'[DRY RUN] ' if dry_run else ''}Deleting empty backtest directory: {item.relative_to(backtest_dir)}"
+                )
                 if not dry_run:
                     item.rmdir()
             except Exception as e:
@@ -161,11 +167,17 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
     return count
 
 
-def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR) -> dict:
+def cleanup_database(
+    db_url: str,
+    audit_db_url: str | None = None,
+    dry_run: bool = False,
+    archive_dir: Path = ARCHIVE_DIR,
+) -> dict:
     """Purge old records from the database according to the retention policy."""
     engine = create_engine(db_url)
     # Ensure tables exist (especially for SQLite)
     from src.core.trade_logger import Base as TradeBase
+
     TradeBase.metadata.create_all(engine)
 
     Session = sessionmaker(bind=engine)
@@ -197,7 +209,9 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         results["model_signals"] = len(unlinked_records)
 
         if unlinked_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_records)} unlinked signals older than {signal_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_records)} unlinked signals older than {signal_cutoff.date()}"
+            )
             if not dry_run:
                 # No archival for unlinked signals as per policy (ephemeral)
                 for obj in unlinked_records:
@@ -210,7 +224,9 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         results["risk_events"] = len(risk_records)
 
         if risk_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_records)} risk events older than {risk_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_records)} risk events older than {risk_cutoff.date()}"
+            )
             if not dry_run:
                 # Archiving risk events (Audit 2-year category, archived before purge)
                 if archive_records(risk_records, "risk_events", archive_dir):
@@ -226,7 +242,9 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         results["performance_metrics"] = len(perf_records)
 
         if perf_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_records)} performance metrics older than {perf_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_records)} performance metrics older than {perf_cutoff.date()}"
+            )
             if not dry_run:
                 for obj in perf_records:
                     session.delete(obj)
@@ -238,14 +256,22 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         results["trades"] = len(trade_records)
 
         if trade_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_records)} trade records older than {trade_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_records)} trade records older than {trade_cutoff.date()}"
+            )
             if not dry_run:
                 # Mandatory archival for Compliance data
                 if archive_records(trade_records, "trades", archive_dir):
                     # Also archive associated signals before deleting trades
                     signal_ids = [t.signal_id for t in trade_records if t.signal_id]
                     if signal_ids:
-                        signals_to_archive = session.execute(select(ModelSignal).where(ModelSignal.id.in_(signal_ids))).scalars().all()
+                        signals_to_archive = (
+                            session.execute(
+                                select(ModelSignal).where(ModelSignal.id.in_(signal_ids))
+                            )
+                            .scalars()
+                            .all()
+                        )
                         archive_records(signals_to_archive, "linked_signals", archive_dir)
 
                     for obj in trade_records:
@@ -257,10 +283,13 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
             session.commit()
 
     # 5. Cleanup Audit Log (older than 7 years)
-    audit_engine = create_engine(audit_db_url) if audit_db_url and audit_db_url != db_url else engine
+    audit_engine = (
+        create_engine(audit_db_url) if audit_db_url and audit_db_url != db_url else engine
+    )
 
     # Ensure audit tables exist
     from src.core.audit_log import Base as AuditBase
+
     AuditBase.metadata.create_all(audit_engine)
 
     AuditSession = sessionmaker(bind=audit_engine)
@@ -272,7 +301,9 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         results["audit_log"] = len(audit_records)
 
         if audit_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(audit_records)} audit log entries older than {audit_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(audit_records)} audit log entries older than {audit_cutoff.date()}"
+            )
             if not dry_run:
                 # Mandatory archival for Audit data
                 if archive_records(audit_records, "audit_log", archive_dir):
@@ -289,7 +320,9 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
 
 def main():
     parser = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Data Cleanup Utility")
-    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without deleting any data.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Perform a dry run without deleting any data."
+    )
     parser.add_argument("--db-url", help="Override the primary database URL from config.")
     parser.add_argument("--audit-db-url", help="Override the audit database URL.")
     parser.add_argument("--logs-dir", help="Override the logs directory from config.")
@@ -326,7 +359,11 @@ def main():
         logger.warning(f"Using production-like audit DB URL: {audit_db_url}")
 
     logs_dir = Path(args.logs_dir) if args.logs_dir else cfg.logs_dir
-    backtest_dir = Path(args.backtest_dir) if args.backtest_dir else Path(__file__).resolve().parents[1] / "backtest_results"
+    backtest_dir = (
+        Path(args.backtest_dir)
+        if args.backtest_dir
+        else Path(__file__).resolve().parents[1] / "backtest_results"
+    )
     archive_dir = Path(args.archive_dir) if args.archive_dir else ARCHIVE_DIR
 
     logger.info(f"Starting data cleanup (dry_run={args.dry_run})")
@@ -340,7 +377,9 @@ def main():
     logger.info(f"Backtest cleanup complete. Total files processed: {backtest_count}")
 
     # Database cleanup
-    db_results = cleanup_database(db_url, audit_db_url=audit_db_url, dry_run=args.dry_run, archive_dir=archive_dir)
+    db_results = cleanup_database(
+        db_url, audit_db_url=audit_db_url, dry_run=args.dry_run, archive_dir=archive_dir
+    )
     logger.info("Database cleanup complete.")
     for table, count in db_results.items():
         logger.info(f"  - {table}: {count} records {'identified' if args.dry_run else 'purged'}")

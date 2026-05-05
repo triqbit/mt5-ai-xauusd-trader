@@ -6,8 +6,9 @@ Verification script for the benchmarking framework.
 
 import os
 import sys
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
@@ -17,28 +18,32 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.research import (
     BenchmarkEvaluator,
     EMACrossoverStrategy,
-    MomentumStrategy,
-    VolatilityBreakoutStrategy,
-    NaiveDirectionalStrategy,
-    RiskFilteredBaseline,
     MeanReversionStrategy,
-    RandomStrategy
+    MomentumStrategy,
+    NaiveDirectionalStrategy,
+    RandomStrategy,
+    RiskFilteredBaseline,
+    VolatilityBreakoutStrategy,
 )
+
 
 def generate_synthetic_data(n=1000):
     """Generate synthetic XAUUSD data."""
     np.random.seed(42)
     # Trend + Noise
     close = 2000 + np.cumsum(np.random.randn(n) * 2 + 0.1)
-    df = pd.DataFrame({
-        "open": close - np.random.randn(n),
-        "high": close + np.abs(np.random.randn(n) * 2),
-        "low": close - np.abs(np.random.randn(n) * 2),
-        "close": close,
-        "tick_volume": np.random.randint(100, 1000, n),
-    })
+    df = pd.DataFrame(
+        {
+            "open": close - np.random.randn(n),
+            "high": close + np.abs(np.random.randn(n) * 2),
+            "low": close - np.abs(np.random.randn(n) * 2),
+            "close": close,
+            "tick_volume": np.random.randint(100, 1000, n),
+        }
+    )
     df.index = pd.date_range(start="2024-01-01", periods=n, freq="5min")
     return df
+
 
 def main():
     console = Console()
@@ -56,7 +61,7 @@ def main():
         NaiveDirectionalStrategy(),
         RiskFilteredBaseline(9, 21, 0.01),
         MeanReversionStrategy(14, 70, 30),
-        RandomStrategy(seed=42)
+        RandomStrategy(seed=42),
     ]
 
     # 3. Evaluate All
@@ -76,7 +81,7 @@ def main():
             f"{row['Total Return']:.2%}",
             f"{row['Sharpe Ratio']:.2f}",
             f"{row['Max Drawdown']:.2%}",
-            f"{int(row['Num Trades'])}"
+            f"{int(row['Num Trades'])}",
         )
     console.print(table)
 
@@ -105,12 +110,13 @@ def main():
             f"{comp['Outperformance']:.2%}",
             f"{comp['T-Statistic']:.4f}",
             f"{comp['P-Value']:.4f}",
-            sig_str
+            sig_str,
         )
 
     console.print(comp_table)
 
     console.print("\n[bold green]✅ Benchmarking Framework Verification Complete![/]")
+
 
 if __name__ == "__main__":
     main()

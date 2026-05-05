@@ -2,16 +2,20 @@
 Unit tests for AuditLogger and additional health checks.
 """
 
-from unittest.mock import MagicMock, patch
-import pytest
-from src.core.audit_log import AuditLogger, AuditEntry
-from src.core.health import HealthChecker, HealthStatus
-from src.core.config import TradingConfig
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.core.audit_log import AuditEntry, AuditLogger
+from src.core.config import TradingConfig
+from src.core.health import HealthChecker, HealthStatus
+
 
 @pytest.fixture
 def db_url():
     return "sqlite:///:memory:"
+
 
 @pytest.fixture
 def mock_config():
@@ -20,6 +24,7 @@ def mock_config():
     cfg.logs_dir.exists.return_value = True
     cfg.redis_url = "redis://localhost:6379/0"
     return cfg
+
 
 def test_audit_logger_singleton(db_url):
     # Reset singleton for testing
@@ -30,6 +35,7 @@ def test_audit_logger_singleton(db_url):
     logger2 = AuditLogger(db_url)
     assert logger1 is logger2
     assert logger1._initialized is True
+
 
 def test_audit_log_entry(db_url):
     AuditLogger._instance = None
@@ -45,6 +51,7 @@ def test_audit_log_entry(db_url):
         assert entry.action == "test_action"
         assert entry.details == "test_details"
 
+
 def test_check_redis_success(mock_config):
     checker = HealthChecker(mock_config)
     with patch("redis.from_url") as mock_redis:
@@ -54,6 +61,7 @@ def test_check_redis_success(mock_config):
         status = checker.check_redis()
         assert status.status == HealthStatus.HEALTHY
         assert "reachable" in status.message
+
 
 def test_check_redis_failure(mock_config):
     checker = HealthChecker(mock_config)
@@ -65,6 +73,7 @@ def test_check_redis_failure(mock_config):
         assert status.status == HealthStatus.DEGRADED
         assert "ping failed" in status.message
 
+
 def test_check_redis_exception(mock_config):
     checker = HealthChecker(mock_config)
     with patch("redis.from_url") as mock_redis:
@@ -73,6 +82,7 @@ def test_check_redis_exception(mock_config):
         status = checker.check_redis()
         assert status.status == HealthStatus.DEGRADED
         assert "Connection refused" in status.message
+
 
 def test_check_audit_log_success(mock_config):
     mock_audit = MagicMock()
@@ -83,6 +93,7 @@ def test_check_audit_log_success(mock_config):
     assert status.status == HealthStatus.HEALTHY
     assert "initialized" in status.message
 
+
 def test_check_audit_log_failure(mock_config):
     mock_audit = MagicMock()
     mock_audit._initialized = False
@@ -91,6 +102,7 @@ def test_check_audit_log_failure(mock_config):
     status = checker.check_audit_log()
     assert status.status == HealthStatus.FAILED
     assert "not properly initialized" in status.message
+
 
 def test_check_audit_log_none(mock_config):
     checker = HealthChecker(mock_config, audit_logger=None)

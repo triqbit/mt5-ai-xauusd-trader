@@ -1,4 +1,5 @@
 """Tests for src.core.config_validator module."""
+
 import sys
 
 import pytest
@@ -19,6 +20,7 @@ def base_config(monkeypatch, tmp_path):
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     return TradingConfig()
 
+
 def test_validator_success(base_config):
     """Test validator succeeds with valid configuration."""
     validator = ConfigValidator(base_config)
@@ -27,6 +29,7 @@ def test_validator_success(base_config):
     # TradingConfig default is 0.6, so it should be clean.
     assert result.success is True
     assert len([e for e in result.errors if e.critical]) == 0
+
 
 def test_validator_mt5_login_invalid(monkeypatch, tmp_path):
     """Test validator fails with invalid MT5 login."""
@@ -42,6 +45,7 @@ def test_validator_mt5_login_invalid(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "MT5_LOGIN" for e in result.errors)
 
+
 def test_validator_mt5_placeholders(monkeypatch, tmp_path):
     """Test validator fails with placeholder MT5 server/password."""
     model_file = tmp_path / "model.pt"
@@ -56,6 +60,7 @@ def test_validator_mt5_placeholders(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "MT5_SERVER" for e in result.errors)
     assert any(e.field == "MT5_PASSWORD" for e in result.errors)
+
 
 def test_validator_mt5_path_windows(monkeypatch, tmp_path):
     """Test validator checks MT5 path on Windows."""
@@ -75,6 +80,7 @@ def test_validator_mt5_path_windows(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "MT5_PATH" for e in result.errors)
 
+
 def test_validator_live_mode_no_confirmation(monkeypatch, tmp_path):
     """Test validator fails in LIVE mode without CONFIRM_LIVE_TRADING=YES."""
     model_file = tmp_path / "model.pt"
@@ -92,6 +98,7 @@ def test_validator_live_mode_no_confirmation(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "MODE" for e in result.errors)
 
+
 def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     """Test validator succeeds in LIVE mode with confirmation."""
     model_file = tmp_path / "model.pt"
@@ -108,6 +115,7 @@ def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     validator = ConfigValidator(cfg)
     result = validator.validate()
     assert result.success is True
+
 
 def test_validator_placeholder_secrets(monkeypatch, tmp_path):
     """Test validator detects placeholder database URL, Telegram, and MetaAPI."""
@@ -128,6 +136,7 @@ def test_validator_placeholder_secrets(monkeypatch, tmp_path):
     assert any(e.field == "DATABASE_URL" for e in result.errors)
     assert any(e.field == "TELEGRAM_TOKEN" for e in result.errors)
     assert any(e.field == "METAAPI_TOKEN" for e in result.errors)
+
 
 def test_validator_risk_parameters(monkeypatch, tmp_path):
     """Test validator detects unsafe risk parameters."""
@@ -154,6 +163,7 @@ def test_validator_risk_parameters(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "RISK_PER_TRADE" and e.critical for e in result.errors)
 
+
 def test_validator_risk_warnings(monkeypatch, tmp_path):
     """Test validator gives warnings for risk parameters exceeding policy but not hard limits."""
     model_file = tmp_path / "model.pt"
@@ -171,6 +181,7 @@ def test_validator_risk_warnings(monkeypatch, tmp_path):
     result = validator.validate()
     assert result.success is True
     assert any(e.field == "RISK_PER_TRADE" and not e.critical for e in result.errors)
+
 
 def test_validator_max_daily_loss(monkeypatch, tmp_path):
     """Test validator detects unsafe daily loss limits."""
@@ -195,6 +206,7 @@ def test_validator_max_daily_loss(monkeypatch, tmp_path):
     assert result.success is True
     assert any(e.field == "MAX_DAILY_LOSS" and not e.critical for e in result.errors)
 
+
 def test_validator_incompatible_live_positions(monkeypatch, tmp_path):
     """Test validator detects too many positions in LIVE mode."""
     model_file = tmp_path / "model.pt"
@@ -212,6 +224,7 @@ def test_validator_incompatible_live_positions(monkeypatch, tmp_path):
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MAX_POSITIONS" and e.critical for e in result.errors)
+
 
 def test_validator_backtest_warning(monkeypatch, tmp_path):
     """Test validator gives a non-critical warning for Telegram in backtest."""
@@ -232,6 +245,7 @@ def test_validator_backtest_warning(monkeypatch, tmp_path):
     # It should still be successful because it's non-critical
     assert result.success is True
     assert any(e.field == "TELEGRAM_TOKEN" and e.critical is False for e in result.errors)
+
 
 def test_validator_metaapi_consistency(monkeypatch, tmp_path):
     """Test validator detects inconsistent MetaAPI configuration."""
@@ -262,6 +276,7 @@ def test_validator_metaapi_consistency(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "METAAPI_TOKEN" for e in result.errors)
 
+
 def test_validator_telegram_consistency(monkeypatch, tmp_path):
     """Test validator detects inconsistent Telegram configuration."""
     model_file = tmp_path / "model.pt"
@@ -287,6 +302,7 @@ def test_validator_telegram_consistency(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "TELEGRAM_TOKEN" for e in result.errors)
 
+
 def test_validator_telegram_chat_id_placeholder(monkeypatch, tmp_path):
     """Test validator detects placeholder Telegram chat ID."""
     model_file = tmp_path / "model.pt"
@@ -303,6 +319,7 @@ def test_validator_telegram_chat_id_placeholder(monkeypatch, tmp_path):
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "TELEGRAM_CHAT_ID" for e in result.errors)
+
 
 def test_validator_model_path_existence(monkeypatch, tmp_path):
     """Test validator checks for model path existence in non-backtest modes."""
@@ -329,6 +346,7 @@ def test_validator_model_path_existence(monkeypatch, tmp_path):
     result = ConfigValidator(cfg).validate()
     assert result.success is True
 
+
 def test_validator_live_debug_warning(monkeypatch, tmp_path):
     """Test validator gives warning for DEBUG log level in LIVE mode."""
     # Ensure model path exists to avoid other errors
@@ -349,6 +367,7 @@ def test_validator_live_debug_warning(monkeypatch, tmp_path):
     # Should still be successful because it's a warning
     assert result.success is True
     assert any(e.field == "LOG_LEVEL" and e.critical is False for e in result.errors)
+
 
 def test_validator_min_confidence(monkeypatch, tmp_path):
     """Test validator detects unsafe confidence threshold."""
@@ -373,6 +392,7 @@ def test_validator_min_confidence(monkeypatch, tmp_path):
     assert result.success is True
     assert any(e.field == "MIN_CONFIDENCE" and not e.critical for e in result.errors)
 
+
 def test_validator_placeholder_server_password(monkeypatch, tmp_path):
     """Test validator detects placeholder MT5 server and password."""
     model_file = tmp_path / "model.pt"
@@ -387,6 +407,7 @@ def test_validator_placeholder_server_password(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "MT5_SERVER" for e in result.errors)
     assert any(e.field == "MT5_PASSWORD" for e in result.errors)
+
 
 def test_validator_leverage_limits(monkeypatch, tmp_path):
     """Test validator detects unsafe leverage."""
@@ -412,6 +433,7 @@ def test_validator_leverage_limits(monkeypatch, tmp_path):
     assert result.success is True
     assert any(e.field == "MAX_LEVERAGE" and not e.critical for e in result.errors)
 
+
 def test_validator_drawdown_limits(monkeypatch, tmp_path):
     """Test validator detects unsafe drawdown limits."""
     model_file = tmp_path / "model.pt"
@@ -436,6 +458,7 @@ def test_validator_drawdown_limits(monkeypatch, tmp_path):
     assert result.success is True
     assert any(e.field == "MAX_DRAWDOWN" and not e.critical for e in result.errors)
 
+
 def test_validator_position_size_limits(monkeypatch, tmp_path):
     """Test validator detects unsafe position size pct."""
     model_file = tmp_path / "model.pt"
@@ -459,6 +482,7 @@ def test_validator_position_size_limits(monkeypatch, tmp_path):
     result = ConfigValidator(cfg).validate()
     assert result.success is True
     assert any(e.field == "MAX_POSITION_SIZE_PCT" and not e.critical for e in result.errors)
+
 
 def test_validator_stability_guards(monkeypatch, tmp_path):
     """Test validator detects unsafe stability guards."""

@@ -21,19 +21,24 @@ from src.trading.risk_manager import RiskManager, TradeSignal
 @pytest.fixture
 def mock_ohlcv_data():
     """Generate 200 bars of synthetic OHLCV data."""
-    dates = pd.date_range(end=pd.Timestamp.now(), periods=200, freq='5min')
-    data = pd.DataFrame({
-        'open': np.random.rand(200) + 2300,
-        'high': np.random.rand(200) + 2305,
-        'low': np.random.rand(200) + 2295,
-        'close': np.random.rand(200) + 2300,
-        'tick_volume': np.random.randint(100, 1000, 200)
-    }, index=dates)
+    dates = pd.date_range(end=pd.Timestamp.now(), periods=200, freq="5min")
+    data = pd.DataFrame(
+        {
+            "open": np.random.rand(200) + 2300,
+            "high": np.random.rand(200) + 2305,
+            "low": np.random.rand(200) + 2295,
+            "close": np.random.rand(200) + 2300,
+            "tick_volume": np.random.randint(100, 1000, 200),
+        },
+        index=dates,
+    )
     return data
+
 
 @pytest.fixture
 def trade_logger():
     return TradeLogger(db_url="sqlite:///:memory:")
+
 
 def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     """
@@ -53,7 +58,7 @@ def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     metrics = {
         "ppo": {"accuracy": 0.65, "calibration_error": 0.1, "drift_score": 0.05},
         "lstm": {"accuracy": 0.45, "calibration_error": 0.3, "drift_score": 0.2},
-        "dreamer": {"accuracy": 0.55, "calibration_error": 0.1, "drift_score": 0.1}
+        "dreamer": {"accuracy": 0.55, "calibration_error": 0.1, "drift_score": 0.1},
     }
 
     # Force update via dynamic_ensemble (underlying EnsembleModel's rebalance_weights uses Sharpe)
@@ -73,8 +78,9 @@ def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
     obs = mock_ohlcv_data.iloc[-1][["open", "high", "low", "close", "tick_volume"]].values
     signal_obj = ensemble.predict(obs)
 
-    assert signal_obj.direction == 1 # SignalDirection.BUY
+    assert signal_obj.direction == 1  # SignalDirection.BUY
     assert signal_obj.confidence > 0.5
+
 
 def test_capital_and_risk_integration(trade_logger):
     """
@@ -94,13 +100,13 @@ def test_capital_and_risk_integration(trade_logger):
             strategy_id="ensemble_gold",
             symbol="XAUUSD",
             model_family="ensemble",
-            capital_cap=50000.0
+            capital_cap=50000.0,
         )
         allocator.add_strategy(strat_cfg)
 
         allocation = allocator.request_allocation("ensemble_gold", risk_pct=0.01)
         assert allocation.is_allowed is True
-        assert allocation.allocated_amount == 1000.0 # 1% of 100k
+        assert allocation.allocated_amount == 1000.0  # 1% of 100k
 
         # 2. Risk Management Approval (Jules01/Jules02)
         risk = RiskManager(cfg, account_balance=100000.0, logger_db=trade_logger)
@@ -113,7 +119,7 @@ def test_capital_and_risk_integration(trade_logger):
             take_profit=2380.0,
             lot_size=0.1,
             algorithm="ensemble",
-            confidence=0.85
+            confidence=0.85,
         )
 
         # Signal approval
@@ -121,6 +127,6 @@ def test_capital_and_risk_integration(trade_logger):
         assert approved is True
 
         # Test rejection (high drawdown simulation)
-        risk.update_equity(80000.0) # 20% drawdown
+        risk.update_equity(80000.0)  # 20% drawdown
         approved_after_crash = risk.approve(signal)
         assert approved_after_crash is False

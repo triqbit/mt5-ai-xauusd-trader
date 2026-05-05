@@ -290,9 +290,7 @@ class SignalExplainer:
             "risk_reward_ratio": risk_assessment.risk_reward_ratio,
             "risk_rejection_reasons": risk_assessment.rejection_reasons,
             "execution_passed": execution_summary.passed,
-            "failed_execution_filters": [
-                f.filter_name for f in execution_filters if not f.passed
-            ],
+            "failed_execution_filters": [f.filter_name for f in execution_filters if not f.passed],
             "regime_confluence": regime_context.confidence,
             "dominant_models": dominant_models,
             "feature_impacts": {c.cluster_name: c.contribution_score for c in contributions},

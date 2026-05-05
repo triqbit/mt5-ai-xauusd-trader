@@ -14,6 +14,7 @@ def audit_logger():
     AuditLogger._initialized = False
     return AuditLogger("sqlite:///:memory:")
 
+
 def test_log_config_snapshot(audit_logger):
     config_data = {"SYMBOL": "XAUUSD", "MODE": "live"}
     entry_id = audit_logger.log_config_snapshot(config_data, reason="unit_test")
@@ -23,6 +24,7 @@ def test_log_config_snapshot(audit_logger):
         assert entry.action == "config_snapshot"
         assert entry.metadata_json == config_data
         assert "unit_test" in entry.details
+
 
 def test_log_prediction(audit_logger):
     metadata = {"weights": [0.5, 0.5]}
@@ -36,6 +38,7 @@ def test_log_prediction(audit_logger):
         assert entry.metadata_json["confidence"] == 0.95
         assert entry.metadata_json["model_context"] == metadata
 
+
 def test_log_risk_decision(audit_logger):
     decision_chain = {"circuit_breaker": True, "daily_loss": False}
     entry_id = audit_logger.log_risk_decision("XAUUSD", -1, decision_chain, False)
@@ -45,6 +48,7 @@ def test_log_risk_decision(audit_logger):
         assert entry.action == "risk_decision"
         assert entry.metadata_json["passed"] is False
         assert entry.metadata_json["decision_chain"] == decision_chain
+
 
 def test_log_blocked_trade(audit_logger):
     context = {"filter": "ATR"}
@@ -56,6 +60,7 @@ def test_log_blocked_trade(audit_logger):
         assert "High Volatility" in entry.details
         assert entry.metadata_json["context"] == context
 
+
 def test_log_operator_action(audit_logger):
     entry_id = audit_logger.log_operator_action("admin", "emergency_halt", "System anomaly")
 
@@ -64,6 +69,7 @@ def test_log_operator_action(audit_logger):
         assert entry.actor == "admin"
         assert entry.action == "operator_emergency_halt"
         assert "System anomaly" in entry.details
+
 
 def test_log_deployment(audit_logger):
     entry_id = audit_logger.log_deployment("1.1.0", "production")

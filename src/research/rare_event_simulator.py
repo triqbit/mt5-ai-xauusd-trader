@@ -279,7 +279,9 @@ class RareEventSimulator:
 
         # In a vacuum, the range (high-low) is much larger than the open-close move
         # We add extra volatility to the high/low of each candle relative to base volatility
-        noise_magnitude = df.loc[vacuum_mask, "open"] * config.base_volatility * 5.0 * config.event_magnitude
+        noise_magnitude = (
+            df.loc[vacuum_mask, "open"] * config.base_volatility * 5.0 * config.event_magnitude
+        )
         df.loc[vacuum_mask, "high"] += noise_magnitude
         df.loc[vacuum_mask, "low"] -= noise_magnitude
 
@@ -397,7 +399,9 @@ class RareEventSimulator:
         )
 
         event_prices = df["close"].iloc[dislocation_idx:]
-        start_price = df["close"].iloc[dislocation_idx - 1] if dislocation_idx > 0 else df["close"].iloc[0]
+        start_price = (
+            df["close"].iloc[dislocation_idx - 1] if dislocation_idx > 0 else df["close"].iloc[0]
+        )
         peak_impact = float((event_prices / start_price - 1).min())
 
         result = RareEventResult(
@@ -516,7 +520,9 @@ class RareEventSimulator:
 
         # Max percentage deviation from the very beginning of the multi-session event
         event_prices = df["close"].iloc[session_size:]
-        start_price_val = df["close"].iloc[session_size - 1] if session_size > 0 else df["close"].iloc[0]
+        start_price_val = (
+            df["close"].iloc[session_size - 1] if session_size > 0 else df["close"].iloc[0]
+        )
         peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
 
         result = RareEventResult(

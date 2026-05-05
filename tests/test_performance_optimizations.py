@@ -1,10 +1,10 @@
-
-import pytest
-from unittest.mock import MagicMock
-from src.core.decision_support import DecisionSupportSystem, DecisionPacket
-from src.core.trade_logger import TradeLogger
-from src.core.constants import SignalDirection
 import os
+from unittest.mock import MagicMock
+
+from src.core.constants import SignalDirection
+from src.core.decision_support import DecisionSupportSystem
+from src.core.trade_logger import TradeLogger
+
 
 def test_decision_support_optimization(mocker):
     """Verify that format_for_operator returns early when console is provided."""
@@ -55,6 +55,7 @@ def test_decision_support_optimization(mocker):
     assert result == ""
     assert mock_console.print.called
 
+
 def test_trade_logger_persistence_flag():
     """Verify that read_performance_report only persists when requested."""
     db_path = "test_perf_flag.db"
@@ -70,6 +71,7 @@ def test_trade_logger_persistence_flag():
     # Initially no metrics
     with logger.Session() as session:
         from src.core.trade_logger import PerformanceMetric
+
         count_before = session.query(PerformanceMetric).count()
         assert count_before == 0
 
