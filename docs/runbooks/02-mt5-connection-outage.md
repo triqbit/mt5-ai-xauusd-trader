@@ -71,6 +71,7 @@ If MT5 remains unreachable for >15 minutes during market hours:
 - **Check Health API:** `curl http://localhost:8000/health/readiness`
 - **Verify Connections:** `python scripts/doctor.py`
 - **Tail Logs:** `docker logs -f mt5-trader | grep -E "MT5|MetaAPI"`
+- **Verify Audit Logs:** `sqlite3 audit.db "SELECT action, details, created_at FROM audit_log WHERE action='trade_blocked' AND details LIKE '%MT5%' ORDER BY created_at DESC LIMIT 5;"`
 
 ## Escalation Path
 1. **Level 1:** Trading Operations (@maintainer-trading).
