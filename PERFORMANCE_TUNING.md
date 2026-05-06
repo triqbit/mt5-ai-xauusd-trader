@@ -154,7 +154,9 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 
 ### 7.1 Python Optimization
 - **Bypass Redundant Rendering**: In `DecisionSupportSystem.format_for_operator`, we bypass `rich.Console.capture()` when a console is already provided for direct printing. This eliminates expensive string rendering in the main loop.
-- **Vectorized Backtest Loops**: In `BacktestEngine.run_walk_forward`, we pre-extract DataFrame columns into NumPy arrays. Accessing data via `high_vals[abs_idx]` is ~150x faster than `df.iloc[i]["high"]` because it avoids creating a new `pd.Series` object for every bar in the simulation.
+- **Vectorized Backtest Loops**: In `BacktestEngine.run_walk_forward`, we pre-calculate all execution filter metrics (ATR, EMA, RSI, and slopes) outside the main walk-forward loop. Complexity is reduced from $O(N^2)$ to $O(N)$ by eliminating redundant slicing and rolling calculations.
+- **TradeLogger Caching**: Implemented an intelligent cache for performance reports in `TradeLogger` that invalidates only on trade closure. This prevents redundant database I/O and $O(N)$ P&L recalculations on every tick evaluation in live mode.
+- **Precomputed Execution Filters**: `ExecutionFilter.validate` now supports a `precomputed_metrics` parameter, enabling it to bypass all internal DataFrame processing when metrics are supplied by an optimized loop (like the backtester).
 
 ```python
 # Bad: List comprehension with function call
