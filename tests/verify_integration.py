@@ -211,7 +211,16 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.update_equity(8000.0)  # 20% drawdown (Limit 15%)
 
     with patch.object(mock_monitor, "alert_circuit_breaker") as mock_alert:
-        signal = TradeSignal("XAUUSD", 1, 2300, 2200, 2500, 0.1, "test", 0.9)
+        signal = TradeSignal(
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2300.0,
+            stop_loss=2200.0,
+            take_profit=2500.0,
+            lot_size=0.1,
+            algorithm="test",
+            confidence=0.9
+        )
         approved = risk.approve(signal)
         assert approved is False
         mock_alert.assert_called_once()
@@ -232,12 +241,30 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
 
     # 4. Trigger via Invalid Symbol
     risk.open_positions = {}
-    signal_invalid = TradeSignal("INVALID", 1, 1.0, 0.9, 1.1, 0.1, "test", 0.9)
+    signal_invalid = TradeSignal(
+        symbol="INVALID",
+        direction=1,
+        entry_price=1.0,
+        stop_loss=0.9,
+        take_profit=1.1,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.9
+    )
     approved = risk.approve(signal_invalid)
     assert approved is False
 
     # 5. Trigger via Low Confidence
-    signal_low_conf = TradeSignal("XAUUSD", 1, 2300, 2200, 2500, 0.1, "test", 0.4)
+    signal_low_conf = TradeSignal(
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2300.0,
+        stop_loss=2200.0,
+        take_profit=2500.0,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.4
+    )
     approved = risk.approve(signal_low_conf)
     assert approved is False
 
@@ -312,7 +339,16 @@ def test_system_performance_and_resources(mock_cfg, trade_logger, sample_market_
 
         # Full stack logic (Inference + Filter)
         signal_obj = model.predict(obs)
-        signal = TradeSignal("XAUUSD", 1, 2300, 2200, 2500, 0.1, "test", 0.8)
+        signal = TradeSignal(
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2300.0,
+            stop_loss=2200.0,
+            take_profit=2500.0,
+            lot_size=0.1,
+            algorithm="test",
+            confidence=0.8
+        )
         exec_filter.validate(signal, df_for_filter, 0.0)
 
         latencies.append((time.perf_counter() - start) * 1000)
