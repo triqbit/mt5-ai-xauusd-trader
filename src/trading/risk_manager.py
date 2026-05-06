@@ -49,6 +49,7 @@ class DailyStats:
     realised_pnl: float = 0.0
     trade_count: int = 0
     peak_equity: float = 0.0
+    consecutive_losses: int = 0
 
 
 class RiskManager:
@@ -74,9 +75,14 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(self, signal: TradeSignal, signal_id: Optional[int] = None) -> bool:
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        model_health: Optional[dict] = None,
+    ) -> bool:
         """
-        Run the full 6-layer risk filter cascade.
+        Run the full 8-layer risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -92,6 +98,10 @@ class RiskManager:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
+        elif not self._check_consecutive_losses():
+            rejection_reason = "Max consecutive losses reached"
+        elif not self._check_model_health(model_health):
+            rejection_reason = "Model health metrics below threshold"
 
         passed = rejection_reason == ""
         if not passed:
@@ -149,6 +159,10 @@ class RiskManager:
         """Accumulate intraday realised PnL."""
         self.daily.realised_pnl += pnl
         self.daily.trade_count += 1
+        if pnl < 0:
+            self.daily.consecutive_losses += 1
+        else:
+            self.daily.consecutive_losses = 0
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -160,6 +174,40 @@ class RiskManager:
         logger.info("Daily stats reset")
 
     # -- Private filter layers ----------------------------------------------
+    def _check_consecutive_losses(self) -> bool:
+        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
+            logger.warning(
+                "Losing streak limit hit: %d (Limit: %d)",
+                self.daily.consecutive_losses,
+                self.cfg.max_losing_streak,
+            )
+            return False
+        return True
+
+    def _check_model_health(self, health: Optional[dict]) -> bool:
+        if health is None:
+            return True
+
+        drift = float(health.get("drift", 0.0))
+        accuracy = float(health.get("accuracy", 1.0))
+        calibration = float(health.get("calibration", 0.0))
+
+        if drift > self.cfg.model_drift_threshold:
+            logger.warning("Model drift too high: %.2f > %.2f", drift, self.cfg.model_drift_threshold)
+            return False
+        if accuracy < self.cfg.model_accuracy_floor:
+            logger.warning("Model accuracy too low: %.2f < %.2f", accuracy, self.cfg.model_accuracy_floor)
+            return False
+        if calibration > self.cfg.model_calibration_threshold:
+            logger.warning(
+                "Model calibration error too high: %.2f > %.2f",
+                calibration,
+                self.cfg.model_calibration_threshold,
+            )
+            return False
+
+        return True
+
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading

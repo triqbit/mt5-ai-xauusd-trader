@@ -78,7 +78,7 @@ def test_audit_log_execution_decision(audit_logger):
         "drawdown_limit": {"passed": False, "current_drawdown": 0.2, "max_drawdown": 0.15}
     }
 
-    audit_logger.log_execution_decision(
+    entry_id = audit_logger.log_execution_decision(
         symbol="XAUUSD",
         direction=1,
         trace=trace,
@@ -87,7 +87,7 @@ def test_audit_log_execution_decision(audit_logger):
 
     with audit_logger.Session() as session:
         from sqlalchemy import select
-        entry = session.execute(select(AuditEntry).where(AuditEntry.action == "execution_decision")).scalar_one_or_none()
+        entry = session.execute(select(AuditEntry).where(AuditEntry.id == entry_id)).scalar_one_or_none()
         assert entry is not None
         assert entry.actor == "execution_filter"
         assert entry.metadata_json["symbol"] == "XAUUSD"

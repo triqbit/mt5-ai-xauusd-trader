@@ -7,6 +7,7 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 ## 1. Position-Level Limits
 
 ### 1.1 Per-Trade Limits
+- **8-Layer Safety Cascade**: All signals must pass 8 validation layers (Circuit Breaker, Daily Loss, Max Positions, Symbol Allocation, Min Confidence, Risk-Reward, Consecutive Losses, Model Health).
 - **Max Position Size**: 10% of account equity per trade
 - **Min Position Size**: 0.01 lot (prevent rounding errors)
 - **Max Leverage**: 10:1 (conservative for gold trading)
@@ -46,8 +47,8 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 ### 2.3 Daily Trade Limits
 - **Max Trades**: 20 trades per day
 - **Max Winning Streaks**: Alert after 5 consecutive wins
-- **Max Losing Streaks**: Halt trading after 3 consecutive losses
-- **Consecutive Losses**: Reset at daily close (00:00 UTC)
+- **Max Losing Streaks**: Halt trading after 3 consecutive losses (Enforced in RiskManager)
+- **Consecutive Losses**: Reset at daily close (00:00 UTC) or after a profitable trade.
 
 ## 3. Weekly/Monthly Limits
 
@@ -73,9 +74,10 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 - **Very High Confidence**: >0.75 → 100% position size (max)
 
 ### 4.2 Model Performance
-- **Accuracy Floor**: If accuracy <50%, halt trading
+- **Accuracy Floor**: If accuracy <50%, halt trading (Enforced in RiskManager model health gate)
 - **Win Rate Floor**: If win rate <45%, reduce position size to 25%
 - **Drift Threshold**: If model drift >0.3, retrain immediately
+- **Calibration Threshold**: Halt trading if Expected Calibration Error (ECE) > 0.25
 - **Daily Retraining**: Update model daily with latest data
 
 ### 4.3 Prediction Diversity

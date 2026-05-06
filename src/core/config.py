@@ -204,6 +204,12 @@ class TradingConfig(BaseSettings):
         le=0.7,
         description="Minimum allowed historical win rate before halting trades",
     )
+    model_calibration_threshold: float = Field(
+        default=0.25,
+        ge=0.05,
+        le=0.5,
+        description="Maximum allowed model calibration error (ECE) before halting trades",
+    )
     data_freshness_threshold: int = Field(
         default=300, ge=60, description="Maximum age of market data in seconds before alerting"
     )
