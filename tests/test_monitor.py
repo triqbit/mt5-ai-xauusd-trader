@@ -4,7 +4,7 @@ Tests for Monitor class.
 import asyncio
 import time
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.core.config import TradingConfig
 from datetime import datetime, timezone
@@ -62,8 +62,7 @@ class TestMonitor(unittest.TestCase):
     @patch("asyncio.get_running_loop")
     def test_send_message_sync(self, mock_get_running_loop, mock_asyncio_run):
         self.monitor.bot = MagicMock()
-        # Mocking the async send_message
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
 
         mock_get_running_loop.side_effect = RuntimeError("No loop")
         self.monitor.send_message("test message")
@@ -72,7 +71,7 @@ class TestMonitor(unittest.TestCase):
     @patch("asyncio.get_running_loop")
     def test_send_message_async(self, mock_get_running_loop):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
 
         mock_loop = MagicMock()
         mock_get_running_loop.return_value = mock_loop
@@ -82,7 +81,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_alert_circuit_breaker(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
         with patch.object(DRAWDOWN_GAUGE, 'set') as mock_set:
             self.monitor.alert_circuit_breaker(0.15)
             self.assertTrue(self.monitor.bot.send_message.called)
@@ -93,7 +92,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_send_daily_summary(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
         with patch.object(DAILY_PNL_GAUGE, 'set') as mock_set:
             self.monitor.send_daily_summary(500.0, 10)
             self.assertTrue(self.monitor.bot.send_message.called)
@@ -105,7 +104,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_check_confidence_degradation(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
         with patch.object(CONFIDENCE_GAUGE, 'set') as mock_set:
             # Case 1: Below threshold
             self.monitor.check_confidence_degradation(0.5)
@@ -128,7 +127,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_log_system_error(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
         with patch.object(SYSTEM_ERROR_COUNTER, "labels") as mock_labels:
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
@@ -190,7 +189,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_alert_balance_mismatch(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
 
         self.monitor.alert_balance_mismatch(10000.0, 9500.0)
         # Verify bot.send_message was triggered via send_message wrapper
@@ -201,7 +200,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_alert_margin_call(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
 
         self.monitor.alert_margin_call(50.0)
         self.assertTrue(self.monitor.bot.send_message.called)
@@ -225,7 +224,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_log_model_performance(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
         self.config.model_accuracy_floor = 0.5
         self.config.model_drift_threshold = 0.3
         self.config.model_calibration_threshold = 0.25
@@ -253,7 +252,7 @@ class TestMonitor(unittest.TestCase):
 
     def test_log_data_freshness(self):
         self.monitor.bot = MagicMock()
-        self.monitor.bot.send_message = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
         self.config.data_freshness_threshold = 300
 
         with patch.object(DATA_FRESHNESS_GAUGE, "set") as mock_set:
@@ -284,6 +283,31 @@ class TestMonitor(unittest.TestCase):
             mock_hist.observe.assert_called_once()
             duration = mock_hist.observe.call_args[0][0]
             self.assertGreaterEqual(duration, 0.1)
+
+    def test_alert_liquidity_crisis(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+        self.monitor.alert_liquidity_crisis("XAUUSD", 2.5)
+        self.assertTrue(self.monitor.bot.send_message.called)
+        msg = self.monitor.bot.send_message.call_args[1]["text"]
+        self.assertIn("Liquidity Crisis", msg)
+        self.assertIn("2.50 pips", msg)
+
+    def test_alert_broker_connection_lost(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+        self.monitor.alert_broker_connection_lost()
+        self.assertTrue(self.monitor.bot.send_message.called)
+        msg = self.monitor.bot.send_message.call_args[1]["text"]
+        self.assertIn("Broker Connection Lost", msg)
+
+    def test_alert_broker_connection_restored(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+        self.monitor.alert_broker_connection_restored()
+        self.assertTrue(self.monitor.bot.send_message.called)
+        msg = self.monitor.bot.send_message.call_args[1]["text"]
+        self.assertIn("Broker Connection Restored", msg)
 
 if __name__ == '__main__':
     unittest.main()
