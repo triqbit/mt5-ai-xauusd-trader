@@ -47,36 +47,58 @@ The automated script performs the following checks for every backup:
 ### 6.1. Database Restoration (Scenario: Data Corruption)
 1. **Stop the Bot**:
    ```bash
-   kill $(pgrep -f "python main.py") 2>/dev/null || true
+   # Ensure all trading processes are terminated
+   pkill -f "python main.py" || true
    ```
 2. **Identify Latest Healthy Backup**:
    ```bash
-   ls -lh backups/db/
+   # List available backups for both trades and audit databases
+   ls -ltr backups/db/
    ```
 3. **Verify Checksum**:
    ```bash
+   # Verify the integrity of the backup file before restoration
    cd backups/db/
    sha256sum -c trades_YYYYMMDD_HHMMSS.db.sha256
+   sha256sum -c audit_YYYYMMDD_HHMMSS.db.sha256
    ```
-4. **Restore Database File**:
+4. **Restore Database Files**:
    ```bash
+   # Restore the database files to the application root
    cp trades_YYYYMMDD_HHMMSS.db ../../trades.db
+   cp audit_YYYYMMDD_HHMMSS.db ../../audit.db
    cd ../..
    ```
 5. **Verify Restoration**:
    ```bash
+   # Run integrity checks on the restored databases
    sqlite3 trades.db "PRAGMA integrity_check;"
+   sqlite3 audit.db "PRAGMA integrity_check;"
+
+   # Verify data presence
    sqlite3 trades.db "SELECT count(*) FROM trades;"
+   sqlite3 audit.db "SELECT count(*) FROM audit_log;"
    ```
 
 ### 6.2. Log and Report Restoration
 1. **Locate and Verify Archive**:
    ```bash
+   # Verify the tarball integrity
    tar -tzf backups/logs/logs_YYYYMMDD_HHMMSS.tar.gz > /dev/null
+   tar -tzf backups/reports/reports_YYYYMMDD_HHMMSS.tar.gz > /dev/null
    ```
 2. **Extract Archive**:
    ```bash
+   # Extract to the respective directories
+   mkdir -p logs reports
    tar -xzf backups/logs/logs_YYYYMMDD_HHMMSS.tar.gz -C ./logs/
+   tar -xzf backups/reports/reports_YYYYMMDD_HHMMSS.tar.gz -C ./reports/
+   ```
+3. **Verify Restoration**:
+   ```bash
+   # Confirm files are present
+   ls -R logs/
+   ls -R reports/
    ```
 
 ### 6.3. Complete System Loss

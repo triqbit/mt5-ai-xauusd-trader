@@ -32,9 +32,23 @@ log_message() {
 
 log_message "Starting Disaster Recovery Backup Process..."
 
-# 0. Disk Space Check
+# 0. Dependencies Check
+for cmd in sqlite3 tar sha256sum awk; do
+    if ! command -v $cmd >/dev/null 2>&1; then
+        log_message "FAILURE: Required command '$cmd' not found. Please install it."
+        exit 1
+    fi
+done
+
+# 0.1 Disk Space Check
 if command -v df >/dev/null 2>&1; then
+    # More robust df parsing using POSIX output and targeting the current directory's partition
     FREE_SPACE=$(df -m . | awk 'NR==2 {print $4}')
+    # If NR==2 didn't work (e.g. long filesystem name), try the last field of the last line
+    if [ -z "$FREE_SPACE" ] || ! [[ "$FREE_SPACE" =~ ^[0-9]+$ ]]; then
+        FREE_SPACE=$(df -m . | tail -1 | awk '{print $(NF-2)}')
+    fi
+
     if [ "${FREE_SPACE}" -lt "${MIN_DISK_SPACE_MB}" ]; then
         log_message "FAILURE: Insufficient disk space for backup. Required: ${MIN_DISK_SPACE_MB}MB, Available: ${FREE_SPACE}MB"
         exit 1
@@ -63,17 +77,26 @@ for DB_FILE in "${DB_FILES[@]}"; do
                 exit 1
             fi
 
-            # 2.1 Schema Validation
+            # 2.1 Schema Validation (Enhanced Restore Test)
             log_message "Validating schema for ${BACKUP_FILE}..."
+            REQUIRED_TABLES=()
             if [ "${DB_BASE}" == "trades" ]; then
-                TABLE_CHECK=$(sqlite3 "${BACKUP_FILE}" "SELECT name FROM sqlite_master WHERE type='table' AND name='trades';")
+                REQUIRED_TABLES=("trades" "risk_events" "performance_metrics" "model_signals")
             elif [ "${DB_BASE}" == "audit" ]; then
-                TABLE_CHECK=$(sqlite3 "${BACKUP_FILE}" "SELECT name FROM sqlite_master WHERE type='table' AND name='audit_log';")
-            else
-                TABLE_CHECK="skipped"
+                REQUIRED_TABLES=("audit_log")
             fi
 
-            if [ -n "${TABLE_CHECK}" ]; then
+            VALID=true
+            for table in "${REQUIRED_TABLES[@]}"; do
+                TABLE_CHECK=$(sqlite3 "${BACKUP_FILE}" "SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';")
+                if [ -z "${TABLE_CHECK}" ]; then
+                    log_message "FAILURE: Schema validation failed for ${BACKUP_FILE}. Table '${table}' missing."
+                    VALID=false
+                    break
+                fi
+            done
+
+            if [ "${VALID}" == "true" ]; then
                 log_message "SUCCESS: Schema validation passed for ${BACKUP_FILE}."
             else
                 log_message "FAILURE: Schema validation failed for ${BACKUP_FILE}. Required table not found."
