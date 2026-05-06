@@ -46,10 +46,13 @@ Indicate a breaking change by adding a `!` after the type/scope or by adding `BR
 *Example*: `feat!: overhaul risk management engine`
 
 ## 3. Pull Request Labels (Optional)
-While Conventional Commits are the primary driver, PR labels can be used to override or supplement automation:
-- `release:major`: Forces a MAJOR version bump.
-- `release:minor`: Forces a MINOR version bump.
-- `release:patch`: Forces a PATCH version bump.
+While Conventional Commits are the primary driver, PR labels can be used to override or supplement automation. This is particularly useful when a PR contains multiple commit types but should trigger a specific version increment.
+
+- `release:major`: Forces a **MAJOR** version bump regardless of commit types.
+- `release:minor`: Forces a **MINOR** version bump.
+- `release:patch`: Forces a **PATCH** version bump.
+
+If multiple labels are applied, the highest increment takes precedence (`major` > `minor` > `patch`).
 
 ## 4. Tagging & Release Strategy
 
@@ -59,9 +62,9 @@ While Conventional Commits are the primary driver, PR labels can be used to over
 - **Requirement**: Must pass all CI/CD gates, including security scans, 85% test coverage, and pre-production checklists.
 
 ### Pre-releases (Release Candidates)
-- **Tag Format**: `vMAJOR.MINOR.PATCH-rc.N` (e.g., `v1.2.0-rc.1`)
+- **Tag Format**: `vMAJOR.MINOR.PATCH-rc.N` (e.g., `v1.1.0-rc.5`)
 - **Use Case**: Final validation before a stable release.
-- **Automation**: Triggered manually via the `Release Orchestration` workflow by setting the `prerelease` flag.
+- **Automation**: Triggered manually via the `Release Orchestration` workflow by setting the `prerelease` flag. Note: Automated version calculation will ignore pre-release suffixes and bump from the base `MAJOR.MINOR.PATCH` version.
 
 ### Alpha/Beta Releases
 - **Tag Format**: `vMAJOR.MINOR.PATCH-alpha.N` or `vMAJOR.MINOR.PATCH-beta.N`

@@ -12,22 +12,43 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   changelog:
     name: Update Unreleased Section
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'chore: release v')"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Update Changelog [Unreleased]
-        uses: Conventional-Changelog/github-action-generate-changelog@v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path-to-changelog: CHANGELOG.md
+          python-version: '3.11'
+
+      - name: Get PR labels
+        id: pr_labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+            });
+            if (pullRequests.length > 0) {
+              const labels = pullRequests[0].labels.map(l => l.name);
+              return labels.join(' ');
+            }
+            return '';
+          result-encoding: string
+
+      - name: Run Changelog Automation
+        run: python scripts/update_changelog.py --labels ${{ steps.pr_labels.outputs.result }}
 
       - name: Commit and Push Changelog
         run: |
