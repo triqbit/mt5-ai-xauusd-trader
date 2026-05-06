@@ -3,7 +3,7 @@ Unit tests for RiskScenarioBuilder.
 """
 import pytest
 from src.utils.synthetic_data import RiskScenarioBuilder
-from src.trading.risk_manager import TradeSignal
+from src.core.schemas import TradeSignal
 
 @pytest.fixture
 def risk_builder():

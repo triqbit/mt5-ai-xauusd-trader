@@ -1,7 +1,11 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/schemas.py
+
 Centralized Pydantic schemas for data validation and technical trust.
+This module defines the core data structures used throughout the system,
+ensuring strict runtime validation and price sanity checks.
+
 Author : triqbit
 License: MIT
 """
@@ -11,7 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import IntEnum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class SignalDirection(IntEnum):
@@ -21,7 +25,7 @@ class SignalDirection(IntEnum):
     HOLD = 0
 
 
-class TradeSignalSchema(BaseModel):
+class TradeSignal(BaseModel):
     """
     Enterprise-grade validated trading signal schema.
     Enforces strict constraints to ensure technical trust in model outputs.
@@ -52,3 +56,29 @@ class TradeSignalSchema(BaseModel):
             except ValueError as err:
                 raise ValueError(f"Invalid direction: {v}. Must be 1, -1, or 0.") from err
         return v
+
+    @model_validator(mode="after")
+    def validate_price_boundaries(self) -> TradeSignal:
+        """
+        Validate that SL/TP are on the correct side of the entry price
+        based on the signal direction.
+        """
+        if self.direction == SignalDirection.BUY:
+            if self.stop_loss >= self.entry_price:
+                raise ValueError(
+                    f"BUY Stop Loss ({self.stop_loss}) must be below Entry Price ({self.entry_price})"
+                )
+            if self.take_profit <= self.entry_price:
+                raise ValueError(
+                    f"BUY Take Profit ({self.take_profit}) must be above Entry Price ({self.entry_price})"
+                )
+        elif self.direction == SignalDirection.SELL:
+            if self.stop_loss <= self.entry_price:
+                raise ValueError(
+                    f"SELL Stop Loss ({self.stop_loss}) must be above Entry Price ({self.entry_price})"
+                )
+            if self.take_profit >= self.entry_price:
+                raise ValueError(
+                    f"SELL Take Profit ({self.take_profit}) must be below Entry Price ({self.entry_price})"
+                )
+        return self

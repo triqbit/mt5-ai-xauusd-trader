@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from src.trading.mt5_connector import MT5Connector
 from src.core.config import TradingConfig
-from src.trading.risk_manager import TradeSignal
+from src.core.schemas import TradeSignal
 
 @pytest.fixture
 def mock_config():

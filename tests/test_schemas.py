@@ -1,7 +1,7 @@
 
 import pytest
 from pydantic import ValidationError
-from src.core.schemas import TradeSignalSchema, SignalDirection
+from src.core.schemas import TradeSignal, SignalDirection
 
 def test_trade_signal_schema_valid():
     """Verify that a valid signal data dictionary passes validation."""
@@ -15,7 +15,7 @@ def test_trade_signal_schema_valid():
         "algorithm": "ensemble",
         "confidence": 0.85
     }
-    signal = TradeSignalSchema(**data)
+    signal = TradeSignal(**data)
     assert signal.symbol == "XAUUSD"
     assert signal.direction == SignalDirection.BUY
     assert signal.entry_price == 2300.0
@@ -23,12 +23,12 @@ def test_trade_signal_schema_valid():
 
 def test_trade_signal_schema_enum_parsing():
     """Verify that integer directions are correctly parsed into SignalDirection enums."""
-    assert TradeSignalSchema(
+    assert TradeSignal(
         symbol="XAUUSD", direction=1, entry_price=2300, stop_loss=2250,
         take_profit=2400, lot_size=0.1, algorithm="test", confidence=0.9
     ).direction == SignalDirection.BUY
 
-    assert TradeSignalSchema(
+    assert TradeSignal(
         symbol="XAUUSD", direction=-1, entry_price=2300, stop_loss=2350,
         take_profit=2200, lot_size=0.1, algorithm="test", confidence=0.9
     ).direction == SignalDirection.SELL
@@ -58,4 +58,40 @@ def test_trade_signal_schema_invalid_values(field, value):
     }
     data[field] = value
     with pytest.raises(ValidationError):
-        TradeSignalSchema(**data)
+        TradeSignal(**data)
+
+def test_buy_price_boundaries():
+    """Verify BUY boundary validation (SL < Entry < TP)."""
+    base = {
+        "symbol": "XAUUSD", "direction": 1, "entry_price": 2000.0,
+        "lot_size": 0.1, "algorithm": "test", "confidence": 0.9
+    }
+
+    # Valid
+    TradeSignal(**base, stop_loss=1900, take_profit=2100)
+
+    # Invalid SL
+    with pytest.raises(ValidationError, match="BUY Stop Loss"):
+        TradeSignal(**base, stop_loss=2050, take_profit=2100)
+
+    # Invalid TP
+    with pytest.raises(ValidationError, match="BUY Take Profit"):
+        TradeSignal(**base, stop_loss=1900, take_profit=1950)
+
+def test_sell_price_boundaries():
+    """Verify SELL boundary validation (SL > Entry > TP)."""
+    base = {
+        "symbol": "XAUUSD", "direction": -1, "entry_price": 2000.0,
+        "lot_size": 0.1, "algorithm": "test", "confidence": 0.9
+    }
+
+    # Valid
+    TradeSignal(**base, stop_loss=2100, take_profit=1900)
+
+    # Invalid SL
+    with pytest.raises(ValidationError, match="SELL Stop Loss"):
+        TradeSignal(**base, stop_loss=1950, take_profit=1900)
+
+    # Invalid TP
+    with pytest.raises(ValidationError, match="SELL Take Profit"):
+        TradeSignal(**base, stop_loss=2100, take_profit=2050)

@@ -42,7 +42,7 @@ from src.core.exceptions import (
     MT5ExecutionError,
 )
 from src.core.retry import with_retry
-from src.trading.risk_manager import TradeSignal
+from src.core.schemas import TradeSignal
 
 # Apply nest_asyncio to allow nested loops (MetaAPI SDK uses asyncio)
 nest_asyncio.apply()

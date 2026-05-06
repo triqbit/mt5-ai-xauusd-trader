@@ -11,7 +11,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from src.trading.risk_manager import TradeSignal
+from src.core.schemas import TradeSignal
 
 
 class ScenarioGenerator:

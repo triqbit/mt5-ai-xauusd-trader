@@ -57,7 +57,8 @@ from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.core.schemas import TradeSignal
+from src.trading.risk_manager import RiskManager
 
 # -- Logging setup ---------------------------------------------------------
 
