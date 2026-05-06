@@ -186,6 +186,38 @@ class TestDynamicEnsemble(unittest.TestCase):
 
         self.assertGreater(weights["lstm"], weights["ppo"])
 
+    def test_regime_alpha_scaling(self):
+        """Verify that regime-aware alpha adjustments are correctly applied."""
+        # Use lower smoothing to avoid hitting max_swing cap in both cases
+        ensemble = DynamicEnsemble(
+            model_names=self.models,
+            smoothing_factor=0.05,
+            max_swing=0.1
+        )
+        metrics = {
+            "ppo": {"accuracy": 1.0, "calibration_error": 0.0, "drift_score": 0.0},
+            "lstm": {"accuracy": 0.0, "calibration_error": 0.0, "drift_score": 0.0},
+            "transformer": {"accuracy": 0.0, "calibration_error": 0.0, "drift_score": 0.0}
+        }
+
+        # Test TRENDING (Alpha increased: 1.2x)
+        regime_trending = RegimeInfo(label=MarketRegime.TRENDING, confidence=1.0, transition_score=0.0, volatility_index=1.0)
+        ensemble.update_weights(metrics, regime_info=regime_trending)
+        w_trending = ensemble.weights["ppo"]
+        step_trending = w_trending - (1.0/3.0)
+
+        # Reset
+        ensemble.weights = dict.fromkeys(self.models, 1.0/3.0)
+        ensemble._target_weights = ensemble.weights.copy()
+
+        # Test NEWS_SHOCK (Alpha decreased: 0.5x)
+        regime_news = RegimeInfo(label=MarketRegime.NEWS_SHOCK, confidence=1.0, transition_score=0.0, volatility_index=1.0)
+        ensemble.update_weights(metrics, regime_info=regime_news)
+        w_news = ensemble.weights["ppo"]
+        step_news = w_news - (1.0/3.0)
+
+        self.assertGreater(step_trending, step_news)
+
     def test_ema_decay_logic(self):
         # Verify that weights move towards the target incrementally (EMA decay)
         # Target: ppo=1.0, others=0.0
