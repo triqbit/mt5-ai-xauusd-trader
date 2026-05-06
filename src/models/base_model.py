@@ -4,6 +4,8 @@ src/models/base_model.py
 Base interface for all AI/ML models.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, NamedTuple
 

@@ -93,7 +93,7 @@ daily-summary:
 	$(PYTHON_EXEC) generate_triage_report.py
 
 analytics:
-	@echo "Running Post-Trade Attribution Analysis..."
+	@echo "Running Post-Trade Signal Attribution Analysis..."
 	$(PYTHON_EXEC) scripts/verify_allocator_reporting.py
 
 clean:

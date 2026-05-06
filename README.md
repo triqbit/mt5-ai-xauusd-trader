@@ -112,7 +112,7 @@ python main.py --check
 python main.py --mode demo --symbol XAUUSD --algo ensemble
 
 # Start live trading (requires explicit confirmation)
-python main.py --mode live --confirm-live
+python main.py --mode live --algo ensemble --confirm-live
 ```
 
 ---
