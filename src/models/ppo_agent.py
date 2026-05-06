@@ -31,6 +31,7 @@ class PPOAgent(BaseModel):
         env: Any | None = None,
         model_path: str | Path | None = None,
         device: str = "auto",
+        ppo_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
         Initializes the PPO agent with lazy loading for stable-baselines3.
@@ -39,11 +40,13 @@ class PPOAgent(BaseModel):
             env: An instance of the Gymnasium-compatible TradingEnv.
             model_path: Optional path to a pre-trained PPO model file (.zip).
             device: Computing device to use ('cpu', 'cuda', 'auto').
+            ppo_kwargs: Optional dictionary of hyperparameters for the PPO constructor.
         """
         self.logger = logging.getLogger(__name__)
         self.device = device
         self.model = None
         self.env = None
+        self.ppo_kwargs = ppo_kwargs or {}
 
         # Lazy loading of SB3 to avoid dependency issues in non-training environments
         try:
@@ -59,12 +62,15 @@ class PPOAgent(BaseModel):
                 self.model = PPO.load(model_path, env=self.env, device=device)
             elif self.env is not None:
                 self.logger.info("Creating new PPO model with MlpPolicy...")
-                self.model = PPO(
-                    policy="MlpPolicy",
-                    env=self.env,
-                    verbose=1,
-                    device=device,
-                )
+                # Combine default parameters with user-provided kwargs
+                default_kwargs = {
+                    "policy": "MlpPolicy",
+                    "env": self.env,
+                    "verbose": 1,
+                    "device": device,
+                }
+                combined_kwargs = {**default_kwargs, **self.ppo_kwargs}
+                self.model = PPO(**combined_kwargs)
             else:
                 self.logger.debug("PPOAgent initialized without model or environment.")
 
@@ -86,6 +92,15 @@ class PPOAgent(BaseModel):
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Model not loaded"},
+            )
+
+        # Production-grade robustness: Check for NaN or Inf in input features
+        if not np.isfinite(features).all():
+            self.logger.error("Input features contain NaN or Inf values.")
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": "Invalid features: NaN or Inf detected"},
             )
 
         try:
