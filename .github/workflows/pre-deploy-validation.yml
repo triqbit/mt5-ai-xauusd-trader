@@ -35,13 +35,13 @@ jobs:
       - name: Gate 1.1: Ruff Lint & Format Check
         run: |
           echo "Running Ruff checks..."
-          ruff check src/ main.py scripts/ tests/
-          ruff format --check src/ main.py scripts/ tests/
+          ruff check src/ main.py scripts/ tests/ || { echo "::error::Ruff linting failed. Please fix violations."; exit 1; }
+          ruff format --check src/ main.py scripts/ tests/ || { echo "::error::Ruff formatting failed. Run 'ruff format .'"; exit 1; }
 
       - name: Gate 1.2: Mypy Type Check
         run: |
           echo "Running Mypy static analysis..."
-          mypy src/ main.py scripts/ --ignore-missing-imports
+          mypy src/ main.py scripts/ --ignore-missing-imports || { echo "::error::Mypy type checks failed."; exit 1; }
 
       - name: Gate 2: Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
@@ -51,18 +51,18 @@ jobs:
       - name: Gate 3: Validate Environment Config Template
         run: |
           echo "Verifying .env.example matches src/core/config.py..."
-          python scripts/validate_env.py
+          python scripts/validate_env.py || { echo "::error::Environment template validation failed. Sync .env.example with src/core/config.py"; exit 1; }
 
       - name: Gate 4: Validate Release Notes
         run: |
           echo "Checking CHANGELOG.md for [Unreleased] content..."
-          python scripts/check_release_notes.py
+          python scripts/check_release_notes.py || { echo "::error::Release notes validation failed. Add your changes to the [Unreleased] section in CHANGELOG.md"; exit 1; }
 
       - name: Gate 5: Dependency Security Audit
         run: |
           echo "Scanning dependencies for vulnerabilities (CI & Prod)..."
-          pip-audit --requirement requirements-ci.txt
-          pip-audit --requirement requirements.txt
+          pip-audit --requirement requirements-ci.txt || { echo "::error::Security vulnerabilities found in CI requirements."; exit 1; }
+          pip-audit --requirement requirements.txt || { echo "::error::Security vulnerabilities found in production requirements."; exit 1; }
 
       - name: Gate 6: License Compliance Check
         run: |
@@ -77,7 +77,7 @@ jobs:
           pip-licenses \
             --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python" \
             --partial-match \
-            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools || { echo "::error::License compliance check failed. Prohibited licenses detected."; exit 1; }
 
   # -----------------------------------------------------------
   # STAGE 2: Functional - Migrations, Tests & Coverage
@@ -126,12 +126,12 @@ jobs:
       - name: Gate 7: Database Migration Reversibility Check
         run: |
           echo "Verifying database migrations (up/down/up cycle)..."
-          python scripts/verify_migrations.py
+          python scripts/verify_migrations.py || { echo "::error::Migration reversibility check failed. Verify your Alembic scripts."; exit 1; }
 
       - name: Gate 8: Run Tests with Coverage Gate (85%)
         run: |
           echo "Running unit and integration tests..."
-          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85
+          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85 || { echo "::error::Tests failed or coverage below 85% gate."; exit 1; }
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"

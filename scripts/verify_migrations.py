@@ -39,9 +39,13 @@ def verify_migrations():
         return True
 
     except Exception as e:
+        print("="*60)
+        print("  DEPLOYMENT BLOCKED: MIGRATION VERIFICATION FAILED")
+        print("="*60)
         print(f"Error during migration verification: {e}")
         import traceback
         traceback.print_exc()
+        print("="*60)
         return False
 
     finally:
@@ -50,6 +54,5 @@ def verify_migrations():
 
 if __name__ == "__main__":
     if not verify_migrations():
-        print("Migration verification FAILED.")
         sys.exit(1)
     sys.exit(0)
