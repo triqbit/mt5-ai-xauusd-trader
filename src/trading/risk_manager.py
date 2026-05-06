@@ -22,8 +22,8 @@ from datetime import date
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
-from src.core.schemas import TradeSignal
 from src.core.monitor import Monitor
+from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)

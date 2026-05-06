@@ -6,13 +6,14 @@ This document outlines the resilience and error-handling standards for the MT5 A
 
 All custom exceptions inherit from `TradingError` in `src/core/exceptions.py`.
 
-- `TradingError`: Base exception.
+- `TradingError`: Base exception. Includes an `is_retriable` flag (defaulting to `True`).
 - `MT5Error`: Base for MT5-specific issues.
 - `MT5ConnectionError`: Network or terminal connectivity failures.
 - `MT5DataError`: Data retrieval failures (OHLCV, ticks).
 - `MT5ExecutionError`: Order placement or modification failures.
+- `ConfigurationError`: Permanent environment setup issues (`is_retriable=False`).
 
-## Retry Strategy
+## Smart Retry Strategy
 
 Critical external dependencies (MT5 terminal, MetaAPI) are protected by a robust retry mechanism defined in `src/core/retry.py`.
 
@@ -22,11 +23,13 @@ Used to wrap functions that interact with external services. Features include:
 - **Exponential Backoff**: Delay increases after each failure.
 - **Jitter**: Random noise added to delays to prevent thundering herd problems.
 - **Max Retries**: Configurable limit (default: 3).
+- **Retriability Awareness**: Respects the `is_retriable` flag on exceptions. If `False`, it fails immediately without retrying.
 
 ### Application
 
 - **Connectivity**: `MT5Connector.initialize` retries on connection loss.
-- **Market Data**: `get_rates` and `get_tick` retry on transient data errors.
+- **Market Data**: `get_rates` and `get_tick` retry on transient data errors. Permanent errors like `RES_E_INVALID_PARAMS` are marked as non-retriable.
+- **Execution**: `place_order` retries on transient broker rejections (e.g., `TRADE_RETCODE_REQUOTE`) but fails immediately on permanent ones (e.g., `TRADE_RETCODE_NO_MONEY`, `TRADE_RETCODE_INVALID_VOLUME`).
 
 ## Loop Recovery
 
