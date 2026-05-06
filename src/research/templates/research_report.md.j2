@@ -172,10 +172,10 @@
 ## {{ ns.count }}. RL Agent Evaluation
 **Summary:** {{ rl_evaluation.comparison_summary }}
 
-| Agent | Sharpe | Sortino | PF | MaxDD | Recovery | VaR(95%) | Ulcer | SQN |
-|-------|--------|---------|----|-------|----------|----------|-------|-----|
+| Agent | Sharpe | Sortino | PF | MaxDD | Recovery | VaR(95%) | CSR | G2P |
+|-------|--------|---------|----|-------|----------|----------|-----|-----|
 {% for m in rl_evaluation.metrics %}
-| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.sortino|round(2) }} | {{ m.profit_factor|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ m.recovery_factor|round(2) }} | {{ (m.var_95 * 100)|round(2) }}% | {{ m.ulcer_index|round(2) }} | {{ m.sqn|round(2) }} |
+| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.sortino|round(2) }} | {{ m.profit_factor|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ m.recovery_factor|round(2) }} | {{ (m.var_95 * 100)|round(2) }}% | {{ m.common_sense_ratio|round(2) }} | {{ m.gain_to_pain_ratio|round(2) }} |
 {% endfor %}
 {% endif %}
 
