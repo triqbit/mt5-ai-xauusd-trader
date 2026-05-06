@@ -139,6 +139,8 @@ class TradeLogger:
         # Create tables if they don't exist
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
+        # Caching performance report to avoid O(N) DB queries on every signal
+        self._perf_cache: dict[str, float] | None = None
 
     def log_signal(self, signal_data: dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
@@ -170,6 +172,10 @@ class TradeLogger:
         status: str = "OPEN",
     ) -> int:
         """Log a trade execution."""
+        # Invalidate cache if a new closed trade is logged (unlikely to be CLOSED immediately but for safety)
+        if status == "CLOSED":
+            self._perf_cache = None
+
         with self.Session() as session:
             trade = Trade(
                 ticket=ticket,
@@ -192,6 +198,9 @@ class TradeLogger:
         drawdown_impact: float = 0.0,
     ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
+        # Invalidate cache since a trade is being closed
+        self._perf_cache = None
+
         with self.Session() as session:
             trade = (
                 session.query(Trade)
@@ -253,6 +262,10 @@ class TradeLogger:
         Args:
             persist: Whether to save the calculated metrics to the database.
         """
+        # Return cached report if available and not persisting
+        if self._perf_cache is not None and not persist:
+            return self._perf_cache
+
         with self.Session() as session:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
@@ -297,6 +310,9 @@ class TradeLogger:
                 "win_rate": win_rate,
                 "total_trades": len(pnls),
             }
+
+            # Update cache
+            self._perf_cache = metrics
 
             # Optionally log these metrics to DB
             if persist:

@@ -37,7 +37,7 @@ class TestMonitor(unittest.TestCase):
         self.config = MagicMock()
         self.config.telegram_token.get_secret_value.return_value = "fake_token"
         self.config.telegram_chat_id = "fake_chat_id"
-        self.config.confidence_threshold = 0.6
+        self.config.min_confidence = 0.6
         self.config.prometheus_port = 8000
 
         with patch('telegram.Bot'):

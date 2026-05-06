@@ -11,7 +11,7 @@ import numpy as np
 @pytest.fixture
 def mock_config():
     config = MagicMock(spec=TradingConfig)
-    config.confidence_threshold = 0.6
+    config.min_confidence = 0.6
     config.model_drift_threshold = 0.3
     config.model_accuracy_floor = 0.5
     config.model_win_rate_floor = 0.45
@@ -79,7 +79,7 @@ def test_filter_low_historical_win_rate(execution_filter, valid_signal, mock_mar
     assert decision.blocked_by == "PERFORMANCE_FLOOR"
 
 def test_filter_low_confidence_threshold(execution_filter, valid_signal, mock_market_data):
-    execution_filter.cfg.confidence_threshold = 0.8
+    execution_filter.cfg.min_confidence = 0.8
     valid_signal.confidence = 0.7
     decision = execution_filter.validate(valid_signal, mock_market_data, 0.05)
     assert decision.is_approved is False

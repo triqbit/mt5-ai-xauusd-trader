@@ -61,33 +61,47 @@ class ExecutionFilter:
         timestamp: datetime | None = None,
         model_health: dict[str, float] | None = None,
         trade_logger: TradeLogger | None = None,
+        precomputed_metrics: dict[str, Any] | None = None,
     ) -> ExecutionDecision:
         """
         Run the full 9-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
+
+        Args:
+            signal: The signal to validate.
+            market_data: DataFrame with OHLCV and technical indicators.
+            current_drawdown: Current account drawdown (0.0 to 1.0).
+            timestamp: Evaluation time.
+            model_health: Optional model health metrics.
+            trade_logger: Optional trade logger for performance floor checks.
+            precomputed_metrics: Optional dictionary containing pre-calculated metrics
+                                 to bypass expensive DataFrame operations.
         """
         timestamp = timestamp or signal.timestamp or datetime.now(UTC)
         trace: dict[str, Any] = {}
+        metrics = precomputed_metrics or {}
 
         # Layer 1: ATR Volatility
-        atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(market_data)
+        atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(
+            market_data, precomputed=metrics.get("atr_volatility")
+        )
         trace["atr_volatility"] = {"passed": atr_passed, **atr_metrics}
 
         # Layer 2: Trend Angle
         trend_passed, trend_metrics = self._check_trend_angle_with_metrics(
-            market_data, signal.direction
+            market_data, signal.direction, precomputed=metrics.get("trend_angle")
         )
         trace["trend_angle"] = {"passed": trend_passed, **trend_metrics}
 
         # Layer 3: EMA Sequence
         ema_passed, ema_metrics = self._check_ema_sequence_with_metrics(
-            market_data, signal.direction
+            market_data, signal.direction, precomputed=metrics.get("ema_sequence")
         )
         trace["ema_sequence"] = {"passed": ema_passed, **ema_metrics}
 
         # Layer 4: Momentum (RSI)
         momentum_passed, momentum_metrics = self._check_momentum_with_metrics(
-            market_data, signal.direction
+            market_data, signal.direction, precomputed=metrics.get("momentum")
         )
         trace["momentum"] = {"passed": momentum_passed, **momentum_metrics}
 
@@ -154,25 +168,37 @@ class ExecutionFilter:
         return passed
 
     def _check_atr_volatility_with_metrics(
-        self, df: pd.DataFrame, threshold: float = 3.0
+        self,
+        df: pd.DataFrame,
+        threshold: float = 3.0,
+        precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         """Blocks if current ATR is > threshold * average ATR."""
-        if "base_M5_atr" in df.columns:
-            atr = df["base_M5_atr"]
-        elif "atr" in df.columns:
-            atr = df["atr"]
+        if precomputed:
+            current_atr = precomputed.get("current_atr", 0.0)
+            avg_atr = precomputed.get("avg_atr", 1.0)
         else:
-            # Fallback calculation if not in DF
-            high = df["high"]
-            low = df["low"]
-            close = df["close"]
-            tr = pd.concat(
-                [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
-            ).max(axis=1)
-            atr = tr.rolling(window=14).mean()
+            if "base_M5_atr" in df.columns:
+                atr = df["base_M5_atr"]
+            elif "atr" in df.columns:
+                atr = df["atr"]
+            else:
+                # Fallback calculation if not in DF - only use what's needed for the calculation
+                # ATR 14 needs at least 15 bars for the shift(1) and rolling(14)
+                # But avg_atr needs 100 bars.
+                # Optimization: Slice to avoid processing entire history if not precomputed
+                lookback = 120
+                df_slice = df.iloc[-lookback:]
+                high = df_slice["high"]
+                low = df_slice["low"]
+                close = df_slice["close"]
+                tr = pd.concat(
+                    [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+                ).max(axis=1)
+                atr = tr.rolling(window=14).mean()
 
-        current_atr = float(atr.iloc[-1])
-        avg_atr = float(atr.rolling(window=100).mean().iloc[-1])
+            current_atr = float(atr.iloc[-1])
+            avg_atr = float(atr.rolling(window=100).mean().iloc[-1])
 
         if np.isnan(current_atr) or np.isnan(avg_atr):
             return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
@@ -187,23 +213,31 @@ class ExecutionFilter:
         return passed
 
     def _check_trend_angle_with_metrics(
-        self, df: pd.DataFrame, direction: int, window: int = 20
+        self,
+        df: pd.DataFrame,
+        direction: int,
+        window: int = 20,
+        precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         """Validates that the price trend matches signal direction using regression slope of EMA21."""
-        ema_col = "base_M5_ema_21"
-        if ema_col in df.columns:
-            ema_series = df[ema_col]
-        elif "close" in df.columns:
-            ema_series = df["close"].ewm(span=21, adjust=False).mean()
+        if precomputed:
+            slope = precomputed.get("slope", 0.0)
         else:
-            return True, {"slope": 0.0, "reason": "No EMA data"}
+            ema_col = "base_M5_ema_21"
+            if ema_col in df.columns:
+                ema_series = df[ema_col]
+            elif "close" in df.columns:
+                # Optimization: only compute required window
+                ema_series = df["close"].iloc[-(window + 50) :].ewm(span=21, adjust=False).mean()
+            else:
+                return True, {"slope": 0.0, "reason": "No EMA data"}
 
-        target_ema = ema_series.iloc[-window:]
-        if len(target_ema) < window:
-            return True, {"slope": 0.0, "reason": "Insufficient data"}
+            target_ema = ema_series.iloc[-window:]
+            if len(target_ema) < window:
+                return True, {"slope": 0.0, "reason": "Insufficient data"}
 
-        x = np.arange(len(target_ema))
-        slope, _, _, _, _ = stats.linregress(x, target_ema.values)
+            x = np.arange(len(target_ema))
+            slope, _, _, _, _ = stats.linregress(x, target_ema.values)
 
         if direction > 0:  # BUY
             passed = bool(slope > 0)
@@ -220,18 +254,24 @@ class ExecutionFilter:
         return passed
 
     def _check_ema_sequence_with_metrics(
-        self, df: pd.DataFrame, direction: int
+        self,
+        df: pd.DataFrame,
+        direction: int,
+        precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         """Verifies EMA stack (8 > 21 > 50 > 200 for BUY)."""
-        periods = [8, 21, 50, 200]
-        emas = {}
-
-        for p in periods:
-            col = f"base_M5_ema_{p}"
-            if col in df.columns:
-                emas[p] = float(df[col].iloc[-1])
-            else:
-                emas[p] = float(df["close"].ewm(span=p, adjust=False).mean().iloc[-1])
+        if precomputed:
+            emas = precomputed.get("emas", {})
+        else:
+            periods = [8, 21, 50, 200]
+            emas = {}
+            for p in periods:
+                col = f"base_M5_ema_{p}"
+                if col in df.columns:
+                    emas[p] = float(df[col].iloc[-1])
+                else:
+                    # Optimization: only compute what is needed
+                    emas[p] = float(df["close"].iloc[-300:].ewm(span=p, adjust=False).mean().iloc[-1])
 
         if direction > 0:  # BUY
             passed = bool(emas[8] > emas[21] > emas[50] > emas[200])
@@ -248,18 +288,27 @@ class ExecutionFilter:
         return passed
 
     def _check_momentum_with_metrics(
-        self, df: pd.DataFrame, direction: int
+        self,
+        df: pd.DataFrame,
+        direction: int,
+        precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         """Validates RSI is in a healthy momentum zone."""
-        col = "base_M5_rsi"
-        if col in df.columns:
-            rsi = float(df[col].iloc[-1])
+        if precomputed:
+            rsi = precomputed.get("rsi", 0.0)
         else:
-            delta = df["close"].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
-            rs = gain / (loss + 1e-8)
-            rsi = float(100 - (100 / (1 + rs)).iloc[-1])
+            col = "base_M5_rsi"
+            if col in df.columns:
+                rsi = float(df[col].iloc[-1])
+            else:
+                # Optimization: only compute what is needed
+                lookback = self.rsi_period + 5
+                df_slice = df["close"].iloc[-lookback:]
+                delta = df_slice.diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
+                rs = gain / (loss + 1e-8)
+                rsi = float(100 - (100 / (1 + rs)).iloc[-1])
 
         if np.isnan(rsi):
             return True, {"rsi": 0.0}

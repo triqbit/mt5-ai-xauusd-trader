@@ -87,7 +87,9 @@ def test_audit_log_execution_decision(audit_logger):
 
     with audit_logger.Session() as session:
         from sqlalchemy import select
-        entry = session.execute(select(AuditEntry).where(AuditEntry.action == "execution_decision")).scalar_one_or_none()
+        entry = session.execute(
+            select(AuditEntry).where(AuditEntry.action == "execution_decision")
+        ).scalars().first()
         assert entry is not None
         assert entry.actor == "execution_filter"
         assert entry.metadata_json["symbol"] == "XAUUSD"

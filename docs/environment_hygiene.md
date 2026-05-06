@@ -6,7 +6,7 @@
     - `max_positions`: reduced maximum from 10 to 5.
     - `risk_per_trade`: reduced maximum from 5% to 2%.
     - `max_daily_loss`: reduced maximum from 20% to 6%.
-    - `confidence_threshold`: minimum set to 0.5.
+    - `min_confidence`: minimum set to 0.5.
     - `model_accuracy_floor`: minimum set to 0.5.
     - `model_win_rate_floor`: minimum set to 0.4.
 

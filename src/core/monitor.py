@@ -204,11 +204,11 @@ class Monitor:
     def check_confidence_degradation(self, confidence: float) -> None:
         """Send warning if model confidence falls below threshold and update metrics."""
         CONFIDENCE_GAUGE.set(confidence)
-        if confidence < self.cfg.confidence_threshold:
+        if confidence < self.cfg.min_confidence:
             msg = (
                 f"⚠️ WARNING: Model Confidence Degradation\n"
                 f"Current: {confidence:.3f}\n"
-                f"Threshold: {self.cfg.confidence_threshold:.3f}"
+                f"Threshold: {self.cfg.min_confidence:.3f}"
             )
             self.send_message(msg)
 
