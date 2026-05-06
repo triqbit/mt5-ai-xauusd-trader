@@ -40,6 +40,10 @@ def test_audit_logger_redaction(tmp_path):
     db_file = tmp_path / "test_audit.db"
     db_url = f"sqlite:///{db_file}"
 
+    # Reset singleton for testing to ensure it uses the test DB
+    AuditLogger._instance = None
+    AuditLogger._initialized = False
+
     # Setup masking processor with a secret
     from src.core.log_config import get_masking_processor
     processor = get_masking_processor()
