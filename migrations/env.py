@@ -20,8 +20,9 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.trade_logger import Base
-target_metadata = Base.metadata
+from src.core.trade_logger import Base as TradeBase
+from src.core.audit_log import Base as AuditBase
+target_metadata = [TradeBase.metadata, AuditBase.metadata]
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

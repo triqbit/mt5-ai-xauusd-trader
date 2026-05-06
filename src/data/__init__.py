@@ -12,9 +12,9 @@ from .event_intelligence import (
 )
 
 __all__ = [
-    "EventIntelligence",
-    "MacroEvent",
     "EventCategory",
     "EventImpact",
+    "EventIntelligence",
+    "MacroEvent",
     "RiskStatus",
 ]
