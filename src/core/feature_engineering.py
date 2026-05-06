@@ -72,30 +72,34 @@ class FeatureEngineer:
             df = df.copy()
             df.columns = [col.lower() for col in df.columns]
 
-            # 1. Base Timeframe Features
-            feature_blocks = []
+            # 1. Base Timeframe Features - Optimization: Collect all in one dict
+            all_features = {}
             with profile_context("fe_base_technical"):
-                feature_blocks.append(
+                all_features.update(
                     self._get_technical_indicators(df, prefix=f"base_{self.base_timeframe}")
                 )
             with profile_context("fe_candle_patterns"):
-                feature_blocks.append(self._get_candle_patterns(df))
+                all_features.update(self._get_candle_patterns(df))
             with profile_context("fe_price_action"):
-                feature_blocks.append(self._get_price_action_features(df))
+                all_features.update(self._get_price_action_features(df))
             with profile_context("fe_volume"):
-                feature_blocks.append(self._get_volume_features(df))
+                all_features.update(self._get_volume_features(df))
+
+            # Convert base features to DataFrame once
+            base_features_df = pd.DataFrame(all_features, index=df.index)
 
             # 2. Multi-Timeframe Features
+            mtf_blocks = []
             with profile_context("fe_mtf_all"):
                 for tf in self.timeframes:
                     if tf == self.base_timeframe:
                         continue
                     with profile_context(f"fe_mtf_{tf}"):
                         mtf_features = self._compute_mtf_features(df, tf)
-                        feature_blocks.append(mtf_features)
+                        mtf_blocks.append(mtf_features)
 
             # Concatenate all blocks to avoid fragmentation
-            full_df = pd.concat([df, *feature_blocks], axis=1)
+            full_df = pd.concat([df, base_features_df, *mtf_blocks], axis=1)
 
             # Optimization: Be selective with dropna to avoid losing all data if MTF fails
             # We identify base features and MTF features
@@ -156,7 +160,7 @@ class FeatureEngineer:
             self.feature_columns = features_only.columns.tolist()
             return features_only
 
-    def _get_technical_indicators(self, df: pd.DataFrame, prefix: str) -> pd.DataFrame:
+    def _get_technical_indicators(self, df: pd.DataFrame, prefix: str) -> dict[str, np.ndarray]:
         """
         Compute standard technical indicators including momentum, volatility, and trend.
 
@@ -165,7 +169,7 @@ class FeatureEngineer:
             prefix: Prefix to prepend to all indicator column names.
 
         Returns:
-            DataFrame containing computed technical indicators.
+            Dictionary containing computed technical indicators.
         """
         indicators = {}
         close = df["close"].values.astype(np.float64)
@@ -229,9 +233,9 @@ class FeatureEngineer:
         indicators[f"{prefix}_ht_trendline"] = talib.HT_TRENDLINE(close)
         indicators[f"{prefix}_ht_dcperiod"] = talib.HT_DCPERIOD(close)
 
-        return pd.DataFrame(indicators, index=df.index)
+        return indicators
 
-    def _get_candle_patterns(self, df: pd.DataFrame, prefix: str = "") -> pd.DataFrame:
+    def _get_candle_patterns(self, df: pd.DataFrame, prefix: str = "") -> dict[str, np.ndarray]:
         """
         Compute all TA-Lib candle patterns.
 
@@ -240,7 +244,7 @@ class FeatureEngineer:
             prefix: Optional prefix for pattern column names.
 
         Returns:
-            DataFrame of candle patterns.
+            Dictionary of candle patterns.
         """
         op = df["open"].values.astype(np.float64)
         hi = df["high"].values.astype(np.float64)
@@ -254,9 +258,9 @@ class FeatureEngineer:
         for pattern in pattern_list:
             patterns[f"{col_prefix}{pattern.lower()}"] = getattr(talib, pattern)(op, hi, lo, cl)
 
-        return pd.DataFrame(patterns, index=df.index)
+        return patterns
 
-    def _get_price_action_features(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _get_price_action_features(self, df: pd.DataFrame) -> dict[str, np.ndarray]:
         """
         Compute custom price action features such as returns, range, and slope.
 
@@ -264,31 +268,33 @@ class FeatureEngineer:
             df: Input DataFrame with OHLCV data.
 
         Returns:
-            DataFrame containing custom price action features.
+            Dictionary containing custom price action features.
         """
         pa = {}
-        close = df["close"]
+        close = df["close"].values.astype(np.float64)
+        high = df["high"].values.astype(np.float64)
+        low = df["low"].values.astype(np.float64)
+        open_ = df["open"].values.astype(np.float64)
 
-        # Returns
-        pa["returns_1"] = close.pct_change(1)
-        pa["returns_5"] = close.pct_change(5)
+        # Optimization: Use TA-Lib ROCP for returns
+        pa["returns_1"] = talib.ROCP(close, timeperiod=1)
+        pa["returns_5"] = talib.ROCP(close, timeperiod=5)
 
-        # Log returns
-        pa["log_returns"] = np.log(close / close.shift(1).replace(0, 1e-8))
+        # Log returns - Optimization: Use NumPy
+        pa["log_returns"] = np.log(close / (np.roll(close, 1) + 1e-8))
+        pa["log_returns"][0] = np.nan
 
-        # Range
-        pa["day_range"] = (df["high"] - df["low"]) / df["close"].replace(0, 1e-8)
-        pa["body_size"] = (df["close"] - df["open"]).abs() / (df["high"] - df["low"]).replace(
-            0, 1e-8
-        )
+        # Range - Optimization: Use NumPy
+        pa["day_range"] = (high - low) / (close + 1e-8)
+        pa["body_size"] = np.abs(close - open_) / (high - low + 1e-8)
 
         # Linear Regression Slopes (Institutional-grade TA-Lib implementation)
-        pa["slope_5"] = talib.LINEARREG_SLOPE(close.values.astype(np.float64), timeperiod=5)
-        pa["slope_20"] = talib.LINEARREG_SLOPE(close.values.astype(np.float64), timeperiod=20)
+        pa["slope_5"] = talib.LINEARREG_SLOPE(close, timeperiod=5)
+        pa["slope_20"] = talib.LINEARREG_SLOPE(close, timeperiod=20)
 
-        return pd.DataFrame(pa, index=df.index)
+        return pa
 
-    def _get_volume_features(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _get_volume_features(self, df: pd.DataFrame) -> dict[str, np.ndarray]:
         """
         Compute volume-based features including rolling VWAP, OBV, and VPT.
 
@@ -296,32 +302,38 @@ class FeatureEngineer:
             df: Input DataFrame with OHLCV data.
 
         Returns:
-            DataFrame containing volume-based features.
+            Dictionary containing volume-based features.
         """
         vol = {}
-        close = df["close"]
-        high = df["high"]
-        low = df["low"]
-        volume = df["tick_volume"]
+        close = df["close"].values.astype(np.float64)
+        high = df["high"].values.astype(np.float64)
+        low = df["low"].values.astype(np.float64)
+        volume = df["tick_volume"].values.astype(np.float64)
 
-        vol["vol_sma_20"] = volume / volume.rolling(window=20).mean().replace(0, 1e-8)
+        # Optimization: Use TA-Lib for SMA instead of Pandas rolling
+        vol_sma_20 = talib.SMA(volume, timeperiod=20)
+        vol["vol_sma_20"] = volume / (vol_sma_20 + 1e-8)
         vol["rvol"] = vol["vol_sma_20"]  # Canonical RVOL
-        vol["obv"] = talib.OBV(close.values, volume.values.astype(float))
+        vol["obv"] = talib.OBV(close, volume)
 
-        # VWAP Approximation (Rolling)
+        # VWAP Approximation (Rolling) - Optimization: Use TA-Lib for SUM
         typical_price = (high + low + close) / 3
+        tp_vol = typical_price * volume
         for period in [20, 50, 100]:
-            vol[f"vwap_{period}"] = (typical_price * volume).rolling(
-                window=period
-            ).sum() / volume.rolling(window=period).sum().replace(0, 1e-8)
-            vol[f"dist_vwap_{period}"] = (close - vol[f"vwap_{period}"]) / vol[
-                f"vwap_{period}"
-            ].replace(0, 1e-8)
+            sum_tp_vol = talib.SUM(tp_vol, timeperiod=period)
+            sum_vol = talib.SUM(volume, timeperiod=period)
+            vol[f"vwap_{period}"] = sum_tp_vol / (sum_vol + 1e-8)
+            vol[f"dist_vwap_{period}"] = (close - vol[f"vwap_{period}"]) / (
+                vol[f"vwap_{period}"] + 1e-8
+            )
 
-        # Volume Price Trend (VPT)
-        vol["vpt"] = (volume * close.pct_change().fillna(0)).cumsum()
+        # Volume Price Trend (VPT) - Optimization: Use TA-Lib ROCP and NumPy cumsum
+        returns = talib.ROCP(close, timeperiod=1)
+        # Handle first NaN from ROCP to match pct_change().fillna(0)
+        returns[np.isnan(returns)] = 0
+        vol["vpt"] = np.cumsum(volume * returns)
 
-        return pd.DataFrame(vol, index=df.index)
+        return vol
 
     def _compute_mtf_features(self, df: pd.DataFrame, tf: str) -> pd.DataFrame:
         """
@@ -364,14 +376,14 @@ class FeatureEngineer:
             .dropna()
         )
 
-        # 1. Compute indicators on resampled data
-        mtf_indicators = self._get_technical_indicators(resampled, prefix=f"mtf_{tf}")
+        # 1. Compute indicators and patterns on resampled data
+        # Optimization: Use dictionary update instead of multiple DFs + concat
+        mtf_all = {}
+        mtf_all.update(self._get_technical_indicators(resampled, prefix=f"mtf_{tf}"))
+        mtf_all.update(self._get_candle_patterns(resampled, prefix=f"mtf_{tf}"))
 
-        # 2. Compute candle patterns on resampled data
-        mtf_patterns = self._get_candle_patterns(resampled, prefix=f"mtf_{tf}")
-
-        # Combine them
-        combined_mtf = pd.concat([mtf_indicators, mtf_patterns], axis=1)
+        # Create DataFrame once
+        combined_mtf = pd.DataFrame(mtf_all, index=resampled.index)
 
         # Reindex to original DataFrame using forward fill to handle frequency misalignment.
         # We then shift by 1 to ensure that at any time T, we only use MTF data
