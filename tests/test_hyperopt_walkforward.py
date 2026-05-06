@@ -66,6 +66,13 @@ def test_robustness_scoring_components(sample_data):
     stability = optimizer._calculate_stability_penalty(params, sample_data)
     assert isinstance(stability, float)
 
+    # Test type-safe perturbations for integers
+    int_params = {"window": 10}
+    # Mock _evaluate_strategy to just return a dummy Sharpe Ratio
+    optimizer._evaluate_strategy = lambda d, p: {"Sharpe Ratio": 1.0 + (p["window"] * 0.01)}
+    stability_int = optimizer._calculate_stability_penalty(int_params, sample_data)
+    assert isinstance(stability_int, float)
+
     # Test regime consistency
     consistency = optimizer._calculate_regime_consistency(optimizer.data, params)
     assert 0 <= consistency <= 1.0
@@ -92,6 +99,7 @@ def test_full_optimization_run(sample_data):
     assert result.metrics.robustness_score is not None
     assert result.metrics.oos_sharpe_mean is not None
     assert result.metrics.worst_window_sharpe is not None
+    assert result.metrics.walk_forward_efficiency is not None
     assert 0 <= result.metrics.win_rate_consistency <= 1.0
     assert 0 <= result.metrics.max_drawdown_consistency <= 1.0
     assert len(result.oos_returns) > 0
