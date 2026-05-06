@@ -9,9 +9,11 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -53,6 +55,7 @@ class AuditEntry(Base):
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class AuditLogger:
@@ -96,12 +99,16 @@ class AuditLogger:
         if metadata:
             redacted_metadata = get_masking_processor().redact_any(metadata)
 
+        # Retrieve trace_id from structlog context if available
+        trace_id = structlog.contextvars.get_contextvars().get("trace_id")
+
         with self.Session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
                 details=details,
                 metadata_json=redacted_metadata,
+                trace_id=trace_id,
             )
             session.add(entry)
             session.commit()

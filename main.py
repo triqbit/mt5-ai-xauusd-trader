@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -66,6 +67,7 @@ from src.trading.risk_manager import RiskManager
 def configure_logging(level: str = "INFO") -> None:
     structlog.configure(
         processors=[
+            structlog.contextvars.merge_contextvars,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
             get_masking_processor(),
@@ -105,6 +107,10 @@ def run_live(
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     while True:
+        # Generate and bind a unique trace_id for this iteration
+        trace_id = str(uuid.uuid4())
+        structlog.contextvars.bind_contextvars(trace_id=trace_id)
+
         with profile("loop_total"):
             try:
                 # 1. Fetch latest market data
@@ -430,6 +436,7 @@ def run_live(
                     monitor.log_equity(balance)
 
                 # Wait for next interval
+                structlog.contextvars.clear_contextvars()
                 time.sleep(poll_interval)
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
