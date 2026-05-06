@@ -57,6 +57,24 @@ class AuditedRiskManager(RiskManager):
                 decision_chain=decision_chain,
                 passed=passed,
             )
+
+            # Log high-severity circuit breaker events specifically
+            if not decision_chain.get("circuit_breaker", True):
+                audit.log_operator_action(
+                    operator="system",
+                    action="circuit_breaker_triggered",
+                    reason=f"Hard drawdown limit hit during signal validation for {signal.symbol}",
+                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain}
+                )
+
+            if not decision_chain.get("daily_loss", True):
+                audit.log_operator_action(
+                    operator="system",
+                    action="daily_loss_limit_triggered",
+                    reason=f"Daily loss limit reached during signal validation for {signal.symbol}",
+                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain}
+                )
+
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 

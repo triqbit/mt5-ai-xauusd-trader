@@ -27,6 +27,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
+from src.core.audit_log import get_audit_logger
+
 logger = logging.getLogger(__name__)
 
 
@@ -224,6 +226,23 @@ class TradeLogger:
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
                 session.commit()
+
+                # Audit the outcome
+                try:
+                    audit = get_audit_logger()
+                    audit.log_trade_outcome(
+                        ticket=ticket,
+                        symbol=trade.symbol,
+                        pnl=trade.pnl,
+                        reason="closed_at_exit",
+                        metadata={
+                            "entry": trade.entry_price,
+                            "exit": exit_price,
+                            "lots": trade.lot_size,
+                        },
+                    )
+                except (RuntimeError, ImportError):
+                    pass
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
 

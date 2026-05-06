@@ -420,7 +420,12 @@ class HealthChecker:
             msg = f"Startup health gate FAILED. Critical components: {', '.join(failed_components)}"
             logger.critical(msg)
             if self.audit_logger:
-                self.audit_logger.log("system", "startup_gate_failure", msg)
+                self.audit_logger.log_operator_action(
+                    operator="system",
+                    action="startup_gate_failure",
+                    reason=msg,
+                    metadata={"failed_components": failed_components}
+                )
             raise RuntimeError(msg)
 
         if report.status == HealthStatus.DEGRADED:

@@ -189,11 +189,15 @@ class AuditLogger:
         self, operator: str, action: str, reason: str, metadata: dict[str, Any] | None = None
     ) -> int:
         """Log manual operator actions like emergency halts."""
+        combined_metadata = {"action_type": action, "reason": reason}
+        if metadata:
+            combined_metadata.update(metadata)
+
         return self.log(
             actor=operator,
             action=f"operator_{action}",
             details=f"Operator action: {action}. Reason: {reason}",
-            metadata=metadata,
+            metadata=combined_metadata,
         )
 
     def log_deployment(self, version: str, environment: str, status: str = "success") -> int:
@@ -203,6 +207,43 @@ class AuditLogger:
             action="deployment",
             details=f"Deployment {version} to {environment}: {status}",
             metadata={"version": version, "environment": environment, "status": status},
+        )
+
+    def log_trade_outcome(
+        self,
+        ticket: int,
+        symbol: str,
+        pnl: float,
+        reason: str = "close",
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        """Log the final outcome of a trade."""
+        return self.log(
+            actor="system",
+            action="trade_outcome",
+            details=f"Trade {ticket} ({symbol}) closed with PnL: {pnl:.2f}. Reason: {reason}",
+            metadata={
+                "ticket": ticket,
+                "symbol": symbol,
+                "pnl": pnl,
+                "reason": reason,
+                "context": metadata,
+            },
+        )
+
+    def log_config_change(
+        self, old_config: dict[str, Any], new_config: dict[str, Any], reason: str
+    ) -> int:
+        """Log changes to system configuration."""
+        return self.log(
+            actor="system",
+            action="config_change",
+            details=f"Configuration changed: {reason}",
+            metadata={
+                "old": old_config,
+                "new": new_config,
+                "reason": reason,
+            },
         )
 
     @classmethod

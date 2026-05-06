@@ -5,6 +5,9 @@
     - Record every significant system action (e.g., order placement, configuration change, risk limit breach).
     - Each entry must include: timestamp (UTC), actor (system/user), action, and detailed payload.
     - Support persistence to a relational database (SQLAlchemy) for long-term retention.
+    - Capture detailed decision explanation traces for all non-hold signals, including risk and execution filter status.
+    - Automatically log trade outcomes (PnL, entry/exit price) upon position closure.
+    - Periodically audit the full global configuration state to detect silent drift.
 - **Edge Cases:**
     - Handle rapid bursts of events (e.g., high-frequency signal generation) without losing entries or blocking the main thread.
     - Handle database connection failures by falling back to local file logging.
