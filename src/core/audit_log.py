@@ -12,6 +12,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from src.core.log_config import get_masking_processor
+
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -89,12 +91,17 @@ class AuditLogger:
         """
         Record a new audit entry.
         """
+        # Redact metadata before persisting to database
+        redacted_metadata = None
+        if metadata:
+            redacted_metadata = get_masking_processor().redact_any(metadata)
+
         with self.Session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
                 details=details,
-                metadata_json=metadata,
+                metadata_json=redacted_metadata,
             )
             session.add(entry)
             session.commit()

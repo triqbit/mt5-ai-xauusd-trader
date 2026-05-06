@@ -3,6 +3,8 @@ Startup Validation Layer for MT5 AI Trading Bot.
 src/core/config_validator.py
 """
 
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -39,6 +41,7 @@ class ConfigValidator:
         self._check_model_settings()
         self._check_risk_parameters()
         self._check_incompatible_settings()
+        self._check_file_permissions()
 
         # Application is valid only if there are no critical errors
         success = not any(e.critical for e in self.errors)
@@ -468,3 +471,36 @@ class ConfigValidator:
                     "Comment out TELEGRAM_TOKEN during backtests to avoid noise.",
                 )
             )
+
+    def _check_file_permissions(self) -> None:
+        """Verify sensitive files have restrictive permissions (Linux/Mac only)."""
+        if sys.platform == "win32":
+            return
+
+        sensitive_files = [
+            Path(".env"),
+            Path("trades.db"),
+            Path("audit.db"),
+            self.config.model_config.get("env_file"),
+        ]
+
+        # Filter out None and duplicates
+        unique_paths = {Path(p).resolve() for p in sensitive_files if p and Path(p).exists()}
+
+        for path in unique_paths:
+            try:
+                mode = os.stat(path).st_mode
+                # Check if group or others have any permissions (0o077 mask)
+                if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                    current_mode = oct(stat.S_IMODE(mode))
+                    self.errors.append(
+                        ValidationError(
+                            "FILE_PERMISSION",
+                            f"Insecure permissions for {path.name}: {current_mode}",
+                            False,  # Warning for now to avoid breaking existing setups
+                            f"Run 'chmod 600 {path.name}' to restrict access.",
+                        )
+                    )
+            except Exception as e:
+                # Log but don't fail if we can't check permissions
+                pass

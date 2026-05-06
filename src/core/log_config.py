@@ -21,6 +21,15 @@ class SecretMaskingProcessor:
     def __init__(self, config: TradingConfig | None = None, mask: str = "[MASKED]") -> None:
         self.mask = mask
         self.secrets: set[str] = set()
+        self.sensitive_patterns = [
+            "password",
+            "token",
+            "secret",
+            "key",
+            "auth",
+            "credential",
+            "private",
+        ]
         if config:
             self.update_secrets(config)
 
@@ -52,18 +61,44 @@ class SecretMaskingProcessor:
             if match:
                 self.secrets.add(match.group(2))
 
-    def __call__(self, logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
-        if not self.secrets:
-            return event_dict
-
-        new_dict = event_dict.copy()
-        for key, value in new_dict.items():
-            if isinstance(value, str):
+    def redact_any(self, data: Any) -> Any:
+        """
+        Recursively redact secrets and sensitive fields from any data structure.
+        """
+        if isinstance(data, str):
+            # 1. Mask known secret values
+            result = data
+            if self.secrets:
                 for secret in self.secrets:
-                    if secret in value:
-                        new_dict[key] = new_dict[key].replace(secret, self.mask)
+                    if secret and secret in result:
+                        result = result.replace(secret, self.mask)
+            return result
 
-        return new_dict
+        elif isinstance(data, dict):
+            new_dict = {}
+            for k, v in data.items():
+                # 2. Mask by key name (heuristic)
+                if isinstance(k, str) and any(p in k.lower() for p in self.sensitive_patterns):
+                    if isinstance(v, (str, int, float)) or v is None:
+                        new_dict[k] = self.mask
+                    else:
+                        # If it's a complex object under a sensitive key, still redact its contents
+                        new_dict[k] = self.redact_any(v)
+                else:
+                    new_dict[k] = self.redact_any(v)
+            return new_dict
+
+        elif isinstance(data, (list, tuple)):
+            return type(data)(self.redact_any(v) for v in data)
+
+        elif isinstance(data, set):
+            return {self.redact_any(v) for v in data}
+
+        return data
+
+    def __call__(self, logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+        """Structlog-compatible processor interface."""
+        return self.redact_any(event_dict)
 
 
 _masking_processor = SecretMaskingProcessor()
