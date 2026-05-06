@@ -76,8 +76,8 @@ class RobustnessMetrics(BaseModel):
     is_oos_gap: float
     stability_penalty: float
     regime_consistency: float
-    walk_forward_efficiency: float
     robustness_score: float
+    walk_forward_efficiency: float = 0.0
 
 
 class WindowResult(BaseModel):

@@ -331,3 +331,5 @@ Features to generate:
 3. ✅ Implement institutional RiskEngine with ATR sizing and circuit breakers.
 4. ✅ Implement weighted signal ensemble logic.
 5. Begin Phase 3 data collection and feature engineering.
+6. ✅ Implement production-ready model stubs (PPO, LSTM, DreamerV3).
+7. ✅ Enhance Gymnasium-compatible XAUUSD trading environment.
