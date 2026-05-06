@@ -11,6 +11,9 @@ Unlike simple monitoring, the DSS aggregates intelligence from across the system
 The `DecisionPacket` is a structured Pydantic model that serves as the single source of truth for a trade decision. It includes:
 - **Symbol & Direction:** The target asset and the intended trade direction (BUY/SELL/HOLD).
 - **Consensus Level:** A qualitative measure of agreement among the ensemble models (Unanimous, Strong Majority, Mixed, etc.).
+- **Decision Status:** Augmented status level (`EXECUTE`, `CAUTION`, `BLOCKED`) derived from overall decision quality.
+- **Decision Score:** A composite score (0-100) aggregating multiple intelligence dimensions.
+- **Sizing Multiplier:** A recommended scaling factor (0.0-1.0) for position sizing based on risk and confidence.
 - **Execution Status:** A final "Go/No-Go" flag determined by the combined state of all filters.
 - **Blocking Reasons:** A clear list of reasons if a trade is prevented from executing.
 
@@ -28,7 +31,23 @@ For human operators, the DSS generates a high-fidelity terminal dashboard using 
 - Detailed macro intelligence including active events and impact scores.
 - Full signal attribution details with model votes and feature impacts.
 
-## Consensus Logic
+## Augmented Decision Logic
+
+### Decision Score (0-100)
+The DSS calculates a weighted composite score to quantify the quality of a trade setup:
+- **Ensemble Consensus (40%):** Strength of agreement among models.
+- **Regime Confidence (30%):** Reliability of the detected market regime.
+- **Risk Quality (20%):** Based on the calculated Risk:Reward ratio (normalized against a 3.0 target).
+- **Macro Safety (10%):** Absence or low impact of upcoming economic events.
+
+### Sizing Recommendation
+The `sizing_multiplier` provides dynamic position sizing advice:
+- **EXECUTE Status:** Sizing is scaled non-linearly based on the decision score ($score^{1.5}$).
+- **CAUTION Status:** A 50% penalty is applied to the base multiplier to reduce exposure in marginal setups.
+- **BLOCKED Status:** Multiplier is forced to 0.0.
+- **Macro Risk:** Final sizing is always adjusted by the `macro_risk.risk_multiplier`.
+
+### Consensus Logic
 The system calculates model consensus based on the weighted alignment of votes within the ensemble:
 - **Unanimous:** 100% of weighted models agree on the direction.
 - **Strong Majority:** At least 66% of weighted votes agree.
