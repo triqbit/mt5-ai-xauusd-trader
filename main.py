@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 try:
     import torch
 except ImportError:
@@ -104,7 +105,25 @@ def run_live(
     explainer = SignalExplainer()
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    last_reset_date = datetime.now(timezone.utc).date()
     while True:
+        # 0. Update account metrics at start of loop
+        with profile("account_updates"):
+            try:
+                balance = connector.get_account_balance()
+                risk.update_equity(balance)
+                if monitor:
+                    monitor.log_equity(balance)
+            except Exception as e:
+                log.error("Failed to update account metrics: %s", e)
+
+        # 0.1 Check for day change to trigger daily summary
+        current_date = datetime.now(timezone.utc).date()
+        if current_date > last_reset_date:
+            log.info("Day change detected, resetting daily stats")
+            risk.reset_daily()
+            last_reset_date = current_date
+
         with profile("loop_total"):
             try:
                 # 1. Fetch latest market data
@@ -113,15 +132,43 @@ def run_live(
                         # Fetch more bars to satisfy FeatureEngineer and RegimeDetector windows
                         df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=500)
                         tick = connector.get_tick(cfg.symbol)
+
+                        if monitor and not df_raw.empty:
+                            # Monitor data freshness using latest bar timestamp
+                            latest_bar_time = df_raw.index[-1] if isinstance(df_raw.index, pd.DatetimeIndex) else df_raw["time"].iloc[-1]
+                            monitor.log_data_freshness(latest_bar_time)
+
+                        # Check for liquidity crisis (extreme spread)
+                        raw_spread = abs(tick["ask"] - tick["bid"])
+
+                        # Get symbol properties for precise pip calculation
+                        props = connector.get_symbol_properties(cfg.symbol)
+                        if props and "point" in props:
+                            # Standard pip is 10 points for XAUUSD (0.01 -> 0.10)
+                            # We use a robust mapping or derivation
+                            point = props["point"]
+                            pip_size = point * 10 if "XAUUSD" in cfg.symbol else point
+                            spread_pips = raw_spread / pip_size if pip_size > 0 else raw_spread
+                        else:
+                            # Fallback for XAUUSD
+                            spread_pips = raw_spread * 10.0 if "XAUUSD" in cfg.symbol else raw_spread
+
+                        if monitor and spread_pips > cfg.spread_halt_pips:
+                            monitor.alert_liquidity_crisis(cfg.symbol, spread_pips)
+
                     except MT5DataError as e:
                         log.error("Transient data retrieval error: %s. Skipping this iteration.", e)
                         time.sleep(poll_interval)
                         continue
                     except MT5ConnectionError:
                         log.warning("Connection lost. Attempting reconnection...")
+                        if monitor:
+                            monitor.alert_broker_connection_lost()
                         try:
                             connector.connect()
                             log.info("Reconnection successful.")
+                            if monitor:
+                                monitor.alert_broker_connection_restored()
                             continue
                         except MT5ConnectionError as reconnect_exc:
                             log.critical(
@@ -423,12 +470,6 @@ def run_live(
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
-                # 7. Update equity
-                with profile("account_updates"):
-                    balance = connector.get_account_balance()
-                    risk.update_equity(balance)
-                    monitor.log_equity(balance)
-
                 # Wait for next interval
                 time.sleep(poll_interval)
             except KeyboardInterrupt:
@@ -440,9 +481,13 @@ def run_live(
                 break
             except MT5ConnectionError as exc:
                 log.error("Critical connection failure: %s. Re-initializing...", exc)
+                if monitor:
+                    monitor.alert_broker_connection_lost()
                 time.sleep(5)
                 try:
                     connector.connect()
+                    if monitor:
+                        monitor.alert_broker_connection_restored()
                 except MT5ConnectionError:
                     log.error("Re-initialization failed during outer loop recovery.")
             except Exception as exc:
