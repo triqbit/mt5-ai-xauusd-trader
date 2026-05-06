@@ -4,13 +4,13 @@
 # ============================================================
 
 # -- Core numeric / data -------------------------------------------
-numpy>=2.2.6,<3
+numpy==2.2.6
 scipy==1.13.0
 scikit-learn==1.7.2
-pandas==2.3.3
+pandas==2.2.3
 
 # -- Technical Analysis --------------------------------------------
-TA-Lib>=0.6.4
+TA-Lib==0.6.4
 mplfinance==0.12.10b0
 
 # -- Data Acquisition ----------------------------------------------
@@ -28,7 +28,7 @@ redis==5.0.4
 # -- Monitoring & Logging ------------------------------------------
 prometheus-client==0.25.0
 structlog==25.5.0
-rich==15.0.0
+rich==13.9.4
 tqdm==4.67.1
 
 # -- Notifications -------------------------------------------------
@@ -36,14 +36,14 @@ python-telegram-bot==22.7
 
 # -- Dashboard / API -----------------------------------------------
 fastapi==0.115.2
-uvicorn[standard]==0.46.0
+uvicorn[standard]==0.34.0
 dash==4.1.0
 plotly==5.22.0
 
 # -- Configuration -------------------------------------------------
 python-dotenv==1.2.2
-pydantic==2.13.3
-pydantic-settings==2.14.0
+pydantic==2.10.6
+pydantic-settings==2.7.1
 tomli==2.4.1
 
 # -- Utilities -----------------------------------------------------
@@ -60,4 +60,5 @@ torchvision==0.18.1+cpu
 stable-baselines3==2.8.0
 gymnasium==0.29.1
 optuna==4.8.0
-psutil
+psutil==7.2.2
+starlette==0.40.0
