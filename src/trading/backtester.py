@@ -264,9 +264,7 @@ class BacktestEngine:
                         "avg_atr": atr_avg_vals[abs_idx],
                     },
                     "trend_angle": {"slope": slopes[abs_idx]},
-                    "ema_sequence": {
-                        "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
-                    },
+                    "ema_sequence": {"emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}},
                     "momentum": {"rsi": rsi_vals[abs_idx]},
                 }
 

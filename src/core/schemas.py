@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class SignalDirection(IntEnum):
     """Standardized signal directions for schema enforcement."""
+
     BUY = 1
     SELL = -1
     HOLD = 0
@@ -32,7 +33,9 @@ class TradeSignal(BaseModel):
     """
 
     symbol: str = Field(..., description="The financial instrument symbol (e.g., XAUUSD)")
-    direction: SignalDirection = Field(..., description="Signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)")
+    direction: SignalDirection = Field(
+        ..., description="Signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)"
+    )
     entry_price: float = Field(..., gt=0, description="The target entry price for the trade")
     stop_loss: float = Field(..., gt=0, description="The mandatory protective stop loss price")
     take_profit: float = Field(..., gt=0, description="The target profit taking price")

@@ -62,7 +62,9 @@ TRADING_BLOCK_DURATION = Histogram(
 CONFIDENCE_GAUGE = Gauge("trading_model_confidence", "Latest model prediction confidence")
 MODEL_ACCURACY_GAUGE = Gauge("trading_model_accuracy", "Model prediction accuracy")
 MODEL_DRIFT_GAUGE = Gauge("trading_model_drift_score", "Statistical drift from baseline")
-MODEL_CALIBRATION_GAUGE = Gauge("trading_model_calibration_error", "Expected Calibration Error (ECE)")
+MODEL_CALIBRATION_GAUGE = Gauge(
+    "trading_model_calibration_error", "Expected Calibration Error (ECE)"
+)
 
 # 5. Data Quality Metrics
 DATA_FRESHNESS_GAUGE = Gauge(

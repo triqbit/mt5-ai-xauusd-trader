@@ -291,7 +291,9 @@ class ExecutionScenarioBuilder:
     def passing_buy(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
         """A clean BUY signal in a moderate bullish trend."""
         # Lower trend strength to avoid RSI > 75
-        df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005)
+        df = self.gen.generate(
+            n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005
+        )
         # Ensure enough data for indicators
         signal = TradeSignal(
             symbol=symbol,
@@ -380,7 +382,9 @@ class ExecutionScenarioBuilder:
         df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0005)
         # Spike the very end to push RSI over 75 without blowing up EMA sequence too much
         # or just use a very strong trend that eventually hits RSI 80+
-        df_spike = self.gen.generate(n_steps=50, regime="trending", trend_strength=0.01, start_price=df["close"].iloc[-1])
+        df_spike = self.gen.generate(
+            n_steps=50, regime="trending", trend_strength=0.01, start_price=df["close"].iloc[-1]
+        )
         df = pd.concat([df, df_spike]).iloc[-300:]
 
         signal = TradeSignal(

@@ -193,7 +193,8 @@ class ExecutionFilter:
                 low = df_slice["low"]
                 close = df_slice["close"]
                 tr = pd.concat(
-                    [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+                    [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
+                    axis=1,
                 ).max(axis=1)
                 atr = tr.rolling(window=14).mean()
 
@@ -271,7 +272,9 @@ class ExecutionFilter:
                     emas[p] = float(df[col].iloc[-1])
                 else:
                     # Optimization: only compute what is needed
-                    emas[p] = float(df["close"].iloc[-300:].ewm(span=p, adjust=False).mean().iloc[-1])
+                    emas[p] = float(
+                        df["close"].iloc[-300:].ewm(span=p, adjust=False).mean().iloc[-1]
+                    )
 
         if direction > 0:  # BUY
             passed = bool(emas[8] > emas[21] > emas[50] > emas[200])

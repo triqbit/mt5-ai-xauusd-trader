@@ -223,7 +223,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds 2%.",
+                    f"Risk per trade {self.config.risk_per_trade * 100}% exceeds 2%.",
                     True,
                     "Reduce RISK_PER_TRADE to 0.02 (2%) or less.",
                 )
@@ -232,7 +232,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds policy limit of 1%.",
+                    f"Risk per trade {self.config.risk_per_trade * 100}% exceeds policy limit of 1%.",
                     False,  # Non-critical warning
                     "Consider reducing RISK_PER_TRADE to 0.01 (1%) for better risk parity.",
                 )
@@ -244,7 +244,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 6%.",
+                    f"Max daily loss {self.config.max_daily_loss * 100}% exceeds 6%.",
                     True,
                     "Reduce MAX_DAILY_LOSS to 0.06 or less.",
                 )
@@ -253,7 +253,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% limit.",
+                    f"Max daily loss {self.config.max_daily_loss * 100}% exceeds 5% limit.",
                     False,
                     "Set MAX_DAILY_LOSS to 0.05 for compliance with enterprise standards.",
                 )
@@ -324,7 +324,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITION_SIZE_PCT",
-                    f"Max position size {self.config.max_position_size_pct*100}% is dangerously high.",
+                    f"Max position size {self.config.max_position_size_pct * 100}% is dangerously high.",
                     True,
                     "Reduce MAX_POSITION_SIZE_PCT to 0.20 or less.",
                 )
@@ -333,7 +333,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITION_SIZE_PCT",
-                    f"Max position size {self.config.max_position_size_pct*100}% exceeds 10% limit.",
+                    f"Max position size {self.config.max_position_size_pct * 100}% exceeds 10% limit.",
                     False,
                     "Set MAX_POSITION_SIZE_PCT to 0.10 for compliance.",
                 )
@@ -344,7 +344,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DRAWDOWN",
-                    f"Max drawdown {self.config.max_drawdown*100}% is unacceptable.",
+                    f"Max drawdown {self.config.max_drawdown * 100}% is unacceptable.",
                     True,
                     "Reduce MAX_DRAWDOWN to 0.40 or less.",
                 )
@@ -353,7 +353,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DRAWDOWN",
-                    f"Max drawdown {self.config.max_drawdown*100}% exceeds 30% policy limit.",
+                    f"Max drawdown {self.config.max_drawdown * 100}% exceeds 30% policy limit.",
                     False,
                     "Set MAX_DRAWDOWN to 0.30 for enterprise standards.",
                 )

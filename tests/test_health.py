@@ -33,6 +33,7 @@ def mock_config():
     cfg.mt5_server = "TestServer"
     cfg.mt5_password = "TestPassword"
     cfg.mode = "demo"
+    cfg.symbol = "XAUUSD"
     cfg.database_url = "sqlite:///:memory:"
     cfg.redis_url = "redis://localhost:6379/0"
     cfg.telegram_token = ""

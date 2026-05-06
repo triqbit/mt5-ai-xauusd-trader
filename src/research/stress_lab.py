@@ -324,7 +324,9 @@ class StressLab:
         """
         stressed_scenarios = [m.total_return for name, m in results.items() if name != "Baseline"]
         num_stressed = len(stressed_scenarios)
-        summary = f"Strategy '{self.strategy.name}' evaluated against {num_stressed} stress scenarios.\n"
+        summary = (
+            f"Strategy '{self.strategy.name}' evaluated against {num_stressed} stress scenarios.\n"
+        )
         avg_return = np.mean(stressed_scenarios) if stressed_scenarios else 0.0
         summary += (
             f"Baseline Return: {baseline.total_return:.2%}, Avg Stressed Return: {avg_return:.2%}\n"
@@ -548,10 +550,16 @@ class StressLab:
         # Profit Factor
         gross_profit = sum([p for p in trade_pnls if p > 0])
         gross_loss = abs(sum([p for p in trade_pnls if p < 0]))
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else (10.0 if gross_profit > 0 else 0.0)
+        profit_factor = (
+            gross_profit / gross_loss if gross_loss > 0 else (10.0 if gross_profit > 0 else 0.0)
+        )
 
         # Recovery Factor
-        recovery_factor = net_pnl / (max_drawdown * initial_balance) if max_drawdown > 0 else (5.0 if net_pnl > 0 else 0.0)
+        recovery_factor = (
+            net_pnl / (max_drawdown * initial_balance)
+            if max_drawdown > 0
+            else (5.0 if net_pnl > 0 else 0.0)
+        )
 
         return StressTestMetrics(
             total_return=total_return,

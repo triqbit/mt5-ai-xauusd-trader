@@ -580,6 +580,7 @@ def main() -> int:
 
     # ── Startup Summary ────────────────────────────────────────────────────────
     import platform
+
     summary = Table.grid(expand=True)
     summary.add_column(style="cyan", justify="right")
     summary.add_column(style="white", justify="left")
@@ -612,21 +613,21 @@ def main() -> int:
     # Risk summary row
     summary.add_row("[bold underline]Risk Controls[/]", "")
     risk_color = (
-        "red"
-        if cfg.risk_per_trade > 0.02
-        else "yellow"
-        if cfg.risk_per_trade > 0.01
-        else "green"
+        "red" if cfg.risk_per_trade > 0.02 else "yellow" if cfg.risk_per_trade > 0.01 else "green"
     )
     summary.add_row("Risk/Trade:  ", f"[{risk_color}]{cfg.risk_per_trade:.1%}[/]")
 
-    daily_loss_color = "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    daily_loss_color = (
+        "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    )
     summary.add_row("Daily Stop:  ", f"[{daily_loss_color}]{cfg.max_daily_loss:.1%}[/]")
 
     pos_color = "red" if cfg.max_positions > 10 else "yellow" if cfg.max_positions > 5 else "green"
     summary.add_row("Max Positions:  ", f"[{pos_color}]{cfg.max_positions}[/]")
 
-    conf_color = "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    conf_color = (
+        "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    )
     summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
 
     console.print(
@@ -761,9 +762,7 @@ def main() -> int:
             if comp.status == HealthStatus.DEGRADED
             else "red"
         )
-        table.add_row(
-            name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy
-        )
+        table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy)
     console.print(table)
 
     if report.status == HealthStatus.FAILED:

@@ -237,17 +237,13 @@ class WalkForwardOptimizer:
 
                 for direction in [-1, 1]:
                     perturbed_params = params.copy()
-                    delta = (
-                        max(1, int(abs(original_val) * 0.05))
-                        if is_int
-                        else original_val * 0.05
-                    )
+                    delta = max(1, int(abs(original_val) * 0.05)) if is_int else original_val * 0.05
 
                     new_val = original_val + (direction * delta)
 
                     # Ensure type safety
                     if is_int:
-                        new_val = int(round(new_val))
+                        new_val = round(new_val)
 
                     # If no change occurred (e.g. value was small and delta was 0), skip
                     if new_val == original_val:

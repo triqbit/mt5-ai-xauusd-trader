@@ -10,6 +10,7 @@ from src.trading.capital_allocator import (
     StrategyConfig,
 )
 from src.trading.mt5_connector import MT5Connector
+from src.trading.risk_engine import RiskDecision, RiskEngine
 from src.trading.risk_manager import DailyStats, RiskManager
 
 __all__ = [
@@ -18,6 +19,8 @@ __all__ = [
     "CapitalAllocator",
     "DailyStats",
     "MT5Connector",
+    "RiskDecision",
+    "RiskEngine",
     "RiskManager",
     "StrategyConfig",
     "TradeSignal",
