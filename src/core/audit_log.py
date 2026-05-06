@@ -21,6 +21,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
+from src.core.log_config import get_masking_processor
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,12 +91,17 @@ class AuditLogger:
         """
         Record a new audit entry.
         """
+        # Redact metadata before persisting to database
+        redacted_metadata = None
+        if metadata:
+            redacted_metadata = get_masking_processor().redact_any(metadata)
+
         with self.Session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
                 details=details,
-                metadata_json=metadata,
+                metadata_json=redacted_metadata,
             )
             session.add(entry)
             session.commit()
