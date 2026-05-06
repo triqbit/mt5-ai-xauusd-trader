@@ -201,6 +201,8 @@ jobs:
           fi
 
           # Transition [Unreleased] to Versioned in CHANGELOG.md
+          # This replaces "## [Unreleased]" with "## [Unreleased]\n\n## [VERSION] - DATE"
+          # thus moving current unreleased notes to the new version section.
           if grep -q "## \[Unreleased\]" CHANGELOG.md; then
             sed -i "s/## \[Unreleased\]/## [Unreleased]\n\n## [${VERSION}] - ${DATE}/" CHANGELOG.md
           fi
