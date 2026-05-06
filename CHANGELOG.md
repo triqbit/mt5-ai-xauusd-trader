@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Institutional Strategy Stress Lab:** Implemented an adversarial resilience testing framework in `src/research/stress_lab.py` to evaluate strategies under 7 adverse market conditions (spread widening, slippage spikes, missing ticks, delayed fills, choppy breakouts, regime transitions, and service failures).
+- **Fragility Intelligence:** Integrated automated fragility detection (over-trading spikes, negative edge transitions) into the StressLab reporting engine.
 - **Enterprise Health Monitoring:** Refined the `src/core/health.py` system with robust liveness/readiness probes, multi-layered dependency checks (Database, MT5, Redis, Models, Audit), and a mandatory startup gate.
 - **Deployment Validation Gates:** Implemented a robust pre-deployment validation workflow in `.github/workflows/pre-deploy-validation.yml` to prevent unsafe releases.
 - **Environment Safety Checks:** Enhanced `scripts/validate_env.py` and synchronized `.env.example` to ensure configuration completeness before deployment.

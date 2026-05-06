@@ -28,7 +28,12 @@ class StressSeverity(str, Enum):
 
 
 class StressScenario(BaseModel):
-    """Configuration for a specific stress scenario."""
+    """
+    Configuration for a specific stress scenario.
+
+    Defines the parameters for market data perturbations and execution friction
+    used to test strategy resilience under adverse conditions.
+    """
 
     name: str
     description: str
@@ -57,7 +62,12 @@ class StressScenario(BaseModel):
 
 
 class StressTestMetrics(BaseModel):
-    """Metrics captured during a stress test run."""
+    """
+    Standardized metrics captured during a stress test simulation.
+
+    Aggregates performance, risk, and execution quality data to facilitate
+    comparative analysis against baseline runs.
+    """
 
     total_return: float
     max_drawdown: float
@@ -93,6 +103,8 @@ class ResilienceReport(BaseModel):
                 total_return=f"{m.total_return:.2%}",
                 max_drawdown=f"{m.max_drawdown:.2%}",
                 sharpe=f"{m.sharpe_ratio:.2f}",
+                recovery_factor=f"{m.recovery_factor:.2f}",
+                profit_factor=f"{m.profit_factor:.2f}",
                 outcome="FAIL" if m.total_return < 0 else "PASS",
             )
 
@@ -185,7 +197,21 @@ class StressLab:
         )
 
     def run_standard_suite(self, baseline_metrics: StressTestMetrics) -> ResilienceReport:
-        """Runs the full standard suite of stress tests and returns a report."""
+        """
+        Executes the standard suite of adversarial stress scenarios.
+
+        This suite covers:
+        - Execution Hell: High friction and latency.
+        - Liquidity Crisis: Data gaps and choppy price action.
+        - Regime Shock: Structural market instability.
+        - Flash Crash: Extreme tail risk events.
+
+        Args:
+            baseline_metrics: Metrics from a neutral/normal run for comparison.
+
+        Returns:
+            ResilienceReport: Aggregated results and fragility analysis.
+        """
         scenarios = [
             self.create_execution_hell_scenario(),
             self.create_liquidity_crisis_scenario(),
@@ -226,7 +252,19 @@ class StressLab:
         return metrics
 
     def generate_report(self, baseline_metrics: StressTestMetrics) -> ResilienceReport:
-        """Generate a comprehensive resilience report after running scenarios."""
+        """
+        Synthesizes results from all executed scenarios into a structured report.
+
+        Calculates a composite resilience score based on performance retention,
+        identifies non-linear failure points, and detects 'fragility indicators'
+        such as over-trading spikes or negative edge transitions.
+
+        Args:
+            baseline_metrics: The reference performance metrics under normal conditions.
+
+        Returns:
+            ResilienceReport: A typed report with insights and metrics.
+        """
         scenario_results = self.results
 
         # Calculate resilience score (0-100)
@@ -248,12 +286,18 @@ class StressLab:
                 fragility.append(f"Drawdown explosion in {scenario_name}")
             if metrics.total_return < 0 and baseline_metrics.total_return > 0:
                 failure_points.append(f"Strategy becomes unprofitable under {scenario_name}")
+            if metrics.max_drawdown > 0.5:
+                failure_points.append(f"Critical drawdown (>50%) in {scenario_name}")
             if metrics.sharpe_ratio < baseline_metrics.sharpe_ratio * 0.5:
                 fragility.append(f"Sharpe ratio halved under {scenario_name}")
             if metrics.latency_impact > 0.1:
                 fragility.append(f"High sensitivity to infrastructure delays in {scenario_name}")
             if metrics.max_slippage_experienced > 100:
                 fragility.append(f"Extreme slippage sensitivity in {scenario_name}")
+            if metrics.num_trades > baseline_metrics.num_trades * 2:
+                fragility.append(f"Over-trading spike in {scenario_name}")
+            if metrics.profit_factor < 1.0 and baseline_metrics.profit_factor >= 1.0:
+                fragility.append(f"Negative edge (PF < 1.0) in {scenario_name}")
 
         return ResilienceReport(
             strategy_name=self.strategy.name,
@@ -268,10 +312,20 @@ class StressLab:
     def _generate_summary(
         self, baseline: StressTestMetrics, results: dict[str, StressTestMetrics]
     ) -> str:
-        summary = (
-            f"Strategy '{self.strategy.name}' evaluated against {len(results)} stress scenarios.\n"
-        )
-        avg_return = np.mean([m.total_return for m in results.values()])
+        """
+        Generates a human-readable summary of the strategy's overall robustness.
+
+        Args:
+            baseline: Baseline performance metrics.
+            results: Dictionary of scenario names to their respective metrics.
+
+        Returns:
+            str: A multi-line summary with return comparisons and status labels.
+        """
+        stressed_scenarios = [m.total_return for name, m in results.items() if name != "Baseline"]
+        num_stressed = len(stressed_scenarios)
+        summary = f"Strategy '{self.strategy.name}' evaluated against {num_stressed} stress scenarios.\n"
+        avg_return = np.mean(stressed_scenarios) if stressed_scenarios else 0.0
         summary += (
             f"Baseline Return: {baseline.total_return:.2%}, Avg Stressed Return: {avg_return:.2%}\n"
         )
