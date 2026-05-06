@@ -69,6 +69,7 @@ class PatternConcentration(BaseModel):
     value: str
     win_rate: float
     profit_factor: float
+    total_trades: int = 0
 
 
 class BehavioralRisk(BaseModel):
@@ -150,6 +151,9 @@ class RLMetric(BaseModel):
     recovery_factor: float = 0.0
     ulcer_index: float = 0.0
     sqn: float = 0.0
+    tail_ratio: float = 0.0
+    common_sense_ratio: float = 0.0
+    gain_to_pain_ratio: float = 0.0
 
 
 class RLSection(BaseModel):
@@ -320,12 +324,17 @@ class ResearchReporter:
         if report.trade_patterns:
             self.console.print("\n[bold yellow]4. Trade Pattern Findings[/]")
             self.console.print(f"Insight: {report.trade_patterns.primary_insight}")
+            self.console.print(
+                f"[dim]Avg Win Duration: {report.trade_patterns.avg_win_duration:.1f}m | "
+                f"Avg Loss Duration: {report.trade_patterns.avg_loss_duration:.1f}m[/]"
+            )
             table = Table(box=None)
             table.add_column("Attribute")
             table.add_column("Value")
             table.add_column("PF")
+            table.add_column("Trades")
             for c in report.trade_patterns.concentrations:
-                table.add_row(c.attribute, c.value, f"{c.profit_factor:.2f}")
+                table.add_row(c.attribute, c.value, f"{c.profit_factor:.2f}", str(c.total_trades))
             self.console.print(table)
 
             if report.trade_patterns.motifs:

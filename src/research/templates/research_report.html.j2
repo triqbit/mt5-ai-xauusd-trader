@@ -462,6 +462,8 @@
                     <th scope="col">MaxDD</th>
                     <th scope="col">Recovery</th>
                     <th scope="col">VaR(95%)</th>
+                    <th scope="col">Tail Ratio</th>
+                    <th scope="col">CSR</th>
                 </tr>
             </thead>
             <tbody>
@@ -474,6 +476,8 @@
                     <td>{{ (m.max_dd * 100)|round(1) }}%</td>
                     <td>{{ m.recovery_factor|round(2) }}</td>
                     <td>{{ (m.var_95 * 100)|round(2) }}%</td>
+                    <td>{{ m.tail_ratio|round(2) }}</td>
+                    <td>{{ m.common_sense_ratio|round(2) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
