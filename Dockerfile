@@ -28,17 +28,24 @@ RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6
 COPY requirements-docker.txt .
 
 # Architecture-specific adjustments for PyTorch
-# amd64: uses extra-index-url for CPU wheels
-# arm64: uses standard PyPI wheels (no +cpu suffix)
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        # ARM64 (Apple Silicon / AWS Graviton): PyPI provides valid CPU wheels
         sed -i '/--extra-index-url/d' requirements-docker.txt && \
         sed -i 's/+cpu//g' requirements-docker.txt; \
+    else \
+        # AMD64: Explicitly use the CPU-optimized wheels from PyTorch's dedicated index
+        sed -i 's/torch==2.3.1/torch==2.3.1+cpu/g' requirements-docker.txt && \
+        sed -i 's/torchvision==0.18.1/torchvision==0.18.1+cpu/g' requirements-docker.txt; \
     fi
 
-# Install Python dependencies into a separate prefix for easy copying
+# Initialize virtual environment for isolation
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
-    pip install --no-cache-dir --prefix=/install -r requirements-docker.txt
+    pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
 FROM python:3.11-slim AS runtime
@@ -58,8 +65,9 @@ COPY --from=builder /usr/lib/libta_lib* /usr/lib/
 COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
 RUN ldconfig
 
-# Copy compiled Python packages from builder
-COPY --from=builder /install /usr/local
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source and assets
 COPY src/ ./src/
@@ -67,12 +75,14 @@ COPY migrations/ ./migrations/
 COPY main.py .
 COPY alembic.ini .
 
-# Create log directory with proper permissions
-RUN mkdir -p /app/logs && chmod 755 /app/logs
-
 # Setup non-root user for production security
-RUN useradd -m -u 1000 trader && \
-    chown -R trader:trader /app
+RUN useradd -m -u 1000 trader
+
+# Create log directory and ensure correct ownership
+RUN mkdir -p /app/logs && \
+    chown -R trader:trader /app && \
+    chmod 755 /app/logs
+
 USER trader
 
 # Expose ports for Prometheus (8000) and Dash (8050)
