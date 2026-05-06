@@ -20,10 +20,8 @@ jobs:
     if: github.event.pull_request.draft == false
     outputs:
       risk_status: ${{ steps.risk-check.outputs.risk_status }}
-      has_tests: ${{ steps.compliance-check.outputs.has_tests }}
-      has_docs: ${{ steps.compliance-check.outputs.has_docs }}
-      source_modified: ${{ steps.compliance-check.outputs.source_modified }}
-      coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
+      compliance_status: ${{ steps.compliance-check.outputs.compliance_status }}
+      observability_status: ${{ steps.observability-check.outputs.observability_status }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -40,8 +38,13 @@ jobs:
           # Patterns that strictly block and escalate
           HIGH_RISK_PATTERNS=(
             "src/trading/executor.py"      # Live trading execution logic
+            "src/core/risk_engine.py"      # Core risk engine
+            "src/trading/risk_engine.py"   # Trading risk engine
+            "src/trading/risk_manager.py"  # Risk parameters and sizing
             "config/secrets.*"             # Credentials and secrets
             ".github/workflows/deploy.*"   # Deployment workflows
+            ".github/workflows/ci.yml"     # CI workflows affecting deployment
+            "Dockerfile"                   # Infrastructure control
             "migrations/.*"                # Database migrations
           )
 
@@ -51,6 +54,7 @@ jobs:
               if [[ "$file" =~ $pattern ]]; then
                 echo "🚨 HIGH-RISK FILE DETECTED: $file"
                 TOUCHED_HIGH_RISK=true
+                break
               fi
             done
           done
@@ -75,26 +79,49 @@ jobs:
             if [[ "$file" =~ ^src/ || "$file" == "main.py" ]]; then SOURCE_MODIFIED=true; fi
           done
 
-          echo "has_tests=$HAS_TESTS" >> $GITHUB_OUTPUT
-          echo "has_docs=$HAS_DOCS" >> $GITHUB_OUTPUT
-          echo "source_modified=$SOURCE_MODIFIED" >> $GITHUB_OUTPUT
+          VIOLATION=false
+          if [ "$SOURCE_MODIFIED" = "true" ]; then
+            if [ "$HAS_TESTS" = "false" ]; then
+              echo "::warning::Source code modified but no tests added/updated."
+              VIOLATION=true
+            fi
+            if [ "$HAS_DOCS" = "false" ]; then
+              echo "::warning::Source code modified but no documentation updated."
+              VIOLATION=true
+            fi
+          fi
 
-      - name: Check Coverage
-        id: coverage-check
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if [ "$VIOLATION" = "true" ]; then
+            echo "compliance_status=fail" >> $GITHUB_OUTPUT
+          else
+            echo "compliance_status=pass" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check Observability Standards
+        id: observability-check
         run: |
-          # Verify coverage from CI status or local execution results if available
-          # In this environment, we assume CI job 'test' must pass which implies coverage meets standards.
-          # Future improvement: Fetch actual coverage % from coverage-report artifact or API.
-          echo "coverage_pass=true" >> $GITHUB_OUTPUT
+          # Incremental check for 'print(' statements in changed files
+          VIOLATION=false
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [[ "$file" =~ ^src/.*\.py$ ]]; then
+              if grep "print(" "$file"; then
+                echo "::warning::Found 'print' statements in $file. Use 'structlog' instead."
+                VIOLATION=true
+              fi
+            fi
+          done
+
+          if [ "$VIOLATION" = "true" ]; then
+            echo "observability_status=fail" >> $GITHUB_OUTPUT
+          else
+            echo "observability_status=pass" >> $GITHUB_OUTPUT
+          fi
 
       - name: Handle Violations
         if: |
           steps.risk-check.outputs.risk_status == 'blocked' ||
-          (steps.compliance-check.outputs.source_modified == 'true' &&
-           (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
-          steps.coverage-check.outputs.coverage_pass == 'false'
+          steps.compliance-check.outputs.compliance_status == 'fail' ||
+          steps.observability-check.outputs.observability_status == 'fail'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -104,16 +131,11 @@ jobs:
             REASON="$REASON\n- 🚨 **High-risk files modified.** (Must be ESCALATED and manually reviewed)"
             gh pr edit $PR_NUMBER --add-label "escalated-risk" || echo "Failed to add label"
           fi
-          if [ "${{ steps.coverage-check.outputs.coverage_pass }}" = "false" ]; then
-            REASON="$REASON\n- ❌ **Test coverage is below the required 80% threshold.**"
+          if [ "${{ steps.compliance-check.outputs.compliance_status }}" = "fail" ]; then
+            REASON="$REASON\n- ❌ **Missing required tests or documentation for source changes.**"
           fi
-          if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
-            if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
-              REASON="$REASON\n- ❌ **Source code modified but no tests added.**"
-            fi
-            if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
-              REASON="$REASON\n- ❌ **Source code modified but no documentation updated.**"
-            fi
+          if [ "${{ steps.observability-check.outputs.observability_status }}" = "fail" ]; then
+            REASON="$REASON\n- ❌ **Observability standards not met (detected 'print' statements).**"
           fi
 
           gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, or infrastructure are automatically escalated."
@@ -134,4 +156,5 @@ jobs:
         run: |
           # This enables GitHub's built-in auto-merge feature for this PR.
           # It will only merge once all other requirements (approvals, CI, conflicts) are met.
+          # Note: CI now enforces 80% coverage via pytest-cov in ci.yml.
           gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled. Skipping."
