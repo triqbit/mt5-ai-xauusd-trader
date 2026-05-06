@@ -35,9 +35,9 @@ jobs:
           # Patterns must match auto-merge-policy.yml
           HIGH_RISK_PATTERNS=(
             "src/trading/executor.py"      # Live trading execution logic
-            "src/core/risk_engine.py"      # Core risk calculation engine
-            "src/trading/risk_engine.py"   # Core risk calculation engine
-            "src/trading/risk_manager.py"  # Risk parameters and position sizing
+            "src/core/risk_engine.py"      # Core risk engine
+            "src/trading/risk_engine.py"   # Trading risk engine
+            "src/trading/risk_manager.py"  # Risk parameters and sizing
             "config/secrets.*"             # Credentials and secrets
             ".github/workflows/deploy.*"   # Deployment workflows
             ".github/workflows/ci.yml"     # CI workflows affecting deployment
@@ -56,15 +56,31 @@ jobs:
             done
           done
 
-          # Only log if it was likely an auto-merge (low risk)
-          if [ "$TOUCHED_HIGH_RISK" = "false" ]; then
-            DATE=$(date +'%Y-%m-%d')
-            LOG_ENTRY="| $DATE | #$PR_NUMBER | Auto-Merged | Policy checks passed | [PR]($PR_URL) |"
-            echo "$LOG_ENTRY" >> docs/integration/AUTO_MERGE_POLICY.md
+          # Check for labels as well to determine if it was an escalated review
+          # Fetch PR labels using GH CLI
+          LABELS=$(gh pr view $PR_NUMBER --json labels --template '{{range .labels}}{{.name}},{{end}}')
 
-            git config user.name "Jules05-Bot"
-            git config user.email "jules05@users.noreply.github.com"
-            git add docs/integration/AUTO_MERGE_POLICY.md
-            git commit -m "🤖 Jules05: Update auto-merge audit log for PR #$PR_NUMBER"
-            git push origin main
+          if [[ "$LABELS" =~ "escalated-risk" ]]; then
+            ACTION="Manual Review (Escalated)"
+            REASON="High-risk files or policy violation"
+          elif [ "$TOUCHED_HIGH_RISK" = "true" ]; then
+             ACTION="Manual Review"
+             REASON="High-risk files detected"
+          else
+            ACTION="Auto-Merged"
+            REASON="Policy checks passed"
           fi
+
+          DATE=$(date +'%Y-%m-%d')
+          LOG_ENTRY="| $DATE | #$PR_NUMBER | $ACTION | $REASON | [PR]($PR_URL) |"
+
+          # Use sed to insert the new log entry after the table header
+          sed -i "/| :--- | :--- | :--- | :--- | :--- |/a $LOG_ENTRY" docs/integration/AUTO_MERGE_POLICY.md
+
+          git config user.name "Jules05-Bot"
+          git config user.email "jules05@users.noreply.github.com"
+          git add docs/integration/AUTO_MERGE_POLICY.md
+          git commit -m "🤖 Jules05: Update auto-merge audit log for PR #$PR_NUMBER"
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
