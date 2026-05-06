@@ -89,6 +89,12 @@ jobs:
           sudo ldconfig
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
+      - name: Verify database schema sync (Alembic check)
+        run: |
+          PYTHONPATH=. alembic upgrade head
+          PYTHONPATH=. alembic check
+        env:
+          DATABASE_URL: sqlite:///trades.db
       - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
