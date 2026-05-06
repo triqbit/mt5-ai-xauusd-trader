@@ -43,6 +43,13 @@ class StabilityMetrics(BaseModel):
     max_consecutive_losses: int = Field(default=0, description="Max sequence of losing trades")
     ulcer_index: float = Field(default=0.0, description="Ulcer Index (Drawdown stress metric)")
     sqn: float = Field(default=0.0, description="System Quality Number")
+    tail_ratio: float = Field(default=0.0, description="Ratio of 95th percentile to 5th percentile")
+    common_sense_ratio: float = Field(
+        default=0.0, description="Tail Ratio * Profit Factor (institutional robustness)"
+    )
+    gain_to_pain_ratio: float = Field(
+        default=0.0, description="Sum of gains / Abs(Sum of losses) per month/period"
+    )
 
 
 class TurnoverMetrics(BaseModel):
@@ -118,31 +125,26 @@ class RLComparison(BaseModel):
 
 
 class MomentumBaseline:
-    """Rule-based momentum baseline for RL comparison."""
+    """
+    Rule-based momentum baseline for RL comparison.
+    Uses configurable thresholds on normalized price distance from mean.
+    """
 
-    def __init__(self, window: int = 14, close_idx: int = 3, n_features: int = 5):
-        self.window = window
+    def __init__(
+        self,
+        threshold: float = 0.2,
+        close_idx: int = 3,
+        n_features: int = 5,
+    ):
+        self.threshold = threshold
         self.close_idx = close_idx
         self.n_features = n_features
 
     def predict(self, observation: np.ndarray) -> int:
         """
-        Simple momentum: if current price > price N steps ago, buy.
-        Note: This expects the observation to contain historical prices.
-        In TradingEnv, observations are normalized windows [window_size, n_features].
-        Close price is at index 3 in each step's features.
+        Momentum logic: Buy if normalized price is significantly positive (trending up),
+        Sell if significantly negative (trending down).
         """
-        # Observation format from TradingEnv: [window_normalized_flattened, balance, position]
-        # To get the last close, we need to know n_features.
-        # However, if we don't know it, we can guess from observation size.
-        # Typical window_size=60, n_features=5 -> 300 + 2 = 302 elements.
-        # The last step of the window starts at (window_size - 1) * n_features.
-        # But we can also look at the relative index from the end.
-        # balance is -2, position is -1.
-        # The last step's features are from -(n_features+2) to -3.
-        # If n_features=5 (OHLCV), close is 4th feature (index 3).
-        # So last close is at -(5+2) + 3 = -4.
-
         # Observation format from TradingEnv: [window_normalized_flattened, balance, position]
         last_close_idx = -(self.n_features + 2) + self.close_idx
 
@@ -150,35 +152,45 @@ class MomentumBaseline:
             return 0
 
         last_val = observation[last_close_idx]
-        if last_val > 0.2:  # Reduced threshold for normalized values
+        if last_val > self.threshold:
             return 1  # Buy
-        if last_val < -0.2:
+        if last_val < -self.threshold:
             return 2  # Sell
         return 0  # Hold
 
 
 class MeanReversionBaseline:
-    """Rule-based Mean Reversion baseline for RL comparison."""
+    """
+    Rule-based Mean Reversion baseline for RL comparison.
+    Uses configurable overbought/oversold thresholds on normalized price.
+    """
 
-    def __init__(self, window: int = 14, close_idx: int = 3, n_features: int = 5):
-        self.window = window
+    def __init__(
+        self,
+        ob_threshold: float = 1.5,
+        os_threshold: float = -1.5,
+        close_idx: int = 3,
+        n_features: int = 5,
+    ):
+        self.ob_threshold = ob_threshold
+        self.os_threshold = os_threshold
         self.close_idx = close_idx
         self.n_features = n_features
 
     def predict(self, observation: np.ndarray) -> int:
-        # Simplified RSI-like logic on normalized values
-        # Normalized values already represent distance from mean.
-        # If last close is very high relative to window mean, sell.
+        """
+        Mean reversion logic: Sell if significantly above mean, Buy if significantly below.
+        """
         last_close_idx = -(self.n_features + 2) + self.close_idx
 
         if len(observation) < abs(last_close_idx):
             return 0
 
         last_val = observation[last_close_idx]
-        if last_val > 1.5:  # Overbought
-            return 2  # Sell
-        if last_val < -1.5:  # Oversold
-            return 1  # Buy
+        if last_val > self.ob_threshold:
+            return 2  # Sell (Overbought)
+        if last_val < self.os_threshold:
+            return 1  # Buy (Oversold)
         return 0
 
 
@@ -258,8 +270,11 @@ class RLEvaluator:
                 current_price = data[current_step - 1, self.close_idx]  # Close price
 
                 if current_step >= 100:
+                    # Safely handle data with potentially more than 5 features
+                    # but only use the OHLCV columns for regime detection
+                    slice_data = data[current_step - 100 : current_step, :5]
                     df_slice = pd.DataFrame(
-                        data[current_step - 100 : current_step],
+                        slice_data,
                         columns=["open", "high", "low", "close", "tick_volume"],
                     )
                     current_regime = self.regime_detector.detect(df_slice).label
@@ -370,27 +385,45 @@ class RLEvaluator:
         )
 
     def _get_prediction(self, agent: Any, obs: np.ndarray) -> int:
-        """Translate agent prediction (int or Signal) into environment action."""
-        prediction = agent.predict(obs)
+        """
+        Translate agent prediction (int or Signal) into environment action.
+        Robustly handles SB3 tuples, numpy scalars/arrays, and Signal objects.
+        """
+        try:
+            prediction = agent.predict(obs)
 
-        # Handle StableBaselines3 models (returns tuple (action, states))
-        if isinstance(prediction, tuple) and len(prediction) == 2:
-            prediction = prediction[0]
+            # Handle Signal objects FIRST (they are tuples, but we want the object)
+            if hasattr(prediction, "direction"):
+                direction = prediction.direction
+                if direction == SignalDirection.BUY:
+                    return 1
+                if direction == SignalDirection.SELL:
+                    return 2
+                return 0
 
-        # If prediction is a numpy array (common in SB3/Gym), get the scalar
-        if isinstance(prediction, np.ndarray):
-            prediction = prediction.item()
+            # Handle StableBaselines3 models (returns tuple (action, states))
+            if (
+                isinstance(prediction, tuple)
+                and len(prediction) >= 2
+                and not hasattr(prediction, "_fields")
+            ):
+                prediction = prediction[0]
 
-        # Handle Signal objects (standardized model output)
-        if hasattr(prediction, "direction"):
-            if prediction.direction == SignalDirection.BUY:
-                return 1
-            if prediction.direction == SignalDirection.SELL:
-                return 2
-            return 0
+            # If prediction is a numpy array or list, get the first element
+            if isinstance(prediction, (np.ndarray, list)):
+                if isinstance(prediction, np.ndarray) and prediction.size == 1:
+                    prediction = prediction.item()
+                else:
+                    prediction = prediction[0]
 
-        # Handle raw integer actions
-        return int(prediction)
+            # Handle Pydantic-like or Enum-like objects that might have 'value'
+            if hasattr(prediction, "value") and not isinstance(prediction, (int, float)):
+                prediction = prediction.value
+
+            return int(prediction)
+        except Exception as e:
+            logger.error("Error extracting prediction from agent %s: %s", type(agent), e)
+            return 0  # Default to Hold on error
 
     def _generate_report(self, agent_name: str, df: pd.DataFrame) -> RLReport:
         """Calculate all metrics and return an RLReport."""
@@ -544,6 +577,20 @@ class RLEvaluator:
             if std_pnl > 0:
                 sqn = np.sqrt(len(trade_pnls)) * avg_pnl / std_pnl
 
+        # Tail Ratio: 95th percentile / abs(5th percentile)
+        p95 = np.percentile(returns, 95) if len(returns) > 20 else 0.0
+        p5 = np.percentile(returns, 5) if len(returns) > 20 else 0.0
+        tail_ratio = abs(p95 / p5) if abs(p5) > 1e-9 else 0.0
+
+        # Common Sense Ratio: Tail Ratio * Profit Factor
+        common_sense_ratio = tail_ratio * (profit_factor if profit_factor != float("inf") else 1.0)
+
+        # Gain-to-Pain Ratio: Sum(Gains) / Abs(Sum(Losses))
+        # Note: Often calculated on monthly basis, here we use step returns for granularity
+        gains = returns[returns > 0].sum()
+        pains = abs(returns[returns < 0].sum())
+        gain_to_pain_ratio = gains / pains if pains > 1e-9 else 0.0
+
         return StabilityMetrics(
             sharpe_ratio=float(sharpe),
             sortino_ratio=float(sortino),
@@ -559,6 +606,9 @@ class RLEvaluator:
             max_consecutive_losses=int(max_consecutive_losses),
             ulcer_index=float(ulcer_index),
             sqn=float(sqn),
+            tail_ratio=float(tail_ratio),
+            common_sense_ratio=float(common_sense_ratio),
+            gain_to_pain_ratio=float(gain_to_pain_ratio),
         )
 
     def _calculate_turnover(
