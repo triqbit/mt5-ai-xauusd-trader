@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -27,7 +26,6 @@ except ImportError:
     nn = None  # type: ignore
 
 from src.core.constants import ModelAction, SignalDirection
-from src.core.profiler import profile
 from src.models.base_model import BaseModel, Signal
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMAttentionModel

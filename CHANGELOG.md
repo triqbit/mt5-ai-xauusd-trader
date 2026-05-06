@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enterprise Core Scaffolding:** Refined `src/` package structure and core modules (`config.py`, `mt5_connector.py`, `risk_engine.py`, `ensemble.py`) to meet institutional enterprise standards with full type hints, docstrings, and unit tests.
 - **Enterprise Monitoring System:** Implemented a robust monitoring and alerting backbone in `src/core/monitor.py` featuring real-time equity curve tracking, Prometheus metrics export, and async-safe Telegram bot notifications.
 - **Institutional Risk Notifications:** Integrated real-time alerts for circuit breaker triggers, margin calls, account balance mismatches, and liquidity (spread) crises into the primary trading loop.
 - **Automated Daily Performance Summaries:** Added logic to detect day changes and trigger automated Telegram summaries capturing daily P&L and trade counts.
