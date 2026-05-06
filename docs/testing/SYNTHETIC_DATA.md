@@ -18,6 +18,29 @@ Located in `src/utils/synthetic_data.py`, the `ScenarioGenerator` provides deter
 - **regime_shift** (New): Transition from a stable/ranging regime to a highly volatile one. Used for testing model adaptability and risk multiplier adjustments.
 - **malformed**: Data with intentional errors (NaNs, negative prices, High < Low) to test pipeline resilience.
 
+## ExecutionScenarioBuilder
+
+Located in `src/utils/synthetic_data.py`, the `ExecutionScenarioBuilder` generates paired `TradeSignal` and `pd.DataFrame` (market data) designed to test specific layers of the `ExecutionFilter`.
+
+### Key Scenarios
+
+- **passing_buy**: A clean BUY signal in a moderate bullish trend that satisfies all filter layers.
+- **atr_failure**: A scenario with an extreme volatility spike designed to trigger the ATR Volatility filter.
+- **trend_failure**: A BUY signal generated during a bearish trend, designed to trigger the Trend Angle filter.
+- **ema_out_of_sequence**: A scenario where EMAs are not correctly stacked (e.g., EMA8 < EMA21 for BUY), designed to trigger the EMA Sequence filter.
+- **momentum_failure**: A scenario where RSI is in an overbought zone, designed to trigger the Momentum filter.
+
+## ModelHealthGenerator
+
+Located in `src/utils/synthetic_data.py`, the `ModelHealthGenerator` provides deterministic model health metrics for testing stability guards.
+
+### Supported States
+
+- **perfect_health**: Metrics well within safety limits.
+- **degraded_drift**: Breaches the model drift threshold.
+- **degraded_accuracy**: Breaches the model accuracy floor.
+- **degraded_calibration**: Breaches the model calibration threshold.
+
 ## RiskScenarioBuilder
 
 Located in `src/utils/synthetic_data.py`, the `RiskScenarioBuilder` generates deterministic sequences of `TradeSignal` objects.

@@ -278,3 +278,143 @@ class RiskScenarioBuilder:
                 confidence=0.9,
             )
         ]
+
+
+class ExecutionScenarioBuilder:
+    """
+    Generates (TradeSignal, DataFrame) pairs tailored to test specific ExecutionFilter layers.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def passing_buy(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+        """A clean BUY signal in a moderate bullish trend."""
+        # Lower trend strength to avoid RSI > 75
+        df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005)
+        # Ensure enough data for indicators
+        signal = TradeSignal(
+            symbol=symbol,
+            direction=1,
+            entry_price=df["close"].iloc[-1],
+            stop_loss=df["close"].iloc[-1] - 10,
+            take_profit=df["close"].iloc[-1] + 20,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.8,
+        )
+        return signal, df
+
+    def atr_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+        """Signal during extreme volatility spike (ATR failure)."""
+        df = self.gen.generate(n_steps=200, regime="ranging", volatility=0.0005)
+        # Spike ATR at the end by blowing up the range of the last candle
+        last_idx = df.index[-1]
+        df.loc[last_idx, "high"] = df.loc[last_idx, "close"] + 50.0
+        df.loc[last_idx, "low"] = df.loc[last_idx, "close"] - 50.0
+
+        signal = TradeSignal(
+            symbol=symbol,
+            direction=1,
+            entry_price=df["close"].iloc[-1],
+            stop_loss=df["close"].iloc[-1] - 5,
+            take_profit=df["close"].iloc[-1] + 10,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.7,
+        )
+        return signal, df
+
+    def trend_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+        """BUY signal in a BEARISH trend (Trend Angle failure)."""
+        df = self.gen.generate(n_steps=200, regime="trending", trend_strength=-0.005)
+        signal = TradeSignal(
+            symbol=symbol,
+            direction=1,
+            entry_price=df["close"].iloc[-1],
+            stop_loss=df["close"].iloc[-1] - 10,
+            take_profit=df["close"].iloc[-1] + 20,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.7,
+        )
+        return signal, df
+
+    def ema_out_of_sequence(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+        """BUY signal where EMAs are not correctly stacked."""
+        # Use a trending regime so it passes Trend Angle (slope > 0)
+        df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0005)
+
+        # Manually break the EMA sequence in the last row to trigger failure
+        # For BUY, we need EMA8 > EMA21 > EMA50 > EMA200. We'll swap 8 and 21.
+        # Note: ExecutionFilter computes EMAs if not present in columns.
+        # We can pre-calculate and put them in the DF to force the check.
+        df["base_M5_ema_8"] = df["close"].ewm(span=8, adjust=False).mean()
+        df["base_M5_ema_21"] = df["close"].ewm(span=21, adjust=False).mean()
+        df["base_M5_ema_50"] = df["close"].ewm(span=50, adjust=False).mean()
+        df["base_M5_ema_200"] = df["close"].ewm(span=200, adjust=False).mean()
+
+        last_idx = df.index[-1]
+        # Swap so EMA21 > EMA8 -> Failure for BUY
+        val8 = df.loc[last_idx, "base_M5_ema_8"]
+        val21 = df.loc[last_idx, "base_M5_ema_21"]
+        df.loc[last_idx, "base_M5_ema_8"] = val21
+        df.loc[last_idx, "base_M5_ema_21"] = val8
+
+        signal = TradeSignal(
+            symbol=symbol,
+            direction=1,
+            entry_price=df["close"].iloc[-1],
+            stop_loss=df["close"].iloc[-1] - 10,
+            take_profit=df["close"].iloc[-1] + 20,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.7,
+        )
+        return signal, df
+
+    def momentum_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+        """BUY signal when RSI is too high (overbought)."""
+        # Rapid vertical move spikes RSI.
+        # Needs to pass ATR, TREND_ANGLE, EMA_SEQUENCE first.
+        df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0005)
+        # Spike the very end to push RSI over 75 without blowing up EMA sequence too much
+        # or just use a very strong trend that eventually hits RSI 80+
+        df_spike = self.gen.generate(n_steps=50, regime="trending", trend_strength=0.01, start_price=df["close"].iloc[-1])
+        df = pd.concat([df, df_spike]).iloc[-300:]
+
+        signal = TradeSignal(
+            symbol=symbol,
+            direction=1,
+            entry_price=df["close"].iloc[-1],
+            stop_loss=df["close"].iloc[-1] - 10,
+            take_profit=df["close"].iloc[-1] + 20,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.7,
+        )
+        return signal, df
+
+
+class ModelHealthGenerator:
+    """Generates deterministic model health metrics for testing."""
+
+    @staticmethod
+    def perfect_health() -> dict[str, float]:
+        """Metrics well within safety limits."""
+        return {"drift": 0.01, "accuracy": 0.92, "calibration": 0.05}
+
+    @staticmethod
+    def degraded_drift() -> dict[str, float]:
+        """Breaches drift threshold."""
+        return {"drift": 0.35, "accuracy": 0.88, "calibration": 0.08}
+
+    @staticmethod
+    def degraded_accuracy() -> dict[str, float]:
+        """Breaches accuracy floor."""
+        return {"drift": 0.02, "accuracy": 0.45, "calibration": 0.10}
+
+    @staticmethod
+    def degraded_calibration() -> dict[str, float]:
+        """Breaches calibration threshold."""
+        return {"drift": 0.02, "accuracy": 0.85, "calibration": 0.45}
