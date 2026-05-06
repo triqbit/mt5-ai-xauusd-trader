@@ -85,6 +85,7 @@ class BacktestEngine:
 
         self.balance = initial_balance
         self.trades: list[BacktestTrade] = []
+        self.equity_curve: list[tuple[datetime, float]] = []
         self.results: PerformanceReport | None = None
 
     def run_walk_forward(
@@ -108,6 +109,7 @@ class BacktestEngine:
 
         # Pre-calculate all possible features and technical indicators for efficiency
         logger.info("Pre-calculating features for the entire dataset...")
+        # Note: drop_ohlcv=False so we can still use high/low/close for trade simulation
         df_features = self.fe.compute_features(data, drop_ohlcv=False)
 
         if df_features.empty:
@@ -124,12 +126,11 @@ class BacktestEngine:
             )
             return PerformanceReport()
 
-        # Calculate ATR once for the whole dataset
+        # Calculate ATR once for the whole dataset for SL/TP
         high_low = data["high"] - data["low"]
         high_close = (data["high"] - data["close"].shift(1)).abs()
         low_close = (data["low"] - data["close"].shift(1)).abs()
         tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        data = data.copy()
         data["atr"] = tr.rolling(14).mean()
 
         # Pre-calculate ExecutionFilter metrics to avoid O(N) calculations in loop
@@ -145,21 +146,16 @@ class BacktestEngine:
         # 2. Trend Angle (EMA21 Slope)
         ema21_col = f"{prefix}_ema_21"
         if ema21_col not in df_features.columns:
-            # Fallback if FeatureEngineer didn't provide it
             ema21_series = data["close"].ewm(span=21, adjust=False).mean()
         else:
             ema21_series = df_features[ema21_col]
 
-        # Use a vectorized rolling slope if possible, or pre-calculate
-        # For simplicity and correctness with ExecutionFilter logic:
         ema21_vals = ema21_series.values
         slopes = np.zeros(n)
         window = 20
         x = np.arange(window)
         x_mean = np.mean(x)
         x_var = np.var(x) * window
-
-        # Optimized rolling slope calculation
         for j in range(window, n + 1):
             y = ema21_vals[j - window : j]
             slope = np.sum((x - x_mean) * y) / x_var
@@ -179,7 +175,6 @@ class BacktestEngine:
         if rsi_col in df_features.columns:
             rsi_vals = df_features[rsi_col].values
         else:
-            # Simple RSI fallback
             delta = data["close"].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
@@ -188,25 +183,30 @@ class BacktestEngine:
 
         start = 0
         active_trades: list[dict[str, Any]] = []
+        last_processed_idx = -1
 
-        # Optimization: Pre-extract data into NumPy arrays to avoid expensive pandas indexing in the loop
-        # Slicing .iloc[i] on a DataFrame creates a new Series object, which is slow.
+        # Optimization: Pre-extract data into NumPy arrays
         high_vals = data["high"].values
         low_vals = data["low"].values
         close_vals = data["close"].values
         atr_vals = data["atr"].values
         time_vals = data.index
-        feature_vals = df_features.values
+        feature_cols = [c for c in df_features.columns if c not in ["open", "high", "low", "close", "tick_volume", "atr"]]
+        feature_vals = df_features[feature_cols].values
 
         while start + train_window + test_window <= n:
             test_start_idx = start + train_window
 
             for i in range(test_window):
                 abs_idx = test_start_idx + i
+                if abs_idx <= last_processed_idx:
+                    continue
+                if abs_idx >= n:
+                    break
+
                 bar_time = time_vals[abs_idx]
 
-                # 1. Update active trades (SL/TP checks)
-                # Optimization: Pass raw values instead of a pd.Series
+                # 1. Update active trades (SL/TP and MAE/MFE)
                 self._update_active_trades(
                     active_trades,
                     high=high_vals[abs_idx],
@@ -216,29 +216,36 @@ class BacktestEngine:
 
                 # 2. Skip if max positions reached
                 if len(active_trades) >= self.max_positions:
+                    self._record_equity(bar_time, close_vals[abs_idx], active_trades)
+                    last_processed_idx = abs_idx
                     continue
 
                 # 3. Get Model Signal
-                # Optimization: Direct NumPy row access
                 obs = feature_vals[abs_idx]
                 try:
                     signal_obj = model.predict(obs)
-                    direction = signal_obj.direction
-                    confidence = signal_obj.confidence
+                    direction = int(signal_obj.direction)
+                    confidence = float(signal_obj.confidence)
                 except Exception:
-                    pred = model.predict(obs)
-                    direction = (
-                        int(pred[0]) if isinstance(pred, (tuple, list, np.ndarray)) else int(pred)
-                    )
-                    confidence = 1.0
+                    try:
+                        pred = model.predict(obs)
+                        direction = int(pred[0]) if isinstance(pred, (tuple, list, np.ndarray)) else int(pred)
+                        confidence = 1.0
+                    except Exception:
+                        direction = 0
+                        confidence = 0.0
 
                 if direction == 0:
+                    self._record_equity(bar_time, close_vals[abs_idx], active_trades)
+                    last_processed_idx = abs_idx
                     continue
 
                 # 4. Prepare Signal and Validate with Execution Filter
                 price = close_vals[abs_idx]
                 atr = atr_vals[abs_idx]
-                if np.isnan(atr):
+                if np.isnan(atr) or atr == 0:
+                    self._record_equity(bar_time, close_vals[abs_idx], active_trades)
+                    last_processed_idx = abs_idx
                     continue
 
                 stop_loss = price - (direction * 2 * atr)
@@ -257,7 +264,12 @@ class BacktestEngine:
                 )
 
                 # Prepare filter metrics
-                drawdown = (self.initial_balance - self.balance) / self.initial_balance
+                drawdown = 0.0
+                if self.equity_curve:
+                    peak = max(e[1] for e in self.equity_curve)
+                    current_equity = self.equity_curve[-1][1]
+                    drawdown = (peak - current_equity) / peak if peak > 0 else 0.0
+
                 precomputed = {
                     "atr_volatility": {
                         "current_atr": atr_current_vals[abs_idx],
@@ -270,9 +282,10 @@ class BacktestEngine:
                     "momentum": {"rsi": rsi_vals[abs_idx]},
                 }
 
+                # FIX: Pass only history up to current bar to avoid look-ahead bias
                 decision = self.ef.validate(
                     signal,
-                    df_features,  # Still pass df for layers that might need it (though we precomputed most)
+                    df_features.iloc[: abs_idx + 1],
                     current_drawdown=drawdown,
                     timestamp=bar_time,
                     precomputed_metrics=precomputed,
@@ -281,16 +294,31 @@ class BacktestEngine:
                 if decision.is_approved:
                     self._open_trade(active_trades, signal)
 
+                self._record_equity(bar_time, close_vals[abs_idx], active_trades)
+                last_processed_idx = abs_idx
+
             start += step_size
 
         # Close any remaining trades at the end of data
         self._close_all_trades(active_trades, last_close=close_vals[-1], last_time=time_vals[-1])
+        # Final equity recording
+        self._record_equity(time_vals[-1], close_vals[-1], [])
 
         return self._calculate_performance()
 
+    def _record_equity(self, timestamp: datetime, current_price: float, active_trades: list[dict[str, Any]]) -> None:
+        """Records current equity to the curve."""
+        unrealized_pnl = 0
+        multiplier = 100 if "XAU" in self.symbol else 1
+        for t in active_trades:
+            dir = int(t["signal"].direction)
+            unrealized_pnl += (current_price - t["entry_price"]) * dir * t["signal"].lot_size * multiplier
+
+        self.equity_curve.append((timestamp, self.balance + unrealized_pnl))
+
     def _open_trade(self, active_trades: list[dict[str, Any]], signal: TradeSignal) -> None:
         """Opens a new trade and adds it to the active list."""
-        execution_price = signal.entry_price + (signal.direction * self.spread / 2)
+        execution_price = signal.entry_price + (int(signal.direction) * self.spread / 2)
         active_trades.append(
             {"signal": signal, "entry_price": execution_price, "mae": 0.0, "mfe": 0.0}
         )
@@ -306,16 +334,16 @@ class BacktestEngine:
         closed_indices = []
         for i, trade in enumerate(active_trades):
             signal = trade["signal"]
-            direction = signal.direction
+            direction = int(signal.direction)
             entry_price = trade["entry_price"]
 
-            # Update MAE/MFE
+            # Update MAE/MFE based on CURRENT bar's high/low
             if direction == 1:
-                trade["mae"] = max(trade["mae"], entry_price - low)
-                trade["mfe"] = max(trade["mfe"], high - entry_price)
+                trade["mae"] = max(trade["mae"], float(entry_price - low))
+                trade["mfe"] = max(trade["mfe"], float(high - entry_price))
             else:
-                trade["mae"] = max(trade["mae"], high - entry_price)
-                trade["mfe"] = max(trade["mfe"], entry_price - low)
+                trade["mae"] = max(trade["mae"], float(high - entry_price))
+                trade["mfe"] = max(trade["mfe"], float(entry_price - low))
 
             # SL/TP Check
             exit_price = None
@@ -348,7 +376,7 @@ class BacktestEngine:
     def _record_trade(self, trade: dict[str, Any], exit_price: float, exit_time: datetime) -> None:
         """Finalizes a trade, calculates PnL, and records it."""
         signal = trade["signal"]
-        direction = signal.direction
+        direction = int(signal.direction)
 
         # Adjust exit price for spread
         exit_price_adj = exit_price - (direction * self.spread / 2)
@@ -382,7 +410,7 @@ class BacktestEngine:
 
     def _calculate_performance(self) -> PerformanceReport:
         """Aggregates all trades and calculates final metrics."""
-        if not self.trades:
+        if not self.trades or not self.equity_curve:
             return PerformanceReport()
 
         pnls = np.array([t.pnl for t in self.trades])
@@ -390,32 +418,38 @@ class BacktestEngine:
         mfes = np.array([t.mfe for t in self.trades])
 
         total_return = (self.balance - self.initial_balance) / self.initial_balance
-        win_rate = np.sum(pnls > 0) / len(pnls)
+        win_rate = np.sum(pnls > 0) / len(pnls) if len(pnls) > 0 else 0.0
 
         gross_profit = np.sum(pnls[pnls > 0])
         gross_loss = abs(np.sum(pnls[pnls < 0]))
         profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
-        # Equity curve for drawdown calculation
-        equity_curve = self.initial_balance + np.cumsum(pnls)
-        peak = np.maximum.accumulate(equity_curve)
-        drawdown = (peak - equity_curve) / peak
+        # Equity curve analysis
+        equity_values = np.array([e[1] for e in self.equity_curve])
+        peak = np.maximum.accumulate(equity_values)
+        drawdown = (peak - equity_values) / peak
         max_drawdown = np.max(drawdown)
 
-        # Sharpe Ratio (daily approximation)
-        if len(pnls) > 1:
-            avg_pnl = np.mean(pnls)
-            std_pnl = np.std(pnls)
-            sharpe = (avg_pnl / std_pnl * np.sqrt(252)) if std_pnl > 0 else 0.0
+        # Sharpe Ratio (daily return based)
+        df_equity = pd.DataFrame(self.equity_curve, columns=["time", "equity"])
+        df_equity.set_index("time", inplace=True)
+        daily_equity = df_equity["equity"].resample("D").last().dropna()
+        if len(daily_equity) > 1:
+            daily_returns = daily_equity.pct_change().dropna()
+            if len(daily_returns) > 0 and daily_returns.std() > 0:
+                sharpe = (daily_returns.mean() / daily_returns.std()) * np.sqrt(252)
+            else:
+                sharpe = 0.0
         else:
             sharpe = 0.0
 
-        # Annualized Return
-        start_time = self.trades[0].entry_time
-        end_time = self.trades[-1].exit_time
-        days = (end_time - start_time).days
-        if days > 0:
-            annualized_return = (1 + total_return) ** (365 / days) - 1
+        # Annualized Return (CAGR)
+        start_time = self.equity_curve[0][0]
+        end_time = self.equity_curve[-1][0]
+        duration = end_time - start_time
+        years = duration.days / 365.25
+        if years > 0:
+            annualized_return = (1 + total_return) ** (1 / years) - 1
         else:
             annualized_return = total_return
 
@@ -424,8 +458,8 @@ class BacktestEngine:
             sharpe_ratio=sharpe,
             max_drawdown=max_drawdown,
             profit_factor=profit_factor,
-            mae_avg=np.mean(maes),
-            mfe_avg=np.mean(mfes),
+            mae_avg=np.mean(maes) if len(maes) > 0 else 0.0,
+            mfe_avg=np.mean(mfes) if len(mfes) > 0 else 0.0,
             total_trades=len(self.trades),
             win_rate=win_rate,
             total_return=total_return,
