@@ -63,6 +63,7 @@ This runbook provides standardized procedures for recovering from failures in Gi
 - GitHub Actions workflows display a green "Success" status.
 - All code complies with `EXCELLENCE_BLUEPRINT.md` standards.
 - Test coverage meets or exceeds the 85% mandatory threshold.
+- Successful deployments are recorded in the `audit_log` table in `audit.db`.
 
 ## Verification Commands
 - **Environment:** `python scripts/validate_env.py`
@@ -70,8 +71,9 @@ This runbook provides standardized procedures for recovering from failures in Gi
 - **Full Test Suite:** `pytest tests/ --cov=src --cov-fail-under=85`
 - **Linting:** `ruff check .`
 - **Security:** `pip-audit`
+- **Audit Verification:** `sqlite3 audit.db "SELECT * FROM audit_log WHERE action='deployment' ORDER BY created_at DESC LIMIT 1;"`
 
 ## Escalation Path
-1. **Level 1:** Release Engineer (Jules03 - @andonly1348).
+1. **Level 1:** Release Reliability Engineer (Jules03 - @andonly1348).
 2. **Level 2:** Quality Lead (@maintainer-quality).
 3. **Level 3:** Security Lead (if Gitleaks/Trivy related).

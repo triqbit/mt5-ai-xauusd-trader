@@ -55,6 +55,11 @@ After any secret rotation, you **must** execute the following checks:
    ```bash
    curl http://localhost:8000/health/readiness
    ```
+4. **Audit Trail:**
+   Verify that the configuration change (sanitized) is recorded in the audit log:
+   ```bash
+   sqlite3 audit.db "SELECT action, details, created_at FROM audit_log WHERE action='config_snapshot' ORDER BY created_at DESC LIMIT 1;"
+   ```
 
 ## Safety Guidelines
 - **NEVER** commit `.env` files or hardcoded secrets to the repository.

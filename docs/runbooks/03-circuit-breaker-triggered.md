@@ -25,9 +25,14 @@ docker stop mt5-trader
 ## Investigation
 
 ### 1. Identify the Trigger Event
-Query the `risk_events` table in the audit database to find the timestamp and specific drawdown value:
+Query the `risk_events` table in the trades database to find the timestamp and specific drawdown value:
 ```bash
 sqlite3 trades.db "SELECT event_type, description, created_at FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"
+```
+
+Also, check the `audit_log` for technical decision metadata:
+```bash
+sqlite3 audit.db "SELECT action, details, metadata_json, created_at FROM audit_log WHERE action='risk_decision' ORDER BY created_at DESC LIMIT 1;"
 ```
 
 ### 2. Analyze Recent Trade Performance
@@ -71,8 +76,9 @@ sqlite3 trades.db "SELECT event_type, description, created_at FROM risk_events O
 
 ## Verification Commands
 - **Check Readiness:** `curl http://localhost:8000/health/readiness`
-- **Verify Audit Logs:** `sqlite3 trades.db "SELECT event_type, created_at FROM risk_events WHERE created_at > datetime('now', '-1 hour');"`
-- **Monitor Risk Logs:** `docker logs mt5-trader | grep "RiskManager"`
+- **Verify Risk Events:** `sqlite3 trades.db "SELECT event_type, created_at FROM risk_events WHERE created_at > datetime('now', '-1 hour');"`
+- **Verify Audit Logs:** `sqlite3 audit.db "SELECT action, created_at FROM audit_log WHERE action='risk_decision' AND created_at > datetime('now', '-1 hour');"`
+- **Monitor Risk Logs:** `docker logs mt5-trader | grep -E "RiskManager|AuditedRiskManager"`
 
 ## Escalation Path
 1. **Level 1:** Risk Lead (@maintainer-trading).

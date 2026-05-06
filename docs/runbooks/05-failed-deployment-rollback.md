@@ -62,11 +62,13 @@ If the failed release included a database migration that is incompatible with th
 - The system is restored to the previous stable state (Docker image and DB schema).
 - P0/P1 alerts are resolved.
 - Trading resumes (if appropriate) or is safely halted in a known stable state.
+- Audit log records the rollback event for traceability.
 
 ## Verification Commands
-- **Image Version:** `docker inspect triqbit/mt5-trader --format '{{.Config.Labels.version}}'`
+- **Image Version:** `docker inspect mt5-trader --format '{{.Config.Labels.version}}'`
 - **Migration Status:** `alembic current`
 - **Health Check:** `curl http://localhost:8000/health/liveness`
+- **Audit Trace:** `sqlite3 audit.db "SELECT * FROM audit_log WHERE action='operator_rollback' ORDER BY created_at DESC LIMIT 1;"`
 
 ## Escalation Path
 1. **Level 1:** Release Engineer (Jules03 - @andonly1348).
