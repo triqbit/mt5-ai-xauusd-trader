@@ -73,3 +73,38 @@ def test_log_deployment(audit_logger):
         assert entry.action == "deployment"
         assert entry.metadata_json["version"] == "1.1.0"
         assert entry.metadata_json["environment"] == "production"
+
+def test_log_trade_outcome(audit_logger):
+    metadata = {"entry": 2000.0, "exit": 2010.0}
+    entry_id = audit_logger.log_trade_outcome(12345, "XAUUSD", 100.0, "market_close", metadata)
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+        assert entry.action == "trade_outcome"
+        assert entry.metadata_json["ticket"] == 12345
+        assert entry.metadata_json["pnl"] == 100.0
+        assert entry.metadata_json["context"] == metadata
+
+def test_log_config_change(audit_logger):
+    old = {"MODE": "demo"}
+    new = {"MODE": "live"}
+    entry_id = audit_logger.log_config_change(old, new, "Manual switch")
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+        assert entry.action == "config_change"
+        assert entry.metadata_json["old"] == old
+        assert entry.metadata_json["new"] == new
+        assert "Manual switch" in entry.details
+
+def test_log_operator_action_refined(audit_logger):
+    # Test the refined version of log_operator_action
+    entry_id = audit_logger.log_operator_action("admin", "emergency_halt", "System anomaly", {"extra": "data"})
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+        assert entry.actor == "admin"
+        assert entry.action == "operator_emergency_halt"
+        assert entry.metadata_json["action_type"] == "emergency_halt"
+        assert entry.metadata_json["reason"] == "System anomaly"
+        assert entry.metadata_json["extra"] == "data"

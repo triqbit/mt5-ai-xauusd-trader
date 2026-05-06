@@ -106,7 +106,26 @@ def run_live(
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     last_reset_date = datetime.now(timezone.utc).date()
+    loop_count = 0
     while True:
+        # 0. Periodic Audit of Configuration State
+        if loop_count % 100 == 0:
+            if audit_logger:
+                audit_logger.log_config_snapshot(
+                    cfg.model_dump(
+                        mode="json",
+                        exclude={
+                            "mt5_password",
+                            "metaapi_token",
+                            "metaapi_account_id",
+                            "database_url",
+                            "telegram_token",
+                        },
+                    ),
+                    reason=f"periodic_check_loop_{loop_count}"
+                )
+        loop_count += 1
+
         # 0. Update account metrics at start of loop
         with profile("account_updates"):
             try:
@@ -386,6 +405,22 @@ def run_live(
                             execution_data=execution_data,
                         )
 
+    # Log comprehensive decision trace for every non-hold signal
+    if audit_logger:
+        audit_logger.log(
+            actor="system",
+            action="decision_explanation",
+            details=f"Decision trace for {cfg.symbol}: {explanation.get('summary', 'No summary')}",
+            metadata={
+                "symbol": cfg.symbol,
+                "direction": direction,
+                "confidence": confidence,
+                "risk_data": risk_data,
+                "regime_data": regime_data,
+                "execution_data": execution_data,
+            }
+        )
+
                         # Use a stub for macro risk since we don't have a live feed in this loop yet
                         macro_risk = RiskStatus(
                             is_blocked=False, active_events=[], reason="No active data"
@@ -457,6 +492,7 @@ def run_live(
                                         tick["bid"] if trade_info.direction == 1 else tick["ask"]
                                     )
                                     # P&L will be calculated automatically by update_trade
+                                    # This also logs to audit trail internally now
                                     trade_logger.update_trade(
                                         ticket=ticket,
                                         exit_price=exit_price,
@@ -897,7 +933,14 @@ def main() -> int:
         return 0
 
     # Record successful deployment/startup
-    audit_logger.log_deployment(version="1.1.0", environment=cfg.mode)
+    from src import __version__
+    audit_logger.log_deployment(version=__version__, environment=cfg.mode)
+    audit_logger.log_operator_action(
+        operator="system",
+        action="trading_engine_started",
+        reason=f"System transition to RUNNING state in {cfg.mode} mode",
+        metadata={"mode": cfg.mode, "algo": cfg.algorithm, "symbol": cfg.symbol, "version": __version__}
+    )
 
     try:
         if cfg.mode in ("demo", "live"):
@@ -920,8 +963,20 @@ def main() -> int:
             connector.disconnect()  # Already connected in run_backtest bridge
             return run_backtest(args, cfg, feature_engineer, execution_filter, model, console, log)
     finally:
+        if audit_logger:
+            audit_logger.log_operator_action(
+                operator="system",
+                action="shutdown_initiated",
+                reason="Cleaning up resources and disconnecting"
+            )
         if connector._is_initialized:
             connector.disconnect()
+        if audit_logger:
+            audit_logger.log_operator_action(
+                operator="system",
+                action="shutdown_completed",
+                reason="System shutdown sequence finished"
+            )
     return 0
 
 

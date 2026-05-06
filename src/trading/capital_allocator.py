@@ -14,6 +14,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.core.audit_log import get_audit_logger
+
 logger = logging.getLogger(__name__)
 
 
@@ -119,6 +121,7 @@ class CapitalAllocator:
             return
 
         config = self.strategies[strategy_id]
+        old_multiplier = config.performance_multiplier
         config.historical_pnl += pnl
 
         if pnl > 0:
@@ -140,6 +143,16 @@ class CapitalAllocator:
                     config.consecutive_losses,
                 )
                 config.performance_multiplier = min(config.performance_multiplier, 0.1)
+
+        if old_multiplier != config.performance_multiplier:
+            try:
+                get_audit_logger().log_config_change(
+                    old_config={"strategy_id": strategy_id, "multiplier": old_multiplier},
+                    new_config={"strategy_id": strategy_id, "multiplier": config.performance_multiplier},
+                    reason=f"Performance adjustment for {strategy_id} after trade outcome: {pnl:.2f}",
+                )
+            except (RuntimeError, ImportError):
+                pass
 
         logger.debug(
             "Strategy %s multiplier updated to %.2f | PnL: %.2f | Consecutive Losses: %d",
