@@ -6,7 +6,12 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-from src.core.decision_support import DecisionSupportSystem, DecisionPacket, PerformanceContext
+from src.core.decision_support import (
+    DecisionSupportSystem,
+    DecisionPacket,
+    PerformanceContext,
+    DecisionStatus,
+)
 from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment, ModelAttribution
 from src.core.constants import SignalDirection
 from src.models.regime_detector import RegimeInfo, MarketRegime
@@ -101,6 +106,53 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
     assert packet.performance.win_loss_ratio == 1.8
     assert packet.performance.total_trades == 100
 
+    # Verification of Augmented Fields
+    assert packet.status_level == DecisionStatus.EXECUTE
+    assert packet.decision_score > 0
+    assert packet.sizing_multiplier > 0
+
+
+def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_risk):
+    dss = DecisionSupportSystem()
+
+    # 1. High Confidence Case (Unanimous, High Regime Confidence, Good RR)
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.9, weight=1.0)
+    ]
+    mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+    mock_regime.confidence = 1.0
+    mock_macro_risk.risk_multiplier = 1.0
+
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert packet.decision_score == 100.0  # (1.0*40) + (1.0*30) + (1.0*20) + (1.0*10)
+    assert packet.status_level == DecisionStatus.EXECUTE
+    assert packet.sizing_multiplier == 1.0
+
+    # 2. Caution Case (Low Score)
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.5, weight=0.5),
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.5, weight=0.5),
+    ]
+    mock_regime.confidence = 0.5
+    mock_explanation.risk_assessment.risk_reward_ratio = 1.0  # (1/3)*20 = 6.66
+    mock_macro_risk.risk_multiplier = 0.5  # 0.5*10 = 5
+
+    # Consensus score: 0.5 * 40 = 20
+    # Regime score: 0.5 * 30 = 15
+    # Risk score: 6.66
+    # Macro score: 5
+    # Total ~ 46.66
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert 46.0 < packet.decision_score < 47.0
+    assert packet.status_level == DecisionStatus.CAUTION
+    assert packet.sizing_multiplier < 0.2  # (0.46^1.5) * 0.5 * 0.5
+
+    # 3. Blocked Case
+    mock_explanation.risk_assessment.passed = False
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert packet.status_level == DecisionStatus.BLOCKED
+    assert packet.sizing_multiplier == 0.0
+
 
 def test_consensus_logic():
     dss = DecisionSupportSystem()
@@ -189,4 +241,4 @@ def test_format_for_operator(mock_explanation, mock_regime, mock_macro_risk):
     output = dss.format_for_operator(packet)
     assert isinstance(output, str)
     assert "XAUUSD" in output
-    assert "EXECUTE" in output or "BLOCKED" in output
+    assert any(s in output for s in ["EXECUTE", "CAUTION", "BLOCKED"])

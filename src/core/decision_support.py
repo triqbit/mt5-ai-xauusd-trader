@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,6 +22,14 @@ from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
+
+
+class DecisionStatus(str, Enum):
+    """Augmented status levels for trade execution."""
+
+    EXECUTE = "execute"
+    CAUTION = "caution"
+    BLOCKED = "blocked"
 
 
 class PerformanceContext(BaseModel):
@@ -47,6 +56,15 @@ class DecisionPacket(BaseModel):
     symbol: str = Field(..., description="Target trading symbol")
     direction: SignalDirection = Field(..., description="Final signal direction")
     consensus: str = Field(..., description="Qualitative model consensus level")
+    status_level: DecisionStatus = Field(
+        DecisionStatus.BLOCKED, description="Augmented status level"
+    )
+    decision_score: float = Field(
+        0.0, ge=0.0, le=100.0, description="Composite decision confidence score"
+    )
+    sizing_multiplier: float = Field(
+        0.0, ge=0.0, le=1.0, description="Recommended sizing multiplier"
+    )
     is_executable: bool = Field(
         False, description="Final decision on whether the trade should proceed"
     )
@@ -101,6 +119,24 @@ class DecisionSupportSystem:
         # Determine if executable
         is_executable = len(blocking_reasons) == 0
 
+        # Calculate Consensus and Score
+        consensus = self._calculate_consensus(explanation)
+        decision_score = self._calculate_decision_score(
+            explanation, regime_info, macro_risk
+        )
+
+        # Determine Augmented Status Level
+        status_level = DecisionStatus.BLOCKED
+        if is_executable:
+            status_level = (
+                DecisionStatus.EXECUTE if decision_score >= 70.0 else DecisionStatus.CAUTION
+            )
+
+        # Calculate Sizing Multiplier
+        sizing_multiplier = self._calculate_sizing_multiplier(
+            decision_score, status_level, macro_risk
+        )
+
         # Construct Performance Context
         performance = PerformanceContext(
             sharpe_ratio=performance_metrics.get("sharpe_ratio", 0.0),
@@ -112,13 +148,13 @@ class DecisionSupportSystem:
             total_trades=int(performance_metrics.get("total_trades", 0)),
         )
 
-        # Calculate Consensus
-        consensus = self._calculate_consensus(explanation)
-
         return DecisionPacket(
             symbol=symbol,
             direction=explanation.direction,
             consensus=consensus,
+            status_level=status_level,
+            decision_score=decision_score,
+            sizing_multiplier=sizing_multiplier,
             is_executable=is_executable,
             blocking_reasons=blocking_reasons,
             explanation=explanation,
@@ -126,6 +162,63 @@ class DecisionSupportSystem:
             macro_risk=macro_risk,
             performance=performance,
         )
+
+    def _calculate_decision_score(
+        self, explanation: SignalExplanation, regime: RegimeInfo, macro_risk: RiskStatus
+    ) -> float:
+        """
+        Calculate a composite score (0-100) for the decision quality.
+        Weights:
+        - Ensemble Consensus: 40%
+        - Regime Confidence: 30%
+        - Risk Assessment quality (R:R): 20%
+        - Macro Risk safety: 10%
+        """
+        # 1. Consensus Score (0-40)
+        total_weight = sum(attr.weight for attr in explanation.model_attributions)
+        consensus_strength = 0.0
+        if total_weight > 0:
+            weighted_votes = sum(
+                attr.weight
+                for attr in explanation.model_attributions
+                if attr.vote == explanation.direction
+            )
+            consensus_strength = weighted_votes / total_weight
+        consensus_score = consensus_strength * 40.0
+
+        # 2. Regime Score (0-30)
+        regime_score = regime.confidence * 30.0
+
+        # 3. Risk Quality Score (0-20)
+        # Normalize R:R - assuming 3.0 is excellent
+        rr = explanation.risk_assessment.risk_reward_ratio
+        risk_score = min(rr / 3.0, 1.0) * 20.0
+
+        # 4. Macro Safety Score (0-10)
+        macro_score = macro_risk.risk_multiplier * 10.0
+
+        return float(consensus_score + regime_score + risk_score + macro_score)
+
+    def _calculate_sizing_multiplier(
+        self, score: float, status: DecisionStatus, macro_risk: RiskStatus
+    ) -> float:
+        """
+        Determine recommended sizing based on decision quality and macro risk.
+        """
+        if status == DecisionStatus.BLOCKED:
+            return 0.0
+
+        # Base multiplier from score
+        base_mult = (score / 100.0) ** 1.5  # Non-linear scaling
+
+        # Apply caution penalty
+        if status == DecisionStatus.CAUTION:
+            base_mult *= 0.5
+
+        # Apply macro risk multiplier
+        final_mult = base_mult * macro_risk.risk_multiplier
+
+        return float(min(max(final_mult, 0.0), 1.0))
 
     def _calculate_consensus(self, explanation: SignalExplanation) -> str:
         """
@@ -165,9 +258,14 @@ class DecisionSupportSystem:
             from rich.table import Table
             from rich.text import Text
 
-            # 1. Header with Go/No-Go status
-            status_color = "green" if packet.is_executable else "red"
-            status_text = "EXECUTE" if packet.is_executable else "BLOCKED"
+            # 1. Header with Augmented Status
+            status_colors = {
+                DecisionStatus.EXECUTE: "green",
+                DecisionStatus.CAUTION: "yellow",
+                DecisionStatus.BLOCKED: "red",
+            }
+            status_color = status_colors.get(packet.status_level, "white")
+            status_text = packet.status_level.value.upper()
 
             dir_color = (
                 "green"
@@ -198,6 +296,24 @@ class DecisionSupportSystem:
                 subtitle=packet.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 border_style=status_color,
                 box=box.DOUBLE,
+            )
+
+            # 1b. Augmented Score Panel
+            score_color = (
+                "green"
+                if packet.decision_score >= 80
+                else "yellow"
+                if packet.decision_score >= 50
+                else "red"
+            )
+            score_content = Text()
+            score_content.append("Decision Score: ", style="bold")
+            score_content.append(f"{packet.decision_score:.1f}/100", style=f"bold {score_color}")
+            score_content.append("  |  Sizing Recommendation: ", style="bold")
+            score_content.append(f"{packet.sizing_multiplier:.1%}", style="bold cyan")
+
+            augmentation_panel = Panel(
+                score_content, title="Augmentation Metrics", border_style="blue"
             )
 
             # 2. Market and Performance Overview (Two-column table)
@@ -260,6 +376,7 @@ class DecisionSupportSystem:
             # Assemble everything into a single group for output
             dashboard = Group(
                 header,
+                augmentation_panel,
                 overview_table,
                 macro_panel,
                 attribution_summary,
@@ -281,7 +398,8 @@ class DecisionSupportSystem:
         except ImportError:
             # Fallback to plain text
             res = f"=== DECISION PACKET: {packet.symbol} ===\n"
-            res += f"STATUS: {'EXECUTE' if packet.is_executable else 'BLOCKED'}\n"
+            res += f"STATUS: {packet.status_level.value.upper()}\n"
+            res += f"DECISION SCORE: {packet.decision_score:.1f}/100 | SIZING: {packet.sizing_multiplier:.1%}\n"
             res += f"DIRECTION: {packet.direction.name} | CONSENSUS: {packet.consensus}\n"
 
             if packet.blocking_reasons:
