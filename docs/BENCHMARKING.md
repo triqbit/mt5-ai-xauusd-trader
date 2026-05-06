@@ -10,9 +10,12 @@ To prove that sophisticated strategies (Ensemble, RL, Deep Learning) outperform 
 
 The following rule-based baselines are available in `src/research/benchmarks.py`:
 
+- **Buy and Hold**: Passive long baseline.
+- **Sell and Hold**: Passive short baseline.
 - **EMA Crossover**: Simple trend-following using fast and slow Exponential Moving Averages.
 - **Momentum (ROC)**: Momentum-based strategy using Rate of Change with a configurable noise-filtering threshold.
 - **Volatility Breakout**: Bollinger Band breakout strategy.
+- **Donchian Channel Breakout**: Trend-following breakout based on high/low price channels.
 - **Naive Directional**: Follows the direction of the previous candle.
 - **Risk-Filtered EMA**: EMA Crossover supplemented with a volatility filter to avoid choppy markets.
 - **Mean Reversion (RSI)**: RSI-based overbought/oversold reversal strategy.
@@ -30,6 +33,14 @@ The `BenchmarkEvaluator` calculates high-fidelity metrics beyond simple returns:
 - **System Quality Number (SQN)**: Evaluates trade quality and expectancy relative to volatility.
 - **Profit Factor**: Gross Profit / Gross Loss.
 - **Expectancy**: Average profit expected per trade.
+- **Skewness & Kurtosis**: Measures of the return distribution shape.
+- **Value at Risk (VaR 95%)**: Potential loss at the 95% confidence level.
+- **Conditional VaR (CVaR 95%)**: Expected loss exceeding VaR.
+- **Stability Score**: Consistency of the equity curve (R-squared of linear fit).
+- **Ulcer Index**: Measure of drawdown depth and duration.
+- **Tail Ratio**: Ratio of the 95th percentile to the 5th percentile of returns.
+- **Common Sense Ratio**: Tail Ratio multiplied by Profit Factor.
+- **Gain-to-Pain Ratio**: Sum of positive returns divided by the absolute sum of negative returns.
 
 ## Statistical Comparison
 
