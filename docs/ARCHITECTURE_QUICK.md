@@ -10,7 +10,7 @@ The system is designed as a modular, event-driven trading engine that separates 
 
 | Layer | Responsibility | Key Modules |
 | :--- | :--- | :--- |
-| **Intelligence** | Market regime detection, signal generation, and ensemble consensus. | `src/models/`, `src/environment/` |
+| **Intelligence** | Market regime detection, directional signal generation, and ensemble consensus. | `src/models/`, `src/environment/` |
 | **Execution** | MT5 lifecycle management, order execution, and connectivity. | `src/trading/mt5_connector.py` |
 | **Risk & Allocation** | Position sizing, drawdown protection, and capital allocation. | `src/trading/risk_manager.py`, `src/trading/capital_allocator.py` |
 | **Infrastructure** | Config validation, health monitoring, and trade logging. | `src/core/` |
@@ -38,7 +38,7 @@ This map identifies the production readiness of various subsystems to ensure tra
 1.  **Ingestion:** `MT5Connector` fetches real-time tick and OHLC data.
 2.  **Transformation:** `FeatureEngineering` computes 140+ technical and sentiment indicators.
 3.  **Intelligence:** `RegimeDetector` classifies market state; `DynamicEnsemble` generates a directional signal.
-4.  **Risk Gate:** `RiskManager` and `ExecutionFilter` validate signal against a 6-layer cascade: ATR volatility, Trend Angle, EMA Sequence, Momentum, Session time, and Drawdown circuit breakers.
+4.  **Risk Gate:** `RiskManager` and `ExecutionFilter` validate the signal against a 6-layer cascade: ATR volatility, Trend Angle, EMA Sequence, Momentum, Session time, and Drawdown circuit breakers.
 5.  **Allocation:** `CapitalAllocator` determines optimal lot size based on equity and regime.
 6.  **Execution:** `MT5Connector` dispatches the order and monitors for fills/slippage.
 7.  **Observability:** `TradeLogger` records execution details; `Monitor` pushes metrics to Prometheus.
