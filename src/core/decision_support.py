@@ -11,25 +11,16 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.core.constants import SignalDirection
+from src.core.constants import DecisionStatus, SignalDirection
 from src.core.explainability import SignalExplainer, SignalExplanation
 from src.data.event_intelligence import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
-
-
-class DecisionStatus(str, Enum):
-    """Augmented status levels for trade execution."""
-
-    EXECUTE = "execute"
-    CAUTION = "caution"
-    BLOCKED = "blocked"
 
 
 class PerformanceContext(BaseModel):

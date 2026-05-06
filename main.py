@@ -138,7 +138,7 @@ def run_live(
 
                     volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
 
-                # 3. Get model prediction
+                # 3. Model Signal Generation
                 with profile("inference"):
                     # Pass regime context to models that support it (e.g. Ensemble)
                     if hasattr(model, "predict"):
@@ -151,7 +151,7 @@ def run_live(
                                 signal_obj = model.predict(obs, seq=seq, regime_info=regime_info)
                             else:
                                 signal_obj = model.predict(obs)
-                        except TypeError:
+                        except (TypeError, ValueError):
                             signal_obj = model.predict(obs)
 
                     direction = signal_obj.direction
@@ -159,7 +159,7 @@ def run_live(
                     if monitor:
                         monitor.check_confidence_degradation(confidence)
 
-                    # Log prediction to audit trail
+                    # Log signal to audit trail
                     if audit_logger:
                         audit_logger.log_prediction(
                             symbol=cfg.symbol,
@@ -455,11 +455,15 @@ def run_live(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument("--mode", choices=["demo", "live", "backtest"], help="Execution mode")
+    p.add_argument(
+        "--mode",
+        choices=["demo", "live", "backtest"],
+        help="Execution mode (demo, live, or backtest)",
+    )
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble"],
-        help="Trading algorithm",
+        help="Model algorithm to use for signal generation",
     )
     p.add_argument("--start", help="Start date for backtest (YYYY-MM-DD)")
     p.add_argument("--end", help="End date for backtest (YYYY-MM-DD)")

@@ -11,9 +11,10 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
-from enum import Enum, IntEnum
 
 from pydantic import BaseModel, Field
+
+from src.core.constants import EventCategory, EventImpact
 
 logger = logging.getLogger(__name__)
 
@@ -28,28 +29,6 @@ __all__ = [
     "MetaAPIEventProvider",
     "EventIntelligence",
 ]
-
-
-class EventImpact(IntEnum):
-    """Normalized event impact scores."""
-
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
-    CRITICAL = 4
-
-
-class EventCategory(Enum):
-    """Categories of macro events relevant to XAUUSD."""
-
-    CPI = "CPI"
-    NFP = "NFP"
-    FOMC = "FOMC"
-    RATES = "RATES"
-    USD = "USD"
-    USD_MACRO = "USD_MACRO"
-    GEOPOLITICAL = "GEOPOLITICAL"
-    OTHER = "OTHER"
 
 
 class MacroEvent(BaseModel):
