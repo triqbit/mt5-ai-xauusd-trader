@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Vectorized Feature Engineering:** Optimized `FeatureEngineer` by refactoring internal methods to return dictionaries of NumPy arrays and using TA-Lib vectorization (`SMA`, `SUM`, `ROCP`), achieving ~20% overall speedup.
+
+### Fixed
+- **Dependency Harmonization:** Downgraded `starlette` to `0.40.0` to resolve version conflicts with `fastapi` and stabilize CI/CD submission pipelines.
 - **Enterprise Health Monitoring:** Refined the `src/core/health.py` system with robust liveness/readiness probes, multi-layered dependency checks (Database, MT5, Redis, Models, Audit), and a mandatory startup gate.
 - **Deployment Validation Gates:** Implemented a robust pre-deployment validation workflow in `.github/workflows/pre-deploy-validation.yml` to prevent unsafe releases.
 - **Environment Safety Checks:** Enhanced `scripts/validate_env.py` and synchronized `.env.example` to ensure configuration completeness before deployment.
