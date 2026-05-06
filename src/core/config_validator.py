@@ -390,6 +390,28 @@ class ConfigValidator:
                 )
             )
 
+        # 8. Calibration Threshold (RISK_LIMITS.md 4.2)
+        # Release-readiness gate: Prevents deployment of overconfident/poorly calibrated models.
+        # High ECE (Expected Calibration Error) indicates the model's confidence doesn't match its accuracy.
+        if self.config.model_calibration_threshold > 0.35:
+            self.errors.append(
+                ValidationError(
+                    "MODEL_CALIBRATION_THRESHOLD",
+                    f"Model calibration threshold {self.config.model_calibration_threshold} is dangerously high.",
+                    True,
+                    "Set MODEL_CALIBRATION_THRESHOLD to 0.35 or lower.",
+                )
+            )
+        elif self.config.model_calibration_threshold > 0.25:
+            self.errors.append(
+                ValidationError(
+                    "MODEL_CALIBRATION_THRESHOLD",
+                    f"Model calibration threshold {self.config.model_calibration_threshold} exceeds 0.25 limit.",
+                    False,
+                    "Set MODEL_CALIBRATION_THRESHOLD to 0.25 for enterprise compliance.",
+                )
+            )
+
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
         # 1. LIVE mode restrictions
