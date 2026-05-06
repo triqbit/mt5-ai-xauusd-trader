@@ -61,7 +61,7 @@ jobs:
 
           if [ "$TOUCHED_HIGH_RISK" = "true" ]; then
             echo "risk_status=blocked" >> $GITHUB_OUTPUT
-            echo "::error::High-risk files touched. Auto-merge is strictly PROHIBITED and must be ESCALATED."
+            echo "::warning::High-risk files touched. Auto-merge is disabled and must be ESCALATED."
           else
             echo "risk_status=pass" >> $GITHUB_OUTPUT
             echo "✅ No high-risk files detected."
@@ -127,26 +127,43 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           REASON="The following auto-merge criteria were not met:"
+          FATAL_VIOLATION=false
+
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
-            REASON="$REASON\n- 🚨 **High-risk files modified.** (Must be ESCALATED and manually reviewed)"
+            REASON="${REASON}\n- 🚨 **High-risk files modified.** (Must be ESCALATED and manually reviewed)"
             gh pr edit $PR_NUMBER --add-label "escalated-risk" || echo "Failed to add label"
           fi
+
           if [ "${{ steps.compliance-check.outputs.compliance_status }}" = "fail" ]; then
-            REASON="$REASON\n- ❌ **Missing required tests or documentation for source changes.**"
-          fi
-          if [ "${{ steps.observability-check.outputs.observability_status }}" = "fail" ]; then
-            REASON="$REASON\n- ❌ **Observability standards not met (detected 'print' statements).**"
+            REASON="${REASON}\n- ❌ **Missing required tests or documentation for source changes.**"
+            FATAL_VIOLATION=true
           fi
 
-          gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, or infrastructure are automatically escalated."
+          if [ "${{ steps.observability-check.outputs.observability_status }}" = "fail" ]; then
+            REASON="${REASON}\n- ❌ **Observability standards not met (detected 'print' statements).**"
+            FATAL_VIOLATION=true
+          fi
+
+          # Post comment with proper newlines
+          gh pr comment $PR_NUMBER --body "$(printf "$REASON")\n\nManual review by code owners is required. Changes to trading logic, risk parameters, or infrastructure are automatically escalated."
+
+          # Explicitly disable auto-merge on the PR
           gh pr merge $PR_NUMBER --disable-auto || true
-          exit 1
+
+          if [ "$FATAL_VIOLATION" = "true" ]; then
+            echo "::error::Policy compliance failure. Pull request requires corrections."
+            exit 1
+          fi
 
   enable-auto-merge:
     name: Enable Auto-Merge
     needs: enforce-policy
     runs-on: ubuntu-latest
-    if: success()
+    if: |
+      success() &&
+      needs.enforce-policy.outputs.risk_status == 'pass' &&
+      needs.enforce-policy.outputs.compliance_status == 'pass' &&
+      needs.enforce-policy.outputs.observability_status == 'pass'
     steps:
       - uses: actions/checkout@v5
       - name: Enable Auto-Merge
