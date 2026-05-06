@@ -41,6 +41,15 @@ def with_retry(
                 try:
                     return func(*args, **kwargs)
                 except exceptions as e:
+                    # Check if the exception is marked as non-retriable
+                    if hasattr(e, "is_retriable") and not e.is_retriable:
+                        logger.warning(
+                            "Caught non-retriable exception %s in %s. Failing immediately.",
+                            type(e).__name__,
+                            func.__name__,
+                        )
+                        raise
+
                     if attempt == max_retries:
                         logger.error(
                             "Max retries (%d) reached for %s. Last error: %s",

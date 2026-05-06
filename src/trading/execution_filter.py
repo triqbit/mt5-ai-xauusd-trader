@@ -19,8 +19,8 @@ from scipy import stats
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
-    from src.core.trade_logger import TradeLogger
     from src.core.schemas import TradeSignal
+    from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
