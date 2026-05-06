@@ -228,6 +228,7 @@ class TestMonitor(unittest.TestCase):
         self.monitor.bot.send_message = MagicMock()
         self.config.model_accuracy_floor = 0.5
         self.config.model_drift_threshold = 0.3
+        self.config.model_calibration_threshold = 0.25
 
         with patch.object(MODEL_ACCURACY_GAUGE, "set") as mock_acc, \
              patch.object(MODEL_DRIFT_GAUGE, "set") as mock_drift:
