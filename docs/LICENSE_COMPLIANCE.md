@@ -49,8 +49,9 @@ If the automated scanner detects a risky or incompatible license:
 3. **Formal Exception:** If no alternative exists, a formal risk assessment must be performed. Current exceptions include:
    - `MetaAPI` (Proprietary/Commercial)
    - `pandas-ta` (UNKNOWN license, but verified as LGPL/MIT compatible for use).
-   - `NVIDIA CUDA` components (Proprietary).
+   - `NVIDIA CUDA` components (Proprietary/LicenseRef-NVIDIA-Proprietary).
+   - `peewee` (UNKNOWN by scanner, but MIT licensed).
 
 ---
-*Last Updated: 2024-05-22*
+*Last Updated: 2026-05-06*
 *Owner: Jules03 (Release & Governance Lead)*
