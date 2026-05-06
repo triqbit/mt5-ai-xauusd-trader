@@ -12,9 +12,9 @@ This policy defines the retention periods and disposal procedures for operationa
 | **Audit** | Risk Events (`risk_events` table) | 2 Years | Purge | Operational Auditing |
 | **Audit** | Linked Model Signals | 7 Years | Archival + Purge | Trade Traceability |
 | **Operational** | Unlinked Model Signals | 90 Days | Purge | Performance Tuning |
-| **Operational** | Performance Metrics | 2 Years | Purge | Trend Analysis |
+| **Operational** | Performance Metrics | 2 Years | Archival + Purge | Trend Analysis |
 | **Diagnostics** | Application Logs (`logs/*.log`) | 90 Days | Deletion | Troubleshooting |
-| **Research** | Backtest Results | 1 Year | Deletion | Optimization |
+| **Research** | Backtest Results | 1 Year | Archival + Deletion | Optimization |
 
 ## 3. Data Classification
 
@@ -33,8 +33,10 @@ The following data can be purged more frequently to manage storage:
 ## 4. Archival and Purging Rules
 
 ### 4.1 Archival Procedures
-Prior to purging, data in the **Compliance** and **Audit (7-year)** categories must be archived:
-- **Format**: Data is exported to compressed CSV format.
+Prior to purging, data in the **Compliance**, **Audit**, **Operational (Performance Metrics)**, and **Research (Backtest Results)** categories must be archived:
+- **Format**:
+  - Database records are exported to compressed CSV format.
+  - Filesystem-based research data (Backtest Results) is bundled into compressed `.tar.gz` archives.
 - **Destination**: Archives are stored in the `archives/` directory or enterprise cold-storage (e.g., AWS S3 Glacier).
 - **Integrity**: SHA256 checksums are generated for each archive file to ensure immutability.
 

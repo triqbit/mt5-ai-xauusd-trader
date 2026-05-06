@@ -8,6 +8,7 @@ import argparse
 import csv
 import hashlib
 import logging
+import tarfile
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -124,39 +125,68 @@ def cleanup_logs(logs_dir: Path, dry_run: bool = False) -> int:
     return count
 
 
-def cleanup_backtests(backtest_dir: Path, dry_run: bool = False) -> int:
-    """Delete backtest results older than RETENTION_BACKTESTS days."""
+def cleanup_backtests(backtest_dir: Path, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR) -> int:
+    """Archive and delete backtest results older than RETENTION_BACKTESTS days."""
     if not backtest_dir.exists():
         logger.info(f"Backtest directory {backtest_dir} does not exist. Skipping.")
         return 0
 
     count = 0
     cutoff = datetime.now() - timedelta(days=RETENTION_BACKTESTS)
+    to_cleanup = []
 
-    logger.info(f"Cleaning up backtest results in {backtest_dir} older than {cutoff.date()}...")
+    logger.info(f"Checking backtest results in {backtest_dir} older than {cutoff.date()}...")
 
-    # Recursively check for files and directories in backtest_dir
+    # Identify files to cleanup
     for item in backtest_dir.rglob("*"):
         if item.is_file():
             try:
                 mtime = datetime.fromtimestamp(item.stat().st_mtime)
                 if mtime < cutoff:
-                    logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting old backtest file: {item.relative_to(backtest_dir)} (mtime: {mtime})")
-                    if not dry_run:
-                        item.unlink()
-                    count += 1
+                    to_cleanup.append(item)
             except Exception as e:
-                logger.error(f"Failed to delete backtest file {item}: {e}")
+                logger.error(f"Failed to check backtest file {item}: {e}")
+
+    if not to_cleanup:
+        return 0
+
+    # Archive before deletion
+    if not dry_run:
+        if not archive_dir.exists():
+            archive_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        archive_path = archive_dir / f"archive_backtests_{timestamp}.tar.gz"
+
+        logger.info(f"Archiving {len(to_cleanup)} backtest files to {archive_path}...")
+        try:
+            with tarfile.open(archive_path, "w:gz") as tar:
+                for item in to_cleanup:
+                    tar.add(item, arcname=item.relative_to(backtest_dir))
+
+            generate_checksum(archive_path)
+        except Exception as e:
+            logger.error(f"Failed to archive backtests: {e}")
+            return 0
+
+    # Delete files
+    for item in to_cleanup:
+        try:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting old backtest file: {item.relative_to(backtest_dir)}")
+            if not dry_run:
+                item.unlink()
+            count += 1
+        except Exception as e:
+            logger.error(f"Failed to delete backtest file {item}: {e}")
 
     # After deleting files, attempt to delete empty directories
     for item in sorted(backtest_dir.rglob("*"), reverse=True):
         if item.is_dir() and item != backtest_dir and not any(item.iterdir()):
             try:
-                logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting empty backtest directory: {item.relative_to(backtest_dir)}")
                 if not dry_run:
                     item.rmdir()
-            except Exception as e:
-                logger.error(f"Failed to delete directory {item}: {e}")
+            except Exception:
+                pass # Directory might not be empty or already deleted
 
     return count
 
@@ -228,8 +258,12 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         if perf_records:
             logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_records)} performance metrics older than {perf_cutoff.date()}")
             if not dry_run:
-                for obj in perf_records:
-                    session.delete(obj)
+                # Archiving performance metrics (Operational 2-year category, archived before purge)
+                if archive_records(perf_records, "performance_metrics", archive_dir):
+                    for obj in perf_records:
+                        session.delete(obj)
+                else:
+                    logger.error("Skipping deletion of performance metrics due to archival failure.")
 
         # 4. Cleanup Trades (older than 7 years)
         trade_cutoff = now - timedelta(days=RETENTION_TRADES)
@@ -336,7 +370,7 @@ def main():
     logger.info(f"Log cleanup complete. Total files processed: {log_count}")
 
     # Filesystem cleanup - Backtests
-    backtest_count = cleanup_backtests(backtest_dir, dry_run=args.dry_run)
+    backtest_count = cleanup_backtests(backtest_dir, dry_run=args.dry_run, archive_dir=archive_dir)
     logger.info(f"Backtest cleanup complete. Total files processed: {backtest_count}")
 
     # Database cleanup
