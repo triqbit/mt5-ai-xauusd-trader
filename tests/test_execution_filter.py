@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from src.trading.execution_filter import ExecutionFilter
-from src.trading.risk_manager import TradeSignal
+from src.core.schemas import TradeSignal
 
 
 @pytest.fixture

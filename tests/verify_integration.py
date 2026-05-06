@@ -23,7 +23,8 @@ from src.research.benchmarks import EMACrossoverStrategy
 from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.core.schemas import TradeSignal
+from src.trading.risk_manager import RiskManager
 
 # --- Fixtures ---
 

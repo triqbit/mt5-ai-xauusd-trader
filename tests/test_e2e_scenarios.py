@@ -11,7 +11,8 @@ import pytest
 
 from src.core.config import get_config
 from src.core.trade_logger import TradeLogger
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.core.schemas import TradeSignal
+from src.trading.risk_manager import RiskManager
 from src.utils.synthetic_data import ScenarioGenerator
 
 

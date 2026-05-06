@@ -15,7 +15,8 @@ from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import MarketRegime, RegimeDetector
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.trading.risk_manager import RiskManager, TradeSignal
+from src.core.schemas import TradeSignal
+from src.trading.risk_manager import RiskManager
 
 
 @pytest.fixture

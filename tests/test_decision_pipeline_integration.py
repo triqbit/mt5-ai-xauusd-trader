@@ -39,7 +39,8 @@ with patch.dict("sys.modules", {
     from src.models.ensemble import EnsembleModel
     from src.models.regime_detector import MarketRegime, RegimeInfo
     from src.trading.execution_filter import ExecutionFilter
-    from src.trading.risk_manager import RiskManager, TradeSignal
+    from src.core.schemas import TradeSignal
+    from src.trading.risk_manager import RiskManager
     from src.utils.synthetic_data import ScenarioGenerator
 
 @pytest.fixture

@@ -18,7 +18,7 @@ import pandas as pd
 
 from src.core.feature_engineering import FeatureEngineer
 from src.trading.execution_filter import ExecutionFilter
-from src.trading.risk_manager import TradeSignal
+from src.core.schemas import TradeSignal
 
 logger = logging.getLogger(__name__)
 

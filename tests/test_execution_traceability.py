@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timezone
 from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
-from src.trading.risk_manager import TradeSignal
+from src.core.schemas import TradeSignal
 from src.core.audit_log import AuditLogger, AuditEntry
 
 class MockConfig:
