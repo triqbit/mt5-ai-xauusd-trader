@@ -30,6 +30,9 @@ The `BenchmarkEvaluator` calculates high-fidelity metrics beyond simple returns:
 - **System Quality Number (SQN)**: Evaluates trade quality and expectancy relative to volatility.
 - **Profit Factor**: Gross Profit / Gross Loss.
 - **Expectancy**: Average profit expected per trade.
+- **Tail Ratio**: Ratio of the 95th percentile return to the absolute value of the 5th percentile return, measuring right-tail (profit) vs left-tail (loss) potential.
+- **Common Sense Ratio**: Product of Tail Ratio and Profit Factor, providing a robust metric for strategy stability.
+- **Gain-to-Pain Ratio**: Sum of all gains divided by the absolute sum of all losses, offering a clear view of reward-to-risk efficiency.
 
 ## Statistical Comparison
 
