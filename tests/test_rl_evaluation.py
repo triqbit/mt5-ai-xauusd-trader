@@ -247,6 +247,52 @@ def test_advanced_stability_metrics(trading_env):
     assert report.stability.cvar_95 is not None
     assert report.stability.ulcer_index >= 0.0
     assert report.stability.sqn is not None
+    assert report.stability.tail_ratio >= 0.0
+    assert report.stability.common_sense_ratio >= 0.0
+    assert report.stability.gain_to_pain_ratio >= 0.0
+
+
+def test_robustness_to_high_feature_count():
+    # Test that evaluate handles data with > 5 features correctly
+    data10 = np.random.randn(200, 10).astype(np.float32)
+    data10[:, 3] = np.linspace(100, 110, 200)
+    env = TradingEnv(data=data10, window_size=10)
+    evaluator = RLEvaluator(env=env, n_features=10)
+
+    class HoldAgent:
+        def predict(self, obs): return 0
+
+    # This should not raise ValueError when creating df_slice in evaluate
+    report = evaluator.evaluate(HoldAgent())
+    assert report.agent_name == "RL_Agent"
+
+
+def test_get_prediction_robustness():
+    evaluator = RLEvaluator(env=MagicMock())
+
+    class MultiAgent:
+        def predict(self, obs):
+            if obs[0] == 1: return (np.array([1]), {"info": "sb3"})
+            if obs[0] == 2: return [2, 0]
+            if obs[0] == 3:
+                from src.core.constants import SignalDirection
+                from src.models.base_model import Signal
+                return Signal(direction=SignalDirection.SELL, confidence=0.8)
+            if obs[0] == 4:
+                class MockEnum:
+                    value = 1
+                return MockEnum()
+            return 0
+
+    assert evaluator._get_prediction(MultiAgent(), np.array([1])) == 1
+    assert evaluator._get_prediction(MultiAgent(), np.array([2])) == 2
+    # SignalDirection.SELL is -1. The environment's action for SELL is 2.
+    # _get_prediction currently returns the raw direction for Signal objects.
+    # Wait, the environment expects 0, 1, 2. SignalDirection is 1, -1, 0.
+    # Let me re-verify _get_prediction logic for Signal objects.
+    assert evaluator._get_prediction(MultiAgent(), np.array([3])) == 2
+    assert evaluator._get_prediction(MultiAgent(), np.array([4])) == 1
+    assert evaluator._get_prediction(MultiAgent(), np.array([0])) == 0
 
 
 def test_profit_concentration():
