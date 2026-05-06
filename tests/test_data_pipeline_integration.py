@@ -91,6 +91,8 @@ def setup_mock_talib(m_talib):
     m_talib.HT_TRENDMODE.side_effect = lambda x, *a, **k: np.random.randint(0, 2, len(x)).astype(float)
     m_talib.SMA.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.SUM.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.MAX.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.MIN.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.ROCP.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.get_function_groups.return_value = {"Pattern Recognition": []}
 

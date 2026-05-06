@@ -1,88 +1,116 @@
 """
-Verification script for the refined benchmarking framework.
-Compares multiple baselines and generates a summary report.
+MT5 AI/ML Trading Bot - Enterprise Edition
+scripts/verify_benchmarking.py
+Verification script for the benchmarking framework.
 """
 
+import os
+import sys
 import pandas as pd
 import numpy as np
-from datetime import datetime, UTC
-from src.research.benchmarks import (
+from rich.console import Console
+from rich.table import Table
+
+# Ensure src is in path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from src.research import (
     BenchmarkEvaluator,
     EMACrossoverStrategy,
     MomentumStrategy,
     VolatilityBreakoutStrategy,
-    DonchianChannelStrategy,
-    BuyAndHoldStrategy,
+    NaiveDirectionalStrategy,
+    RiskFilteredBaseline,
+    MeanReversionStrategy,
     RandomStrategy
 )
-from src.research.reporting import ResearchOrchestrator, ResearchReporter
 
-def generate_synthetic_data(n_bars=2000):
-    """Generate XAUUSD-like synthetic data."""
+def generate_synthetic_data(n=1000):
+    """Generate synthetic XAUUSD data."""
     np.random.seed(42)
-
-    # Simulate price with some trend and volatility
-    steps = np.random.normal(0, 1, n_bars)
-    # Add a slight upward drift
-    steps += 0.02
-    close = 2000 + np.cumsum(steps * 2)
-
+    # Trend + Noise
+    close = 2000 + np.cumsum(np.random.randn(n) * 2 + 0.1)
     df = pd.DataFrame({
-        "open": close - np.random.normal(0, 0.5, n_bars),
-        "high": close + np.abs(np.random.normal(0, 1, n_bars)),
-        "low": close - np.abs(np.random.normal(0, 1, n_bars)),
+        "open": close - np.random.randn(n),
+        "high": close + np.abs(np.random.randn(n) * 2),
+        "low": close - np.abs(np.random.randn(n) * 2),
         "close": close,
-        "tick_volume": np.random.randint(100, 1000, n_bars)
+        "tick_volume": np.random.randint(100, 1000, n),
     })
+    df.index = pd.date_range(start="2024-01-01", periods=n, freq="5min")
     return df
 
-def run_verification():
-    print("Starting Benchmarking Framework Verification...")
+def main():
+    console = Console()
+    console.print("[bold blue]🚀 Starting Benchmarking Framework Verification...[/]")
 
-    df = generate_synthetic_data()
-    evaluator = BenchmarkEvaluator(df, initial_balance=10000.0, commission=0.0001)
+    # 1. Setup Data
+    data = generate_synthetic_data(1000)
+    evaluator = BenchmarkEvaluator(data, initial_balance=10000.0, commission=0.0001)
 
+    # 2. Define Strategies
     strategies = [
-        BuyAndHoldStrategy(),
-        RandomStrategy(seed=42),
         EMACrossoverStrategy(9, 21),
-        MomentumStrategy(14, threshold=0.001),
-        VolatilityBreakoutStrategy(20, num_std=2.0),
-        DonchianChannelStrategy(20)
+        MomentumStrategy(14),
+        VolatilityBreakoutStrategy(20, 2.0),
+        NaiveDirectionalStrategy(),
+        RiskFilteredBaseline(9, 21, 0.01),
+        MeanReversionStrategy(14, 70, 30),
+        RandomStrategy(seed=42)
     ]
 
-    print(f"Evaluating {len(strategies)} strategies...")
-    summary = evaluator.evaluate_all(strategies)
+    # 3. Evaluate All
+    console.print("\n[bold]📊 Running Evaluations...[/]")
+    summary_df = evaluator.evaluate_all(strategies)
 
-    print("\nPerformance Summary:")
-    cols_to_show = ["Total Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Profit Factor", "Stability Score"]
-    print(summary[cols_to_show].to_string())
+    table = Table(title="Strategy Performance Summary")
+    table.add_column("Strategy", style="cyan")
+    table.add_column("Return", justify="right")
+    table.add_column("Sharpe", justify="right")
+    table.add_column("MaxDD", justify="right")
+    table.add_column("Trades", justify="right")
 
-    # Use Buy and Hold as the baseline for comparison
-    baseline_name = "Buy_And_Hold"
-    print(f"\nComparing against baseline: {baseline_name}")
+    for name, row in summary_df.iterrows():
+        table.add_row(
+            str(name),
+            f"{row['Total Return']:.2%}",
+            f"{row['Sharpe Ratio']:.2f}",
+            f"{row['Max Drawdown']:.2%}",
+            f"{int(row['Num Trades'])}"
+        )
+    console.print(table)
 
-    section = evaluator.to_report_section(baseline_name=baseline_name)
+    # 4. Statistical Comparison
+    baseline_name = f"Random_Baseline_seed_{42}"
+    console.print(f"\n[bold]🧪 Comparing strategies against {baseline_name}...[/]")
 
-    # Orchestrate a research report
-    orchestrator = ResearchOrchestrator(
-        title="Institutional Benchmarking Verification Report",
-        executive_summary="This report verifies the enhanced benchmarking framework, comparing standard baselines against a passive Buy and Hold strategy on synthetic XAUUSD data.",
-        conclusion="The benchmarking framework successfully calculates institutional-grade metrics and performs statistical outperformance testing.",
-        overall_status="VERIFIED"
-    )
+    comp_table = Table(title=f"Statistical Comparison (vs {baseline_name})")
+    comp_table.add_column("Strategy", style="cyan")
+    comp_table.add_column("Outperformance", justify="right")
+    comp_table.add_column("T-Stat", justify="right")
+    comp_table.add_column("P-Value", justify="right")
+    comp_table.add_column("Significant", justify="center")
 
-    orchestrator.add_section(section)
-    report = orchestrator.build()
+    for strategy in strategies:
+        if strategy.name == baseline_name:
+            continue
 
-    # Print to terminal
-    reporter = ResearchReporter()
-    reporter.format_for_terminal(report)
+        comp = evaluator.compare_to_baseline(strategy.name, baseline_name)
 
-    # Save as Markdown
-    output_path = "benchmarking_verification_report.md"
-    reporter.save_markdown(report, output_path)
-    print(f"Report saved to {output_path}")
+        is_sig = comp.get("Significant", False)
+        sig_str = "[green]YES[/]" if is_sig else "[red]NO[/]"
+
+        comp_table.add_row(
+            strategy.name,
+            f"{comp['Outperformance']:.2%}",
+            f"{comp['T-Statistic']:.4f}",
+            f"{comp['P-Value']:.4f}",
+            sig_str
+        )
+
+    console.print(comp_table)
+
+    console.print("\n[bold green]✅ Benchmarking Framework Verification Complete![/]")
 
 if __name__ == "__main__":
-    run_verification()
+    main()

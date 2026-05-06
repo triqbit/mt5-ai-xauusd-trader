@@ -181,48 +181,6 @@ class RandomStrategy:
         return rng.choice([-1, 0, 1], size=len(df))
 
 
-class BuyAndHoldStrategy:
-    """Naive 'Buy and Hold' baseline."""
-
-    @property
-    def name(self) -> str:
-        return "Buy_And_Hold"
-
-    def predict(self, df: pd.DataFrame) -> np.ndarray:
-        return np.ones(len(df))
-
-
-class SellAndHoldStrategy:
-    """Naive 'Sell and Hold' baseline."""
-
-    @property
-    def name(self) -> str:
-        return "Sell_And_Hold"
-
-    def predict(self, df: pd.DataFrame) -> np.ndarray:
-        return -np.ones(len(df))
-
-
-class DonchianChannelStrategy:
-    """Donchian Channel Breakout baseline."""
-
-    def __init__(self, window: int = 20):
-        self.window = window
-
-    @property
-    def name(self) -> str:
-        return f"Donchian_Breakout_{self.window}"
-
-    def predict(self, df: pd.DataFrame) -> np.ndarray:
-        upper = df["high"].rolling(window=self.window).max()
-        lower = df["low"].rolling(window=self.window).min()
-
-        signals = np.zeros(len(df))
-        signals[df["close"] >= upper.shift(1)] = 1
-        signals[df["close"] <= lower.shift(1)] = -1
-        return signals
-
-
 class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
@@ -304,8 +262,8 @@ class BenchmarkEvaluator:
 
         sharpe = 0.0
         sortino = 0.0
-        volatility = np.std(daily_returns) * np.sqrt(self.bars_per_year)
-        if volatility > 0:
+        if np.std(daily_returns) > 0:
+            # Use bars_per_year for annualization
             avg_return = np.mean(daily_returns)
             sharpe = avg_return / np.std(daily_returns) * np.sqrt(self.bars_per_year)
 
@@ -321,9 +279,6 @@ class BenchmarkEvaluator:
         win_rate = 0.0
         profit_factor = 0.0
         expectancy = 0.0
-        avg_win = 0.0
-        avg_loss = 0.0
-        max_consecutive_losses = 0
         if len(trade_pnls) > 0:
             wins = [p for p in trade_pnls if p > 0]
             losses = [p for p in trade_pnls if p < 0]
@@ -338,15 +293,8 @@ class BenchmarkEvaluator:
             loss_rate = len(losses) / len(trade_pnls)
             expectancy = (avg_win * win_rate) - (avg_loss * loss_rate)
 
-            curr_consecutive = 0
-            for pnl in trade_pnls:
-                if pnl < 0:
-                    curr_consecutive += 1
-                    max_consecutive_losses = max(max_consecutive_losses, curr_consecutive)
-                else:
-                    curr_consecutive = 0
-
         calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
+        volatility = np.std(daily_returns) * np.sqrt(self.bars_per_year)
 
         sqn = 0.0
         if len(trade_pnls) > 0:
@@ -354,37 +302,6 @@ class BenchmarkEvaluator:
             std_pnl = np.std(trade_pnls)
             if std_pnl > 0:
                 sqn = np.sqrt(len(trade_pnls)) * avg_pnl / std_pnl
-
-        # Institutional Stats
-        skew = stats.skew(daily_returns)
-        kurt = stats.kurtosis(daily_returns)
-        var_95 = np.percentile(daily_returns, 5) if len(daily_returns) > 20 else 0.0
-        cvar_95 = daily_returns[daily_returns <= var_95].mean() if len(daily_returns) > 20 else 0.0
-
-        # Stability score: consistency of equity curve (R-squared of linear fit)
-        x = np.arange(len(equity))
-        y = equity
-        slope, intercept = np.polyfit(x, y, 1)
-        line = slope * x + intercept
-        y_var = np.sum((y - y.mean()) ** 2)
-        stability_score = 1 - (np.sum((y - line) ** 2) / (y_var + 1e-9))
-
-        # Ulcer Index
-        ulcer_index = np.sqrt(np.mean(np.square(drawdown)))
-
-        # Tail Ratio
-        p95 = np.percentile(daily_returns, 95) if len(daily_returns) > 20 else 0.0
-        p5 = np.percentile(daily_returns, 5) if len(daily_returns) > 20 else 0.0
-        tail_ratio = abs(p95 / p5) if abs(p5) > 1e-9 else 0.0
-
-        # Common Sense Ratio
-        pf_val = profit_factor if profit_factor != float("inf") else 1.0
-        common_sense_ratio = tail_ratio * pf_val
-
-        # Gain-to-Pain Ratio
-        gains = daily_returns[daily_returns > 0].sum()
-        pains = abs(daily_returns[daily_returns < 0].sum())
-        gain_to_pain_ratio = gains / pains if pains > 1e-9 else 0.0
 
         # Store daily returns for statistical testing
         self.results[name + "_returns"] = daily_returns
@@ -394,7 +311,7 @@ class BenchmarkEvaluator:
             "Sharpe Ratio": sharpe,
             "Sortino Ratio": sortino,
             "Calmar Ratio": calmar,
-            "Recovery Factor": calmar,
+            "Recovery Factor": calmar,  # Alias for Calmar in this context
             "Volatility": volatility,
             "Max Drawdown": max_drawdown,
             "Win Rate": win_rate,
@@ -402,18 +319,6 @@ class BenchmarkEvaluator:
             "Expectancy": expectancy,
             "SQN": sqn,
             "Num Trades": len(trade_pnls),
-            "Skewness": float(skew),
-            "Kurtosis": float(kurt),
-            "VaR_95": float(var_95),
-            "CVaR_95": float(cvar_95),
-            "Max Consecutive Losses": max_consecutive_losses,
-            "Stability Score": float(stability_score),
-            "Ulcer Index": float(ulcer_index),
-            "Tail Ratio": float(tail_ratio),
-            "Common Sense Ratio": float(common_sense_ratio),
-            "Gain to Pain Ratio": float(gain_to_pain_ratio),
-            "Avg Win": float(avg_win),
-            "Avg Loss": float(avg_loss),
         }
 
     def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> dict[str, Any]:

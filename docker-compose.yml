@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        TARGETARCH: amd64  # Default for local dev, Buildx handles this in CI
     container_name: xauusd_trader
     ports:
       - "8000:8000"  # Prometheus metrics / API
@@ -12,10 +14,12 @@ services:
     volumes:
       - ./.env:/app/.env:ro
       - ./logs:/app/logs
+      - ./models:/app/models:ro
     environment:
       - MODE=${MODE:-demo}
       - ALGO=${ALGO:-ensemble}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import src.core.config; print('healthy')"]

@@ -16,8 +16,6 @@ HAS_TORCH = importlib.util.find_spec("torch") is not None
 from src.models.base_model import Signal
 from src.research.benchmarks import (
     BenchmarkEvaluator,
-    BuyAndHoldStrategy,
-    DonchianChannelStrategy,
     DreamerAdapter,
     EMACrossoverStrategy,
     EnsembleAdapter,
@@ -28,7 +26,6 @@ from src.research.benchmarks import (
     PPOAdapter,
     RandomStrategy,
     RiskFilteredBaseline,
-    SellAndHoldStrategy,
     TransformerAdapter,
     VolatilityBreakoutStrategy,
 )
@@ -94,25 +91,6 @@ def test_mean_reversion_signals(sample_data):
     assert np.all(np.isin(signals, [0, 1, -1]))
 
 
-def test_buy_and_hold_signals(sample_data):
-    strategy = BuyAndHoldStrategy()
-    signals = strategy.predict(sample_data)
-    assert np.all(signals == 1)
-
-
-def test_sell_and_hold_signals(sample_data):
-    strategy = SellAndHoldStrategy()
-    signals = strategy.predict(sample_data)
-    assert np.all(signals == -1)
-
-
-def test_donchian_breakout_signals(sample_data):
-    strategy = DonchianChannelStrategy(window=5)
-    signals = strategy.predict(sample_data)
-    assert len(signals) == len(sample_data)
-    assert np.all(np.isin(signals, [0, 1, -1]))
-
-
 def test_evaluator_metrics(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
     strategies = [
@@ -130,15 +108,6 @@ def test_evaluator_metrics(sample_data):
     assert "Profit Factor" in results.columns
     assert "Calmar Ratio" in results.columns
     assert "Expectancy" in results.columns
-
-    # Check institutional metrics
-    assert "VaR_95" in results.columns
-    assert "CVaR_95" in results.columns
-    assert "Stability Score" in results.columns
-    assert "Ulcer Index" in results.columns
-    assert "Tail Ratio" in results.columns
-    assert "Common Sense Ratio" in results.columns
-    assert "Gain to Pain Ratio" in results.columns
 
 
 def test_comparison_logic(sample_data):
