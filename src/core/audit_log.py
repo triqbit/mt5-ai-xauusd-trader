@@ -12,8 +12,6 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from src.core.log_config import get_masking_processor
-
 from sqlalchemy import (
     JSON,
     DateTime,
@@ -22,6 +20,8 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+
+from src.core.log_config import get_masking_processor
 
 logger = logging.getLogger(__name__)
 

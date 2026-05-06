@@ -501,6 +501,6 @@ class ConfigValidator:
                             f"Run 'chmod 600 {path.name}' to restrict access.",
                         )
                     )
-            except Exception as e:
+            except Exception:
                 # Log but don't fail if we can't check permissions
                 pass
