@@ -22,3 +22,15 @@ def test_health_report_table_display():
 
     assert len(table.columns) == 3
     assert table.columns[0].header == "Component"
+
+
+def test_research_report_template_rendering_sanity():
+    """Verify that the research report template can be loaded (UX Check)."""
+    import os
+
+    template_path = "src/research/templates/research_report.html.j2"
+    assert os.path.exists(template_path)
+    with open(template_path, "r") as f:
+        content = f.read()
+    assert "focus-visible" in content
+    assert "fill-up" in content
