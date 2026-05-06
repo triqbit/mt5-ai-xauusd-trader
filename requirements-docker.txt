@@ -7,7 +7,7 @@
 numpy==2.2.6
 scipy==1.13.0
 scikit-learn==1.7.2
-pandas==2.2.3
+pandas==2.3.2
 
 # -- Technical Analysis --------------------------------------------
 TA-Lib==0.6.4
@@ -35,7 +35,7 @@ tqdm==4.67.1
 python-telegram-bot==22.7
 
 # -- Dashboard / API -----------------------------------------------
-fastapi==0.115.2
+fastapi==0.136.1
 uvicorn[standard]==0.34.0
 dash==4.1.0
 plotly==5.22.0
