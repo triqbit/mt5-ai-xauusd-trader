@@ -116,7 +116,7 @@ class ExecutionFilter:
         trace["confidence_threshold"] = {
             "passed": conf_passed,
             "confidence": signal.confidence,
-            "threshold": self.cfg.confidence_threshold if self.cfg else 0.0,
+            "threshold": self.cfg.min_confidence if self.cfg else 0.0,
         }
 
         # Determine final approval
@@ -341,7 +341,7 @@ class ExecutionFilter:
         """Enforces configured confidence threshold."""
         if self.cfg is None:
             return True
-        return confidence >= self.cfg.confidence_threshold
+        return confidence >= self.cfg.min_confidence
 
     def _check_session_time(self, timestamp: datetime) -> bool:
         """Blocks outside institutional trading hours (Sun 17:00 - Fri 16:00 GMT)."""
