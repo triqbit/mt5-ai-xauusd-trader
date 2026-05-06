@@ -186,6 +186,15 @@ class DynamicEnsemble:
             # Reduce alpha in high volatility or when oscillating to preserve stability
             vol_factor = float(np.clip(2.0 / (volatility + 1.0), 0.2, 1.0))
             alpha = self.smoothing_factor * vol_factor
+
+            # Regime-specific alpha adjustments (XAUUSD stability heuristics)
+            if regime == MarketRegime.NEWS_SHOCK:
+                alpha *= 0.5  # Be extremely cautious during news shocks
+            elif regime == MarketRegime.TRENDING:
+                alpha *= 1.2  # Adapt slightly faster during established trends
+            elif regime == MarketRegime.VOLATILE_BREAKOUT:
+                alpha *= 0.7  # Slow down during breakout turbulence
+
             if is_oscillating:
                 # Aggressive dampening on flip-flops (Oscillation Prevention)
                 alpha *= 0.2
