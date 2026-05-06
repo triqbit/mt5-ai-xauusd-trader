@@ -94,3 +94,65 @@ def test_constraints(logger):
             )
             session.add(bad_signal)
             session.commit()
+
+def test_log_rejected_trade(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0,
+        "algorithm": "ppo",
+        "confidence": 0.8
+    })
+
+    logger.log_risk_event(
+        event_type="SIGNAL_REJECTED",
+        description="Confidence too low",
+        symbol="XAUUSD",
+        signal_id=signal_id
+    )
+
+    with logger.Session() as session:
+        from src.core.trade_logger import RiskEvent
+        event = session.query(RiskEvent).filter_by(signal_id=signal_id).first()
+        assert event is not None
+        assert event.event_type == "SIGNAL_REJECTED"
+        assert event.description == "Confidence too low"
+
+def test_performance_report_persistence(logger):
+    # Log closed trades
+    logger.log_trade(1, "XAUUSD", 1, 2000.0, 0.1, status="OPEN")
+    logger.update_trade(1, 2010.0, 100.0)
+
+    report = logger.read_performance_report(persist=True)
+    assert report["total_trades"] == 1
+
+    with logger.Session() as session:
+        from src.core.trade_logger import PerformanceMetric
+        metric = session.query(PerformanceMetric).order_by(PerformanceMetric.id.desc()).first()
+        assert metric is not None
+        assert metric.total_trades == 1
+        assert metric.profit_factor == float('inf') # Only one winning trade
+
+def test_audit_mixin_automatic_population(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    })
+
+    with logger.Session() as session:
+        from src.core.trade_logger import ModelSignal
+        signal = session.get(ModelSignal, signal_id)
+        assert signal.created_at is not None
+        assert signal.updated_at is not None
+
+        original_updated_at = signal.updated_at
+
+        import time
+        time.sleep(0.1) # Ensure time difference
+
+        signal.confidence = 0.9
+        session.commit()
+        session.refresh(signal)
+
+        assert signal.updated_at > original_updated_at
