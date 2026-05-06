@@ -38,7 +38,7 @@ This runbook defines the triage and response process for alerts received via the
 2. **Classify:** Confirm the severity level (P0-P3) based on the criteria above.
 3. **Analyze:** Run the triage reporting script to identify incident patterns:
    ```bash
-   python generate_triage_report.py
+   python scripts/generate_triage_report.py
    ```
 4. **Respond:** Execute the corresponding runbook for the identified symptom.
 5. **Update:** For P0/P1 alerts, provide status updates every 15-30 minutes until resolution.
@@ -54,7 +54,8 @@ For every P0/P1 incident, a **Blameless Post-Mortem** must be conducted to updat
 
 ## Verification Commands
 - **Check Health API:** `curl http://localhost:8000/health/readiness`
-- **Review Audit Logs:** `sqlite3 trades.db "SELECT event_type, description, created_at FROM risk_events ORDER BY created_at DESC LIMIT 10;"`
+- **Review Risk Events:** `sqlite3 trades.db "SELECT event_type, description, created_at FROM risk_events ORDER BY created_at DESC LIMIT 10;"`
+- **Review Audit Logs:** `sqlite3 audit.db "SELECT action, details, created_at FROM audit_log ORDER BY created_at DESC LIMIT 10;"`
 - **Prometheus Metrics:** `curl http://localhost:8000/metrics | grep trading_system_errors`
 
 ## Escalation Path
