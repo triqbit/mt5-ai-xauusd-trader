@@ -80,12 +80,12 @@ class ModelSignal(Base, AuditMixin):
 
 
 class Trade(Base, AuditMixin):
-    """Logs every executed trade."""
+    """Logs every executed or rejected trade."""
 
     __tablename__ = "trades"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    ticket: Mapped[int] = mapped_column(unique=True, index=True)
+    ticket: Mapped[int | None] = mapped_column(unique=True, index=True, nullable=True)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     direction: Mapped[int] = mapped_column(nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
@@ -93,7 +93,7 @@ class Trade(Base, AuditMixin):
     lot_size: Mapped[float] = mapped_column(Float, nullable=False)
     pnl: Mapped[float] = mapped_column(Float, default=0.0)
     drawdown_impact: Mapped[float | None] = mapped_column(Float)  # impact on total drawdown
-    status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
+    status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED, REJECTED
 
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"))
     signal: Mapped["ModelSignal"] = relationship("ModelSignal", back_populates="trade")
@@ -163,17 +163,19 @@ class TradeLogger:
 
     def log_trade(
         self,
-        ticket: int,
+        ticket: int | None,
         symbol: str,
         direction: int,
         entry_price: float,
         lot_size: float,
         signal_id: int | None = None,
         status: str = "OPEN",
+        pnl: float = 0.0,
+        drawdown_impact: float | None = None,
     ) -> int:
-        """Log a trade execution."""
-        # Invalidate cache if a new closed trade is logged (unlikely to be CLOSED immediately but for safety)
-        if status == "CLOSED":
+        """Log a trade execution or rejection."""
+        # Invalidate cache if a new closed or rejected trade is logged
+        if status in ("CLOSED", "REJECTED"):
             self._perf_cache = None
 
         with self.Session() as session:
@@ -185,6 +187,8 @@ class TradeLogger:
                 lot_size=lot_size,
                 signal_id=signal_id,
                 status=status,
+                pnl=pnl,
+                drawdown_impact=drawdown_impact,
             )
             session.add(trade)
             session.commit()
@@ -202,11 +206,8 @@ class TradeLogger:
         self._perf_cache = None
 
         with self.Session() as session:
-            trade = (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
-            )
+            stmt = select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+            trade = session.execute(stmt).scalar_one_or_none()
             if trade:
                 trade.exit_price = exit_price
                 if pnl is not None:
@@ -230,11 +231,8 @@ class TradeLogger:
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
-            return (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
-            )
+            stmt = select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+            return session.execute(stmt).scalar_one_or_none()
 
     def log_risk_event(
         self,
@@ -268,31 +266,28 @@ class TradeLogger:
 
         with self.Session() as session:
             # Optimized: only fetch pnl column for active closed trades
-            pnls = np.array(
-                session.execute(
-                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
-                )
-                .scalars()
-                .all()
-            )
+            stmt = select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+            pnls = np.array(session.execute(stmt).scalars().all())
 
             if len(pnls) == 0:
                 return {
                     "sharpe_ratio": 0.0,
                     "profit_factor": 0.0,
                     "max_drawdown": 0.0,
+                    "win_rate": 0.0,
+                    "total_trades": 0,
                 }
 
             # Profit Factor
             gross_profit = np.sum(pnls[pnls > 0])
             gross_loss = abs(np.sum(pnls[pnls < 0]))
-            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+            profit_factor = float(gross_profit / gross_loss) if gross_loss > 0 else float("inf")
 
             # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
             if len(pnls) > 1:
                 avg_ret = np.mean(pnls)
                 std_ret = np.std(pnls)
-                sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
+                sharpe = float(avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
             else:
                 sharpe = 0.0
 
@@ -300,7 +295,7 @@ class TradeLogger:
             equity_curve = np.cumsum(pnls)
             peak = np.maximum.accumulate(equity_curve)
             drawdown = peak - equity_curve
-            max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
+            max_dd = float(np.max(drawdown)) if len(drawdown) > 0 else 0.0
 
             win_rate = float(np.sum(pnls > 0) / len(pnls))
             metrics = {
