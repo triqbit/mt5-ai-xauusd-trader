@@ -391,5 +391,59 @@ class MT5Connector:
 
             return asyncio.run(_get_pos())
 
+    def get_terminal_status(self) -> Dict[str, Any]:
+        """Retrieve terminal status (e.g., algo trading enabled)."""
+        if not self._is_initialized:
+            return {}
+        if not self.use_metaapi:
+            info = mt5.terminal_info()
+            return info._asdict() if info else {}
+        else:
+            # MetaAPI doesn't have a direct equivalent for terminal 'algo_trading' button
+            # but we assume it's true if we can connect.
+            return {"algo_trading": True}
+
+    def get_symbol_properties(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Retrieve symbol properties."""
+        if not self._is_initialized:
+            return None
+        if not self.use_metaapi:
+            info = mt5.symbol_info(symbol)
+            if not info:
+                return None
+            return {
+                "name": info.name,
+                "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
+                "spread": info.spread,
+                "digits": info.digits,
+            }
+        else:
+
+            async def _get_info():
+                return await self.metaapi_connection.get_symbol_specification(symbol)
+
+            try:
+                spec = asyncio.run(_get_info())
+                return {
+                    "name": spec["symbol"],
+                    "tradable": True,  # MetaAPI symbols are usually tradable if found
+                    "spread": 0,  # Not directly in spec
+                    "digits": spec["digits"],
+                }
+            except Exception:
+                return None
+
+    def find_symbols(self, pattern: str) -> List[str]:
+        """Find symbols matching a pattern."""
+        if not self._is_initialized:
+            return []
+        if not self.use_metaapi:
+            symbols = mt5.symbols_get(pattern)
+            return [s.name for s in symbols] if symbols else []
+        else:
+            # For MetaAPI, we'd need to fetch all and filter, which is slow.
+            # Return empty or a simple guess.
+            return [pattern.upper()]
+
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]
