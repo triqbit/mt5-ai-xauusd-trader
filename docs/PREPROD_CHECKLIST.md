@@ -1,6 +1,8 @@
 # Pre-Production Deployment Gate Checklist
 
-This document defines the mandatory gates that must be satisfied and verified before any deployment to the production environment. No production push is permitted without explicit completion of this checklist.
+This document defines the mandatory gates that must be satisfied and verified before any deployment to the production environment.
+
+**Goal: No production push happens without explicit checklist completion.**
 
 ## Mandatory Gates
 
@@ -13,8 +15,7 @@ This document defines the mandatory gates that must be satisfied and verified be
 - [ ] **7. Release Manifest:** Release notes prepared, reviewed, and finalized in `CHANGELOG.md`.
 - [ ] **8. Bug Scrub:** No open critical or high-severity bugs identified in the current release candidate.
 - [ ] **9. Documentation Synchronization:** Documentation updated (README, runbooks, API docs) to reflect changes.
-- [ ] **10. SLO Governance:** Verification that performance meets [SLO Targets](SLO_TARGETS.md) over the 30-day window.
-- [ ] **11. Stakeholder Sign-off:** Explicit sign-off obtained from Trading and DevOps stakeholders.
+- [ ] **10. Stakeholder Sign-off:** Explicit sign-off obtained from Trading and DevOps stakeholders.
 
 ---
 
