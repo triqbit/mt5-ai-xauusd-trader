@@ -31,6 +31,8 @@ jobs:
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v47
+        with:
+          separator: " "
 
       - name: Check for High-Risk Files
         id: risk-check
