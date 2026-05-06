@@ -110,7 +110,7 @@ echo "Exporting Docker Image ${IMAGE_NAME}:${IMAGE_TAG} to tarball..."
 docker save "${IMAGE_NAME}:${IMAGE_TAG}" | gzip > "${RELEASE_PATH}/image.tar.gz"
 
 # B. Docker Info (Metadata)
-echo "Collecting Docker Information..."
+echo "   [+] Component: Docker Metadata (docker_info.json)"
 cat <<EOF > "${RELEASE_PATH}/docker_info.json"
 {
   "image": "${IMAGE_NAME}",
@@ -121,24 +121,24 @@ cat <<EOF > "${RELEASE_PATH}/docker_info.json"
 EOF
 
 # C. Environment Template
-echo "Collecting Environment Template..."
+echo "   [+] Component: Environment Template (.env.example)"
 cp ".env.example" "${RELEASE_PATH}/"
 
 # D. Database Migrations
-echo "Collecting Database Migrations..."
+echo "   [+] Component: Database Migrations (migrations/)"
 cp -r migrations "${RELEASE_PATH}/"
 
 # E. Configuration Documentation
-echo "Generating Configuration Reference..."
+echo "   [+] Component: Configuration Reference (CONFIG_REFERENCE.md)"
 python3 scripts/generate_config_docs.py src/core/config.py "${RELEASE_PATH}/CONFIG_REFERENCE.md" "$VERSION"
 
 # F. Release Notes
-echo "Extracting Release Notes..."
-# Improved extraction logic: find specific version header or [Unreleased] section
+echo "   [+] Component: Release Notes (RELEASE_NOTES.md)"
+# Robust extraction logic using awk: extract text between target header and next header
 if grep -q "## \[${VERSION}\]" CHANGELOG.md; then
-    sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+    awk "/## \[${VERSION}\]/{flag=1;next} /^## \[/{flag=0} flag" CHANGELOG.md > "${RELEASE_PATH}/RELEASE_NOTES.md"
 else
-    sed -n '/## \[Unreleased\]/,/## \[/p' CHANGELOG.md | sed '1d;$d' > "${RELEASE_PATH}/RELEASE_NOTES.md"
+    awk "/## \[Unreleased\]/{flag=1;next} /^## \[/{flag=0} flag" CHANGELOG.md > "${RELEASE_PATH}/RELEASE_NOTES.md"
 fi
 
 if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ] || [ "$(grep -c "[a-zA-Z]" "${RELEASE_PATH}/RELEASE_NOTES.md")" -eq 0 ]; then
