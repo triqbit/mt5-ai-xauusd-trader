@@ -88,6 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Institutional-grade rare event simulation framework in `src/research/rare_event_simulator.py`.
 - Institutional-grade dynamic ensemble weighting engine in `src/models/dynamic_ensemble.py`.
 - Institutional-grade execution quality analytics in `src/analytics/execution_quality.py`.
+- Dynamic instrument property detection (pip size, contract size) in `MT5Connector` and `ExecutionAnalyzer`.
+- Standardized UTC-aware temporal logic for all execution analytics.
 
 ## [1.0.0] - 2024-05-24
 ### Added
