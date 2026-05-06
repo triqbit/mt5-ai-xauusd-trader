@@ -20,7 +20,6 @@ from scipy import stats
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
-    from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +37,14 @@ class ExecutionDecision:
 
 class ExecutionFilter:
     """
-    Implements a 9-layer validation cascade for trading signals.
-    Layers: ATR, Trend Angle, EMA Sequence, Momentum, Session, Drawdown,
-    Model Stability, Performance Floor, Confidence Threshold.
+    Implements a 6-layer validation cascade for trading signals.
+    Layers:
+        1. ATR Volatility Threshold
+        2. Trend Angle Confirmation
+        3. EMA Sequence Check
+        4. Momentum Filter
+        5. Session/Time Filter
+        6. Drawdown Circuit Breaker
     """
 
     def __init__(
@@ -59,12 +63,10 @@ class ExecutionFilter:
         market_data: pd.DataFrame,
         current_drawdown: float,
         timestamp: datetime | None = None,
-        model_health: dict[str, float] | None = None,
-        trade_logger: TradeLogger | None = None,
         precomputed_metrics: dict[str, Any] | None = None,
     ) -> ExecutionDecision:
         """
-        Run the full 9-layer filter cascade.
+        Run the full 6-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -72,12 +74,12 @@ class ExecutionFilter:
             market_data: DataFrame with OHLCV and technical indicators.
             current_drawdown: Current account drawdown (0.0 to 1.0).
             timestamp: Evaluation time.
-            model_health: Optional model health metrics.
-            trade_logger: Optional trade logger for performance floor checks.
             precomputed_metrics: Optional dictionary containing pre-calculated metrics
                                  to bypass expensive DataFrame operations.
         """
-        timestamp = timestamp or signal.timestamp or datetime.now(UTC)
+        if timestamp is None:
+            timestamp = signal.timestamp or datetime.now(UTC)
+
         trace: dict[str, Any] = {}
         metrics = precomputed_metrics or {}
 
@@ -85,29 +87,50 @@ class ExecutionFilter:
         atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(
             market_data, precomputed=metrics.get("atr_volatility")
         )
-        trace["atr_volatility"] = {"passed": atr_passed, **atr_metrics}
+        trace["atr_volatility"] = {
+            "passed": atr_passed,
+            **atr_metrics,
+        }
 
         # Layer 2: Trend Angle
         trend_passed, trend_metrics = self._check_trend_angle_with_metrics(
-            market_data, signal.direction, precomputed=metrics.get("trend_angle")
+            market_data,
+            signal.direction,
+            precomputed=metrics.get("trend_angle"),
         )
-        trace["trend_angle"] = {"passed": trend_passed, **trend_metrics}
+        trace["trend_angle"] = {
+            "passed": trend_passed,
+            **trend_metrics,
+        }
 
         # Layer 3: EMA Sequence
         ema_passed, ema_metrics = self._check_ema_sequence_with_metrics(
-            market_data, signal.direction, precomputed=metrics.get("ema_sequence")
+            market_data,
+            signal.direction,
+            precomputed=metrics.get("ema_sequence"),
         )
-        trace["ema_sequence"] = {"passed": ema_passed, **ema_metrics}
+        trace["ema_sequence"] = {
+            "passed": ema_passed,
+            **ema_metrics,
+        }
 
         # Layer 4: Momentum (RSI)
         momentum_passed, momentum_metrics = self._check_momentum_with_metrics(
-            market_data, signal.direction, precomputed=metrics.get("momentum")
+            market_data,
+            signal.direction,
+            precomputed=metrics.get("momentum"),
         )
-        trace["momentum"] = {"passed": momentum_passed, **momentum_metrics}
+        trace["momentum"] = {
+            "passed": momentum_passed,
+            **momentum_metrics,
+        }
 
         # Layer 5: Session/Time
         session_passed = self._check_session_time(timestamp)
-        trace["session_time"] = {"passed": session_passed, "timestamp": timestamp.isoformat()}
+        trace["session_time"] = {
+            "passed": session_passed,
+            "timestamp": timestamp.isoformat(),
+        }
 
         # Layer 6: Drawdown
         drawdown_passed = self._check_drawdown_limit(current_drawdown)
@@ -115,22 +138,6 @@ class ExecutionFilter:
             "passed": drawdown_passed,
             "current_drawdown": current_drawdown,
             "max_drawdown": self.max_drawdown,
-        }
-
-        # Layer 7: Model Stability Guard
-        stability_passed, stability_metrics = self._check_model_stability_with_metrics(model_health)
-        trace["model_stability"] = {"passed": stability_passed, **stability_metrics}
-
-        # Layer 8: Performance Floor
-        perf_passed, perf_metrics = self._check_performance_floor_with_metrics(trade_logger)
-        trace["performance_floor"] = {"passed": perf_passed, **perf_metrics}
-
-        # Layer 9: Confidence Threshold
-        conf_passed = self._check_dynamic_confidence(signal.confidence)
-        trace["confidence_threshold"] = {
-            "passed": conf_passed,
-            "confidence": signal.confidence,
-            "threshold": self.cfg.min_confidence if self.cfg else 0.0,
         }
 
         # Determine final approval
@@ -145,9 +152,6 @@ class ExecutionFilter:
                 "momentum",
                 "session_time",
                 "drawdown_limit",
-                "model_stability",
-                "performance_floor",
-                "confidence_threshold",
             ]
             for layer in failure_order:
                 if not trace[layer]["passed"]:
@@ -183,17 +187,19 @@ class ExecutionFilter:
             elif "atr" in df.columns:
                 atr = df["atr"]
             else:
-                # Fallback calculation if not in DF - only use what's needed for the calculation
-                # ATR 14 needs at least 15 bars for the shift(1) and rolling(14)
-                # But avg_atr needs 100 bars.
-                # Optimization: Slice to avoid processing entire history if not precomputed
+                # Fallback calculation if not in DF
                 lookback = 120
                 df_slice = df.iloc[-lookback:]
                 high = df_slice["high"]
                 low = df_slice["low"]
                 close = df_slice["close"]
                 tr = pd.concat(
-                    [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1
+                    [
+                        high - low,
+                        (high - close.shift(1)).abs(),
+                        (low - close.shift(1)).abs(),
+                    ],
+                    axis=1,
                 ).max(axis=1)
                 atr = tr.rolling(window=14).mean()
 
@@ -227,8 +233,9 @@ class ExecutionFilter:
             if ema_col in df.columns:
                 ema_series = df[ema_col]
             elif "close" in df.columns:
-                # Optimization: only compute required window
-                ema_series = df["close"].iloc[-(window + 50) :].ewm(span=21, adjust=False).mean()
+                ema_series = (
+                    df["close"].iloc[-(window + 50) :].ewm(span=21, adjust=False).mean()
+                )
             else:
                 return True, {"slope": 0.0, "reason": "No EMA data"}
 
@@ -270,8 +277,13 @@ class ExecutionFilter:
                 if col in df.columns:
                     emas[p] = float(df[col].iloc[-1])
                 else:
-                    # Optimization: only compute what is needed
-                    emas[p] = float(df["close"].iloc[-300:].ewm(span=p, adjust=False).mean().iloc[-1])
+                    emas[p] = float(
+                        df["close"]
+                        .iloc[-300:]
+                        .ewm(span=p, adjust=False)
+                        .mean()
+                        .iloc[-1]
+                    )
 
         if direction > 0:  # BUY
             passed = bool(emas[8] > emas[21] > emas[50] > emas[200])
@@ -301,12 +313,19 @@ class ExecutionFilter:
             if col in df.columns:
                 rsi = float(df[col].iloc[-1])
             else:
-                # Optimization: only compute what is needed
                 lookback = self.rsi_period + 5
                 df_slice = df["close"].iloc[-lookback:]
                 delta = df_slice.diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
+                gain = (
+                    (delta.where(delta > 0, 0))
+                    .rolling(window=self.rsi_period)
+                    .mean()
+                )
+                loss = (
+                    (-delta.where(delta < 0, 0))
+                    .rolling(window=self.rsi_period)
+                    .mean()
+                )
                 rs = gain / (loss + 1e-8)
                 rsi = float(100 - (100 / (1 + rs)).iloc[-1])
 
@@ -322,76 +341,6 @@ class ExecutionFilter:
 
         return passed, {"rsi": rsi, "direction": direction}
 
-    def _check_model_stability(self, health: dict[str, float] | None) -> bool:
-        """Original method - now delegates to metrics version."""
-        passed, _ = self._check_model_stability_with_metrics(health)
-        return passed
-
-    def _check_model_stability_with_metrics(
-        self, health: dict[str, float] | None
-    ) -> tuple[bool, dict[str, Any]]:
-        """Blocks if aggregate model drift or accuracy breaches limits."""
-        if health is None or self.cfg is None:
-            return True, {"drift": 0.0, "accuracy": 1.0}
-
-        drift = float(health.get("drift", 0.0))
-        acc = float(health.get("accuracy", 1.0))
-
-        passed = True
-        if drift > self.cfg.model_drift_threshold:
-            logger.warning(
-                "EXECUTION BLOCKED: Model drift %.2f > %.2f", drift, self.cfg.model_drift_threshold
-            )
-            passed = False
-
-        if acc < self.cfg.model_accuracy_floor:
-            logger.warning(
-                "EXECUTION BLOCKED: Model accuracy %.2f < %.2f", acc, self.cfg.model_accuracy_floor
-            )
-            passed = False
-
-        return passed, {
-            "drift": drift,
-            "accuracy": acc,
-            "drift_threshold": self.cfg.model_drift_threshold,
-            "accuracy_floor": self.cfg.model_accuracy_floor,
-        }
-
-    def _check_performance_floor(self, trade_logger: TradeLogger | None) -> bool:
-        """Original method - now delegates to metrics version."""
-        passed, _ = self._check_performance_floor_with_metrics(trade_logger)
-        return passed
-
-    def _check_performance_floor_with_metrics(
-        self, trade_logger: TradeLogger | None
-    ) -> tuple[bool, dict[str, Any]]:
-        """Blocks if historical win rate drops below floor."""
-        if trade_logger is None or self.cfg is None:
-            return True, {"win_rate": 1.0, "total_trades": 0}
-
-        report = trade_logger.read_performance_report()
-        win_rate = float(report.get("win_rate", 1.0))
-        total_trades = int(report.get("total_trades", 0))
-
-        passed = True
-        if total_trades >= 20 and win_rate < self.cfg.model_win_rate_floor:
-            logger.warning(
-                "EXECUTION BLOCKED: Win rate %.2f < %.2f", win_rate, self.cfg.model_win_rate_floor
-            )
-            passed = False
-
-        return passed, {
-            "win_rate": win_rate,
-            "total_trades": total_trades,
-            "win_rate_floor": self.cfg.model_win_rate_floor,
-        }
-
-    def _check_dynamic_confidence(self, confidence: float) -> bool:
-        """Enforces configured confidence threshold."""
-        if self.cfg is None:
-            return True
-        return confidence >= self.cfg.min_confidence
-
     def _check_session_time(self, timestamp: datetime) -> bool:
         """Blocks outside institutional trading hours (Sun 17:00 - Fri 16:00 GMT)."""
         weekday = timestamp.weekday()  # Mon=0, Sun=6
@@ -400,12 +349,18 @@ class ExecutionFilter:
         if weekday == 5:  # Saturday
             return False
         if weekday == 6:  # Sunday
-            return hour >= 17
+            if hour < 17:
+                return False
+            return True
         if weekday == 4:  # Friday
-            return hour < 16
+            if hour >= 16:
+                return False
+            return True
 
         return True
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
         """Blocks if account drawdown exceeds limit."""
-        return current_drawdown < self.max_drawdown
+        if current_drawdown >= self.max_drawdown:
+            return False
+        return True
