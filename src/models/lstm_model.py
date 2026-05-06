@@ -205,6 +205,15 @@ class LSTMModel(BaseModel):
                 metadata={"error": "Model not initialized or PyTorch missing"},
             )
 
+        # Production-grade robustness: Check for NaN or Inf in input features
+        if not np.isfinite(features).all():
+            self.logger.error("Input features contain NaN or Inf values.")
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": "Invalid features: NaN or Inf detected"},
+            )
+
         try:
             # Ensure input is a torch tensor and moved to the correct device
             x = torch.from_numpy(features).float().to(self.device)
