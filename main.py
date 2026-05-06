@@ -579,9 +579,26 @@ def main() -> int:
             log.warning("Startup validation passed with warnings.")
 
     # ── Startup Summary ────────────────────────────────────────────────────────
+    import platform
     summary = Table.grid(expand=True)
     summary.add_column(style="cyan", justify="right")
     summary.add_column(style="white", justify="left")
+
+    # Environment Group
+    hw = "CPU"
+    if torch and torch.cuda.is_available():
+        hw = f"GPU (CUDA: {torch.cuda.get_device_name(0)})"
+    elif torch and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        hw = "GPU (MPS)"
+
+    summary.add_row("[bold underline]Environment[/]", "")
+    summary.add_row("OS:  ", f"{platform.system()} {platform.release()}")
+    summary.add_row("Python:  ", platform.python_version())
+    summary.add_row("Hardware:  ", hw)
+    summary.add_row("", "")
+
+    # Configuration Group
+    summary.add_row("[bold underline]Configuration[/]", "")
     summary.add_row("Mode:  ", f"[bold]{cfg.mode.upper()}[/]")
     summary.add_row("Symbol:  ", f"[bold]{cfg.symbol}[/]")
     summary.add_row("Timeframe:  ", cfg.timeframe)
@@ -590,8 +607,10 @@ def main() -> int:
         "Database:  ",
         "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite",
     )
+    summary.add_row("", "")
 
     # Risk summary row
+    summary.add_row("[bold underline]Risk Controls[/]", "")
     risk_color = (
         "red"
         if cfg.risk_per_trade > 0.02
@@ -733,6 +752,7 @@ def main() -> int:
     table.add_column("Component", style="cyan")
     table.add_column("Status", justify="center")
     table.add_column("Message")
+    table.add_column("Suggested Remedy", style="green")
     for name, comp in report.components.items():
         color = (
             "green"
@@ -741,7 +761,9 @@ def main() -> int:
             if comp.status == HealthStatus.DEGRADED
             else "red"
         )
-        table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message)
+        table.add_row(
+            name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy
+        )
     console.print(table)
 
     if report.status == HealthStatus.FAILED:

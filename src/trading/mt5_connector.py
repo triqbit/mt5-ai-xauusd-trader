@@ -411,6 +411,84 @@ class MT5Connector:
         info = self.get_account_info()
         return float(info.get("balance", 0.0))
 
+    def get_terminal_status(self) -> dict[str, Any]:
+        """Retrieve terminal and connectivity status."""
+        if not self._is_initialized:
+            return {"connected": False, "algo_trading": False}
+
+        if not self.use_metaapi:
+            info = mt5.terminal_info()
+            if info:
+                return {
+                    "connected": info.connected,
+                    "algo_trading": info.trade_allowed,
+                    "max_bars": info.maxbars,
+                }
+            return {"connected": False, "algo_trading": False}
+        else:
+            # MetaAPI: account status is proxies for terminal status
+            info = self.get_account_info()
+            return {
+                "connected": info.get("connectionStatus") == "CONNECTED",
+                "algo_trading": True,  # MetaAPI generally allows trading if connected
+                "platform": info.get("platform"),
+            }
+
+    def get_symbol_properties(self, symbol: str) -> dict[str, Any] | None:
+        """Retrieve symbol specification and tradability."""
+        if not self._is_initialized:
+            return None
+
+        if not self.use_metaapi:
+            info = mt5.symbol_info(symbol)
+            if info:
+                return {
+                    "name": info.name,
+                    "visible": info.visible,
+                    "tradable": info.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL,
+                    "digits": info.digits,
+                    "spread": info.spread,
+                }
+            return None
+        else:
+
+            async def _get_spec():
+                return await self.metaapi_connection.get_symbol_specification(symbol)
+
+            try:
+                spec = asyncio.run(_get_spec())
+                return {
+                    "name": spec["symbol"],
+                    "visible": True,
+                    "tradable": True,  # MetaAPI symbol spec implies existence
+                    "digits": spec.get("digits", 5),
+                }
+            except Exception:
+                return None
+
+    def find_symbols(self, pattern: str) -> list[str]:
+        """Search for available symbols matching a pattern."""
+        if not self._is_initialized:
+            return []
+
+        if not self.use_metaapi:
+            # mt5.symbols_get returns all symbols if group is specified
+            symbols = mt5.symbols_get(group=f"*{pattern}*")
+            if symbols:
+                return [s.name for s in symbols]
+            return []
+        else:
+
+            async def _get_symbols():
+                return await self.metaapi_connection.get_symbols()
+
+            try:
+                all_symbols = asyncio.run(_get_symbols())
+                pattern = pattern.upper()
+                return [s for s in all_symbols if pattern in s.upper()]
+            except Exception:
+                return []
+
     def get_positions(self, symbol: str | None = None) -> list[dict[str, Any]]:
         if not self._is_initialized:
             return []
