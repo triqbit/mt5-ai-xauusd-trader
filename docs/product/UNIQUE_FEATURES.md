@@ -223,7 +223,41 @@ Generic bots provide basic logs: "Buy @ 2000, Sell @ 2010, Profit $10". The MT5 
 
 ---
 
+## 7. Model Confidence Heatmaps Over Time
+
+### What it is and why it matters
+**Model Confidence Heatmaps Over Time** is a multi-dimensional visualization tool that tracks the evolving reliability and conviction of individual models within the ensemble across different market conditions.
+
+In AI-driven trading, models often experience "performance drift" or varying efficacy depending on market volatility and regime. This feature allows institutional operators to visualize not just the *output* of the models, but their *stability* and *calibration* over time. It helps identify when a specific model (e.g., the LSTM or PPO agent) is "in-sync" with the current market and when its confidence is decoupling from realized accuracy.
+
+### How it differentiates from generic trading bots
+Generic bots treat AI models as static entities. The MT5 AI Trader recognizes that model intelligence is dynamic. By mapping confidence scores against time and price, operators can see patterns of "model exhaustion" or "regime-specific brilliance" that a single ensemble weight would hide. It provides a temporal "Model Health" layer that is crucial for maintaining long-term institutional alpha.
+
+### Architecture Outline
+1.  **Confidence Tracker**: A telemetry module that logs the raw confidence/probability scores from each ensemble member (LSTM, PPO, Dreamer) for every signal generated.
+2.  **Calibration Engine**: A service that cross-references historical confidence scores with actual trade outcomes (PnL and MFE/MAE) to compute "Calibration Error" heatmaps.
+3.  **Temporal Heatmap Generator**: A visualization utility that produces 2D and 3D heatmaps (Time vs. Confidence vs. Accuracy) for the Decision Cockpit or Research Reports.
+4.  **Dynamic Weighting Feedback**: An optional loop where the `EnsembleModel` can use the heatmap data to automatically down-weight models showing high confidence but low realized accuracy (overconfidence).
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Real-time logging of confidence scores for all active ensemble members. |
+| **Functional** | Generation of daily "Confidence vs. Accuracy" heatmaps per model. |
+| **Technical** | Heatmap data must be indexed by `regime_id` to allow for regime-specific stability analysis. |
+| **Operational** | Heatmap summaries must be visible in the **Decision Cockpit** as a "Model Reliability" panel. |
+| **Release Readiness** | Must include a "Drift Alert" system that triggers when a model's calibration error exceeds a 2-sigma threshold. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on calibration mathematics, drift detection algorithms, and heatmap logic.
+*   **Jules02 (Observability)**: Lead on visualizing the heatmaps in the TUI/Cockpit and ensuring telemetry efficiency.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires the `EnsembleModel` to output explicit confidence scores for every prediction.
+*   **Constraints**: Heatmap generation must be performed asynchronously to ensure it does not introduce latency into the core trading loop.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Model confidence heatmaps over time**
 - **Adaptive position sizing based on regime stability**
 - **Institutional Liquidity Heatmap** (Identifying "Smart Money" resting orders)
