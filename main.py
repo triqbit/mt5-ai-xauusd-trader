@@ -46,6 +46,7 @@ from src.core.feature_engineering import FeatureEngineer
 from src.core.health import HealthStatus, init_health_checker
 from src.core.log_config import get_masking_processor
 from src.core.monitor import Monitor
+from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
 from src.data.event_intelligence import RiskStatus
 from src.models.base_model import BaseModel
@@ -57,7 +58,6 @@ from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.core.schemas import TradeSignal
 from src.trading.risk_manager import RiskManager
 
 # -- Logging setup ---------------------------------------------------------

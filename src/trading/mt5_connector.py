@@ -56,6 +56,21 @@ TRADE_ACTION_DEAL = 1
 ORDER_TIME_GTC = 1
 ORDER_FILLING_IOC = 1
 
+# MT5 Retcodes that indicate permanent failure (no retry)
+NON_RETRIABLE_RETCODES = {
+    10014,  # TRADE_RETCODE_INVALID_VOLUME
+    10015,  # TRADE_RETCODE_INVALID_PRICE
+    10016,  # TRADE_RETCODE_INVALID_STOPS
+    10017,  # TRADE_RETCODE_INVALID_FILL
+    10018,  # TRADE_RETCODE_MARKET_CLOSED
+    10019,  # TRADE_RETCODE_NO_MONEY
+    10022,  # TRADE_RETCODE_TOO_MANY_OPEN_ORDERS
+    10023,  # TRADE_RETCODE_INVALID_EXPIRATION
+    10024,  # TRADE_RETCODE_ORDER_CHANGED
+    10027,  # TRADE_RETCODE_NO_HISTORY
+    10028,  # TRADE_RETCODE_ON_ONLY_STOPS
+}
+
 TIMEFRAME_MAP: dict[str, int] = {
     "M1": 1,
     "M5": 5,
@@ -203,7 +218,13 @@ class MT5Connector:
         if not self.use_metaapi:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
-                raise MT5DataError(f"Failed to copy rates: {mt5.last_error()}")
+                err_code, err_desc = mt5.last_error()
+                # Permanent failures for data retrieval (e.g. invalid symbol or params)
+                is_retriable = err_code not in [-2, -5]  # RES_E_INVALID_PARAMS, RES_E_NOT_FOUND
+                raise MT5DataError(
+                    f"Failed to copy rates: {err_desc} (code: {err_code})",
+                    is_retriable=is_retriable,
+                )
             df = pd.DataFrame(rates)
             df["time"] = pd.to_datetime(df["time"], unit="s")
             return df
@@ -265,7 +286,12 @@ class MT5Connector:
         if not self.use_metaapi:
             tick = mt5.symbol_info_tick(symbol)
             if tick is None:
-                raise MT5DataError(f"Failed to get tick: {mt5.last_error()}")
+                err_code, err_desc = mt5.last_error()
+                is_retriable = err_code not in [-2, -5]
+                raise MT5DataError(
+                    f"Failed to get tick: {err_desc} (code: {err_code})",
+                    is_retriable=is_retriable,
+                )
             return {"bid": tick.bid, "ask": tick.ask, "spread": tick.ask - tick.bid}
         else:
 
@@ -330,12 +356,19 @@ class MT5Connector:
 
             result = mt5.order_send(request)
             if result is None:
-                raise MT5ExecutionError(f"Order send failed (None result): {mt5.last_error()}")
+                err_code, err_desc = mt5.last_error()
+                raise MT5ExecutionError(
+                    f"Order send failed (None result): {err_desc} (code: {err_code})"
+                )
 
-            if result.retcode != mt5.TRADE_RETCODE_DONE:
+            if result.retcode not in [
+                getattr(mt5, "TRADE_RETCODE_DONE", 10009),
+                getattr(mt5, "TRADE_RETCODE_PLACED", 10008),
+            ]:
                 error_msg = f"Order rejected: {result.comment} (code: {result.retcode})"
                 logger.error(error_msg)
-                raise MT5ExecutionError(error_msg)
+                is_retriable = result.retcode not in NON_RETRIABLE_RETCODES
+                raise MT5ExecutionError(error_msg, is_retriable=is_retriable)
 
             logger.info("Order executed successfully | ticket=%d", result.order)
             return int(result.order)
