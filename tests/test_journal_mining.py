@@ -197,17 +197,19 @@ def test_strategy_state_correlation(miner):
         {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
         {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
         {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+        {"id": 9, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 9},
     ])
 
-    # Risk events: one within 24h of the cluster, one outside
+    # Risk events: one within 24h BEFORE, one DURING, one outside
     risk_events = pd.DataFrame([
-        {"event_type": "MAX_DRAWDOWN", "created_at": now + pd.Timedelta(hours=1)},
-        {"event_type": "MAX_DRAWDOWN", "created_at": now + pd.Timedelta(hours=48)},
+        {"event_type": "MAX_DRAWDOWN", "created_at": now - pd.Timedelta(hours=1)},
+        {"event_type": "MAX_DRAWDOWN", "created_at": now + pd.Timedelta(minutes=1)},
+        {"event_type": "MAX_DRAWDOWN", "created_at": now - pd.Timedelta(hours=48)},
     ])
 
     correlations = miner.analyze_strategy_state_correlation(risk_events, trades)
-    # 1 out of 2 events are in 'weak state' (within 24h of cluster)
-    assert correlations["MAX_DRAWDOWN"] == 0.5
+    # 2 out of 3 events are in 'weak state' (preceding or during cluster)
+    assert round(correlations["MAX_DRAWDOWN"], 2) == 0.67
 
 def test_to_report_section_with_toxic_motif(miner):
     from src.analytics.journal_mining import BlockReasonSummary, JournalReport, SignalMotif
@@ -270,12 +272,54 @@ def test_detect_pre_drawdown_motifs(miner):
     assert motifs[0].algorithm == "ensemble"
     assert motifs[0].frequency == 2
 
+def test_find_combination_motifs(miner):
+    now = datetime.now(timezone.utc)
+    # 3 consecutive losses form a cluster starting at now
+    # We need a non-losing trade to end the cluster
+    trades1 = pd.DataFrame([
+        {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
+        {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
+        {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+        {"id": 9, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 9},
+    ])
+
+    # Add second cluster
+    later = now + pd.Timedelta(days=1)
+    trades2 = pd.DataFrame([
+        {"id": 4, "pnl": -10, "created_at": later, "signal_id": 4},
+        {"id": 5, "pnl": -10, "created_at": later + pd.Timedelta(minutes=1), "signal_id": 5},
+        {"id": 6, "pnl": -10, "created_at": later + pd.Timedelta(minutes=2), "signal_id": 6},
+        {"id": 7, "pnl": 10, "created_at": later + pd.Timedelta(minutes=3), "signal_id": 7},
+    ])
+    all_trades = pd.concat([trades1, trades2])
+
+    # Multiple signals before cluster 1
+    signals1 = pd.DataFrame([
+        {"id": 10, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "created_at": now - pd.Timedelta(minutes=30)},
+        {"id": 11, "algorithm": "ppo", "direction": -1, "volatility": 0.1, "created_at": now - pd.Timedelta(minutes=29)},
+    ])
+
+    # Multiple signals before cluster 2
+    signals2 = pd.DataFrame([
+        {"id": 20, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "created_at": later - pd.Timedelta(minutes=30)},
+        {"id": 21, "algorithm": "ppo", "direction": -1, "volatility": 0.1, "created_at": later - pd.Timedelta(minutes=29)},
+    ])
+    all_signals = pd.concat([signals1, signals2])
+
+    motifs = miner.find_combination_motifs(all_signals, all_trades)
+    assert len(motifs) == 1
+    assert "ensemble:1" in motifs[0].patterns
+    assert "ppo:-1" in motifs[0].patterns
+    assert motifs[0].frequency == 2
+    assert motifs[0].is_toxic is True
+
 def test_find_frequent_motifs_with_clusters(miner):
     now = datetime.now(timezone.utc)
     trades = pd.DataFrame([
         {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
         {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
         {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+        {"id": 8, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 8},
     ])
 
     signals = pd.DataFrame([
