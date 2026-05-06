@@ -87,6 +87,7 @@ def test_capital_and_risk_integration(trade_logger):
         cfg.risk_per_trade = 0.02
         cfg.max_daily_loss = 0.05
         cfg.max_positions = 3
+        cfg.max_losing_streak = 5
         mock_get_cfg.return_value = cfg
 
         # 1. Capital Allocation (Jules04)
