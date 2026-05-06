@@ -38,6 +38,8 @@ class StressedMetric(BaseModel):
     total_return: str
     max_drawdown: str
     sharpe: str
+    recovery_factor: str = "0.00"
+    profit_factor: str = "0.00"
     outcome: str
 
 
@@ -280,15 +282,26 @@ class ResearchReporter:
             table.add_column("Scenario")
             table.add_column("Return")
             table.add_column("MaxDD")
+            table.add_column("Recov")
+            table.add_column("PF")
             table.add_column("Outcome")
             table.add_row(
                 "Baseline",
                 report.stress_tests.baseline.total_return,
                 report.stress_tests.baseline.max_drawdown,
+                report.stress_tests.baseline.recovery_factor,
+                report.stress_tests.baseline.profit_factor,
                 "N/A",
             )
             for s in report.stress_tests.scenarios:
-                table.add_row(s.name, s.total_return, s.max_drawdown, s.outcome)
+                table.add_row(
+                    s.name,
+                    s.total_return,
+                    s.max_drawdown,
+                    s.recovery_factor,
+                    s.profit_factor,
+                    s.outcome,
+                )
             self.console.print(table)
 
         if report.hyperparameter_robustness:
