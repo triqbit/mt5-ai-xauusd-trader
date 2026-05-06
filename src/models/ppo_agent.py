@@ -87,20 +87,19 @@ class PPOAgent(BaseModel):
         Returns:
             A Signal object containing direction, confidence, and metadata.
         """
-        if self.model is None:
-            return Signal(
-                direction=SignalDirection.HOLD,
-                confidence=0.0,
-                metadata={"error": "Model not loaded"},
-            )
-
-        # Production-grade robustness: Check for NaN or Inf in input features
         if not np.isfinite(features).all():
             self.logger.error("Input features contain NaN or Inf values.")
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Invalid features: NaN or Inf detected"},
+            )
+
+        if self.model is None:
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": "Model not loaded"},
             )
 
         try:

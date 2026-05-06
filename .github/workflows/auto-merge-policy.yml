@@ -145,7 +145,8 @@ jobs:
           fi
 
           # Post comment with proper newlines
-          gh pr comment $PR_NUMBER --body "$(printf "$REASON")\n\nManual review by code owners is required. Changes to trading logic, risk parameters, or infrastructure are automatically escalated."
+          echo -e "$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, or infrastructure are automatically escalated." > comment.txt
+          gh pr comment $PR_NUMBER --body-file comment.txt
 
           # Explicitly disable auto-merge on the PR
           gh pr merge $PR_NUMBER --disable-auto || true
