@@ -253,3 +253,30 @@ def test_rl_evaluation_reporting():
     assert "RL Agent Evaluation" in html
     assert "Agent_V2" in html
     assert 'href="#rl-evaluation"' in html
+
+def test_rl_metric_new_fields():
+    from src.research.reporting import RLMetric
+    metric = RLMetric(
+        agent_name="TestAgent",
+        sharpe=1.5,
+        profit_factor=1.2,
+        max_dd=0.1,
+        win_rate=0.5,
+        tail_ratio=1.8,
+        common_sense_ratio=2.1,
+        gain_to_pain_ratio=1.4
+    )
+    assert metric.tail_ratio == 1.8
+    assert metric.common_sense_ratio == 2.1
+    assert metric.gain_to_pain_ratio == 1.4
+
+def test_pattern_concentration_total_trades():
+    from src.research.reporting import PatternConcentration
+    pc = PatternConcentration(
+        attribute="Algo",
+        value="PPO",
+        win_rate=0.6,
+        profit_factor=2.0,
+        total_trades=100
+    )
+    assert pc.total_trades == 100
