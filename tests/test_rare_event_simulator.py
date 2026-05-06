@@ -62,10 +62,13 @@ def test_reproducibility(simulator):
 
 
 def test_flash_crash_behavior(simulator):
-    config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=300, event_magnitude=2.0, recovery_factor=0.8)
+    config = RareEventConfig(
+        event_type=RareEventType.FLASH_CRASH, n_steps=300, event_magnitude=2.0, recovery_factor=0.8
+    )
     df, result = simulator.generate_scenario(config)
 
-    assert result.peak_impact_pct < -0.05
+    # Standardized peak_impact_pct is now absolute
+    assert result.peak_impact_pct > 0.05
     assert result.recovery_attained > 0.5
 
     # Check volume spike
@@ -73,8 +76,10 @@ def test_flash_crash_behavior(simulator):
     normal_vol = df["tick_volume"].iloc[:result.start_index].mean()
     assert crash_vol > normal_vol * 2
 
-    # Verify peak impact calculation (it should be negative for a crash)
-    assert result.peak_impact_pct < 0
+    # Verify spread widening
+    crash_spread = df["spread"].iloc[result.start_index : result.start_index + 10].mean()
+    normal_spread = df["spread"].iloc[: result.start_index].mean()
+    assert crash_spread > normal_spread * 2
 
 
 def test_liquidity_vacuum_behavior(simulator):
@@ -109,8 +114,13 @@ def test_gold_gap_behavior(simulator):
     # Calculate gap
     gap_idx = result.start_index
     gap = df["open"].iloc[gap_idx] - df["close"].iloc[gap_idx - 1]
-    assert abs(gap) > 10 # Assuming start_price 2300 and 2% gap
-    assert abs(result.peak_impact_pct) > 0.01
+    assert abs(gap) > 10  # Assuming start_price 2300 and 2% gap
+    assert result.peak_impact_pct > 0.01
+
+    # Verify spread spike at gap
+    gap_spread = df["spread"].iloc[gap_idx]
+    normal_spread = df["spread"].iloc[:gap_idx].mean()
+    assert gap_spread > normal_spread * 5
 
 
 def test_violent_reversal_behavior(simulator):
@@ -197,3 +207,24 @@ def test_custom_bars_per_day(simulator):
 
     freq_h1 = (df_h1.index[1] - df_h1.index[0]).total_seconds()
     assert freq_h1 == 3600
+
+
+def test_feature_engineering_compatibility(simulator):
+    """Verify that generated data is compatible with FeatureEngineer."""
+    from src.core.feature_engineering import FeatureEngineer
+
+    # Generate a scenario
+    config = RareEventConfig(event_type=RareEventType.VOL_CLUSTER, n_steps=300)
+    df, _ = simulator.generate_scenario(config)
+
+    # Initialize FeatureEngineer (mocked via conftest if talib not present)
+    fe = FeatureEngineer()
+
+    # Compute features
+    # Note: FeatureEngineer might drop rows due to indicators needing history,
+    # but it should not crash and should return a non-empty DataFrame for 300 steps.
+    features = fe.compute_features(df)
+
+    assert isinstance(features, pd.DataFrame)
+    assert not features.empty
+    assert len(features) < len(df)  # Rows dropped for indicator warmup

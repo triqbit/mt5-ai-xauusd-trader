@@ -133,11 +133,23 @@ class RareEventSimulator:
         gaps: np.ndarray | None = None,
         spread_multiplier: float = 1.0,
     ) -> pd.DataFrame:
-        config_ref = getattr(self, "_current_config", None)
         """
         Helper to convert a returns series into a valid OHLCV DataFrame.
+
         Ensures price continuity: open[i] = close[i-1] unless gap requested.
+
+        Args:
+            start_price: The price to start the simulation from.
+            returns: Array of returns for each step.
+            base_vol: Base volatility for intraday noise.
+            base_volume: Base tick volume.
+            gaps: Optional array of price gaps to apply at each step.
+            spread_multiplier: Multiplier for the generated spreads.
+
+        Returns:
+            pd.DataFrame: OHLCV data.
         """
+        config_ref = getattr(self, "_current_config", None)
         n = len(returns)
         opens = np.zeros(n)
         highs = np.zeros(n)
@@ -224,20 +236,22 @@ class RareEventSimulator:
             config.start_price, returns, config.base_volatility, config.base_volume
         )
 
-        # Volume Surge during crash
-        crash_mask = (np.arange(n) >= start_idx) & (np.arange(n) < start_idx + crash_duration)
-        df.loc[crash_mask, "tick_volume"] *= int(3 * config.event_magnitude)
+        # Volume Surge and spread widening during crash
+        event_total_duration = crash_duration + recovery_duration
+        event_mask = (np.arange(n) >= start_idx) & (np.arange(n) < start_idx + event_total_duration)
+        df.loc[event_mask, "tick_volume"] *= int(3 * config.event_magnitude)
+        df.loc[event_mask, "spread"] *= 5.0 * config.event_magnitude
 
-        # Peak impact is the max percentage deviation from the price before the crash
-        event_prices = df["close"].iloc[start_idx : start_idx + crash_duration + recovery_duration]
-        start_price = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
-        peak_impact = float((event_prices / start_price - 1).min())
+        # Peak impact is the maximum percentage deviation from the price before the event
+        event_prices = df["close"].iloc[start_idx : start_idx + event_total_duration]
+        start_price_val = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
 
         result = RareEventResult(
             event_type=RareEventType.FLASH_CRASH,
             config=config,
             start_index=start_idx,
-            end_index=min(n - 1, start_idx + crash_duration + recovery_duration),
+            end_index=min(n - 1, start_idx + event_total_duration),
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=float(recovered_total_pct / abs(impact)) if impact != 0 else 0,
@@ -321,12 +335,19 @@ class RareEventSimulator:
             config.start_price, returns, config.base_volatility, config.base_volume, gaps=gaps
         )
 
+        # Spread spike at gap
+        df.loc[df.index[gap_idx], "spread"] *= 10.0 * config.event_magnitude
+
+        event_prices = df["close"].iloc[gap_idx : gap_idx + post_gap_duration]
+        start_price_val = df["close"].iloc[gap_idx - 1] if gap_idx > 0 else df["close"].iloc[0]
+        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
+
         result = RareEventResult(
             event_type=RareEventType.GOLD_GAP,
             config=config,
             start_index=gap_idx,
             end_index=gap_idx + post_gap_duration,
-            peak_impact_pct=gap_magnitude_pct,
+            peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
         )
@@ -357,10 +378,10 @@ class RareEventSimulator:
             config.start_price, returns, config.base_volatility, config.base_volume
         )
 
-        # Peak impact is the reversal magnitude from the peak reached during the trend
-        peak_price = df["high"].iloc[start_idx:reversal_idx].max()
-        min_price_after = df["low"].iloc[reversal_idx : reversal_idx + reversal_duration].min()
-        peak_impact = float(min_price_after / peak_price - 1)
+        # Peak impact is the maximum percentage deviation from the start price
+        event_prices = df["close"].iloc[start_idx : reversal_idx + reversal_duration]
+        start_price_val = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
 
         result = RareEventResult(
             event_type=RareEventType.VIOLENT_REVERSAL,
@@ -397,8 +418,10 @@ class RareEventSimulator:
         )
 
         event_prices = df["close"].iloc[dislocation_idx:]
-        start_price = df["close"].iloc[dislocation_idx - 1] if dislocation_idx > 0 else df["close"].iloc[0]
-        peak_impact = float((event_prices / start_price - 1).min())
+        start_price_val = (
+            df["close"].iloc[dislocation_idx - 1] if dislocation_idx > 0 else df["close"].iloc[0]
+        )
+        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
 
         result = RareEventResult(
             event_type=RareEventType.DISLOCATION,
