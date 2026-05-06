@@ -22,8 +22,9 @@ The health check endpoints are exposed via FastAPI (default port 8000, prefix `/
 - **Status:** `healthy`, `degraded`, or `failed`.
 - **Components tracked:**
     - `liveness`: Process status.
+    - `environment`: OS, Python version, and hardware acceleration (CUDA/MPS).
     - `database`: Primary trade database connectivity.
-    - `mt5`: MetaTrader 5 terminal/cloud connection.
+    - `mt5`: MetaTrader 5 terminal/cloud connection, terminal-level 'Algo Trading' permission, broker account trading permission, and symbol tradability validation (including auto-suggestions for typos).
     - `models`: Loading status of AI models (PPO, LSTM, Dreamer).
     - `config`: Environment and risk limit validation.
     - `disk`: Sufficient space in the `logs/` directory.
