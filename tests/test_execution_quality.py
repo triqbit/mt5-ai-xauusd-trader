@@ -25,6 +25,16 @@ def mock_connector():
     ])
     connector.get_rates.return_value = rates_df
     connector.get_rates_range.return_value = rates_df
+
+    # Mock symbol properties
+    def get_props(symbol):
+        if "XAUUSD" in symbol:
+            return {"digits": 2, "contract_size": 100.0, "point": 0.01}
+        elif "EURUSD" in symbol:
+            return {"digits": 5, "contract_size": 100000.0, "point": 0.00001}
+        return None
+
+    connector.get_symbol_properties.side_effect = get_props
     return connector
 
 @pytest.fixture
@@ -212,3 +222,13 @@ def test_generate_summary_report(analyzer):
         assert report_section.efficiency_score == pytest.approx(summary.execution_efficiency_score * 100)
         assert report_section.opportunity_cost == "$50.00"
         assert len(report_section.metrics) > 0
+
+def test_dynamic_properties(analyzer):
+    """Test that pip size and contract size are correctly fetched from connector."""
+    # XAUUSD: digits=2 -> pip_size = 10^-(2-1) = 0.1
+    assert analyzer._get_pip_size("XAUUSD") == 0.1
+    assert analyzer._get_contract_size("XAUUSD") == 100.0
+
+    # EURUSD: digits=5 -> pip_size = 10^-(5-1) = 0.0001
+    assert analyzer._get_pip_size("EURUSD") == 0.0001
+    assert analyzer._get_contract_size("EURUSD") == 100000.0

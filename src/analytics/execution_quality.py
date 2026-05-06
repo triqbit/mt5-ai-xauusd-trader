@@ -148,11 +148,31 @@ class ExecutionAnalyzer:
 
     def _get_pip_size(self, symbol: str) -> float:
         """Utility to get pip size for a symbol."""
+        if self.connector:
+            props = self.connector.get_symbol_properties(symbol)
+            if props and "digits" in props:
+                digits = props["digits"]
+                # For XAUUSD, digits is usually 2 or 3. Pip is 0.1 (digits-1)
+                # For EURUSD, digits is 5. Pip is 0.0001 (digits-1)
+                # Heuristic: 10 ^ -(digits - 1)
+                return 10 ** -(digits - 1)
+
         if any(x in symbol for x in ["XAUUSD", "GOLD"]):
             return 0.1
         if any(x in symbol for x in ["JPY", "HUF"]):
             return 0.01
         return 0.0001
+
+    def _get_contract_size(self, symbol: str) -> float:
+        """Utility to get contract size for a symbol."""
+        if self.connector:
+            props = self.connector.get_symbol_properties(symbol)
+            if props and "contract_size" in props:
+                return float(props["contract_size"])
+
+        if any(x in symbol for x in ["XAUUSD", "GOLD"]):
+            return 100.0
+        return 100000.0
 
     def analyze_trade(self, trade_id: int) -> TradeExecutionQuality | None:
         """
@@ -174,7 +194,9 @@ class ExecutionAnalyzer:
             slippage_pips = slippage_price / pip_size
 
             # 2. Latency calculation
-            latency_td = trade.created_at - signal.timestamp
+            t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
+            s_timestamp = signal.timestamp.replace(tzinfo=UTC) if signal.timestamp.tzinfo is None else signal.timestamp
+            latency_td = t_created - s_timestamp
             latency_ms = max(0.0, latency_td.total_seconds() * 1000.0)
 
             # 3. Spread calculation
@@ -258,6 +280,9 @@ class ExecutionAnalyzer:
         if not self.connector or not horizons:
             return {}
 
+        if entry_time.tzinfo is None:
+            entry_time = entry_time.replace(tzinfo=UTC)
+
         pip_size = self._get_pip_size(symbol)
         max_horizon = max(horizons)
         # Fetch data once for all horizons
@@ -267,12 +292,13 @@ class ExecutionAnalyzer:
         if df.empty:
             return {f"{h}m": 0.0 for h in horizons}
 
+        # Ensure df['time'] is UTC aware
+        if df["time"].dt.tz is None:
+            df["time"] = df["time"].dt.tz_localize(UTC)
+
         results = {}
         for h in horizons:
             target_time = entry_time + timedelta(minutes=h)
-            # Ensure target_time is timezone-aware if the dataframe is aware
-            if df["time"].dt.tz is not None and target_time.tzinfo is None:
-                target_time = target_time.replace(tzinfo=UTC)
 
             # Find the row closest to target_time
             # Since we use M1, we can find it by index or by time comparison
@@ -296,10 +322,14 @@ class ExecutionAnalyzer:
             return 0.0
 
         pip_size = self._get_pip_size(trade.symbol)
+
+        t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
+        s_timestamp = signal.timestamp.replace(tzinfo=UTC) if signal.timestamp.tzinfo is None else signal.timestamp
+
         # Movement between signal price and execution price that is NOT slippage
         # In this context, let's define it as the price movement in the market
         # during the latency period.
-        df = self.connector.get_rates_range(trade.symbol, "M1", signal.timestamp, trade.created_at)
+        df = self.connector.get_rates_range(trade.symbol, "M1", s_timestamp, t_created)
         if df.empty or len(df) < 2:
             return 0.0
 
@@ -340,9 +370,11 @@ class ExecutionAnalyzer:
             return {"spread_pips": 0.0}
 
         pip_size = self._get_pip_size(trade.symbol)
+        t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
+
         # Fetch data around execution time
         df = self.connector.get_rates_range(
-            trade.symbol, "M1", trade.created_at - timedelta(minutes=1), trade.created_at
+            trade.symbol, "M1", t_created - timedelta(minutes=1), t_created
         )
 
         if df.empty:
@@ -363,9 +395,11 @@ class ExecutionAnalyzer:
         if not self.connector:
             return 0.5
 
+        t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
+
         # Fetch exactly the candle where the trade was created
         df = self.connector.get_rates_range(
-            trade.symbol, "M1", trade.created_at, trade.created_at + timedelta(seconds=59)
+            trade.symbol, "M1", t_created, t_created + timedelta(seconds=59)
         )
         if df.empty:
             return 0.5
@@ -469,7 +503,8 @@ class ExecutionAnalyzer:
                     would_win = False
                     break
 
-            opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * 100  # XAUUSD
+            contract_size = self._get_contract_size(signal.symbol)
+            opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * contract_size
         else:  # SELL
             mfe = signal.entry_price - np.min(lows)
             mae = np.max(highs) - signal.entry_price
@@ -484,7 +519,8 @@ class ExecutionAnalyzer:
                     would_win = False
                     break
 
-            opp_cost = (signal.entry_price - prices[-1]) * signal.lot_size * 100
+            contract_size = self._get_contract_size(signal.symbol)
+            opp_cost = (signal.entry_price - prices[-1]) * signal.lot_size * contract_size
 
         return BlockedSignalQuality(
             signal_id=signal.id,

@@ -448,6 +448,8 @@ class MT5Connector:
                     "tradable": info.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL,
                     "digits": info.digits,
                     "spread": info.spread,
+                    "point": info.point,
+                    "contract_size": info.trade_contract_size,
                 }
             return None
         else:
@@ -462,6 +464,8 @@ class MT5Connector:
                     "visible": True,
                     "tradable": True,  # MetaAPI symbol spec implies existence
                     "digits": spec.get("digits", 5),
+                    "point": spec.get("pipSize", 0.00001),
+                    "contract_size": spec.get("contractSize", 1.0),
                 }
             except Exception:
                 return None

@@ -14,6 +14,8 @@ The `ExecutionAnalyzer` module provides institutional-grade analytics to measure
 - **Improved Fill Quality Score**: Uses a spread-relative sigmoid model to penalize slippage more fairly across different volatility regimes.
 - **Alpha Decay Tracking**: Measures price movement between signal generation and actual execution to quantify information loss.
 - **Spread-Aware Metrics**: Tracks spread at execution and calculates slippage-to-spread ratios.
+- **Dynamic Instrument Property Detection**: Automatically detects pip sizes and contract sizes for diverse asset classes (FX, Gold, Indices) via the `MT5Connector`.
+- **Standardized UTC Temporal Logic**: Ensures consistent timezone handling for robust cross-instrument analytics.
 
 ## Implementation Details
 
