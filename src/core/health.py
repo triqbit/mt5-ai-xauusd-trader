@@ -9,6 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import platform
 import shutil
 from datetime import UTC, datetime
 from enum import Enum
@@ -45,6 +46,7 @@ class HealthStatus(str, Enum):
 class ComponentStatus(BaseModel):
     status: HealthStatus
     message: str
+    remedy: str = "N/A"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -90,6 +92,27 @@ class HealthChecker:
         self._update_gauge("liveness", res.status)
         return res
 
+    def check_environment(self) -> ComponentStatus:
+        """Report on the execution environment (OS, Python, Hardware)."""
+        py_ver = platform.python_version()
+        os_info = f"{platform.system()} {platform.release()}"
+
+        hardware = "CPU"
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                hardware = f"GPU (CUDA: {torch.cuda.get_device_name(0)})"
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                hardware = "GPU (MPS)"
+        except ImportError:
+            hardware = "CPU (PyTorch not installed)"
+
+        msg = f"Python {py_ver} on {os_info} | Hardware: {hardware}"
+        res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
+        self._update_gauge("environment", res.status)
+        return res
+
     def check_database(self) -> ComponentStatus:
         """Verify database reachability."""
         if not self.trade_logger:
@@ -133,18 +156,66 @@ class HealthChecker:
             return res
 
         try:
-            # Active check by attempting to fetch account info (lightweight call)
+            # 1. Connectivity Check
             info = self.connector.get_account_info()
-            if info:
-                msg = "MT5 connection active and responding"
+            if not info:
+                res = ComponentStatus(
+                    status=HealthStatus.FAILED, message="MT5 failed to return account info"
+                )
+                self._update_gauge("mt5", res.status)
+                return res
+
+            # 2. Terminal & Account Status
+            status_info = self.connector.get_terminal_status()
+            # Standard MT5 field is 'trade_allowed', MetaAPI might be different but we handle defaults
+            account_trade_allowed = info.get("trade_allowed", True)
+            terminal_trade_allowed = status_info.get("algo_trading", True)
+
+            # 3. Symbol Validation
+            symbol = self.cfg.symbol
+            symbol_props = self.connector.get_symbol_properties(symbol)
+
+            messages = []
+            overall_status = HealthStatus.HEALTHY
+
+            remedies = []
+            if not terminal_trade_allowed:
+                messages.append("Algo Trading is DISABLED in MT5 terminal")
+                remedies.append("Enable 'Algo Trading' button in MT5 Top Toolbar")
+                overall_status = HealthStatus.DEGRADED
+
+            if not account_trade_allowed:
+                messages.append("Trading is DISABLED for this account by the broker")
+                remedies.append("Contact broker or check if account is Investor/Read-only")
+                overall_status = HealthStatus.FAILED
+
+            if not symbol_props:
+                # Attempt to find similar symbols for auto-suggestion
+                pattern = symbol[:3] if len(symbol) >= 3 else symbol
+                similar = self.connector.find_symbols(pattern)
+                suggestion = (
+                    f" (Suggestions: {', '.join(similar[:3])})" if similar else " (None found)"
+                )
+                messages.append(f"Symbol '{symbol}' not found on server{suggestion}")
+                remedies.append(f"Check SYMBOL in .env{suggestion}")
+                overall_status = HealthStatus.FAILED
+            elif not symbol_props.get("tradable", True):
+                messages.append(f"Symbol '{symbol}' is not tradable (Market Closed or Restricted)")
+                remedies.append("Wait for market open or check symbol restrictions")
+                overall_status = HealthStatus.DEGRADED
+
+            if not messages:
+                msg = "MT5 connection active, trading allowed, and symbol found"
                 if getattr(self.connector, "use_metaapi", False):
                     msg += " (via MetaAPI)"
                 res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
             else:
                 res = ComponentStatus(
-                    status=HealthStatus.FAILED,
-                    message="MT5 connection failed to return account info",
+                    status=overall_status,
+                    message=" | ".join(messages),
+                    remedy="; ".join(remedies) if remedies else "N/A",
                 )
+
         except Exception as e:
             logger.error("Health check - MT5 failure: %s", e)
             res = ComponentStatus(status=HealthStatus.FAILED, message=f"MT5 API call failed: {e!s}")
@@ -304,6 +375,7 @@ class HealthChecker:
 
         components = {
             "liveness": self.check_liveness(),
+            "environment": self.check_environment(),
             "database": self.check_database(),
             "mt5": self.check_mt5(),
             "models": self.check_models(),
