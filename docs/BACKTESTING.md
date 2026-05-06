@@ -36,7 +36,7 @@ python main.py --mode backtest --start 2024-01-01 --end 2024-03-30 --algo ensemb
 
 ## Implementation Details
 
-The engine is implemented in `src/trading/backtester.py`. It follows a vectorized-ready approach where data is prepared upfront, and the simulation loop is optimized for speed.
+The engine is implemented in `src/trading/backtester.py`. It uses a highly optimized $O(N)$ simulation loop where all technical indicators and execution filter metrics are pre-calculated using vectorized NumPy operations before entering the walk-forward cycle.
 
 - `BacktestEngine`: The core engine class.
 - `PerformanceReport`: Dataclass containing the final backtest results.
