@@ -76,6 +76,7 @@ class RobustnessMetrics(BaseModel):
     is_oos_gap: float
     stability_penalty: float
     regime_consistency: float
+    walk_forward_efficiency: float
     robustness_score: float
 
 
@@ -411,6 +412,7 @@ class WalkForwardOptimizer:
             is_oos_gap=best_trial.user_attrs["gap"],
             stability_penalty=best_trial.user_attrs["stability"],
             regime_consistency=best_trial.user_attrs["regime_cons"],
+            walk_forward_efficiency=best_trial.user_attrs.get("wfe", 0.0),
             robustness_score=best_trial.user_attrs["robustness_score"],
         )
 

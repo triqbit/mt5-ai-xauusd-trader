@@ -37,6 +37,7 @@ def mock_walk_forward_result():
             is_oos_gap=0.3,
             stability_penalty=0.1,
             regime_consistency=0.9,
+            walk_forward_efficiency=0.8,
             robustness_score=0.85
         ),
         window_results=[]

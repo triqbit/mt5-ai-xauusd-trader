@@ -32,6 +32,7 @@ def mock_config():
     cfg.mt5_login = 12345
     cfg.mt5_server = "TestServer"
     cfg.mt5_password = "TestPassword"
+    cfg.symbol = "XAUUSD"
     cfg.mode = "demo"
     cfg.database_url = "sqlite:///:memory:"
     cfg.redis_url = "redis://localhost:6379/0"
