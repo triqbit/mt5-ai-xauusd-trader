@@ -1,105 +1,111 @@
 # Release Playbook
 
-This document outlines the standard operating procedure (SOP) for releasing new versions of the MT5 AI/ML Trading Bot.
+This document defines the standard operating procedure (SOP) for releasing new versions of the MT5 AI/ML Trading Bot. It ensures that every release is predictable, audited, and recoverable.
 
 ## 1. Release Process Overview
 
-The release process is fully automated via GitHub Actions. It includes:
-- **Validation Stage:** Code quality (Ruff), static analysis (Mypy), security audit (pip-audit), license compliance (pip-licenses), and full test suite execution with 85% coverage enforcement. It also includes an **Automated Pre-Prod Checklist Verification** to ensure all mandatory gates are completed.
-- **Build Stage:** Docker image building and automated vulnerability scanning (Trivy).
-- **Release Stage:** Automated version bumping, changelog transition, Git tagging, artifact packaging (including integrity checksums), and GitHub Release creation.
+The release process is fully automated via GitHub Actions (`.github/workflows/release.yml`). The workflow enforces a "Chain of Trust" through three distinct stages:
+
+1.  **Validation Stage:**
+    - Code quality and formatting (Ruff).
+    - Static type analysis (Mypy).
+    - Secret scanning (Gitleaks).
+    - Dependency security audits (`pip-audit`).
+    - License compliance verification (`pip-licenses`).
+    - Full test suite execution with a mandatory **85% code coverage gate**.
+    - Configuration and environment template validation (`scripts/validate_env.py`).
+    - Database migration reversibility checks (`scripts/verify_migrations.py`).
+    - **Automated Pre-Prod Checklist Verification**: Ensures `docs/PREPROD_CHECKLIST.md` contains no unchecked items `[ ]`.
+
+2.  **Build Stage:**
+    - Multi-stage Docker image build.
+    - Automated vulnerability scanning using Trivy (failing on CRITICAL or HIGH vulnerabilities).
+
+3.  **Release Stage:**
+    - Automated version bumping and `CHANGELOG.md` finalization.
+    - Git tagging.
+    - Artifact packaging with SHA256 integrity checksums.
+    - Creation of a GitHub Release with version-specific notes and rollback links.
+
+---
 
 ## 2. Triggering a Release
 
-### Method A: Manual (Recommended for Production)
-1. Go to the **Actions** tab in GitHub.
-2. Select the **Release Orchestration** workflow.
-3. Click **Run workflow**.
-4. Enter the version number (e.g., `1.2.3`). Leave empty to auto-calculate.
-5. Choose whether to perform a **dry_run** (validation only, no tag/release created).
+### Method A: Manual Trigger (Recommended)
+1.  Navigate to the **Actions** tab in the GitHub repository.
+2.  Select the **Release Orchestration** workflow.
+3.  Click **Run workflow**.
+4.  Parameters:
+    - **Version**: Enter the semantic version (e.g., `1.2.3`). If left empty, the next version will be calculated from commit history.
+    - **Prerelease**: Check if this is a beta or RC build.
+    - **Dry Run**: Check this to run all validation and build steps without creating a tag or publishing the release.
 
-### Method B: Git Tag
-1. Create a semantic version tag locally: `git tag -a v1.2.3 -m "Release v1.2.3"`
-2. Push the tag: `git push origin v1.2.3`
-3. The workflow will trigger automatically.
+### Method B: Git Tag Push
+1.  Tag the desired commit locally: `git tag -a v1.2.3 -m "Release v1.2.3"`
+2.  Push the tag: `git push origin v1.2.3`
+3.  The workflow will detect the tag and proceed directly to validation and release (skipping code-level version bumping).
 
-## 3. Pre-Production Acceptance
-Before triggering a production release, the operator MUST ensure that `docs/PREPROD_CHECKLIST.md` is updated and all mandatory items are checked `[x]`.
-The CI workflow will automatically verify that no incomplete items `[ ]` remain in the checklist.
+---
 
-## 4. Verification After Release
-1. Check the **Releases** page on GitHub.
-2. Verify that the ZIP artifact and `checksums.txt` are present.
-3. Verify that the `CHANGELOG.md` accurately reflects the changes.
-4. Download the artifact and verify the checksum:
-   ```bash
-   sha256sum -c checksums.txt
-   ```
+## 3. Pre-Production Acceptance Gate
+
+Before any production release, the operator **MUST** update `docs/PREPROD_CHECKLIST.md`.
+- All mandatory items must be checked `[x]`.
+- The CI workflow will automatically fail if any `[ ]` markers are found.
+- Ensure backtest results are attached to the release or linked in the changelog.
+
+---
+
+## 4. Post-Release Verification Checklist
+
+Immediately following a deployment, the operator MUST perform the following checks:
+
+- [ ] **Liveness Probe:** `curl http://<deploy-host>:8000/health/liveness` returns `{"status": "ok"}`.
+- [ ] **MT5 Connectivity:** Check logs for "Successfully connected to MT5 account: <ID>".
+- [ ] **Audit Trail:** Verify a "System Startup" event is recorded in the `audit_log` table of `audit.db`.
+- [ ] **Telegram Alerts:** Confirm receipt of the "Trading Bot Started (vX.Y.Z)" notification.
+- [ ] **Metric Flow:** Verify that Prometheus metrics are being populated at `/metrics`.
+
+---
 
 ## 5. Rollback Procedures
 
-Rollback decisions are governed by the Stability Freeze protocol in [SLO Targets](SLO_TARGETS.md).
+Rollback decisions are governed by the Stability Freeze protocol defined in [SLO Targets](SLO_TARGETS.md).
 
-### Container Rollback
-If the new Docker image is unstable, revert to the previous version immediately:
-```bash
-# 1. Update the image tag in your deployment manifest or docker-compose.yml
-# From: triqbit/mt5-ai-xauusd-trader:v1.2.3
-# To:   triqbit/mt5-ai-xauusd-trader:v1.2.2
+### A. Container Image Rollback
+If the new version exhibits unstable behavior (high latency, frequent crashes):
+1.  Identify the previous stable tag (e.g., `v1.2.2`).
+2.  Update your `docker-compose.yml` or deployment manifest to point to the previous image:
+    ```yaml
+    image: triqbit/mt5-ai-xauusd-trader:v1.2.2
+    ```
+3.  Redeploy: `docker-compose up -d`.
 
-# 2. Pull the stable image
-docker pull triqbit/mt5-ai-xauusd-trader:v1.2.2
+### B. Database Migration Rollback
+If a schema change causes data corruption or application failure:
+1.  Exec into the running container: `docker exec -it trading-bot bash`.
+2.  Downgrade the schema by one version: `alembic downgrade -1`.
+3.  Verify the current version: `alembic current`.
 
-# 3. Restart the service
-docker-compose up -d trading-bot
-```
+### C. MT5 Emergency Kill-Switch
+In case of catastrophic trading behavior (e.g., rogue orders, risk limit bypass):
+1.  **Immediate Halt:** Stop the Docker container: `docker stop trading-bot`.
+2.  **Physical Disconnect:** If possible, disconnect the internet connection of the host/VPS.
+3.  **Terminal Force Quit:**
+    - Linux (Wine): `pkill -9 terminal.exe`
+    - Windows: Task Manager -> End Task on `terminal.exe`.
+4.  **Credential Invalidation:** Log in to your broker's portal and **change the MT5 account password** immediately. This will force-disconnect any active sessions.
+5.  **Manual Cleanup:** Log in to the MT5 mobile app or another terminal to manually close all open positions.
 
-### Database Migration Rollback
-If a schema change causes issues, downgrade the database:
-```bash
-# 1. Enter the running container (or local environment)
-# 2. Run the alembic downgrade command (one step back)
-alembic downgrade -1
-
-# 3. Verify current version
-alembic current
-```
-
-### Emergency "Kill Switch"
-In case of catastrophic trading behavior or risk limit breach:
-1. **Halt Execution:** Log in to the MT5 Terminal or VPS.
-2. **Close Exposure:** Manually close all open XAUUSD positions.
-3. **Terminate Process:** Stop the Docker container: `docker stop trading-bot`.
-4. **Audit Log:** Document the event in the Audit Log using `scripts/data_cleanup.py` if necessary for archival.
-
-#### MT5 Emergency Kill-Switch
-If the automated trading bot cannot be stopped via Docker or if the MT5 terminal itself is misbehaving, follow these emergency steps:
-1. **Physical Disconnect:** If running on a local machine or dedicated VPS, disconnect the internet connection to prevent further order transmission.
-2. **Terminal Force Quit:**
-   - **Windows:** Press `Ctrl+Shift+Esc`, find `terminal.exe` or `metatrader.exe`, and click **End Task**.
-   - **Linux (Wine):** Run `pkill -9 terminal.exe` or `pkill -9 metatrader.exe`.
-3. **Password Change:** Immediately change the MT5 trading account password via the broker's web portal to invalidate existing sessions.
-4. **Account Disable:** If possible, use the broker's dashboard to set the account to "Read-Only" or "Disabled" status.
+---
 
 ## 6. Disaster Recovery Integration
 
-In the event of database corruption during or after release:
-1. **Locate Backup:** Find the latest hourly backup in `/backups/trades.db.bak`.
-2. **Verify Integrity:** Run `scripts/backup_verify.sh` to ensure the backup is valid.
-3. **Restore:** Follow the recovery steps in [Disaster Recovery](DISASTER_RECOVERY.md).
-
-## 7. Post-Release Verification Checklist
-After a successful deployment, the operator MUST verify the following:
-- [ ] **Liveness:** `curl http://localhost:8000/health/liveness` returns `{"status": "ok"}`.
-- [ ] **MT5 Connection:** Logs show "Successfully connected to MT5 account XXXXXX".
-- [ ] **Audit Trail:** Check `trades.db` for the initial "System Startup" audit entry.
-- [ ] **Telegram:** Confirm the "Trading Bot Started (vX.Y.Z)" message was received.
-
-## 8. Incident Response
-- **Workflow Failure:** Check the GitHub Actions logs for the specific job that failed. Common issues include dependency conflicts, test failures, or expired secrets.
-- **Security Alert:** If Trivy or pip-audit fails, do not bypass. Fix the vulnerabilities before proceeding.
-- **Connectivity Issues:** Ensure the GitHub runner has access to required external resources (e.g., Docker Hub, if pushing).
+If the deployment causes unrecoverable database state:
+1.  Follow the [Disaster Recovery Plan](DISASTER_RECOVERY.md).
+2.  Restore the latest hourly backup from `backups/trades.db.bak` using `scripts/backup_verify.sh`.
+3.  Re-verify the restored data against the `AuditLogger` records.
 
 ---
 **Author:** Jules03 (Release Reliability & Governance)
-**Last Updated:** May 2024
+**Last Updated:** 2024-05-24
