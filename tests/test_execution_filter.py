@@ -36,8 +36,8 @@ def bullish_data(base_data):
     df["high"] = df["close"] + 5
     df["low"] = df["close"] - 5
 
-    # Pre-calculate EMAs to avoid fallback logic testing only
-    for p in [8, 20, 21, 50, 200]:
+    # Pre-calculate EMAs (8, 21, 50, 200)
+    for p in [8, 21, 50, 200]:
         df[f"base_M5_ema_{p}"] = df["close"].ewm(span=p, adjust=False).mean()
 
     # Pre-calculate RSI in bullish zone (60)
@@ -57,8 +57,8 @@ def bearish_data(base_data):
     df["high"] = df["close"] + 5
     df["low"] = df["close"] - 5
 
-    # Pre-calculate EMAs
-    for p in [8, 20, 21, 50, 200]:
+    # Pre-calculate EMAs (8, 21, 50, 200)
+    for p in [8, 21, 50, 200]:
         df[f"base_M5_ema_{p}"] = df["close"].ewm(span=p, adjust=False).mean()
 
     # Pre-calculate RSI in bearish zone (40)
@@ -101,104 +101,122 @@ def sell_signal():
 
 # --- Layer 1: ATR Volatility ---
 def test_atr_volatility_pass(filter_engine, base_data):
-    # Normal volatility
     df = base_data.copy()
     df["base_M5_atr"] = 1.0
-    assert filter_engine._check_atr_volatility(df) is True
+    passed, metrics = filter_engine._check_atr_volatility_with_metrics(df)
+    assert passed is True
+    assert metrics["ratio"] <= 3.0
 
 def test_atr_volatility_fail(filter_engine, base_data):
-    # Spiking volatility
     df = base_data.copy()
     df["base_M5_atr"] = [1.0] * 199 + [10.0]
-    assert filter_engine._check_atr_volatility(df) is False
+    passed, metrics = filter_engine._check_atr_volatility_with_metrics(df)
+    assert passed is False
+    assert metrics["ratio"] > 3.0
 
-# --- Layer 2: Trend Angle (EMA20) ---
+# --- Layer 2: Trend Angle ---
 def test_trend_angle_buy_pass(filter_engine, bullish_data):
-    assert filter_engine._check_trend_angle(bullish_data, direction=1) is True
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(bullish_data, direction=1)
+    assert passed is True
+    assert metrics["slope"] > 0
 
 def test_trend_angle_buy_fail(filter_engine, bearish_data):
-    assert filter_engine._check_trend_angle(bearish_data, direction=1) is False
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(bearish_data, direction=1)
+    assert passed is False
+    assert metrics["slope"] < 0
 
 def test_trend_angle_sell_pass(filter_engine, bearish_data):
-    assert filter_engine._check_trend_angle(bearish_data, direction=-1) is True
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(bearish_data, direction=-1)
+    assert passed is True
+    assert metrics["slope"] < 0
 
 def test_trend_angle_sell_fail(filter_engine, bullish_data):
-    assert filter_engine._check_trend_angle(bullish_data, direction=-1) is False
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(bullish_data, direction=-1)
+    assert passed is False
+    assert metrics["slope"] > 0
 
 def test_trend_angle_fallback(filter_engine, base_data):
-    # Test without pre-calculated EMA20 column
+    # Test without pre-calculated EMA21 column
     df = base_data.copy()
     df["close"] = np.linspace(1700, 1900, 200) # Uptrend
-    assert filter_engine._check_trend_angle(df, direction=1) is True
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(df, direction=1)
+    assert passed is True
+    assert metrics["slope"] > 0
 
 # --- Layer 3: EMA Sequence ---
 def test_ema_sequence_buy_pass(filter_engine, bullish_data):
-    assert filter_engine._check_ema_sequence(bullish_data, direction=1) is True
+    passed, metrics = filter_engine._check_ema_sequence_with_metrics(bullish_data, direction=1)
+    assert passed is True
 
 def test_ema_sequence_buy_fail(filter_engine, bearish_data):
-    assert filter_engine._check_ema_sequence(bearish_data, direction=1) is False
+    passed, metrics = filter_engine._check_ema_sequence_with_metrics(bearish_data, direction=1)
+    assert passed is False
 
 def test_ema_sequence_sell_pass(filter_engine, bearish_data):
-    assert filter_engine._check_ema_sequence(bearish_data, direction=-1) is True
+    passed, metrics = filter_engine._check_ema_sequence_with_metrics(bearish_data, direction=-1)
+    assert passed is True
 
 def test_ema_sequence_sell_fail(filter_engine, bullish_data):
-    assert filter_engine._check_ema_sequence(bullish_data, direction=-1) is False
+    passed, metrics = filter_engine._check_ema_sequence_with_metrics(bullish_data, direction=-1)
+    assert passed is False
 
 # --- Layer 4: Momentum (RSI) ---
 def test_momentum_buy_pass(filter_engine, bullish_data):
-    # bullish_data has RSI 60 (Healthy for BUY: 50-75)
-    assert filter_engine._check_momentum(bullish_data, direction=1) is True
+    passed, metrics = filter_engine._check_momentum_with_metrics(bullish_data, direction=1)
+    assert passed is True
+    assert 50 <= metrics["rsi"] <= 75
 
 def test_momentum_buy_fail_low(filter_engine, bearish_data):
-    # bearish_data has RSI 40 (Too low for BUY)
-    assert filter_engine._check_momentum(bearish_data, direction=1) is False
+    passed, metrics = filter_engine._check_momentum_with_metrics(bearish_data, direction=1)
+    assert passed is False
 
 def test_momentum_buy_fail_high(filter_engine, bullish_data):
-    # RSI too high (80)
     bullish_data["base_M5_rsi"] = 80
-    assert filter_engine._check_momentum(bullish_data, direction=1) is False
+    passed, metrics = filter_engine._check_momentum_with_metrics(bullish_data, direction=1)
+    assert passed is False
 
 def test_momentum_sell_pass(filter_engine, bearish_data):
-    # bearish_data has RSI 40 (Healthy for SELL: 25-50)
-    assert filter_engine._check_momentum(bearish_data, direction=-1) is True
+    passed, metrics = filter_engine._check_momentum_with_metrics(bearish_data, direction=-1)
+    assert passed is True
+    assert 25 <= metrics["rsi"] <= 50
 
 def test_momentum_sell_fail_high(filter_engine, bullish_data):
-    # bullish_data has RSI 60 (Too high for SELL)
-    assert filter_engine._check_momentum(bullish_data, direction=-1) is False
+    passed, metrics = filter_engine._check_momentum_with_metrics(bullish_data, direction=-1)
+    assert passed is False
 
 def test_momentum_sell_fail_low(filter_engine, bearish_data):
-    # RSI too low (20)
     bearish_data["base_M5_rsi"] = 20
-    assert filter_engine._check_momentum(bearish_data, direction=-1) is False
+    passed, metrics = filter_engine._check_momentum_with_metrics(bearish_data, direction=-1)
+    assert passed is False
 
 # --- Layer 5: Session/Time ---
-def test_session_time_pass(filter_engine):
+def test_session_time_weekday_pass(filter_engine):
     # Tuesday 10:00 GMT
     dt = datetime(2023, 10, 10, 10, 0, 0)
     assert filter_engine._check_session_time(dt) is True
 
-def test_session_time_fail_saturday(filter_engine):
+def test_session_time_saturday_fail(filter_engine):
     # Saturday
     dt = datetime(2023, 10, 14, 10, 0, 0)
     assert filter_engine._check_session_time(dt) is False
 
-def test_session_time_sunday_pass(filter_engine):
-    # Sunday 18:00 GMT (Passes after 17:00)
-    dt = datetime(2023, 10, 15, 18, 0, 0)
-    assert filter_engine._check_session_time(dt) is True
-
-def test_session_time_sunday_fail(filter_engine):
-    # Sunday 12:00 GMT (Fails before 17:00)
+def test_session_time_sunday_early_fail(filter_engine):
+    # Sunday 12:00 GMT
     dt = datetime(2023, 10, 15, 12, 0, 0)
     assert filter_engine._check_session_time(dt) is False
 
-def test_session_time_friday_pass(filter_engine):
-    # Friday 12:00 GMT (Passes before 16:00)
+def test_session_time_sunday_late_pass(filter_engine):
+    # Sunday 18:00 GMT
+    dt = datetime(2023, 10, 15, 18, 0, 0)
+    assert filter_engine._check_session_time(dt) is True
+
+def test_session_time_friday_early_pass(filter_engine):
+    # Friday 12:00 GMT
     dt = datetime(2023, 10, 13, 12, 0, 0)
     assert filter_engine._check_session_time(dt) is True
 
-def test_session_time_friday_fail(filter_engine):
-    # Friday 18:00 GMT (Fails after 16:00)
+def test_session_time_friday_late_fail(filter_engine):
+    # Friday 18:00 GMT
     dt = datetime(2023, 10, 13, 18, 0, 0)
     assert filter_engine._check_session_time(dt) is False
 
@@ -211,15 +229,13 @@ def test_drawdown_fail(filter_engine):
 
 # --- Full Cascade ---
 def test_full_cascade_pass(filter_engine, buy_signal, bullish_data):
-    # Tuesday 10:00 GMT
     ts = datetime(2023, 10, 10, 10, 0, 0)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is True
     assert decision.blocked_by is None
-    assert decision.confidence_score == buy_signal.confidence
+    assert decision.signal == buy_signal
 
 def test_full_cascade_blocked_by_atr(filter_engine, buy_signal, base_data):
-    # Spiking volatility
     base_data["base_M5_atr"] = [1.0] * 199 + [10.0]
     ts = datetime(2023, 10, 10, 10, 0, 0)
     decision = filter_engine.validate(buy_signal, base_data, 0.05, timestamp=ts)
@@ -227,14 +243,12 @@ def test_full_cascade_blocked_by_atr(filter_engine, buy_signal, base_data):
     assert decision.blocked_by == "ATR_VOLATILITY"
 
 def test_full_cascade_blocked_by_trend(filter_engine, buy_signal, bearish_data):
-    # Buy signal on bearish data
     ts = datetime(2023, 10, 10, 10, 0, 0)
     decision = filter_engine.validate(buy_signal, bearish_data, 0.05, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "TREND_ANGLE"
 
 def test_full_cascade_blocked_by_ema(filter_engine, buy_signal, bullish_data):
-    # Break EMA sequence
     bullish_data["base_M5_ema_200"] = 3000
     ts = datetime(2023, 10, 10, 10, 0, 0)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
@@ -242,7 +256,6 @@ def test_full_cascade_blocked_by_ema(filter_engine, buy_signal, bullish_data):
     assert decision.blocked_by == "EMA_SEQUENCE"
 
 def test_full_cascade_blocked_by_momentum(filter_engine, buy_signal, bullish_data):
-    # Set RSI to 80 (Overbought, outside 50-75 zone)
     bullish_data["base_M5_rsi"] = 80
     ts = datetime(2023, 10, 10, 10, 0, 0)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
@@ -250,7 +263,6 @@ def test_full_cascade_blocked_by_momentum(filter_engine, buy_signal, bullish_dat
     assert decision.blocked_by == "MOMENTUM"
 
 def test_full_cascade_blocked_by_session(filter_engine, buy_signal, bullish_data):
-    # Saturday
     ts = datetime(2023, 10, 14, 10, 0, 0)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is False
