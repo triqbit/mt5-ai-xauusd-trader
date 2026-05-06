@@ -15,25 +15,33 @@
 # Trading & Risk Management (Highest Sensitivity) (Jules01, Jules03)
 /src/trading/ @maintainer-trading @andonly1348
 /src/analytics/ @maintainer-trading
+/src/data/ @maintainer-trading @maintainer-models
 
 # AI/ML Model Architectures & Research (Jules04)
 /src/models/ @maintainer-models
 /src/research/ @maintainer-models
 /src/environment/ @maintainer-models
 
-# Release Reliability & Security Enforcement
+# Monitoring & Observability (Jules06)
+/src/monitoring/ @maintainer-quality @andonly1348
+
+# Utilities & Shared Helpers
+/src/utils/ @maintainer-quality @andonly1348
+
+# Release Reliability & Security Enforcement (Jules02, Jules03)
 /.github/workflows/ @andonly1348 @xnessom
 /scripts/ @andonly1348 @xnessom
 /Dockerfile @andonly1348 @xnessom
 /requirements*.txt @xnessom
 
-# Database Migrations & Schemas
+# Database Migrations & Schemas (Jules03)
 /migrations/ @andonly1348
 
 # Documentation & Governance Policies
 /docs/ @andonly1348
 /README.md @andonly1348
 /CHANGELOG.md @andonly1348
+/SECURITY.md @andonly1348 @xnessom
 
-# Testing & Quality Assurance
+# Testing & Quality Assurance (Jules06)
 /tests/ @maintainer-quality
