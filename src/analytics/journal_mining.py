@@ -58,6 +58,15 @@ class PatternConcentration(BaseModel):
     total_trades: int
 
 
+class CombinationMotif(BaseModel):
+    """A recurring combination of multiple signals within a time window."""
+
+    patterns: list[str]  # e.g. ["ensemble:1", "ppo:-1"]
+    frequency: int
+    avg_pnl_after: float
+    is_toxic: bool = False
+
+
 class BlockReasonSummary(BaseModel):
     """Summary of repeated signal block reasons."""
 
@@ -91,6 +100,7 @@ class JournalReport(BaseModel):
     risk_block_summary: list[BlockReasonSummary]
     recurring_motifs: list[SignalMotif] = Field(default_factory=list)
     pre_drawdown_motifs: list[SignalMotif] = Field(default_factory=list)
+    combination_motifs: list[CombinationMotif] = Field(default_factory=list)
     avg_win_duration: float = 0.0
     avg_loss_duration: float = 0.0
 
@@ -328,7 +338,15 @@ class JournalMiner:
         if trades_df.empty:
             return []
 
-        trades = trades_df.sort_values("created_at").to_dict("records")
+        # Ensure UTC-aware
+        df = trades_df.copy()
+        if df["created_at"].dt.tz is None:
+            df["created_at"] = df["created_at"].dt.tz_localize(UTC)
+        else:
+            df["created_at"] = df["created_at"].dt.tz_convert(UTC)
+
+        trades = df.sort_values("created_at").to_dict("records")
+
         clusters = []
         current_cluster = []
 
@@ -698,7 +716,7 @@ class JournalMiner:
     ) -> dict[str, float]:
         """
         Detect if risk blocks increase during 'weak strategy states'.
-        Weak state is defined as being within 24 hours of a drawdown cluster.
+        Weak state is defined as the 24-hour window preceding a drawdown cluster.
         """
         if risk_events_df.empty or trades_df.empty:
             return {}
@@ -707,14 +725,16 @@ class JournalMiner:
         if not clusters:
             return dict.fromkeys(risk_events_df["event_type"].unique(), 0.0)
 
-        # Mark 'weak' time windows
+        # Mark 'weak' time windows: 24h before any drawdown cluster
         weak_windows = []
         for cluster in clusters:
-            # Window starts at cluster start and ends 24h after cluster end
-            end_time = cluster.end_time + pd.Timedelta(hours=24)
-            weak_windows.append((cluster.start_time, end_time))
+            start_time = cluster.start_time - pd.Timedelta(hours=24)
+            weak_windows.append((start_time, cluster.start_time))
 
         def is_weak(dt: datetime) -> bool:
+            # Ensure dt is timezone-aware
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=UTC)
             return any(start <= dt <= end for start, end in weak_windows)
 
         # Assume risk_events_df has a timestamp. If not, we might need to join with signals
@@ -734,6 +754,72 @@ class JournalMiner:
             results[reason] = float(weak_count / len(group))
 
         return results
+
+    def find_combination_motifs(
+        self, signals_df: pd.DataFrame, trades_df: pd.DataFrame, window_minutes: int = 60
+    ) -> list[CombinationMotif]:
+        """
+        Detect recurring combinations of multiple signals (e.g. from different algorithms)
+        within a short window that frequently precede drawdown clusters.
+        """
+        if signals_df.empty or trades_df.empty:
+            return []
+
+        # Ensure UTC-awareness for comparisons
+        sigs = signals_df.copy()
+        if sigs["created_at"].dt.tz is None:
+            sigs["created_at"] = sigs["created_at"].dt.tz_localize(UTC)
+        else:
+            sigs["created_at"] = sigs["created_at"].dt.tz_convert(UTC)
+
+        clusters = self.detect_drawdown_clusters(trades_df)
+        if not clusters:
+            return []
+
+        combinations = []
+        for cluster in clusters:
+            # Ensure cluster start_time is timezone-aware and UTC
+            cluster_start = cluster.start_time
+            if cluster_start.tzinfo is None:
+                cluster_start = cluster_start.replace(tzinfo=UTC)
+            else:
+                cluster_start = cluster_start.astimezone(UTC)
+
+            start_window = cluster_start - pd.Timedelta(minutes=window_minutes)
+
+            pre_cluster = sigs[
+                (sigs["created_at"] >= start_window)
+                & (sigs["created_at"] <= cluster_start)
+            ]
+
+            if len(pre_cluster) >= 2:
+                # Create a pattern string: sorted list of algo:direction
+                pattern = sorted(
+                    [f"{row['algorithm']}:{row['direction']}" for _, row in pre_cluster.iterrows()]
+                )
+                combinations.append(tuple(pattern))
+
+        if not combinations:
+            return []
+
+        from collections import Counter
+
+        counts = Counter(combinations)
+        results = []
+
+        for pattern_tuple, count in counts.items():
+            if count >= 2:
+                # Heuristic: these combinations precede clusters, so they are toxic by definition
+                results.append(
+                    CombinationMotif(
+                        patterns=list(pattern_tuple),
+                        frequency=count,
+                        avg_pnl_after=0.0,  # Could be calculated if needed
+                        is_toxic=True,
+                    )
+                )
+
+        return sorted(results, key=lambda x: x.frequency, reverse=True)
 
     def run_mining(self) -> JournalReport:
         """Execute full mining suite and return typed report."""
@@ -799,6 +885,7 @@ class JournalMiner:
                 risk_block_summary=self.analyze_risk_blocks(risk_df, signals_df, trades_df),
                 recurring_motifs=self.find_frequent_motifs(signals_df, trades_df),
                 pre_drawdown_motifs=self.detect_pre_drawdown_motifs(signals_df, trades_df),
+                combination_motifs=self.find_combination_motifs(signals_df, trades_df),
                 avg_win_duration=durations["avg_win_duration"],
                 avg_loss_duration=durations["avg_loss_duration"],
             )
