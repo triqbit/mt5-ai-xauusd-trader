@@ -17,6 +17,18 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "EventImpact",
+    "EventCategory",
+    "MacroEvent",
+    "RiskStatus",
+    "BaseEventProvider",
+    "MockEventProvider",
+    "JSONEventProvider",
+    "MetaAPIEventProvider",
+    "EventIntelligence",
+]
+
 
 class EventImpact(IntEnum):
     """Normalized event impact scores."""
@@ -172,6 +184,10 @@ class MetaAPIEventProvider(BaseEventProvider):
 
             macro_events = []
             for item in data:
+                # Filter for USD events
+                if item.get("country") != "US" and item.get("currency") != "USD":
+                    continue
+
                 # Basic normalization
                 name = item.get("event", "Unknown Event")
                 category = self._guess_category(name)
@@ -208,9 +224,15 @@ class MetaAPIEventProvider(BaseEventProvider):
             kw in name_upper for kw in ["DECISION", "STATEMENT", "MINUTES", "PRESS CONFERENCE"]
         ):
             return EventCategory.RATES
-        if any(kw in name_upper for kw in ["WAR", "CONFLICT", "SANCTION", "GEOPOLITICAL", "ELECTION"]):
+        if any(
+            kw in name_upper
+            for kw in ["WAR", "CONFLICT", "SANCTION", "GEOPOLITICAL", "ELECTION", "TENSION"]
+        ):
             return EventCategory.GEOPOLITICAL
-        if any(kw in name_upper for kw in ["GDP", "PMI", "ISM", "RETAIL SALES", "CONSUMER CONFIDENCE"]):
+        if any(
+            kw in name_upper
+            for kw in ["GDP", "PMI", "ISM", "RETAIL SALES", "CONSUMER CONFIDENCE", "TREASURY"]
+        ):
             return EventCategory.USD_MACRO
         if "USD" in name_upper:
             return EventCategory.USD

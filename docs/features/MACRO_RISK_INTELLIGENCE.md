@@ -10,7 +10,7 @@ The `EventIntelligence` module (located in `src/data/event_intelligence.py`) pro
 - **Risk Multipliers:** Calculates a `risk_multiplier` to reduce position sizes during elevated risk periods.
 - **Execution Blocking:** Automatically identifies when trading should be strictly prohibited due to critical events.
 - **Enterprise-Grade Resilience:** Features an internal caching mechanism and robust fallback logic that maintains "elevated risk awareness" even if external data providers fail.
-- **Advanced Categorization:** Utilizes keyword-based intelligence to identify geopolitical risks and key USD macro drivers beyond standard economic calendar classifications.
+- **Advanced Categorization:** Utilizes keyword-based intelligence to identify geopolitical risks (e.g., "TENSION") and key USD macro drivers (e.g., "TREASURY") beyond standard economic calendar classifications.
 - **Timezone Safety:** Standardizes all event processing on timezone-aware UTC datetimes to prevent synchronization bugs.
 
 ## Data Providers
