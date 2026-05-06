@@ -20,7 +20,9 @@ Calculated directly on the primary timeframe of the input data.
 - **Williams %R (14)**: Percentage price oscillator.
 - **Ultimate Oscillator (7, 14, 28)**: Combined momentum indicator.
 - **Stochastic**: Slow K and Slow D (5, 3, 3).
-- **Hilbert Transform**: HT_TRENDLINE and HT_DCPERIOD for trend and cycle analysis.
+- **Hilbert Transform**: Trendline, DC Period, Phasor (In-Phase/Quad), Sine/Lead Sine, and Trend Mode.
+- **Donchian Channels**: High, Low, and Mid bands (20 period).
+- **Keltner Channels**: Upper, Lower, and Mid bands (20 EMA, 2x ATR).
 
 ### Candle Patterns (60+)
 All TA-Lib Pattern Recognition functions computed for both base and MTF data, including but not limited to:
@@ -39,6 +41,7 @@ All TA-Lib Pattern Recognition functions computed for both base and MTF data, in
 - **VWAP Distances**: Percentage distance from price to each VWAP.
 - **OBV**: On-Balance Volume.
 - **VPT**: Volume Price Trend.
+- **Volume Profile Proxies**: Point of Control (POC), Value Area High (VAH), and Value Area Low (VAL).
 
 ## Multi-Timeframe (MTF) Features
 Data is resampled to higher timeframes, indicators are calculated, and then aligned with the base timeframe using a 1-period shift to prevent look-ahead bias.
