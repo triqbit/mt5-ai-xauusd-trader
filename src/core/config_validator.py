@@ -34,6 +34,7 @@ class ConfigValidator:
         self.errors = []
 
         self._check_mt5_credentials()
+        self._check_market_settings()
         self._check_live_mode_confirmation()
         self._check_placeholder_secrets()
         self._check_model_settings()
@@ -75,11 +76,12 @@ class ConfigValidator:
                 )
             )
         elif " " in self.config.mt5_server:
+            is_critical = self.config.mode == "live"
             self.errors.append(
                 ValidationError(
                     "MT5_SERVER",
                     "MT5 server name contains spaces.",
-                    False,  # Warning
+                    is_critical,
                     "Remove spaces from MT5_SERVER (e.g., Use IC-Markets-Demo instead of IC Markets Demo).",
                 )
             )
@@ -112,6 +114,41 @@ class ConfigValidator:
                         "Verify MT5_PATH in .env. Ensure it points to terminal64.exe.",
                     )
                 )
+
+    def _check_market_settings(self) -> None:
+        """Validate SYMBOL and TIMEFRAME settings."""
+        if not self.config.symbol:
+            self.errors.append(
+                ValidationError(
+                    "SYMBOL",
+                    "Trading symbol is missing.",
+                    True,
+                    "Set SYMBOL in your .env (e.g., XAUUSD).",
+                )
+            )
+        elif self.config.symbol != self.config.symbol.upper():
+            self.errors.append(
+                ValidationError(
+                    "SYMBOL",
+                    f"Symbol '{self.config.symbol}' should be uppercase.",
+                    False,
+                    f"Change SYMBOL to {self.config.symbol.upper()} in .env.",
+                )
+            )
+
+        valid_timeframes = {
+            "M1", "M2", "M3", "M4", "M5", "M6", "M10", "M12", "M15", "M20", "M30",
+            "H1", "H2", "H3", "H4", "H6", "H8", "H12", "D1", "W1", "MN1"
+        }
+        if self.config.timeframe.upper() not in valid_timeframes:
+            self.errors.append(
+                ValidationError(
+                    "TIMEFRAME",
+                    f"Invalid timeframe: {self.config.timeframe}.",
+                    True,
+                    f"Use one of: {', '.join(sorted(valid_timeframes))}.",
+                )
+            )
 
     def _check_live_mode_confirmation(self) -> None:
         """Enforce explicit confirmation for LIVE trading."""
@@ -148,6 +185,27 @@ class ConfigValidator:
                     "Database URL is using default placeholder credentials.",
                     True,
                     "Update DATABASE_URL in .env with a secure password.",
+                )
+            )
+
+        if self.config.mode == "live" and "sqlite" in db_url.lower():
+            self.errors.append(
+                ValidationError(
+                    "DATABASE_URL",
+                    "Using SQLite in LIVE mode is discouraged for production reliability.",
+                    False,
+                    "Consider using PostgreSQL for LIVE trading.",
+                )
+            )
+
+        # Check Redis
+        if any(p in self.config.redis_url.upper() for p in placeholders):
+             self.errors.append(
+                ValidationError(
+                    "REDIS_URL",
+                    "Redis URL contains placeholder text.",
+                    True,
+                    "Replace with your actual Redis connection string in .env.",
                 )
             )
 
