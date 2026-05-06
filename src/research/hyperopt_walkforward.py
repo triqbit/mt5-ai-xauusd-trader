@@ -37,15 +37,15 @@ class RobustnessWeights(BaseModel):
     """Weights for the robustness score calculation."""
 
     oos_mean: float = Field(0.4, description="Weight for mean OOS Sharpe Ratio")
-    worst_oos: float = Field(0.2, description="Weight for worst window OOS Sharpe Ratio")
+    worst_oos: float = Field(0.3, description="Weight for worst window OOS Sharpe Ratio")
     win_rate_consistency: float = Field(0.1, description="Weight for win rate consistency (1-CV)")
     drawdown_consistency: float = Field(
         0.1, description="Weight for max drawdown consistency (1-CV)"
     )
-    oos_std: float = Field(0.3, description="Penalty weight for OOS Sharpe standard deviation")
-    is_oos_gap: float = Field(0.2, description="Penalty weight for IS-OOS Sharpe gap")
-    stability: float = Field(0.3, description="Penalty weight for parameter instability")
-    regime_consistency: float = Field(0.1, description="Weight for consistency across regimes")
+    oos_std: float = Field(0.2, description="Penalty weight for OOS Sharpe standard deviation")
+    is_oos_gap: float = Field(0.3, description="Penalty weight for IS-OOS Sharpe gap")
+    stability: float = Field(0.4, description="Penalty weight for parameter instability")
+    regime_consistency: float = Field(0.2, description="Weight for consistency across regimes")
 
 
 class WalkForwardConfig(BaseModel):
@@ -76,6 +76,7 @@ class RobustnessMetrics(BaseModel):
     is_oos_gap: float
     stability_penalty: float
     regime_consistency: float
+    walk_forward_efficiency: float
     robustness_score: float
 
 
@@ -117,16 +118,18 @@ class WalkForwardResult(BaseModel):
             )
 
         insights = (
-            f"OOS Sharpe Mean: {self.metrics.oos_sharpe_mean:.2f}, "
-            f"Worst Window Sharpe: {self.metrics.worst_window_sharpe:.2f}, "
-            f"IS-OOS Gap: {self.metrics.is_oos_gap:.2f}, "
-            f"Regime Consistency: {self.metrics.regime_consistency:.2f}, "
-            f"WinRate Consistency: {self.metrics.win_rate_consistency:.2f}"
+            f"OOS Sharpe Mean: {self.metrics.oos_sharpe_mean:.2f} | "
+            f"WFE: {self.metrics.walk_forward_efficiency:.2f} | "
+            f"Worst OOS Sharpe: {self.metrics.worst_window_sharpe:.2f} | "
+            f"IS-OOS Gap: {self.metrics.is_oos_gap:.2f} | "
+            f"Regime Consist: {self.metrics.regime_consistency:.2f} | "
+            f"Stability Penalty: {self.metrics.stability_penalty:.2f}"
         )
 
         # Scale robustness score to 0-100 for report
-        # We assume a score of 1.5+ is excellent (100) and 0 is poor (0)
-        display_score = float(np.clip(self.metrics.robustness_score / 1.5 * 100, 0, 100))
+        # We assume a score of 1.2+ is excellent (100) and 0 is poor (0)
+        # Institutional standards typically look for Sharpe > 1.0 OOS
+        display_score = float(np.clip(self.metrics.robustness_score / 1.2 * 100, 0, 100))
 
         return HyperparameterSection(
             stability_score=display_score,
@@ -213,7 +216,7 @@ class WalkForwardOptimizer:
 
     def _calculate_stability_penalty(self, params: dict[str, Any], data: pd.DataFrame) -> float:
         """
-        Calculates a penalty for parameter instability by perturbing continuous parameters.
+        Calculates a penalty for parameter instability by perturbing parameters.
 
         Measures how much performance (Sharpe Ratio) changes when parameters are shifted
         by a small amount. Uses only training data to prevent look-ahead bias.
@@ -230,14 +233,27 @@ class WalkForwardOptimizer:
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 # Small perturbation (5%)
                 original_val = value
+                is_int = isinstance(original_val, int)
+
                 for direction in [-1, 1]:
                     perturbed_params = params.copy()
                     delta = (
-                        max(1, abs(original_val) * 0.05)
-                        if isinstance(original_val, int)
+                        max(1, int(abs(original_val) * 0.05))
+                        if is_int
                         else original_val * 0.05
                     )
-                    perturbed_params[key] = original_val + (direction * delta)
+
+                    new_val = original_val + (direction * delta)
+
+                    # Ensure type safety
+                    if is_int:
+                        new_val = int(round(new_val))
+
+                    # If no change occurred (e.g. value was small and delta was 0), skip
+                    if new_val == original_val:
+                        continue
+
+                    perturbed_params[key] = new_val
 
                     try:
                         p_metrics = self._evaluate_strategy(data, perturbed_params)
@@ -250,6 +266,7 @@ class WalkForwardOptimizer:
             return 0.0
 
         # Penalty is the standard deviation of Sharpe ratios under perturbation
+        # This highlights "parameter cliffs" where small changes cause large performance swings
         return float(np.std(perturbations))
 
     def _calculate_regime_consistency(
@@ -380,6 +397,8 @@ class WalkForwardOptimizer:
             trial.set_user_attr("gap", float(gap))
             trial.set_user_attr("stability", float(stability))
             trial.set_user_attr("regime_cons", float(regime_cons))
+            wfe = oos_mean / (is_mean + 1e-9)
+            trial.set_user_attr("wfe", float(wfe))
             trial.set_user_attr("robustness_score", float(robustness))
 
             # Select return value based on config
@@ -411,6 +430,7 @@ class WalkForwardOptimizer:
             is_oos_gap=best_trial.user_attrs["gap"],
             stability_penalty=best_trial.user_attrs["stability"],
             regime_consistency=best_trial.user_attrs["regime_cons"],
+            walk_forward_efficiency=best_trial.user_attrs["wfe"],
             robustness_score=best_trial.user_attrs["robustness_score"],
         )
 
