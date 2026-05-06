@@ -86,6 +86,11 @@ def setup_mock_talib(m_talib):
     m_talib.LINEARREG_SLOPE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_TRENDLINE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_DCPERIOD.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.HT_PHASOR.side_effect = lambda x, *a, **k: (np.random.rand(len(x)), np.random.rand(len(x)))
+    m_talib.HT_SINE.side_effect = lambda x, *a, **k: (np.random.rand(len(x)), np.random.rand(len(x)))
+    m_talib.HT_TRENDMODE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.MAX.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.MIN.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.SMA.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.SUM.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.ROCP.side_effect = lambda x, *a, **k: np.random.rand(len(x))
@@ -130,8 +135,8 @@ def test_pipeline_resilience_to_malformed_data(data_generator, feature_engineer,
 
     if not features.empty:
         obs = features.iloc[-1].values
-        direction, confidence, _ = mock_ensemble.predict(obs)
-        assert direction in SignalDirection
+        signal = mock_ensemble.predict(obs)
+        assert isinstance(signal.direction, SignalDirection)
 
 def test_pipeline_insufficient_history(data_generator, feature_engineer):
     """Verifies behavior when data is too short for technical indicators."""
