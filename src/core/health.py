@@ -14,11 +14,11 @@ from datetime import UTC, datetime
 from enum import Enum
 
 import redis
-from sqlalchemy import text
 from fastapi import APIRouter, FastAPI, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from prometheus_client import Gauge, make_asgi_app
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 
 from src.core.audit_log import AuditLogger
 from src.core.config import TradingConfig, get_config

@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Enterprise Health Monitoring:** Refined the `src/core/health.py` system with robust liveness/readiness probes, multi-layered dependency checks (Database, MT5, Redis, Models, Audit), and a mandatory startup gate.
 - **Deployment Validation Gates:** Implemented a robust pre-deployment validation workflow in `.github/workflows/pre-deploy-validation.yml` to prevent unsafe releases.
 - **Environment Safety Checks:** Enhanced `scripts/validate_env.py` and synchronized `.env.example` to ensure configuration completeness before deployment.
 - **Release Readiness Auditing:** Integrated `scripts/check_release_notes.py` to mandate descriptive changelog entries for all new releases.
