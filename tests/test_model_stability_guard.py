@@ -72,6 +72,11 @@ def test_filter_with_healthy_model(execution_filter, valid_signal, mock_market_d
     # Adjust mock data to ensure earlier layers pass
     assert decision.is_approved is True
 
+def test_filter_with_model_stability_in_trace(execution_filter, valid_signal, mock_market_data):
+    health = {"drift": 0.1, "accuracy": 0.7}
+    decision = execution_filter.validate(valid_signal, mock_market_data, 0.05, model_health=health)
+    assert "model_stability" in decision.trace
+
 def test_filter_low_historical_win_rate(execution_filter, valid_signal, mock_market_data):
     mock_logger = MagicMock()
     mock_logger.read_performance_report.return_value = {"win_rate": 0.4, "total_trades": 25}

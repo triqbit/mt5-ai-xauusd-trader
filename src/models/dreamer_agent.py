@@ -53,6 +53,15 @@ class DreamerAgent(BaseModel):
         """
         self.logger.debug("DreamerAgent.predict called (placeholder).")
 
+        # Production-grade robustness: Check for NaN or Inf in input features
+        if not np.isfinite(features).all():
+            self.logger.error("Input features contain NaN or Inf values.")
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": "Invalid features: NaN or Inf detected"},
+            )
+
         # Placeholder logic: return neutral signal
         return Signal(
             direction=SignalDirection.HOLD,

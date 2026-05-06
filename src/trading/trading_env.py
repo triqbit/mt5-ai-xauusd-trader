@@ -27,18 +27,25 @@ class TradingEnv(gym.Env):
 
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, df: pd.DataFrame | None = None, window_size: int = 20) -> None:
+    def __init__(
+        self,
+        df: pd.DataFrame | None = None,
+        window_size: int = 20,
+        initial_balance: float = 10000.0,
+    ) -> None:
         """
         Initializes the trading environment.
 
         Args:
             df: Optional DataFrame containing historical market data.
             window_size: Number of past time steps to include in the observation.
+            initial_balance: Starting account balance.
         """
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.df = df
         self.window_size = window_size
+        self.initial_balance = initial_balance
 
         # Actions: 0 = HOLD, 1 = BUY, 2 = SELL
         self.action_space = spaces.Discrete(3)
@@ -54,7 +61,13 @@ class TradingEnv(gym.Env):
         # expensive repeated indexing and casting in _get_observation.
         self._data = df.values.astype(np.float32) if df is not None else None
 
+        # State variables
+        self.balance = initial_balance
+        self.equity = initial_balance
+        self.position = 0  # 0: None, 1: Long, -1: Short (Simplified)
+        self.entry_price = 0.0
         self.current_step = window_size
+
         self.reset()
 
     def reset(
@@ -72,8 +85,13 @@ class TradingEnv(gym.Env):
         """
         super().reset(seed=seed)
         self.current_step = self.window_size
+        self.balance = self.initial_balance
+        self.equity = self.initial_balance
+        self.position = 0
+        self.entry_price = 0.0
+
         obs = self._get_observation()
-        return obs, {}
+        return obs, {"balance": self.balance, "equity": self.equity}
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
@@ -87,25 +105,63 @@ class TradingEnv(gym.Env):
         """
         self.current_step += 1
 
-        # Reward logic - Placeholder skeleton
-        # In a production env, this would use realized/unrealized P&L,
-        # transaction costs, and potentially risk-adjusted metrics like Sharpe.
+        # In a production env, these would come from config or live data
+        spread = 0.0002
+        slippage = 0.0001
+
         reward = 0.0
         if self._data is not None and self.current_step < len(self._data):
-            # Example: Simple price change reward for BUY/SELL
-            current_price = self._data[self.current_step, 3]  # Assuming index 3 is Close
+            # Assuming index 3 is Close price
+            current_price = self._data[self.current_step, 3]
             prev_price = self._data[self.current_step - 1, 3]
-            price_change = current_price - prev_price
 
-            if action == 1:  # BUY
-                reward = float(price_change)
-            elif action == 2:  # SELL
-                reward = float(-price_change)
-            # action == 0 (HOLD) -> reward = 0
+            # Update equity based on open position
+            if self.position == 1:  # Long
+                unrealized_pnl = current_price - prev_price
+                self.equity += unrealized_pnl
+                reward = float(unrealized_pnl)
+            elif self.position == -1:  # Short
+                unrealized_pnl = prev_price - current_price
+                self.equity += unrealized_pnl
+                reward = float(unrealized_pnl)
+
+            # Handle actions (categorical: 0=HOLD, 1=BUY, 2=SELL)
+            if action == 1:  # Want to go LONG
+                if self.position == -1:  # Close short first
+                    realized_pnl = self.entry_price - current_price - (spread + slippage)
+                    self.balance += realized_pnl
+                    self.position = 0
+
+                if self.position == 0:  # Open long
+                    self.position = 1
+                    self.entry_price = current_price + (spread + slippage)
+                    # Apply immediate cost to equity
+                    self.equity -= (spread + slippage)
+
+            elif action == 2:  # Want to go SHORT
+                if self.position == 1:  # Close long first
+                    realized_pnl = current_price - self.entry_price - (spread + slippage)
+                    self.balance += realized_pnl
+                    self.position = 0
+
+                if self.position == 0:  # Open short
+                    self.position = -1
+                    self.entry_price = current_price - (spread + slippage)
+                    # Apply immediate cost to equity
+                    self.equity -= (spread + slippage)
+
+            elif action == 0:  # HOLD / CLOSE
+                # Optional: In some envs, action 0 means "no position"
+                # For this skeleton, we'll keep it as "do nothing to current position"
+                pass
 
         terminated = False
         if self._data is not None and self.current_step >= len(self._data) - 1:
             terminated = True
+            # Close any open position at the end
+            if self.position != 0:
+                self.balance = self.equity
+                self.position = 0
 
         truncated = False
         obs = self._get_observation()
@@ -115,6 +171,11 @@ class TradingEnv(gym.Env):
             "step": self.current_step,
             "action": action,
             "reward": reward,
+            "balance": float(self.balance),
+            "equity": float(self.equity),
+            "position": self.position,
+            "spread": spread,
+            "slippage": slippage,
         }
 
         return obs, reward, terminated, truncated, info

@@ -64,6 +64,8 @@ class ExecutionFilter:
         current_drawdown: float,
         timestamp: datetime | None = None,
         precomputed_metrics: dict[str, Any] | None = None,
+        model_health: dict[str, Any] | None = None,
+        trade_logger: Any | None = None,
     ) -> ExecutionDecision:
         """
         Run the full 6-layer filter cascade.
@@ -140,6 +142,56 @@ class ExecutionFilter:
             "max_drawdown": self.max_drawdown,
         }
 
+        # Layer 7: Model Stability (Optional)
+        stability_passed = True
+        stability_trace = {"passed": True}
+        if model_health:
+            drift = model_health.get("drift", 0.0)
+            accuracy = model_health.get("accuracy", 1.0)
+
+            drift_threshold = (
+                self.cfg.model_drift_threshold if self.cfg else 0.3
+            )
+            accuracy_floor = (
+                self.cfg.model_accuracy_floor if self.cfg else 0.5
+            )
+
+            stability_passed = (drift < drift_threshold) and (accuracy >= accuracy_floor)
+            stability_trace = {
+                "passed": stability_passed,
+                "drift": drift,
+                "accuracy": accuracy,
+                "drift_threshold": drift_threshold,
+                "accuracy_floor": accuracy_floor
+            }
+        trace["model_stability"] = stability_trace
+
+        # Layer 8: Performance Floor (Optional)
+        perf_passed = True
+        perf_trace = {"passed": True}
+        if trade_logger:
+            perf = trade_logger.read_performance_report()
+            win_rate = perf.get("win_rate", 1.0)
+            win_rate_floor = (
+                self.cfg.model_win_rate_floor if self.cfg else 0.45
+            )
+            perf_passed = win_rate >= win_rate_floor
+            perf_trace = {
+                "passed": perf_passed,
+                "win_rate": win_rate,
+                "win_rate_floor": win_rate_floor
+            }
+        trace["performance_floor"] = perf_trace
+
+        # Layer 9: Confidence Threshold
+        min_confidence = self.cfg.min_confidence if self.cfg else 0.6
+        confidence_passed = signal.confidence >= min_confidence
+        trace["confidence_threshold"] = {
+            "passed": confidence_passed,
+            "confidence": signal.confidence,
+            "min_confidence": min_confidence
+        }
+
         # Determine final approval
         is_approved = all(t["passed"] for t in trace.values())
         blocked_by = None
@@ -152,6 +204,9 @@ class ExecutionFilter:
                 "momentum",
                 "session_time",
                 "drawdown_limit",
+                "model_stability",
+                "performance_floor",
+                "confidence_threshold",
             ]
             for layer in failure_order:
                 if not trace[layer]["passed"]:

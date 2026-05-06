@@ -86,6 +86,9 @@ def setup_mock_talib(m_talib):
     m_talib.LINEARREG_SLOPE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_TRENDLINE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_DCPERIOD.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.SMA.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.SUM.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+    m_talib.ROCP.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.get_function_groups.return_value = {"Pattern Recognition": []}
 
 def test_data_to_model_inference_flow(data_generator, feature_engineer, mock_ensemble):
