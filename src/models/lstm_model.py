@@ -198,13 +198,6 @@ class LSTMModel(BaseModel):
         Returns:
             A Signal object with direction, confidence, and probability distribution.
         """
-        if self.model is None or not torch:
-            return Signal(
-                direction=SignalDirection.HOLD,
-                confidence=0.0,
-                metadata={"error": "Model not initialized or PyTorch missing"},
-            )
-
         # Production-grade robustness: Check for NaN or Inf in input features
         if not np.isfinite(features).all():
             self.logger.error("Input features contain NaN or Inf values.")
@@ -212,6 +205,13 @@ class LSTMModel(BaseModel):
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Invalid features: NaN or Inf detected"},
+            )
+
+        if self.model is None or not torch:
+            return Signal(
+                direction=SignalDirection.HOLD,
+                confidence=0.0,
+                metadata={"error": "Model not initialized or PyTorch missing"},
             )
 
         try:
