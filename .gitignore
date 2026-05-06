@@ -96,7 +96,7 @@ htmlcov/
 *.tfstate
 *.tfstate.backup
 .terraform/
-releases/
+# releases/  <-- Don't ignore docs/releases/
 
 # Archives (Cleanup outputs)
 archives/

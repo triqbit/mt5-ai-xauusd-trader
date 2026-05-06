@@ -100,6 +100,7 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config.model_drift_threshold = 0.3
     config.model_accuracy_floor = 0.5
     config.model_win_rate_floor = 0.45
+    config.model_calibration_threshold = 0.25
     config.log_level = "INFO"
 
     validator = ConfigValidator(config)
