@@ -14,7 +14,7 @@ class MockConfig:
         self.model_drift_threshold = 0.3
         self.model_accuracy_floor = 0.45
         self.model_win_rate_floor = 0.40
-        self.confidence_threshold = 0.6
+        self.min_confidence = 0.6
         self.logs_dir = "logs"
 
 @pytest.fixture
