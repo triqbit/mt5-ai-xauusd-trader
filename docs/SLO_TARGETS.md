@@ -10,7 +10,7 @@ Uptime is measured during active market hours (XAUUSD: Monday 00:00 - Friday 23:
 |--------|--------|--------------------|
 | **System Uptime (Live Mode)** | 99.5% | `/health/readiness` probe success rate (Prometheus: `up{job="mt5-bot"}`). |
 | **API Availability** | 99.9% | Percentage of 2xx/3xx responses (Prometheus: `http_requests_total`). |
-| **MT5 Connectivity** | 99.0% | `MT5Connector.is_initialized` status during market hours (Audit Log). |
+| **MT5 Connectivity** | 99.0% | `MT5Connector.is_initialized` status during market hours (Audit Log: `action="mt5_connection_status"`). |
 
 **Acceptable Downtime:** ~3.6 hours per 30-day rolling window.
 
@@ -20,28 +20,28 @@ Ensuring high engineering standards and stable delivery pipelines.
 
 | Metric | Target | Measurement Method |
 |--------|--------|--------------------|
-| **CI Pipeline Success Rate** | 95.0% | Ratio of "Success" vs "Failure" in GitHub Actions `ci.yml` on protected branches. |
+| **CI Pipeline Success Rate** | 95.0% | Ratio of "Success" vs "Failure" in GitHub Actions `ci.yml` on protected branches (GHA REST API). |
 | **Test Coverage (Core)** | > 85% | Automated `pytest-cov` report uploaded to CI artifacts for each PR. |
 | **Static Analysis Compliance** | 100% | Zero critical/high issues from `ruff`, `mypy`, and `bandit` in PRs. |
 
 ## 3. Performance & Latency SLOs
 
-Measured via `src/core/profiler.py` and exported to Prometheus.
+Measured via `src/core/profiler.py` and exported to Prometheus histograms.
 
 | Metric | P50 | P95 | P99 | Measurement Method |
 |--------|-----|-----|-----|-------------------|
-| **Model Inference** | < 10ms | < 50ms | < 100ms | Time from feature vector input to PPO/Ensemble output. |
-| **Risk Approval** | < 20ms | < 50ms | < 100ms | Time to pass through the 6-layer `RiskManager` cascade. |
-| **End-to-End Latency** | < 100ms | < 500ms | < 1.5s | Market Event -> Inference -> Risk -> MT5 Order Execution. |
-| **Backtest Generation** | < 5 min | < 8 min | < 12 min | Time to execute 1-year XAUUSD backtest (1M candles). |
+| **Model Inference** | < 10ms | < 50ms | < 100ms | `trading_block_duration_seconds{block_label="inference"}` |
+| **Risk Approval** | < 20ms | < 50ms | < 100ms | `trading_block_duration_seconds{block_label="risk_check"}` |
+| **End-to-End Latency** | < 100ms | < 500ms | < 1.5s | `trading_execution_latency_seconds` |
+| **Backtest Generation** | < 5 min | < 8 min | < 12 min | GitHub Actions workflow duration for `backtest.yml`. |
 
 ## 4. Operational Reliability & Alerting
 
-Response expectations for the Jules-led operations team, aligned with `docs/runbooks/06-monitoring-alert-triage.md`.
+Response expectations for the operations team, aligned with `docs/runbooks/06-monitoring-alert-triage.md`.
 
 | Severity | Target Response | Target Resolution | Measurement Method |
 |----------|-----------------|-------------------|--------------------|
-| **P0 (Critical)** | < 5 mins | < 1 hour | Telegram notification timestamp to `ack` command. |
+| **P0 (Critical)** | < 5 mins | < 1 hour | Telegram notification timestamp to `ack` command (Audit Log). |
 | **P1 (High)** | < 15 mins | < 4 hours | Prometheus `ALERTS{alertstate="firing"}` duration. |
 | **P2 (Medium)** | < 2 hours | < 24 hours | Issue creation time to first maintainer response in GitHub. |
 | **P3 (Low)** | < 24 hours | 1 Week | Triage labels applied to GitHub issues. |
@@ -50,10 +50,10 @@ Response expectations for the Jules-led operations team, aligned with `docs/runb
 
 Defined in [Disaster Recovery Plan](DISASTER_RECOVERY.md).
 
-| Metric | Target | Description |
-|--------|--------|-------------|
-| **Recovery Time (RTO)** | 15 mins | Maximum time to restore service after a system/process failure. |
-| **Recovery Point (RPO)** | 1 hour | Maximum data loss allowed (governed by hourly database backups). |
+| Metric | Target | Measurement Method |
+|--------|--------|--------------------|
+| **Recovery Time (RTO)** | 15 mins | System downtime between `circuit_breaker_triggered` and `system_restored` (Audit Log). |
+| **Recovery Point (RPO)** | 1 hour | Timestamp difference between last valid backup and incident start. |
 
 ## 6. Error Budget Framework (30-Day Rolling Window)
 
@@ -63,8 +63,8 @@ The error budget is the acceptable amount of failure. Exceeding these triggers a
 |-----------|--------------|-----------------------------------------|
 | **Availability** | 0.5% (3.6h) | ~3.6 hours of cumulative outage during market hours. |
 | **CI Stability** | 5% | ~5 failed builds per 100 commits to protected branches. |
-| **Trade Execution** | 0.1% | 1 failed order per 1,000 approved signals. |
-| **Model Accuracy** | 5% Drift | Max 5% deviation from expected confidence thresholds. |
+| **Trade Execution** | 0.1% | 1 failed order per 1,000 approved signals (`trading_orders_rejected_total`). |
+| **Model Accuracy** | 5% Drift | Max 5% deviation from expected confidence thresholds (`trading_model_drift_score`). |
 | **Data Integrity** | 0% | Zero unrecoverable data corruption events. |
 
 ### 6.1 Error Budget Calculation Formulas
@@ -92,6 +92,6 @@ If any error budget is exhausted (reaches 0% remaining) within a 30-day window:
 3. **Post-Mortem Review**: Mandatory review with @andonly1348 to adjust risk limits or monitoring thresholds.
 
 ## 7. Monitoring & Governance
-- **Automation:** Compliance is tracked via Prometheus metrics (`trading_latency_ms`, `health_check_status`).
+- **Automation:** Compliance is tracked via Prometheus metrics (`trading_execution_latency_seconds`, `system_component_health`).
 - **Reporting:** Weekly reliability reports generated from Prometheus/Grafana.
 - **Audit:** Any SLO breach requires a Blameless Post-Mortem and an update to the [Risk Manager](../src/trading/risk_manager.py) or [Circuit Breaker](../src/core/monitor.py) logic if applicable.
