@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 from src.data.event_intelligence import (
     EventIntelligence,
     MockEventProvider,
+    BaseEventProvider,
     JSONEventProvider,
     MetaAPIEventProvider,
     MacroEvent,
@@ -203,7 +204,9 @@ def test_metaapi_provider(mock_get, now):
         {
             "event": "Core CPI m/m",
             "impact": "high",
-            "time": time_str
+            "time": time_str,
+            "currency": "USD",
+            "country": "US"
         }
     ]
     mock_get.return_value = mock_response
@@ -238,3 +241,99 @@ def test_major_event_extended_window(now):
     # Check at 50m
     status = intel.get_risk_status(now + timedelta(minutes=40))
     assert status.is_blocked is True
+
+def test_guess_category_new_keywords():
+    provider = MetaAPIEventProvider(token="fake")
+    assert provider._guess_category("Geopolitical Tension") == EventCategory.GEOPOLITICAL
+    assert provider._guess_category("US Treasury Bond Auction") == EventCategory.USD_MACRO
+
+@patch("requests.get")
+def test_metaapi_provider_filtering(mock_get, now):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    event_time = now + timedelta(minutes=30)
+    time_str = event_time.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+    mock_response.json.return_value = [
+        {
+            "event": "USD Event",
+            "impact": "high",
+            "time": time_str,
+            "currency": "USD",
+            "country": "US"
+        },
+        {
+            "event": "EUR Event",
+            "impact": "high",
+            "time": time_str,
+            "currency": "EUR",
+            "country": "EU"
+        }
+    ]
+    mock_get.return_value = mock_response
+
+    provider = MetaAPIEventProvider(token="fake_token")
+    events = provider.get_upcoming_events(now - timedelta(hours=1), now + timedelta(hours=1))
+
+    # Should only include the USD event
+    assert len(events) == 1
+    assert events[0].name == "USD Event"
+
+def test_macro_event_properties(now):
+    event = MacroEvent(
+        name="Test",
+        category=EventCategory.OTHER,
+        impact=EventImpact.HIGH,
+        timestamp=now
+    )
+    assert event.is_high_impact is True
+
+    event.end_timestamp = now + timedelta(hours=1)
+    assert event.is_ongoing(now + timedelta(minutes=30)) is True
+    assert event.is_ongoing(now - timedelta(minutes=1)) is False
+
+def test_json_provider_missing_file():
+    provider = JSONEventProvider("non_existent.json")
+    assert provider.get_upcoming_events(datetime.now(), datetime.now()) == []
+
+def test_json_provider_error(tmp_path):
+    file_path = tmp_path / "corrupt.json"
+    file_path.write_text("invalid json")
+    provider = JSONEventProvider(str(file_path))
+    assert provider.get_upcoming_events(datetime.now(), datetime.now()) == []
+
+@patch("requests.get")
+def test_metaapi_provider_error(mock_get, now):
+    mock_get.side_effect = Exception("Network Error")
+    provider = MetaAPIEventProvider(token="fake")
+    assert provider.get_upcoming_events(now, now) == []
+
+def test_guess_category_more_keywords():
+    provider = MetaAPIEventProvider(token="fake")
+    assert provider._guess_category("Federal Reserve Meeting") == EventCategory.FOMC
+    assert provider._guess_category("Interest Rate Decision") == EventCategory.RATES
+    assert provider._guess_category("GDP Annualized") == EventCategory.USD_MACRO
+    assert provider._guess_category("USD Strength Index") == EventCategory.USD
+
+def test_event_intelligence_helpers(now):
+    event = MacroEvent(
+        name="Blocked",
+        category=EventCategory.FOMC,
+        impact=EventImpact.CRITICAL,
+        timestamp=now + timedelta(minutes=10)
+    )
+    provider = MockEventProvider([event])
+    intel = EventIntelligence(provider)
+
+    assert intel.should_block_execution(now) is True
+    assert intel.get_risk_multiplier(now) == 0.0
+
+def test_fallback_no_events(now):
+    class FailingProvider(BaseEventProvider):
+        def get_upcoming_events(self, start, end):
+            raise Exception("Fail")
+
+    intel = EventIntelligence(FailingProvider())
+    status = intel.get_risk_status(now)
+    assert status.is_blocked is False
+    assert status.risk_multiplier == 1.0
