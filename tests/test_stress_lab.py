@@ -303,3 +303,65 @@ def test_metrics_new_fields(sample_data):
     assert hasattr(metrics, "recovery_factor")
     assert hasattr(metrics, "profit_factor")
     assert metrics.profit_factor >= 0
+
+
+def test_fragility_detection_negative_edge(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        profit_factor=1.5,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    # Mock a scenario where profit factor drops below 1.0
+    lab.results["NegativeEdge"] = StressTestMetrics(
+        total_return=-0.05,
+        max_drawdown=0.1,
+        sharpe_ratio=-0.5,
+        win_rate=0.3,
+        num_trades=15,
+        profit_factor=0.8,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    report = lab.generate_report(baseline)
+    assert any("Negative edge (PF < 1.0) in NegativeEdge" in fi for fi in report.fragility_indicators)
+
+
+def test_fragility_detection_overtrading(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        profit_factor=1.5,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    # Mock a scenario where trade count spikes
+    lab.results["Overtrading"] = StressTestMetrics(
+        total_return=0.05,
+        max_drawdown=0.1,
+        sharpe_ratio=0.5,
+        win_rate=0.4,
+        num_trades=25,  # > 10 * 2
+        profit_factor=1.1,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    report = lab.generate_report(baseline)
+    assert any("Over-trading spike in Overtrading" in fi for fi in report.fragility_indicators)
