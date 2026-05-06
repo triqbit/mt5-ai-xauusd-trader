@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enterprise Monitoring System:** Implemented a robust monitoring and alerting backbone in `src/core/monitor.py` featuring real-time equity curve tracking, Prometheus metrics export, and async-safe Telegram bot notifications.
+- **Institutional Risk Notifications:** Integrated real-time alerts for circuit breaker triggers, margin calls, account balance mismatches, and liquidity (spread) crises into the primary trading loop.
+- **Automated Daily Performance Summaries:** Added logic to detect day changes and trigger automated Telegram summaries capturing daily P&L and trade counts.
+- **Model Health Monitoring:** Implemented confidence degradation warnings and drift detection alerts to ensure institutional model reliability during live execution.
 - **Vectorized Walk-Forward Backtester:** Implemented high-performance `BacktestEngine` in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission), path-dependent metrics (MAE/MFE), and institutional performance reporting (Sharpe, CAGR, MDD).
 - **Enhanced RL Evaluation Suite:** Advanced institutional metrics including Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio. Improved robustness for regime sensitivity and agent interface integration (SB3, Signal objects).
 - **Vectorized Feature Engineering:** Optimized `FeatureEngineer` by refactoring internal methods to return dictionaries of NumPy arrays and using TA-Lib vectorization (`SMA`, `SUM`, `ROCP`), achieving ~20% overall speedup.
