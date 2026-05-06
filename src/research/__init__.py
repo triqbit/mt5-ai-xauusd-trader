@@ -7,12 +7,15 @@ Research and evaluation modules.
 from src.research.benchmarks import (
     BenchmarkEvaluator,
     BenchmarkStrategy,
+    BuyAndHoldStrategy,
+    DonchianChannelStrategy,
     EMACrossoverStrategy,
     MeanReversionStrategy,
     MomentumStrategy,
     NaiveDirectionalStrategy,
     RandomStrategy,
     RiskFilteredBaseline,
+    SellAndHoldStrategy,
     VolatilityBreakoutStrategy,
 )
 from src.research.hyperopt_walkforward import (
@@ -26,7 +29,7 @@ from src.research.rare_event_simulator import (
     RareEventSimulator,
     RareEventType,
 )
-from src.research.reporting import ResearchReport, ResearchReporter
+from src.research.reporting import ResearchOrchestrator, ResearchReport, ResearchReporter
 from src.research.rl_evaluation import (
     MeanReversionBaseline,
     MomentumBaseline,
@@ -39,6 +42,8 @@ from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 __all__ = [
     "BenchmarkEvaluator",
     "BenchmarkStrategy",
+    "BuyAndHoldStrategy",
+    "DonchianChannelStrategy",
     "EMACrossoverStrategy",
     "MeanReversionBaseline",
     "MeanReversionStrategy",
@@ -53,9 +58,11 @@ __all__ = [
     "RareEventResult",
     "RareEventSimulator",
     "RareEventType",
+    "ResearchOrchestrator",
     "ResearchReport",
     "ResearchReporter",
     "RiskFilteredBaseline",
+    "SellAndHoldStrategy",
     "StressLab",
     "StressScenario",
     "StressTestMetrics",
