@@ -32,7 +32,7 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 
 ### 🧠 Advanced Intelligence
 - **DRL Architectures:** PPO (Proximal Policy Optimization), Dreamer V3, and LSTM-based actors.
-- **Ensemble Engine:** Real-time signal consensus from multiple neural networks to minimize variance.
+- **Dynamic Ensemble Engine:** Adaptive model weighting system that adjusts model influence based on real-time performance (Sharpe/Accuracy), confidence calibration, and market regime context.
 - **Explainability System:** Structured attribution breakdowns for every trade signal, providing institutional-grade transparency into model and risk decisions.
 - **Dynamic Feature Engineering:** 140+ market indicators including multi-timeframe TA-Lib features and macro-sentiment integration.
 
