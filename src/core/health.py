@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from enum import Enum
 
 import redis
+from sqlalchemy import text
 from fastapi import APIRouter, FastAPI, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from prometheus_client import Gauge, make_asgi_app
@@ -49,6 +50,8 @@ class ComponentStatus(BaseModel):
 
 class HealthReport(BaseModel):
     status: HealthStatus
+    version: str = "1.1.0"
+    environment: str = "production"
     components: dict[str, ComponentStatus]
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -95,9 +98,14 @@ class HealthChecker:
             return res
 
         try:
-            # Simple connectivity check using SQLAlchemy engine
+            # Simple connectivity check using SQLAlchemy engine with fallback
             with self.trade_logger.engine.connect() as conn:
-                conn.execute(self.trade_logger.engine.dialect.do_ping(conn.connection))
+                try:
+                    # Preferred method
+                    conn.execute(self.trade_logger.engine.dialect.do_ping(conn.connection))
+                except (AttributeError, Exception):
+                    # Fallback for different SQLAlchemy versions or dialects
+                    conn.execute(text("SELECT 1"))
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
@@ -126,23 +134,17 @@ class HealthChecker:
 
         try:
             # Active check by attempting to fetch account info (lightweight call)
-            # For MetaAPI fallback, get_account_info currently returns {} as it's not implemented,
-            # so we only perform the active check for native MT5.
-            if getattr(self.connector, "use_metaapi", False):
-                res = ComponentStatus(
-                    status=HealthStatus.HEALTHY, message="MT5 connection alive (MetaAPI fallback)"
-                )
+            info = self.connector.get_account_info()
+            if info:
+                msg = "MT5 connection active and responding"
+                if getattr(self.connector, "use_metaapi", False):
+                    msg += " (via MetaAPI)"
+                res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
             else:
-                info = self.connector.get_account_info()
-                if info:
-                    res = ComponentStatus(
-                        status=HealthStatus.HEALTHY, message="MT5 connection active and responding"
-                    )
-                else:
-                    res = ComponentStatus(
-                        status=HealthStatus.FAILED,
-                        message="MT5 connection failed to return account info",
-                    )
+                res = ComponentStatus(
+                    status=HealthStatus.FAILED,
+                    message="MT5 connection failed to return account info",
+                )
         except Exception as e:
             logger.error("Health check - MT5 failure: %s", e)
             res = ComponentStatus(status=HealthStatus.FAILED, message=f"MT5 API call failed: {e!s}")
@@ -298,6 +300,8 @@ class HealthChecker:
 
     def get_full_report(self) -> HealthReport:
         """Aggregate all checks into a comprehensive report."""
+        from src import __version__
+
         components = {
             "liveness": self.check_liveness(),
             "database": self.check_database(),
@@ -319,7 +323,12 @@ class HealthChecker:
             else (HealthStatus.DEGRADED if degraded else HealthStatus.HEALTHY)
         )
 
-        return HealthReport(status=overall_status, components=components)
+        return HealthReport(
+            status=overall_status,
+            version=__version__,
+            environment=self.cfg.mode,
+            components=components,
+        )
 
     def startup_gate(self) -> HealthReport:
         """
