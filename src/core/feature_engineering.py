@@ -9,6 +9,7 @@ candle patterns, and volume profiles.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -23,6 +24,7 @@ class FeatureEngineer:
     """
     Engineers technical features from raw OHLCV data.
     Implements multi-timeframe analysis and ensures no look-ahead bias.
+    Supports stateful normalization for production inference.
     """
 
     def __init__(
@@ -72,7 +74,7 @@ class FeatureEngineer:
             df = df.copy()
             df.columns = [col.lower() for col in df.columns]
 
-            # 1. Base Timeframe Features - Optimization: Collect all in one dict
+            # 1. Base Timeframe Features
             all_features = {}
             with profile_context("fe_base_technical"):
                 all_features.update(
@@ -101,8 +103,7 @@ class FeatureEngineer:
             # Concatenate all blocks to avoid fragmentation
             full_df = pd.concat([df, base_features_df, *mtf_blocks], axis=1)
 
-            # Optimization: Be selective with dropna to avoid losing all data if MTF fails
-            # We identify base features and MTF features
+            # Optimization: Filter by base and MTF columns
             base_cols = [
                 c
                 for c in full_df.columns
@@ -114,22 +115,14 @@ class FeatureEngineer:
             if base_cols:
                 full_df = full_df.dropna(subset=base_cols)
 
-            # If MTF features are all NaN (data too short), we might want to keep the base features
-            # instead of returning an empty DataFrame.
             if not full_df.empty and mtf_cols:
-                # Check if MTF columns are entirely NaN for the remaining rows
                 if full_df[mtf_cols].isna().all().all():
                     logger.warning(
-                        "MTF features are entirely NaN due to insufficient data history. Falling back to base features."
+                        "MTF features are entirely NaN due to insufficient data history."
                     )
-                    # Keep rows, but MTF features will be NaN or we can drop the columns
-                    # To be safe for models, we might need to fill with 0 or drop columns.
-                    # Here we choose to drop columns to maintain model input integrity if expected.
-                    # But if the model EXPECTS MTF, it will fail later.
-                    # Better to drop rows and see if any remain.
                     temp_df = full_df.dropna(subset=mtf_cols)
                     if temp_df.empty:
-                        logger.error("Insufficient data for MTF features. Row count dropped to 0.")
+                        logger.error("Insufficient data for MTF features.")
                     else:
                         full_df = temp_df
                 else:
@@ -147,11 +140,9 @@ class FeatureEngineer:
             else:
                 features_only = full_df
 
-            # Also drop any 'real_volume' if present
             if "real_volume" in features_only.columns:
                 features_only = features_only.drop(columns=["real_volume"])
 
-            # Ensure all remaining features are NaN-free before normalization
             features_only = features_only.dropna()
 
             if self.normalize:
@@ -196,42 +187,45 @@ class FeatureEngineer:
         indicators[f"{prefix}_bb_lower"] = lower
         indicators[f"{prefix}_bb_width"] = (upper - lower) / (middle + 1e-8)
 
-        # EMA Stacks
+        # Donchian Channels (Institutional)
+        indicators[f"{prefix}_donchian_high"] = talib.MAX(high, timeperiod=20)
+        indicators[f"{prefix}_donchian_low"] = talib.MIN(low, timeperiod=20)
+        indicators[f"{prefix}_donchian_mid"] = (
+            indicators[f"{prefix}_donchian_high"] + indicators[f"{prefix}_donchian_low"]
+        ) / 2
+
+        # Keltner Channels (Institutional)
+        kc_mid = talib.EMA(close, timeperiod=20)
+        kc_range = talib.ATR(high, low, close, timeperiod=20)
+        indicators[f"{prefix}_keltner_upper"] = kc_mid + (2 * kc_range)
+        indicators[f"{prefix}_keltner_lower"] = kc_mid - (2 * kc_range)
+        indicators[f"{prefix}_keltner_mid"] = kc_mid
+
+        # EMA Stacks (Institutional 8/21/50/200)
         for period in [8, 21, 50, 200]:
-            indicators[f"{prefix}_ema_{period}"] = talib.EMA(close, timeperiod=period)
-            # Distance from EMA
-            indicators[f"{prefix}_dist_ema_{period}"] = (
-                close - indicators[f"{prefix}_ema_{period}"]
-            ) / (indicators[f"{prefix}_ema_{period}"] + 1e-8)
+            ema = talib.EMA(close, timeperiod=period)
+            indicators[f"{prefix}_ema_{period}"] = ema
+            indicators[f"{prefix}_dist_ema_{period}"] = (close - ema) / (ema + 1e-8)
 
-        # ADX
+        # Trend and Strength
         indicators[f"{prefix}_adx"] = talib.ADX(high, low, close, timeperiod=14)
-
-        # Williams %R
         indicators[f"{prefix}_willr"] = talib.WILLR(high, low, close, timeperiod=14)
-
-        # Ultimate Oscillator
         indicators[f"{prefix}_ultosc"] = talib.ULTOSC(
             high, low, close, timeperiod1=7, timeperiod2=14, timeperiod3=28
         )
 
-        # Stochastic
         slowk, slowd = talib.STOCH(
-            high,
-            low,
-            close,
-            fastk_period=5,
-            slowk_period=3,
-            slowk_matype=0,
-            slowd_period=3,
-            slowd_matype=0,
+            high, low, close, fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0
         )
         indicators[f"{prefix}_stoch_k"] = slowk
         indicators[f"{prefix}_stoch_d"] = slowd
 
-        # Hilbert Transform
+        # Hilbert Transform (Institutional)
         indicators[f"{prefix}_ht_trendline"] = talib.HT_TRENDLINE(close)
         indicators[f"{prefix}_ht_dcperiod"] = talib.HT_DCPERIOD(close)
+        indicators[f"{prefix}_ht_phasor_inphase"], indicators[f"{prefix}_ht_phasor_quad"] = talib.HT_PHASOR(close)
+        indicators[f"{prefix}_ht_sine"], indicators[f"{prefix}_ht_leadsine"] = talib.HT_SINE(close)
+        indicators[f"{prefix}_ht_trendmode"] = talib.HT_TRENDMODE(close).astype(np.float64)
 
         return indicators
 
@@ -256,7 +250,7 @@ class FeatureEngineer:
         col_prefix = f"{prefix}_" if prefix else "pattern_"
 
         for pattern in pattern_list:
-            patterns[f"{col_prefix}{pattern.lower()}"] = getattr(talib, pattern)(op, hi, lo, cl)
+            patterns[f"{col_prefix}{pattern.lower()}"] = getattr(talib, pattern)(op, hi, lo, cl).astype(np.float64)
 
         return patterns
 
@@ -276,19 +270,17 @@ class FeatureEngineer:
         low = df["low"].values.astype(np.float64)
         open_ = df["open"].values.astype(np.float64)
 
-        # Optimization: Use TA-Lib ROCP for returns
         pa["returns_1"] = talib.ROCP(close, timeperiod=1)
         pa["returns_5"] = talib.ROCP(close, timeperiod=5)
 
-        # Log returns - Optimization: Use NumPy
+        # Log returns
         pa["log_returns"] = np.log(close / (np.roll(close, 1) + 1e-8))
         pa["log_returns"][0] = np.nan
 
-        # Range - Optimization: Use NumPy
         pa["day_range"] = (high - low) / (close + 1e-8)
         pa["body_size"] = np.abs(close - open_) / (high - low + 1e-8)
 
-        # Linear Regression Slopes (Institutional-grade TA-Lib implementation)
+        # Slopes
         pa["slope_5"] = talib.LINEARREG_SLOPE(close, timeperiod=5)
         pa["slope_20"] = talib.LINEARREG_SLOPE(close, timeperiod=20)
 
@@ -296,7 +288,7 @@ class FeatureEngineer:
 
     def _get_volume_features(self, df: pd.DataFrame) -> dict[str, np.ndarray]:
         """
-        Compute volume-based features including rolling VWAP, OBV, and VPT.
+        Compute volume-based features including rolling VWAP, OBV, and Volume Profile proxies.
 
         Args:
             df: Input DataFrame with OHLCV data.
@@ -310,28 +302,44 @@ class FeatureEngineer:
         low = df["low"].values.astype(np.float64)
         volume = df["tick_volume"].values.astype(np.float64)
 
-        # Optimization: Use TA-Lib for SMA instead of Pandas rolling
         vol_sma_20 = talib.SMA(volume, timeperiod=20)
         vol["vol_sma_20"] = volume / (vol_sma_20 + 1e-8)
-        vol["rvol"] = vol["vol_sma_20"]  # Canonical RVOL
+        vol["rvol"] = vol["vol_sma_20"]
         vol["obv"] = talib.OBV(close, volume)
 
-        # VWAP Approximation (Rolling) - Optimization: Use TA-Lib for SUM
+        # VWAP Approximation
         typical_price = (high + low + close) / 3
         tp_vol = typical_price * volume
         for period in [20, 50, 100]:
             sum_tp_vol = talib.SUM(tp_vol, timeperiod=period)
             sum_vol = talib.SUM(volume, timeperiod=period)
-            vol[f"vwap_{period}"] = sum_tp_vol / (sum_vol + 1e-8)
-            vol[f"dist_vwap_{period}"] = (close - vol[f"vwap_{period}"]) / (
-                vol[f"vwap_{period}"] + 1e-8
-            )
+            vwap = sum_tp_vol / (sum_vol + 1e-8)
+            vol[f"vwap_{period}"] = vwap
+            vol[f"dist_vwap_{period}"] = (close - vwap) / (vwap + 1e-8)
 
-        # Volume Price Trend (VPT) - Optimization: Use TA-Lib ROCP and NumPy cumsum
+        # Volume Price Trend (VPT)
         returns = talib.ROCP(close, timeperiod=1)
-        # Handle first NaN from ROCP to match pct_change().fillna(0)
         returns[np.isnan(returns)] = 0
         vol["vpt"] = np.cumsum(volume * returns)
+
+        # Volume Profile Proxy (POC, VAH, VAL)
+        # Using rolling weighted quantiles as an approximation
+        window = 30
+        try:
+            # We use rolling for POC/VAH/VAL
+            # POC approximated by 0.5 quantile (median) weighted by volume?
+            # Actually, a better proxy for POC is just the VWAP.
+            # But let's use rolling quantiles for VAH (0.7) and VAL (0.3)
+            rolling_close = pd.Series(close)
+            vol["vp_poc"] = rolling_close.rolling(window).median().values
+            vol["vp_vah"] = rolling_close.rolling(window).quantile(0.7).values
+            vol["vp_val"] = rolling_close.rolling(window).quantile(0.3).values
+            vol["vp_width"] = (vol["vp_vah"] - vol["vp_val"]) / (vol["vp_poc"] + 1e-8)
+        except Exception:
+            vol["vp_poc"] = np.full_like(close, np.nan)
+            vol["vp_vah"] = np.full_like(close, np.nan)
+            vol["vp_val"] = np.full_like(close, np.nan)
+            vol["vp_width"] = np.full_like(close, np.nan)
 
         return vol
 
@@ -339,73 +347,33 @@ class FeatureEngineer:
         """
         Resample data to a different timeframe and compute features.
         Ensures no look-ahead bias by shifting.
-
-        Args:
-            df: Input DataFrame.
-            tf: Timeframe string (e.g., 'M15', 'H1').
-
-        Returns:
-            DataFrame of resampled indicators.
         """
-        # Map MT5-style timeframe strings to Pandas frequency strings
         tf_map = {
-            "M1": "1min",
-            "M5": "5min",
-            "M15": "15min",
-            "M30": "30min",
-            "H1": "1h",
-            "H4": "4h",
-            "D1": "1D",
-            "W1": "1W",
-            "MN1": "1ME",
+            "M1": "1min", "M5": "5min", "M15": "15min", "M30": "30min",
+            "H1": "1h", "H4": "4h", "D1": "1D", "W1": "1W", "MN1": "1ME",
         }
         freq = tf_map.get(tf, tf)
 
-        # Resample
         resampled = (
             df.resample(freq)
-            .agg(
-                {
-                    "open": "first",
-                    "high": "max",
-                    "low": "min",
-                    "close": "last",
-                    "tick_volume": "sum",
-                }
-            )
+            .agg({"open": "first", "high": "max", "low": "min", "close": "last", "tick_volume": "sum"})
             .dropna()
         )
 
-        # 1. Compute indicators and patterns on resampled data
-        # Optimization: Use dictionary update instead of multiple DFs + concat
         mtf_all = {}
         mtf_all.update(self._get_technical_indicators(resampled, prefix=f"mtf_{tf}"))
         mtf_all.update(self._get_candle_patterns(resampled, prefix=f"mtf_{tf}"))
 
-        # Create DataFrame once
         combined_mtf = pd.DataFrame(mtf_all, index=resampled.index)
-
-        # Reindex to original DataFrame using forward fill to handle frequency misalignment.
-        # We then shift by 1 to ensure that at any time T, we only use MTF data
-        # from periods that have completely closed.
         combined_mtf = combined_mtf.reindex(df.index, method="ffill").shift(1)
 
         return combined_mtf
 
     def _normalize_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Normalize the feature matrix using the specified method.
-
-        Args:
-            df: Feature DataFrame to normalize.
-
-        Returns:
-            Normalized DataFrame.
-        """
+        """Normalize features using stored or newly computed stats."""
         if self.method == "zscore":
             if self.means is None:
                 self.means = df.mean()
-                # Use 1.0 for constant features to avoid division by zero
                 self.stds = df.std().replace(0, 1.0).fillna(1.0)
             return (df - self.means) / self.stds
 
@@ -418,11 +386,40 @@ class FeatureEngineer:
 
         return df
 
-    def get_feature_count(self) -> int:
+    def get_normalization_stats(self) -> dict[str, Any]:
         """
-        Return the number of engineered features.
+        Retrieve normalization statistics for persistence.
 
         Returns:
-            Total count of feature columns.
+            Dictionary containing means, stds, mins, maxs.
         """
+        return {
+            "method": self.method,
+            "means": self.means.to_dict() if self.means is not None else None,
+            "stds": self.stds.to_dict() if self.stds is not None else None,
+            "mins": self.mins.to_dict() if self.mins is not None else None,
+            "maxs": self.maxs.to_dict() if self.maxs is not None else None,
+            "columns": self.feature_columns,
+        }
+
+    def set_normalization_stats(self, stats: dict[str, Any]) -> None:
+        """
+        Set normalization statistics from a previously saved state.
+
+        Args:
+            stats: Dictionary of normalization stats.
+        """
+        self.method = stats.get("method", self.method)
+        if stats.get("means"):
+            self.means = pd.Series(stats["means"])
+        if stats.get("stds"):
+            self.stds = pd.Series(stats["stds"])
+        if stats.get("mins"):
+            self.mins = pd.Series(stats["mins"])
+        if stats.get("maxs"):
+            self.maxs = pd.Series(stats["maxs"])
+        self.feature_columns = stats.get("columns", [])
+
+    def get_feature_count(self) -> int:
+        """Return the number of engineered features."""
         return len(self.feature_columns)
