@@ -39,7 +39,7 @@ We use a role-based governance model where specific leads oversee different doma
 - **Draft PRs:** Open a Draft PR early to get feedback on architectural direction.
 - **Complete the PR Template:** Use the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) and fill out every section, including the **Rollback Strategy**.
 - **Evidence:** Attach test logs, coverage reports, and backtest evidence (if applicable).
-- **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required. Address all comments and re-request review.
+- **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required. Changes to **Sensitive Zones** require multi-signature approval from at least two leads (typically the domain lead and Jules03).
 - **Merge Criteria:** Once all CI gates pass and approval is received, Jules03 or the module lead will merge the PR.
 
 ---
