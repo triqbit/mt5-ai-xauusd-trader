@@ -21,6 +21,7 @@ from src.core.health import (
     init_health_checker,
     router,
 )
+from src import __version__
 
 
 @pytest.fixture
@@ -214,7 +215,24 @@ def test_check_disk_space_failure(mock_disk_usage, health_checker, mock_config):
     assert status.status == HealthStatus.FAILED
     assert "Low disk space" in status.message
 
-def test_get_full_report(health_checker):
+def test_check_database_fallback(health_checker, mock_trade_logger):
+    # Mock do_ping to raise AttributeError to trigger SELECT 1 fallback
+    mock_trade_logger.engine.dialect.do_ping.side_effect = AttributeError("No do_ping")
+
+    status = health_checker.check_database()
+    assert status.status == HealthStatus.HEALTHY
+    assert "reachable" in status.message
+    # Verification of SQL execution is implicit as it didn't raise exception
+
+def test_check_mt5_metaapi_active_success(health_checker, mock_connector):
+    mock_connector.use_metaapi = True
+    mock_connector.get_account_info.return_value = {"balance": 1000}
+
+    status = health_checker.check_mt5()
+    assert status.status == HealthStatus.HEALTHY
+    assert "(via MetaAPI)" in status.message
+
+def test_get_full_report(health_checker, mock_config):
     with patch.object(HealthChecker, 'check_config') as mock_conf:
         mock_conf.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
         with patch.object(HealthChecker, 'check_disk_space') as mock_disk:
@@ -228,6 +246,8 @@ def test_get_full_report(health_checker):
                     report = health_checker.get_full_report()
                     assert isinstance(report, HealthReport)
                     assert report.status == HealthStatus.HEALTHY
+                    assert report.version == __version__
+                    assert report.environment == mock_config.mode
                     assert "liveness" in report.components
                     assert "database" in report.components
                     assert "redis" in report.components

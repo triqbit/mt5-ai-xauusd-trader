@@ -20,6 +20,7 @@ The health check endpoints are exposed via FastAPI (default port 8000, prefix `/
 ### 3. Full Report (`GET /health/full`)
 **Purpose:** Provides a detailed breakdown of all system components.
 - **Status:** `healthy`, `degraded`, or `failed`.
+- **Metadata:** Includes application `version` (from `src/__init__.py`) and current `environment` (e.g., demo, live).
 - **Components tracked:**
     - `liveness`: Process status.
     - `database`: Primary trade database connectivity.
