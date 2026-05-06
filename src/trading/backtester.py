@@ -132,6 +132,60 @@ class BacktestEngine:
         data = data.copy()
         data["atr"] = tr.rolling(14).mean()
 
+        # Pre-calculate ExecutionFilter metrics to avoid O(N) calculations in loop
+        logger.info("Pre-calculating execution filter metrics...")
+        prefix = f"base_{self.fe.base_timeframe}"
+
+        # 1. ATR Ratio (current / avg)
+        atr_series = data["atr"]
+        avg_atr_series = atr_series.rolling(window=100).mean()
+        atr_current_vals = atr_series.values
+        atr_avg_vals = avg_atr_series.values
+
+        # 2. Trend Angle (EMA21 Slope)
+        ema21_col = f"{prefix}_ema_21"
+        if ema21_col not in df_features.columns:
+            # Fallback if FeatureEngineer didn't provide it
+            ema21_series = data["close"].ewm(span=21, adjust=False).mean()
+        else:
+            ema21_series = df_features[ema21_col]
+
+        # Use a vectorized rolling slope if possible, or pre-calculate
+        # For simplicity and correctness with ExecutionFilter logic:
+        ema21_vals = ema21_series.values
+        slopes = np.zeros(n)
+        window = 20
+        x = np.arange(window)
+        x_mean = np.mean(x)
+        x_var = np.var(x) * window
+
+        # Optimized rolling slope calculation
+        for j in range(window, n + 1):
+            y = ema21_vals[j - window : j]
+            slope = np.sum((x - x_mean) * y) / x_var
+            slopes[j - 1] = slope
+
+        # 3. EMA Sequence
+        ema_vals = {}
+        for p in [8, 21, 50, 200]:
+            col = f"{prefix}_ema_{p}"
+            if col in df_features.columns:
+                ema_vals[p] = df_features[col].values
+            else:
+                ema_vals[p] = data["close"].ewm(span=p, adjust=False).mean().values
+
+        # 4. RSI
+        rsi_col = f"{prefix}_rsi"
+        if rsi_col in df_features.columns:
+            rsi_vals = df_features[rsi_col].values
+        else:
+            # Simple RSI fallback
+            delta = data["close"].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / (loss + 1e-8)
+            rsi_vals = (100 - (100 / (1 + rs))).values
+
         start = 0
         active_trades: list[dict[str, Any]] = []
 
@@ -202,16 +256,26 @@ class BacktestEngine:
                     timestamp=bar_time,
                 )
 
-                # Prepare filter context
-                # Optimization: Position-based slicing is significantly faster than label-based (.loc)
-                filter_context = df_features.iloc[: abs_idx + 1]
+                # Prepare filter metrics
                 drawdown = (self.initial_balance - self.balance) / self.initial_balance
+                precomputed = {
+                    "atr_volatility": {
+                        "current_atr": atr_current_vals[abs_idx],
+                        "avg_atr": atr_avg_vals[abs_idx],
+                    },
+                    "trend_angle": {"slope": slopes[abs_idx]},
+                    "ema_sequence": {
+                        "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
+                    },
+                    "momentum": {"rsi": rsi_vals[abs_idx]},
+                }
 
                 decision = self.ef.validate(
                     signal,
-                    filter_context,
+                    df_features,  # Still pass df for layers that might need it (though we precomputed most)
                     current_drawdown=drawdown,
                     timestamp=bar_time,
+                    precomputed_metrics=precomputed,
                 )
 
                 if decision.is_approved:
