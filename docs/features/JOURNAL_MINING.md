@@ -37,7 +37,8 @@ Calculates average win vs loss holding times in minutes. This reveals behavioral
 Detects advanced behavioral risks:
 - **Toxic Motifs**: Recurring attribute combinations that show significantly lower win rates or high frequency within drawdown clusters. Motifs are ranked using a toxic score: `(1.0 - win_rate) * log1p(frequency)`, prioritizing high-confidence failures.
 - **Pre-Drawdown Motifs**: Identification of signal combinations that frequently occur shortly before (default 6 hours) a drawdown cluster begins.
-- **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as being within 24h of a drawdown cluster).
+- **Combination Motifs**: Recurring sets of multiple signals (e.g., Ensemble BUY + PPO SELL) within a short window (60m) that frequently precede drawdown clusters.
+- **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as the 24-hour window *preceding* a drawdown cluster).
 
 ### 7. Risk Block Analysis
 Summarizes recurring reasons why the `RiskManager` rejected AI signals (e.g., `MAX_DRAWDOWN`, `SPREAD_TOO_WIDE`). This reveals the "opportunity cost" of the current risk parameters.

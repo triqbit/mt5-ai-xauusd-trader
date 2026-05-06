@@ -8,6 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
@@ -65,6 +66,8 @@ class CombinationMotif(BaseModel):
     frequency: int
     avg_pnl_after: float
     is_toxic: bool = False
+    session: str = "Mixed"
+    volatility_bucket: str = "Mixed"
 
 
 class BlockReasonSummary(BaseModel):
@@ -608,10 +611,15 @@ class JournalMiner:
         pre_cluster_signals = []
         for cluster in clusters:
             start_window = cluster.start_time - pd.Timedelta(hours=window_hours)
-            mask = (signals_df["created_at"] >= start_window) & (
-                signals_df["created_at"] < cluster.start_time
+            # Ensure sigs for comparison are UTC-aware
+            sigs = signals_df.copy()
+            if sigs["created_at"].dt.tz is None:
+                sigs["created_at"] = sigs["created_at"].dt.tz_localize(UTC)
+
+            mask = (sigs["created_at"] >= start_window) & (
+                sigs["created_at"] < cluster.start_time
             )
-            pre_cluster_signals.append(signals_df[mask])
+            pre_cluster_signals.append(sigs[mask])
 
         if not pre_cluster_signals:
             return []
@@ -716,7 +724,8 @@ class JournalMiner:
     ) -> dict[str, float]:
         """
         Detect if risk blocks increase during 'weak strategy states'.
-        Weak state is defined as the 24-hour window preceding a drawdown cluster.
+        Weak state is defined as the 24-hour window preceding a drawdown cluster
+        plus the duration of the drawdown cluster itself.
         """
         if risk_events_df.empty or trades_df.empty:
             return {}
@@ -725,11 +734,11 @@ class JournalMiner:
         if not clusters:
             return dict.fromkeys(risk_events_df["event_type"].unique(), 0.0)
 
-        # Mark 'weak' time windows: 24h before any drawdown cluster
+        # Mark 'weak' time windows: 24h before any drawdown cluster PLUS cluster period
         weak_windows = []
         for cluster in clusters:
             start_time = cluster.start_time - pd.Timedelta(hours=24)
-            weak_windows.append((start_time, cluster.start_time))
+            weak_windows.append((start_time, cluster.end_time))
 
         def is_weak(dt: datetime) -> bool:
             # Ensure dt is timezone-aware
@@ -737,16 +746,16 @@ class JournalMiner:
                 dt = dt.replace(tzinfo=UTC)
             return any(start <= dt <= end for start, end in weak_windows)
 
-        # Assume risk_events_df has a timestamp. If not, we might need to join with signals
-        # Let's check RiskEvent model in trade_logger. It has AuditMixin (created_at)
-        if "created_at" not in risk_events_df.columns:
-            return dict.fromkeys(risk_events_df["event_type"].unique(), 0.0)
+        # Ensure risk_events_df created_at is available and formatted
+        df = risk_events_df.copy()
+        if "created_at" not in df.columns:
+            return dict.fromkeys(df["event_type"].unique(), 0.0)
 
-        risk_events_df["is_weak_state"] = risk_events_df["created_at"].apply(is_weak)
+        df["is_weak_state"] = df["created_at"].apply(is_weak)
 
         results = {}
-        for reason in risk_events_df["event_type"].unique():
-            group = risk_events_df[risk_events_df["event_type"] == reason]
+        for reason in df["event_type"].unique():
+            group = df[df["event_type"] == reason]
             if len(group) == 0:
                 results[reason] = 0.0
                 continue
@@ -797,17 +806,32 @@ class JournalMiner:
                 pattern = sorted(
                     [f"{row['algorithm']}:{row['direction']}" for _, row in pre_cluster.iterrows()]
                 )
-                combinations.append(tuple(pattern))
+
+                # Determine dominant session and volatility if consistent
+                # First add sessions and buckets if not already there
+                pre_cluster = pre_cluster.copy()
+                pre_cluster["session"] = pre_cluster["created_at"].apply(
+                    lambda x: (self._get_session(x) or ["Unknown"])[0]
+                )
+                pre_cluster["vol_bucket"] = pre_cluster["volatility"].apply(
+                    self._extract_volatility_bucket
+                )
+
+                sessions = pre_cluster["session"].unique()
+                dom_session = sessions[0] if len(sessions) == 1 else "Mixed"
+
+                vol_buckets = pre_cluster["vol_bucket"].unique()
+                dom_vol = vol_buckets[0] if len(vol_buckets) == 1 else "Mixed"
+
+                combinations.append((tuple(pattern), dom_session, dom_vol))
 
         if not combinations:
             return []
 
-        from collections import Counter
-
         counts = Counter(combinations)
         results = []
 
-        for pattern_tuple, count in counts.items():
+        for (pattern_tuple, sess, vol), count in counts.items():
             if count >= 2:
                 # Heuristic: these combinations precede clusters, so they are toxic by definition
                 results.append(
@@ -816,6 +840,8 @@ class JournalMiner:
                         frequency=count,
                         avg_pnl_after=0.0,  # Could be calculated if needed
                         is_toxic=True,
+                        session=sess,
+                        volatility_bucket=vol,
                     )
                 )
 

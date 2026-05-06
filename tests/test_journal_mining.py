@@ -197,17 +197,19 @@ def test_strategy_state_correlation(miner):
         {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
         {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
         {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+        {"id": 9, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 9},
     ])
 
-    # Risk events: one within 24h BEFORE the cluster, one outside
+    # Risk events: one within 24h BEFORE, one DURING, one outside
     risk_events = pd.DataFrame([
         {"event_type": "MAX_DRAWDOWN", "created_at": now - pd.Timedelta(hours=1)},
+        {"event_type": "MAX_DRAWDOWN", "created_at": now + pd.Timedelta(minutes=1)},
         {"event_type": "MAX_DRAWDOWN", "created_at": now - pd.Timedelta(hours=48)},
     ])
 
     correlations = miner.analyze_strategy_state_correlation(risk_events, trades)
-    # 1 out of 2 events are in 'weak state' (24h before cluster)
-    assert correlations["MAX_DRAWDOWN"] == 0.5
+    # 2 out of 3 events are in 'weak state' (preceding or during cluster)
+    assert round(correlations["MAX_DRAWDOWN"], 2) == 0.67
 
 def test_to_report_section_with_toxic_motif(miner):
     from src.analytics.journal_mining import BlockReasonSummary, JournalReport, SignalMotif
@@ -293,14 +295,14 @@ def test_find_combination_motifs(miner):
 
     # Multiple signals before cluster 1
     signals1 = pd.DataFrame([
-        {"id": 10, "algorithm": "ensemble", "direction": 1, "created_at": now - pd.Timedelta(minutes=30)},
-        {"id": 11, "algorithm": "ppo", "direction": -1, "created_at": now - pd.Timedelta(minutes=29)},
+        {"id": 10, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "created_at": now - pd.Timedelta(minutes=30)},
+        {"id": 11, "algorithm": "ppo", "direction": -1, "volatility": 0.1, "created_at": now - pd.Timedelta(minutes=29)},
     ])
 
     # Multiple signals before cluster 2
     signals2 = pd.DataFrame([
-        {"id": 20, "algorithm": "ensemble", "direction": 1, "created_at": later - pd.Timedelta(minutes=30)},
-        {"id": 21, "algorithm": "ppo", "direction": -1, "created_at": later - pd.Timedelta(minutes=29)},
+        {"id": 20, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "created_at": later - pd.Timedelta(minutes=30)},
+        {"id": 21, "algorithm": "ppo", "direction": -1, "volatility": 0.1, "created_at": later - pd.Timedelta(minutes=29)},
     ])
     all_signals = pd.concat([signals1, signals2])
 
