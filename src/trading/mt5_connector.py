@@ -13,8 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import contextmanager
-from datetime import datetime
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import nest_asyncio
 import pandas as pd
@@ -71,7 +70,7 @@ NON_RETRIABLE_RETCODES = {
     10028,  # TRADE_RETCODE_ON_ONLY_STOPS
 }
 
-TIMEFRAME_MAP: dict[str, int] = {
+TIMEFRAME_MAP: Dict[str, int] = {
     "M1": 1,
     "M5": 5,
     "M15": 15,
@@ -138,15 +137,15 @@ class MT5Connector:
                 logger.warning(
                     "Native mt5.initialize failed: %s (code: %d)", error_desc, error_code
                 )
-                if error_code == getattr(mt5, "RES_E_NOT_FOUND", -5):
-                    logger.info("TIP: MT5 terminal not found. Check if MT5_PATH is correct.")
             except Exception as e:
                 logger.warning("Native MT5 initialization encountered an error: %s", e)
         else:
             logger.info("Native MetaTrader5 SDK not available on this platform.")
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
-        metaapi_token = self.cfg.metaapi_token.get_secret_value() if self.cfg.metaapi_token else ""
+        metaapi_token = (
+            self.cfg.metaapi_token.get_secret_value() if self.cfg.metaapi_token else ""
+        )
         if METAAPI_AVAILABLE and metaapi_token and self.cfg.metaapi_account_id:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
@@ -177,10 +176,6 @@ class MT5Connector:
         logger.error(msg)
         raise MT5ConnectionError(msg)
 
-    def connect(self) -> bool:
-        """Alias for initialize() to support existing interfaces."""
-        return self.initialize()
-
     def shutdown(self) -> None:
         """Gracefully close all connections."""
         if self._is_initialized:
@@ -190,10 +185,6 @@ class MT5Connector:
                 asyncio.run(self.metaapi_connection.close())
             logger.info("MT5 connector shutdown complete.")
             self._is_initialized = False
-
-    def disconnect(self) -> None:
-        """Alias for shutdown() to support existing interfaces."""
-        self.shutdown()
 
     @contextmanager
     def session(self):
@@ -209,6 +200,14 @@ class MT5Connector:
     def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
         Fetch historical OHLCV data.
+
+        Args:
+            symbol: Trading symbol (e.g., XAUUSD).
+            timeframe: Chart timeframe (e.g., M5, H1).
+            n_bars: Number of bars to retrieve.
+
+        Returns:
+            pd.DataFrame: OHLCV data.
         """
         if not self._is_initialized:
             raise MT5ConnectionError("MT5 connector not initialized.")
@@ -219,8 +218,7 @@ class MT5Connector:
             rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
             if rates is None:
                 err_code, err_desc = mt5.last_error()
-                # Permanent failures for data retrieval (e.g. invalid symbol or params)
-                is_retriable = err_code not in [-2, -5]  # RES_E_INVALID_PARAMS, RES_E_NOT_FOUND
+                is_retriable = err_code not in [-2, -5]
                 raise MT5DataError(
                     f"Failed to copy rates: {err_desc} (code: {err_code})",
                     is_retriable=is_retriable,
@@ -242,44 +240,17 @@ class MT5Connector:
                 df["time"] = pd.to_datetime(df["time"])
             return df
 
-    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
-        return self.get_rates(symbol, timeframe, n_bars)
-
-    def get_rates_range(
-        self, symbol: str, timeframe: str, date_from: datetime, date_to: datetime
-    ) -> pd.DataFrame:
-        """
-        Fetch historical OHLCV data for a specific time range.
-        """
-        if not self._is_initialized:
-            return pd.DataFrame()
-
-        tf = TIMEFRAME_MAP.get(timeframe, 5)
-
-        if not self.use_metaapi:
-            rates = mt5.copy_rates_range(symbol, tf, date_from, date_to)
-            if rates is None:
-                logger.error("Failed to copy rates range for %s: %s", symbol, mt5.last_error())
-                return pd.DataFrame()
-            df = pd.DataFrame(rates)
-            df["time"] = pd.to_datetime(df["time"], unit="s")
-            return df
-        else:
-
-            async def _get_range():
-                return await self.metaapi_connection.get_historical_candles(
-                    symbol, timeframe, date_from, date_to
-                )
-
-            candles = asyncio.run(_get_range())
-            df = pd.DataFrame(candles)
-            if not df.empty:
-                df["time"] = pd.to_datetime(df["time"])
-            return df
-
     @with_retry(MT5DataError, max_retries=2)
-    def get_tick(self, symbol: str) -> dict[str, float]:
-        """Retrieve latest symbol tick."""
+    def get_tick(self, symbol: str) -> Dict[str, float]:
+        """
+        Retrieve latest symbol tick.
+
+        Args:
+            symbol: Trading symbol.
+
+        Returns:
+            Dict[str, float]: Bid, Ask, and Spread.
+        """
         if not self._is_initialized:
             raise MT5ConnectionError("MT5 connector not initialized.")
 
@@ -296,7 +267,6 @@ class MT5Connector:
         else:
 
             async def _get_tick():
-                await self.metaapi_connection.get_symbol_specification(symbol)
                 price = await self.metaapi_connection.get_symbol_price(symbol)
                 return {
                     "bid": price["bid"],
@@ -307,19 +277,19 @@ class MT5Connector:
             return asyncio.run(_get_tick())
 
     @with_retry(MT5ExecutionError, max_retries=2)
-    def place_order(self, signal: TradeSignal) -> int | None:
+    def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
         Execute a market order based on a validated trade signal.
 
         Args:
-            signal: Validated TradeSignal object containing direction, lot size, etc.
+            signal: Validated TradeSignal object.
 
         Returns:
             Optional[int]: Order ticket ID if successful.
 
         Raises:
-            MT5ConnectionError: If the connector is not initialized.
-            MT5ExecutionError: If the order is rejected by the broker or MetaAPI.
+            MT5ConnectionError: If not initialized.
+            MT5ExecutionError: If order is rejected.
         """
         if not self._is_initialized:
             raise MT5ConnectionError("MT5 connector not initialized.")
@@ -393,7 +363,8 @@ class MT5Connector:
             logger.info("MetaAPI order executed successfully | ticket=%d", ticket)
             return ticket
 
-    def get_account_info(self) -> dict[str, Any]:
+    def get_account_info(self) -> Dict[str, Any]:
+        """Retrieve account information."""
         if not self._is_initialized:
             return {}
         if not self.use_metaapi:
@@ -406,94 +377,8 @@ class MT5Connector:
 
             return asyncio.run(_get_acc())
 
-    def get_account_balance(self) -> float:
-        """Retrieve current account balance."""
-        info = self.get_account_info()
-        return float(info.get("balance", 0.0))
-
-    def get_terminal_status(self) -> dict[str, Any]:
-        """Retrieve terminal and connectivity status."""
-        if not self._is_initialized:
-            return {"connected": False, "algo_trading": False}
-
-        if not self.use_metaapi:
-            info = mt5.terminal_info()
-            if info:
-                return {
-                    "connected": info.connected,
-                    "algo_trading": info.trade_allowed,
-                    "max_bars": info.maxbars,
-                }
-            return {"connected": False, "algo_trading": False}
-        else:
-            # MetaAPI: account status is proxies for terminal status
-            info = self.get_account_info()
-            return {
-                "connected": info.get("connectionStatus") == "CONNECTED",
-                "algo_trading": True,  # MetaAPI generally allows trading if connected
-                "platform": info.get("platform"),
-            }
-
-    def get_symbol_properties(self, symbol: str) -> dict[str, Any] | None:
-        """Retrieve symbol specification and tradability."""
-        if not self._is_initialized:
-            return None
-
-        if not self.use_metaapi:
-            info = mt5.symbol_info(symbol)
-            if info:
-                return {
-                    "name": info.name,
-                    "visible": info.visible,
-                    "tradable": info.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL,
-                    "digits": info.digits,
-                    "spread": info.spread,
-                    "point": info.point,
-                    "contract_size": info.trade_contract_size,
-                }
-            return None
-        else:
-
-            async def _get_spec():
-                return await self.metaapi_connection.get_symbol_specification(symbol)
-
-            try:
-                spec = asyncio.run(_get_spec())
-                return {
-                    "name": spec["symbol"],
-                    "visible": True,
-                    "tradable": True,  # MetaAPI symbol spec implies existence
-                    "digits": spec.get("digits", 5),
-                    "point": spec.get("pipSize", 0.00001),
-                    "contract_size": spec.get("contractSize", 1.0),
-                }
-            except Exception:
-                return None
-
-    def find_symbols(self, pattern: str) -> list[str]:
-        """Search for available symbols matching a pattern."""
-        if not self._is_initialized:
-            return []
-
-        if not self.use_metaapi:
-            # mt5.symbols_get returns all symbols if group is specified
-            symbols = mt5.symbols_get(group=f"*{pattern}*")
-            if symbols:
-                return [s.name for s in symbols]
-            return []
-        else:
-
-            async def _get_symbols():
-                return await self.metaapi_connection.get_symbols()
-
-            try:
-                all_symbols = asyncio.run(_get_symbols())
-                pattern = pattern.upper()
-                return [s for s in all_symbols if pattern in s.upper()]
-            except Exception:
-                return []
-
-    def get_positions(self, symbol: str | None = None) -> list[dict[str, Any]]:
+    def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieve open positions."""
         if not self._is_initialized:
             return []
         if not self.use_metaapi:

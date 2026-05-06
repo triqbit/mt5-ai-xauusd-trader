@@ -14,7 +14,7 @@ def test_drawdown_breaker(risk_engine):
 
 def test_daily_loss_breaker(risk_engine):
     risk_engine.update_metrics(10000.0, realized_pnl=-600.0) # 6% loss
-    assert not risk_engine._check_daily_loss_breaker()
+    assert risk_engine.get_daily_loss_level() >= 4
 
 def test_calculate_position_size(risk_engine):
     data = pd.DataFrame({
@@ -25,13 +25,21 @@ def test_calculate_position_size(risk_engine):
     assert size >= 0.01
 
 def test_validate_signal_rejection(risk_engine):
-    class MockSignal:
-        def __init__(self):
-            self.symbol = "XAUUSD"
-            self.direction = 1
-            self.confidence = 0.4 # Below default 0.55
+    from src.core.schemas import TradeSignal
+    from src.core.constants import SignalDirection
+
+    signal = TradeSignal(
+        symbol="XAUUSD",
+        direction=SignalDirection.BUY,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
+        lot_size=0.1,
+        algorithm="ppo",
+        confidence=0.4 # Below default 0.55
+    )
 
     data = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
-    decision = risk_engine.validate_signal(MockSignal(), data, [])
+    decision = risk_engine.validate_signal(signal, data, [])
     assert not decision.is_approved
     assert "Confidence" in decision.reason
