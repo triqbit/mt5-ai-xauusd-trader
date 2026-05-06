@@ -40,3 +40,8 @@ Fixed cache invalidation logic ensuring that CLI flags (e.g., `--algo ensemble`)
 - Reduced troubleshooting time for environment setup.
 - Clearer path to production compliance with policy-based risk warnings.
 - Predictable CLI behavior for automated scripting.
+
+### 5. Enterprise Audit Visibility
+Enhanced the traceability of trading decisions by integrating the `ExecutionFilter` and `AuditedRiskManager` with the `AuditLogger`.
+- **Decision Traceability**: Every rejection now includes a detailed trace (e.g., 'TREND_ANGLE', 'risk_reward') persisted in the database.
+- **Integration Testing**: Verified the cross-module decision flow from Signal to Audit Persistence to prevent observability regressions.
