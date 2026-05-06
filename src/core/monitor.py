@@ -258,6 +258,24 @@ class Monitor:
         self.send_message(msg)
         logger.error("margin_call_warning", margin_ratio=margin_ratio)
 
+    def alert_liquidity_crisis(self, symbol: str, spread: float) -> None:
+        """Send critical alert for liquidity crisis (extreme spread)."""
+        msg = f"🚨 CRITICAL: Liquidity Crisis!\nSymbol: {symbol}\nSpread: {spread:.2f} pips"
+        self.send_message(msg)
+        logger.warning("liquidity_crisis_alert", symbol=symbol, spread=spread)
+
+    def alert_broker_connection_lost(self) -> None:
+        """Send critical alert for broker connection loss."""
+        msg = "🚨 CRITICAL: Broker Connection Lost!\nAttempting reconnection..."
+        self.send_message(msg)
+        logger.error("broker_connection_lost_alert")
+
+    def alert_broker_connection_restored(self) -> None:
+        """Send notification for broker connection restoration."""
+        msg = "✅ INFO: Broker Connection Restored."
+        self.send_message(msg)
+        logger.info("broker_connection_restored_alert")
+
     def log_execution_quality(
         self, latency_ms: float, slippage_pips: float, fill_rate: float
     ) -> None:

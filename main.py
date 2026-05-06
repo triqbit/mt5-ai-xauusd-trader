@@ -104,7 +104,15 @@ def run_live(
     explainer = SignalExplainer()
     log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
+    last_reset_date = datetime.now(timezone.utc).date()
     while True:
+        # 0. Check for day change to trigger daily summary
+        current_date = datetime.now(timezone.utc).date()
+        if current_date > last_reset_date:
+            log.info("Day change detected, resetting daily stats")
+            risk.reset_daily()
+            last_reset_date = current_date
+
         with profile("loop_total"):
             try:
                 # 1. Fetch latest market data
@@ -113,15 +121,29 @@ def run_live(
                         # Fetch more bars to satisfy FeatureEngineer and RegimeDetector windows
                         df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=500)
                         tick = connector.get_tick(cfg.symbol)
+
+                        # Check for liquidity crisis (extreme spread)
+                        raw_spread = abs(tick["ask"] - tick["bid"])
+                        # For XAUUSD, 1 pip is typically 0.10.
+                        # We convert raw spread to pips for comparison with config.
+                        spread_pips = raw_spread * 10.0 if "XAUUSD" in cfg.symbol else raw_spread
+
+                        if monitor and spread_pips > cfg.spread_halt_pips:
+                            monitor.alert_liquidity_crisis(cfg.symbol, spread_pips)
+
                     except MT5DataError as e:
                         log.error("Transient data retrieval error: %s. Skipping this iteration.", e)
                         time.sleep(poll_interval)
                         continue
                     except MT5ConnectionError:
                         log.warning("Connection lost. Attempting reconnection...")
+                        if monitor:
+                            monitor.alert_broker_connection_lost()
                         try:
                             connector.connect()
                             log.info("Reconnection successful.")
+                            if monitor:
+                                monitor.alert_broker_connection_restored()
                             continue
                         except MT5ConnectionError as reconnect_exc:
                             log.critical(
@@ -440,9 +462,13 @@ def run_live(
                 break
             except MT5ConnectionError as exc:
                 log.error("Critical connection failure: %s. Re-initializing...", exc)
+                if monitor:
+                    monitor.alert_broker_connection_lost()
                 time.sleep(5)
                 try:
                     connector.connect()
+                    if monitor:
+                        monitor.alert_broker_connection_restored()
                 except MT5ConnectionError:
                     log.error("Re-initialization failed during outer loop recovery.")
             except Exception as exc:
