@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
 try:
     import torch
 except ImportError:
@@ -109,10 +110,9 @@ def run_live(
     loop_count = 0
     while True:
         # 0. Periodic Audit of Configuration State
-        if loop_count % 100 == 0:
-            if audit_logger:
-                audit_logger.log_config_snapshot(
-                    cfg.model_dump(
+        if loop_count % 100 == 0 and audit_logger:
+            audit_logger.log_config_snapshot(
+                cfg.model_dump(
                         mode="json",
                         exclude={
                             "mt5_password",
@@ -405,21 +405,21 @@ def run_live(
                             execution_data=execution_data,
                         )
 
-    # Log comprehensive decision trace for every non-hold signal
-    if audit_logger:
-        audit_logger.log(
-            actor="system",
-            action="decision_explanation",
-            details=f"Decision trace for {cfg.symbol}: {explanation.get('summary', 'No summary')}",
-            metadata={
-                "symbol": cfg.symbol,
-                "direction": direction,
-                "confidence": confidence,
-                "risk_data": risk_data,
-                "regime_data": regime_data,
-                "execution_data": execution_data,
-            }
-        )
+                        # Log comprehensive decision trace for every non-hold signal
+                        if audit_logger:
+                            audit_logger.log(
+                                actor="system",
+                                action="decision_explanation",
+                                details=f"Decision trace for {cfg.symbol}: {explanation.get('summary', 'No summary')}",
+                                metadata={
+                                    "symbol": cfg.symbol,
+                                    "direction": direction,
+                                    "confidence": confidence,
+                                    "risk_data": risk_data,
+                                    "regime_data": regime_data,
+                                    "execution_data": execution_data,
+                                }
+                            )
 
                         # Use a stub for macro risk since we don't have a live feed in this loop yet
                         macro_risk = RiskStatus(

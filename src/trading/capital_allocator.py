@@ -8,6 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from enum import Enum
 from typing import Any
@@ -145,14 +146,12 @@ class CapitalAllocator:
                 config.performance_multiplier = min(config.performance_multiplier, 0.1)
 
         if old_multiplier != config.performance_multiplier:
-            try:
+            with contextlib.suppress(RuntimeError, ImportError):
                 get_audit_logger().log_config_change(
                     old_config={"strategy_id": strategy_id, "multiplier": old_multiplier},
                     new_config={"strategy_id": strategy_id, "multiplier": config.performance_multiplier},
                     reason=f"Performance adjustment for {strategy_id} after trade outcome: {pnl:.2f}",
                 )
-            except (RuntimeError, ImportError):
-                pass
 
         logger.debug(
             "Strategy %s multiplier updated to %.2f | PnL: %.2f | Consecutive Losses: %d",
