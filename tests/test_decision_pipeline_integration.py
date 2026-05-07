@@ -62,11 +62,13 @@ def data_generator():
 @pytest.fixture
 def ensemble_model():
     with patch.object(ensemble, "torch", mock_torch), \
-         patch.object(ensemble, "LSTMAttentionModel", MagicMock()):
+         patch.object(ensemble, "LSTMModel", MagicMock()):
         model = EnsembleModel(device="cpu")
         # Mock sub-models
-        model._ppo_model = MagicMock()
-        model._ppo_model.predict.return_value = (1, None) # Default BUY
+        model.ppo_agent = MagicMock()
+        from src.models.base_model import Signal
+        from src.core.constants import SignalDirection
+        model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
         return model
 
 @pytest.fixture

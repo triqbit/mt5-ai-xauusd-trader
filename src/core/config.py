@@ -182,6 +182,12 @@ class TradingConfig(BaseSettings):
         le=1.0,
         description="Minimum model confidence score required to execute a signal",
     )
+    confidence_threshold: float = Field(
+        default=0.60,
+        ge=0.1,
+        le=1.0,
+        description="Confidence level below which a warning alert is triggered",
+    )
     consensus_threshold: float = Field(
         default=0.60, ge=0.5, le=1.0, description="Need 60%+ agreement across ensemble"
     )

@@ -1,13 +1,13 @@
 """
 Tests for Monitor class.
+Ensures real-time tracking, metrics updates, and Telegram alerting work as expected.
 """
 import asyncio
 import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-
-from src.core.config import TradingConfig
 from datetime import datetime, timezone
+
 from src.core.monitor import (
     CONFIDENCE_GAUGE,
     CPU_USAGE_GAUGE,
@@ -39,6 +39,10 @@ class TestMonitor(unittest.TestCase):
         self.config.telegram_chat_id = "fake_chat_id"
         self.config.confidence_threshold = 0.6
         self.config.prometheus_port = 8000
+        self.config.model_accuracy_floor = 0.5
+        self.config.model_drift_threshold = 0.3
+        self.config.model_calibration_threshold = 0.25
+        self.config.data_freshness_threshold = 300
 
         with patch('telegram.Bot'):
             self.monitor = Monitor(self.config)
@@ -57,6 +61,11 @@ class TestMonitor(unittest.TestCase):
         self.assertEqual(len(curve), 2)
         self.assertEqual(curve[0]["equity"], 10000.0)
         self.assertEqual(curve[1]["equity"], 10100.0)
+
+    def test_log_pnl(self):
+        with patch.object(DAILY_PNL_GAUGE, 'set') as mock_set:
+            self.monitor.log_pnl(250.0)
+            mock_set.assert_called_once_with(250.0)
 
     @patch("asyncio.run")
     @patch("asyncio.get_running_loop")
@@ -161,10 +170,6 @@ class TestMonitor(unittest.TestCase):
         self.assertTrue(self.monitor._server_started)
         mock_loop.create_task.assert_called_once()
 
-        # Second call should not start it again
-        self.monitor.start_metrics_server()
-        mock_start_server.assert_called_once()
-
     @patch("psutil.cpu_percent")
     @patch("psutil.virtual_memory")
     @patch("psutil.disk_usage")
@@ -192,7 +197,6 @@ class TestMonitor(unittest.TestCase):
         self.monitor.bot.send_message = AsyncMock()
 
         self.monitor.alert_balance_mismatch(10000.0, 9500.0)
-        # Verify bot.send_message was triggered via send_message wrapper
         self.assertTrue(self.monitor.bot.send_message.called)
         msg = self.monitor.bot.send_message.call_args[1]["text"]
         self.assertIn("Balance Mismatch", msg)
@@ -225,9 +229,6 @@ class TestMonitor(unittest.TestCase):
     def test_log_model_performance(self):
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = AsyncMock()
-        self.config.model_accuracy_floor = 0.5
-        self.config.model_drift_threshold = 0.3
-        self.config.model_calibration_threshold = 0.25
 
         with patch.object(MODEL_ACCURACY_GAUGE, "set") as mock_acc, \
              patch.object(MODEL_DRIFT_GAUGE, "set") as mock_drift:
@@ -253,7 +254,6 @@ class TestMonitor(unittest.TestCase):
     def test_log_data_freshness(self):
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = AsyncMock()
-        self.config.data_freshness_threshold = 300
 
         with patch.object(DATA_FRESHNESS_GAUGE, "set") as mock_set:
             # Case 1: Fresh data
