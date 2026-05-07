@@ -234,7 +234,6 @@ class RegimeDetector:
             label = MarketRegime.RANGING
             confidence = 1.0 - er
 
-        # Refined transition score based on rate of change in volatility and efficiency
         transition_score = abs(atr_ratio - 1.0) * 0.4 + abs(er - 0.5) * 0.4 + abs(vc) * 0.2
         return label, confidence, transition_score
 
@@ -250,7 +249,6 @@ class RegimeDetector:
         counts = df["regime"].value_counts(normalize=True) * 100
 
         # Calculate durations per regime
-        # Avoid modifying input df if possible or work on a copy
         analysis_df = df.copy()
         analysis_df["regime_group"] = (analysis_df["regime"] != analysis_df["regime"].shift()).cumsum()
         durations = analysis_df.groupby("regime_group")["regime"].agg(["first", "count"])

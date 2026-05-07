@@ -140,8 +140,7 @@ class TestRegimeDetector(unittest.TestCase):
         self.assertIn('regime', df_vec.columns)
         self.assertEqual(len(df_vec), len(data))
 
-        # Sample check for consistency (allowing some small floating point differences in heuristics)
-        # Note: news shock and some thresholds might be very slightly different due to rolling vs subsetting
+        # Sample check for consistency
         idx = 80
         self.assertEqual(df_vec['regime'].iloc[idx], df_iter['regime'].iloc[idx])
 
