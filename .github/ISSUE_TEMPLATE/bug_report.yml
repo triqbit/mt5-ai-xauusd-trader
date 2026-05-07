@@ -6,6 +6,7 @@ body:
     attributes:
       value: |
         Please ensure you have checked for existing issues before submitting a new one.
+        **Note:** For critical production outages, follow the escalation path in `docs/runbooks/README.md`.
   - type: textarea
     id: description
     attributes:
@@ -46,12 +47,13 @@ body:
     id: environment
     attributes:
       label: Environment Info
-      description: OS, Python version, MT5 version, etc.
+      description: OS, Python version, MT5 version, Broker/Server details.
       placeholder: |
         - OS: Ubuntu 22.04
         - Python: 3.11
         - Mode: Live/Demo
         - Deployment: Docker/Bare-metal
+        - Broker/Server: IC Markets / MetaQuotes-Demo
     validations:
       required: true
   - type: textarea
@@ -65,6 +67,12 @@ body:
         3. Observe the error in the logs...
     validations:
       required: true
+  - type: textarea
+    id: audit-ids
+    attributes:
+      label: Related Audit IDs / Decision Traces
+      description: Provide any relevant IDs from `audit_log` or `risk_events`.
+      placeholder: e.g., trade_id: 12345, event_id: 9876
   - type: textarea
     id: expected-behavior
     attributes:

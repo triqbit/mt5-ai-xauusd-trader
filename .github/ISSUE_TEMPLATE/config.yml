@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/triqbit/mt5-ai-xauusd-trader/discussions
+    about: Ask questions, share ideas, and interact with the community.
+  - name: 🛡️ Security Policy
+    url: https://github.com/triqbit/mt5-ai-xauusd-trader/security/policy
+    about: Read our security policy for private vulnerability reporting.

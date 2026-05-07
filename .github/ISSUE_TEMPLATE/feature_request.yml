@@ -21,6 +21,7 @@ body:
     attributes:
       label: Business Value / ROI
       description: What is the expected benefit or value? (e.g., higher Sharpe ratio, reduced latency, improved observability)
+      placeholder: e.g., "Expected to reduce slippage by 15% through optimized order execution."
     validations:
       required: true
   - type: dropdown
@@ -53,6 +54,7 @@ body:
     attributes:
       label: Risk Assessment
       description: Does this feature introduce new risks (e.g., higher latency, dependency bloat, capital risk)?
+      placeholder: "No new dependencies; potential 5ms increase in inference latency."
     validations:
       required: true
   - type: textarea
