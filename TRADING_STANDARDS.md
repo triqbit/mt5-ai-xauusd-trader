@@ -6,7 +6,9 @@
 - **Maximum Position Size**: Limited to 5% of account equity per trade
 - **Leverage Limits**: Maximum 1:50 for gold (XAUUSD) trading
 - **Correlation Limits**: No 2+ correlated positions simultaneously
-- **Portfolio Heat**: Maximum 20% of equity at risk across all positions
+- **Portfolio Heat**: Maximum 70% of total budget committed across all strategies (default)
+- **Symbol Concentration**: Maximum 40% of budget per symbol (default)
+- **Model Family Concentration**: Maximum 40% of budget per model family (default)
 
 ### 1.2 Risk Parameters
 ```python
@@ -37,7 +39,13 @@ def calculate_position_size(
 - **Trailing Stops**: Implement after profit threshold (e.g., +50 pips)
 - **Profit Target Levels**: Multiple profit levels with partial exits
 
-### 1.4 Daily Loss Limits (Circuit Breaker)
+### 1.4 Capital Allocation & Performance Scaling
+- **Adaptive Sizing**: Strategy risk is scaled by a performance multiplier (0.0 to 2.0).
+- **Cooling-Off**: Automatic multiplier floor (0.1) after 5 consecutive losses.
+- **Diversification Guard**: Linear scaling of allocations as heat or concentration limits are approached.
+- **Strategy Caps**: Each strategy has an absolute capital cap.
+
+### 1.5 Daily Loss Limits (Circuit Breaker)
 - **Daily Loss Limit**: 3% of account equity
 - **Weekly Loss Limit**: 8% of account equity
 - **Monthly Loss Limit**: 15% of account equity

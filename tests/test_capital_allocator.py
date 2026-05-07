@@ -264,7 +264,8 @@ def test_get_strategy_utilization(allocator):
 def test_request_allocation_zero_cap(allocator):
     # This shouldn't happen with Pydantic validation (gt=0), but let's test logic if cap was 0
     # Actually Pydantic will raise error on StrategyConfig creation.
-    with pytest.raises(Exception):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
         StrategyConfig(
             strategy_id="s1",
             symbol="XAUUSD",
@@ -326,6 +327,8 @@ def test_rejection_history(allocator):
     # Trigger different rejections
     allocator.request_allocation("unknown", 0.01)  # STRATEGY_NOT_FOUND
 
+    # Disable soft buffer to trigger hard limit directly
+    allocator.soft_limit_buffer = 0.0
     allocator.max_total_heat = 0.05
     allocator.update_allocation("s1", 5000.0)  # Already used 5%
     allocator.request_allocation("s1", 0.01)  # TOTAL_HEAT_LIMIT (requests another 1%)
@@ -516,3 +519,56 @@ def test_allocate_batch(allocator):
     assert results[1].allocated_risk_pct == pytest.approx(0.12)
 
     assert allocator.get_total_heat() == pytest.approx(0.27)
+
+
+def test_update_budget(allocator):
+    """Test dynamic budget updates."""
+    assert allocator.total_budget == 100000.0
+    allocator.update_budget(200000.0)
+    assert allocator.total_budget == 200000.0
+
+    # Ensure heat is recalculated based on new budget
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=100000.0,
+    )
+    allocator.add_strategy(config)
+    allocator.update_allocation("s1", 20000.0)
+
+    # 20k / 200k = 10% heat
+    assert allocator.get_total_heat() == 0.1
+
+
+def test_release_allocation(allocator):
+    """Test explicit allocation release."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+    )
+    allocator.add_strategy(config)
+    allocator.update_allocation("s1", 10000.0)
+    assert allocator.current_allocations["s1"] == 10000.0
+
+    allocator.release_allocation("s1")
+    assert allocator.current_allocations["s1"] == 0.0
+
+
+def test_scaled_to_zero_rejection(allocator):
+    """Test granular SCALED_TO_ZERO rejection."""
+    # Performance multiplier of 0
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+        performance_multiplier=0.0,
+    )
+    allocator.add_strategy(config)
+
+    result = allocator.request_allocation("s1", 0.01)
+    assert result.is_allowed is False
+    assert result.rejection_code == RejectionCode.SCALED_TO_ZERO
