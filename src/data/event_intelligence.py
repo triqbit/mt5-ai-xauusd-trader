@@ -12,9 +12,8 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 
-from pydantic import BaseModel, Field
-
 from src.core.constants import EventCategory, EventImpact
+from src.data.event_models import MacroEvent, RiskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -27,50 +26,9 @@ __all__ = [
     "MockEventProvider",
     "JSONEventProvider",
     "MetaAPIEventProvider",
+    "TradingViewEventProvider",
     "EventIntelligence",
 ]
-
-
-class MacroEvent(BaseModel):
-    """Typed model for a macroeconomic event."""
-
-    name: str
-    category: EventCategory
-    impact: EventImpact
-    timestamp: datetime
-    end_timestamp: datetime | None = None
-    symbol_impact: list[str] = Field(default_factory=lambda: ["XAUUSD", "USD"])
-    description: str | None = None
-    actual: float | None = None
-    forecast: float | None = None
-    previous: float | None = None
-
-    @property
-    def is_high_impact(self) -> bool:
-        return self.impact >= EventImpact.HIGH
-
-    def is_ongoing(self, now: datetime) -> bool:
-        """Checks if the event is currently happening (within its duration)."""
-        if self.end_timestamp:
-            return self.timestamp <= now <= self.end_timestamp
-        return False
-
-    def model_post_init(self, __context) -> None:
-        """Ensure timestamps are timezone-aware UTC."""
-        if self.timestamp.tzinfo is None:
-            self.timestamp = self.timestamp.replace(tzinfo=UTC)
-        if self.end_timestamp and self.end_timestamp.tzinfo is None:
-            self.end_timestamp = self.end_timestamp.replace(tzinfo=UTC)
-
-
-class RiskStatus(BaseModel):
-    """Current risk status based on events."""
-
-    is_blocked: bool = False
-    risk_multiplier: float = 1.0  # 1.0 = normal risk, < 1.0 = reduced risk
-    active_events: list[MacroEvent] = Field(default_factory=list)
-    blocking_events: list[MacroEvent] = Field(default_factory=list)
-    reason: str | None = None
 
 
 class BaseEventProvider(ABC):
@@ -127,6 +85,24 @@ class JSONEventProvider(BaseEventProvider):
             return []
 
 
+class TradingViewEventProvider(BaseEventProvider):
+    """
+    Mocked provider for TradingView economic calendar.
+    In a real implementation, this would use scraping or an unofficial API.
+    """
+
+    def __init__(self):
+        self._impact_map = {
+            "low": EventImpact.LOW,
+            "medium": EventImpact.MEDIUM,
+            "high": EventImpact.HIGH,
+        }
+
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
+        # Implementation left as mock for now, demonstrating multi-source capability.
+        return []
+
+
 class MetaAPIEventProvider(BaseEventProvider):
     """
     Provider that fetches macroeconomic events from MetaAPI.
@@ -163,15 +139,22 @@ class MetaAPIEventProvider(BaseEventProvider):
 
             macro_events = []
             for item in data:
-                # Filter for USD events
-                if item.get("country") != "US" and item.get("currency") != "USD":
-                    continue
-
                 # Basic normalization
                 name = item.get("event", "Unknown Event")
                 category = self._guess_category(name)
+
+                # Filter for XAUUSD relevant events:
+                # 1. US/USD events
+                # 2. Geopolitical events (regardless of country)
+                # 3. High/Critical impact events from other major economies
+                is_usd = item.get("country") == "US" or item.get("currency") == "USD"
+                is_geopolitical = category == EventCategory.GEOPOLITICAL
+                is_major_economy = item.get("country") in ["EU", "GB", "JP", "CH", "CN"]
                 impact_str = item.get("impact", "low").lower()
                 impact = self._impact_map.get(impact_str, EventImpact.LOW)
+
+                if not (is_usd or is_geopolitical or (is_major_economy and impact >= EventImpact.HIGH)):
+                    continue
 
                 # MetaAPI uses UTC ISO strings
                 ts = datetime.fromisoformat(item["time"].replace("Z", "+00:00"))
@@ -193,24 +176,55 @@ class MetaAPIEventProvider(BaseEventProvider):
     def _guess_category(self, name: str) -> EventCategory:
         """Guesses the event category based on the event name."""
         name_upper = name.upper()
-        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE"]):
+        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE"]):
             return EventCategory.CPI
-        if any(kw in name_upper for kw in ["NON-FARM PAYROLL", "NFP", "UNEMPLOYMENT", "EMPLOYMENT"]):
-            return EventCategory.NFP
-        if any(kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE"]):
-            return EventCategory.FOMC
-        if any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"]) and any(
-            kw in name_upper for kw in ["DECISION", "STATEMENT", "MINUTES", "PRESS CONFERENCE"]
+        if any(
+            kw in name_upper
+            for kw in ["NON-FARM PAYROLL", "NFP", "UNEMPLOYMENT", "EMPLOYMENT", "JOBLESS"]
         ):
+            return EventCategory.NFP
+        if any(kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT"]):
+            return EventCategory.FOMC
+        if (
+            any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
+            and any(
+                kw in name_upper
+                for kw in ["DECISION", "STATEMENT", "MINUTES", "PRESS CONFERENCE", "TARGET"]
+            )
+        ) or "FUNDS RATE" in name_upper:
             return EventCategory.RATES
         if any(
             kw in name_upper
-            for kw in ["WAR", "CONFLICT", "SANCTION", "GEOPOLITICAL", "ELECTION", "TENSION"]
+            for kw in [
+                "WAR",
+                "CONFLICT",
+                "SANCTION",
+                "GEOPOLITICAL",
+                "ELECTION",
+                "TENSION",
+                "ESCALATION",
+                "MISSILE",
+                "STRIKE",
+                "SAFE HAVEN",
+            ]
         ):
             return EventCategory.GEOPOLITICAL
         if any(
             kw in name_upper
-            for kw in ["GDP", "PMI", "ISM", "RETAIL SALES", "CONSUMER CONFIDENCE", "TREASURY"]
+            for kw in [
+                "GDP",
+                "PMI",
+                "ISM",
+                "RETAIL SALES",
+                "CONSUMER CONFIDENCE",
+                "TREASURY",
+                "YIELD",
+                "BOND AUCTION",
+                "DURABLE GOODS",
+                "HOUSING STARTS",
+                "MANUFACTURING",
+                "CENTRAL BANK",
+            ]
         ):
             return EventCategory.USD_MACRO
         if "USD" in name_upper:
@@ -226,11 +240,11 @@ class EventIntelligence:
 
     def __init__(
         self,
-        provider: BaseEventProvider,
+        providers: list[BaseEventProvider],
         pre_event_minutes: dict[EventImpact, int] | None = None,
         post_event_minutes: dict[EventImpact, int] | None = None,
     ):
-        self.provider = provider
+        self.providers = providers
         self._cached_events: list[MacroEvent] = []
         self._last_successful_fetch: datetime | None = None
         # Default risk windows (minutes)
@@ -247,6 +261,38 @@ class EventIntelligence:
             EventImpact.CRITICAL: 240,
         }
 
+    def refresh(self, current_time: datetime | None = None) -> None:
+        """
+        Force a refresh of event data from all providers.
+        """
+        now = current_time or datetime.now(UTC)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=UTC)
+
+        max_pre = max(self.pre_event_minutes.values())
+        max_post = max(self.post_event_minutes.values())
+        start_lookback = now - timedelta(minutes=max_post + 1440)
+        end_lookahead = now + timedelta(minutes=max_pre + 1440)
+
+        events: list[MacroEvent] = []
+        any_success = False
+        for provider in self.providers:
+            try:
+                provider_events = provider.get_upcoming_events(start_lookback, end_lookahead)
+                events.extend(provider_events)
+                any_success = True
+            except Exception as e:
+                logger.error(f"Provider {provider.__class__.__name__} failed during refresh: {e}")
+
+        if any_success:
+            unique_events = {}
+            for e in events:
+                key = (e.name, e.timestamp)
+                if key not in unique_events:
+                    unique_events[key] = e
+            self._cached_events = list(unique_events.values())
+            self._last_successful_fetch = now
+
     def get_risk_status(self, current_time: datetime | None = None) -> RiskStatus:
         """
         Calculates the current risk status based on upcoming and recent events.
@@ -259,21 +305,40 @@ class EventIntelligence:
         max_pre = max(self.pre_event_minutes.values())
         max_post = max(self.post_event_minutes.values())
 
+        # Also consider major event minimum windows (120m pre, 180m post)
+        max_pre = max(max_pre, 120)
+        max_post = max(max_post, 180)
+
         # Extend windows for long-duration events
         start_lookback = now - timedelta(minutes=max_post + 1440)  # +1 day for long events
         end_lookahead = now + timedelta(minutes=max_pre + 1440)
 
         events: list[MacroEvent] = []
-        is_fallback = False
+        all_fetch_failed = True
 
-        try:
-            events = self.provider.get_upcoming_events(start_lookback, end_lookahead)
-            # Update cache on success
+        for provider in self.providers:
+            try:
+                provider_events = provider.get_upcoming_events(start_lookback, end_lookahead)
+                if provider_events is not None:
+                    events.extend(provider_events)
+                    all_fetch_failed = False
+            except Exception as e:
+                logger.error(f"Provider {provider.__class__.__name__} failed to fetch events: {e}")
+
+        # De-duplicate events by name and timestamp
+        if not all_fetch_failed:
+            unique_events = {}
+            for e in events:
+                key = (e.name, e.timestamp)
+                if key not in unique_events:
+                    unique_events[key] = e
+            events = list(unique_events.values())
+
+            # Update cache on success (if we got at least some events)
             self._cached_events = events
             self._last_successful_fetch = now
-        except Exception as e:
-            logger.error("Failed to fetch macro events: %s. Falling back to cached data.", e)
-            is_fallback = True
+        else:
+            logger.warning("All providers failed. Falling back to cached data.")
             # Use cached events, filtering for the current relevant window
             events = [
                 e
@@ -281,7 +346,7 @@ class EventIntelligence:
                 if (e.end_timestamp or e.timestamp) >= start_lookback and e.timestamp <= end_lookahead
             ]
 
-        if not events and is_fallback:
+        if not events and all_fetch_failed:
             # If no cached data is available, return safe-mode status.
             return RiskStatus(
                 is_blocked=False, risk_multiplier=1.0, reason="Event data unavailable (no cache)"
@@ -358,12 +423,20 @@ class EventIntelligence:
                     blocking_events.append(event)
 
                 # Update multiplier
+                event_mult = 1.0
                 if event.impact == EventImpact.CRITICAL:
-                    min_multiplier = 0.0
+                    event_mult = 0.0
                 elif event.impact == EventImpact.HIGH:
-                    min_multiplier = min(min_multiplier, 0.5)
+                    event_mult = 0.5
                 elif event.impact == EventImpact.MEDIUM:
-                    min_multiplier = min(min_multiplier, 0.75)
+                    event_mult = 0.75
+
+                # Stricter multiplier for major events
+                if event.category in [EventCategory.FOMC, EventCategory.NFP, EventCategory.RATES]:
+                    if event.impact >= EventImpact.HIGH:
+                        event_mult = min(event_mult, 0.0 if event.impact == EventImpact.CRITICAL else 0.25)
+
+                min_multiplier = min(min_multiplier, event_mult)
 
         reason = None
         if is_blocked:

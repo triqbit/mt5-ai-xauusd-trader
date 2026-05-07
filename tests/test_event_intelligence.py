@@ -57,7 +57,7 @@ def test_risk_status_blocking(now):
         )
     ]
     provider = MockEventProvider(events)
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     status = intel.get_risk_status(now)
 
@@ -75,7 +75,7 @@ def test_risk_status_critical_blocking(now):
         )
     ]
     provider = MockEventProvider(events)
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     status = intel.get_risk_status(now)
     assert status.is_blocked is True
@@ -93,17 +93,18 @@ def test_risk_status_cooldown(now):
         )
     ]
     provider = MockEventProvider(events)
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     status = intel.get_risk_status(now)
     assert status.is_blocked is True
-    assert status.risk_multiplier == 0.5
+    # NFP is a major event, so it gets a stricter multiplier (0.25)
+    assert status.risk_multiplier == 0.25
     assert len(status.active_events) == 1
     assert status.active_events[0].name == "Past NFP"
 
 def test_no_active_events(now):
     provider = MockEventProvider([])
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     status = intel.get_risk_status(now)
     assert status.is_blocked is False
@@ -115,7 +116,7 @@ def test_fallback_behavior_no_cache(now):
         def get_upcoming_events(self, start, end):
             raise Exception("API Down")
 
-    intel = EventIntelligence(BrokenProvider())
+    intel = EventIntelligence([BrokenProvider()])
     status = intel.get_risk_status(now)
 
     assert status.is_blocked is False
@@ -140,7 +141,7 @@ def test_fallback_behavior_with_cache(now):
         timestamp=now + timedelta(minutes=15)
     )
     provider = SometimesBrokenProvider([event])
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     # First fetch to populate cache
     status = intel.get_risk_status(now)
@@ -166,7 +167,7 @@ def test_ongoing_event(now):
         )
     ]
     provider = MockEventProvider(events)
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     status = intel.get_risk_status(now)
     assert status.is_blocked is True
@@ -231,12 +232,13 @@ def test_major_event_extended_window(now):
         )
     ]
     provider = MockEventProvider(events)
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     status = intel.get_risk_status(now)
     assert status.is_blocked is False # Blocks at 60m for HIGH major event
     assert len(status.active_events) == 1
-    assert status.risk_multiplier == 0.5
+    # NFP is a major event, so it gets a stricter multiplier (0.25)
+    assert status.risk_multiplier == 0.25
 
     # Check at 50m
     status = intel.get_risk_status(now + timedelta(minutes=40))
@@ -275,9 +277,11 @@ def test_metaapi_provider_filtering(mock_get, now):
     provider = MetaAPIEventProvider(token="fake_token")
     events = provider.get_upcoming_events(now - timedelta(hours=1), now + timedelta(hours=1))
 
-    # Should only include the USD event
-    assert len(events) == 1
-    assert events[0].name == "USD Event"
+    # Should include both USD and EU High Impact event
+    assert len(events) == 2
+    names = [e.name for e in events]
+    assert "USD Event" in names
+    assert "EUR Event" in names
 
 def test_macro_event_properties(now):
     event = MacroEvent(
@@ -323,7 +327,7 @@ def test_event_intelligence_helpers(now):
         timestamp=now + timedelta(minutes=10)
     )
     provider = MockEventProvider([event])
-    intel = EventIntelligence(provider)
+    intel = EventIntelligence([provider])
 
     assert intel.should_block_execution(now) is True
     assert intel.get_risk_multiplier(now) == 0.0
@@ -333,7 +337,7 @@ def test_fallback_no_events(now):
         def get_upcoming_events(self, start, end):
             raise Exception("Fail")
 
-    intel = EventIntelligence(FailingProvider())
+    intel = EventIntelligence([FailingProvider()])
     status = intel.get_risk_status(now)
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
