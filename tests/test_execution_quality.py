@@ -232,3 +232,55 @@ def test_dynamic_properties(analyzer):
     # EURUSD: digits=5 -> pip_size = 10^-(5-1) = 0.0001
     assert analyzer._get_pip_size("EURUSD") == 0.0001
     assert analyzer._get_contract_size("EURUSD") == 100000.0
+
+def test_dynamic_properties_enhanced(analyzer, mock_connector):
+    """Test enhanced dynamic property detection with new fields."""
+    symbol = "BTCUSD"
+
+    # 1. Test MetaAPI style properties
+    def get_meta_props(s):
+        return {
+            "digits": 2,
+            "pip_size": 1.0,
+            "trade_contract_size": 1.0,
+            "point": 0.01
+        }
+    mock_connector.get_symbol_properties.side_effect = get_meta_props
+
+    assert analyzer._get_pip_size(symbol) == 1.0
+    assert analyzer._get_contract_size(symbol) == 1.0
+
+    # 2. Test fallback to legacy contract_size
+    def get_legacy_props(s):
+        return {
+            "digits": 3,
+            "contract_size": 5000.0
+        }
+    mock_connector.get_symbol_properties.side_effect = get_legacy_props
+
+    assert analyzer._get_pip_size(symbol) == 0.01 # 10^-(3-1)
+    assert analyzer._get_contract_size(symbol) == 5000.0
+
+def test_execution_spread_dynamic_point(analyzer, mock_connector):
+    """Test that _get_execution_spread uses the point property from connector."""
+    trade = MagicMock(spec=Trade)
+    trade.symbol = "XAUUSD"
+    trade.created_at = datetime.now(timezone.utc)
+
+    # Mock rates with spread=20
+    rates_df = pd.DataFrame([
+        {"time": trade.created_at, "spread": 20}
+    ])
+    mock_connector.get_rates_range.return_value = rates_df
+
+    # Mock properties with specific point size
+    mock_connector.get_symbol_properties.side_effect = None
+    mock_connector.get_symbol_properties.return_value = {
+        "digits": 2,
+        "point": 0.05 # Non-standard point for testing
+    }
+
+    # spread_pips = (avg_spread_points * point_size) / pip_size
+    # = (20 * 0.05) / 0.1 = 1.0 / 0.1 = 10.0
+    spread_info = analyzer._get_execution_spread(trade)
+    assert spread_info["spread_pips"] == 10.0
