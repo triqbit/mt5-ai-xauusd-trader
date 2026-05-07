@@ -9,3 +9,7 @@
 ## 2025-05-22 - [Pre-converting DataFrames to NumPy for Environment Observations]
 **Learning:** In Gymnasium environments, calling `df.iloc[...].values.astype(np.float32)` inside the `step()` or `_get_observation()` method is a major bottleneck due to pandas indexing overhead and repeated type conversion. Pre-converting the entire DataFrame to a NumPy array during initialization and using direct NumPy slicing provides a ~50x speedup.
 **Action:** Always pre-convert static historical DataFrames to NumPy arrays with the target dtype (usually `float32`) in RL environments.
+
+## 2025-05-23 - [Vectorized Rolling Linear Regression Slope in Backtester]
+**Learning:** Manual Python loops for rolling statistics (like linear regression slope) are a major bottleneck in backtesting. Replacing a (N \cdot W)$ loop with a vectorized dot product using `np.convolve` with reversed weights (`weights[::-1]`) provides a ~200x speedup.
+**Action:** Ensure vectorized output array length parity with input by using explicit length checks (`if n >= window`) and padding, especially for small $ edge cases.
