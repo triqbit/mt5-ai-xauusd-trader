@@ -7,9 +7,8 @@ from .event_intelligence import (
     EventCategory,
     EventImpact,
     EventIntelligence,
-    MacroEvent,
-    RiskStatus,
 )
+from .event_models import MacroEvent, RiskStatus
 
 __all__ = [
     "EventIntelligence",

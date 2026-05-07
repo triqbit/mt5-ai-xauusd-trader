@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from src.core.constants import DecisionStatus, SignalDirection
 from src.core.explainability import SignalExplainer, SignalExplanation
-from src.data.event_intelligence import RiskStatus
+from src.data.event_models import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)

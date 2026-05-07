@@ -14,16 +14,26 @@ The `EventIntelligence` module (located in `src/data/event_intelligence.py`) pro
 - **Timezone Safety:** Standardizes all event processing on timezone-aware UTC datetimes to prevent synchronization bugs.
 
 ## Data Providers
-The system supports multiple event sources through the `BaseEventProvider` interface:
-- **`MetaAPIEventProvider`:** Fetches real-time economic calendar data from MetaAPI.
+The system utilizes a multi-provider architecture for redundancy and enhanced coverage:
+- **`MetaAPIEventProvider`:** Primary source fetching real-time economic calendar data from MetaAPI, covering USD and major global economies (EU, GB, JP, CH, CN).
+- **`TradingViewEventProvider`:** Secondary (mocked) provider for cross-verification.
 - **`JSONEventProvider`:** Allows for local manual event ingestion or overrides via a JSON file.
 - **`MockEventProvider`:** Used for testing and simulation.
+
+The `EventIntelligence` orchestrator automatically de-duplicates events appearing across multiple providers.
 
 ## Configuration
 Risk windows are configurable via `pre_event_minutes` and `post_event_minutes` dictionaries mapping `EventImpact` levels to durations.
 
 ## Integration
 The module is integrated into the `DecisionSupportSystem` to provide macro context in the pre-trade briefing dashboard.
+
+### Risk Windows and Multipliers
+The system implements tiered risk management based on event impact:
+- **Critical Impact:** Blocks execution (`is_blocked=True`) and sets `risk_multiplier=0.0`.
+- **High Impact (Major):** For FOMC, NFP, and Interest Rate decisions, a stricter `risk_multiplier=0.25` is applied, with a minimum 2-hour pre-event window and 3-hour cooldown.
+- **High Impact (Generic):** Applies a `risk_multiplier=0.5`.
+- **Medium Impact:** Applies a `risk_multiplier=0.75`.
 The internal `RiskStatus` model provides structured output for downstream components:
 - `is_blocked`: Boolean flag for execution suppression.
 - `risk_multiplier`: Floating point value (0.0 to 1.0) for position size adjustment.
