@@ -50,6 +50,8 @@ def test_audit_logger_redaction(tmp_path):
     processor.secrets.add("API_KEY_HIDDEN")
 
     logger = AuditLogger(db_url=db_url)
+    from src.core.database import Base
+    Base.metadata.create_all(logger.engine)
 
     # Log something sensitive in metadata
     logger.log(

@@ -35,6 +35,8 @@ def test_audit_log_entry(db_url):
     AuditLogger._instance = None
     AuditLogger._initialized = False
     logger = AuditLogger(db_url)
+    from src.core.database import Base
+    Base.metadata.create_all(logger.engine)
 
     entry_id = logger.log("test_actor", "test_action", "test_details")
     assert entry_id is not None
