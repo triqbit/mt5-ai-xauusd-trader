@@ -6,12 +6,26 @@ Deterministic scenario generator for testing system robustness across market reg
 
 from __future__ import annotations
 
-from typing import Literal
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 
 from src.core.schemas import TradeSignal
+
+
+@dataclass
+class ValidationScenario:
+    """Bundles all inputs required for ExecutionFilter validation."""
+
+    signal: TradeSignal
+    market_data: pd.DataFrame
+    current_drawdown: float = 0.0
+    timestamp: datetime | None = None
+    model_health: dict[str, Any] | None = None
+    trade_logger: Any | None = None
 
 
 class ScenarioGenerator:
@@ -65,6 +79,28 @@ class ScenarioGenerator:
             return self._generate_regime_shift(n_steps, start_price, volatility)
         raise ValueError(f"Unknown regime: {regime}")
 
+    def generate_with_holes(
+        self, n_steps: int = 100, hole_pct: float = 0.1, regime: str = "ranging"
+    ) -> pd.DataFrame:
+        """Generates data and then injects NaNs (holes) to test data quality handling."""
+        df = self.generate(n_steps=n_steps, regime=regime)  # type: ignore
+        mask = self.rng.random(len(df)) < hole_pct
+        # Don't poke a hole in the last row to ensure we always have a current price
+        mask[-1] = False
+        cols = ["open", "high", "low", "close"]
+        for col in cols:
+            df.loc[mask, col] = np.nan
+        return df
+
+    def generate_stale_feed(self, n_steps: int = 100, stale_len: int = 5) -> pd.DataFrame:
+        """Generates data where the last few bars are exact copies (frozen feed)."""
+        df = self.generate(n_steps=n_steps, regime="trending")
+        last_good_idx = n_steps - stale_len - 1
+        last_bar = df.iloc[last_good_idx].copy()
+        for i in range(last_good_idx + 1, n_steps):
+            df.iloc[i] = last_bar
+        return df
+
     def _generate_base(self, n_steps: int, start_price: float, returns: np.ndarray) -> pd.DataFrame:
         """Helper to convert returns to OHLCV."""
         prices = start_price * np.exp(np.cumsum(returns))
@@ -84,6 +120,10 @@ class ScenarioGenerator:
         # Ensure high is actually the highest and low is the lowest
         df["high"] = df[["open", "close", "high"]].max(axis=1)
         df["low"] = df[["open", "close", "low"]].min(axis=1)
+
+        # Add a synthetic datetime index
+        start_time = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
+        df.index = [start_time + timedelta(minutes=5 * i) for i in range(n_steps)]
 
         return df
 
@@ -160,16 +200,16 @@ class ScenarioGenerator:
 
         # Inject anomalies
         # 1. High < Low
-        df.loc[0, "high"] = df.loc[0, "low"] - 10.0
+        df.iloc[0, df.columns.get_loc("high")] = df.iloc[0, df.columns.get_loc("low")] - 10.0
 
         # 2. Negative price
-        df.loc[1, "close"] = -100.0
+        df.iloc[1, df.columns.get_loc("close")] = -100.0
 
         # 3. NaNs
-        df.loc[2, "open"] = np.nan
+        df.iloc[2, df.columns.get_loc("open")] = np.nan
 
         # 4. Zero volume
-        df.loc[3, "tick_volume"] = 0
+        df.iloc[3, df.columns.get_loc("tick_volume")] = 0
 
         return df
 
@@ -282,17 +322,15 @@ class RiskScenarioBuilder:
 
 class ExecutionScenarioBuilder:
     """
-    Generates (TradeSignal, DataFrame) pairs tailored to test specific ExecutionFilter layers.
+    Generates ValidationScenario objects tailored to test specific ExecutionFilter layers.
     """
 
     def __init__(self, seed: int = 42):
         self.gen = ScenarioGenerator(seed=seed)
 
-    def passing_buy(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+    def passing_buy(self, symbol: str = "XAUUSD") -> ValidationScenario:
         """A clean BUY signal in a moderate bullish trend."""
-        # Lower trend strength to avoid RSI > 75
         df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005)
-        # Ensure enough data for indicators
         signal = TradeSignal(
             symbol=symbol,
             direction=1,
@@ -303,12 +341,11 @@ class ExecutionScenarioBuilder:
             algorithm="ensemble",
             confidence=0.8,
         )
-        return signal, df
+        return ValidationScenario(signal=signal, market_data=df)
 
-    def atr_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+    def atr_failure(self, symbol: str = "XAUUSD") -> ValidationScenario:
         """Signal during extreme volatility spike (ATR failure)."""
         df = self.gen.generate(n_steps=200, regime="ranging", volatility=0.0005)
-        # Spike ATR at the end by blowing up the range of the last candle
         last_idx = df.index[-1]
         df.loc[last_idx, "high"] = df.loc[last_idx, "close"] + 50.0
         df.loc[last_idx, "low"] = df.loc[last_idx, "close"] - 50.0
@@ -323,9 +360,9 @@ class ExecutionScenarioBuilder:
             algorithm="ensemble",
             confidence=0.7,
         )
-        return signal, df
+        return ValidationScenario(signal=signal, market_data=df)
 
-    def trend_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+    def trend_failure(self, symbol: str = "XAUUSD") -> ValidationScenario:
         """BUY signal in a BEARISH trend (Trend Angle failure)."""
         df = self.gen.generate(n_steps=200, regime="trending", trend_strength=-0.005)
         signal = TradeSignal(
@@ -338,24 +375,17 @@ class ExecutionScenarioBuilder:
             algorithm="ensemble",
             confidence=0.7,
         )
-        return signal, df
+        return ValidationScenario(signal=signal, market_data=df)
 
-    def ema_out_of_sequence(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+    def ema_out_of_sequence(self, symbol: str = "XAUUSD") -> ValidationScenario:
         """BUY signal where EMAs are not correctly stacked."""
-        # Use a trending regime so it passes Trend Angle (slope > 0)
         df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0005)
-
-        # Manually break the EMA sequence in the last row to trigger failure
-        # For BUY, we need EMA8 > EMA21 > EMA50 > EMA200. We'll swap 8 and 21.
-        # Note: ExecutionFilter computes EMAs if not present in columns.
-        # We can pre-calculate and put them in the DF to force the check.
         df["base_M5_ema_8"] = df["close"].ewm(span=8, adjust=False).mean()
         df["base_M5_ema_21"] = df["close"].ewm(span=21, adjust=False).mean()
         df["base_M5_ema_50"] = df["close"].ewm(span=50, adjust=False).mean()
         df["base_M5_ema_200"] = df["close"].ewm(span=200, adjust=False).mean()
 
         last_idx = df.index[-1]
-        # Swap so EMA21 > EMA8 -> Failure for BUY
         val8 = df.loc[last_idx, "base_M5_ema_8"]
         val21 = df.loc[last_idx, "base_M5_ema_21"]
         df.loc[last_idx, "base_M5_ema_8"] = val21
@@ -371,15 +401,11 @@ class ExecutionScenarioBuilder:
             algorithm="ensemble",
             confidence=0.7,
         )
-        return signal, df
+        return ValidationScenario(signal=signal, market_data=df)
 
-    def momentum_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+    def momentum_failure(self, symbol: str = "XAUUSD") -> ValidationScenario:
         """BUY signal when RSI is too high (overbought)."""
-        # Rapid vertical move spikes RSI.
-        # Needs to pass ATR, TREND_ANGLE, EMA_SEQUENCE first.
         df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0005)
-        # Spike the very end to push RSI over 75 without blowing up EMA sequence too much
-        # or just use a very strong trend that eventually hits RSI 80+
         df_spike = self.gen.generate(n_steps=50, regime="trending", trend_strength=0.01, start_price=df["close"].iloc[-1])
         df = pd.concat([df, df_spike]).iloc[-300:]
 
@@ -393,7 +419,62 @@ class ExecutionScenarioBuilder:
             algorithm="ensemble",
             confidence=0.7,
         )
-        return signal, df
+        return ValidationScenario(signal=signal, market_data=df)
+
+    def session_violation(self, symbol: str = "XAUUSD") -> ValidationScenario:
+        """Signal generated during a Saturday (market closed)."""
+        scenario = self.passing_buy(symbol)
+        # Force timestamp to a Saturday (2024-01-06 is a Saturday)
+        scenario.timestamp = datetime(2024, 1, 6, 12, 0, tzinfo=UTC)
+        return scenario
+
+    def drawdown_breach(self, symbol: str = "XAUUSD") -> ValidationScenario:
+        """Signal generated when account is in 20% drawdown (>15% limit)."""
+        scenario = self.passing_buy(symbol)
+        scenario.current_drawdown = 0.20
+        return scenario
+
+    def confidence_failure(self, symbol: str = "XAUUSD") -> ValidationScenario:
+        """Signal with confidence below typical 0.6 threshold."""
+        scenario = self.passing_buy(symbol)
+        scenario.signal.confidence = 0.4
+        return scenario
+
+    def performance_floor_failure(self, symbol: str = "XAUUSD") -> ValidationScenario:
+        """Signal when historical win rate is below 45% floor."""
+        scenario = self.passing_buy(symbol)
+        # Mock trade_logger with low win rate
+        class MockLogger:
+            def read_performance_report(self):
+                return {"win_rate": 0.35}
+
+        scenario.trade_logger = MockLogger()
+        return scenario
+
+    def flicker_sequence(self, symbol: str = "XAUUSD") -> list[ValidationScenario]:
+        """Sequence of 5 signals alternating BUY/SELL to trigger Flicker Guard."""
+        scenarios = []
+        # Use a trending regime so it passes other filters more easily,
+        # but we will rely on precomputed metrics in tests to force pass layers 1-9.
+        df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005)
+        price = df["close"].iloc[-1]
+
+        for i in range(5):
+            direction = 1 if i % 2 == 0 else -1
+            sl = price - (direction * 10)
+            tp = price + (direction * 20)
+            signal = TradeSignal(
+                symbol=symbol,
+                direction=direction,
+                entry_price=price,
+                stop_loss=sl,
+                take_profit=tp,
+                lot_size=0.1,
+                algorithm="ensemble",
+                confidence=0.8,
+            )
+            scenarios.append(ValidationScenario(signal=signal, market_data=df))
+        return scenarios
 
 
 class ModelHealthGenerator:
