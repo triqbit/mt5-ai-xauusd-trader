@@ -16,7 +16,7 @@ except ImportError:
     torch = None
     nn = None
 
-from src.core.constants import ModelAction
+from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
 
 
@@ -78,7 +78,7 @@ class TimeSeriesTransformer(BaseModel, nn.Module if nn else object):
         """
         if not torch or not nn:
             return Signal(
-                direction=ModelAction.HOLD.to_direction(),
+                direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "PyTorch missing"},
             )
@@ -106,14 +106,17 @@ class TimeSeriesTransformer(BaseModel, nn.Module if nn else object):
             action_idx = int(np.argmax(probs_np))
             confidence = float(probs_np[action_idx])
 
+            # Explicitly map ModelAction to SignalDirection via helper
+            direction = ModelAction(action_idx).to_direction()
+
             return Signal(
-                direction=ModelAction(action_idx).to_direction(),
+                direction=direction,
                 confidence=confidence,
                 metadata={"probabilities": probs_np.tolist()},
             )
         except Exception as e:
             return Signal(
-                direction=ModelAction.HOLD.to_direction(),
+                direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": str(e)},
             )

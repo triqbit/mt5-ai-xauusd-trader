@@ -173,25 +173,25 @@ class EnsembleModel(BaseModel):
             Signal: Consolidated ensemble signal.
         """
         seq = kwargs.get("seq")
-        _regime_info = kwargs.get("regime_info")
+        regime_info = kwargs.get("regime_info")
         votes: Dict[str, Signal] = {}
 
         # PPO prediction
         if self.ppo_agent is not None:
             with profile("inference_ppo"):
-                votes["ppo"] = self.ppo_agent.predict(features)
+                votes["ppo"] = self.ppo_agent.predict(features, regime_info=regime_info)
 
         # Dreamer prediction
         if self.dreamer_agent is not None:
             with profile("inference_dreamer"):
-                votes["dreamer"] = self.dreamer_agent.predict(features)
+                votes["dreamer"] = self.dreamer_agent.predict(features, regime_info=regime_info)
 
         # LSTM prediction
         if self.lstm_model is not None:
             with profile("inference_lstm"):
                 # Use seq if provided, otherwise fallback to features
                 lstm_input = seq if seq is not None else features
-                votes["lstm"] = self.lstm_model.predict(lstm_input)
+                votes["lstm"] = self.lstm_model.predict(lstm_input, regime_info=regime_info)
 
         return self.aggregate_signals(votes)
 
