@@ -24,8 +24,8 @@ PIP_EXEC := $(shell if [ -f $(PIP) ]; then echo $(PIP); else echo pip3; fi)
 help:
 	@echo "MT5 AI/ML Trading Bot - Developer Commands"
 	@echo "------------------------------------------"
-	@echo "bootstrap : Install dependencies and setup environment"
-	@echo "doctor    : Run system health check and diagnostics"
+	@echo "doctor    : [REQUIRED] Run system diagnostics and verification"
+	@echo "bootstrap : [REQUIRED] Install dependencies and setup environment"
 	@echo "test      : Run unit and integration tests"
 	@echo "lint      : Run ruff linter and formatter"
 	@echo "audit     : Run security and dependency audit"

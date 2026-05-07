@@ -22,17 +22,27 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-import pandas as pd
+try:
+    import pandas as pd
+    import structlog
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+except ImportError as e:
+    print("=" * 60)
+    print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
+    print("=" * 60)
+    print(f"Error: {e}")
+    print("\nREMEDIATION:")
+    print("1. Run 'pip install -r requirements.txt'")
+    print("2. Run 'python3 scripts/doctor.py' to diagnose your environment.")
+    print("=" * 60)
+    sys.exit(1)
 
 try:
     import torch
 except ImportError:
     torch = None
-
-import structlog
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
 from src.core import profile
 from src.core.audit_log import AuditLogger
@@ -534,8 +544,20 @@ def run_live(
 # -- CLI -------------------------------------------------------------------
 
 
+def get_system_version() -> str:
+    """Retrieve application version from src package."""
+    try:
+        from src import __version__
+        return __version__
+    except ImportError:
+        return "unknown"
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
+    p.add_argument(
+        "--version", action="version", version=f"%(prog)s {get_system_version()}"
+    )
     p.add_argument(
         "--mode",
         choices=["demo", "live", "backtest"],
