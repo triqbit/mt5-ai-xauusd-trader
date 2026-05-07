@@ -7,12 +7,15 @@ Research and evaluation modules.
 from src.research.benchmarks import (
     BenchmarkEvaluator,
     BenchmarkStrategy,
+    BuyAndHoldStrategy,
+    DonchianChannelStrategy,
     EMACrossoverStrategy,
     MeanReversionStrategy,
     MomentumStrategy,
     NaiveDirectionalStrategy,
     RandomStrategy,
     RiskFilteredBaseline,
+    SellAndHoldStrategy,
     VolatilityBreakoutStrategy,
 )
 from src.research.hyperopt_walkforward import (
@@ -39,6 +42,8 @@ from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 __all__ = [
     "BenchmarkEvaluator",
     "BenchmarkStrategy",
+    "BuyAndHoldStrategy",
+    "DonchianChannelStrategy",
     "EMACrossoverStrategy",
     "MeanReversionBaseline",
     "MeanReversionStrategy",
@@ -56,6 +61,7 @@ __all__ = [
     "ResearchReport",
     "ResearchReporter",
     "RiskFilteredBaseline",
+    "SellAndHoldStrategy",
     "StressLab",
     "StressScenario",
     "StressTestMetrics",
