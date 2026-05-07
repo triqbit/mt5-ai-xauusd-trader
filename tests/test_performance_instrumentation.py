@@ -37,9 +37,11 @@ def test_feature_engineer_profiling_blocks():
 def test_ensemble_model_profiling_blocks():
     """Verify that EnsembleModel uses profiling blocks for sub-models."""
     model = EnsembleModel()
-    model._ppo_model = MagicMock()
-    # Mock the return value of ppo.predict which returns (action, state)
-    model._ppo_model.predict.return_value = (0, None)
+    model.ppo_agent = MagicMock()
+    # Mock the return value of ppo.predict which returns a Signal
+    from src.models.base_model import Signal
+    from src.core.constants import SignalDirection
+    model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
 
     features = np.random.randn(140)
 

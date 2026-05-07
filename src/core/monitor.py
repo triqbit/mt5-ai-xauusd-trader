@@ -96,9 +96,9 @@ class Monitor:
         if telegram_token:
             try:
                 self.bot = telegram.Bot(token=telegram_token)
-                logger.info("Telegram bot initialized")
+                logger.info("telegram_bot_initialized")
             except Exception as e:
-                logger.error("Failed to initialize Telegram bot: %s", e)
+                logger.error("telegram_bot_init_failed", error=str(e))
 
     def start_metrics_server(self) -> None:
         """Start the Prometheus metrics server if not already running."""
@@ -159,15 +159,15 @@ class Monitor:
         Handles both synchronous and asynchronous contexts safely.
         """
         if not self.bot or not self.cfg.telegram_chat_id:
-            logger.debug("Telegram bot not configured, message not sent: %s", text)
+            logger.debug("telegram_not_configured", message=text)
             return
 
         async def _send():
             try:
                 await self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
-                logger.info("Telegram message sent")
+                logger.info("telegram_message_sent")
             except Exception as e:
-                logger.error("Failed to send Telegram message", error=str(e))
+                logger.error("telegram_send_failed", error=str(e))
 
         try:
             try:
@@ -180,19 +180,18 @@ class Monitor:
                 # No event loop is running, use asyncio.run (blocking)
                 asyncio.run(_send())
         except Exception as e:
-            logger.error("send_message_error", error=str(e))
+            logger.error("send_message_wrapper_failed", error=str(e))
 
     def alert_circuit_breaker(self, drawdown: float) -> None:
         """Send critical alert for circuit breaker trigger and update metrics."""
         DRAWDOWN_GAUGE.set(drawdown * 100)
         msg = f"🚨 CRITICAL: Circuit Breaker Triggered!\nDrawdown: {drawdown * 100:.2f}%\nTrading Halted."
         self.send_message(msg)
+        logger.critical("circuit_breaker_triggered", drawdown_pct=drawdown * 100)
 
     def send_daily_summary(self, pnl: float, trades: int) -> None:
         """Send daily P&L and trade count summary and update metrics."""
         DAILY_PNL_GAUGE.set(pnl)
-        # Note: TRADE_COUNTER is cumulative, so we don't set it to 'trades' directly here
-        # unless 'trades' is the increment.
         status = "PROFIT" if pnl >= 0 else "LOSS"
         msg = (
             f"📅 Daily Summary - {datetime.now(UTC).date()}\n"
@@ -201,6 +200,7 @@ class Monitor:
             f"Trades Today: {trades}"
         )
         self.send_message(msg)
+        logger.info("daily_summary_sent", pnl=pnl, trades=trades)
 
     def check_confidence_degradation(self, confidence: float) -> None:
         """Send warning if model confidence falls below threshold and update metrics."""
@@ -212,6 +212,7 @@ class Monitor:
                 f"Threshold: {self.cfg.confidence_threshold:.3f}"
             )
             self.send_message(msg)
+            logger.warning("model_confidence_degradation", confidence=confidence, threshold=self.cfg.confidence_threshold)
 
     def record_trade(self) -> None:
         """Increment the total trade counter."""
