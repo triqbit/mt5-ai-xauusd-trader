@@ -75,3 +75,33 @@
 - **Impact**: High. Causes incorrect trade execution for transformer-based models.
 - **Resolution**: Refactor `TimeSeriesTransformer` and `TransformerAdapter` to align with `ModelAction`.
 - **Owner**: Jules05
+
+## [2026-05-07] - Model Interface Harmonization & System Coherence
+
+### 1. `BaseModel.predict` Signature Mismatch
+- **Conflict**: The `BaseModel.predict` method is overly restrictive (`features: np.ndarray`), while `EnsembleModel` and `TransformerModel` require additional context like sequences or market regime info.
+- **Agents**: Jules01, Jules04
+- **Impact**: Medium. Leads to ugly `hasattr` or `isinstance` checks in `main.py`, breaking polymorphism.
+- **Resolution**: Harmonize `BaseModel.predict` to accept `**kwargs` for flexible context passing.
+- **Owner**: Jules05
+
+### 2. `TimeSeriesTransformer` Exclusion from CLI
+- **Conflict**: `TimeSeriesTransformer` is implemented but not exposed via `main.py` algorithm factory or exported in `src/models/__init__.py`.
+- **Agents**: Jules01
+- **Impact**: Low. Feature is inaccessible to end-users despite being ready.
+- **Resolution**: Export in `__init__.py` and add to `main.py` factory.
+- **Owner**: Jules05
+
+### 3. Duplicated Signal Post-Processing in `main.py`
+- **Conflict**: The logic for stop-loss, take-profit, and risk-filtered signal creation is repeated in several places or tightly coupled with the live loop, making it hard to maintain.
+- **Agents**: Jules01, Jules05
+- **Impact**: Low. Increased maintenance burden and potential for subtle bugs in risk calculation.
+- **Resolution**: Extract to `_prepare_trade_signal` helper.
+- **Owner**: Jules05
+
+### 4. Terminology Drift (SignalDirection vs ModelAction)
+- **Conflict**: Models return `SignalDirection` (1, -1, 0) but some internal adapters still reference `ModelAction` indices (0, 1, 2) without clear mapping, leading to potential confusion during debugging.
+- **Agents**: Jules01, Jules02
+- **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
+- **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
+- **Owner**: Jules05

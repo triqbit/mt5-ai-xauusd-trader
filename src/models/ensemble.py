@@ -159,20 +159,22 @@ class EnsembleModel(BaseModel):
     def predict(
         self,
         features: np.ndarray,
-        seq: Optional[np.ndarray] = None,
-        regime_info: Optional[RegimeInfo] = None,
+        **kwargs: Any,
     ) -> Signal:
         """
         Generate a trading signal from input features using internal models.
 
         Args:
             features: Primary feature array for RL agents (PPO, Dreamer).
-            seq: Sequence data for the LSTM model. If None, features is used.
-            regime_info: Optional market regime information.
+            **kwargs: Additional context:
+                seq (np.ndarray): Sequence data for the LSTM model.
+                regime_info (RegimeInfo): Market regime information.
 
         Returns:
             Signal: Consolidated ensemble signal.
         """
+        seq = kwargs.get("seq")
+        regime_info = kwargs.get("regime_info")
         votes: Dict[str, Signal] = {}
 
         # PPO prediction

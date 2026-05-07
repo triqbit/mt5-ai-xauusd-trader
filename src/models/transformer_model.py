@@ -7,6 +7,8 @@ Transformer-based architecture for time-series forecasting and signal generation
 import math
 from typing import Any
 
+import numpy as np
+
 try:
     import torch
     import torch.nn as nn
@@ -14,8 +16,11 @@ except ImportError:
     torch = None
     nn = None
 
+from src.core.constants import ModelAction
+from src.models.base_model import BaseModel, Signal
 
-class TimeSeriesTransformer(nn.Module if nn else object):
+
+class TimeSeriesTransformer(BaseModel, nn.Module if nn else object):
     """
     Advanced Transformer model for price action forecasting.
     Input: [batch_size, seq_len, features]
@@ -30,7 +35,9 @@ class TimeSeriesTransformer(nn.Module if nn else object):
         num_layers: int = 4,
         dropout: float = 0.1,
     ):
-        super().__init__()
+        BaseModel.__init__(self)
+        if nn:
+            nn.Module.__init__(self)
         self.model_dim = model_dim
         self.pos_encoder = PositionalEncoding(model_dim, dropout)
 
@@ -57,6 +64,59 @@ class TimeSeriesTransformer(nn.Module if nn else object):
         # Use only the last time step for classification
         output = self.decoder(output[:, -1, :])
         return torch.softmax(output, dim=-1)
+
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
+        """
+        Generate a trading signal from input features using the Transformer model.
+
+        Args:
+            features: Current observation (ignored if seq provided).
+            **kwargs: Must contain 'seq' (np.ndarray) of shape (seq_len, input_dim).
+
+        Returns:
+            Signal: Consolidated signal.
+        """
+        if not torch or not nn:
+            return Signal(
+                direction=ModelAction.HOLD.to_direction(),
+                confidence=0.0,
+                metadata={"error": "PyTorch missing"},
+            )
+
+        seq = kwargs.get("seq")
+        if seq is None:
+            # Fallback to features if seq not provided (might fail if shape is wrong)
+            seq = features
+
+        try:
+            # Handle sequence shape
+            if isinstance(seq, np.ndarray):
+                x = torch.from_numpy(seq).float()
+            else:
+                x = seq
+
+            if x.dim() == 2:
+                x = x.unsqueeze(0)  # Add batch dim
+
+            self.eval()
+            with torch.no_grad():
+                probs = self.forward(x)
+                probs_np = probs.cpu().numpy()[0]
+
+            action_idx = int(np.argmax(probs_np))
+            confidence = float(probs_np[action_idx])
+
+            return Signal(
+                direction=ModelAction(action_idx).to_direction(),
+                confidence=confidence,
+                metadata={"probabilities": probs_np.tolist()},
+            )
+        except Exception as e:
+            return Signal(
+                direction=ModelAction.HOLD.to_direction(),
+                confidence=0.0,
+                metadata={"error": str(e)},
+            )
 
 
 class PositionalEncoding(nn.Module if nn else object):

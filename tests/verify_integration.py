@@ -103,8 +103,10 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
         obs = df_features.values[-1]
 
         # 3. Model Inference
-        model._ppo_model = MagicMock()
-        model._ppo_model.predict.return_value = (1, None) # BUY
+        from src.models.base_model import Signal
+        from src.core.constants import SignalDirection
+        model.ppo_agent = MagicMock()
+        model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
         signal_out = model.predict(obs, regime_info=regime_info)
 
         # 4. Log Signal
@@ -246,7 +248,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
         direction=1,
         entry_price=1.0,
         stop_loss=0.9,
-        take_profit=1.1,
+        take_profit=1.2, # RR >= 1.5
         lot_size=0.1,
         algorithm="test",
         confidence=0.9
@@ -295,16 +297,21 @@ def test_ensemble_intelligence_integration(sample_market_data):
     model = EnsembleModel(device="cpu")
     initial_weights = model.weights.copy()
 
-    # Simulate some performance to trigger rebalance
-    for _ in range(60):
-        model.record_return("ppo", 0.02)
-        model.record_return("lstm", -0.01)
+    # Simulate performance of PPO via dynamic_ensemble
+    metrics = {
+        "ppo": {"accuracy": 0.8, "calibration_error": 0.05, "drift_score": 0.02},
+        "lstm": {"accuracy": 0.4, "calibration_error": 0.3, "drift_score": 0.25},
+        "dreamer": {"accuracy": 0.5, "calibration_error": 0.1, "drift_score": 0.1}
+    }
+    model.dynamic_ensemble.update_weights(metrics)
 
     assert model.weights["ppo"] > initial_weights["ppo"]
 
     # 3. Decision
-    model._ppo_model = MagicMock()
-    model._ppo_model.predict.return_value = (1, None)
+    from src.models.base_model import Signal
+    from src.core.constants import SignalDirection
+    model.ppo_agent = MagicMock()
+    model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
 
     # Generate features for observation
     feature_eng = FeatureEngineer(base_timeframe="M5", timeframes=["M5", "M15"])

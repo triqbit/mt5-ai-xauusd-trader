@@ -82,12 +82,13 @@ class PPOAgent(BaseModel):
         except ImportError as e:
             self.logger.warning(f"Stable-Baselines3 not installed. PPOAgent will be limited: {e}")
 
-    def predict(self, features: np.ndarray) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """
         Generate a trading signal from input features using the PPO policy.
 
         Args:
             features: Input feature array (e.g., OHLCV window).
+            **kwargs: Ignored.
 
         Returns:
             A Signal object containing direction, confidence, and metadata.
