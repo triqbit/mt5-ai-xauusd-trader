@@ -157,6 +157,16 @@ def run_live(
                             latest_bar_time = df_raw.index[-1] if isinstance(df_raw.index, pd.DatetimeIndex) else df_raw["time"].iloc[-1]
                             monitor.log_data_freshness(latest_bar_time)
 
+                        # Periodically log model performance if metrics are available
+                        if monitor and loop_count % 50 == 0 and hasattr(model, "get_health_metrics"):
+                            metrics = model.get_health_metrics()
+                            if metrics:
+                                monitor.log_model_performance(
+                                    accuracy=metrics.get("accuracy", 0.0),
+                                    drift_score=metrics.get("drift", 0.0),
+                                    calibration_error=metrics.get("calibration", 0.0),
+                                )
+
                         # Check for liquidity crisis (extreme spread)
                         raw_spread = abs(tick["ask"] - tick["bid"])
 
@@ -183,11 +193,15 @@ def run_live(
                         log.warning("Connection lost. Attempting reconnection...")
                         if monitor:
                             monitor.alert_broker_connection_lost()
+                        if audit_logger:
+                            audit_logger.log_mt5_status("disconnected", details="Connection lost in trading loop")
                         try:
                             connector.connect()
                             log.info("Reconnection successful.")
                             if monitor:
                                 monitor.alert_broker_connection_restored()
+                            if audit_logger:
+                                audit_logger.log_mt5_status("connected", details="Reconnection successful")
                             continue
                         except MT5ConnectionError as reconnect_exc:
                             log.critical(
@@ -821,7 +835,11 @@ def main() -> int:
     with console.status("[bold green]Connecting to MT5 terminal..."):
         try:
             connector.connect()
+            if audit_logger:
+                audit_logger.log_mt5_status("connected", details="Initial connection successful")
         except MT5ConnectionError as exc:
+            if audit_logger:
+                audit_logger.log_mt5_status("failed", details=f"Initial connection failed: {exc!s}")
             # Enhanced connection diagnostics
             diag = Table.grid(expand=True)
             diag.add_column(style="cyan", justify="right")
