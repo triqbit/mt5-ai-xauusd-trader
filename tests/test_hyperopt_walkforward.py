@@ -167,3 +167,76 @@ def test_insufficient_data(sample_data):
     )
     with pytest.raises(ValueError, match="Insufficient data"):
         optimizer.run_optimization()
+
+
+def test_oos_constraints(sample_data):
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    # Extremely strict constraints that will likely be violated
+    config = WalkForwardConfig(
+        n_trials=1,
+        train_size=100,
+        test_size=20,
+        step_size=50,
+        min_oos_sharpe=10.0,  # Impossible Sharpe
+        max_oos_drawdown=0.000001,  # Almost zero drawdown allowed
+    )
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config
+    )
+
+    result = optimizer.run_optimization()
+    assert result.metrics.constraints_violated is True
+
+
+def test_improved_regime_consistency(sample_data):
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config
+    )
+
+    # Manual test of the _calculate_regime_consistency method
+    params = {"fast_window": 10, "slow_window": 30}
+    consistency = optimizer._calculate_regime_consistency(optimizer.data, params)
+    assert 0 <= consistency <= 1.0
+
+
+def test_additional_metric_selection(sample_data):
+    def param_space(trial):
+        return {"fast_window": trial.suggest_int("fast_window", 5, 15), "slow_window": 30}
+
+    # Test Calmar optimization
+    config_calmar = WalkForwardConfig(
+        n_trials=2, train_size=100, test_size=20, step_size=50, metric=OptimizationMetric.CALMAR
+    )
+    optimizer_calmar = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config_calmar
+    )
+    result_calmar = optimizer_calmar.run_optimization()
+    assert result_calmar is not None
+
+    # Test Win Rate optimization
+    config_wr = WalkForwardConfig(
+        n_trials=2, train_size=100, test_size=20, step_size=50, metric=OptimizationMetric.WIN_RATE
+    )
+    optimizer_wr = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config_wr
+    )
+    result_wr = optimizer_wr.run_optimization()
+    assert result_wr is not None
