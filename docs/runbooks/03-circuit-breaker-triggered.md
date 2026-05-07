@@ -1,86 +1,35 @@
 # Runbook 03: Circuit Breaker Triggered
+**Version:** 1.1 | **Last Updated:** 2026-05-07
 
 ## Overview
-The `RiskManager` implements a global circuit breaker that halts all trading if the account equity drawdown reaches or exceeds **15%** from its peak. This is a critical safety mechanism to prevent catastrophic capital loss.
+Critical response for when the `RiskManager` circuit breaker halts trading due to a 15% equity drawdown.
 
-## Symptoms
-- **Telegram Alert:** `🚨 CIRCUIT BREAKER: drawdown=XX.X% - trading halted` (P0 - Critical)
-- **Logs:** `CIRCUIT BREAKER: drawdown=0.15 - trading halted`
-- **Signal Rejection:** New signals are rejected with reason: `Circuit breaker active`.
-- **Health Check:** `/health/readiness` reports `RiskManager: DEGRADED`.
+## Step-by-Step Instructions
 
-## Immediate Response (P0 Protocol)
+### 1. Emergency Halt
+- Stop the bot immediately: `docker stop mt5-trader`.
+- Manually close or hedge risky positions in the MT5 Terminal/Mobile App.
 
-### 1. Stop Trading Engine
-Shut down the bot immediately to prevent any further automated activity during investigation.
-```bash
-docker stop mt5-trader
-```
+### 2. Incident Analysis
+- Run the incident report: `python scripts/generate_incident_report.py`.
+- Query `risk_events` table for breach details.
+- Check `audit_log` for the `risk_decision` that triggered the halt.
 
-### 2. Secure Open Positions
-1. Log in to the MT5 terminal (Desktop, Web, or Mobile).
-2. Review all open positions.
-3. **Manual Exit:** Close any positions that are contributing to the drawdown or pose further risk.
-
-## Investigation
-
-### 1. Identify the Trigger Event
-Query the `risk_events` table in the trades database to find the timestamp and specific drawdown value:
-```bash
-sqlite3 trades.db "SELECT event_type, description, created_at FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"
-```
-
-Also, check the `audit_log` for technical decision metadata:
-```bash
-sqlite3 audit.db "SELECT action, details, metadata_json, created_at FROM audit_log WHERE action='risk_decision' ORDER BY created_at DESC LIMIT 1;"
-```
-
-### 2. Analyze Recent Trade Performance
-Review the trades leading up to the breach to identify patterns or failures:
-```bash
-sqlite3 trades.db "SELECT ticket, symbol, direction, entry_price, exit_price, pnl, created_at FROM trades ORDER BY created_at DESC LIMIT 10;"
-```
-- Did multiple trades hit Stop Loss (SL) simultaneously?
-- Was there a failure in SL execution (slippage)?
-- Is there a discrepancy between the bot's equity calculation and the broker's balance?
-
-### 3. Check for Model/Strategy Drift
-Review `performance_metrics` snapshots:
-```bash
-sqlite3 trades.db "SELECT * FROM performance_metrics ORDER BY created_at DESC LIMIT 5;"
-```
-
-## Reset Procedure
-
-**WARNING:** Do NOT reset the circuit breaker until the root cause is fully understood and documented.
-
-### 1. Manual Reset
-The circuit breaker state is in-memory. Restarting the application re-initializes the `peak_equity` to the current balance.
-
-1. Ensure all critical issues are addressed.
-2. Restart the bot:
-   ```bash
-   docker start mt5-trader
-   ```
-
-### 2. Audit the Reset
-Confirm that the system has resumed in a healthy state:
-```bash
-sqlite3 trades.db "SELECT event_type, description, created_at FROM risk_events ORDER BY created_at DESC LIMIT 5;"
-```
+### 3. Reset (After Resolution)
+- Address the root cause (e.g., model failure, extreme market event).
+- Restart the bot: `docker start mt5-trader`.
+- Monitor the first 5 trades closely.
 
 ## Expected Outcomes
-- Circuit breaker is cleared and the bot is ready to accept new signals.
-- `peak_equity` is reset to the current account level.
-- A full audit trail of the trigger event and resolution exists in `risk_events`.
+- All open risk is neutralized.
+- Circuit breaker state is cleared only after root cause analysis.
+- Audit trail for the event is complete.
 
 ## Verification Commands
-- **Check Readiness:** `curl http://localhost:8000/health/readiness`
-- **Verify Risk Events:** `sqlite3 trades.db "SELECT event_type, created_at FROM risk_events WHERE created_at > datetime('now', '-1 hour');"`
-- **Verify Audit Logs:** `sqlite3 audit.db "SELECT action, created_at FROM audit_log WHERE action='risk_decision' AND created_at > datetime('now', '-1 hour');"`
-- **Monitor Risk Logs:** `docker logs mt5-trader | grep -E "RiskManager|AuditedRiskManager"`
+- `python scripts/generate_incident_report.py`
+- `sqlite3 trades.db "SELECT * FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"`
 
 ## Escalation Path
-1. **Level 1:** Risk Lead (@maintainer-trading).
-2. **Level 2:** ML/Quant Lead (@maintainer-models).
-3. **Level 3:** Business Owner (@andonly1348).
+1. **Risk Breach:** Risk Lead (@maintainer-trading).
+2. **Model Failure:** ML Lead (@maintainer-models).
+3. **P0 Incident:** Business Owner (@andonly1348).
