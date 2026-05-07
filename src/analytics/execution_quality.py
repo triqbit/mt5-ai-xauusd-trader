@@ -150,12 +150,15 @@ class ExecutionAnalyzer:
         """Utility to get pip size for a symbol."""
         if self.connector:
             props = self.connector.get_symbol_properties(symbol)
-            if props and "digits" in props:
-                digits = props["digits"]
-                # For XAUUSD, digits is usually 2 or 3. Pip is 0.1 (digits-1)
-                # For EURUSD, digits is 5. Pip is 0.0001 (digits-1)
-                # Heuristic: 10 ^ -(digits - 1)
-                return 10 ** -(digits - 1)
+            if props:
+                if "pip_size" in props and props["pip_size"]:
+                    return float(props["pip_size"])
+                if "digits" in props:
+                    digits = props["digits"]
+                    # For XAUUSD, digits is usually 2 or 3. Pip is 0.1 (digits-1)
+                    # For EURUSD, digits is 5. Pip is 0.0001 (digits-1)
+                    # Heuristic: 10 ^ -(digits - 1)
+                    return 10 ** -(digits - 1)
 
         if any(x in symbol for x in ["XAUUSD", "GOLD"]):
             return 0.1
@@ -167,8 +170,11 @@ class ExecutionAnalyzer:
         """Utility to get contract size for a symbol."""
         if self.connector:
             props = self.connector.get_symbol_properties(symbol)
-            if props and "contract_size" in props:
-                return float(props["contract_size"])
+            if props:
+                if "trade_contract_size" in props and props["trade_contract_size"]:
+                    return float(props["trade_contract_size"])
+                if "contract_size" in props and props["contract_size"]:
+                    return float(props["contract_size"])
 
         if any(x in symbol for x in ["XAUUSD", "GOLD"]):
             return 100.0
@@ -381,7 +387,11 @@ class ExecutionAnalyzer:
             return {"spread_pips": 2.0}  # Default for XAUUSD
 
         # MT5 'spread' in rates is in points
-        point_size = 0.01 if "XAUUSD" in trade.symbol else 0.00001
+        props = self.connector.get_symbol_properties(trade.symbol)
+        point_size = props.get("point") if props else None
+        if not point_size:
+            point_size = 0.01 if "XAUUSD" in trade.symbol else 0.00001
+
         avg_spread_points = df["spread"].mean()
         spread_pips = (avg_spread_points * point_size) / pip_size
 

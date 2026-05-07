@@ -544,6 +544,8 @@ class MT5Connector:
                 "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
                 "spread": info.spread,
                 "digits": info.digits,
+                "point": info.point,
+                "trade_contract_size": info.trade_contract_size,
             }
         else:
 
@@ -557,6 +559,9 @@ class MT5Connector:
                     "tradable": True,  # MetaAPI symbols are usually tradable if found
                     "spread": 0,  # Not directly in spec
                     "digits": spec["digits"],
+                    "point": spec.get("point"),
+                    "pip_size": spec.get("pipSize"),
+                    "trade_contract_size": spec.get("contractSize"),
                 }
             except Exception:
                 return None
