@@ -12,7 +12,10 @@ def audit_logger():
     # Reset singleton for testing
     AuditLogger._instance = None
     AuditLogger._initialized = False
-    return AuditLogger("sqlite:///:memory:")
+    logger = AuditLogger("sqlite:///:memory:")
+    from src.core.database import Base
+    Base.metadata.create_all(logger.engine)
+    return logger
 
 def test_log_config_snapshot(audit_logger):
     config_data = {"SYMBOL": "XAUUSD", "MODE": "live"}

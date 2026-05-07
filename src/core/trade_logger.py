@@ -14,7 +14,6 @@ from typing import Any
 
 import numpy as np
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -22,37 +21,14 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
     select,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+from sqlalchemy.orm import Mapped, mapped_column, relationship, sessionmaker
 
 from src.core.audit_log import get_audit_logger
+from src.core.database import AuditMixin, Base, get_engine
 
 logger = logging.getLogger(__name__)
-
-
-class Base(DeclarativeBase):
-    """Base class for SQLAlchemy models."""
-    pass
-
-
-class AuditMixin:
-    """Audit columns as per DATABASE_STANDARDS.md."""
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-        nullable=False,
-    )
-    created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    updated_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -137,8 +113,8 @@ class TradeLogger:
     """Enterprise trade logging interface."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
-        self.engine = create_engine(db_url)
-        # Create tables if they don't exist
+        self.engine = get_engine(db_url)
+        # Create tables if they don't exist (Legacy behavior, migrations preferred)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
         # Caching performance report to avoid O(N) DB queries on every signal

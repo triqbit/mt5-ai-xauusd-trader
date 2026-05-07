@@ -46,7 +46,10 @@ def reset_audit_logger():
 @pytest.fixture
 def audit_logger():
     """Provide a fresh in-memory AuditLogger."""
-    return AuditLogger(db_url="sqlite:///:memory:")
+    logger = AuditLogger(db_url="sqlite:///:memory:")
+    from src.core.database import Base
+    Base.metadata.create_all(logger.engine)
+    return logger
 
 @pytest.fixture
 def mock_cfg():
