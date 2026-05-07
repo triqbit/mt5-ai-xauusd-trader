@@ -1,39 +1,40 @@
-# 🚀 Release Candidate: v1.1.0-rc4
+# 🚀 Release Candidate: v1.1.0-rc5
 
-**Date:** 2026-05-06
+**Date:** 2026-05-07
 **Status:** Release Candidate
-**Tag:** `v1.1.0-rc4`
+**Tag:** `v1.1.0-rc5`
 
 ## 📝 Overview
-This release candidate (v1.1.0-rc4) represents the culmination of a intensive multi-agent development phase. It transforms the system into a truly institutional-grade platform with advanced reporting, execution quality analytics, and an multi-layered safety infrastructure. Total repository test coverage has reached **86%**, ensuring maximum reliability for the target release.
+This release candidate (v1.1.0-rc5) builds upon rc4 by integrating the first institutional-grade feature engineering pipeline and the foundational mapping for operational workflow simplification. Total repository test coverage has reached **87%**, exceeding the institutional release threshold.
 
 ## ✅ What's Included and Why
-- **Enhanced Research Reporting System:** High-fidelity Jinja2-based reporting with institutional metrics (Tail Ratio, Common Sense Ratio, Gain-to-Pain Ratio, SQN). Essential for quantitative alpha validation.
-- **Institutional Execution Quality Analytics:** Advanced tracking of slippage, latency, fill rates, and execution costs. Enables optimization of broker interaction and execution filters.
-- **Enterprise Trade Logging:** SQLAlchemy 2.0-powered logging system with standardized audit trails, providing a "black box" recorder for all trading activity.
-- **Enterprise Health System:** Real-time monitoring of system vitals, including data freshness, model drift, memory usage, and MT5 connectivity status.
-- **Strategy Benchmarking Framework:** Deterministic comparison of AI models against standard benchmarks (EMA Crossover, Mean Reversion, Momentum) to justify active risk-taking.
-- **6-Layer Execution Filter Cascade:** A sophisticated pre-trade gate system (ATR Volatility, Trend Angle, EMA Sequence, Momentum, Session Time, Drawdown) to block low-probability setups.
+- **Institutional Feature Engineering Pipeline:** Vectorized pipeline computing 140+ features (RSI, MFI, MACD, ATR, Bollinger Bands, Candle Patterns, Volume Profiles). Includes multi-timeframe analysis (M1 to D1) with look-ahead bias prevention. Essential for high-fidelity model training and inference.
+- **Workflow Simplification Mapping:** Comprehensive audit of 13 critical friction points (Setup, Backtesting, Emergency Stop, PR Triage). Establishes the roadmap for transitioning to one-command autonomous operations.
+- **Enhanced Research Reporting System:** High-fidelity Jinja2-based reporting with institutional metrics (Tail Ratio, Common Sense Ratio, Gain-to-Pain Ratio, SQN).
+- **Institutional Execution Quality Analytics:** Advanced tracking of slippage, latency, fill rates, and execution costs.
+- **Enterprise Trade Logging:** SQLAlchemy 2.0-powered logging system with standardized audit trails.
+- **Enterprise Health System:** Real-time monitoring of system vitals, including data freshness and connectivity status.
+- **6-Layer Execution Filter Cascade:** Pre-trade gate system to block low-probability setups.
 
 ## ❌ What's Excluded and Why
-- **Dreamer V3 World Model RL:** Full world-model integration remains in the research phase to ensure it doesn't compromise system stability.
-- **Explainable Decision Cockpit (TUI):** Design and rendering logic are finalized but dashboarding is deferred to v1.2.0 to maintain zero-latency execution paths.
-- **Live Macro Intelligence Pipeline:** FRED/YFinance data pipelines are developed but the live integration gate is pending final institutional risk review.
+- **Dreamer V3 World Model RL:** Integration remains in research to ensure zero impact on production stability.
+- **Telegram Actionable Alerts:** Dashboarding logic is ready but "click-to-action" button handlers are deferred to v1.2.0 for final security review.
+- **Live Macro Intelligence Pipeline:** FRED/YFinance data pipelines are pending final institutional risk sign-off for live integration.
 
 ## ⚠️ Known Limitations
-- **Platform Constraint:** `MetaTrader5` remains Windows-only; system uses sophisticated mocks for Linux-based CI and research.
-- **Initialization Latency:** Large feature vectors and health checks may add up to 800ms to the first loop iteration during data warm-up.
-- **Memory Usage:** Vectorized analytics and backtesting of multiple years of M1 data require a minimum of 16GB RAM.
+- **Platform Constraint:** `MetaTrader5` remains Windows-only; system uses mocks for Linux-based research and CI.
+- **Initialization Latency:** MTF feature calculation and health checks may add up to 850ms to the first loop iteration.
+- **Memory Usage:** Vectorized analytics and large feature matrices require a minimum of 16GB RAM.
 
 ## 🧪 Testing Performed
-- **Unit & Integration Tests:** 482 tests passed with 100% success rate.
-- **Integration Flow Verification:** Verified full data-to-execution-to-analytics flow with multiple model adapters.
-- **Coverage:** Reached **86.0%** total repository coverage.
-- **Institutional Scenarios:** Verified 10+ risk scenarios, including circuit breaker activation and recovery.
+- **Unit & Integration Tests:** 547 tests passed with 100% success rate.
+- **Feature Pipeline Verification:** Verified 140+ indicators, normalization consistency, and look-ahead bias prevention.
+- **Coverage:** Reached **87.0%** total repository coverage.
+- **Institutional Scenarios:** Verified 15+ risk scenarios, including circuit breaker and regime-aware safety.
 
 ## 🛡️ Rollback Procedure
-1. **Version Reversion:** Checkout tag `v1.1.0-rc2` or `v1.1.0-rc1` and redeploy.
-2. **Database:** Schema is backward compatible; no `alembic` downgrade required for core tables.
+1. **Version Reversion:** Checkout tag `v1.1.0-rc4` or `v1.1.0-rc3` and redeploy.
+2. **Database:** Schema is backward compatible; no `alembic` downgrade required.
 3. **Emergency Stop:** Utilize `Makefile emergency-stop` or `docker stop trading-bot`.
 
 ---
