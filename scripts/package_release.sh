@@ -88,6 +88,9 @@ python3 scripts/verify_migrations.py
 echo "Validating release notes in CHANGELOG.md..."
 python3 scripts/check_release_notes.py
 
+echo "Verifying dependencies harmonization..."
+python3 scripts/verify_dependencies.py
+
 # --- 4. Directory Management ---
 if [ -d "$RELEASE_PATH" ]; then
     echo "Warning: Release directory $RELEASE_PATH already exists. Re-creating..."

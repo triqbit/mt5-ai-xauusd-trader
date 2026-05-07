@@ -33,12 +33,15 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
 
 ### Method A: Manual Trigger (Recommended)
 1.  Navigate to the **Actions** tab in the GitHub repository.
-2.  Select the **Release Orchestration** workflow.
-3.  Click **Run workflow**.
-4.  Parameters:
-    - **Version**: Enter the semantic version (e.g., `1.2.3`). If left empty, the next version will be calculated from commit history.
-    - **Prerelease**: Check if this is a beta or RC build.
-    - **Dry Run**: Check this to run all validation and build steps without creating a tag or publishing the release.
+2.  Select the **Release Orchestration** workflow (`release.yml`).
+3.  Click **Run workflow** dropdown on the right side.
+4.  Select the **Branch** (usually `main`).
+5.  Fill in the parameters:
+    - **Version**: Enter the target semantic version (e.g., `1.2.3`).
+        - *Note*: If left empty, the system will use `mathieudutour/github-tag-action` to calculate the next version based on [Conventional Commits](VERSIONING_POLICY.md).
+    - **Prerelease**: Toggle this if creating a Release Candidate (`-rc.N`) or beta build.
+    - **Dry Run**: Toggle this to execute all validation, test, and build steps *without* creating a Git tag, pushing code changes, or publishing a GitHub Release. Use this for final verification before a real push.
+6.  Click **Run workflow** button to start the process.
 
 ### Method B: Git Tag Push
 1.  Tag the desired commit locally: `git tag -a v1.2.3 -m "Release v1.2.3"`
@@ -73,15 +76,29 @@ Immediately following a deployment, the operator MUST perform the following chec
 Rollback decisions are governed by the Stability Freeze protocol defined in [SLO Targets](SLO_TARGETS.md).
 
 ### A. Container Image Rollback
-If the new version exhibits unstable behavior (high latency, frequent crashes):
-1.  Identify the previous stable tag (e.g., `v1.2.2`).
-2.  Update your `docker-compose.yml` or deployment manifest to point to the previous image:
+If the new version exhibits unstable behavior (high latency, frequent crashes, memory leaks):
+1.  **Identify Stable Version**: Find the last known stable tag from the [Releases](https://github.com/triqbit/mt5-ai-xauusd-trader/releases) page (e.g., `v1.2.2`).
+2.  **Update Manifest**: Modify your `docker-compose.yml` or K8s deployment to point to the stable image:
     ```yaml
     image: triqbit/mt5-ai-xauusd-trader:v1.2.2
     ```
-3.  Redeploy: `docker-compose up -d`.
+3.  **Redeploy**: Restart the service:
+    ```bash
+    docker-compose up -d --force-recreate
+    ```
+4.  **Verify**: Check health status immediately: `curl http://localhost:8000/health/readiness`.
 
-### B. Database Migration Rollback
+### B. Code/Git Rollback
+If the release contains functional bugs or logic errors that require a full revert:
+1.  **Revert Tag**: If the tag was created erroneously, delete it (carefully):
+    ```bash
+    git tag -d v1.2.3
+    git push --delete origin v1.2.3
+    ```
+2.  **Revert Commits**: Use `git revert` on the merge commit or release commit to return `main` to the previous state.
+3.  **Update Version**: Ensure `pyproject.toml` version is corrected if a bump occurred.
+
+### C. Database Migration Rollback
 If a schema change causes data corruption or application failure:
 1.  Exec into the running container: `docker exec -it trading-bot bash`.
 2.  Downgrade the schema by one version: `alembic downgrade -1`.
