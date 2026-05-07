@@ -214,6 +214,13 @@ class TradingConfig(BaseSettings):
         default=300, ge=60, description="Maximum age of market data in seconds before alerting"
     )
 
+    signal_flicker_window: int = Field(
+        default=6, ge=2, le=20, description="Window size for signal flicker detection"
+    )
+    max_signal_changes: int = Field(
+        default=3, ge=1, le=10, description="Maximum allowed signal direction changes in window"
+    )
+
     @field_validator("risk_per_trade")
     @classmethod
     def risk_must_be_safe(cls, v: float) -> float:
