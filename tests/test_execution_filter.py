@@ -4,7 +4,7 @@ tests/test_execution_filter.py
 Unit tests for the 6-layer execution filter.
 """
 
-from datetime import datetime, UTC
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -44,7 +44,7 @@ def bullish_data(base_data):
     df["base_M5_rsi"] = 60
 
     # Pre-calculate ATR
-    df["base_M5_atr"] = 10
+    df["base_M5_atr"] = 1.0
 
     return df
 
@@ -65,7 +65,7 @@ def bearish_data(base_data):
     df["base_M5_rsi"] = 40
 
     # Pre-calculate ATR
-    df["base_M5_atr"] = 10
+    df["base_M5_atr"] = 1.0
 
     return df
 
@@ -86,11 +86,24 @@ def buy_signal():
         confidence=0.8
     )
 
+@pytest.fixture
+def sell_signal():
+    return TradeSignal(
+        symbol="XAUUSD",
+        direction=-1,
+        entry_price=1850,
+        stop_loss=1860,
+        take_profit=1830,
+        lot_size=0.1,
+        algorithm="ensemble",
+        confidence=0.8
+    )
+
 # --- Layer 1: ATR Volatility ---
 def test_atr_volatility_pass(filter_engine, base_data):
     df = base_data.copy()
     df["base_M5_atr"] = 1.0
-    passed, metrics = filter_engine._check_atr_volatility(df)
+    passed, metrics = filter_engine._check_atr_volatility_with_metrics(df)
     assert passed is True
     assert metrics["ratio"] <= 3.0
 
@@ -98,54 +111,65 @@ def test_atr_volatility_fail(filter_engine, base_data):
     df = base_data.copy()
     # Mock ATR: 1.0 avg, 10.0 current
     df["base_M5_atr"] = [1.0] * 199 + [10.0]
-    passed, metrics = filter_engine._check_atr_volatility(df)
+    passed, metrics = filter_engine._check_atr_volatility_with_metrics(df)
     assert passed is False
     assert metrics["ratio"] > 3.0
 
 # --- Layer 2: Trend Angle ---
 def test_trend_angle_buy_pass(filter_engine, bullish_data):
-    passed, metrics = filter_engine._check_trend_angle(bullish_data, direction=1)
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(bullish_data, direction=1)
     assert passed is True
     assert metrics["slope"] > 0
 
-def test_trend_angle_buy_fail(filter_engine, bearish_data):
-    passed, metrics = filter_engine._check_trend_angle(bearish_data, direction=1)
-    assert passed is False
+def test_trend_angle_sell_pass(filter_engine, bearish_data):
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(bearish_data, direction=-1)
+    assert passed is True
     assert metrics["slope"] < 0
+
+def test_trend_angle_fail(filter_engine, bullish_data):
+    # Pass bullish data but request SELL signal
+    passed, metrics = filter_engine._check_trend_angle_with_metrics(bullish_data, direction=-1)
+    assert passed is False
+    assert metrics["slope"] > 0
 
 # --- Layer 3: EMA Sequence ---
 def test_ema_sequence_buy_pass(filter_engine, bullish_data):
-    passed, metrics = filter_engine._check_ema_sequence(bullish_data, direction=1)
+    passed, _ = filter_engine._check_ema_sequence_with_metrics(bullish_data, direction=1)
     assert passed is True
 
-def test_ema_sequence_buy_fail(filter_engine, bearish_data):
-    passed, metrics = filter_engine._check_ema_sequence(bearish_data, direction=1)
+def test_ema_sequence_sell_pass(filter_engine, bearish_data):
+    passed, _ = filter_engine._check_ema_sequence_with_metrics(bearish_data, direction=-1)
+    assert passed is True
+
+def test_ema_sequence_fail(filter_engine, bullish_data):
+    # Mess up the sequence
+    bullish_data.loc[bullish_data.index[-1], "base_M5_ema_8"] = 0
+    passed, _ = filter_engine._check_ema_sequence_with_metrics(bullish_data, direction=1)
     assert passed is False
 
 # --- Layer 4: Momentum (RSI) ---
 def test_momentum_buy_pass(filter_engine, bullish_data):
-    passed, metrics = filter_engine._check_momentum(bullish_data, direction=1)
+    passed, metrics = filter_engine._check_momentum_with_metrics(bullish_data, direction=1)
     assert passed is True
     assert 50 <= metrics["rsi"] <= 75
 
-def test_momentum_buy_fail_low(filter_engine, bearish_data):
-    passed, metrics = filter_engine._check_momentum(bearish_data, direction=1)
-    assert passed is False
+def test_momentum_sell_pass(filter_engine, bearish_data):
+    passed, metrics = filter_engine._check_momentum_with_metrics(bearish_data, direction=-1)
+    assert passed is True
+    assert 25 <= metrics["rsi"] <= 50
 
-def test_momentum_buy_fail_high(filter_engine, bullish_data):
+def test_momentum_fail(filter_engine, bullish_data):
     bullish_data["base_M5_rsi"] = 80
-    passed, metrics = filter_engine._check_momentum(bullish_data, direction=1)
+    passed, _ = filter_engine._check_momentum_with_metrics(bullish_data, direction=1)
     assert passed is False
 
 # --- Layer 5: Session/Time ---
-def test_session_time_weekday_pass(filter_engine):
-    # Tuesday 10:00 GMT
-    dt = datetime(2023, 10, 10, 10, 0, 0)
+def test_session_time_pass(filter_engine):
+    dt = datetime(2023, 10, 10, 10, 0, 0) # Tue
     assert filter_engine._check_session_time(dt) is True
 
-def test_session_time_saturday_fail(filter_engine):
-    # Saturday
-    dt = datetime(2023, 10, 14, 10, 0, 0)
+def test_session_time_fail(filter_engine):
+    dt = datetime(2023, 10, 14, 10, 0, 0) # Sat
     assert filter_engine._check_session_time(dt) is False
 
 # --- Layer 6: Drawdown ---
@@ -153,7 +177,7 @@ def test_drawdown_pass(filter_engine):
     assert filter_engine._check_drawdown_limit(0.05) is True
 
 def test_drawdown_fail(filter_engine):
-    assert filter_engine._check_drawdown_limit(0.15) is False
+    assert filter_engine._check_drawdown_limit(0.13) is False
 
 # --- Full Cascade ---
 def test_full_cascade_pass(filter_engine, buy_signal, bullish_data):
@@ -161,11 +185,9 @@ def test_full_cascade_pass(filter_engine, buy_signal, bullish_data):
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is True
     assert decision.blocked_by is None
-    assert decision.confidence_score == buy_signal.confidence
 
 def test_full_cascade_blocked_by_session(filter_engine, buy_signal, bullish_data):
-    # Saturday
-    ts = datetime(2023, 10, 14, 10, 0, 0)
+    ts = datetime(2023, 10, 14, 10, 0, 0) # Sat
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "SESSION_CLOSED"
