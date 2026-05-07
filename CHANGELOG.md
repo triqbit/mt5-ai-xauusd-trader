@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Improved Trading Environment:** Refined `TradingEnv` in `src/trading/trading_env.py` with institutional reward skeleton and Gymnasium compatibility.
 - **Semantic TUI Visuals:** Enhanced the Decision Support System cockpit with semantic emojis (📈, 📉, ✅, ⚠️, 🛑) and panel icons for improved scannability and accessibility.
 - **Enterprise Core Scaffolding:** Refined `src/` package structure and core modules (`config.py`, `mt5_connector.py`, `risk_engine.py`, `ensemble.py`) to meet institutional enterprise standards with full type hints, docstrings, and unit tests.
+- **Institutional Risk Safeguards:** Hardened the 8-layer safety cascade in `src/trading/risk_engine.py` with strict ATR-based sizing and cascading circuit breakers.
 - **Enterprise Monitoring System:** Implemented a robust monitoring and alerting backbone in `src/core/monitor.py` featuring real-time equity curve tracking, Prometheus metrics export, and async-safe Telegram bot notifications.
 - **Institutional Backtesting Engine:** Implemented a high-performance, vectorized walk-forward backtesting engine in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission) and path-dependent metrics (MAE/MFE).
 - **Institutional Risk Notifications:** Integrated real-time alerts for circuit breaker triggers, margin calls, account balance mismatches, and liquidity (spread) crises into the primary trading loop.
