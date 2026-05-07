@@ -5,7 +5,7 @@ __author__ = "triqbit"
 __license__ = "MIT"
 
 # Sub-package discovery for enterprise modularity
-__all__: list[str] = [
+__all__ = [
     "analytics",
     "core",
     "data",

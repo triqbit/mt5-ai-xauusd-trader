@@ -6,7 +6,8 @@ Ensemble voting system combining signals from multiple AI models:
   - Dreamer V3 (world model RL)
   - LSTM + Multi-head Attention
 Weighted confidence voting with model dissent checks and dynamic weight adaptation.
-Author : triqbit
+
+Author: triqbit
 License: MIT
 """
 
@@ -103,18 +104,18 @@ class EnsembleModel(BaseModel):
         if not signals:
             return Signal(direction=SignalDirection.HOLD, confidence=0.0)
 
-        # 1. Dissent Check: Block if there are conflicting BUY and SELL signals
+        # 1. Dissent Check: Veto if there are conflicting BUY and SELL signals
         has_buy = any(s.direction == SignalDirection.BUY for s in signals.values())
         has_sell = any(s.direction == SignalDirection.SELL for s in signals.values())
 
         if has_buy and has_sell:
-            logger.warning("Dissent detected: BUY and SELL conflict. Returning HOLD.")
+            logger.warning("DISSENT VETO: Conflicting signals detected. Blocking execution.")
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={
                     "reason": "Dissent conflict",
-                    "per_algo_votes": {k: s.direction for k, s in signals.items()},
+                    "votes": {k: s.direction.name for k, s in signals.items()},
                 },
             )
 
@@ -143,8 +144,7 @@ class EnsembleModel(BaseModel):
                 "HOLD": weighted_hold_conf,
             },
             "weights": self.weights,
-            "per_algo_votes": {k: s.direction for k, s in signals.items()},
-            "per_algo_signals": {k: s._asdict() for k, s in signals.items()},
+            "votes": {k: s.direction.name for k, s in signals.items()},
         }
 
         # 3. Consensus Threshold Check
@@ -165,9 +165,7 @@ class EnsembleModel(BaseModel):
 
         Args:
             features: Primary feature array for RL agents (PPO, Dreamer).
-            **kwargs: Additional context:
-                seq (np.ndarray): Sequence data for the LSTM model.
-                regime_info (RegimeInfo): Market regime information.
+            **kwargs: Additional context (seq, regime_info).
 
         Returns:
             Signal: Consolidated ensemble signal.
@@ -189,7 +187,6 @@ class EnsembleModel(BaseModel):
         # LSTM prediction
         if self.lstm_model is not None:
             with profile("inference_lstm"):
-                # Use seq if provided, otherwise fallback to features
                 lstm_input = seq if seq is not None else features
                 votes["lstm"] = self.lstm_model.predict(lstm_input, regime_info=regime_info)
 
