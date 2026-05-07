@@ -56,18 +56,20 @@ def check_python_version():
             "Install Python 3.10 or higher."
         )
 
-def check_dependencies():
-    deps = {
-        "numpy": "numpy",
-        "pandas": "pandas",
-        "pydantic": "pydantic",
-        "sqlalchemy": "sqlalchemy",
-        "torch": "torch",
-        "talib": "talib",
-        "structlog": "structlog",
-        "rich": "rich",
-        "python-dotenv": "dotenv"
-    }
+CORE_DEPENDENCIES = {
+    "numpy": "numpy",
+    "pandas": "pandas",
+    "pydantic": "pydantic",
+    "sqlalchemy": "sqlalchemy",
+    "torch": "torch",
+    "talib": "talib",
+    "structlog": "structlog",
+    "rich": "rich",
+    "python-dotenv": "dotenv"
+}
+
+def check_dependencies(dependencies=None):
+    deps = dependencies or CORE_DEPENDENCIES
     missing = []
     for display_name, module_name in deps.items():
         try:
