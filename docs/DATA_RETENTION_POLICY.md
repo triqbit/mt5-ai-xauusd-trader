@@ -22,7 +22,7 @@ This policy defines the retention periods and disposal procedures for operationa
 The following data must be preserved for the full 7-year compliance window:
 - **Trade Records**: All fields in the `trades` table, including tickets, symbols, prices, and PnL.
 - **Audit Log**: System actions, configuration changes, and operator events in the `audit_log` table.
-- **Linked Signals**: Any `model_signals` record referenced by a `trade` record via `signal_id`.
+- **Linked Signals**: Any `model_signals` record referenced by a `trade` record via `signal_id` OR a `risk_event` record via `signal_id`.
 
 ### 3.2 Ephemeral Data (Rotate/Purge)
 The following data can be purged more frequently to manage storage:
@@ -46,7 +46,7 @@ The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a
 - **Automation**: Managed via cron or CI/CD scheduled workflows.
 
 ### 4.3 Safe Deletion Logic
-- **Foreign Key Integrity**: The cleanup script ensures that `model_signals` linked to `trades` are NOT deleted if the trade record is still within its 7-year retention window.
+- **Foreign Key Integrity**: The cleanup script ensures that `model_signals` linked to `trades` or `risk_events` are NOT deleted if the parent record is still within its retention window.
 - **Dry-Run Mode**: All cleanup operations must support a `--dry-run` flag to verify deletions before execution.
 - **Logging**: Every cleanup operation is logged to the system audit trail.
 
@@ -54,6 +54,6 @@ The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a
 The primary mechanism for enforcement is the `scripts/data_cleanup.py` tool. It uses the `database_url` and `logs_dir` from the system configuration to target the correct data stores.
 
 ---
-**Version**: 1.2.0
-**Effective Date**: 2026-05-20
+**Version**: 1.3.0
+**Effective Date**: 2026-05-22
 **Owner**: Release Reliability & Governance (Jules03)

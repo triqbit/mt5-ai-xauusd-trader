@@ -16,6 +16,7 @@ from scripts.data_cleanup import (
     cleanup_backtests,
     cleanup_database,
     cleanup_logs,
+    check_disk_space,
     RETENTION_LOGS,
     RETENTION_UNLINKED_SIGNALS,
     RETENTION_RISK_EVENTS,
@@ -74,7 +75,8 @@ def test_cleanup_logs(test_env):
     # Create old and new log files
     old_log = logs_dir / "old.log"
     old_log.write_text("old")
-    old_time = datetime.now() - timedelta(days=RETENTION_LOGS + 1)
+    # Use UTC for consistency as per refactored script
+    old_time = datetime.now(timezone.utc) - timedelta(days=RETENTION_LOGS + 1)
     os.utime(old_log, (old_time.timestamp(), old_time.timestamp()))
 
     new_log = logs_dir / "new.log"
@@ -93,7 +95,7 @@ def test_cleanup_backtests(test_env):
     # Create old and new backtest results
     old_bt = backtest_dir / "old_result.csv"
     old_bt.write_text("old backtest")
-    old_time = datetime.now() - timedelta(days=RETENTION_BACKTESTS + 1)
+    old_time = datetime.now(timezone.utc) - timedelta(days=RETENTION_BACKTESTS + 1)
     os.utime(old_bt, (old_time.timestamp(), old_time.timestamp()))
 
     new_bt = backtest_dir / "new_result.csv"
@@ -127,17 +129,26 @@ def test_cleanup_database_retention(test_env):
     with TradeSession() as session:
         # 1. Unlinked Signal (Old) -> Should be purged
         old_unlinked = ModelSignal(symbol="XAUUSD", direction=1, entry_price=2000.0, created_at=now - timedelta(days=RETENTION_UNLINKED_SIGNALS + 1))
-        # 2. Linked Signal (Old) -> Should be preserved
+
+        # 2. Linked Signal to Trade (Old) -> Should be preserved
         old_linked_signal = ModelSignal(symbol="XAUUSD", direction=1, entry_price=2000.0, created_at=now - timedelta(days=RETENTION_UNLINKED_SIGNALS + 1))
-        session.add_all([old_unlinked, old_linked_signal])
+
+        # 3. Linked Signal to RiskEvent (Old) -> Should be preserved
+        old_risk_linked_signal = ModelSignal(symbol="XAUUSD", direction=1, entry_price=2000.0, created_at=now - timedelta(days=RETENTION_UNLINKED_SIGNALS + 1))
+
+        session.add_all([old_unlinked, old_linked_signal, old_risk_linked_signal])
         session.commit()
 
         old_linked_signal_id = old_linked_signal.id
+        old_risk_linked_signal_id = old_risk_linked_signal.id
 
         # Trade linked to the old signal (New)
         new_trade = Trade(ticket=123, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=0.1, signal_id=old_linked_signal_id, created_at=now)
         # Old Trade -> Should be archived and purged
         old_trade = Trade(ticket=456, symbol="XAUUSD", direction=1, entry_price=1900.0, lot_size=0.1, created_at=now - timedelta(days=RETENTION_TRADES + 1))
+
+        # Risk Event linked to signal (New) -> Signal should be preserved
+        new_risk = RiskEvent(event_type="CIRCUIT_BREAKER", description="test", signal_id=old_risk_linked_signal_id, created_at=now)
 
         # Old Risk Event -> Should be archived and purged
         old_risk = RiskEvent(event_type="CIRCUIT_BREAKER", description="test", created_at=now - timedelta(days=RETENTION_RISK_EVENTS + 1))
@@ -145,7 +156,7 @@ def test_cleanup_database_retention(test_env):
         # Old Performance Metric -> Should be archived and purged
         old_perf = PerformanceMetric(sharpe_ratio=1.5, created_at=now - timedelta(days=RETENTION_PERFORMANCE_METRICS + 1))
 
-        session.add_all([new_trade, old_trade, old_risk, old_perf])
+        session.add_all([new_trade, old_trade, new_risk, old_risk, old_perf])
         session.commit()
 
     with AuditSession() as session:
@@ -166,9 +177,11 @@ def test_cleanup_database_retention(test_env):
     # Verify DB state
     with TradeSession() as session:
         # Check ModelSignal
-        signals = session.execute(select(ModelSignal)).scalars().all()
-        assert len(signals) == 1
-        assert signals[0].id == old_linked_signal_id
+        signals = session.execute(select(ModelSignal).order_by(ModelSignal.id)).scalars().all()
+        assert len(signals) == 2
+        signal_ids = [s.id for s in signals]
+        assert old_linked_signal_id in signal_ids
+        assert old_risk_linked_signal_id in signal_ids
 
         # Check Trades
         trades = session.execute(select(Trade)).scalars().all()
@@ -177,7 +190,8 @@ def test_cleanup_database_retention(test_env):
 
         # Check RiskEvents
         risks = session.execute(select(RiskEvent)).scalars().all()
-        assert len(risks) == 0
+        assert len(risks) == 1
+        assert risks[0].event_type == "CIRCUIT_BREAKER"
 
         # Check Performance Metrics
         perfs = session.execute(select(PerformanceMetric)).scalars().all()
@@ -193,3 +207,12 @@ def test_cleanup_database_retention(test_env):
     assert len(list(archive_dir.glob("archive_trades_*.csv"))) == 1
     assert len(list(archive_dir.glob("archive_audit_log_*.csv"))) == 1
     assert len(list(archive_dir.glob("*.sha256"))) >= 4
+
+def test_check_disk_space(test_env):
+    archive_dir = test_env["archive_dir"]
+
+    # Should pass on normal systems
+    assert check_disk_space(archive_dir, min_mb=1) == True
+
+    # Should fail if we ask for an impossible amount (e.g. 1000 TB)
+    assert check_disk_space(archive_dir, min_mb=1000 * 1024 * 1024) == False
