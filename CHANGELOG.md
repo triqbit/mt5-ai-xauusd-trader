@@ -26,12 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced RL Evaluation Suite:** Advanced institutional metrics including Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio. Improved robustness for regime sensitivity and agent interface integration (SB3, Signal objects).
 - **Vectorized Feature Engineering:** Optimized `FeatureEngineer` by refactoring internal methods to return dictionaries of NumPy arrays and using TA-Lib vectorization (`SMA`, `SUM`, `ROCP`), achieving ~20% overall speedup.
 
+### Added
+- **Robust Startup Validation:** Implemented a mandatory configuration validation layer (`src/core/config_validator.py`) that blocks application launch for invalid/incomplete production settings, market parameters, and risk perimeter breaches.
+
+### Changed
+- **Enterprise Risk Hardening:** Strictly aligned startup validation with `RISK_LIMITS.md`, enforcing critical blocks for low model accuracy (<0.50), low win rate (<0.45), and high calibration error (>0.25).
+
 ### Fixed
 - **Dependency Harmonization:** Downgraded `starlette` to `0.40.0` to resolve version conflicts with `fastapi` and stabilize CI/CD submission pipelines.
 - **Enterprise Health Monitoring:** Refined the `src/core/health.py` system with robust liveness/readiness probes, multi-layered dependency checks (Database, MT5, Redis, Models, Audit), and a mandatory startup gate.
 - **Deployment Validation Gates:** Implemented a robust pre-deployment validation workflow in `.github/workflows/pre-deploy-validation.yml` to prevent unsafe releases.
 - **Environment Safety Checks:** Enhanced `scripts/validate_env.py` and synchronized `.env.example` to ensure configuration completeness before deployment.
 - **Release Readiness Auditing:** Integrated `scripts/check_release_notes.py` to mandate descriptive changelog entries for all new releases.
+- **CI/Quality Maintenance:** Resolved linting errors (SIM117, I001) in `src/models/ensemble.py` and updated `tests/test_health.py` to match the latest internal logging API.
 
 ## [1.1.0-rc4] - 2026-05-05
 

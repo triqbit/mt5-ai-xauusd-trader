@@ -19,15 +19,15 @@ from src.core.constants import EventCategory, EventImpact
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "EventImpact",
-    "EventCategory",
-    "MacroEvent",
-    "RiskStatus",
     "BaseEventProvider",
-    "MockEventProvider",
-    "JSONEventProvider",
-    "MetaAPIEventProvider",
+    "EventCategory",
+    "EventImpact",
     "EventIntelligence",
+    "JSONEventProvider",
+    "MacroEvent",
+    "MetaAPIEventProvider",
+    "MockEventProvider",
+    "RiskStatus",
 ]
 
 

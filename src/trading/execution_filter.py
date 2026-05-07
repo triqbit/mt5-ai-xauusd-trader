@@ -404,18 +404,12 @@ class ExecutionFilter:
         if weekday == 5:  # Saturday
             return False
         if weekday == 6:  # Sunday
-            if hour < 17:
-                return False
-            return True
+            return not hour < 17
         if weekday == 4:  # Friday
-            if hour >= 16:
-                return False
-            return True
+            return not hour >= 16
 
         return True
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
         """Blocks if account drawdown exceeds limit."""
-        if current_drawdown >= self.max_drawdown:
-            return False
-        return True
+        return not current_drawdown >= self.max_drawdown

@@ -12,6 +12,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src import __version__
 from src.core.config import TradingConfig
 from src.core.health import (
     ComponentStatus,
@@ -21,7 +22,6 @@ from src.core.health import (
     init_health_checker,
     router,
 )
-from src import __version__
 
 
 @pytest.fixture
@@ -180,7 +180,13 @@ def test_startup_gate_failed(health_checker, mock_audit_logger):
         with pytest.raises(RuntimeError) as exc:
             health_checker.startup_gate()
         assert "mt5" in str(exc.value)
-        mock_audit_logger.log.assert_called_with("system", "startup_gate_failure", unittest.mock.ANY)
+        # HealthChecker calls log_operator_action if available
+        mock_audit_logger.log_operator_action.assert_called_with(
+            operator="system",
+            action="startup_gate_failure",
+            reason=unittest.mock.ANY,
+            metadata=unittest.mock.ANY
+        )
 
 @patch("src.core.health.ConfigValidator")
 def test_check_config_success(mock_validator_class, health_checker):

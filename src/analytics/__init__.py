@@ -13,10 +13,10 @@ from src.analytics.execution_quality import (
 from src.analytics.journal_mining import JournalMiner, JournalReport
 
 __all__ = [
+    "BlockedSignalQuality",
     "ExecutionAnalyzer",
     "ExecutionSummary",
-    "TradeExecutionQuality",
-    "BlockedSignalQuality",
     "JournalMiner",
     "JournalReport",
+    "TradeExecutionQuality",
 ]
