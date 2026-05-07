@@ -16,13 +16,16 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.research import (
     BenchmarkEvaluator,
+    BuyAndHoldStrategy,
+    DonchianChannelStrategy,
     EMACrossoverStrategy,
-    MomentumStrategy,
-    VolatilityBreakoutStrategy,
-    NaiveDirectionalStrategy,
-    RiskFilteredBaseline,
     MeanReversionStrategy,
-    RandomStrategy
+    MomentumStrategy,
+    NaiveDirectionalStrategy,
+    RandomStrategy,
+    RiskFilteredBaseline,
+    SellAndHoldStrategy,
+    VolatilityBreakoutStrategy,
 )
 
 def generate_synthetic_data(n=1000):
@@ -50,17 +53,20 @@ def main():
 
     # 2. Define Strategies
     strategies = [
+        BuyAndHoldStrategy(),
+        SellAndHoldStrategy(),
+        DonchianChannelStrategy(20),
         EMACrossoverStrategy(9, 21),
         MomentumStrategy(14),
         VolatilityBreakoutStrategy(20, 2.0),
         NaiveDirectionalStrategy(),
         RiskFilteredBaseline(9, 21, 0.01),
         MeanReversionStrategy(14, 70, 30),
-        RandomStrategy(seed=42)
+        RandomStrategy(seed=42),
     ]
 
     # 3. Evaluate All
-    console.print("\n[bold]📊 Running Evaluations...[/]")
+    console.print("\n[bold]📊 Running Evaluations with Institutional Metrics...[/]")
     summary_df = evaluator.evaluate_all(strategies)
 
     table = Table(title="Strategy Performance Summary")
@@ -68,6 +74,9 @@ def main():
     table.add_column("Return", justify="right")
     table.add_column("Sharpe", justify="right")
     table.add_column("MaxDD", justify="right")
+    table.add_column("Stability", justify="right")
+    table.add_column("Tail Ratio", justify="right")
+    table.add_column("CSR", justify="right")
     table.add_column("Trades", justify="right")
 
     for name, row in summary_df.iterrows():
@@ -76,7 +85,10 @@ def main():
             f"{row['Total Return']:.2%}",
             f"{row['Sharpe Ratio']:.2f}",
             f"{row['Max Drawdown']:.2%}",
-            f"{int(row['Num Trades'])}"
+            f"{row['Stability Score']:.2f}",
+            f"{row['Tail Ratio']:.2f}",
+            f"{row['Common Sense Ratio']:.2f}",
+            f"{int(row['Num Trades'])}",
         )
     console.print(table)
 

@@ -15,6 +15,48 @@ from scipy import stats
 from src.core.constants import ModelAction
 
 
+class BuyAndHoldStrategy:
+    """Strategy that remains long for the entire duration."""
+
+    @property
+    def name(self) -> str:
+        return "Buy_And_Hold"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        return np.ones(len(df))
+
+
+class SellAndHoldStrategy:
+    """Strategy that remains short for the entire duration."""
+
+    @property
+    def name(self) -> str:
+        return "Sell_And_Hold"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        return -np.ones(len(df))
+
+
+class DonchianChannelStrategy:
+    """Donchian Channel Breakout baseline."""
+
+    def __init__(self, window: int = 20):
+        self.window = window
+
+    @property
+    def name(self) -> str:
+        return f"Donchian_Channel_{self.window}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        upper = df["high"].rolling(window=self.window).max()
+        lower = df["low"].rolling(window=self.window).min()
+
+        signals = np.zeros(len(df))
+        signals[df["close"] >= upper.shift(1)] = 1
+        signals[df["close"] <= lower.shift(1)] = -1
+        return signals
+
+
 class BenchmarkStrategy(Protocol):
     """Protocol for all strategies and baselines to ensure consistent evaluation."""
 
@@ -273,8 +315,8 @@ class BenchmarkEvaluator:
                 sortino = avg_return / downside_std * np.sqrt(self.bars_per_year)
 
         peak = np.maximum.accumulate(equity)
-        drawdown = (peak - equity) / peak
-        max_drawdown = np.max(drawdown) if len(drawdown) > 0 else 0
+        drawdowns = (peak - equity) / (peak + 1e-9)
+        max_drawdown = np.max(drawdowns) if len(drawdowns) > 0 else 0.0
 
         win_rate = 0.0
         profit_factor = 0.0
@@ -303,6 +345,35 @@ class BenchmarkEvaluator:
             if std_pnl > 0:
                 sqn = np.sqrt(len(trade_pnls)) * avg_pnl / std_pnl
 
+        # Institutional Stats
+        skew = stats.skew(daily_returns)
+        kurt = stats.kurtosis(daily_returns)
+        var_95 = np.percentile(daily_returns, 5) if len(daily_returns) > 20 else 0.0
+        cvar_95 = daily_returns[daily_returns <= var_95].mean() if len(daily_returns) > 20 else 0.0
+
+        # Stability score: consistency of equity curve (R-squared of linear fit)
+        x = np.arange(len(equity))
+        y = equity
+        slope, intercept, r_value, p_value_reg, std_err = stats.linregress(x, y)
+        stability_score = r_value**2 if not np.isnan(r_value) else 0.0
+
+        # Ulcer Index: square root of the mean of squared drawdowns
+        ulcer_index = np.sqrt(np.mean(np.square(drawdowns)))
+
+        # Tail Ratio: 95th percentile / abs(5th percentile)
+        p95 = np.percentile(daily_returns, 95) if len(daily_returns) > 20 else 0.0
+        p5 = np.percentile(daily_returns, 5) if len(daily_returns) > 20 else 0.0
+        tail_ratio = abs(p95 / p5) if abs(p5) > 1e-9 else 0.0
+
+        # Common Sense Ratio: Tail Ratio * Profit Factor
+        pf_capped = profit_factor if profit_factor != float("inf") else 100.0
+        common_sense_ratio = tail_ratio * pf_capped
+
+        # Gain-to-Pain Ratio: Sum(Gains) / Abs(Sum(Losses))
+        gains = daily_returns[daily_returns > 0].sum()
+        pains = abs(daily_returns[daily_returns < 0].sum())
+        gain_to_pain_ratio = gains / pains if pains > 1e-9 else 0.0
+
         # Store daily returns for statistical testing
         self.results[name + "_returns"] = daily_returns
 
@@ -311,7 +382,7 @@ class BenchmarkEvaluator:
             "Sharpe Ratio": sharpe,
             "Sortino Ratio": sortino,
             "Calmar Ratio": calmar,
-            "Recovery Factor": calmar,  # Alias for Calmar in this context
+            "Recovery Factor": calmar,
             "Volatility": volatility,
             "Max Drawdown": max_drawdown,
             "Win Rate": win_rate,
@@ -319,6 +390,15 @@ class BenchmarkEvaluator:
             "Expectancy": expectancy,
             "SQN": sqn,
             "Num Trades": len(trade_pnls),
+            "Skewness": skew,
+            "Kurtosis": kurt,
+            "VaR (95%)": var_95,
+            "CVaR (95%)": cvar_95,
+            "Stability Score": stability_score,
+            "Ulcer Index": ulcer_index,
+            "Tail Ratio": tail_ratio,
+            "Common Sense Ratio": common_sense_ratio,
+            "Gain-to-Pain Ratio": gain_to_pain_ratio,
         }
 
     def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> dict[str, Any]:
