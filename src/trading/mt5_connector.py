@@ -441,6 +441,11 @@ class MT5Connector:
 
             return asyncio.run(_place_order())
 
+    def get_account_balance(self) -> float:
+        """Retrieve current account balance."""
+        info = self.get_account_info()
+        return float(info.get("balance", 0.0))
+
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account information."""
         if not self._is_initialized:
@@ -465,5 +470,56 @@ class MT5Connector:
                 return await self.metaapi_connection.get_positions()
             return asyncio.run(_get_pos())
 
+    def get_terminal_status(self) -> Dict[str, Any]:
+        """Retrieve terminal status."""
+        if not self._is_initialized:
+            return {}
+        if not self.use_metaapi:
+            info = mt5.terminal_info()
+            return info._asdict() if info else {}
+        else:
+            return {"algo_trading": True}
 
-__all__ = ["TIMEFRAME_MAP", "MT5Connector"]
+    def get_symbol_properties(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Retrieve symbol properties."""
+        if not self._is_initialized:
+            return None
+        if not self.use_metaapi:
+            info = mt5.symbol_info(symbol)
+            if not info:
+                return None
+            return {
+                "name": info.name,
+                "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
+                "spread": info.spread,
+                "digits": info.digits,
+                "point": info.point,
+                "trade_contract_size": info.trade_contract_size,
+            }
+        else:
+            async def _get_info():
+                return await self.metaapi_connection.get_symbol_specification(symbol)
+            try:
+                spec = asyncio.run(_get_info())
+                return {
+                    "name": spec["symbol"],
+                    "tradable": True,
+                    "digits": spec["digits"],
+                    "point": spec.get("point"),
+                    "trade_contract_size": spec.get("contractSize"),
+                }
+            except Exception:
+                return None
+
+    def find_symbols(self, pattern: str) -> List[str]:
+        """Find symbols matching a pattern."""
+        if not self._is_initialized:
+            return []
+        if not self.use_metaapi:
+            symbols = mt5.symbols_get(pattern)
+            return [s.name for s in symbols] if symbols else []
+        else:
+            return [pattern.upper()]
+
+
+__all__ = ["MT5Connector", "TIMEFRAME_MAP"]

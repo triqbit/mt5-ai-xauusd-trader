@@ -116,6 +116,7 @@ class EnsembleModel(BaseModel):
                 metadata={
                     "reason": "Dissent conflict",
                     "votes": {k: s.direction.name for k, s in signals.items()},
+                    "per_algo_votes": {k: s.direction for k, s in signals.items()},
                 },
             )
 
@@ -145,6 +146,7 @@ class EnsembleModel(BaseModel):
             },
             "weights": self.weights,
             "votes": {k: s.direction.name for k, s in signals.items()},
+            "per_algo_votes": {k: s.direction for k, s in signals.items()},
         }
 
         # 3. Consensus Threshold Check
