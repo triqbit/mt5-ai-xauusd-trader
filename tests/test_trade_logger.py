@@ -70,6 +70,7 @@ def test_log_risk_event(logger):
 
 def test_log_rejected_trade(logger):
     trade_id = logger.log_trade(
+        ticket=None,
         symbol="XAUUSD",
         direction=1,
         entry_price=2000.0,

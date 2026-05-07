@@ -8,6 +8,7 @@ from src.core.decision_support import DecisionPacket, DecisionSupportSystem
 from src.core.explainability import SignalExplainer, SignalExplanation
 from src.core.monitor import Monitor
 from src.core.profiler import profile
+from src.core.trade_logger import TradeLogger
 
 if TYPE_CHECKING:
     from src.core.feature_engineering import FeatureEngineer
@@ -29,6 +30,7 @@ __all__ = [
     "Monitor",
     "SignalExplainer",
     "SignalExplanation",
+    "TradeLogger",
     "TradingConfig",
     "get_audit_logger",
     "get_config",

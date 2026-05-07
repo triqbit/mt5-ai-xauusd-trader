@@ -168,11 +168,11 @@ class TradeLogger:
 
     def log_trade(
         self,
+        ticket: int | None,
         symbol: str,
         direction: int,
         entry_price: float,
         lot_size: float,
-        ticket: int | None = None,
         signal_id: int | None = None,
         signal_source: str | None = None,
         status: str = "OPEN",
