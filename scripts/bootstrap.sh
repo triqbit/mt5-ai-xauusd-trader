@@ -46,4 +46,5 @@ else
 fi
 
 echo "=========================================="
-echo "Bootstrap COMPLETE. Run 'make doctor' to verify."
+echo "Bootstrap COMPLETE."
+echo "CRITICAL: Run 'make doctor' or 'python3 scripts/doctor.py' to verify your installation."
