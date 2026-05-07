@@ -230,12 +230,12 @@ class DecisionSupportSystem:
         agreement_pct = weighted_votes / total_weight
 
         if agreement_pct >= 1.0:
-            return "Unanimous"
+            return "💎 Unanimous"
         if agreement_pct >= 0.66:
-            return "Strong Majority"
+            return "💪 Strong Majority"
         if agreement_pct >= 0.5:
-            return "Mixed Confluence"
-        return "Divided/Weak"
+            return "⚖️ Mixed Confluence"
+        return "⚠️ Divided/Weak"
 
     def format_for_operator(self, packet: DecisionPacket, console: Any | None = None) -> str:
         """
@@ -255,8 +255,14 @@ class DecisionSupportSystem:
                 DecisionStatus.CAUTION: "yellow",
                 DecisionStatus.BLOCKED: "red",
             }
+            status_icons = {
+                DecisionStatus.EXECUTE: "✅ ",
+                DecisionStatus.CAUTION: "⚠️ ",
+                DecisionStatus.BLOCKED: "🛑 ",
+            }
             status_color = status_colors.get(packet.status_level, "white")
             status_text = packet.status_level.value.upper()
+            status_icon = status_icons.get(packet.status_level, "")
 
             dir_color = (
                 "green"
@@ -265,25 +271,34 @@ class DecisionSupportSystem:
                 if packet.direction == SignalDirection.SELL
                 else "yellow"
             )
+            dir_icon = (
+                "📈 "
+                if packet.direction == SignalDirection.BUY
+                else "📉 "
+                if packet.direction == SignalDirection.SELL
+                else "⏸️ "
+            )
 
             header_content = Text()
+            header_content.append("📍 ", style="white")
             header_content.append(f"SYMBOL: {packet.symbol}  ", style="bold")
+            header_content.append(dir_icon, style=dir_color)
             header_content.append(
                 f"DIRECTION: {packet.direction.name}\n", style=f"bold {dir_color}"
             )
             header_content.append("STATUS: ", style="bold")
-            header_content.append(status_text, style=f"bold {status_color}")
+            header_content.append(f"{status_icon}{status_text}", style=f"bold {status_color}")
             header_content.append("  |  CONSENSUS: ", style="bold")
             header_content.append(packet.consensus.upper(), style="bold cyan")
 
             if packet.blocking_reasons:
                 header_content.append("\n\nBLOCKING REASONS:\n", style="bold red")
                 for reason in packet.blocking_reasons:
-                    header_content.append(f" • {reason}\n", style="red")
+                    header_content.append(f" 🚫 {reason}\n", style="red")
 
             header = Panel(
                 header_content,
-                title="[bold]Institutional Decision Support[/bold]",
+                title="💠 [bold]Institutional Decision Support[/bold]",
                 subtitle=packet.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 border_style=status_color,
                 box=box.DOUBLE,
@@ -304,7 +319,7 @@ class DecisionSupportSystem:
             score_content.append(f"{packet.sizing_multiplier:.1%}", style="bold cyan")
 
             augmentation_panel = Panel(
-                score_content, title="Augmentation Metrics", border_style="blue"
+                score_content, title="🎯 Augmentation Metrics", border_style="blue"
             )
 
             # 2. Market and Performance Overview (Two-column table)
@@ -319,7 +334,7 @@ class DecisionSupportSystem:
                 f"Volatility: [bold]{packet.regime.volatility_index:.2f}[/bold]\n"
                 f"Transition: {packet.regime.transition_score:.2f}"
             )
-            regime_panel = Panel(regime_content, title="Market Regime", border_style="cyan")
+            regime_panel = Panel(regime_content, title="🌐 Market Regime", border_style="cyan")
 
             # Right Column: Performance
             perf_content = (
@@ -330,7 +345,7 @@ class DecisionSupportSystem:
                 f"W/L Ratio: [bold]{packet.performance.win_loss_ratio:.2f}[/bold]\n"
                 f"Total Trades: {packet.performance.total_trades}"
             )
-            perf_panel = Panel(perf_content, title="Recent Performance", border_style="magenta")
+            perf_panel = Panel(perf_content, title="📊 Recent Performance", border_style="magenta")
 
             overview_table.add_row(regime_panel, perf_panel)
 
@@ -355,12 +370,12 @@ class DecisionSupportSystem:
             if packet.macro_risk.reason:
                 macro_content.append(f"\nInsight: {packet.macro_risk.reason}", style="italic")
 
-            macro_panel = Panel(macro_content, title="Macro Intelligence", border_style=macro_color)
+            macro_panel = Panel(macro_content, title="🌍 Macro Intelligence", border_style=macro_color)
 
             # 4. Attribution Summary (Text)
             attribution_summary = Panel(
                 Text(packet.explanation.human_readable_summary),
-                title="Signal Attribution Summary",
+                title="🔍 Signal Attribution Summary",
                 border_style="yellow",
             )
 
