@@ -315,21 +315,24 @@ def test_find_combination_motifs(miner):
 
 def test_find_frequent_motifs_with_clusters(miner):
     now = datetime.now(timezone.utc)
+    # clusters need 3+ consecutive losses
     trades = pd.DataFrame([
         {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
         {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
         {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
-        {"id": 8, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 8},
+        {"id": 4, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 4},
     ])
 
+    # motifs need freq >= 2
     signals = pd.DataFrame([
         {"id": 1, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -10, "created_at": now},
         {"id": 2, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1)},
+        {"id": 3, "algorithm": "ensemble", "direction": 1, "volatility": 0.1, "confidence": 0.8, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2)},
     ])
 
     motifs = miner.find_frequent_motifs(signals, trades)
     assert len(motifs) == 1
-    assert motifs[0].cluster_frequency == 2
+    assert motifs[0].cluster_frequency == 3
 
 def test_profitable_patterns_multi_attribute(miner, sample_trades):
     # Add symbol and algorithm to sample_trades

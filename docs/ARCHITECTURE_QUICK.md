@@ -13,7 +13,7 @@ The system is designed as a modular, event-driven trading engine that separates 
 | **Intelligence** | Market regime detection, directional signal generation, and ensemble consensus. | `src/models/`, `src/environment/` |
 | **Execution** | MT5 lifecycle management, order execution, and connectivity. | `src/trading/mt5_connector.py` |
 | **Risk & Allocation** | Position sizing, drawdown protection, and capital allocation. | `src/trading/risk_manager.py`, `src/trading/capital_allocator.py` |
-| **Infrastructure** | Config validation, health monitoring, and trade logging. | `src/core/` |
+| **Infrastructure** | Config validation, health monitoring, centralized database management, and trade logging. | `src/core/`, `src/core/database.py` |
 | **Research** | Backtesting, stress testing, and model evaluation. | `src/research/`, `src/analytics/` |
 
 ---
@@ -41,7 +41,7 @@ This map identifies the production readiness of various subsystems to ensure tra
 4.  **Risk Gate:** `RiskManager` and `ExecutionFilter` validate the signal against a 6-layer cascade: ATR volatility, Trend Angle, EMA Sequence, Momentum, Session time, and Drawdown circuit breakers.
 5.  **Allocation:** `CapitalAllocator` determines optimal lot size based on equity and regime.
 6.  **Execution:** `MT5Connector` dispatches the order and monitors for fills/slippage.
-7.  **Observability:** `TradeLogger` records execution details; `Monitor` pushes metrics to Prometheus.
+7.  **Observability:** `TradeLogger` and `AuditLogger` record execution and system traces using a unified, pooled database infrastructure; `Monitor` pushes metrics to Prometheus.
 
 ---
 
