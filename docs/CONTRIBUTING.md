@@ -22,34 +22,34 @@ We use a role-based governance model where specific leads oversee different doma
 ### 1. Preparation
 - **Fork and Clone:** Create your own fork and clone it locally.
 - **Setup Environment:** Use Python 3.11+. Follow the [Setup Guide](../SETUP_GUIDE.md).
-- **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models).
+- **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models, core).
 
 ### 2. Implementation
-- **Branching Strategy:** Use descriptive branch names prefixed by type:
+- **Branching Strategy:** We enforce a strict branching strategy. Use descriptive branch names prefixed by type:
   - `feature/` for new features (e.g., `feature/ppo-optim-v2`)
   - `bugfix/` for bug fixes (e.g., `bugfix/mt5-conn-leak`)
   - `hotfix/` for emergency production fixes
   - `docs/` for documentation-only changes
 - **Conventional Commits:** We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`).
 - **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](../ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
-- **Quality Gates:** Your code must pass all local quality gates before submission.
 
-### 3. Pull Request Submission & Lifecycle
-- **Target Branch:** All PRs should target the `develop` branch unless they are critical hotfixes for `main`.
-- **Draft PRs:** Open a Draft PR early to get feedback on architectural direction.
-- **Complete the PR Template:** Use the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) and fill out every section, including the **Rollback Strategy**.
-- **Evidence:** Attach test logs, coverage reports, and backtest evidence (if applicable).
-- **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required. Changes to **Sensitive Zones** require multi-signature approval from at least two leads (typically the domain lead and Jules03).
-- **Merge Criteria:** Once all CI gates pass and approval is received, Jules03 or the module lead will merge the PR.
+### 3. Pull Request Lifecycle
+1.  **Draft PR:** Open a Draft PR early to get feedback on architectural direction.
+2.  **Mandatory Checks:** Ensure your PR passes all automated CI gates (Lint, Type, Security, Tests).
+3.  **Governance Template:** Complete the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) in full.
+4.  **Evidence:** Attach test logs, coverage reports, and backtest evidence.
+5.  **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required.
+6.  **Multi-Signature Sign-off:** Changes to **Sensitive Zones** require sign-off from both the domain lead and the Release/Governance lead (Jules03).
+7.  **Merge:** Once all criteria are met, the branch is merged into `develop` (or `main` for hotfixes).
 
 ---
 
-## 🛡️ Mandatory Quality Gates
+## 🛡️ Required PR Checks (Mandatory Quality Gates)
 
-Every Pull Request must pass the following gates to be eligible for merge:
+Every Pull Request must pass the following gates before merge:
 
 1.  **CI Pipeline:** Must pass all automated checks in GitHub Actions.
-2.  **Code Coverage:** Minimum **85%** statement coverage. New code must include tests.
+2.  **Code Coverage:** Minimum **85%** statement coverage. New code must include unit tests.
 3.  **Type Safety:** `mypy` must return zero errors for all modified files.
 4.  **Linting:** `ruff check .` must return zero errors.
 5.  **Security Scan:** `pip-audit` must show zero vulnerabilities in dependencies.

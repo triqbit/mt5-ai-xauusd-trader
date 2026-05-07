@@ -1,47 +1,53 @@
 # MT5 AI/ML Trading Bot - Enterprise Code Ownership
 # This file defines mandatory reviewers for specific modules.
 # Reviewers are notified automatically when a PR touches their area.
+#
+# NOTE: Changes to "Sensitive Zones" (Trading, Models, Core) require
+# multi-signature approval from both the domain lead and the Release/Governance lead.
 
 # Global Governance & Quality Oversight (Jules03, Jules06)
 * @andonly1348 @maintainer-quality
 
-# Core Infrastructure & Configuration (Jules03, Jules06)
+# 🔴 SENSITIVE ZONE: Core Infrastructure & Configuration (Jules03, Jules06)
+# Multi-signature required for any change affecting system-wide invariants.
 /src/core/ @andonly1348 @maintainer-quality
-/main.py @andonly1348
+/main.py @andonly1348 @maintainer-quality
 /pyproject.toml @andonly1348 @maintainer-quality
 /alembic.ini @andonly1348
 /.env.example @andonly1348 @xnessom
 
-# Trading & Risk Management (Highest Sensitivity) (Jules01, Jules03)
+# 🔴 SENSITIVE ZONE: Trading & Risk Management (Jules01, Jules03)
+# Highest sensitivity. Multi-signature mandatory for risk/execution logic.
 /src/trading/ @maintainer-trading @andonly1348
 /src/analytics/ @maintainer-trading
 /src/data/ @maintainer-trading @maintainer-models
 
-# AI/ML Model Architectures & Research (Jules04)
-/src/models/ @maintainer-models
+# 🔴 SENSITIVE ZONE: AI/ML Model Architectures & Research (Jules04, Jules03)
+# Multi-signature required for changes to model logic or research environment.
+/src/models/ @maintainer-models @andonly1348
 /src/research/ @maintainer-models
 /src/environment/ @maintainer-models
 
-# Monitoring & Observability (Jules06)
+# 🟡 UTILITY ZONE: Monitoring & Observability (Jules06)
 /src/monitoring/ @maintainer-quality @andonly1348
 
-# Utilities & Shared Helpers
+# 🟡 UTILITY ZONE: Utilities & Shared Helpers
 /src/utils/ @maintainer-quality @andonly1348
 
-# Release Reliability & Security Enforcement (Jules02, Jules03)
+# 🛡️ SECURITY & RELEASE: Reliability Enforcement (Jules02, Jules03)
 /.github/workflows/ @andonly1348 @xnessom
 /scripts/ @andonly1348 @xnessom
 /Dockerfile @andonly1348 @xnessom
 /requirements*.txt @xnessom
 
-# Database Migrations & Schemas (Jules03)
+# 📦 RELEASE: Database Migrations & Schemas (Jules03)
 /migrations/ @andonly1348
 
-# Documentation & Governance Policies
+# 📖 GOVERNANCE: Documentation & Policies
 /docs/ @andonly1348
 /README.md @andonly1348
 /CHANGELOG.md @andonly1348
 /SECURITY.md @andonly1348 @xnessom
 
-# Testing & Quality Assurance (Jules06)
+# 🧪 QUALITY: Testing & Quality Assurance (Jules06)
 /tests/ @maintainer-quality
