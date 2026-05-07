@@ -126,7 +126,7 @@ git checkout -b deploy/v1.2.0
 docker build -t trading-bot:v1.2.0 .
 
 # 3. Run pre-deployment tests
-./scripts/pre_deployment_tests.sh
+python scripts/verify_version_sync.py
 
 # 4. Verify staging deployment
 kubectl apply -f k8s/staging.yaml
@@ -147,7 +147,7 @@ kubectl apply -f k8s/production.yaml
 kubectl rollout status deployment/trading-bot
 
 # 4. Run smoke tests
-./scripts/smoke_tests.sh production
+python scripts/smoke_test.py --url http://localhost:8000 --audit-db audit.db
 
 # 5. Monitor deployment (2+ hours)
 kubectl logs -l app=trading-bot --follow
@@ -164,7 +164,7 @@ kubectl get pods -l app=trading-bot
 # - CPU/Memory usage should be normal
 
 # 3. Run end-to-end tests
-./scripts/e2e_tests.sh production
+# Verification of core trading logic via MT5 simulation (if applicable)
 
 # 4. Update documentation
 git tag -a v1.2.0 -m "Production release v1.2.0"
