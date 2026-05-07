@@ -1,7 +1,9 @@
 
 import pytest
 from pydantic import ValidationError
-from src.core.schemas import TradeSignal, SignalDirection
+
+from src.core.schemas import SignalDirection, TradeSignal
+
 
 def test_trade_signal_schema_valid():
     """Verify that a valid signal data dictionary passes validation."""
@@ -43,6 +45,9 @@ def test_trade_signal_schema_enum_parsing():
     ("lot_size", 0.005),
     ("confidence", -0.1),
     ("confidence", 1.1),
+    ("symbol", "X"),
+    ("symbol", "XAUUSD!"),
+    ("symbol", "this_is_too_long_for_the_schema"),
 ])
 def test_trade_signal_schema_invalid_values(field, value):
     """Verify that invalid values raise ValidationError."""
@@ -61,37 +66,55 @@ def test_trade_signal_schema_invalid_values(field, value):
         TradeSignal(**data)
 
 def test_buy_price_boundaries():
-    """Verify BUY boundary validation (SL < Entry < TP)."""
+    """Verify BUY boundary validation (SL < Entry < TP) and R:R."""
     base = {
         "symbol": "XAUUSD", "direction": 1, "entry_price": 2000.0,
         "lot_size": 0.1, "algorithm": "test", "confidence": 0.9
     }
 
-    # Valid
-    TradeSignal(**base, stop_loss=1900, take_profit=2100)
+    # Valid (Reward=300, Risk=100, RR=3.0)
+    TradeSignal(**base, stop_loss=1900, take_profit=2300)
+
+    # Invalid R:R (Reward=50, Risk=100, RR=0.5)
+    with pytest.raises(ValidationError, match="Risk-Reward ratio"):
+        TradeSignal(**base, stop_loss=1900, take_profit=2050)
 
     # Invalid SL
     with pytest.raises(ValidationError, match="BUY Stop Loss"):
-        TradeSignal(**base, stop_loss=2050, take_profit=2100)
+        TradeSignal(**base, stop_loss=2050, take_profit=2300)
 
-    # Invalid TP
+    # Invalid TP (Higher than entry, but RR < 1.5)
+    with pytest.raises(ValidationError, match="Risk-Reward ratio"):
+        TradeSignal(**base, stop_loss=1900, take_profit=2050)
+
+    # Invalid TP (Lower than entry, but RR is valid)
+    # Risk = 100, Reward = 200 (RR=2.0)
     with pytest.raises(ValidationError, match="BUY Take Profit"):
-        TradeSignal(**base, stop_loss=1900, take_profit=1950)
+        TradeSignal(**base, stop_loss=1900, take_profit=1800)
 
 def test_sell_price_boundaries():
-    """Verify SELL boundary validation (SL > Entry > TP)."""
+    """Verify SELL boundary validation (SL > Entry > TP) and R:R."""
     base = {
         "symbol": "XAUUSD", "direction": -1, "entry_price": 2000.0,
         "lot_size": 0.1, "algorithm": "test", "confidence": 0.9
     }
 
-    # Valid
-    TradeSignal(**base, stop_loss=2100, take_profit=1900)
+    # Valid (Reward=300, Risk=100, RR=3.0)
+    TradeSignal(**base, stop_loss=2100, take_profit=1700)
+
+    # Invalid R:R (Reward=50, Risk=100, RR=0.5)
+    with pytest.raises(ValidationError, match="Risk-Reward ratio"):
+        TradeSignal(**base, stop_loss=2100, take_profit=1950)
 
     # Invalid SL
     with pytest.raises(ValidationError, match="SELL Stop Loss"):
-        TradeSignal(**base, stop_loss=1950, take_profit=1900)
+        TradeSignal(**base, stop_loss=1950, take_profit=1700)
 
-    # Invalid TP
+    # Invalid TP (Lower than entry, but RR < 1.5)
+    with pytest.raises(ValidationError, match="Risk-Reward ratio"):
+        TradeSignal(**base, stop_loss=2100, take_profit=1950)
+
+    # Invalid TP (Higher than entry, but RR is valid)
+    # Risk = 100, Reward = 200 (RR=2.0)
     with pytest.raises(ValidationError, match="SELL Take Profit"):
-        TradeSignal(**base, stop_loss=2100, take_profit=2050)
+        TradeSignal(**base, stop_loss=2100, take_profit=2200)

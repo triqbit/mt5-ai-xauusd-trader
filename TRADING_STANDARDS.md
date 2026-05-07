@@ -33,7 +33,7 @@ def calculate_position_size(
 ### 1.3 Stop-Loss & Take-Profit Rules
 - **Minimum Stop Distance**: 10 pips for XAUUSD
 - **Mandatory Stop-Loss**: Every trade must have a hard stop-loss
-- **Risk-Reward Ratio**: Minimum 1:1.5 (1 risked to gain 1.5)
+- **Risk-Reward Ratio**: Minimum 1:1.5 (1 risked to gain 1.5) [ENFORCED IN SCHEMA]
 - **Trailing Stops**: Implement after profit threshold (e.g., +50 pips)
 - **Profit Target Levels**: Multiple profit levels with partial exits
 

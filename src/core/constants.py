@@ -8,7 +8,12 @@ from enum import Enum, IntEnum
 
 
 class SignalDirection(IntEnum):
-    """Standardized signal directions across all models and environments."""
+    """
+    Standardized signal directions across all models and environments.
+    BUY (1) : Positive price expectation, trigger long entry.
+    SELL (-1): Negative price expectation, trigger short entry.
+    HOLD (0): Neutral or uncertain, do not enter or maintain flat.
+    """
 
     BUY = 1
     SELL = -1
@@ -16,7 +21,12 @@ class SignalDirection(IntEnum):
 
 
 class DecisionStatus(str, Enum):
-    """Augmented status levels for trade execution."""
+    """
+    Augmented status levels for trade execution.
+    EXECUTE: High-confidence signal passing all filters and risk gates.
+    CAUTION: Valid signal but with elevated risk or lower confidence; may require manual oversight or reduced sizing.
+    BLOCKED: Signal rejected by risk management, execution filters, or macro intelligence.
+    """
 
     EXECUTE = "execute"
     CAUTION = "caution"
@@ -48,7 +58,12 @@ class EventCategory(Enum):
 class ModelAction(IntEnum):
     """
     Standardized categorical actions used by RL environments and model outputs.
-    Mapped to SignalDirection in adapters or the execution loop.
+    Mapped to SignalDirection in adapters or the execution loop to ensure
+    consistent interpretation of model predictions.
+
+    HOLD (0): No action recommended.
+    BUY (1) : Long position recommended.
+    SELL (2): Short position recommended.
     """
 
     HOLD = 0

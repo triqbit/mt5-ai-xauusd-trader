@@ -25,15 +25,30 @@ class TradeSignal(BaseModel):
     Enforces strict constraints to ensure technical trust in model outputs.
     """
 
-    symbol: str = Field(..., description="The financial instrument symbol (e.g., XAUUSD)")
-    direction: SignalDirection = Field(..., description="Signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)")
-    entry_price: float = Field(..., gt=0, description="The target entry price for the trade")
-    stop_loss: float = Field(..., gt=0, description="The mandatory protective stop loss price")
-    take_profit: float = Field(..., gt=0, description="The target profit taking price")
+    symbol: str = Field(
+        ...,
+        pattern=r"^[A-Z0-9]{3,20}$",
+        description="The financial instrument symbol (e.g., XAUUSD). Must be 3-20 uppercase alphanumeric characters.",
+    )
+    direction: SignalDirection = Field(
+        ..., description="Signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)"
+    )
+    entry_price: float = Field(
+        ..., gt=0, description="The target entry price for the trade (must be positive)"
+    )
+    stop_loss: float = Field(
+        ..., gt=0, description="The mandatory protective stop loss price (must be positive)"
+    )
+    take_profit: float = Field(
+        ..., gt=0, description="The target profit taking price (must be positive)"
+    )
     lot_size: float = Field(..., ge=0.01, description="The position size in lots (minimum 0.01)")
     algorithm: str = Field(..., description="The name of the algorithm that generated this signal")
     confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="The model's confidence score (0.0 to 1.0)"
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="The model's confidence score (0.0 to 1.0). Higher means more certainty.",
     )
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -55,8 +70,26 @@ class TradeSignal(BaseModel):
     def validate_price_boundaries(self) -> TradeSignal:
         """
         Validate that SL/TP are on the correct side of the entry price
-        based on the signal direction.
+        based on the signal direction and enforce minimum Risk-Reward ratio.
         """
+        if self.direction == SignalDirection.HOLD:
+            return self
+
+        risk = abs(self.entry_price - self.stop_loss)
+        reward = abs(self.take_profit - self.entry_price)
+
+        if risk <= 0:
+            raise ValueError("Risk (Entry - SL) must be greater than zero")
+
+        rr_ratio = reward / risk
+        min_rr = 1.5
+
+        if rr_ratio < min_rr:
+            raise ValueError(
+                f"Risk-Reward ratio ({rr_ratio:.2f}) is below the required minimum of {min_rr}. "
+                f"Risk: {risk:.2f}, Reward: {reward:.2f}"
+            )
+
         if self.direction == SignalDirection.BUY:
             if self.stop_loss >= self.entry_price:
                 raise ValueError(
