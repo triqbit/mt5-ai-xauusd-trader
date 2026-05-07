@@ -11,11 +11,15 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
 from src.core.constants import ModelAction, SignalDirection
+
+if TYPE_CHECKING:
+    from src.models.regime_detector import RegimeInfo
+    from src.trading.execution_filter import ExecutionDecision
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +135,14 @@ class SignalExplainer:
     Collects data from various system components and builds a SignalExplanation.
     """
 
+    FEATURE_MAPPING = {
+        "Trend": ["slope", "ema", "returns", "ht_trendline", "adx"],
+        "Momentum": ["rsi", "mfi", "cci", "mom", "macd", "stoch", "willr", "ultosc"],
+        "Volatility": ["atr", "bb_", "keltner", "range", "ht_dcperiod", "ht_phasor"],
+        "Volume": ["vol", "obv", "vwap", "vpt", "vp_"],
+        "Patterns": ["pattern_"],
+    }
+
     def __init__(self) -> None:
         pass
 
@@ -142,9 +154,9 @@ class SignalExplainer:
         model_votes: dict[str, Any],
         model_weights: dict[str, float],
         risk_data: dict[str, Any],
-        regime_info: dict[str, Any],
-        execution_data: dict[str, Any] | None = None,
-        feature_impacts: list[dict[str, Any]] | None = None,
+        regime_info: dict[str, Any] | RegimeInfo,
+        execution_data: dict[str, Any] | ExecutionDecision | None = None,
+        feature_impacts: list[dict[str, Any]] | dict[str, float] | None = None,
         model_confidences: dict[str, float] | None = None,
     ) -> SignalExplanation:
         """
@@ -157,38 +169,57 @@ class SignalExplainer:
             model_votes: Dictionary mapping model names to their actions (ModelAction index).
             model_weights: Dictionary mapping model names to their ensemble weights.
             risk_data: Raw risk assessment data (passed, rejection_reasons, risk_reward, etc.).
-            regime_info: Market regime data (name, confidence, volatility, etc.).
-            execution_data: Optional execution filter data (filters, summary, etc.).
-            feature_impacts: Optional list of dictionaries describing feature cluster impacts.
+            regime_info: Market regime data (name, confidence, volatility, etc.) or RegimeInfo object.
+            execution_data: Optional execution filter data or ExecutionDecision object.
+            feature_impacts: Optional list of cluster impacts or dict of individual feature scores.
             model_confidences: Optional dictionary mapping model names to their individual confidence scores.
 
         Returns:
             A structured SignalExplanation object.
         """
         # 1. Execution Summary
-        if not execution_data:
-            execution_data = {
-                "passed": True,
-                "filters": [],
-                "summary": "Execution filters bypassed",
-            }
-
-        execution_filters = [
-            FilterResult(
-                filter_name=f["name"],
-                passed=f["passed"],
-                value=f.get("value"),
-                threshold=f.get("threshold"),
-                message=f.get("message"),
+        if execution_data is None:
+            execution_summary = ExecutionSummary(
+                passed=True, filters=[], summary="Execution filters bypassed"
             )
-            for f in execution_data.get("filters", [])
-        ]
+        elif hasattr(execution_data, "trace"):  # ExecutionDecision dataclass
+            filters = []
+            for name, res in execution_data.trace.items():
+                filters.append(
+                    FilterResult(
+                        filter_name=name,
+                        passed=res.get("passed", False),
+                        message=f"Blocked by {execution_data.blocked_by}"
+                        if execution_data.blocked_by == name.upper()
+                        else None,
+                        value=res.get("value") or res.get("ratio") or res.get("rsi") or res.get("slope"),
+                        threshold=res.get("threshold") or res.get("max_drawdown") or res.get("drift_threshold"),
+                    )
+                )
+            execution_summary = ExecutionSummary(
+                passed=execution_data.is_approved,
+                filters=filters,
+                summary=f"Blocked by {execution_data.blocked_by}"
+                if execution_data.blocked_by
+                else "Passed all execution filters",
+            )
+        else:  # dict
+            execution_filters = [
+                FilterResult(
+                    filter_name=f["name"],
+                    passed=f["passed"],
+                    value=f.get("value"),
+                    threshold=f.get("threshold"),
+                    message=f.get("message"),
+                )
+                for f in execution_data.get("filters", [])
+            ]
 
-        execution_summary = ExecutionSummary(
-            passed=execution_data.get("passed", False),
-            filters=execution_filters,
-            summary=execution_data.get("summary", "No execution data"),
-        )
+            execution_summary = ExecutionSummary(
+                passed=execution_data.get("passed", False),
+                filters=execution_filters,
+                summary=execution_data.get("summary", "No execution data"),
+            )
 
         # 2. Model Attribution
         attributions = []
@@ -241,27 +272,65 @@ class SignalExplainer:
         )
 
         # 4. Regime Context
-        regime_context = RegimeContext(
-            regime_name=regime_info.get("name", "Unknown"),
-            confidence=regime_info.get("confidence", 0.0),
-            volatility_state=regime_info.get("volatility", "Normal"),
-            is_favorable=regime_info.get("is_favorable", True),
-            summary=regime_info.get("summary", "Market state stable"),
-        )
-
-        # 5. Feature Contributions
-        if not feature_impacts:
-            feature_impacts = []
-
-        contributions = [
-            FeatureContribution(
-                cluster_name=fi["cluster"],
-                contribution_score=fi["score"],
-                impact_level=fi["impact"],
-                summary=fi["summary"],
+        if hasattr(regime_info, "label"):  # RegimeInfo pydantic model
+            regime_context = RegimeContext(
+                regime_name=str(regime_info.label.value).title(),
+                confidence=regime_info.confidence,
+                volatility_state="High" if regime_info.volatility_index > 1.5 else "Normal",
+                is_favorable=regime_info.confidence > 0.6,
+                summary=f"Market in {regime_info.label.value} state with {regime_info.confidence:.1%} confidence.",
             )
-            for fi in feature_impacts
-        ]
+        else:  # dict
+            regime_context = RegimeContext(
+                regime_name=regime_info.get("name", "Unknown"),
+                confidence=regime_info.get("confidence", 0.0),
+                volatility_state=regime_info.get("volatility", "Normal"),
+                is_favorable=regime_info.get("is_favorable", True),
+                summary=regime_info.get("summary", "Market state stable"),
+            )
+
+        # 5. Feature Contributions (with clustering logic)
+        contributions = []
+        if isinstance(feature_impacts, list):
+            contributions = [
+                FeatureContribution(
+                    cluster_name=fi["cluster"],
+                    contribution_score=fi["score"],
+                    impact_level=fi["impact"],
+                    summary=fi["summary"],
+                )
+                for fi in feature_impacts
+            ]
+        elif isinstance(feature_impacts, dict):
+            # Individual feature scores -> Aggregate into clusters
+            cluster_scores: dict[str, list[float]] = {k: [] for k in self.FEATURE_MAPPING}
+            cluster_scores["Other"] = []
+
+            for feat, score in feature_impacts.items():
+                found = False
+                for cluster, keywords in self.FEATURE_MAPPING.items():
+                    if any(kw in feat.lower() for kw in keywords):
+                        cluster_scores[cluster].append(score)
+                        found = True
+                        break
+                if not found:
+                    cluster_scores["Other"].append(score)
+
+            for cluster, scores in cluster_scores.items():
+                if not scores:
+                    continue
+                avg_score = sum(scores) / len(scores)
+                abs_avg = abs(avg_score)
+                impact = "High" if abs_avg > 0.6 else "Medium" if abs_avg > 0.3 else "Low"
+
+                contributions.append(
+                    FeatureContribution(
+                        cluster_name=cluster,
+                        contribution_score=avg_score,
+                        impact_level=impact,
+                        summary=f"Aggregate impact from {len(scores)} {cluster.lower()} features",
+                    )
+                )
 
         # 6. Generate Human Readable Summary
         dir_str = SignalDirection(direction).name
@@ -291,7 +360,7 @@ class SignalExplainer:
             "risk_rejection_reasons": risk_assessment.rejection_reasons,
             "execution_passed": execution_summary.passed,
             "failed_execution_filters": [
-                f.filter_name for f in execution_filters if not f.passed
+                f.filter_name for f in execution_summary.filters if not f.passed
             ],
             "regime_confluence": regime_context.confidence,
             "dominant_models": dominant_models,
