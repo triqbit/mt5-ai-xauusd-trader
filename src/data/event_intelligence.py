@@ -18,16 +18,16 @@ from src.data.event_models import MacroEvent, RiskStatus
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "EventImpact",
-    "EventCategory",
-    "MacroEvent",
-    "RiskStatus",
     "BaseEventProvider",
-    "MockEventProvider",
-    "JSONEventProvider",
-    "MetaAPIEventProvider",
-    "TradingViewEventProvider",
+    "EventCategory",
+    "EventImpact",
     "EventIntelligence",
+    "JSONEventProvider",
+    "MacroEvent",
+    "MetaAPIEventProvider",
+    "MockEventProvider",
+    "RiskStatus",
+    "TradingViewEventProvider",
 ]
 
 

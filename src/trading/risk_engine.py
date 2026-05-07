@@ -306,9 +306,7 @@ class RiskEngine:
             return False
         if health.get("accuracy", 1.0) < self.cfg.model_accuracy_floor:
             return False
-        if health.get("calibration", 0.0) > self.cfg.model_calibration_threshold:
-            return False
-        return True
+        return health.get("calibration", 0.0) <= self.cfg.model_calibration_threshold
 
     def get_size_multiplier_from_loss(self) -> float:
         """Multiplier based on daily loss level."""
