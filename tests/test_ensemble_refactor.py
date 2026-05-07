@@ -12,7 +12,8 @@ import numpy as np
 
 # Use the standardized SignalDirection from constants
 from src.core.constants import SignalDirection
-from src.models.ensemble import EnsembleModel, LSTMAttentionModel
+from src.models.ensemble import EnsembleModel
+from src.models.lstm_model import LSTMAttentionModel
 
 
 def test_lstm_attention_model_output_shape():
@@ -49,17 +50,18 @@ def test_ensemble_record_return_rebalance():
     ensemble = EnsembleModel(device="cpu")
     initial_weights = ensemble.weights.copy()
 
-    # Record 50 returns to trigger _rebalance_weights
-    # Also mock confidences to avoid calibration penalty
+    # Record 50 outcomes to trigger weight updates in DynamicEnsemble
     for _ in range(50):
-        # We need to fill _last_confidences to avoid NaN/Zero calibration errors
-        ensemble._last_confidences["ppo"].append(0.6)
-        ensemble._last_confidences["lstm"].append(0.6)
-        ensemble._last_confidences["dreamer"].append(0.6)
+        # Model 1 (ppo) is always right
+        ensemble.dynamic_ensemble.record_prediction("ppo", SignalDirection.BUY, 0.8)
+        ensemble.dynamic_ensemble.record_outcome("ppo", SignalDirection.BUY)
 
-        ensemble.record_return("ppo", 0.01)  # Profitable
-        ensemble.record_return("lstm", -0.01)  # Losing
-        ensemble.record_return("dreamer", 0.0)
+        # Model 2 (lstm) is always wrong
+        ensemble.dynamic_ensemble.record_prediction("lstm", SignalDirection.BUY, 0.8)
+        ensemble.dynamic_ensemble.record_outcome("lstm", SignalDirection.SELL)
+
+        # Update weights based on recorded metrics
+        ensemble.dynamic_ensemble.update_weights()
 
     new_weights = ensemble.weights
     assert new_weights["ppo"] > initial_weights["ppo"]

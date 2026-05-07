@@ -31,7 +31,6 @@ from src.research.rare_event_simulator import (
 )
 from src.research.reporting import ResearchReport, ResearchReporter
 from src.research.rl_evaluation import (
-    MeanReversionBaseline,
     MomentumBaseline,
     RandomBaseline,
     RLEvaluator,
@@ -45,7 +44,6 @@ __all__ = [
     "BuyAndHoldStrategy",
     "DonchianChannelStrategy",
     "EMACrossoverStrategy",
-    "MeanReversionBaseline",
     "MeanReversionStrategy",
     "MomentumBaseline",
     "MomentumStrategy",
