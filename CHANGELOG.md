@@ -6,15 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-<!--
-  Add your changes below this line using the following categories:
-  ### Added
-  ### Changed
-  ### Fixed
-  ### Security
-  ### Deprecated
-  ### Removed
--->
 
 ### Added
 - **Monitoring & Alerting System:** Comprehensive real-time monitoring in `src/core/monitor.py` including equity curve tracking, Prometheus metrics export, and Telegram bot integration for critical alerts (circuit breakers, margin calls, liquidity crises) and daily performance summaries.
@@ -22,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Improved Trading Environment:** Refined `TradingEnv` in `src/trading/trading_env.py` with institutional reward skeleton and Gymnasium compatibility.
 - **Semantic TUI Visuals:** Enhanced the Decision Support System cockpit with semantic emojis (📈, 📉, ✅, ⚠️, 🛑) and panel icons for improved scannability and accessibility.
 - **Enterprise Core Scaffolding:** Refined `src/` package structure and core modules (`config.py`, `mt5_connector.py`, `risk_engine.py`, `ensemble.py`) to meet institutional enterprise standards with full type hints, docstrings, and unit tests.
-- **Enterprise Monitoring System:** Implemented a robust monitoring and alerting backbone in `src/core/monitor.py` featuring real-time equity curve tracking, Prometheus metrics export, and async-safe Telegram bot notifications.
 - **Institutional Backtesting Engine:** Implemented a high-performance, vectorized walk-forward backtesting engine in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission) and path-dependent metrics (MAE/MFE).
 - **Institutional Risk Notifications:** Integrated real-time alerts for circuit breaker triggers, margin calls, account balance mismatches, and liquidity (spread) crises into the primary trading loop.
 - **Automated Daily Performance Summaries:** Added logic to detect day changes and trigger automated Telegram summaries capturing daily P&L and trade counts.
@@ -30,13 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vectorized Walk-Forward Backtester:** Implemented high-performance `BacktestEngine` in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission), path-dependent metrics (MAE/MFE), and institutional performance reporting (Sharpe, CAGR, MDD).
 - **Enhanced RL Evaluation Suite:** Advanced institutional metrics including Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio. Improved robustness for regime sensitivity and agent interface integration (SB3, Signal objects).
 - **Vectorized Feature Engineering:** Optimized `FeatureEngineer` by refactoring internal methods to return dictionaries of NumPy arrays and using TA-Lib vectorization (`SMA`, `SUM`, `ROCP`), achieving ~20% overall speedup.
+- **Dependency Parity Guard:** Introduced `scripts/verify_dependencies.py` and `tests/test_verify_dependencies.py` to automate version synchronization checks across environment-specific requirements files.
 
 ### Changed
 - **Dependency Harmonization:** Aligned core dependencies (`pandas==2.3.2`, `fastapi==0.136.1`, `starlette==0.49.1`) across all environments to resolve security vulnerabilities and satisfy `pandas-ta` requirements.
 - **Hardened Risk Validation:** Tightened startup configuration checks to treat `model_calibration_threshold` breaches (> 0.25) as critical failures, ensuring runtime alignment with `RISK_LIMITS.md`.
-
-### Added
-- **Dependency Parity Guard:** Introduced `scripts/verify_dependencies.py` and `tests/test_verify_dependencies.py` to automate version synchronization checks across environment-specific requirements files.
 
 ### Fixed
 - **CI Pipeline Stabilization:** Resolved over 400 Ruff linting violations and standardized import sorting across the enterprise package.

@@ -36,6 +36,7 @@ To enable automated changelog generation and version bumping, all commits to the
 ### Supported Types:
 - `feat`: A new feature (corresponds to a **MINOR** version bump).
 - `fix`: A bug fix (corresponds to a **PATCH** version bump).
+- `security`: A security fix (corresponds to a **PATCH** version bump).
 - `perf`: A code change that improves performance (corresponds to a **PATCH** version bump).
 - `docs`: Documentation only changes (corresponds to a **PATCH** version bump).
 - `refactor`: A code change that neither fixes a bug nor adds a feature (corresponds to a **PATCH** version bump).
@@ -89,6 +90,18 @@ If multiple labels are applied, the highest increment takes precedence (`major` 
 | **New Strategy** | MINOR | `feat: add trend-following ensemble model` |
 | **Bug Fix** | PATCH | `fix: correct ATR calculation window` |
 | **Dependency Update** | PATCH | `chore(deps): bump ruff to 0.4.3` |
+
+## 7. Versioning Decision Matrix
+
+| IF THE CHANGE... | THEN BUMP... | EXAMPLE |
+| :--- | :--- | :--- |
+| Changes a mandatory `.env` variable name | **MAJOR** | `feat!: rename MT5_SERVER to MT5_HOST` |
+| Changes the risk calculation engine logic | **MAJOR** | `feat!: new drawdown calculation algorithm` |
+| Adds a new Technical Indicator | **MINOR** | `feat: add Ichimoku Cloud support` |
+| Adds a new command-line flag | **MINOR** | `feat: add --dry-run to backtester` |
+| Fixes a calculation error in RSI | **PATCH** | `fix: correct RSI smoothing period` |
+| Updates the README with new instructions | **PATCH** | `docs: add deployment troubleshooting section` |
+| Optimizes a loop in feature engineering | **PATCH** | `perf: vectorize moving average calculation` |
 
 ---
 **Policy Owner:** Jules03 (Release Reliability & Governance)

@@ -124,6 +124,9 @@ jobs:
       - name: Validate Release Notes
         run: python scripts/check_release_notes.py
 
+      - name: Verify Version Synchronization
+        run: python scripts/verify_version_sync.py
+
       - name: Automated Pre-Prod Checklist Verification
         run: |
           CHECKLIST="docs/PREPROD_CHECKLIST.md"
@@ -203,21 +206,9 @@ jobs:
         if: steps.version.outputs.IS_TAG == 'false'
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          DATE=$(date +%Y-%m-%d)
 
-          echo "Updating version to ${VERSION} in pyproject.toml and src/__init__.py"
-          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
-
-          if [ -f "src/__init__.py" ]; then
-            sed -i "s/__version__ = \".*\"/__version__ = \"${VERSION}\"/" src/__init__.py
-          fi
-
-          # Transition [Unreleased] to Versioned in CHANGELOG.md
-          # This replaces "## [Unreleased]" with "## [Unreleased]\n\n## [VERSION] - DATE"
-          # thus moving current unreleased notes to the new version section.
-          if grep -q "## \[Unreleased\]" CHANGELOG.md; then
-            sed -i "s/## \[Unreleased\]/## [Unreleased]\n\n## [${VERSION}] - ${DATE}/" CHANGELOG.md
-          fi
+          chmod +x scripts/bump_version.py
+          python scripts/bump_version.py "${VERSION}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

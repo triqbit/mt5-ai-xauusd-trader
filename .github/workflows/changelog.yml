@@ -48,7 +48,7 @@ jobs:
           result-encoding: string
 
       - name: Run Changelog Automation
-        run: python scripts/update_changelog.py --labels ${{ steps.pr_labels.outputs.result }}
+        run: python scripts/update_changelog.py --labels "${{ steps.pr_labels.outputs.result }}"
 
       - name: Commit and Push Changelog
         run: |
