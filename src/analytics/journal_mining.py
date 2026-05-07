@@ -179,6 +179,15 @@ class JournalReport(BaseModel):
                 )
             )
 
+        # Toxic Combinations
+        for motif in self.combination_motifs[:3]:
+            risks.append(
+                BehavioralRisk(
+                    type="Toxic Combination",
+                    description=f"Signals {motif.patterns} occurred {motif.frequency} times before drawdowns in {motif.session} session.",
+                )
+            )
+
         primary_insight = "Strategy shows consistent performance across most sessions."
         if risks:
             risk_types = sorted({r.type for r in risks})
@@ -344,9 +353,9 @@ class JournalMiner:
         # Ensure UTC-aware
         df = trades_df.copy()
         if df["created_at"].dt.tz is None:
-            df["created_at"] = df["created_at"].dt.tz_localize(UTC)
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(UTC)
         else:
-            df["created_at"] = df["created_at"].dt.tz_convert(UTC)
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_convert(UTC)
 
         trades = df.sort_values("created_at").to_dict("records")
 
@@ -598,7 +607,17 @@ class JournalMiner:
     ) -> list[SignalMotif]:
         """
         Identify signal motifs that frequently occur shortly before a drawdown cluster.
+
         These are 'early warning' motifs that might indicate a strategy is about to fail.
+        A drawdown cluster is defined as 3+ consecutive losing trades.
+
+        Args:
+            signals_df: DataFrame containing all model signals.
+            trades_df: DataFrame containing executed trades.
+            window_hours: The look-back window in hours before a drawdown cluster starts.
+
+        Returns:
+            List of SignalMotif objects that appear in the pre-drawdown window.
         """
         if signals_df.empty or trades_df.empty:
             return []
@@ -636,10 +655,33 @@ class JournalMiner:
     ) -> list[SignalMotif]:
         """
         Find recurring motifs in signals, especially focusing on losing combinations.
+
         If trades_df is provided, it specifically highlights motifs found within drawdown clusters.
+        Motifs are scored by 'toxic potential', which favors high frequency and low win rates.
+
+        Args:
+            signals_df: DataFrame containing model signals.
+            trades_df: Optional DataFrame of executed trades to identify cluster overlap.
+
+        Returns:
+            Sorted list of SignalMotif objects, most toxic first.
         """
         if signals_df.empty or "volatility" not in signals_df.columns:
             return []
+
+        # Ensure UTC-aware
+        signals_df = signals_df.copy()
+        if signals_df["created_at"].dt.tz is None:
+            signals_df["created_at"] = pd.to_datetime(signals_df["created_at"]).dt.tz_localize(UTC)
+        else:
+            signals_df["created_at"] = pd.to_datetime(signals_df["created_at"]).dt.tz_convert(UTC)
+
+        if trades_df is not None and not trades_df.empty:
+            trades_df = trades_df.copy()
+            if trades_df["created_at"].dt.tz is None:
+                trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_localize(UTC)
+            else:
+                trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_convert(UTC)
 
         df = signals_df.copy()
         df["vol_bucket"] = df["volatility"].apply(self._extract_volatility_bucket)
@@ -656,10 +698,19 @@ class JournalMiner:
         if trades_df is not None and not trades_df.empty:
             clusters = self.detect_drawdown_clusters(trades_df)
             for cluster in clusters:
+                # Ensure cluster times are UTC-aware Timestamps for comparison
+                c_start = pd.Timestamp(cluster.start_time)
+                if c_start.tzinfo is None:
+                    c_start = c_start.replace(tzinfo=UTC)
+
+                c_end = pd.Timestamp(cluster.end_time)
+                if c_end.tzinfo is None:
+                    c_end = c_end.replace(tzinfo=UTC)
+
                 # Find trades in this cluster
                 cluster_trades = trades_df[
-                    (trades_df["created_at"] >= cluster.start_time)
-                    & (trades_df["created_at"] <= cluster.end_time)
+                    (trades_df["created_at"] >= c_start)
+                    & (trades_df["created_at"] <= c_end)
                     & (trades_df["pnl"] < 0)
                 ]
                 if "signal_id" in trades_df.columns:
@@ -693,7 +744,7 @@ class JournalMiner:
 
         # Score motifs by toxic potential: low win rate * high frequency
         def toxic_score(m: SignalMotif) -> float:
-            return (1.0 - m.win_rate) * np.log1p(m.frequency)
+            return float((1.0 - m.win_rate) * np.log1p(m.frequency))
 
         return sorted(results, key=toxic_score, reverse=True)
 
@@ -724,8 +775,16 @@ class JournalMiner:
     ) -> dict[str, float]:
         """
         Detect if risk blocks increase during 'weak strategy states'.
+
         Weak state is defined as the 24-hour window preceding a drawdown cluster
         plus the duration of the drawdown cluster itself.
+
+        Args:
+            risk_events_df: DataFrame of risk management events (rejections).
+            trades_df: DataFrame of executed trades.
+
+        Returns:
+            Dictionary mapping event type to the percentage of occurrences in weak states.
         """
         if risk_events_df.empty or trades_df.empty:
             return {}
@@ -768,8 +827,18 @@ class JournalMiner:
         self, signals_df: pd.DataFrame, trades_df: pd.DataFrame, window_minutes: int = 60
     ) -> list[CombinationMotif]:
         """
-        Detect recurring combinations of multiple signals (e.g. from different algorithms)
-        within a short window that frequently precede drawdown clusters.
+        Detect recurring combinations of multiple signals within a short window.
+
+        These motifs are identified by looking at signals from different algorithms
+        occurring within a short window that frequently precede drawdown clusters.
+
+        Args:
+            signals_df: DataFrame of model signals.
+            trades_df: DataFrame of executed trades.
+            window_minutes: The look-back window in minutes before a drawdown cluster.
+
+        Returns:
+            List of CombinationMotif objects identified as preceding drawdowns.
         """
         if signals_df.empty or trades_df.empty:
             return []
