@@ -37,3 +37,9 @@ The main trading loop in `main.py` is hardened against crashes:
 - Catching `MT5DataError` skips the current iteration and waits for the next cycle.
 - Catching `MT5ConnectionError` triggers an active reconnection attempt.
 - Critical execution errors are logged but don't halt the entire system.
+
+## Self-Healing Connector
+
+The `MT5Connector` implements a "Self-Healing" pattern to handle long-term connection instability:
+- **Auto-Initialization**: Methods like `get_rates` and `place_order` automatically attempt to initialize the connection if it's detected as down.
+- **Connection Loss Detection**: If an API call fails with a connection-related error code (e.g., terminal closed, network lost), the connector resets its internal state. This ensures that the next retry attempt (via `@with_retry`) will trigger a fresh `initialize()` call, effectively re-establishing the session without operator intervention.
