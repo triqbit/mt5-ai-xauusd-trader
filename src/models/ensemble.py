@@ -26,10 +26,10 @@ except ImportError:
     nn = None  # type: ignore
 
 from src.core.constants import ModelAction, SignalDirection
+from src.core.profiler import profile
 from src.models.base_model import BaseModel, Signal
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMAttentionModel
-from src.core.profiler import profile
 from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
@@ -165,12 +165,13 @@ class EnsembleModel(BaseModel):
 
         # LSTM prediction logic
         if self.lstm_model is not None and seq is not None and torch is not None:
-            with torch.no_grad():
-                with profile("lstm_predict"):
-                    logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                    probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-                    idx = np.argmax(probs)
-                    votes["lstm"] = Signal(direction=ModelAction(idx).to_direction(), confidence=float(probs[idx]))
+            with torch.no_grad(), profile("lstm_predict"):
+                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
+                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                idx = np.argmax(probs)
+                votes["lstm"] = Signal(
+                    direction=ModelAction(idx).to_direction(), confidence=float(probs[idx])
+                )
 
         return self.aggregate_signals(votes)
 

@@ -12,6 +12,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src import __version__
 from src.core.config import TradingConfig
 from src.core.health import (
     ComponentStatus,
@@ -21,7 +22,6 @@ from src.core.health import (
     init_health_checker,
     router,
 )
-from src import __version__
 
 
 @pytest.fixture
