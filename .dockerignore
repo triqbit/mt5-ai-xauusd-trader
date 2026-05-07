@@ -1,0 +1,37 @@
+# Git files
+.git
+.gitignore
+.github
+
+# Python environment and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Local development files
+.env
+logs/
+models/
+*.log
+*.sqlite
+
+# Documentation and temporary files
+docs/
+*.md
+PROJECT_BUNDLE.md
+ruff_output.txt
+walkforward_verification_report.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
