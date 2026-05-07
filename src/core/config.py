@@ -3,7 +3,8 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/config.py
 Centralised Pydantic-v2 settings loaded from environment variables
 or a .env file. All secrets stay out of the codebase.
-Author : triqbit
+
+Author: triqbit
 License: MIT
 """
 
@@ -20,7 +21,75 @@ ROOT = Path(__file__).resolve().parents[2]  # repo root
 
 
 class TradingConfig(BaseSettings):
-    """Runtime-configurable trading parameters."""
+    """
+    Enterprise-grade configuration management for the MT5 AI Trading Bot.
+
+    This class uses Pydantic Settings V2 to load environment variables and
+    enforce strict validation on all trading and risk parameters.
+
+    Attributes:
+        mt5_login (int): MT5 account number.
+        mt5_password (SecretStr): MT5 account password.
+        mt5_server (str): MT5 broker server address.
+        mt5_path (str): Path to the MT5 terminal executable.
+        metaapi_token (SecretStr): MetaAPI cloud authentication token.
+        metaapi_account_id (SecretStr): MetaAPI cloud account identifier.
+        symbol (str): Financial instrument to trade (e.g., XAUUSD).
+        timeframe (str): Chart timeframe for analysis.
+        mode (str): Execution mode (demo, live, backtest).
+        max_positions (int): Maximum concurrent open positions.
+        risk_per_trade (float): Risk fraction per trade (e.g., 0.01 = 1%).
+        max_position_size_pct (float): Max size as % of equity.
+        min_lot_size (float): Minimum permitted lot size.
+        max_leverage (float): Maximum account leverage limit.
+        max_single_direction_pct (float): Max exposure in one direction.
+        max_total_notional_pct (float): Max total notional exposure.
+        margin_alert_pct (float): Margin level for alerts.
+        margin_halt_pct (float): Margin level to stop trading.
+        margin_liquidation_pct (float): Margin level for force closure.
+        max_drawdown (float): Maximum allowed equity drawdown.
+        max_daily_loss (float): Hard daily loss limit (Level 4).
+        daily_loss_lvl1 (float): Yellow alert daily loss level.
+        daily_loss_lvl2 (float): Orange alert daily loss level.
+        daily_loss_lvl3 (float): Red alert daily loss level.
+        daily_loss_hard_stop (float): Hard stop daily loss level.
+        daily_win_cap (float): Maximum daily profit target.
+        max_trades_per_day (int): Limit on daily trade count.
+        max_losing_streak (int): Stop after X consecutive losses.
+        max_winning_streak (int): Alert after X consecutive wins.
+        max_weekly_loss (float): Weekly loss circuit breaker.
+        max_monthly_loss (float): Monthly loss circuit breaker.
+        volatility_high_threshold (float): ATR ratio for high volatility.
+        volatility_very_high_threshold (float): ATR ratio for very high volatility.
+        volatility_extreme_threshold (float): ATR ratio for extreme volatility.
+        max_slippage_pips (float): Max allowed order slippage.
+        min_spread_pips (float): Minimum spread for trading.
+        spread_alert_pips (float): Spread level for warnings.
+        spread_reduce_pips (float): Spread level to reduce sizing.
+        spread_halt_pips (float): Spread level to halt trading.
+        algorithm (str): ML algorithm to use.
+        model_path (Path): Path to model weights.
+        train_steps (int): Total training steps.
+        device (str): Device for inference (cpu, cuda, etc.).
+        database_url (SecretStr): DB connection string.
+        redis_url (str): Redis connection string.
+        prometheus_port (int): Metrics port.
+        dashboard_port (int): UI port.
+        log_level (str): Logging verbosity.
+        telegram_token (SecretStr): Telegram bot token.
+        telegram_chat_id (str): Telegram recipient ID.
+        confirm_live_trading (str): Safety flag for live mode.
+        min_confidence (float): Signal confidence floor.
+        confidence_threshold (float): Alert threshold for confidence.
+        consensus_threshold (float): Ensemble agreement threshold.
+        model_drift_threshold (float): Alert threshold for model drift.
+        model_accuracy_floor (float): Min acceptable model accuracy.
+        model_win_rate_floor (float): Min acceptable historical win rate.
+        model_calibration_threshold (float): Max acceptable calibration error.
+        data_freshness_threshold (int): Max age of market data in seconds.
+        signal_flicker_window (int): Lookback for signal stability.
+        max_signal_changes (int): Max allowed changes in window.
+    """
 
     model_config = SettingsConfigDict(
         env_file=ROOT / ".env",
@@ -230,26 +299,35 @@ class TradingConfig(BaseSettings):
     @field_validator("risk_per_trade")
     @classmethod
     def risk_must_be_safe(cls, v: float) -> float:
+        """Validate that risk per trade does not exceed 2%."""
         if v > 0.02:
             raise ValueError("risk_per_trade > 2% is not permitted in production.")
         return v
 
     @property
     def is_live(self) -> bool:
+        """Check if the system is running in live trading mode."""
         return self.mode == "live"
 
     @property
     def data_dir(self) -> Path:
+        """Return the path to the data directory."""
         return ROOT / "data"
 
     @property
     def logs_dir(self) -> Path:
+        """Return the path to the logs directory."""
         return ROOT / "logs"
 
 
 @lru_cache(maxsize=1)
 def get_config() -> TradingConfig:
-    """Return singleton TradingConfig (cached after first call)."""
+    """
+    Retrieve the singleton TradingConfig instance.
+
+    Returns:
+        TradingConfig: The cached configuration object.
+    """
     return TradingConfig()  # type: ignore[call-arg]
 
 

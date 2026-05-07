@@ -6,7 +6,8 @@ Enterprise risk management engine implementing:
   - Cascading daily loss circuit breakers (Level 1-4)
   - Drawdown safeguards and exposure limits
   - 8-layer safety cascade signal validation
-Author : triqbit
+
+Author: triqbit
 License: MIT
 """
 
@@ -180,7 +181,8 @@ class RiskEngine:
             return self.cfg.min_lot_size
 
         current_atr = market_data["atr"].iloc[-1]
-        avg_atr = market_data["atr"].tail(8640).mean()  # Approx 30 days of M5
+        # Assuming M5 data, 30 days is ~8640 bars
+        avg_atr = market_data["atr"].tail(8640).mean()
 
         vol_multiplier = 1.0
         ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
@@ -200,7 +202,7 @@ class RiskEngine:
 
         # Sizing: risk 1% (cfg.risk_per_trade) of balance
         risk_amount = self.balance * self.cfg.risk_per_trade
-        # ATR * 100 converts gold ATR to $ per lot
+        # ATR * 100 converts gold ATR to $ per lot (approximate for XAUUSD)
         lot_size = (risk_amount / (current_atr * 100)) * total_multiplier
 
         # Cap at Max Position Size (10% of equity)
@@ -233,7 +235,7 @@ class RiskEngine:
     # -- Internal cascade layers -------------------------------------------
 
     def _check_drawdown_breaker(self) -> bool:
-        """Layer 1: Equity Drawdown."""
+        """Layer 1: Equity Drawdown circuit breaker."""
         if self.peak_equity <= 0:
             return True
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
@@ -246,7 +248,7 @@ class RiskEngine:
 
     def get_daily_loss_level(self) -> int:
         """
-        Layer 2: Daily Loss Level (0-4).
+        Layer 2: Daily Loss Level (0-4) based on RISK_LIMITS.md.
         """
         if self.daily.peak_equity <= 0 or self.daily.realised_pnl >= 0:
             return 0
@@ -266,7 +268,7 @@ class RiskEngine:
     def _check_directional_exposure(
         self, signal: TradeSignal, open_positions: List[Dict[str, Any]]
     ) -> bool:
-        """Layer 4: 30% net directional exposure."""
+        """Layer 4: Net directional exposure limit (30%)."""
         net_lots = 0.0
         for pos in open_positions:
             vol = pos.get("volume", 0.0)
@@ -276,7 +278,7 @@ class RiskEngine:
                 net_lots -= vol
 
         net_lots += self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
-        price_estimate = 2300.0  # Gold estimate
+        price_estimate = 2300.0  # XAUUSD estimate
         notional = abs(net_lots) * price_estimate * 100
         exposure_pct = notional / self.balance if self.balance > 0 else 1.0
 
@@ -285,20 +287,20 @@ class RiskEngine:
     def _check_total_notional(
         self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
     ) -> bool:
-        """Layer 4: Total notional < 100% equity."""
+        """Layer 4: Total notional exposure < 100% of equity."""
         total_lots = sum(pos.get("volume", 0.0) for pos in open_positions) + self.cfg.min_lot_size
         price = market_data["close"].iloc[-1] if not market_data.empty else 2300.0
         total_notional = total_lots * price * 100
         return total_notional < (self.balance * self.cfg.max_total_notional_pct)
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
-        """Layer 7: Minimum 1.5 Risk-Reward."""
+        """Layer 7: Risk-Reward validation."""
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
         return reward >= (risk * min_rr) if risk > 0 else False
 
     def _check_model_health(self, health: Optional[Dict[str, float]]) -> bool:
-        """Layer 8: Model Health Metrics."""
+        """Layer 8: Model health validation."""
         if health is None:
             return True
 
@@ -309,8 +311,9 @@ class RiskEngine:
         return health.get("calibration", 0.0) <= self.cfg.model_calibration_threshold
 
     def get_size_multiplier_from_loss(self) -> float:
-        """Multiplier based on daily loss level."""
+        """Calculate position size multiplier based on daily loss level."""
         level = self.get_daily_loss_level()
+        # Level 1: 100%, Level 2: 50%, Level 3: 25%, Level 4: 0%
         mapping = {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.25, 4: 0.0}
         return mapping.get(level, 0.0)
 
