@@ -392,8 +392,8 @@ def run_live(
                         risk_data = {
                             "passed": risk_approved,
                             "rejection_reasons": [],
-                            "risk_reward": abs(take_profit - price) / abs(price - stop_loss)
-                            if abs(price - stop_loss) > 0
+                            "risk_reward": abs(signal.take_profit - price) / abs(price - signal.stop_loss)
+                            if abs(price - signal.stop_loss) > 0
                             else 0.0,
                             "summary": "Passed all risk gates"
                             if risk_approved
