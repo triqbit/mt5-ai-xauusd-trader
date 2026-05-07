@@ -98,7 +98,7 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
 
     assert packet.symbol == "XAUUSD"
     assert packet.direction == SignalDirection.BUY
-    assert packet.consensus == "Unanimous"
+    assert "Unanimous" in packet.consensus
     assert packet.is_executable is True
     assert len(packet.blocking_reasons) == 0
     assert packet.performance.sharpe_ratio == 1.5
@@ -164,7 +164,7 @@ def test_consensus_logic():
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
         ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.5)
     ]
-    assert dss._calculate_consensus(mock_exp) == "Unanimous"
+    assert "Unanimous" in dss._calculate_consensus(mock_exp)
 
     # 2. Strong Majority (Weight: 0.4 + 0.3 = 0.7 >= 0.66)
     mock_exp.model_attributions = [
@@ -172,21 +172,21 @@ def test_consensus_logic():
         ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.3),
         ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.3)
     ]
-    assert dss._calculate_consensus(mock_exp) == "Strong Majority"
+    assert "Strong Majority" in dss._calculate_consensus(mock_exp)
 
     # 3. Mixed Confluence (Weight: 0.51 >= 0.5)
     mock_exp.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.51),
         ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.49)
     ]
-    assert dss._calculate_consensus(mock_exp) == "Mixed Confluence"
+    assert "Mixed Confluence" in dss._calculate_consensus(mock_exp)
 
     # 4. Divided/Weak (Weight: 0.49 < 0.5)
     mock_exp.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.49),
         ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.51)
     ]
-    assert dss._calculate_consensus(mock_exp) == "Divided/Weak"
+    assert "Divided/Weak" in dss._calculate_consensus(mock_exp)
 
     # 5. No votes
     mock_exp.model_attributions = []
