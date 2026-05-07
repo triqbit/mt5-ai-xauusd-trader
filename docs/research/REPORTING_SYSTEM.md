@@ -12,7 +12,7 @@ The research reporting system provides automated generation of institutional-gra
 ## Domains Covered
 
 1. **Market Regime Analysis:** Statistical classification of market conditions.
-2. **Stress Test Outcomes:** Resilience testing under adversarial scenarios.
+2. **Stress Test Outcomes:** Institutional-grade resilience testing under adversarial scenarios including choppy breakouts, regime flips, and stale data simulation.
 3. **Hyperparameter Robustness:** Stability analysis of optimized parameters.
 4. **Trade Pattern Findings:** Journal mining for behavioral risks and concentrations.
 5. **Model Drift Observations:** Statistical tracking of feature distribution shifts.
