@@ -8,20 +8,21 @@ import argparse
 import csv
 import hashlib
 import logging
-import tarfile
 import os
+import shutil
 import sys
+import tarfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Optional
 
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 # Add src to path to import models
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from src.core.audit_log import AuditEntry
+from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.config import get_config
 from src.core.trade_logger import ModelSignal, PerformanceMetric, RiskEvent, Trade
 
@@ -43,8 +44,28 @@ RETENTION_TRADES = 7 * 365
 RETENTION_AUDIT_LOG = 7 * 365
 RETENTION_BACKTESTS = 365
 
+# Minimum required disk space in MB
+MIN_DISK_SPACE_MB = 500
+
 # Archival directory
 ARCHIVE_DIR = Path(__file__).resolve().parents[1] / "archives"
+
+
+def check_disk_space(path: Path, min_mb: int = MIN_DISK_SPACE_MB) -> bool:
+    """Check if there is enough disk space available at the given path."""
+    try:
+        # Use parent if path doesn't exist yet
+        check_path = path if path.exists() else path.parent
+        usage = shutil.disk_usage(check_path)
+        free_mb = usage.free / (1024 * 1024)
+        if free_mb < min_mb:
+            logger.error(f"CRITICAL: Insufficient disk space on {check_path}: {free_mb:.2f}MB available, {min_mb}MB required.")
+            return False
+        logger.info(f"Disk space check passed: {free_mb:.2f}MB available.")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to check disk space: {e}")
+        return False
 
 
 def generate_checksum(filepath: Path) -> str:
@@ -70,7 +91,7 @@ def archive_records(records: List[Any], table_name: str, archive_dir: Path) -> b
     if not archive_dir.exists():
         archive_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filepath = archive_dir / f"archive_{table_name}_{timestamp}.csv"
 
     logger.info(f"Archiving {len(records)} records from {table_name} to {filepath}...")
@@ -107,13 +128,13 @@ def cleanup_logs(logs_dir: Path, dry_run: bool = False) -> int:
         return 0
 
     count = 0
-    cutoff = datetime.now() - timedelta(days=RETENTION_LOGS)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_LOGS)
 
     logger.info(f"Cleaning up logs in {logs_dir} older than {cutoff.date()}...")
 
     for log_file in logs_dir.glob("*.log*"):
         try:
-            mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+            mtime = datetime.fromtimestamp(log_file.stat().st_mtime, tz=timezone.utc)
             if mtime < cutoff:
                 logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting old log file: {log_file.name} (mtime: {mtime})")
                 if not dry_run:
@@ -132,7 +153,7 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False, archive_dir: Pa
         return 0
 
     count = 0
-    cutoff = datetime.now() - timedelta(days=RETENTION_BACKTESTS)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_BACKTESTS)
     to_cleanup = []
 
     logger.info(f"Checking backtest results in {backtest_dir} older than {cutoff.date()}...")
@@ -141,7 +162,7 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False, archive_dir: Pa
     for item in backtest_dir.rglob("*"):
         if item.is_file():
             try:
-                mtime = datetime.fromtimestamp(item.stat().st_mtime)
+                mtime = datetime.fromtimestamp(item.stat().st_mtime, tz=timezone.utc)
                 if mtime < cutoff:
                     to_cleanup.append(item)
             except Exception as e:
@@ -155,7 +176,7 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False, archive_dir: Pa
         if not archive_dir.exists():
             archive_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         archive_path = archive_dir / f"archive_backtests_{timestamp}.tar.gz"
 
         logger.info(f"Archiving {len(to_cleanup)} backtest files to {archive_path}...")
@@ -211,16 +232,18 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
 
     with Session() as session:
         # 1. Cleanup Unlinked Model Signals (older than 90 days)
-        # We must exclude signals that are linked to trades
+        # We must exclude signals that are linked to trades OR risk events
         signal_cutoff = now - timedelta(days=RETENTION_UNLINKED_SIGNALS)
 
-        # Subquery for linked signals
-        linked_signal_ids = select(Trade.signal_id).where(Trade.signal_id.is_not(None))
+        # Subqueries for linked signals
+        linked_trade_signals = select(Trade.signal_id).where(Trade.signal_id.is_not(None))
+        linked_risk_signals = select(RiskEvent.signal_id).where(RiskEvent.signal_id.is_not(None))
 
         unlinked_signals_query = (
             select(ModelSignal)
             .where(ModelSignal.created_at < signal_cutoff)
-            .where(ModelSignal.id.not_in(linked_signal_ids))
+            .where(ModelSignal.id.not_in(linked_trade_signals))
+            .where(ModelSignal.id.not_in(linked_risk_signals))
         )
 
         unlinked_records = session.execute(unlinked_signals_query).scalars().all()
@@ -352,18 +375,29 @@ def main():
         db_val = cfg.database_url.get_secret_value()
         audit_db_url = db_val if "sqlite" in db_val else "sqlite:///audit.db"
 
-    # Ensure we don't accidentally wipe a production PG DB unless intended
-    if "sqlite" not in db_url:
-        logger.warning(f"Using production-like primary DB URL: {db_url}")
-
-    if "sqlite" not in audit_db_url:
-        logger.warning(f"Using production-like audit DB URL: {audit_db_url}")
-
     logs_dir = Path(args.logs_dir) if args.logs_dir else cfg.logs_dir
     backtest_dir = Path(args.backtest_dir) if args.backtest_dir else Path(__file__).resolve().parents[1] / "backtest_results"
     archive_dir = Path(args.archive_dir) if args.archive_dir else ARCHIVE_DIR
 
+    # Initialize AuditLogger
+    try:
+        audit_logger = AuditLogger(db_url=audit_db_url)
+    except Exception as e:
+        logger.warning(f"Could not initialize AuditLogger: {e}. Audit trail will be missing.")
+        audit_logger = None
+
+    if audit_logger:
+        audit_logger.log("system", "data_cleanup_started", details=f"Dry run: {args.dry_run}")
+
     logger.info(f"Starting data cleanup (dry_run={args.dry_run})")
+
+    # Disk space check
+    if not check_disk_space(archive_dir):
+        msg = "Cleanup ABORTED due to insufficient disk space for archival."
+        logger.error(msg)
+        if audit_logger:
+            audit_logger.log("system", "data_cleanup_failed", details=msg)
+        sys.exit(1)
 
     # Filesystem cleanup - Logs
     log_count = cleanup_logs(logs_dir, dry_run=args.dry_run)
@@ -378,6 +412,15 @@ def main():
     logger.info("Database cleanup complete.")
     for table, count in db_results.items():
         logger.info(f"  - {table}: {count} records {'identified' if args.dry_run else 'purged'}")
+
+    summary = {
+        "logs_deleted": log_count,
+        "backtests_deleted": backtest_count,
+        "db_purged": db_results
+    }
+
+    if audit_logger:
+        audit_logger.log("system", "data_cleanup_completed", details=f"Summary: {summary}")
 
     logger.info("Cleanup process finished successfully.")
 

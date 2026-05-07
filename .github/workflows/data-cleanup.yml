@@ -1,0 +1,62 @@
+name: Data Retention Cleanup
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Sundays at 00:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Perform a dry run'
+        required: false
+        default: 'true'
+
+jobs:
+  cleanup:
+    name: Operational Data Cleanup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create Archives Directory
+        run: mkdir -p archives
+
+      - name: Run Cleanup Script
+        env:
+          DATABASE_URL: "sqlite:///trades.db"
+          # Mocking required env vars for TradingConfig validation
+          MT5_PASSWORD: "dummy"
+          MT5_SERVER: "dummy"
+        run: |
+          DRY_RUN_ARG=""
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            DRY_RUN_ARG="--dry-run"
+          fi
+
+          # Default to dry-run for safety if not explicitly scheduled
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+             # On schedule, we run for real
+             python scripts/data_cleanup.py
+          else
+             python scripts/data_cleanup.py $DRY_RUN_ARG
+          fi
+
+      - name: Archive Cleanup Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-cleanup-archives
+          path: archives/
+          retention-days: 7
