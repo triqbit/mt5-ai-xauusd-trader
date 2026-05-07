@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/execution_filter.py
-6-layer entry filter cascade to vet signals before execution.
+10-layer entry filter cascade to vet signals before execution.
 Author : triqbit
 License: MIT
 """
@@ -9,6 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -37,7 +38,7 @@ class ExecutionDecision:
 
 class ExecutionFilter:
     """
-    Implements a 6-layer validation cascade for trading signals.
+    Implements a 10-layer validation cascade for trading signals.
     Layers:
         1. ATR Volatility Threshold
         2. Trend Angle Confirmation
@@ -45,6 +46,10 @@ class ExecutionFilter:
         4. Momentum Filter
         5. Session/Time Filter
         6. Drawdown Circuit Breaker
+        7. Model Stability (Drift/Accuracy)
+        8. Performance Floor (Win Rate)
+        9. Confidence Threshold
+        10. Signal Consistency (Flicker Guard)
     """
 
     def __init__(
@@ -56,6 +61,7 @@ class ExecutionFilter:
         self.max_drawdown = max_drawdown
         self.rsi_period = rsi_period
         self.cfg = config
+        self._signal_history: dict[str, deque[int]] = {}
 
     def validate(
         self,
@@ -192,6 +198,15 @@ class ExecutionFilter:
             "min_confidence": min_confidence
         }
 
+        # Layer 10: Signal Consistency (Flicker Guard)
+        consistency_passed, consistency_metrics = self._check_signal_consistency_with_metrics(
+            signal.symbol, signal.direction
+        )
+        trace["signal_consistency"] = {
+            "passed": consistency_passed,
+            **consistency_metrics,
+        }
+
         # Determine final approval
         is_approved = all(t["passed"] for t in trace.values())
         blocked_by = None
@@ -207,6 +222,7 @@ class ExecutionFilter:
                 "model_stability",
                 "performance_floor",
                 "confidence_threshold",
+                "signal_consistency",
             ]
             for layer in failure_order:
                 if not trace[layer]["passed"]:
@@ -419,3 +435,37 @@ class ExecutionFilter:
         if current_drawdown >= self.max_drawdown:
             return False
         return True
+
+    def _check_signal_consistency_with_metrics(
+        self, symbol: str, direction: int
+    ) -> tuple[bool, dict[str, Any]]:
+        """
+        Detects rapid oscillations (flickering) in signal direction.
+        Blocks if number of direction changes in the window exceeds threshold.
+        """
+        window = self.cfg.signal_flicker_window if self.cfg else 6
+        max_changes = self.cfg.max_signal_changes if self.cfg else 3
+
+        if symbol not in self._signal_history:
+            self._signal_history[symbol] = deque(maxlen=window)
+
+        history = self._signal_history[symbol]
+        history.append(int(direction))
+
+        if len(history) < 2:
+            return True, {"changes": 0, "window": window, "max_changes": max_changes}
+
+        # Count changes between consecutive signals in history
+        changes = 0
+        h_list = list(history)
+        for i in range(1, len(h_list)):
+            if h_list[i] != h_list[i - 1]:
+                changes += 1
+
+        passed = changes <= max_changes
+        return passed, {
+            "changes": changes,
+            "window": window,
+            "max_changes": max_changes,
+            "history": h_list,
+        }

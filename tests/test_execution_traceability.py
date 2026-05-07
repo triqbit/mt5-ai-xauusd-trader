@@ -16,6 +16,8 @@ class MockConfig:
         self.model_win_rate_floor = 0.40
         self.min_confidence = 0.6
         self.logs_dir = "logs"
+        self.signal_flicker_window = 6
+        self.max_signal_changes = 3
 
 @pytest.fixture
 def execution_filter():
