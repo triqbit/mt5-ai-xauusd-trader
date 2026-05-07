@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 tests/test_execution_filter.py
-Unit tests for the 6-layer execution filter.
+Unit tests for the 10-layer execution filter.
 """
 
 from datetime import datetime
@@ -273,3 +273,57 @@ def test_full_cascade_blocked_by_drawdown(filter_engine, buy_signal, bullish_dat
     decision = filter_engine.validate(buy_signal, bullish_data, 0.20, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "DRAWDOWN_LIMIT"
+
+# --- Layer 10: Signal Consistency ---
+def test_signal_consistency_pass(filter_engine):
+    # Stable signal: BUY, BUY, BUY
+    passed, metrics = filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    assert passed is True
+    passed, metrics = filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    assert passed is True
+    passed, metrics = filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    assert passed is True
+    assert metrics["changes"] == 0
+
+def test_signal_consistency_fail(filter_engine):
+    # Oscillating signal: BUY, SELL, BUY, SELL, BUY
+    # max_changes default is 3, window default is 6
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)   # BUY
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", -1)  # SELL (1 change)
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)   # BUY (2 changes)
+    passed, metrics = filter_engine._check_signal_consistency_with_metrics("XAUUSD", -1)  # SELL (3 changes)
+    assert passed is True  # Limit is 3, so 3 is still OK
+
+    passed, metrics = filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)   # BUY (4 changes)
+    assert passed is False
+    assert metrics["changes"] == 4
+    assert metrics["max_changes"] == 3
+
+def test_signal_consistency_per_symbol(filter_engine):
+    # Symbol A is flickering, Symbol B is stable
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", -1)
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", -1)
+    passed_a, _ = filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)  # 4 changes
+
+    passed_b, _ = filter_engine._check_signal_consistency_with_metrics("EURUSD", 1)  # 0 changes
+
+    assert passed_a is False
+    assert passed_b is True
+
+def test_full_cascade_blocked_by_consistency(filter_engine, buy_signal, bullish_data):
+    # Fill history to trigger failure
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", -1)
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", -1)
+
+    ts = datetime(2023, 10, 10, 10, 0, 0)
+    # The next signal is BUY (direction=1), making 4 changes total
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
+
+    assert decision.is_approved is False
+    assert decision.blocked_by == "SIGNAL_CONSISTENCY"
+    assert decision.trace["signal_consistency"]["passed"] is False
+    assert decision.trace["signal_consistency"]["changes"] == 4

@@ -43,3 +43,10 @@ The main trading loop in `main.py` is hardened against crashes:
 The `MT5Connector` implements a "Self-Healing" pattern to handle long-term connection instability:
 - **Auto-Initialization**: Methods like `get_rates` and `place_order` automatically attempt to initialize the connection if it's detected as down.
 - **Connection Loss Detection**: If an API call fails with a connection-related error code (e.g., terminal closed, network lost), the connector resets its internal state. This ensures that the next retry attempt (via `@with_retry`) will trigger a fresh `initialize()` call, effectively re-establishing the session without operator intervention.
+
+## Signal Consistency (Flicker Guard)
+
+To ensure operational stability and prevent rapid, noise-driven execution, the system employs a **Signal Consistency** safety layer within the `ExecutionFilter`:
+- **Flicker Detection**: Tracks a sliding window of recent signal directions per symbol.
+- **Oscillation Blocking**: Automatically blocks execution if the number of direction changes (e.g., BUY <-> SELL) exceeds a strict threshold within the window.
+- **Rationale**: Frequent signal flipping often indicates model instability, high market noise, or regime transitions where predictions are unreliable. By halting execution during these "flickering" periods, the bot avoids unnecessary slippage, commissions, and whipsaw losses.
