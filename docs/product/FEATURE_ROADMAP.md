@@ -12,7 +12,7 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-perfo
 | **Usability** | 🟢 7/10 | Decision Cockpit is excellent for local TUI. Gap: Remote/mobile accessibility and interactive intervention are limited. |
 | **Safety** | 🟢 8/10 | Circuit breakers and health gates are robust. Gap: Pre-trade stress rehearsal (StressLab) is research-only, not yet in the live execution loop. |
 | **Intelligence** | 🟡 6/10 | Regime detection is live but "Macro Blind" to US Real Yields and DXY, which are core gold drivers. |
-| **Differentiation** | 🟢 8/10 | The "Glass Box" approach is unique. Gap: Model confidence heatmaps and LLM-enhanced trade narratives. |
+| **Differentiation** | 🟢 8/10 | The "Glass Box" approach is unique. Gap: LLM-enhanced trade narratives. |
 
 ---
 
@@ -52,17 +52,23 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-perfo
 - **Operational Leverage:** High | **End-user Value:** 10
 - **Pain Solved:** Eliminates the need for 24/7 terminal monitoring; allows remote intervention for high-value signals.
 
+### 6. Adaptive Position Sizing Based on Regime Stability
+- **Score:** 8.5/10 | **Cost:** M | **Why:** Dynamically scale lot sizes based on the persistence and confidence of the market regime. Leans in during high-conviction trends and reduces exposure in fragile/transitional regimes.
+- **Strategic Importance:** 9 | **Implementation Cost:** M | **Dependency Readiness:** 🟢 High
+- **Operational Leverage:** High | **End-user Value:** 9
+- **Pain Solved:** Prevents over-leverage in unstable market conditions and optimizes capital efficiency.
+
 ---
 
 ## 🔭 Future Consideration
 
-### 6. Adaptive Execution Feedback (Slippage-Aware Filters)
+### 7. Adaptive Execution Feedback (Slippage-Aware Filters)
 - **Score:** 8.2/10 | **Cost:** M | **Why:** Feed realized slippage metrics back into the execution cascade. Automatically tightens entry gates if liquidity thins.
 - **Strategic Importance:** 8 | **Implementation Cost:** M | **Dependency Readiness:** 🟢 High
 - **Operational Leverage:** Medium | **End-user Value:** 8
 - **Pain Solved:** Prevents "Death by a Thousand Cuts" (slippage decay) in low-liquidity sessions.
 
-### 7. LLM-Enhanced Trade Narrative Memory
+### 8. LLM-Enhanced Trade Narrative Memory
 - **Score:** 7.8/10 | **Cost:** M | **Why:** Use an LLM to synthesize trade data into natural language post-mortems and self-correcting strategy notes.
 - **Strategic Importance:** 7 | **Implementation Cost:** M | **Dependency Readiness:** 🟡 Medium
 - **Operational Leverage:** Low | **End-user Value:** 8

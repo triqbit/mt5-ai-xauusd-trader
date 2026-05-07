@@ -258,6 +258,40 @@ Generic bots treat AI models as static entities. The MT5 AI Trader recognizes th
 
 ---
 
+## 8. Adaptive Position Sizing Based on Regime Stability
+
+### What it is and why it matters
+**Adaptive Position Sizing Based on Regime Stability** is a risk-management enhancement that dynamically adjusts the capital allocated to a trade based on the statistical "confidence" and "persistence" of the detected market regime.
+
+In institutional XAUUSD trading, some regimes are inherently more predictable and stable than others. A "Trending" regime with high efficiency and low transition probability represents a high-conviction environment, whereas a "News Shock" or "Volatile Breakout" regime may be profitable but carries significantly higher uncertainty. This feature ensures the system "leans in" when the market structure is clear and "steps back" when regime boundaries are blurring.
+
+### How it differentiates from generic trading bots
+Generic bots use fixed lot sizes or simple ATR-based sizing regardless of the underlying market structure. The MT5 AI Trader, with this feature, treats regime stability as a primary risk vector. It asks: *"Is the current 'Trending' regime stable (low transition entropy), or is it showing signs of exhaustion? How well has our strategy performed in *this specific* stability tier historically?"* This prevents the "over-betting" in fragile environments that often leads to catastrophic drawdowns for retail bots.
+
+### Architecture Outline
+1.  **Stability Metric Engine**: Extends `src/models/regime_detector.py` to output a `RegimeStabilityScore` based on the inverse of the GMM entropy or the duration of the current regime.
+2.  **Stability-Risk Mapper**: A lookup service in `src/trading/capital_allocator.py` that maps the stability score to a `SizingMultiplier` (e.g., 0.5x for unstable, 1.25x for highly stable).
+3.  **Kelly-Stability Integration**: Combines the model's Kelly-based sizing with the Regime Stability multiplier to arrive at the final institutional lot size.
+4.  **Feedback Collector**: Monitors the correlation between regime stability and realized trade success to calibrate the sizing multipliers automatically over time.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Lot sizes must be scaled by +/- 25% based on the `transition_score` from the Regime Detector. |
+| **Functional** | System must cap lot sizes at the "Balanced" mode limit regardless of stability to prevent over-leverage. |
+| **Technical** | Implementation must be integrated into `CapitalAllocator.request_allocation`. |
+| **Operational** | The "Sizing Multiplier" and "Stability Score" must be logged in the `TradeBriefing`. |
+| **Release Readiness** | Backtests must demonstrate a 15% reduction in Max Drawdown compared to fixed-sizing strategies. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on defining stability mathematics and regime-specific sizing curves.
+*   **Jules01 (Core Development)**: Lead on integrating the multiplier into the `CapitalAllocator` and `TradeSignal` construction.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires a mature `RegimeDetector` with stable transition scoring.
+*   **Constraints**: Must not violate the global `max_total_heat` limits defined in the `RiskManager`.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Adaptive position sizing based on regime stability**
 - **Institutional Liquidity Heatmap** (Identifying "Smart Money" resting orders)
