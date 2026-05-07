@@ -62,7 +62,7 @@ def test_dreamer_agent_stub():
     assert signal.metadata["status"] == "placeholder"
 
     # Test state management methods
-    agent.update_state(obs, 1, 0.0, False)
+    agent.observe(obs, 1, 0.0, False)
     agent.reset_state()
     assert agent.state is None
 

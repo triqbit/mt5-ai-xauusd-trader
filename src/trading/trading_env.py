@@ -4,6 +4,8 @@ src/trading/trading_env.py
 Custom Gymnasium-compatible environment for XAUUSD trading.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
@@ -16,11 +18,13 @@ from gymnasium import spaces
 class TradingEnv(gym.Env):
     """
     Custom environment for trading XAUUSD.
-    Follows Gymnasium API.
+
+    Follows Gymnasium API. Optimized for high-frequency RL training.
 
     Attributes:
         df: DataFrame containing historical market data.
         window_size: Number of past time steps to include in the observation.
+        initial_balance: Starting account balance.
         action_space: Gymnasium action space (0=HOLD, 1=BUY, 2=SELL).
         observation_space: Gymnasium observation space (window_size x num_features).
     """
@@ -51,7 +55,7 @@ class TradingEnv(gym.Env):
         self.action_space = spaces.Discrete(3)
 
         # Observation space: Window of features
-        # Assuming features are normalized
+        # Assuming features are normalized (z-score or min-max)
         num_features = df.shape[1] if df is not None else 140
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(window_size, num_features), dtype=np.float32
@@ -64,7 +68,7 @@ class TradingEnv(gym.Env):
         # State variables
         self.balance = initial_balance
         self.equity = initial_balance
-        self.position = 0  # 0: None, 1: Long, -1: Short (Simplified)
+        self.position = 0  # 0: None, 1: Long, -1: Short
         self.entry_price = 0.0
         self.current_step = window_size
 
@@ -105,29 +109,32 @@ class TradingEnv(gym.Env):
         """
         self.current_step += 1
 
-        # In a production env, these would come from config or live data
-        spread = 0.0002
-        slippage = 0.0001
+        # XAUUSD specific parameters (configurable in production)
+        # Assuming prices are in points or standard units
+        spread = 0.02  # 20 points spread for Gold
+        slippage = 0.01
 
         reward = 0.0
         if self._data is not None and self.current_step < len(self._data):
-            # Assuming index 3 is Close price
+            # Assuming index 3 is Close price.
+            # In production, use a more explicit column mapping.
             current_price = self._data[self.current_step, 3]
             prev_price = self._data[self.current_step - 1, 3]
 
-            # Update equity based on open position
+            # Update equity based on open position (unrealized P&L)
             if self.position == 1:  # Long
                 unrealized_pnl = current_price - prev_price
                 self.equity += unrealized_pnl
-                reward = float(unrealized_pnl)
+                # Reward based on price change (log returns often preferred for training)
+                reward = float(np.log(current_price / prev_price))
             elif self.position == -1:  # Short
                 unrealized_pnl = prev_price - current_price
                 self.equity += unrealized_pnl
-                reward = float(unrealized_pnl)
+                reward = float(np.log(prev_price / current_price))
 
-            # Handle actions (categorical: 0=HOLD, 1=BUY, 2=SELL)
-            if action == 1:  # Want to go LONG
-                if self.position == -1:  # Close short first
+            # Handle actions (0=HOLD, 1=BUY, 2=SELL)
+            if action == 1:  # LONG
+                if self.position == -1:  # Close short
                     realized_pnl = self.entry_price - current_price - (spread + slippage)
                     self.balance += realized_pnl
                     self.position = 0
@@ -135,11 +142,10 @@ class TradingEnv(gym.Env):
                 if self.position == 0:  # Open long
                     self.position = 1
                     self.entry_price = current_price + (spread + slippage)
-                    # Apply immediate cost to equity
-                    self.equity -= (spread + slippage)
+                    self.equity -= (spread + slippage)  # Immediate cost
 
-            elif action == 2:  # Want to go SHORT
-                if self.position == 1:  # Close long first
+            elif action == 2:  # SHORT
+                if self.position == 1:  # Close long
                     realized_pnl = current_price - self.entry_price - (spread + slippage)
                     self.balance += realized_pnl
                     self.position = 0
@@ -147,18 +153,18 @@ class TradingEnv(gym.Env):
                 if self.position == 0:  # Open short
                     self.position = -1
                     self.entry_price = current_price - (spread + slippage)
-                    # Apply immediate cost to equity
-                    self.equity -= (spread + slippage)
+                    self.equity -= (spread + slippage)  # Immediate cost
 
             elif action == 0:  # HOLD / CLOSE
-                # Optional: In some envs, action 0 means "no position"
-                # For this skeleton, we'll keep it as "do nothing to current position"
+                # Production note: Decide if 0 means 'neutral' or 'do nothing'.
+                # Standard RL trading envs often use 0=CLOSE, 1=BUY, 2=SELL
+                # or -1, 0, 1 mapping.
                 pass
 
         terminated = False
         if self._data is not None and self.current_step >= len(self._data) - 1:
             terminated = True
-            # Close any open position at the end
+            # Close any open position at the end to realize final P&L
             if self.position != 0:
                 self.balance = self.equity
                 self.position = 0
@@ -166,7 +172,7 @@ class TradingEnv(gym.Env):
         truncated = False
         obs = self._get_observation()
 
-        # Add metadata for debugging or monitoring
+        # Metadata for auditing and reward shaping analysis
         info = {
             "step": self.current_step,
             "action": action,
@@ -174,8 +180,7 @@ class TradingEnv(gym.Env):
             "balance": float(self.balance),
             "equity": float(self.equity),
             "position": self.position,
-            "spread": spread,
-            "slippage": slippage,
+            "entry_price": float(self.entry_price),
         }
 
         return obs, reward, terminated, truncated, info
@@ -190,7 +195,7 @@ class TradingEnv(gym.Env):
         if self._data is None:
             return np.zeros(self.observation_space.shape, dtype=np.float32)
 
-        # Optimization: Direct numpy slicing is ~50x faster than df.iloc[].values.astype()
+        # Vectorized slicing for speed
         return self._data[self.current_step - self.window_size : self.current_step]
 
     def render(self) -> None:
@@ -198,3 +203,6 @@ class TradingEnv(gym.Env):
         Renders the current state of the environment (not implemented).
         """
         pass
+
+
+__all__ = ["TradingEnv"]

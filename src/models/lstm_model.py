@@ -4,6 +4,8 @@ src/models/lstm_model.py
 LSTM sequence model using PyTorch for short-term price prediction.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -24,9 +26,16 @@ from src.models.base_model import BaseModel, Signal
 class LSTMAttentionModel(nn.Module if nn else object):
     """
     Bidirectional LSTM with multi-head self-attention.
-    Input : (batch, seq_len, n_features)
-    Output : (batch, 3) -> [hold_logit, buy_logit, sell_logit] (Standardized)
-    Note: Legacy checkpoints use [buy, sell, hold] and require permutation.
+
+    Architecture:
+        1. Bidirectional LSTM for temporal feature extraction.
+        2. Multi-head Self-Attention to focus on critical time steps.
+        3. Layer Normalization and Residual connection.
+        4. Global Average Pooling.
+        5. Fully Connected head for 3-class classification (HOLD, BUY, SELL).
+
+    Input: (batch, seq_len, n_features)
+    Output: (batch, 3) -> [HOLD_logit, BUY_logit, SELL_logit]
     """
 
     def __init__(
@@ -37,6 +46,16 @@ class LSTMAttentionModel(nn.Module if nn else object):
         n_heads: int = 8,
         dropout: float = 0.2,
     ) -> None:
+        """
+        Initializes the Attention-based LSTM model.
+
+        Args:
+            n_features: Number of input features per time step.
+            hidden_size: Hidden dimension of LSTM layers.
+            num_layers: Number of stacked LSTM layers.
+            n_heads: Number of attention heads.
+            dropout: Dropout probability.
+        """
         if not nn:
             raise ImportError("PyTorch is required for LSTMAttentionModel")
         super().__init__()
@@ -62,7 +81,16 @@ class LSTMAttentionModel(nn.Module if nn else object):
             nn.Linear(64, 3),
         )
 
-    def forward(self, x: Any) -> Any:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the LSTMAttentionModel.
+
+        Args:
+            x: Input tensor of shape (batch, seq_len, n_features).
+
+        Returns:
+            Logits of shape (batch, 3).
+        """
         out, _ = self.lstm(x)  # (B, T, 2*H)
         attn_out, _ = self.attn(out, out, out)
         out = self.norm(out + attn_out)  # residual
@@ -72,7 +100,9 @@ class LSTMAttentionModel(nn.Module if nn else object):
 
 class LSTMPricePredictor(nn.Module if nn else object):
     """
-    Simple LSTM-based neural network for price direction prediction.
+    Standard LSTM-based neural network for price direction prediction.
+
+    Simple architecture using the final hidden state of an LSTM for classification.
 
     Attributes:
         lstm: LSTM layer for processing temporal sequences.
@@ -81,15 +111,12 @@ class LSTMPricePredictor(nn.Module if nn else object):
 
     def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2) -> None:
         """
-        Initializes the LSTM architecture.
+        Initializes the standard LSTM architecture.
 
         Args:
             input_dim: Number of input features per time step.
             hidden_dim: Number of hidden units in LSTM layers.
             num_layers: Number of recurrent layers.
-
-        Raises:
-            ImportError: If PyTorch is not installed.
         """
         if not nn:
             raise ImportError("PyTorch is required for LSTMPricePredictor")
@@ -97,7 +124,7 @@ class LSTMPricePredictor(nn.Module if nn else object):
         self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 3)  # Outputs: [hold, buy, sell]
 
-    def forward(self, x: Any) -> Any:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the network.
 
@@ -107,7 +134,6 @@ class LSTMPricePredictor(nn.Module if nn else object):
         Returns:
             Logits for each class (HOLD, BUY, SELL).
         """
-        # lstm output: (batch, seq_len, hidden_dim)
         # hn: (num_layers, batch, hidden_dim)
         _, (hn, _) = self.lstm(x)
 
@@ -118,12 +144,15 @@ class LSTMPricePredictor(nn.Module if nn else object):
 
 class LSTMModel(BaseModel):
     """
-    Wrapper for LSTMPricePredictor implementing the BaseModel interface.
+    Wrapper for LSTM-based models implementing the BaseModel interface.
+
+    Handles data preprocessing (tensors, device placement) and post-processing
+    (probabilities, Signal objects).
 
     Attributes:
         logger: Logger instance for monitoring model activity.
         device: Torch device (cpu or cuda).
-        model: LSTMPricePredictor instance.
+        model: Underlying PyTorch model instance.
     """
 
     def __init__(
@@ -261,3 +290,6 @@ class LSTMModel(BaseModel):
             self.logger.info(f"LSTM model saved to {path}")
         else:
             self.logger.error("Attempted to save LSTMModel but no model is loaded.")
+
+
+__all__ = ["LSTMAttentionModel", "LSTMModel", "LSTMPricePredictor"]

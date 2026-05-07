@@ -20,16 +20,16 @@ import numpy as np
 
 try:
     import torch
-    import torch.nn as nn
 except ImportError:
     torch = None  # type: ignore
-    nn = None  # type: ignore
 
-from src.core.constants import ModelAction, SignalDirection
+from src.core.constants import SignalDirection
 from src.core.profiler import profile
 from src.models.base_model import BaseModel, Signal
+from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
-from src.models.lstm_model import LSTMAttentionModel
+from src.models.lstm_model import LSTMModel
+from src.models.ppo_agent import PPOAgent
 from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
@@ -38,8 +38,10 @@ logger = logging.getLogger(__name__)
 class EnsembleModel(BaseModel):
     """
     Weighted voting ensemble: PPO + Dreamer + LSTM-Attention.
+
     Delegates weight adaptation to DynamicEnsemble for robust rebalancing.
     Implements institutional consensus (60%) and dissent checks (veto).
+    Uses standardized model wrappers for all sub-algorithms.
     """
 
     ALGORITHMS = ["ppo", "dreamer", "lstm"]
@@ -59,7 +61,7 @@ class EnsembleModel(BaseModel):
             model_weights: Initial weights for each algorithm.
         """
         super().__init__()
-        self.device = torch.device(device) if torch is not None else None
+        self.device = device
         self.dynamic_ensemble = DynamicEnsemble(
             model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
         )
@@ -67,9 +69,11 @@ class EnsembleModel(BaseModel):
             total = sum(model_weights.values())
             self.dynamic_ensemble.weights = {k: v / total for k, v in model_weights.items()}
 
-        self._ppo_model = None
-        self._dreamer_model = None
-        self.lstm_model: Optional[LSTMAttentionModel] = None
+        # Standardized model wrappers
+        self.ppo_agent: Optional[PPOAgent] = None
+        self.dreamer_agent: Optional[DreamerAgent] = None
+        self.lstm_model: Optional[LSTMModel] = None
+
         self.consensus_threshold = consensus_threshold
 
         self._performance: Dict[str, deque[float]] = {k: deque(maxlen=200) for k in self.ALGORITHMS}
@@ -109,7 +113,10 @@ class EnsembleModel(BaseModel):
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
-                metadata={"reason": "Dissent conflict", "per_algo_votes": {k: s.direction for k, s in signals.items()}},
+                metadata={
+                    "reason": "Dissent conflict",
+                    "per_algo_votes": {k: s.direction for k, s in signals.items()},
+                },
             )
 
         # 2. Weighted Aggregation
@@ -131,9 +138,14 @@ class EnsembleModel(BaseModel):
                 weighted_hold_conf += sig.confidence * norm_weight
 
         metadata = {
-            "weighted_probs": {"BUY": weighted_buy_conf, "SELL": weighted_sell_conf, "HOLD": weighted_hold_conf},
+            "weighted_probs": {
+                "BUY": weighted_buy_conf,
+                "SELL": weighted_sell_conf,
+                "HOLD": weighted_hold_conf,
+            },
             "weights": self.weights,
             "per_algo_votes": {k: s.direction for k, s in signals.items()},
+            "per_algo_signals": {k: s._asdict() for k, s in signals.items()},
         }
 
         # 3. Consensus Threshold Check
@@ -147,31 +159,38 @@ class EnsembleModel(BaseModel):
     def predict(
         self,
         features: np.ndarray,
-        seq: Optional[Any] = None,
+        seq: Optional[np.ndarray] = None,
         regime_info: Optional[RegimeInfo] = None,
     ) -> Signal:
         """
         Generate a trading signal from input features using internal models.
+
+        Args:
+            features: Primary feature array for RL agents (PPO, Dreamer).
+            seq: Sequence data for the LSTM model. If None, features is used.
+            regime_info: Optional market regime information.
+
+        Returns:
+            Signal: Consolidated ensemble signal.
         """
         votes: Dict[str, Signal] = {}
 
-        # PPO prediction logic
-        if self._ppo_model is not None:
+        # PPO prediction
+        if self.ppo_agent is not None:
             with profile("inference_ppo"):
-                action, _ = self._ppo_model.predict(features, deterministic=True)
-                # action: 0=HOLD, 1=BUY, 2=SELL (ModelAction mapping)
-                dir = ModelAction(action).to_direction()
-                votes["ppo"] = Signal(direction=dir, confidence=1.0) # Discrete PPO
+                votes["ppo"] = self.ppo_agent.predict(features)
 
-        # LSTM prediction logic
-        if self.lstm_model is not None and seq is not None and torch is not None:
-            with torch.no_grad(), profile("inference_lstm"):
-                logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
-                idx = np.argmax(probs)
-                votes["lstm"] = Signal(
-                    direction=ModelAction(idx).to_direction(), confidence=float(probs[idx])
-                )
+        # Dreamer prediction
+        if self.dreamer_agent is not None:
+            with profile("inference_dreamer"):
+                votes["dreamer"] = self.dreamer_agent.predict(features)
+
+        # LSTM prediction
+        if self.lstm_model is not None:
+            with profile("inference_lstm"):
+                # Use seq if provided, otherwise fallback to features
+                lstm_input = seq if seq is not None else features
+                votes["lstm"] = self.lstm_model.predict(lstm_input)
 
         return self.aggregate_signals(votes)
 
