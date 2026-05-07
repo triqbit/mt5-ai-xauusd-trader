@@ -151,15 +151,18 @@ class BacktestEngine:
             ema21_series = df_features[ema21_col]
 
         ema21_vals = ema21_series.values
-        slopes = np.zeros(n)
         window = 20
         x = np.arange(window)
         x_mean = np.mean(x)
         x_var = np.var(x) * window
-        for j in range(window, n + 1):
-            y = ema21_vals[j - window : j]
-            slope = np.sum((x - x_mean) * y) / x_var
-            slopes[j - 1] = slope
+        weights = (x - x_mean) / x_var
+        # Vectorized rolling slope using convolution as a rolling dot product (O(N) vs O(N*W))
+        # Ensure parity with the original loop and handle small N cases
+        if n >= window:
+            conv = np.convolve(ema21_vals, weights[::-1], mode="valid")
+            slopes = np.concatenate([np.zeros(window - 1), conv])
+        else:
+            slopes = np.zeros(n)
 
         # 3. EMA Sequence
         ema_vals = {}

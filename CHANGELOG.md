@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vectorized Walk-Forward Backtester:** Implemented high-performance `BacktestEngine` in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission), path-dependent metrics (MAE/MFE), and institutional performance reporting (Sharpe, CAGR, MDD).
 - **Enhanced RL Evaluation Suite:** Advanced institutional metrics including Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio. Improved robustness for regime sensitivity and agent interface integration (SB3, Signal objects).
 - **Vectorized Feature Engineering:** Optimized `FeatureEngineer` by refactoring internal methods to return dictionaries of NumPy arrays and using TA-Lib vectorization (`SMA`, `SUM`, `ROCP`), achieving ~20% overall speedup.
+- **Optimized Backtest Slopes:** Implemented a vectorized $O(N)$ convolution for rolling linear regression slope calculations in `BacktestEngine`, achieving a ~200x speedup for this specific component.
 
 ### Changed
 - **Dependency Harmonization:** Aligned core dependencies (`pandas==2.3.2`, `fastapi==0.136.1`, `starlette==0.49.1`) across all environments to resolve security vulnerabilities and satisfy `pandas-ta` requirements.
