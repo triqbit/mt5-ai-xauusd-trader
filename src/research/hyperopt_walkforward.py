@@ -30,6 +30,8 @@ class OptimizationMetric(str, Enum):
     SORTINO = "sortino"
     PROFIT_FACTOR = "profit_factor"
     TOTAL_RETURN = "total_return"
+    CALMAR = "calmar"
+    WIN_RATE = "win_rate"
     ROBUSTNESS_SCORE = "robustness_score"
 
 
@@ -63,6 +65,8 @@ class WalkForwardConfig(BaseModel):
     bars_per_year: int = Field(
         252, description="Bars per year for annualization (e.g. 252 for Daily)"
     )
+    min_oos_sharpe: float = Field(-float("inf"), description="Minimum allowed OOS Sharpe Ratio")
+    max_oos_drawdown: float = Field(1.0, description="Maximum allowed OOS Drawdown (fraction)")
 
 
 class RobustnessMetrics(BaseModel):
@@ -78,6 +82,7 @@ class RobustnessMetrics(BaseModel):
     regime_consistency: float
     robustness_score: float
     walk_forward_efficiency: float = 0.0
+    constraints_violated: bool = False
 
 
 class WindowResult(BaseModel):
@@ -117,6 +122,7 @@ class WalkForwardResult(BaseModel):
                 )
             )
 
+        violation_txt = " | [CONSTRAINTS VIOLATED]" if self.metrics.constraints_violated else ""
         insights = (
             f"OOS Sharpe Mean: {self.metrics.oos_sharpe_mean:.2f} | "
             f"WFE: {self.metrics.walk_forward_efficiency:.2f} | "
@@ -124,6 +130,7 @@ class WalkForwardResult(BaseModel):
             f"IS-OOS Gap: {self.metrics.is_oos_gap:.2f} | "
             f"Regime Consist: {self.metrics.regime_consistency:.2f} | "
             f"Stability Penalty: {self.metrics.stability_penalty:.2f}"
+            f"{violation_txt}"
         )
 
         # Scale robustness score to 0-100 for report
@@ -273,7 +280,7 @@ class WalkForwardOptimizer:
         self, data: pd.DataFrame, strategy_params: dict[str, Any]
     ) -> float:
         """
-        Measures how consistent performance is across different detected regimes.
+        Measures how consistent performance (Sharpe Ratio) is across different detected regimes.
 
         Args:
             data: Data containing 'regime' column (typically the training/IS window).
@@ -293,16 +300,23 @@ class WalkForwardOptimizer:
         returns = evaluator.results.get(strategy.name + "_returns", np.zeros(len(data)))
 
         temp_df = pd.DataFrame({"returns": returns, "regime": data["regime"]})
-        regime_returns = temp_df.groupby("regime")["returns"].mean()
 
-        if len(regime_returns) < 2:
+        def calc_sharpe(x):
+            std = x.std()
+            if std < 1e-9:
+                return 0.0
+            return float(x.mean() / std * np.sqrt(self.config.bars_per_year))
+
+        regime_sharpes = temp_df.groupby("regime")["returns"].apply(calc_sharpe)
+
+        if len(regime_sharpes) < 2:
             return 1.0  # Not enough regimes to judge
 
-        # Return 1 - CV of returns across regimes (higher is more consistent)
-        mean_ret = np.mean(regime_returns)
-        std_ret = np.std(regime_returns)
+        # Return 1 - CV of Sharpe ratios across regimes (higher is more consistent)
+        mean_sharpe = np.mean(regime_sharpes)
+        std_sharpe = np.std(regime_sharpes)
 
-        cv = std_ret / (abs(mean_ret) + 1e-9)
+        cv = std_sharpe / (abs(mean_sharpe) + 1e-9)
         return float(np.clip(1.0 - cv, 0.0, 1.0))
 
     def run_optimization(self) -> WalkForwardResult:
@@ -338,6 +352,7 @@ class WalkForwardOptimizer:
             oos_pfs = []
             oos_win_rates = []
             oos_max_drawdowns = []
+            oos_calmars = []
 
             regime_cons_list = []
             for train_data, test_data in windows:
@@ -352,6 +367,7 @@ class WalkForwardOptimizer:
                 oos_pfs.append(oos_metrics.get("Profit Factor", 0.0))
                 oos_win_rates.append(oos_metrics.get("Win Rate", 0.0))
                 oos_max_drawdowns.append(oos_metrics.get("Max Drawdown", 0.0))
+                oos_calmars.append(oos_metrics.get("Calmar Ratio", 0.0))
 
                 # Track regime consistency across windows
                 regime_cons_list.append(self._calculate_regime_consistency(train_data, params))
@@ -361,6 +377,17 @@ class WalkForwardOptimizer:
             oos_std = np.std(oos_sharpes)
             is_mean = np.mean(is_sharpes)
             worst_oos = np.min(oos_sharpes)
+            max_oos_dd = np.max(oos_max_drawdowns)
+
+            # Check constraints
+            constraint_penalty = 0.0
+            violated = False
+            if worst_oos < self.config.min_oos_sharpe:
+                constraint_penalty += 10.0 * (self.config.min_oos_sharpe - worst_oos)
+                violated = True
+            if max_oos_dd > self.config.max_oos_drawdown:
+                constraint_penalty += 10.0 * (max_oos_dd - self.config.max_oos_drawdown)
+                violated = True
 
             # Consistency metrics (1 - CV)
             wr_cons = 1.0 - (np.std(oos_win_rates) / (np.mean(oos_win_rates) + 1e-9))
@@ -376,7 +403,7 @@ class WalkForwardOptimizer:
 
             # Calculate Robustness Score
             # Reward: high OOS Sharpe, worst-case Sharpe, consistency
-            # Penalize: high OOS Variance, high IS/OOS Gap, High parameter sensitivity, Low regime consistency
+            # Penalize: high OOS Variance, high IS/OOS Gap, High parameter sensitivity, Low regime consistency, Constraints violated
             w = self.config.robustness_weights
             robustness = (
                 (w.oos_mean * oos_mean)
@@ -387,6 +414,7 @@ class WalkForwardOptimizer:
                 - (w.is_oos_gap * gap)
                 - (w.stability * stability)
                 + (w.regime_consistency * regime_cons)
+                - constraint_penalty
             )
 
             trial.set_user_attr("oos_mean", float(oos_mean))
@@ -397,6 +425,7 @@ class WalkForwardOptimizer:
             trial.set_user_attr("gap", float(gap))
             trial.set_user_attr("stability", float(stability))
             trial.set_user_attr("regime_cons", float(regime_cons))
+            trial.set_user_attr("violated", bool(violated))
             wfe = oos_mean / (is_mean + 1e-9)
             trial.set_user_attr("wfe", float(wfe))
             trial.set_user_attr("robustness_score", float(robustness))
@@ -412,6 +441,10 @@ class WalkForwardOptimizer:
                 return float(np.mean(oos_pfs))
             if self.config.metric == OptimizationMetric.TOTAL_RETURN:
                 return float(np.mean(oos_returns))
+            if self.config.metric == OptimizationMetric.CALMAR:
+                return float(np.mean(oos_calmars))
+            if self.config.metric == OptimizationMetric.WIN_RATE:
+                return float(np.mean(oos_win_rates))
 
             return float(robustness)
 
@@ -432,6 +465,7 @@ class WalkForwardOptimizer:
             regime_consistency=best_trial.user_attrs["regime_cons"],
             walk_forward_efficiency=best_trial.user_attrs["wfe"],
             robustness_score=best_trial.user_attrs["robustness_score"],
+            constraints_violated=best_trial.user_attrs["violated"],
         )
 
         # Generate window results for best params and aggregate returns
