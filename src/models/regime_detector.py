@@ -482,7 +482,7 @@ class RegimeDetector:
         # Feature order: atr_ratio, efficiency_ratio, slope, z_score, kurtosis, skewness
         self._cluster_to_regime = {}
         for i, center in enumerate(centroids):
-            atr_ratio, er, slope, z_score, kurt, skew = center
+            atr_ratio, er, slope, z_score, _kurt, _skew = center
 
             if atr_ratio > 1.8 and er > 0.6:
                 self._cluster_to_regime[i] = MarketRegime.NEWS_SHOCK
