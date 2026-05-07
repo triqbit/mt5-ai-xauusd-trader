@@ -13,7 +13,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.core.constants import DecisionStatus, SignalDirection
 from src.core.explainability import SignalExplainer, SignalExplanation
@@ -24,52 +24,87 @@ logger = logging.getLogger(__name__)
 
 
 class PerformanceContext(BaseModel):
-    """Recent performance metrics for the current strategy/account."""
+    """
+    Recent performance metrics for the current strategy/account.
+    Enables the operator to understand the strategy's current state.
+    """
 
-    sharpe_ratio: float = Field(0.0, description="Recent Sharpe Ratio")
-    profit_factor: float = Field(0.0, description="Recent Profit Factor")
-    recovery_factor: float = Field(0.0, description="Recent Recovery Factor")
-    win_rate: float = Field(0.0, description="Recent win rate percentage")
-    win_loss_ratio: float = Field(0.0, description="Recent Win/Loss Ratio")
-    max_drawdown: float = Field(0.0, description="Maximum drawdown observed")
-    total_trades: int = Field(0, description="Total trades in the analysis window")
+    sharpe_ratio: float = Field(
+        0.0, description="Risk-adjusted return (Sharpe Ratio). Target > 2.0 per standards."
+    )
+    profit_factor: float = Field(
+        0.0, description="Gross Profit / Gross Loss. Target > 2.0 per standards."
+    )
+    recovery_factor: float = Field(
+        0.0, description="Net Profit / Max Drawdown. Target > 2.0 per standards."
+    )
+    win_rate: float = Field(0.0, description="Percentage of winning trades (0.0 to 1.0).")
+    win_loss_ratio: float = Field(0.0, description="Average Win / Average Loss.")
+    max_drawdown: float = Field(
+        0.0, description="Maximum observed equity drawdown from peak to trough."
+    )
+    total_trades: int = Field(0, ge=0, description="Count of trades analyzed in this window.")
 
 
 class DecisionPacket(BaseModel):
     """
     Unified packet for operator review before trade execution.
-    Aggregates all critical dimensions of a trading decision.
+    Aggregates all critical dimensions of a trading decision for institutional trust.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    symbol: str = Field(..., description="Target trading symbol")
-    direction: SignalDirection = Field(..., description="Final signal direction")
-    consensus: str = Field(..., description="Qualitative model consensus level")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="UTC timestamp when the decision was finalized.",
+    )
+    symbol: str = Field(..., description="Target trading symbol (e.g., XAUUSD).")
+    direction: SignalDirection = Field(
+        ..., description="Consolidated signal direction from the ensemble."
+    )
+    consensus: str = Field(..., description="Qualitative consensus level (e.g., 💪 Strong Majority).")
     status_level: DecisionStatus = Field(
-        DecisionStatus.BLOCKED, description="Augmented status level"
+        DecisionStatus.BLOCKED, description="Augmented execution status for operator safety."
     )
     decision_score: float = Field(
-        0.0, ge=0.0, le=100.0, description="Composite decision confidence score"
+        0.0, ge=0.0, le=100.0, description="Composite decision confidence score (0 to 100)."
     )
     sizing_multiplier: float = Field(
-        0.0, ge=0.0, le=1.0, description="Recommended sizing multiplier"
+        0.0, ge=0.0, le=1.0, description="Risk-based sizing multiplier (0.0 to 1.0)."
     )
     is_executable: bool = Field(
-        False, description="Final decision on whether the trade should proceed"
+        False, description="Final binary decision on whether execution is permitted."
     )
     blocking_reasons: list[str] = Field(
-        default_factory=list, description="List of reasons if the trade is blocked"
+        default_factory=list, description="Explicit reasons for blocking the trade, if any."
     )
 
     # Components
     explanation: SignalExplanation = Field(
-        ..., description="ML signal attribution and explainability"
+        ..., description="Detailed signal attribution and machine-learning explainability."
     )
-    regime: RegimeInfo = Field(..., description="Current market regime context")
-    macro_risk: RiskStatus = Field(..., description="Macroeconomic event risk status")
-    performance: PerformanceContext = Field(..., description="Recent performance context")
+    regime: RegimeInfo = Field(..., description="Current market regime and volatility state.")
+    macro_risk: RiskStatus = Field(..., description="Real-time macroeconomic risk intelligence.")
+    performance: PerformanceContext = Field(
+        ..., description="Recent performance metrics providing historical context."
+    )
+
+    @model_validator(mode="after")
+    def validate_executable_state(self) -> DecisionPacket:
+        """
+        Enforce technical trust: a trade cannot be executable if it has blocking reasons
+        or if the status level is BLOCKED.
+        """
+        if self.is_executable:
+            if self.blocking_reasons:
+                raise ValueError("Decision cannot be executable with active blocking reasons.")
+            if self.status_level == DecisionStatus.BLOCKED:
+                raise ValueError("Decision cannot be executable with a BLOCKED status level.")
+        else:
+            # If not executable, ensure consistency with status/reasons for clarity
+            if self.status_level == DecisionStatus.EXECUTE:
+                # Optional: could warn or auto-coerce, but Jules prefers deterministic validation
+                raise ValueError("Status level cannot be EXECUTE if is_executable is False.")
+
+        return self
 
 
 class DecisionSupportSystem:
