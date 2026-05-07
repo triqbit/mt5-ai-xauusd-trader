@@ -18,7 +18,7 @@ The research reporting system provides automated generation of institutional-gra
 5. **Model Drift Observations:** Statistical tracking of feature distribution shifts.
 6. **Capital Allocation Insights:** Portfolio heat and diversification analytics.
 7. **Benchmark Comparisons:** Performance relative to technical and passive baselines.
-8. **RL Agent Evaluation:** Specialized DRL agent performance auditing.
+8. **RL Agent Evaluation:** Specialized DRL agent performance auditing including stability, turnover, and regime-sensitivity analysis.
 9. **Rare Event Simulations:** Resilience against black-swan events (flash crashes, etc.).
 10. **Execution Quality:** Alpha decay and slippage analytics.
 
@@ -32,6 +32,17 @@ The `ExecutionAnalyzer` module (src/analytics/execution_quality.py) provides ins
 - **Edge Capture:** Spread-adjusted measurement of realized edge vs. theoretical strategy edge.
 - **Post-Entry Drift (Markouts):** Tracks price movement at fixed horizons (1m, 5m, 15m, 30m, 60m) after entry to distinguish alpha decay from execution drag.
 - **Blocked Signal Analysis:** Calculates the opportunity cost of signals rejected by risk management (MFE/MAE and simulated TP/SL outcomes).
+
+## RL Agent Evaluation
+
+The `RLEvaluator` module (src/research/rl_evaluation.py) provides comprehensive performance auditing for reinforcement learning agents:
+
+- **Stability Analysis:** Beyond simple reward, it calculates institutional metrics including Tail Ratio, Common Sense Ratio, Gain-to-Pain Ratio, and System Quality Number (SQN).
+- **Regime Stability:** Calculates a stability score based on the consistency of Sharpe ratios across different market regimes (inverse of Coefficient of Variation).
+- **Turnover & Policy Health:** Tracks trade frequency, average hold times, and **Action Entropy** to detect policy collapse or excessive stagnation.
+- **Reward Decomposition:** Breaks down returns into gross profit, net profit, and commission drag, with concentration analysis on the top 10% of trades.
+- **Vectorized Evaluation:** Optimized evaluation loop using pre-calculated regime labels for the entire dataset to ensure high-performance research iterations.
+- **Baseline Comparison:** Automated comparison against technical baselines (Momentum, Mean Reversion) and Supervised Learning wrappers.
 
 ## Usage
 
