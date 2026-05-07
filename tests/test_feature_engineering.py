@@ -35,10 +35,12 @@ def test_compute_features_shape(synthetic_ohlcv):
     features = fe.compute_features(synthetic_ohlcv)
 
     # Should have many features (140+ requested)
+    # Base indicators ~ 40, Candle patterns ~ 60, Price action ~ 7, Volume ~ 15
+    # MTF M5 ~ 100+
     assert features.shape[1] >= 140
     assert not features.empty
 
-    # Should not contain original OHLCV columns
+    # Should not contain original OHLCV columns by default
     for col in ["open", "high", "low", "close", "tick_volume"]:
         assert col not in features.columns
 
@@ -50,7 +52,6 @@ def test_normalization_zscore(synthetic_ohlcv):
 
     assert not features.empty
     # Mocks return zeros, so means will be 0 and std will be replaced by 1.0
-    # Actually, some features like vp_poc might not be 0 because they use rolling on close
     means = features.mean()
     assert np.all(np.abs(means.dropna()) < 1.0)
 
@@ -124,19 +125,22 @@ def test_no_look_ahead_bias(synthetic_ohlcv):
     features1 = fe.compute_features(df1)
 
     df2 = synthetic_ohlcv.copy()
+    # Change the last bar
     df2.iloc[-1, df2.columns.get_loc("close")] += 100.0
 
     fe2 = FeatureEngineer(base_timeframe="M1", timeframes=["M5"], normalize=False)
     features2 = fe2.compute_features(df2)
 
-    # Check 5 steps before the end to ensure MTF (M5) hasn't leaked
-    idx = -6
+    # Check the bar before the last one. It should NOT be affected by the change in the last bar.
+    # Note: compute_features drops some rows at the beginning.
+    idx = -2
     pd.testing.assert_series_equal(features1.iloc[idx], features2.iloc[idx])
 
 
 def test_full_mtf_suite(synthetic_ohlcv):
     """Test that all requested timeframes generate features."""
     tfs = ["M1", "M5", "M15", "H1", "H4", "D1"]
+    # If base is M5, it should compute MTF for M1, M15, H1, H4, D1
     fe = FeatureEngineer(base_timeframe="M5", timeframes=tfs, normalize=False)
     features = fe.compute_features(synthetic_ohlcv)
 

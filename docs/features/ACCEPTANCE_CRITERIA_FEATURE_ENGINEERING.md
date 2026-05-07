@@ -36,3 +36,10 @@
 - **Backward Compatibility:** Feature indices must remain constant or be mapped explicitly to avoid breaking model inputs.
 - **Migration:** None required; features are calculated on-the-fly.
 - **Sign-off:** Requires approval from the Quant Strategist.
+
+## Status: Implemented
+- [x] All 140+ features implemented with multi-timeframe support.
+- [x] Look-ahead bias prevention via completion-time shifting logic.
+- [x] Stateful normalization (Z-Score/MinMax) verified.
+- [x] Unit tests cover feature count, normalization, and bias checks.
+- [x] Feature dictionary updated in `docs/features/FEATURE_DICTIONARY.md`.
