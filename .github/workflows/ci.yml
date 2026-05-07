@@ -89,6 +89,11 @@ jobs:
           sudo ldconfig
       - name: Install Python dependencies
         run: pip install -r requirements-ci.txt
+      - name: Verify database schema sync (alembic check)
+        run: |
+          export DATABASE_URL=sqlite:///ci_check.db
+          alembic upgrade head
+          alembic check
       - name: Run tests with coverage
         run: pytest tests/ --cov=src -v
         env:
