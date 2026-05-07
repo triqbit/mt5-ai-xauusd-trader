@@ -50,6 +50,9 @@ class StabilityMetrics(BaseModel):
     gain_to_pain_ratio: float = Field(
         default=0.0, description="Sum of gains / Abs(Sum of losses) per month/period"
     )
+    regime_stability_score: float = Field(
+        default=0.0, description="Consistency of performance across different market regimes"
+    )
 
 
 class TurnoverMetrics(BaseModel):
@@ -61,6 +64,9 @@ class TurnoverMetrics(BaseModel):
     min_hold_time: int = Field(default=0, description="Minimum steps held for a single trade")
     total_trades: int
     turnover_ratio: float = Field(..., description="Total traded volume relative to balance")
+    action_entropy: float = Field(
+        default=0.0, description="Entropy of action distribution (detects policy collapse)"
+    )
 
 
 class DrawdownMetrics(BaseModel):
@@ -202,19 +208,38 @@ class RandomBaseline:
 
 
 class SupervisedBaseline:
-    """Wrapper for supervised models to compare against RL agents."""
+    """
+    Wrapper for supervised models (scikit-learn, etc.) to compare against RL agents.
+    Handles reshaping and ensures output matches environment action space.
+    """
 
     def __init__(self, model: Any):
         self.model = model
 
     def predict(self, observation: np.ndarray) -> int:
-        # Assuming supervised model returns 0, 1, 2
-        # We might need to reshape observation for the model
+        """
+        Generate prediction from supervised model.
+        Args:
+            observation: Environment observation.
+        Returns:
+            int: Action (0, 1, 2).
+        """
+        # Reshape for single sample inference if it's a flat array
         obs_reshaped = observation.reshape(1, -1)
-        action = self.model.predict(obs_reshaped)
-        if isinstance(action, np.ndarray):
-            return int(action[0])
-        return int(action)
+        try:
+            prediction = self.model.predict(obs_reshaped)
+
+            # Extract scalar from numpy array or list
+            if isinstance(prediction, (np.ndarray, list)):
+                if isinstance(prediction, np.ndarray) and prediction.size == 1:
+                    prediction = prediction.item()
+                else:
+                    prediction = prediction[0]
+
+            return int(prediction)
+        except Exception as e:
+            logger.error("SupervisedBaseline prediction error: %s", e)
+            return 0
 
 
 class RLEvaluator:
@@ -246,6 +271,16 @@ class RLEvaluator:
         obs, _ = self.env.reset()
         done = False
 
+        # Pre-calculate market regimes for the entire dataset for performance
+        regime_labels = []
+        if hasattr(self.env, "data"):
+            data_df = pd.DataFrame(
+                self.env.data[:, :5],
+                columns=["open", "high", "low", "close", "tick_volume"],
+            )
+            labeled_df = self.regime_detector.label_history(data_df)
+            regime_labels = labeled_df["regime"].values
+
         history = {
             "steps": [],
             "actions": [],
@@ -261,23 +296,19 @@ class RLEvaluator:
             action = self._get_prediction(agent, obs)
             next_obs, reward, terminated, truncated, info = self.env.step(action)
 
-            # Detect market regime
+            # Detect market regime from pre-calculated labels
             current_regime = MarketRegime.UNKNOWN
             current_price = 0.0
             if hasattr(self.env, "data") and hasattr(self.env, "current_step"):
-                data = self.env.data
                 current_step = self.env.current_step
-                current_price = data[current_step - 1, self.close_idx]  # Close price
+                current_price = self.env.data[current_step - 1, self.close_idx]
 
-                if current_step >= 100:
-                    # Safely handle data with potentially more than 5 features
-                    # but only use the OHLCV columns for regime detection
-                    slice_data = data[current_step - 100 : current_step, :5]
-                    df_slice = pd.DataFrame(
-                        slice_data,
-                        columns=["open", "high", "low", "close", "tick_volume"],
-                    )
-                    current_regime = self.regime_detector.detect(df_slice).label
+                if current_step - 1 < len(regime_labels):
+                    regime_val = regime_labels[current_step - 1]
+                    try:
+                        current_regime = MarketRegime(regime_val)
+                    except ValueError:
+                        current_regime = MarketRegime.UNKNOWN
 
             # Calculate Mark-to-Market Equity
             # Equity = Realized Balance + Unrealized PnL
@@ -368,6 +399,9 @@ class RLEvaluator:
                     recovery_factor=float(recovery_factor),
                     ulcer_index=report.stability.ulcer_index,
                     sqn=report.stability.sqn,
+                    tail_ratio=report.stability.tail_ratio,
+                    common_sense_ratio=report.stability.common_sense_ratio,
+                    gain_to_pain_ratio=report.stability.gain_to_pain_ratio,
                 )
             )
 
@@ -388,6 +422,7 @@ class RLEvaluator:
         """
         Translate agent prediction (int or Signal) into environment action.
         Robustly handles SB3 tuples, numpy scalars/arrays, and Signal objects.
+        Maps SignalDirection.SELL (-1) to ModelAction.SELL (2).
         """
         try:
             prediction = agent.predict(obs)
@@ -420,7 +455,11 @@ class RLEvaluator:
             if hasattr(prediction, "value") and not isinstance(prediction, (int, float)):
                 prediction = prediction.value
 
-            return int(prediction)
+            # Final cast to int and SignalDirection mapping
+            res = int(prediction)
+            if res == -1:  # Map SignalDirection.SELL to ModelAction.SELL
+                return 2
+            return res
         except Exception as e:
             logger.error("Error extracting prediction from agent %s: %s", type(agent), e)
             return 0  # Default to Hold on error
@@ -429,9 +468,9 @@ class RLEvaluator:
         """Calculate all metrics and return an RLReport."""
         trades = self._extract_trades(df)
         drawdown = self._calculate_drawdown(df)
-        stability = self._calculate_stability(df, trades, drawdown.max_drawdown)
-        turnover = self._calculate_turnover(df, trades)
         regime_sensitivity = self._calculate_regime_sensitivity(df)
+        stability = self._calculate_stability(df, trades, drawdown.max_drawdown, regime_sensitivity)
+        turnover = self._calculate_turnover(df, trades)
         reward_decomp = self._calculate_reward_decomposition(df, trades)
 
         trade_pnls = [t["pnl"] for t in trades]
@@ -461,6 +500,12 @@ class RLEvaluator:
 
         entry_idx = 0
         in_position = False
+
+        # Special case: position already open at step 0
+        if positions[0] != 0:
+            entry_idx = 0
+            in_position = True
+
         for i in range(1, len(df)):
             # Entry detected
             if positions[i - 1] == 0 and positions[i] != 0:
@@ -469,7 +514,9 @@ class RLEvaluator:
             # Exit detected
             elif positions[i - 1] != 0 and positions[i] == 0:
                 # PnL is the change in MtM equity from the step BEFORE entry to the exit step
-                pnl = balances[i] - balances[entry_idx - 1]
+                # If entry was at 0, we use 0 as the reference point for balance change
+                prev_idx = max(0, entry_idx - 1)
+                pnl = balances[i] - balances[prev_idx]
                 hold_time = i - entry_idx
                 trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
                 in_position = False
@@ -477,14 +524,19 @@ class RLEvaluator:
         # Handle final open position
         if in_position:
             i = len(df) - 1
-            pnl = balances[i] - balances[entry_idx - 1]
+            prev_idx = max(0, entry_idx - 1)
+            pnl = balances[i] - balances[prev_idx]
             hold_time = i - entry_idx
             trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
 
         return trades
 
     def _calculate_stability(
-        self, df: pd.DataFrame, trades: list[dict[str, Any]], max_dd: float
+        self,
+        df: pd.DataFrame,
+        trades: list[dict[str, Any]],
+        max_dd: float,
+        regime_perf: list[RegimePerformance] | None = None,
     ) -> StabilityMetrics:
         """Assess the consistency and risk-adjusted returns with institutional metrics."""
         returns = df["balances"].pct_change().replace([np.inf, -np.inf], 0).fillna(0)
@@ -591,6 +643,17 @@ class RLEvaluator:
         pains = abs(returns[returns < 0].sum())
         gain_to_pain_ratio = gains / pains if pains > 1e-9 else 0.0
 
+        # Regime stability: inverse of CoV of Sharpe across regimes
+        regime_stability = 0.0
+        if regime_perf:
+            sharpes = [rp.sharpe_ratio for rp in regime_perf]
+            if len(sharpes) > 1:
+                mean_sharpe = np.mean(sharpes)
+                std_sharpe = np.std(sharpes)
+                if abs(mean_sharpe) > 1e-9:
+                    cov = std_sharpe / abs(mean_sharpe)
+                    regime_stability = 1.0 / (1.0 + cov)
+
         return StabilityMetrics(
             sharpe_ratio=float(sharpe),
             sortino_ratio=float(sortino),
@@ -609,12 +672,13 @@ class RLEvaluator:
             tail_ratio=float(tail_ratio),
             common_sense_ratio=float(common_sense_ratio),
             gain_to_pain_ratio=float(gain_to_pain_ratio),
+            regime_stability_score=float(regime_stability),
         )
 
     def _calculate_turnover(
         self, df: pd.DataFrame, trades: list[dict[str, Any]]
     ) -> TurnoverMetrics:
-        """Assess trading activity and execution costs."""
+        """Assess trading activity and execution costs, including policy entropy."""
         num_trades = len(trades)
         hold_times = [t["hold_time"] for t in trades]
 
@@ -628,6 +692,12 @@ class RLEvaluator:
         # In this env, each trade is 1.0 unit.
         turnover_ratio = (num_trades * 1.0) / (df["balances"].iloc[0]) if len(df) > 0 else 0.0
 
+        # Action entropy: H(X) = -sum(p(x) * log(p(x)))
+        action_entropy = 0.0
+        if "actions" in df.columns and len(df) > 0:
+            counts = df["actions"].value_counts(normalize=True).values
+            action_entropy = -np.sum(counts * np.log(counts + 1e-9))
+
         return TurnoverMetrics(
             trade_frequency=float(trade_freq),
             avg_hold_time=float(avg_hold_time),
@@ -635,6 +705,7 @@ class RLEvaluator:
             min_hold_time=int(min_hold_time),
             total_trades=num_trades,
             turnover_ratio=float(turnover_ratio),
+            action_entropy=float(action_entropy),
         )
 
     def _calculate_drawdown(self, df: pd.DataFrame) -> DrawdownMetrics:

@@ -282,16 +282,15 @@ def test_get_prediction_robustness():
                 class MockEnum:
                     value = 1
                 return MockEnum()
+            if obs[0] == 5: return -1 # Test explicit SELL mapping
             return 0
 
     assert evaluator._get_prediction(MultiAgent(), np.array([1])) == 1
     assert evaluator._get_prediction(MultiAgent(), np.array([2])) == 2
     # SignalDirection.SELL is -1. The environment's action for SELL is 2.
-    # _get_prediction currently returns the raw direction for Signal objects.
-    # Wait, the environment expects 0, 1, 2. SignalDirection is 1, -1, 0.
-    # Let me re-verify _get_prediction logic for Signal objects.
     assert evaluator._get_prediction(MultiAgent(), np.array([3])) == 2
     assert evaluator._get_prediction(MultiAgent(), np.array([4])) == 1
+    assert evaluator._get_prediction(MultiAgent(), np.array([5])) == 2
     assert evaluator._get_prediction(MultiAgent(), np.array([0])) == 0
 
 
@@ -347,7 +346,10 @@ def test_parameterized_indices(mock_env_data):
 
 def test_turnover_metrics():
     evaluator = RLEvaluator(env=MagicMock())
-    df = pd.DataFrame({"balances": [1000] * 100})
+    df = pd.DataFrame({
+        "balances": [1000] * 100,
+        "actions": [0, 1, 2, 0] * 25
+    })
     trades = [
         {"pnl": 10.0, "hold_time": 5},
         {"pnl": -5.0, "hold_time": 15}
@@ -358,3 +360,55 @@ def test_turnover_metrics():
     assert turnover.max_hold_time == 15
     assert turnover.min_hold_time == 5
     assert turnover.trade_frequency == (2/100) * 1000
+    assert turnover.action_entropy > 0.0
+
+
+def test_regime_stability_metric():
+    from src.research.rl_evaluation import RegimePerformance
+    from src.models.regime_detector import MarketRegime
+    evaluator = RLEvaluator(env=MagicMock())
+
+    # High consistency
+    regime_perf_stable = [
+        RegimePerformance(regime=MarketRegime.TRENDING, sharpe_ratio=2.0, win_rate=0.6, total_trades=10, profit_factor=2.0),
+        RegimePerformance(regime=MarketRegime.RANGING, sharpe_ratio=1.9, win_rate=0.55, total_trades=10, profit_factor=1.8)
+    ]
+    stability_stable = evaluator._calculate_stability(
+        pd.DataFrame({"balances": [100, 110, 120]}), [], 0.05, regime_perf_stable
+    )
+
+    # Low consistency
+    regime_perf_unstable = [
+        RegimePerformance(regime=MarketRegime.TRENDING, sharpe_ratio=5.0, win_rate=0.8, total_trades=10, profit_factor=4.0),
+        RegimePerformance(regime=MarketRegime.RANGING, sharpe_ratio=0.1, win_rate=0.4, total_trades=10, profit_factor=1.0)
+    ]
+    stability_unstable = evaluator._calculate_stability(
+        pd.DataFrame({"balances": [100, 110, 120]}), [], 0.05, regime_perf_unstable
+    )
+
+    assert stability_stable.regime_stability_score > stability_unstable.regime_stability_score
+
+
+def test_supervised_baseline():
+    from src.research.rl_evaluation import SupervisedBaseline
+    mock_model = MagicMock()
+    mock_model.predict.return_value = np.array([1])
+    baseline = SupervisedBaseline(mock_model)
+
+    obs = np.random.randn(52)
+    assert baseline.predict(obs) == 1
+    mock_model.predict.assert_called_once()
+
+
+def test_extract_trades_at_step_0():
+    # Test bug fix: position open at step 0
+    evaluator = RLEvaluator(env=MagicMock())
+    df = pd.DataFrame({
+        "balances": [1000, 1010, 1005],
+        "positions": [1, 1, 0]
+    })
+    # Trade from 0 to 2. PnL = balances[2] - balances[0] = 1005 - 1000 = 5.0
+    trades = evaluator._extract_trades(df)
+    assert len(trades) == 1
+    assert trades[0]["pnl"] == 5.0
+    assert trades[0]["hold_time"] == 2
