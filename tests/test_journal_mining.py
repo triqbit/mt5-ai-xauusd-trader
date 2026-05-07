@@ -369,3 +369,17 @@ def test_toxic_motif_sorting(miner):
     # Motif B toxic score: (1-0) * log(3) = 1 * 1.09 = 1.09
     # A should be first because it has higher frequency and still low win rate
     assert motifs[0].algorithm == "A"
+
+def test_combination_motif_attributes(miner):
+    from src.analytics.journal_mining import CombinationMotif
+    motif = CombinationMotif(
+        patterns=["A:1", "B:-1"],
+        frequency=5,
+        avg_pnl_after=-50.0,
+        is_toxic=True,
+        session="London",
+        volatility_bucket="High"
+    )
+    assert motif.session == "London"
+    assert motif.volatility_bucket == "High"
+    assert motif.is_toxic is True
