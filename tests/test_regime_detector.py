@@ -100,5 +100,64 @@ class TestRegimeDetector(unittest.TestCase):
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.UNKNOWN)
 
+    def test_gmm_fit_and_detect(self):
+        # Generate multi-regime data
+        np.random.seed(42)
+        ranging = 2000.0 + np.random.randn(100) * 0.1
+        trending = np.linspace(2000, 2010, 100)
+        volatile = 2010 + np.random.randn(100) * 2.0
+
+        data = pd.DataFrame({
+            'close': np.concatenate([ranging, trending, volatile]),
+            'high': np.concatenate([ranging + 0.1, trending + 0.1, volatile + 0.5]),
+            'low': np.concatenate([ranging - 0.1, trending - 0.1, volatile - 0.5])
+        })
+
+        # Initial detect should use heuristics
+        info_pre = self.detector.detect(data.iloc[:50])
+
+        # Fit GMM
+        self.detector.fit(data, n_clusters=3)
+        self.assertIsNotNone(self.detector._gmm)
+        self.assertTrue(len(self.detector._cluster_to_regime) > 0)
+
+        # Post-fit detect should use GMM
+        info_post = self.detector.detect(data.iloc[:50])
+        self.assertIn(info_post.label, MarketRegime)
+        self.assertGreater(info_post.confidence, 0.0)
+
+    def test_vectorized_label_history(self):
+        np.random.seed(42)
+        data = pd.DataFrame({
+            'close': 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+            'high': 2000.0 + np.cumsum(np.random.randn(100) * 0.1) + 0.1,
+            'low': 2000.0 + np.cumsum(np.random.randn(100) * 0.1) - 0.1
+        })
+
+        df_vec = self.detector.label_history(data, use_vectorized=True)
+        df_iter = self.detector.label_history(data, use_vectorized=False)
+
+        self.assertIn('regime', df_vec.columns)
+        self.assertEqual(len(df_vec), len(data))
+
+        # Sample check for consistency
+        idx = 80
+        self.assertEqual(df_vec['regime'].iloc[idx], df_iter['regime'].iloc[idx])
+
+    def test_generate_summary(self):
+        np.random.seed(42)
+        data = pd.DataFrame({
+            'close': 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
+            'high': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) + 0.1,
+            'low': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) - 0.1,
+            'returns': np.random.randn(200) * 0.001
+        })
+
+        summary = self.detector.generate_summary(data)
+        from src.research.reporting import RegimeSection
+        self.assertIsInstance(summary, RegimeSection)
+        self.assertTrue(len(summary.regimes) > 0)
+        self.assertIn("Stability", summary.transition_insights)
+
 if __name__ == '__main__':
     unittest.main()

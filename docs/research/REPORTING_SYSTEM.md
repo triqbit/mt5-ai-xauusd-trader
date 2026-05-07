@@ -29,3 +29,12 @@ To generate a validation report with mock data:
 ```bash
 PYTHONPATH=. python scripts/verify_reporting_system.py
 ```
+
+## Market Regime Detector
+
+The `RegimeDetector` module (src/models/regime_detector.py) provides advanced market state classification:
+
+- **Regimes:** TRENDING, RANGING, VOLATILE_BREAKOUT, LOW_VOLATILITY_DRIFT, NEWS_SHOCK, and MEAN_REVERSION.
+- **Dual Detection Logic:** Uses explainable heuristics and data-driven Gaussian Mixture Models (GMM).
+- **Statistical Features:** Kaufman Efficiency Ratio, price slope/angle, z-score, volatility clustering, kurtosis, skewness, and vol-of-vol.
+- **Reporting:** Vectorized historical labeling and stability/transition matrices for institutional auditing.
