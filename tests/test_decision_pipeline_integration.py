@@ -61,8 +61,9 @@ def data_generator():
 
 @pytest.fixture
 def ensemble_model():
+    from src.models import lstm_model
     with patch.object(ensemble, "torch", mock_torch), \
-         patch.object(ensemble, "LSTMAttentionModel", MagicMock()):
+         patch.object(lstm_model, "LSTMAttentionModel", MagicMock()):
         model = EnsembleModel(device="cpu")
         # Mock sub-models
         model._ppo_model = MagicMock()

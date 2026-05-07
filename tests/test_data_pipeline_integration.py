@@ -14,6 +14,11 @@ import pytest
 
 # Standardize mocks for use across all tests and imports
 mock_torch = MagicMock()
+# Scipy's array_api_compat checks issubclass(cls, torch.Tensor)
+# We need to provide a real class to avoid TypeError during import-time checks in some scipy versions
+class MockTensor: pass
+mock_torch.Tensor = MockTensor
+
 mock_sb3 = MagicMock()
 mock_talib = MagicMock()
 
@@ -61,8 +66,9 @@ def feature_engineer():
 @pytest.fixture
 def mock_ensemble():
     # Patch torch and LSTMAttentionModel within the ensemble module specifically
+    from src.models import lstm_model
     with patch.object(ensemble, "torch", mock_torch), \
-         patch.object(ensemble, "LSTMAttentionModel", MagicMock()):
+         patch.object(lstm_model, "LSTMAttentionModel", MagicMock()):
         model = EnsembleModel(device="cpu")
         model._ppo_model = MagicMock()
         model._ppo_model.predict.return_value = (1, None)
