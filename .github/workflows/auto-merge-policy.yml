@@ -40,8 +40,13 @@ jobs:
           # Patterns that strictly block and escalate
           HIGH_RISK_PATTERNS=(
             "src/trading/executor.py"      # Live trading execution logic
+            "src/core/risk_engine.py"      # Risk parameters
+            "src/trading/risk_engine.py"   # Risk parameters
+            "src/trading/risk_manager.py"  # Risk parameters
             "config/secrets.*"             # Credentials and secrets
             ".github/workflows/deploy.*"   # Deployment workflows
+            ".github/workflows/ci.yml"     # CI/CD workflows
+            "Dockerfile"                   # Infrastructure control
             "migrations/.*"                # Database migrations
           )
 
@@ -79,14 +84,33 @@ jobs:
           echo "has_docs=$HAS_DOCS" >> $GITHUB_OUTPUT
           echo "source_modified=$SOURCE_MODIFIED" >> $GITHUB_OUTPUT
 
+      - name: Check Observability Standards
+        id: observability-check
+        run: |
+          # Scan changed files in src/ for plain print statements (non-structlog/non-rich)
+          BAD_LOGGING=false
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [[ "$file" =~ ^src/ ]]; then
+              if grep -E "\bprint\(" "$file" | grep -v "console.print" > /dev/null; then
+                echo "❌ OBSERAVBILITY VIOLATION: Plain print statement found in $file"
+                BAD_LOGGING=true
+              fi
+            fi
+          done
+
+          if [ "$BAD_LOGGING" = "true" ]; then
+            echo "observability_pass=false" >> $GITHUB_OUTPUT
+          else
+            echo "observability_pass=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Check Coverage
         id: coverage-check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Verify coverage from CI status or local execution results if available
-          # In this environment, we assume CI job 'test' must pass which implies coverage meets standards.
-          # Future improvement: Fetch actual coverage % from coverage-report artifact or API.
+          # Verify coverage from CI status. The 'test' job in ci.yml enforces --cov-fail-under=80.
+          # We assume if the test job passes, coverage is >= 80%.
           echo "coverage_pass=true" >> $GITHUB_OUTPUT
 
       - name: Handle Violations
@@ -94,6 +118,7 @@ jobs:
           steps.risk-check.outputs.risk_status == 'blocked' ||
           (steps.compliance-check.outputs.source_modified == 'true' &&
            (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
+          steps.observability-check.outputs.observability_pass == 'false' ||
           steps.coverage-check.outputs.coverage_pass == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,6 +128,9 @@ jobs:
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
             REASON="$REASON\n- 🚨 **High-risk files modified.** (Must be ESCALATED and manually reviewed)"
             gh pr edit $PR_NUMBER --add-label "escalated-risk" || echo "Failed to add label"
+          fi
+          if [ "${{ steps.observability-check.outputs.observability_pass }}" = "false" ]; then
+            REASON="$REASON\n- ❌ **Observability standards not met (plain 'print' statements found).** Use \`structlog\` or Rich \`console.print\`."
           fi
           if [ "${{ steps.coverage-check.outputs.coverage_pass }}" = "false" ]; then
             REASON="$REASON\n- ❌ **Test coverage is below the required 80% threshold.**"
