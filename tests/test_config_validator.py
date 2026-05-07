@@ -579,7 +579,7 @@ def test_validator_stability_guards(monkeypatch, tmp_path):
     assert any(e.field == "MODEL_DRIFT_THRESHOLD" and not e.critical for e in result.errors)
 
 def test_validator_calibration_threshold_critical(monkeypatch, tmp_path):
-    """Test calibration threshold exceeds 0.25 is critical."""
+    """Test calibration threshold exceeds 0.35 is critical."""
     model_file = tmp_path / "model.pt"
     model_file.write_text("data")
     monkeypatch.setenv("MT5_LOGIN", "123456")
@@ -588,11 +588,29 @@ def test_validator_calibration_threshold_critical(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    monkeypatch.setenv("MODEL_CALIBRATION_THRESHOLD", "0.30")
+    # Threshold > 0.35 is critical
+    monkeypatch.setenv("MODEL_CALIBRATION_THRESHOLD", "0.40")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MODEL_CALIBRATION_THRESHOLD" and e.critical for e in result.errors)
+
+def test_validator_calibration_threshold_warning(monkeypatch, tmp_path):
+    """Test calibration threshold > 0.25 is a warning."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Threshold > 0.25 (but <= 0.35) is non-critical
+    monkeypatch.setenv("MODEL_CALIBRATION_THRESHOLD", "0.30")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
+    assert any(e.field == "MODEL_CALIBRATION_THRESHOLD" and not e.critical for e in result.errors)
 
 def test_validator_sqlite_live_warning(monkeypatch, tmp_path):
     """Test validator gives warning for SQLite in LIVE mode."""
