@@ -180,7 +180,12 @@ def test_startup_gate_failed(health_checker, mock_audit_logger):
         with pytest.raises(RuntimeError) as exc:
             health_checker.startup_gate()
         assert "mt5" in str(exc.value)
-        mock_audit_logger.log.assert_called_with("system", "startup_gate_failure", unittest.mock.ANY)
+        mock_audit_logger.log_operator_action.assert_called_with(
+            operator="system",
+            action="startup_gate_failure",
+            reason=unittest.mock.ANY,
+            metadata=unittest.mock.ANY
+        )
 
 @patch("src.core.health.ConfigValidator")
 def test_check_config_success(mock_validator_class, health_checker):

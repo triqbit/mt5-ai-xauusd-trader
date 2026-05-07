@@ -61,13 +61,13 @@ The automated script performs the following checks for every backup:
    cd backups/db/
    sha256sum -c trades_YYYYMMDD_HHMMSS.db.sha256
    sha256sum -c audit_YYYYMMDD_HHMMSS.db.sha256
+   cd ../..
    ```
 4. **Restore Database Files**:
    ```bash
    # Restore the database files to the application root
-   cp trades_YYYYMMDD_HHMMSS.db ../../trades.db
-   cp audit_YYYYMMDD_HHMMSS.db ../../audit.db
-   cd ../..
+   cp backups/db/trades_YYYYMMDD_HHMMSS.db ./trades.db
+   cp backups/db/audit_YYYYMMDD_HHMMSS.db ./audit.db
    ```
 5. **Verify Restoration**:
    ```bash
@@ -83,6 +83,13 @@ The automated script performs the following checks for every backup:
 ### 6.2. Log and Report Restoration
 1. **Locate and Verify Archive**:
    ```bash
+   # Verify checksums
+   cd backups/logs/
+   sha256sum -c logs_YYYYMMDD_HHMMSS.tar.gz.sha256
+   cd ../reports/
+   sha256sum -c reports_YYYYMMDD_HHMMSS.tar.gz.sha256
+   cd ../..
+
    # Verify the tarball integrity
    tar -tzf backups/logs/logs_YYYYMMDD_HHMMSS.tar.gz > /dev/null
    tar -tzf backups/reports/reports_YYYYMMDD_HHMMSS.tar.gz > /dev/null
