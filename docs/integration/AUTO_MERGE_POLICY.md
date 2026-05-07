@@ -10,9 +10,9 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 - ✅ **Approvals:** Required code owners have approved the pull request.
 - ✅ **No Merge Conflicts:** No conflicts with the target branch.
 - ✅ **Safety:** No high-risk files (as defined below) are touched.
-- ✅ **Test Coverage:** Tests must be added or updated for any new functionality.
-- ✅ **Documentation:** Documentation must be updated where required by the change.
-- ✅ **Observability:** Observability and logging must meet project standards (standard `structlog`, no `print` statements, mandatory docstrings).
+- ✅ **Test Coverage:** Tests must be added or updated for any new functionality (mandatory if `src/` or `main.py` is touched).
+- ✅ **Documentation:** Documentation must be updated where required by the change (mandatory if `src/` or `main.py` is touched).
+- ✅ **Observability:** Observability and logging must meet project standards (standard `structlog`, no plain `print()` statements).
 - ✅ **Architecture:** Changes must fit within existing architectural conventions.
 
 ## Block and Escalate Rules
@@ -24,7 +24,7 @@ Automatically **BLOCK** and **ESCALATE** if any of these are true:
 - 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*` or credential handling.
 - 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
 - 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile` or container orchestration.
-- 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*` or `ci.yml`.
+- 🚨 **Changes to CI/CD workflows that affect deployment or quality gates:** Modifications to `.github/workflows/deploy.*` or `ci.yml`.
 
 ## High-Risk Files (Auto-Merge Prohibited)
 
@@ -50,9 +50,8 @@ The following patterns trigger an automatic block and escalation:
 
 ## Audit Log of Auto-Merge Decisions
 
-This log is automatically maintained by the system.
-
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-07 | N/A | Policy Update | Jules05: Strict auto-merge enforcement implemented | [System Change] |
 | 2026-04-30 | #368 | Auto-Merged | Policy checks passed | [PR](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/368) |
 | 2026-04-29 | #365 | Auto-Merged | Policy checks passed | [PR](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/365) |
