@@ -5,7 +5,10 @@
 # ============================================================
 
 # --- Stage 1: builder ------------------------------------------
-FROM python:3.12-slim AS builder
+FROM python:3.11.9-slim AS builder
+
+LABEL maintainer="triqbit"
+LABEL description="MT5 AI/ML Trading Bot - Enterprise Edition"
 
 ARG TARGETARCH
 WORKDIR /app
@@ -48,9 +51,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.11.9-slim AS runtime
 
 WORKDIR /app
+
+# Environment variables for Python and TA-Lib
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    LD_LIBRARY_PATH="/usr/lib:/usr/local/lib:$LD_LIBRARY_PATH"
 
 # Runtime system dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
