@@ -89,6 +89,8 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config.metaapi_token = SecretStr("")
     config.metaapi_account_id = SecretStr("")
     config.mode = "demo"
+    config.symbol = "XAUUSD"
+    config.timeframe = "M5"
     config.model_path = Path("nonexistent")
     config.risk_per_trade = 0.01
     config.max_daily_loss = 0.05
@@ -101,6 +103,7 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config.model_accuracy_floor = 0.5
     config.model_win_rate_floor = 0.45
     config.model_calibration_threshold = 0.25
+    config.redis_url = ""
     config.log_level = "INFO"
 
     validator = ConfigValidator(config)
