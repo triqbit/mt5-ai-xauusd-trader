@@ -27,7 +27,7 @@ jobs:
 
           # Create a unified requirements file for scanning, excluding TA-Lib and MetaTrader5 which are platform-specific
           # Use 'ls' to only cat files that exist to avoid errors. xargs -r prevents cat from waiting on stdin.
-          ls requirements.txt requirements-ci.txt requirements-linux.txt requirements-scan.txt 2>/dev/null | xargs -r cat | grep -vE "TA-Lib|MetaTrader5" | sort | uniq > requirements-all-scan.txt
+          ls requirements.txt requirements-ci.txt requirements-linux.txt 2>/dev/null | xargs -r cat | grep -vE "TA-Lib|MetaTrader5" | sort | uniq > requirements-all-scan.txt
 
           # Install dependencies for scanning. Ignore failures as some platform-specific pins may fail on Linux.
           pip install -r requirements-all-scan.txt || true
@@ -38,6 +38,7 @@ jobs:
           # Explicitly ALLOWED: MIT, BSD, Apache, MPL, LGPL, PSF, Unlicense, ISC, Other/Proprietary, UNKNOWN (verified), Python, NVIDIA.
           # Explicitly BLOCKED: GPL, AGPL, CC-BY-NC.
           # Note: We use --partial-match to handle variations like "MIT License" or "BSD-3-Clause".
+          # pip-licenses uses a semicolon-separated list for --allow-only.
           pip-licenses \
             --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA" \
             --partial-match \
