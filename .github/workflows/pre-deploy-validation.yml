@@ -58,6 +58,23 @@ jobs:
           echo "Checking CHANGELOG.md for [Unreleased] content..."
           python scripts/check_release_notes.py || { echo "::error::Release notes validation failed. Add your changes to the [Unreleased] section in CHANGELOG.md"; exit 1; }
 
+      - name: Gate 4.5: Automated Pre-Prod Checklist Verification
+        run: |
+          echo "Verifying docs/PREPROD_CHECKLIST.md has no uncompleted items..."
+          CHECKLIST="docs/PREPROD_CHECKLIST.md"
+          if [ ! -f "$CHECKLIST" ]; then
+            echo "::error::PREPROD_CHECKLIST.md missing!"
+            exit 1
+          fi
+
+          # Fail if there are any unchecked boxes [ ]
+          if grep -q "\[ \]" "$CHECKLIST"; then
+            echo "::error::Uncompleted items found in PREPROD_CHECKLIST.md. Deployment blocked."
+            grep -n "\[ \]" "$CHECKLIST"
+            exit 1
+          fi
+          echo "SUCCESS: Pre-prod checklist validation passed."
+
       - name: Gate 5: Dependency Security Audit
         run: |
           echo "Scanning dependencies for vulnerabilities (CI & Prod)..."
@@ -70,12 +87,12 @@ jobs:
           # Install torch/torchvision from CPU index to save time/space for the check
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
-          # Create a unified requirements file for scanning, excluding TA-Lib (requires C libs) and MetaTrader5 (Windows-only)
-          cat requirements.txt requirements-ci.txt | grep -v "TA-Lib" | grep -v "MetaTrader5" | sort | uniq > requirements-all-scan.txt
+          # Create a unified requirements file for scanning, excluding TA-Lib and MetaTrader5
+          ls requirements.txt requirements-ci.txt requirements-linux.txt requirements-scan.txt 2>/dev/null | xargs -r cat | grep -vE "TA-Lib|MetaTrader5" | sort | uniq > requirements-all-scan.txt
           pip install -r requirements-all-scan.txt
 
           pip-licenses \
-            --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python" \
+            --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA" \
             --partial-match \
             --ignore-packages pip pip-licenses prettytable wcwidth setuptools || { echo "::error::License compliance check failed. Prohibited licenses detected."; exit 1; }
 
