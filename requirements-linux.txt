@@ -21,7 +21,7 @@ einops==0.8.2
 
 # ── Technical Analysis ──────────────────────────────────────
 TA-Lib==0.6.4
-pandas-ta==0.4.71b0
+pandas-ta==0.3.14b0
 mplfinance==0.12.10b0
 
 # ── Data Acquisition ────────────────────────────────────────
