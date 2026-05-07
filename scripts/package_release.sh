@@ -51,7 +51,32 @@ echo "Packaging Release v${VERSION}..."
 echo "Target Path: ${RELEASE_PATH}"
 echo "--------------------------------------------------------"
 
-# --- 2. Mandatory Validation Gates ---
+# --- 2. Prerequisite Checks ---
+echo "Running Prerequisite Checks..."
+
+# Check for required Python packages
+REQUIRED_PKGS=("alembic" "sqlalchemy" "pydantic" "pydantic_settings")
+for pkg in "${REQUIRED_PKGS[@]}"; do
+    if ! python3 -c "import $pkg" >/dev/null 2>&1; then
+        echo "Error: Python package '$pkg' is not installed."
+        echo "Please install it using: pip install $pkg"
+        exit 1
+    fi
+done
+
+# Check for Docker if build is not skipped
+if [ "$SKIP_DOCKER_BUILD" != "true" ]; then
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "Error: docker command not found."
+        exit 1
+    fi
+    if ! docker info >/dev/null 2>&1; then
+        echo "Error: Docker daemon is not running or accessible."
+        exit 1
+    fi
+fi
+
+# --- 3. Mandatory Validation Gates ---
 echo "Running Pre-Packaging Validation Gates..."
 
 echo "Checking environment template..."
@@ -63,14 +88,14 @@ python3 scripts/verify_migrations.py
 echo "Validating release notes in CHANGELOG.md..."
 python3 scripts/check_release_notes.py
 
-# --- 3. Directory Management ---
+# --- 4. Directory Management ---
 if [ -d "$RELEASE_PATH" ]; then
     echo "Warning: Release directory $RELEASE_PATH already exists. Re-creating..."
     rm -rf "$RELEASE_PATH"
 fi
 mkdir -p "$RELEASE_PATH"
 
-# --- 4. Artifact Collection ---
+# --- 5. Artifact Collection ---
 
 # A. Docker Image (Save)
 if [ "$SKIP_DOCKER_BUILD" = "true" ]; then
@@ -126,7 +151,9 @@ cp ".env.example" "${RELEASE_PATH}/"
 
 # D. Database Migrations
 echo "   [+] Component: Database Migrations (migrations/)"
-cp -r migrations "${RELEASE_PATH}/"
+mkdir -p "${RELEASE_PATH}/migrations"
+cp -r migrations/* "${RELEASE_PATH}/migrations/"
+find "${RELEASE_PATH}/migrations" -name "__pycache__" -type d -exec rm -rf {} +
 
 # E. Configuration Documentation
 echo "   [+] Component: Configuration Reference (CONFIG_REFERENCE.md)"
@@ -146,10 +173,12 @@ if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ] || [ "$(grep -c "[a-zA-Z]" "${REL
      echo "Development Build - No specific release notes for v${VERSION}." > "${RELEASE_PATH}/RELEASE_NOTES.md"
 fi
 
-# --- 5. Validation & Checksums ---
+# --- 6. Validation & Checksums ---
 
 echo "Generating Checksum Manifest..."
-(cd "${RELEASE_PATH}" && find . -type f ! -name "checksums.sha256" | sort | while read -r f; do
+# Clear existing manifest if any
+rm -f "${RELEASE_PATH}/checksums.sha256"
+(cd "${RELEASE_PATH}" && find . -type f ! -name "checksums.sha256" ! -path "*/__pycache__/*" | sort | while read -r f; do
     sha256_cmd "$f" >> "checksums.sha256"
 done)
 
