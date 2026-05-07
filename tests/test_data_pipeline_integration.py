@@ -60,12 +60,14 @@ def feature_engineer():
 
 @pytest.fixture
 def mock_ensemble():
-    # Patch torch and LSTMAttentionModel within the ensemble module specifically
+    # Patch torch and LSTMModel within the ensemble module specifically
     with patch.object(ensemble, "torch", mock_torch), \
-         patch.object(ensemble, "LSTMAttentionModel", MagicMock()):
+         patch.object(ensemble, "LSTMModel", MagicMock()):
         model = EnsembleModel(device="cpu")
-        model._ppo_model = MagicMock()
-        model._ppo_model.predict.return_value = (1, None)
+        model.ppo_agent = MagicMock()
+        from src.models.base_model import Signal
+        from src.core.constants import SignalDirection
+        model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
         return model
 
 def setup_mock_talib(m_talib):
@@ -118,9 +120,9 @@ def test_data_to_model_inference_flow(data_generator, feature_engineer, mock_ens
     assert isinstance(signal.direction, SignalDirection)
     assert 0.0 <= signal.confidence <= 1.0
     assert "ppo" in signal.metadata["per_algo_votes"]
-    mock_ensemble._ppo_model.predict.assert_called_once()
+    mock_ensemble.ppo_agent.predict.assert_called_once()
 
-    called_obs = mock_ensemble._ppo_model.predict.call_args[0][0]
+    called_obs = mock_ensemble.ppo_agent.predict.call_args[0][0]
     np.testing.assert_array_equal(called_obs, latest_obs)
 
 def test_pipeline_resilience_to_malformed_data(data_generator, feature_engineer, mock_ensemble):
