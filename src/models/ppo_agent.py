@@ -4,6 +4,8 @@ src/models/ppo_agent.py
 Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -17,13 +19,16 @@ from src.models.base_model import BaseModel, Signal
 class PPOAgent(BaseModel):
     """
     PPO-based reinforcement learning agent.
+
     Uses Stable-Baselines3 PPO under the hood for policy-based trading decisions.
+    Compatible with Gymnasium-style trading environments.
 
     Attributes:
         logger: Logger instance for monitoring agent activity.
         device: Torch device to use for inference (e.g., 'cpu', 'cuda', 'auto').
         model: Loaded PPO model instance or None.
         env: Vectorized environment used for model loading/training.
+        ppo_kwargs: Hyperparameters passed to the PPO constructor.
     """
 
     def __init__(
@@ -104,7 +109,7 @@ class PPOAgent(BaseModel):
             )
 
         try:
-            # Ensure features have a batch dimension for SB3 (usually (1, window_size, n_features))
+            # Ensure features have a batch dimension for SB3 (usually (batch, window_size, n_features))
             obs = features
             if obs.ndim == 1:
                 # Add batch and window dimensions if only features provided
@@ -172,6 +177,22 @@ class PPOAgent(BaseModel):
                 metadata={"error": str(e)},
             )
 
+    def train(self, total_timesteps: int = 10000, callback: Any | None = None) -> None:
+        """
+        Trains the PPO agent on the provided environment.
+
+        Args:
+            total_timesteps: Total number of steps to train for.
+            callback: Optional callback for monitoring training.
+        """
+        if self.model is None:
+            self.logger.error("Cannot train: No model or environment loaded.")
+            return
+
+        self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
+        self.model.learn(total_timesteps=total_timesteps, callback=callback)
+        self.logger.info("PPO training complete.")
+
     def save(self, path: str | Path) -> None:
         """
         Saves the PPO model to the specified path.
@@ -184,3 +205,6 @@ class PPOAgent(BaseModel):
             self.logger.info(f"PPO model saved to {path}")
         else:
             self.logger.error("Attempted to save PPOAgent but no model is loaded.")
+
+
+__all__ = ["PPOAgent"]

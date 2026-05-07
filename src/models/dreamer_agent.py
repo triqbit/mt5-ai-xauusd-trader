@@ -4,6 +4,8 @@ src/models/dreamer_agent.py
 Placeholder DreamerV3 wrapper compatible with the ensemble interface.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,7 @@ from src.models.base_model import BaseModel, Signal
 class DreamerAgent(BaseModel):
     """
     DreamerV3 wrapper (placeholder).
+
     DreamerV3 is a world model-based reinforcement learning algorithm that
     learns a latent dynamics model and plans in the imagination.
 
@@ -73,7 +76,7 @@ class DreamerAgent(BaseModel):
             },
         )
 
-    def update_state(
+    def observe(
         self,
         features: np.ndarray,
         action: int,
@@ -81,7 +84,7 @@ class DreamerAgent(BaseModel):
         is_terminal: bool,
     ) -> None:
         """
-        Updates the internal latent state of the world model.
+        Updates the internal latent state of the world model based on an observation.
 
         Args:
             features: Current observation features.
@@ -90,8 +93,30 @@ class DreamerAgent(BaseModel):
             is_terminal: Whether the episode has ended.
         """
         # In Dreamer, the world model is recurrent and must be updated
-        # with every step to maintain the latent representation.
-        pass
+        # with every step to maintain the latent representation (RSSM).
+        self.logger.debug("DreamerAgent.observe called (placeholder).")
+
+    def imagine(self, horizon: int = 15) -> Any:
+        """
+        Simulates future trajectories in the latent space.
+
+        Args:
+            horizon: Number of steps to look ahead.
+
+        Returns:
+            Simulated trajectory data (placeholder).
+        """
+        self.logger.debug(f"DreamerAgent.imagine called with horizon {horizon} (placeholder).")
+        return None
+
+    def train(self, replay_buffer: Any) -> None:
+        """
+        Trains the world model, actor, and critic from replay buffer data.
+
+        Args:
+            replay_buffer: Buffer containing past experience transitions.
+        """
+        self.logger.debug("DreamerAgent.train called (placeholder).")
 
     def reset_state(self) -> None:
         """
@@ -108,3 +133,6 @@ class DreamerAgent(BaseModel):
             path: Target file path.
         """
         self.logger.info(f"DreamerAgent.save called for {path} (placeholder).")
+
+
+__all__ = ["DreamerAgent"]
