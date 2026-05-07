@@ -44,3 +44,12 @@ The `RegimeDetector` module (src/models/regime_detector.py) provides advanced ma
 - **Dual Detection Logic:** Uses explainable heuristics and data-driven Gaussian Mixture Models (GMM).
 - **Statistical Features:** Kaufman Efficiency Ratio, price slope/angle, z-score, volatility clustering, kurtosis, skewness, and vol-of-vol.
 - **Reporting:** Vectorized historical labeling and stability/transition matrices for institutional auditing.
+
+## Dynamic Ensemble System
+
+The `DynamicEnsemble` module (src/models/dynamic_ensemble.py) implements an adaptive weighting engine:
+
+- **Autonomous Tracking:** Independent recording of model predictions and realized market outcomes.
+- **Closed-Loop Metrics:** Real-time calculation of accuracy, confidence calibration (alignment between predicted confidence and success), and performance drift.
+- **Stability Controls:** EMA-based weight transitions, abrupt swing caps, and oscillation dampening for volatile regimes.
+- **Regime Awareness:** Adaptation rates and scoring heuristics are modulated by the current market regime (e.g., NEWS_SHOCK, TRENDING) to ensure robust performance.

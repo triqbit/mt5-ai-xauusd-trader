@@ -9,9 +9,13 @@ License: MIT
 from __future__ import annotations
 
 import logging
+from collections import deque
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
+from src.core.constants import SignalDirection
 from src.models.regime_detector import MarketRegime, RegimeInfo
 
 logger = logging.getLogger(__name__)
@@ -42,6 +46,7 @@ class DynamicEnsemble:
         max_swing: float = 0.05,
         min_weight: float = 0.05,
         initial_weights: dict[str, float] | None = None,
+        history_window: int = 100,
     ) -> None:
         """
         Initialize the dynamic ensemble engine.
@@ -52,6 +57,7 @@ class DynamicEnsemble:
             max_swing: Maximum allowed weight change per update (> 0.0).
             min_weight: Minimum weight floor for any single model (>= 0.0).
             initial_weights: Optional initial weight distribution.
+            history_window: Rolling window for autonomous metric tracking.
         """
         if not model_names:
             raise ValueError("model_names cannot be empty")
@@ -72,6 +78,12 @@ class DynamicEnsemble:
         self.smoothing_factor = smoothing_factor  # EMA decay
         self.max_swing = max_swing  # Cap on abrupt changes
         self.min_weight = min_weight  # Floor per model
+
+        # Autonomous tracking state
+        self._history: dict[str, deque[dict[str, Any]]] = {
+            m: deque(maxlen=history_window) for m in model_names
+        }
+        self._pending_predictions: dict[str, dict[str, Any]] = {}
 
         if initial_weights:
             # Validate initial weights
@@ -96,9 +108,98 @@ class DynamicEnsemble:
         self._target_weights = self.weights.copy()
         self._prev_target_weights = self.weights.copy()
 
+    def record_prediction(
+        self, model_name: str, direction: SignalDirection, confidence: float
+    ) -> None:
+        """
+        Record a model's prediction for future outcome matching.
+
+        Args:
+            model_name: Identifier of the model.
+            direction: Predicted signal direction.
+            confidence: Model's internal confidence score (0.0 to 1.0).
+        """
+        if model_name not in self.model_names:
+            logger.warning("Attempted to record prediction for unknown model: %s", model_name)
+            return
+
+        self._pending_predictions[model_name] = {
+            "direction": direction,
+            "confidence": confidence,
+        }
+
+    def record_outcome(self, model_name: str, actual_direction: SignalDirection) -> None:
+        """
+        Match a pending prediction with its actual market outcome.
+
+        Args:
+            model_name: Identifier of the model.
+            actual_direction: The realized market direction.
+        """
+        prediction = self._pending_predictions.pop(model_name, None)
+        if not prediction:
+            return
+
+        is_correct = prediction["direction"] == actual_direction
+        # For HOLD, accuracy is neutral unless we specifically define it
+        if prediction["direction"] == SignalDirection.HOLD:
+            # Neutral weight for HOLD prediction accuracy
+            accuracy_gain = 0.5
+        else:
+            accuracy_gain = 1.0 if is_correct else 0.0
+
+        # Calibration: how close was confidence to the binary outcome?
+        # A well-calibrated model has confidence ~ win rate.
+        cal_error = abs(prediction["confidence"] - (1.0 if is_correct else 0.0))
+
+        self._history[model_name].append(
+            {
+                "correct": is_correct,
+                "accuracy_gain": accuracy_gain,
+                "confidence": prediction["confidence"],
+                "calibration_error": cal_error,
+                "timestamp": datetime.now(UTC),
+            }
+        )
+
+    def calculate_metrics(self, model_name: str) -> dict[str, float]:
+        """
+        Derive performance metrics from tracked history for a specific model.
+
+        Returns:
+            - accuracy: Win rate over the window.
+            - calibration_error: Average deviation between confidence and outcome.
+            - drift_score: Measure of recent performance degradation vs long-term.
+        """
+        history = self._history.get(model_name, [])
+        if not history:
+            return {"accuracy": 0.5, "calibration_error": 0.0, "drift_score": 0.0}
+
+        # 1. Accuracy (Win Rate)
+        acc = sum(h["accuracy_gain"] for h in history) / len(history)
+
+        # 2. Calibration Error
+        cal = sum(h["calibration_error"] for h in history) / len(history)
+
+        # 3. Drift Detection (Recent 20% vs Full Window)
+        drift = 0.0
+        if len(history) >= 10:
+            recent_split = max(1, len(history) // 5)
+            recent_acc = (
+                sum(h["accuracy_gain"] for h in list(history)[-recent_split:]) / recent_split
+            )
+            # Drift is high if recent performance is significantly lower than window average
+            drift = float(np.clip((acc - recent_acc) * 2.0, 0.0, 1.0))
+
+        return {
+            "accuracy": float(acc),
+            "calibration_error": float(cal),
+            "drift_score": drift,
+        }
+
     def update_weights(
         self,
-        metrics: dict[str, dict[str, float]],
+        metrics: dict[str, dict[str, float]] | None = None,
         regime_info: RegimeInfo | None = None,
         volatility_context: float | None = None,
     ) -> dict[str, float]:
@@ -106,18 +207,25 @@ class DynamicEnsemble:
         Update ensemble weights using a multi-factor scoring model and stability controls.
 
         Args:
-            metrics: Dictionary mapping model names to their performance metrics:
+            metrics: Optional external dictionary mapping model names to metrics:
                 - accuracy: Normalized Sharpe or Win-rate (0.0 to 1.0).
                 - calibration_error: Deviation between confidence and success (0.0 to 1.0).
                 - drift_score: Signal of performance degradation (0.0 to 1.0).
+                If None, uses internal autonomous tracking.
             regime_info: Current market regime context for heuristic-based scoring adjustments.
             volatility_context: Optional manual override or additional volatility metric.
 
         Returns:
             Dict[str, float]: The updated weight distribution (sums to 1.0).
         """
-        if not metrics:
-            return self.weights
+        # Blend external metrics with internal autonomous tracking
+        effective_metrics: dict[str, dict[str, float]] = {}
+        for name in self.model_names:
+            # Start with internal metrics
+            effective_metrics[name] = self.calculate_metrics(name)
+            # Override with external metrics if provided
+            if metrics and name in metrics:
+                effective_metrics[name].update(metrics[name])
 
         raw_scores: dict[str, float] = {}
 
@@ -131,7 +239,7 @@ class DynamicEnsemble:
             volatility = regime_info.volatility_index
 
         for name in self.model_names:
-            m = metrics.get(name, {})
+            m = effective_metrics.get(name, {})
             acc = m.get("accuracy", 0.5)
             cal = m.get("calibration_error", 0.0)
             drift = m.get("drift_score", 0.0)

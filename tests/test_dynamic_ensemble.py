@@ -1,5 +1,6 @@
 import unittest
 
+from src.core.constants import SignalDirection
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.regime_detector import MarketRegime, RegimeInfo
 
@@ -280,6 +281,80 @@ class TestDynamicEnsemble(unittest.TestCase):
             DynamicEnsemble(model_names=self.models, min_weight=-0.1)
         with self.assertRaises(ValueError):
             DynamicEnsemble(model_names=self.models, min_weight=0.4)  # 3 * 0.4 = 1.2 > 1.0
+
+    def test_autonomous_tracking(self):
+        """Verify that record_prediction and record_outcome correctly populate history."""
+        self.ensemble.record_prediction("ppo", SignalDirection.BUY, 0.8)
+        self.ensemble.record_outcome("ppo", SignalDirection.BUY)
+
+        history = self.ensemble._history["ppo"]
+        self.assertEqual(len(history), 1)
+        self.assertTrue(history[0]["correct"])
+        self.assertEqual(history[0]["accuracy_gain"], 1.0)
+        self.assertAlmostEqual(history[0]["calibration_error"], 0.2)  # abs(0.8 - 1.0)
+
+    def test_calculate_metrics(self):
+        """Verify calculate_metrics returns expected values."""
+        # 4 correct, 1 incorrect
+        for _ in range(4):
+            self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("ppo", SignalDirection.BUY)
+        self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+        self.ensemble.record_outcome("ppo", SignalDirection.SELL)
+
+        metrics = self.ensemble.calculate_metrics("ppo")
+        self.assertAlmostEqual(metrics["accuracy"], 0.8)
+        self.assertAlmostEqual(metrics["calibration_error"], 0.2)  # (0*4 + 1*1) / 5
+
+    def test_drift_detection(self):
+        """Verify drift_score calculation (recent performance drop)."""
+        # Long-term: 10 correct
+        for _ in range(10):
+            self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("ppo", SignalDirection.BUY)
+
+        # Recent: 5 incorrect
+        for _ in range(5):
+            self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("ppo", SignalDirection.SELL)
+
+        metrics = self.ensemble.calculate_metrics("ppo")
+        # acc = 10/15 = 0.66
+        # recent_acc (last 3 because 15//5=3) = 0/3 = 0.0
+        # drift = (0.66 - 0.0) * 2 = 1.32 -> capped at 1.0
+        self.assertAlmostEqual(metrics["drift_score"], 1.0)
+
+    def test_update_weights_autonomous(self):
+        """Verify update_weights works using internal history only."""
+        # PPO perfect, LSTM failing
+        for _ in range(10):
+            self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("ppo", SignalDirection.BUY)
+            self.ensemble.record_prediction("lstm", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("lstm", SignalDirection.SELL)
+
+        initial_weights = self.ensemble.get_weights()
+        new_weights = self.ensemble.update_weights()  # No metrics passed
+
+        self.assertGreater(new_weights["ppo"], initial_weights["ppo"])
+        self.assertLess(new_weights["lstm"], initial_weights["lstm"])
+
+    def test_metric_blending(self):
+        """Verify external metrics override internal ones."""
+        # Internally PPO is perfect
+        self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+        self.ensemble.record_outcome("ppo", SignalDirection.BUY)
+
+        # Externally PPO is terrible
+        external_metrics = {
+            "ppo": {"accuracy": 0.0, "calibration_error": 1.0, "drift_score": 1.0}
+        }
+
+        initial_ppo = self.ensemble.weights["ppo"]
+        # If external overrides, PPO weight should drop
+        new_weights = self.ensemble.update_weights(metrics=external_metrics)
+
+        self.assertLess(new_weights["ppo"], initial_ppo)
 
 if __name__ == '__main__':
     unittest.main()
