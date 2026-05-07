@@ -134,14 +134,12 @@ class FeatureEngineer:
 
             # Remove original OHLCV columns for the final feature matrix if requested
             if drop_ohlcv:
+                cols_to_drop = ["open", "high", "low", "close", "tick_volume", "real_volume"]
                 features_only = full_df.drop(
-                    columns=["open", "high", "low", "close", "tick_volume"]
+                    columns=[c for c in cols_to_drop if c in full_df.columns]
                 )
             else:
                 features_only = full_df
-
-            if "real_volume" in features_only.columns:
-                features_only = features_only.drop(columns=["real_volume"])
 
             features_only = features_only.dropna()
 
@@ -326,10 +324,6 @@ class FeatureEngineer:
         # Using rolling weighted quantiles as an approximation
         window = 30
         try:
-            # We use rolling for POC/VAH/VAL
-            # POC approximated by 0.5 quantile (median) weighted by volume?
-            # Actually, a better proxy for POC is just the VWAP.
-            # But let's use rolling quantiles for VAH (0.7) and VAL (0.3)
             rolling_close = pd.Series(close)
             vol["vp_poc"] = rolling_close.rolling(window).median().values
             vol["vp_vah"] = rolling_close.rolling(window).quantile(0.7).values
@@ -346,7 +340,7 @@ class FeatureEngineer:
     def _compute_mtf_features(self, df: pd.DataFrame, tf: str) -> pd.DataFrame:
         """
         Resample data to a different timeframe and compute features.
-        Ensures no look-ahead bias by shifting.
+        Ensures no look-ahead bias by shifting completion time.
         """
         tf_map = {
             "M1": "1min", "M5": "5min", "M15": "15min", "M30": "30min",
@@ -365,7 +359,13 @@ class FeatureEngineer:
         mtf_all.update(self._get_candle_patterns(resampled, prefix=f"mtf_{tf}"))
 
         combined_mtf = pd.DataFrame(mtf_all, index=resampled.index)
-        combined_mtf = combined_mtf.reindex(df.index, method="ffill").shift(1)
+
+        # Shift resampled data forward by one timeframe period.
+        # A bar starting at 00:00 is only completed and available at 00:05 (for M5).
+        combined_mtf = combined_mtf.shift(1, freq=freq)
+
+        # Reindex to base timeframe index and forward-fill values
+        combined_mtf = combined_mtf.reindex(df.index, method="ffill")
 
         return combined_mtf
 
