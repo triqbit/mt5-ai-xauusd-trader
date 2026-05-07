@@ -7,6 +7,9 @@ from src.core.explainability import (
     SignalExplainer,
     SignalExplanation,
 )
+from src.core.schemas import TradeSignal
+from src.models.regime_detector import MarketRegime, RegimeInfo
+from src.trading.execution_filter import ExecutionDecision
 
 
 def test_signal_explanation_pydantic_validation():
@@ -261,6 +264,95 @@ def test_signal_explainer_feature_contributions():
     # Check machine attribution for features
     assert "feature_impacts" in explanation.machine_attribution
     assert explanation.machine_attribution["feature_impacts"]["Trend"] == 0.8
+
+
+def test_signal_explainer_feature_clustering():
+    """Test that individual feature impacts are automatically clustered."""
+    explainer = SignalExplainer()
+    feature_impacts = {
+        "base_M5_rsi": 0.8,
+        "base_M5_macd": 0.6,
+        "base_M5_slope": 0.7,
+        "base_M5_atr": 0.1,
+        "unknown_feature": 0.5,
+    }
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        feature_impacts=feature_impacts,
+    )
+
+    clusters = [c.cluster_name for c in explanation.feature_contributions]
+    assert "Momentum" in clusters  # rsi, macd
+    assert "Trend" in clusters     # slope
+    assert "Volatility" in clusters # atr
+    assert "Other" in clusters      # unknown_feature
+
+    momentum = next(c for c in explanation.feature_contributions if c.cluster_name == "Momentum")
+    assert momentum.contribution_score == 0.7  # (0.8 + 0.6) / 2
+    assert momentum.impact_level == "High"
+
+
+def test_signal_explainer_structured_inputs():
+    """Test explain with RegimeInfo and ExecutionDecision objects."""
+    explainer = SignalExplainer()
+
+    regime = RegimeInfo(
+        label=MarketRegime.TRENDING,
+        confidence=0.95,
+        transition_score=0.1,
+        volatility_index=1.1,
+    )
+
+    signal = TradeSignal(
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000.0,
+        stop_loss=1990.0,
+        take_profit=2020.0,
+        lot_size=0.1,
+        algorithm="ppo",
+        confidence=0.9,
+    )
+
+    execution = ExecutionDecision(
+        signal=signal,
+        is_approved=False,
+        confidence_score=0.9,
+        blocked_by="ATR_VOLATILITY",
+        trace={
+            "atr_volatility": {"passed": False, "ratio": 3.5, "threshold": 3.0},
+            "momentum": {"passed": True, "rsi": 65},
+        },
+    )
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.9,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info=regime,
+        execution_data=execution,
+    )
+
+    assert explanation.regime_context.regime_name == "Trending"
+    assert explanation.regime_context.confidence == 0.95
+    assert explanation.execution_summary.passed is False
+    assert "Blocked by ATR_VOLATILITY" in explanation.execution_summary.summary
+
+    # Check filter trace mapping
+    atr_filter = next(f for f in explanation.execution_summary.filters if f.filter_name == "atr_volatility")
+    assert atr_filter.passed is False
+    assert atr_filter.value == 3.5
+    assert atr_filter.threshold == 3.0
 
 
 def test_signal_explainer_with_individual_confidences():
