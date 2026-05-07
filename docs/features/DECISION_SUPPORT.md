@@ -38,8 +38,7 @@ For human operators, the DSS generates a high-fidelity terminal dashboard using 
 The DSS calculates a weighted composite score to quantify the quality of a trade setup:
 - **Ensemble Consensus (40%):** Strength of agreement among models.
 - **Regime Confidence (30%):** Reliability of the detected market regime.
-- **Risk Quality (20%):** Based on the calculated Risk:Reward ratio (normalized against a 3.0 target).
-- **Macro Safety (10%):** Absence or low impact of upcoming economic events.
+- **Risk & Safety (30%):** Decomposed into Risk:Reward quality (20%, normalized against a 3.0 target) and Macro Safety (10%).
 
 ### Sizing Recommendation
 The `sizing_multiplier` provides dynamic position sizing advice:
