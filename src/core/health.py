@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import platform
 import shutil
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 import redis
@@ -43,19 +43,28 @@ class HealthStatus(str, Enum):
     FAILED = "failed"
 
 
+def get_system_version() -> str:
+    """Utility to retrieve application version."""
+    try:
+        from src import __version__
+        return __version__
+    except ImportError:
+        return "unknown"
+
+
 class ComponentStatus(BaseModel):
     status: HealthStatus
     message: str
     remedy: str = "N/A"
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class HealthReport(BaseModel):
     status: HealthStatus
-    version: str = "1.1.0"
+    version: str = "unknown"
     environment: str = "production"
     components: dict[str, ComponentStatus]
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class HealthChecker:
@@ -371,7 +380,7 @@ class HealthChecker:
 
     def get_full_report(self) -> HealthReport:
         """Aggregate all checks into a comprehensive report."""
-        from src import __version__
+        version = get_system_version()
 
         components = {
             "liveness": self.check_liveness(),
@@ -397,7 +406,7 @@ class HealthChecker:
 
         return HealthReport(
             status=overall_status,
-            version=__version__,
+            version=version,
             environment=self.cfg.mode,
             components=components,
         )
@@ -481,10 +490,12 @@ def create_health_app() -> FastAPI:
     """
     Create a FastAPI application that includes health routes and Prometheus metrics.
     """
+    version = get_system_version()
+
     app = FastAPI(
         title="MT5 Trading Bot Health API",
         description="Enterprise health monitoring and metrics for MT5 AI/ML Bot",
-        version="1.0.0",
+        version=version,
     )
     app.include_router(router)
 

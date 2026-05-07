@@ -101,6 +101,10 @@ class MT5Connector:
         self.metaapi_connection: Any | None = None
         self._is_initialized: bool = False
 
+    def connect(self) -> bool:
+        """Alias for initialize() to support legacy calls."""
+        return self.initialize()
+
     @with_retry(MT5ConnectionError, max_retries=3)
     def initialize(self) -> bool:
         """
@@ -362,6 +366,12 @@ class MT5Connector:
             ticket = asyncio.run(_place_order())
             logger.info("MetaAPI order executed successfully | ticket=%d", ticket)
             return ticket
+
+    def get_account_balance(self) -> float:
+        """Retrieve current account balance."""
+        info = self.get_account_info()
+        # MT5 standard field is 'balance', MetaAPI is 'balance'
+        return float(info.get("balance", 0.0))
 
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account information."""

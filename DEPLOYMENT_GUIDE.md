@@ -263,10 +263,17 @@ spec:
 
 ### 8.1 Deployment Monitoring
 - **Deployment Status**: Track rollout status
-- **Pod Health**: Monitor pod readiness
-- **Service Status**: Check service availability
+- **Pod Health**: Monitor pod readiness via `/health/readiness`
+- **Service Status**: Check service availability via `/health/liveness`
 - **Error Rate**: Alert if >1% errors
 - **Latency**: Alert if p95 latency > 500ms
+
+### 8.2 Health Check Endpoints
+The application provides enterprise-grade health monitoring endpoints:
+- `GET /health/liveness`: Returns `200 OK` if the process is running.
+- `GET /health/readiness`: Performs deep dependency checks (DB, MT5, Redis) and returns `200 OK` only if ready to trade. Returns `503 Service Unavailable` on critical failures.
+- `GET /health/full`: Returns a comprehensive report of all system components.
+- `GET /metrics`: Exports Prometheus metrics, including `system_component_health` gauges.
 
 ### 8.2 Application Metrics
 - **Requests**: Requests per second

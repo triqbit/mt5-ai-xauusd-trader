@@ -157,7 +157,7 @@ class EnsembleModel(BaseModel):
 
         # PPO prediction logic
         if self._ppo_model is not None:
-            with profile("ppo_predict"):
+            with profile("inference_ppo"):
                 action, _ = self._ppo_model.predict(features, deterministic=True)
                 # action: 0=HOLD, 1=BUY, 2=SELL (ModelAction mapping)
                 dir = ModelAction(action).to_direction()
@@ -165,7 +165,7 @@ class EnsembleModel(BaseModel):
 
         # LSTM prediction logic
         if self.lstm_model is not None and seq is not None and torch is not None:
-            with torch.no_grad(), profile("lstm_predict"):
+            with torch.no_grad(), profile("inference_lstm"):
                 logits = self.lstm_model(seq.to(self.device).unsqueeze(0))
                 probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
                 idx = np.argmax(probs)
