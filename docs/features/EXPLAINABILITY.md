@@ -43,17 +43,29 @@ The final gate where signals are validated against institutional risk constraint
 
 ```python
 from src.core.explainability import SignalExplainer
+from src.models.regime_detector import MarketRegime, RegimeInfo
+from src.trading.execution_filter import ExecutionDecision
 
 explainer = SignalExplainer()
+
+# Using structured objects for deeper context
+regime = RegimeInfo(
+    label=MarketRegime.TRENDING,
+    confidence=0.95,
+    transition_score=0.1,
+    volatility_index=1.1
+)
+
 explanation = explainer.explain(
     symbol="XAUUSD",
     direction=1,  # BUY
     confidence=0.85,
-    model_votes={"ppo": 0, "lstm": 0},
+    model_votes={"ppo": 1, "lstm": 1},
     model_weights={"ppo": 0.7, "lstm": 0.3},
     risk_data={"passed": True, "risk_reward": 2.5, "summary": "Risk within limits"},
-    regime_info={"name": "Trending", "confidence": 0.9, "volatility": "Normal"},
-    feature_impacts=[{"cluster": "Trend", "score": 0.8, "impact": "High", "summary": "Strong momentum"}]
+    regime_info=regime,
+    # Supports automated feature clustering from raw scores
+    feature_impacts={"base_M5_rsi": 0.8, "base_M5_slope": 0.7}
 )
 ```
 
@@ -75,6 +87,7 @@ The `machine_attribution` field provides high-fidelity metrics for post-trade an
 - **`risk_reward_ratio`**: The realized R:R for the trade.
 - **`risk_rejection_reasons`**: Structured list of reasons if a signal was blocked by the risk engine.
 - **`failed_execution_filters`**: Identification of specific execution gates (e.g., Spread, Timing) that prevented a trade.
+- **`feature_impacts`**: Aggregated cluster-level scores for automated alpha decay analysis.
 
 ## Institutional Analysis
 
