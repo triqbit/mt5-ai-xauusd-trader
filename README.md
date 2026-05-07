@@ -87,11 +87,16 @@ mt5-ai-xauusd-trader/
 
 ## 🏁 Quick Start
 
-### 1. Installation
+### 1. Installation & Verification
 ```bash
 git clone https://github.com/triqbit/mt5-ai-xauusd-trader.git
 cd mt5-ai-xauusd-trader
+
+# Install dependencies
 pip install -r requirements.txt
+
+# [CRITICAL] Verify environment and dependencies
+python3 scripts/doctor.py
 ```
 
 ### 2. Configuration
