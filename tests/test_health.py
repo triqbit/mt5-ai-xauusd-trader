@@ -19,6 +19,7 @@ from src.core.health import (
     HealthChecker,
     HealthReport,
     HealthStatus,
+    get_system_version,
     init_health_checker,
     router,
 )
@@ -300,3 +301,8 @@ def test_api_readiness_failure(client):
                 response = client.get("/health/readiness")
         assert response.status_code == 503
         assert response.json()["detail"]["status"] == "failed"
+
+def test_get_system_version():
+    version = get_system_version()
+    assert isinstance(version, str)
+    assert version != ""
