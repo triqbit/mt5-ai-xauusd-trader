@@ -588,7 +588,7 @@ def test_validator_calibration_threshold_critical(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    monkeypatch.setenv("MODEL_CALIBRATION_THRESHOLD", "0.30")
+    monkeypatch.setenv("MODEL_CALIBRATION_THRESHOLD", "0.40")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
