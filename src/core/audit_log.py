@@ -185,6 +185,18 @@ class AuditLogger:
             metadata={"symbol": symbol, "reason": reason, "context": context},
         )
 
+    def log_mt5_status(self, status: str, details: str | None = None) -> int:
+        """
+        Log MT5 connection status changes.
+        Used for uptime and reliability tracking.
+        """
+        return self.log(
+            actor="system",
+            action="mt5_connection_status",
+            details=details or f"MT5 status changed to: {status}",
+            metadata={"status": status},
+        )
+
     def log_operator_action(
         self, operator: str, action: str, reason: str, metadata: dict[str, Any] | None = None
     ) -> int:

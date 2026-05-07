@@ -186,6 +186,68 @@ class MT5Connector:
             logger.info("MT5 connector shutdown complete.")
             self._is_initialized = False
 
+    def connect(self) -> bool:
+        """Alias for initialize() to match main.py expectations."""
+        return self.initialize()
+
+    def disconnect(self) -> None:
+        """Alias for shutdown() to match main.py expectations."""
+        self.shutdown()
+
+    def get_account_balance(self) -> float:
+        """Retrieve current account balance."""
+        info = self.get_account_info()
+        return float(info.get("balance", 0.0))
+
+    def get_ohlcv(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+        """Alias for get_rates() to match main.py expectations."""
+        return self.get_rates(symbol, timeframe, n_bars)
+
+    @with_retry(MT5DataError, max_retries=3)
+    def get_rates_range(
+        self, symbol: str, timeframe: str, start: datetime, end: datetime
+    ) -> pd.DataFrame:
+        """
+        Fetch historical bars within a date range.
+
+        Args:
+            symbol: Trading symbol.
+            timeframe: Chart timeframe.
+            start: Start datetime.
+            end: End datetime.
+
+        Returns:
+            pd.DataFrame: OHLCV data.
+        """
+        if not self._is_initialized:
+            raise MT5ConnectionError("MT5 connector not initialized.")
+
+        tf = TIMEFRAME_MAP.get(timeframe, 5)
+
+        if not self.use_metaapi:
+            rates = mt5.copy_rates_range(symbol, tf, start, end)
+            if rates is None:
+                err_code, err_desc = mt5.last_error()
+                raise MT5DataError(
+                    f"Failed to copy rates range: {err_code} - {err_desc}",
+                    is_retriable=err_code not in [-2, -5],
+                )
+            df = pd.DataFrame(rates)
+            df["time"] = pd.to_datetime(df["time"], unit="s")
+            return df
+        else:
+
+            async def _get_rates():
+                return await self.metaapi_connection.get_historical_candles(
+                    symbol, timeframe, start, end
+                )
+
+            candles = asyncio.run(_get_rates())
+            df = pd.DataFrame(candles)
+            if not df.empty:
+                df["time"] = pd.to_datetime(df["time"])
+            return df
+
     @contextmanager
     def session(self):
         """Context manager for safe connection handling."""
