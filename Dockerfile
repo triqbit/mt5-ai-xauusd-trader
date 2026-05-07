@@ -59,7 +59,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
-    LD_LIBRARY_PATH="/usr/lib:/usr/local/lib:$LD_LIBRARY_PATH"
+    LD_LIBRARY_PATH="/usr/lib:/usr/local/lib"
 
 # Runtime system dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
