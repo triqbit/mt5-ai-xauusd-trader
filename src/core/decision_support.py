@@ -197,8 +197,7 @@ class DecisionSupportSystem:
         Weights:
         - Ensemble Consensus: 40%
         - Regime Confidence: 30%
-        - Risk Assessment quality (R:R): 20%
-        - Macro Risk safety: 10%
+        - Risk/Reward Quality & Macro Safety: 30%
         """
         # 1. Consensus Score (0-40)
         total_weight = sum(attr.weight for attr in explanation.model_attributions)
@@ -215,15 +214,14 @@ class DecisionSupportSystem:
         # 2. Regime Score (0-30)
         regime_score = regime.confidence * 30.0
 
-        # 3. Risk Quality Score (0-20)
-        # Normalize R:R - assuming 3.0 is excellent
+        # 3. Risk & Safety Score (0-30)
+        # Weights: 20% for Risk/Reward quality, 10% for Macro safety
         rr = explanation.risk_assessment.risk_reward_ratio
-        risk_score = min(rr / 3.0, 1.0) * 20.0
+        rr_quality = min(rr / 3.0, 1.0) * 20.0
+        macro_safety = macro_risk.risk_multiplier * 10.0
+        risk_score = rr_quality + macro_safety
 
-        # 4. Macro Safety Score (0-10)
-        macro_score = macro_risk.risk_multiplier * 10.0
-
-        return float(consensus_score + regime_score + risk_score + macro_score)
+        return float(consensus_score + regime_score + risk_score)
 
     def _calculate_sizing_multiplier(
         self, score: float, status: DecisionStatus, macro_risk: RiskStatus
