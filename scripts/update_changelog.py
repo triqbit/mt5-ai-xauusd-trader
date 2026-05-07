@@ -41,6 +41,7 @@ def categorize_commits(commits, labels=None):
     mapping = {
         "feat": "Added",
         "fix": "Fixed",
+        "security": "Security",
         "perf": "Added",
         "refactor": "Changed",
         "docs": "Changed",
@@ -50,28 +51,27 @@ def categorize_commits(commits, labels=None):
         "test": "Changed",
     }
 
-    # If PR labels are provided, they can influence the categorization of the LAST commit
-    # (assuming the script runs on a push that is likely a PR merge)
+    # If PR labels are provided, they influence categorization
+    label_to_cat = {}
     if labels:
-        label_categories = {
-            "release:major": "Added", # Usually involves new features/major changes
+        label_mapping = {
+            "enhancement": "Added",
+            "feature": "Added",
+            "bug": "Fixed",
+            "fix": "Fixed",
+            "security": "Security",
+            "documentation": "Changed",
+            "refactor": "Changed",
+            "deprecated": "Deprecated",
+            "removal": "Removed",
+            "release:major": "Added",
             "release:minor": "Added",
             "release:patch": "Fixed",
         }
-        # Standard GitHub labels mapping
-        label_categories.update({
-            "enhancement": "Added",
-            "bug": "Fixed",
-            "security": "Security",
-            "documentation": "Changed",
-        })
-
         for label in labels:
-            cat = label_categories.get(label.lower())
-            if cat and commits:
-                # Use the PR title (first commit in a squash merge) or just add a generic entry if needed
-                # For now, we'll still rely on commit messages but use labels as fallback or boost
-                pass
+            cat = label_mapping.get(label.lower())
+            if cat:
+                label_to_cat[label.lower()] = cat
 
     for commit in commits:
         # Ignore automated changelog updates and release commits
@@ -94,13 +94,20 @@ def categorize_commits(commits, labels=None):
             if entry not in categories[category]:
                 categories[category].append(entry)
         else:
-            # Non-conventional commit - put in Changed by default if it's not empty
+            # Non-conventional commit
             if commit.strip() and not commit.startswith("Merge "):
                 message = commit.strip()
                 message = message[0].upper() + message[1:]
                 entry = f"- {message}"
-                if entry not in categories["Changed"]:
-                    categories["Changed"].append(entry)
+
+                # Determine category: labels > default (Changed)
+                category = "Changed"
+                if label_to_cat:
+                    # Use the first matching label as category
+                    category = list(label_to_cat.values())[0]
+
+                if entry not in categories[category]:
+                    categories[category].append(entry)
 
     return {k: v for k, v in categories.items() if v}
 
@@ -129,12 +136,20 @@ def update_changelog(categories):
     unreleased_content = sub_parts[0]
     rest_of_changelog = sub_parts[1] + sub_parts[2] if len(sub_parts) > 1 else ""
 
-    # Merge new categories into unreleased_content
-    for category, entries in categories.items():
+    # Ensure categories are processed in a specific order
+    order = ["Added", "Changed", "Fixed", "Security", "Deprecated", "Removed"]
+    sorted_categories = [(cat, categories[cat]) for cat in order if cat in categories]
+    # Add any other categories that might be there
+    for cat, entries in categories.items():
+        if cat not in order:
+            sorted_categories.append((cat, entries))
+
+    for category, entries in sorted_categories:
         header = f"### {category}"
         if header not in unreleased_content:
-            # If category doesn't exist, append it
-            unreleased_content = unreleased_content.strip() + f"\n\n{header}\n" + "\n".join(entries) + "\n"
+            # If category doesn't exist, we need to find the right place to insert it or append
+            # For simplicity, we append to the end of the unreleased section
+            unreleased_content = unreleased_content.rstrip() + f"\n\n{header}\n" + "\n".join(entries) + "\n"
         else:
             # If category exists, append only new entries
             lines = unreleased_content.splitlines()
@@ -170,12 +185,17 @@ def main():
     parser.add_argument("--labels", nargs="*", help="PR labels to assist categorization.")
     args = parser.parse_args()
 
+    # If labels is a single string with spaces, split it
+    labels = args.labels
+    if labels and len(labels) == 1 and " " in labels[0]:
+        labels = labels[0].split()
+
     commits = get_commits_since_last_tag()
     if not commits:
         print("No new commits found.")
         return
 
-    categories = categorize_commits(commits, labels=args.labels)
+    categories = categorize_commits(commits, labels=labels)
     if not categories:
         print("No relevant commits found.")
         return
