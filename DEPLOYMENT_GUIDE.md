@@ -104,11 +104,16 @@ Comprehensive guide for deploying the MT5 trading bot to production environments
 - **Cleanup**: Remove stale flags regularly
 
 ### 4.3 Configuration Validation
-- **Schema Validation**: Validate config schema
-- **Required Values**: Check required fields
-- **Type Checking**: Verify value types
-- **Range Validation**: Check valid ranges
-- **Dependencies**: Validate config dependencies
+The application implements a mandatory **Startup Validation Layer** (`src/core/config_validator.py`) that blocks launch if mission-critical production configuration is invalid or incomplete.
+
+- **Required Fields**: Ensures all mandatory environment variables (e.g., `MT5_PASSWORD`, `MT5_SERVER`) are provided.
+- **Market Parameters**: Validates that `SYMBOL` is non-empty/uppercase and `TIMEFRAME` matches MT5 standard periods.
+- **Credential Safety**: Detects default/placeholder values in sensitive fields like `DATABASE_URL`, `TELEGRAM_TOKEN`, and `REDIS_URL`.
+- **Trading Mode Restrictions**: Enforces explicit confirmation for `LIVE` mode (requires `CONFIRM_LIVE_TRADING=YES`).
+- **MT5 Format Enforcement**: Prohibits spaces in `MT5_SERVER` when running in `LIVE` mode to prevent broker connection failures.
+- **Risk Perimeter Limits**: Enforces hard limits from `RISK_LIMITS.md` at startup:
+  - **Critical Failure**: Accuracy Floor < 0.50, Win Rate Floor < 0.45, Calibration Error (ECE) > 0.25.
+  - **Warning**: Model Drift > 0.3, SQLite usage in `LIVE` mode.
 
 ## 5. Deployment Process
 

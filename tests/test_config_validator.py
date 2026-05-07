@@ -15,7 +15,7 @@ def base_config(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_LOGIN", "123456")
     monkeypatch.setenv("MT5_PASSWORD", "securepassword")
     monkeypatch.setenv("MT5_SERVER", "Broker-Demo")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db_real")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     return TradingConfig()
 
@@ -56,6 +56,39 @@ def test_validator_mt5_placeholders(monkeypatch, tmp_path):
     assert result.success is False
     assert any(e.field == "MT5_SERVER" for e in result.errors)
     assert any(e.field == "MT5_PASSWORD" for e in result.errors)
+
+def test_validator_mt5_server_spaces_live(monkeypatch, tmp_path):
+    """Test validator fails with spaces in MT5 server in LIVE mode."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "IC Markets Demo")
+    monkeypatch.setenv("MODE", "live")
+    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
+
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MT5_SERVER" and e.critical for e in result.errors)
+
+def test_validator_mt5_server_spaces_demo(monkeypatch, tmp_path):
+    """Test validator gives warning for spaces in MT5 server in demo mode."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "IC Markets Demo")
+    monkeypatch.setenv("MODE", "demo")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db_real")
+
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
+    assert any(e.field == "MT5_SERVER" and not e.critical for e in result.errors)
 
 def test_validator_mt5_path_windows(monkeypatch, tmp_path):
     """Test validator checks MT5 path on Windows."""
@@ -110,7 +143,7 @@ def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     assert result.success is True
 
 def test_validator_placeholder_secrets(monkeypatch, tmp_path):
-    """Test validator detects placeholder database URL, Telegram, and MetaAPI."""
+    """Test validator detects placeholder database URL, Telegram, MetaAPI, and Redis."""
     model_file = tmp_path / "model.pt"
     model_file.write_text("data")
     monkeypatch.setenv("MT5_LOGIN", "12345")
@@ -119,6 +152,7 @@ def test_validator_placeholder_secrets(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://trader:password@localhost:5432/mt5_trades")
     monkeypatch.setenv("TELEGRAM_TOKEN", "YOUR_TOKEN_HERE")
     monkeypatch.setenv("METAAPI_TOKEN", "CHANGE_ME")
+    monkeypatch.setenv("REDIS_URL", "redis://YOUR_TOKEN@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -128,6 +162,45 @@ def test_validator_placeholder_secrets(monkeypatch, tmp_path):
     assert any(e.field == "DATABASE_URL" for e in result.errors)
     assert any(e.field == "TELEGRAM_TOKEN" for e in result.errors)
     assert any(e.field == "METAAPI_TOKEN" for e in result.errors)
+    assert any(e.field == "REDIS_URL" for e in result.errors)
+
+def test_validator_market_parameters(monkeypatch, tmp_path):
+    """Test validator checks for valid symbol and timeframe."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db_real")
+
+    # 1. Empty Symbol
+    monkeypatch.setenv("SYMBOL", "")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "SYMBOL" for e in result.errors)
+
+    # 2. Lowercase Symbol
+    monkeypatch.setenv("SYMBOL", "xauusd")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "SYMBOL" for e in result.errors)
+
+    # 3. Invalid Timeframe
+    monkeypatch.setenv("SYMBOL", "XAUUSD")
+    monkeypatch.setenv("TIMEFRAME", "M7")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "TIMEFRAME" for e in result.errors)
+
+    # 4. Valid
+    monkeypatch.setenv("TIMEFRAME", "H1")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
 
 def test_validator_risk_parameters(monkeypatch, tmp_path):
     """Test validator detects unsafe risk parameters."""
@@ -470,30 +543,70 @@ def test_validator_stability_guards(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Model Accuracy Floor Critical (< 0.45)
-    # TradingConfig has ge=0.5, so we test at 0.5 but validator should flag if it was lower (if Pydantic allowed)
-    # Since Pydantic blocks < 0.5, let's test at 0.50 which is a warning if it was < 0.45 (wait, logic is e.critical if < 0.45)
-    # Let's just verify Pydantic catches the extreme cases and validator handles the allowed range.
+    # Model Accuracy Floor Critical (< 0.50)
+    monkeypatch.setenv("MODEL_ACCURACY_FLOOR", "0.55") # Valid value
+    cfg = TradingConfig()
     monkeypatch.setenv("MODEL_ACCURACY_FLOOR", "0.40")
+    # Pydantic ge=0.5
     with pytest.raises(Exception):
         TradingConfig()
 
-    monkeypatch.setenv("MODEL_ACCURACY_FLOOR", "0.50")
+    # Accuracy floor is 0.5 in TradingConfig default
+    monkeypatch.delenv("MODEL_ACCURACY_FLOOR", raising=False)
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
-    # 0.50 is >= 0.45 so no critical error for accuracy floor.
+    # Should not have a critical error for default 0.5
     assert not any(e.field == "MODEL_ACCURACY_FLOOR" and e.critical for e in result.errors)
 
-    # Model Win Rate Floor Critical (< 0.40)
+    # Model Win Rate Floor Critical (< 0.45)
     monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.35")
     with pytest.raises(Exception):
         TradingConfig()
 
-    # Reset win rate to valid value for next checks
-    monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.45")
+    monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.40")
+    # Pydantic ge=0.4
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert any(e.field == "MODEL_WIN_RATE_FLOOR" and e.critical for e in result.errors)
 
-    # Model Drift Threshold Warning (> 0.4)
-    monkeypatch.setenv("MODEL_DRIFT_THRESHOLD", "0.45")
+    # Reset win rate to valid value for next checks
+    monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.50")
+
+    # Model Drift Threshold Warning (> 0.3)
+    monkeypatch.setenv("MODEL_DRIFT_THRESHOLD", "0.35")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert any(e.field == "MODEL_DRIFT_THRESHOLD" and not e.critical for e in result.errors)
+
+def test_validator_calibration_threshold_critical(monkeypatch, tmp_path):
+    """Test calibration threshold exceeds 0.25 is critical."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    monkeypatch.setenv("MODEL_CALIBRATION_THRESHOLD", "0.30")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MODEL_CALIBRATION_THRESHOLD" and e.critical for e in result.errors)
+
+def test_validator_sqlite_live_warning(monkeypatch, tmp_path):
+    """Test validator gives warning for SQLite in LIVE mode."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("MODE", "live")
+    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///trades.db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
+    assert any(e.field == "DATABASE_URL" and not e.critical for e in result.errors)

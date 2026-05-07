@@ -36,6 +36,7 @@ class ConfigValidator:
         self.errors = []
 
         self._check_mt5_credentials()
+        self._check_market_parameters()
         self._check_live_mode_confirmation()
         self._check_placeholder_secrets()
         self._check_model_settings()
@@ -78,11 +79,12 @@ class ConfigValidator:
                 )
             )
         elif " " in self.config.mt5_server:
+            is_critical = self.config.mode == "live"
             self.errors.append(
                 ValidationError(
                     "MT5_SERVER",
                     "MT5 server name contains spaces.",
-                    False,  # Warning
+                    is_critical,
                     "Remove spaces from MT5_SERVER (e.g., Use IC-Markets-Demo instead of IC Markets Demo).",
                 )
             )
@@ -115,6 +117,43 @@ class ConfigValidator:
                         "Verify MT5_PATH in .env. Ensure it points to terminal64.exe.",
                     )
                 )
+
+    def _check_market_parameters(self) -> None:
+        """Verify market parameters (Symbol, Timeframe) are valid."""
+        # 1. Symbol Validation
+        if not self.config.symbol:
+            self.errors.append(
+                ValidationError(
+                    "SYMBOL",
+                    "Trading symbol is missing.",
+                    True,
+                    "Set SYMBOL in .env (e.g., XAUUSD).",
+                )
+            )
+        elif self.config.symbol != self.config.symbol.upper():
+            self.errors.append(
+                ValidationError(
+                    "SYMBOL",
+                    f"Symbol '{self.config.symbol}' must be uppercase.",
+                    True,
+                    f"Change SYMBOL to '{self.config.symbol.upper()}' in .env.",
+                )
+            )
+
+        # 2. Timeframe Validation
+        valid_timeframes = [
+            "M1", "M2", "M3", "M4", "M5", "M6", "M10", "M12", "M15", "M20", "M30",
+            "H1", "H2", "H3", "H4", "H6", "H8", "H12", "D1", "W1", "MN1"
+        ]
+        if self.config.timeframe not in valid_timeframes:
+            self.errors.append(
+                ValidationError(
+                    "TIMEFRAME",
+                    f"Invalid timeframe '{self.config.timeframe}'.",
+                    True,
+                    f"Choose one of: {', '.join(valid_timeframes)}",
+                )
+            )
 
     def _check_live_mode_confirmation(self) -> None:
         """Enforce explicit confirmation for LIVE trading."""
@@ -198,6 +237,21 @@ class ConfigValidator:
                     "MetaAPI account ID contains placeholder text.",
                     True,
                     "Replace with your actual MetaAPI account ID in .env.",
+                )
+            )
+
+        # Check Redis URL
+        redis_url = self.config.redis_url
+        if hasattr(redis_url, "get_secret_value"):
+            redis_url = redis_url.get_secret_value()
+
+        if redis_url and any(p in redis_url.upper() for p in placeholders):
+            self.errors.append(
+                ValidationError(
+                    "REDIS_URL",
+                    "Redis URL contains placeholder text.",
+                    True,
+                    "Update REDIS_URL in .env with your actual Redis connection string.",
                 )
             )
 
@@ -360,60 +414,62 @@ class ConfigValidator:
             )
 
         # 7. Stability Guards (RISK_LIMITS.md 4.2)
-        if self.config.model_drift_threshold > 0.4:
+        if self.config.model_drift_threshold > 0.3:
             self.errors.append(
                 ValidationError(
                     "MODEL_DRIFT_THRESHOLD",
-                    f"Model drift threshold {self.config.model_drift_threshold} is too high.",
+                    f"Model drift threshold {self.config.model_drift_threshold} is above recommended 0.3.",
                     False,
-                    "Set MODEL_DRIFT_THRESHOLD to 0.3 or lower.",
+                    "Set MODEL_DRIFT_THRESHOLD to 0.3 or lower for better stability.",
                 )
             )
 
-        if self.config.model_accuracy_floor < 0.45:
+        if self.config.model_accuracy_floor < 0.50:
             self.errors.append(
                 ValidationError(
                     "MODEL_ACCURACY_FLOOR",
-                    f"Model accuracy floor {self.config.model_accuracy_floor} is too low.",
+                    f"Model accuracy floor {self.config.model_accuracy_floor} is below 0.50.",
                     True,
-                    "Set MODEL_ACCURACY_FLOOR to 0.45 or higher.",
+                    "Set MODEL_ACCURACY_FLOOR to 0.50 or higher (Policy Limit).",
                 )
             )
 
-        if self.config.model_win_rate_floor < 0.40:
+        if self.config.model_win_rate_floor < 0.45:
             self.errors.append(
                 ValidationError(
                     "MODEL_WIN_RATE_FLOOR",
-                    f"Model win rate floor {self.config.model_win_rate_floor} is too low.",
+                    f"Model win rate floor {self.config.model_win_rate_floor} is below 0.45.",
                     True,
-                    "Set MODEL_WIN_RATE_FLOOR to 0.40 or higher.",
+                    "Set MODEL_WIN_RATE_FLOOR to 0.45 or higher (Policy Limit).",
                 )
             )
 
         # 8. Calibration Threshold (RISK_LIMITS.md 4.2)
         # Release-readiness gate: Prevents deployment of overconfident/poorly calibrated models.
         # High ECE (Expected Calibration Error) indicates the model's confidence doesn't match its accuracy.
-        if self.config.model_calibration_threshold > 0.35:
-            self.errors.append(
-                ValidationError(
-                    "MODEL_CALIBRATION_THRESHOLD",
-                    f"Model calibration threshold {self.config.model_calibration_threshold} is dangerously high.",
-                    True,
-                    "Set MODEL_CALIBRATION_THRESHOLD to 0.35 or lower.",
-                )
-            )
-        elif self.config.model_calibration_threshold > 0.25:
+        if self.config.model_calibration_threshold > 0.25:
             self.errors.append(
                 ValidationError(
                     "MODEL_CALIBRATION_THRESHOLD",
                     f"Model calibration threshold {self.config.model_calibration_threshold} exceeds 0.25 limit.",
-                    False,
-                    "Set MODEL_CALIBRATION_THRESHOLD to 0.25 for enterprise compliance.",
+                    True,
+                    "Set MODEL_CALIBRATION_THRESHOLD to 0.25 or lower for enterprise compliance.",
                 )
             )
 
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
+        # 0. Database Choice
+        if self.config.mode == "live" and "sqlite" in self.config.database_url.get_secret_value().lower():
+            self.errors.append(
+                ValidationError(
+                    "DATABASE_URL",
+                    "SQLite is used in LIVE mode.",
+                    False,  # Warning
+                    "Consider using a production-grade database like PostgreSQL for live trading.",
+                )
+            )
+
         # 1. LIVE mode restrictions
         if self.config.mode == "live" and self.config.log_level == "DEBUG":
             self.errors.append(
