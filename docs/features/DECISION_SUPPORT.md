@@ -26,8 +26,9 @@ The DSS summarizes the following dimensions:
 
 ### 3. Decision Dashboard
 For human operators, the DSS generates a high-fidelity terminal dashboard using the `rich` library. This dashboard provides:
+- Semantic icons and emojis (📈/📉, ✅/⚠️/🛑, 💎/💪) for rapid scannability and accessibility.
 - Color-coded status and direction.
-- Structured panels for market and performance overviews.
+- Structured panels with descriptive icons for market and performance overviews.
 - Detailed macro intelligence including active events and impact scores.
 - Full signal attribution details with model votes and feature impacts.
 
