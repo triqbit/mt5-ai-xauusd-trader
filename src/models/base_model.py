@@ -26,12 +26,13 @@ class BaseModel(ABC):
     """Abstract base class for all trading models."""
 
     @abstractmethod
-    def predict(self, features: np.ndarray) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """
         Generate a trading signal from input features.
 
         Args:
             features: Input feature array (e.g., OHLCV + technical indicators).
+            **kwargs: Additional context (seq, regime_info, etc.).
 
         Returns:
             A Signal object containing direction and confidence.

@@ -16,6 +16,7 @@ LSTMModel = None
 MarketRegime = None
 PPOAgent = None
 RegimeDetector = None
+TimeSeriesTransformer = None
 
 with contextlib.suppress(ImportError):
     from src.models.dreamer_agent import DreamerAgent
@@ -24,6 +25,7 @@ with contextlib.suppress(ImportError):
     from src.models.lstm_model import LSTMAttentionModel, LSTMModel
     from src.models.ppo_agent import PPOAgent
     from src.models.regime_detector import MarketRegime, RegimeDetector
+    from src.models.transformer_model import TimeSeriesTransformer
 
 __all__ = [
     "BaseModel",
@@ -36,4 +38,5 @@ __all__ = [
     "PPOAgent",
     "RegimeDetector",
     "Signal",
+    "TimeSeriesTransformer",
 ]

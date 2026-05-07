@@ -66,6 +66,7 @@ from src.models.ensemble import EnsembleModel
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
 from src.models.regime_detector import RegimeDetector
+from src.models.transformer_model import TimeSeriesTransformer
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.execution_filter import ExecutionFilter
@@ -95,6 +96,70 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 # -- Trading loop ----------------------------------------------------------
+
+
+def _prepare_trade_signal(
+    cfg,
+    direction: int,
+    confidence: float,
+    price: float,
+    atr: float,
+    risk: RiskManager,
+    allocator: CapitalAllocator,
+    audit_logger: Optional[AuditLogger] = None,
+) -> TradeSignal:
+    """
+    Consolidated helper to calculate stop-loss, take-profit, and lot-size
+    based on institutional risk and capital allocation.
+    """
+    log = logging.getLogger("main.risk")
+
+    # 1. SL/TP Calculation
+    stop_loss = price - (direction * 2 * atr)
+    take_profit = price + (direction * 4 * atr)
+
+    # 2. Institutional Capital Allocation
+    strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+    alloc_result = allocator.request_allocation(strat_id, risk_pct=cfg.risk_per_trade)
+
+    if not alloc_result.is_allowed:
+        log.warning(
+            "Allocation REJECTED | %s | Reason: %s",
+            strat_id,
+            alloc_result.rejection_reason,
+        )
+        if audit_logger:
+            audit_logger.log_blocked_trade(
+                symbol=cfg.symbol,
+                reason=f"Capital allocation rejected: {alloc_result.rejection_reason}",
+                context={"strategy_id": strat_id},
+            )
+        approved_risk = 0.0
+    else:
+        approved_risk = alloc_result.allocated_risk_pct
+
+    # 3. Lot Sizing
+    lot_size = (
+        risk.size_position(
+            cfg.symbol,
+            win_rate=0.58,
+            avg_win=4 * atr,
+            avg_loss=2 * atr,
+        )
+        if approved_risk > 0
+        else 0.0
+    )
+
+    return TradeSignal(
+        symbol=cfg.symbol,
+        direction=direction,
+        entry_price=price,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        lot_size=lot_size,
+        algorithm=cfg.algorithm,
+        confidence=confidence,
+    )
 
 
 def run_live(
@@ -216,19 +281,15 @@ def run_live(
 
                 # 3. Model Signal Generation
                 with profile("inference"):
-                    # Pass regime context to models that support it (e.g. Ensemble)
-                    if hasattr(model, "predict"):
-                        # Attempt to pass extra context if the model signature allows it
-                        try:
-                            # EnsembleModel takes seq and regime_info
-                            # For simple BaseModel, we just pass obs
-                            if isinstance(model, EnsembleModel) and torch:
-                                seq = torch.from_numpy(df_features.values[-60:]).float()
-                                signal_obj = model.predict(obs, seq=seq, regime_info=regime_info)
-                            else:
-                                signal_obj = model.predict(obs)
-                        except (TypeError, ValueError):
-                            signal_obj = model.predict(obs)
+                    seq = None
+                    if torch:
+                        seq = torch.from_numpy(df_features.values[-60:]).float()
+
+                    signal_obj = model.predict(
+                        obs,
+                        seq=seq,
+                        regime_info=regime_info
+                    )
 
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
@@ -262,59 +323,22 @@ def run_live(
                         }
                     )
 
-                # 4. Initial Sizing & Risk Parameters
+                # 4. Signal Preparation & Institutional Risk
                 price = tick["ask"] if direction == 1 else tick["bid"]
                 atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
-                stop_loss = price - (direction * 2 * atr)
-                take_profit = price + (direction * 4 * atr)
 
-                # 5. Institutional Capital Allocation
-                with profile("capital_allocation"):
-                    # Request allocation from the institutional router
-                    # Strategy ID: e.g. "PPO_XAUUSD_M5"
-                    strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
-                    alloc_result = allocator.request_allocation(
-                        strat_id, risk_pct=cfg.risk_per_trade
+                with profile("signal_preparation"):
+                    signal = _prepare_trade_signal(
+                        cfg=cfg,
+                        direction=direction,
+                        confidence=confidence,
+                        price=price,
+                        atr=atr,
+                        risk=risk,
+                        allocator=allocator,
+                        audit_logger=audit_logger
                     )
-
-                    if not alloc_result.is_allowed:
-                        log.warning(
-                            "Allocation REJECTED | %s | Reason: %s",
-                            strat_id,
-                            alloc_result.rejection_reason,
-                        )
-                        if audit_logger:
-                            audit_logger.log_blocked_trade(
-                                symbol=cfg.symbol,
-                                reason=f"Capital allocation rejected: {alloc_result.rejection_reason}",
-                                context={"strategy_id": strat_id},
-                            )
-                        approved_risk = 0.0
-                    else:
-                        approved_risk = alloc_result.allocated_risk_pct
-
-                # Calculate lot size based on approved institutional risk
-                lot_size = (
-                    risk.size_position(
-                        cfg.symbol,
-                        win_rate=0.58,
-                        avg_win=4 * atr,
-                        avg_loss=2 * atr,
-                    )
-                    if approved_risk > 0
-                    else 0.0
-                )
-
-                signal = TradeSignal(
-                    symbol=cfg.symbol,
-                    direction=direction,
-                    entry_price=price,
-                    stop_loss=stop_loss,
-                    take_profit=take_profit,
-                    lot_size=lot_size,
-                    algorithm=cfg.algorithm,
-                    confidence=confidence,
-                )
+                lot_size = signal.lot_size
 
                 # 6. Risk approval gate
                 with profile("risk_check"):
@@ -565,7 +589,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--algo",
-        choices=["ppo", "dreamer", "lstm", "ensemble"],
+        choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
         help="Model algorithm to use for signal generation",
     )
     p.add_argument("--start", help="Start date for backtest (YYYY-MM-DD)")
@@ -909,6 +933,12 @@ def main() -> int:
     elif cfg.algorithm == "lstm":
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
+    elif cfg.algorithm == "transformer":
+        transformer_path = args.model_dir / "transformer_xauusd.pt"
+        # Standard input_dim is 140 for the current feature engineer
+        model = TimeSeriesTransformer(input_dim=140)
+        if torch and transformer_path.exists():
+            model.load_state_dict(torch.load(transformer_path, map_location="cpu"))
     else:
         # This branch should rarely be hit if Literal choices are enforced by Pydantic
         log.warning(
