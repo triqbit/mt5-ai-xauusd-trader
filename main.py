@@ -392,8 +392,8 @@ def run_live(
                         risk_data = {
                             "passed": risk_approved,
                             "rejection_reasons": [],
-                            "risk_reward": abs(take_profit - price) / abs(price - stop_loss)
-                            if abs(price - stop_loss) > 0
+                            "risk_reward": abs(signal.take_profit - price) / abs(price - signal.stop_loss)
+                            if abs(price - signal.stop_loss) > 0
                             else 0.0,
                             "summary": "Passed all risk gates"
                             if risk_approved
@@ -592,8 +592,8 @@ def parse_args() -> argparse.Namespace:
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
         help="Model algorithm to use for signal generation",
     )
-    p.add_argument("--start", help="Start date for backtest (YYYY-MM-DD)")
-    p.add_argument("--end", help="End date for backtest (YYYY-MM-DD)")
+    p.add_argument("--start", help="Start date for backtest (YYYY-MM-DD)", default="2023-01-01")
+    p.add_argument("--end", help="End date for backtest (YYYY-MM-DD)", default=datetime.now().strftime("%Y-%m-%d"))
     p.add_argument("--train-window", type=int, default=500, help="Train window size for backtest")
     p.add_argument("--test-window", type=int, default=100, help="Test window size for backtest")
     p.add_argument("--step-size", type=int, default=100, help="Step size for backtest")
@@ -674,8 +674,9 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
         perf_table.add_row("Total Trades", str(bt_report.total_trades))
         perf_table.add_row("MAE Avg", f"{bt_report.mae_avg:.2f}")
         perf_table.add_row("MFE Avg", f"{bt_report.mfe_avg:.2f}")
+        perf_table.add_row("Period", f"{start_date.date()} to {end_date.date()}")
 
-        console.print(Panel(perf_table, border_style="green"))
+        console.print(Panel(perf_table, title="[bold]Institutional Performance Summary[/]", border_style="green"))
         return 0
     finally:
         connector.disconnect()

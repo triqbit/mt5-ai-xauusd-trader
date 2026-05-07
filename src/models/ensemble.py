@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -30,7 +30,6 @@ from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
-from src.models.regime_detector import RegimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +173,7 @@ class EnsembleModel(BaseModel):
             Signal: Consolidated ensemble signal.
         """
         seq = kwargs.get("seq")
-        regime_info = kwargs.get("regime_info")
+        _regime_info = kwargs.get("regime_info")
         votes: Dict[str, Signal] = {}
 
         # PPO prediction
