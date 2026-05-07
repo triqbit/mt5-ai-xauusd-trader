@@ -28,6 +28,7 @@ class RejectionCode(str, Enum):
     SYMBOL_CONCENTRATION_LIMIT = "SYMBOL_CONCENTRATION_LIMIT"
     FAMILY_CONCENTRATION_LIMIT = "FAMILY_CONCENTRATION_LIMIT"
     CAPITAL_CAP_REACHED = "CAPITAL_CAP_REACHED"
+    SCALED_TO_ZERO = "SCALED_TO_ZERO"
 
 
 class StrategyConfig(BaseModel):
@@ -107,10 +108,22 @@ class CapitalAllocator:
             self.current_allocations[config.strategy_id] = 0.0
         logger.info("Strategy %s registered for symbol %s", config.strategy_id, config.symbol)
 
+    def update_budget(self, new_budget: float) -> None:
+        """Dynamically update the total budget."""
+        old_budget = self.total_budget
+        self.total_budget = max(0.0, new_budget)
+        logger.info("Total budget updated from %.2f to %.2f", old_budget, self.total_budget)
+
     def update_allocation(self, strategy_id: str, amount: float) -> None:
         """Update the currently used capital for a strategy."""
         if strategy_id in self.strategies:
             self.current_allocations[strategy_id] = max(0.0, amount)
+
+    def release_allocation(self, strategy_id: str) -> None:
+        """Explicitly release all allocated capital for a strategy."""
+        if strategy_id in self.current_allocations:
+            self.current_allocations[strategy_id] = 0.0
+            logger.debug("Allocation released for strategy %s", strategy_id)
 
     def update_strategy_performance(self, strategy_id: str, pnl: float) -> None:
         """
@@ -435,17 +448,16 @@ class CapitalAllocator:
         # Final check if scaling reduced it to zero
         if target_risk_pct <= 0:
             # We already checked RejectionCode.CAPITAL_CAP_REACHED in step 2.
-            # If scaling brought it to 0, it means we're at some heat limit.
-            # For simplicity, we use the last limit check's code or a generic one.
-            self._record_rejection(RejectionCode.TOTAL_HEAT_LIMIT)
+            # If scaling brought it to 0, it means we're at some heat limit or scaling was zero.
+            self._record_rejection(RejectionCode.SCALED_TO_ZERO)
             return AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
                 allocated_risk_pct=0.0,
                 requested_risk_pct=risk_pct,
                 is_allowed=False,
-                rejection_reason="Scaling reduced allocation to zero due to limits",
-                rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
+                rejection_reason="Scaling or safety limits reduced allocation to zero",
+                rejection_code=RejectionCode.SCALED_TO_ZERO,
             )
 
         target_amount = self.total_budget * target_risk_pct
