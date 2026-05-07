@@ -18,7 +18,15 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 import sys
 import os
+from unittest.mock import MagicMock
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Mock required modules for migration support in environments without full dependencies
+MOCK_MODULES = ["talib", "MetaTrader5", "metaapi_cloud_sdk", "telegram", "telegram.ext"]
+for mod_name in MOCK_MODULES:
+    if mod_name not in sys.modules:
+        sys.modules[mod_name] = MagicMock()
 
 from src.core.trade_logger import Base
 target_metadata = Base.metadata
