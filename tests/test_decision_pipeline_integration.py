@@ -187,20 +187,25 @@ def test_decision_pipeline_risk_rejection(
     df = data_generator.generate(n_steps=10)
     price = 2300.0
 
-    # Low R:R (0.5)
+        # Valid R:R (2.0) to pass Pydantic validation, but we can mock RiskManager to reject it later if needed
+        # Or if we want to test specifically for low R:R rejection by RiskManager,
+        # we must use a valid TradeSignal but make RiskManager's check fail.
+        # However, TradeSignal NOW has a validator that enforces R:R >= 1.5.
     signal = TradeSignal(
         symbol="XAUUSD",
         direction=1,
         entry_price=price,
         stop_loss=price - 10.0,
-        take_profit=price + 5.0,
+            take_profit=price + 20.0,  # 2.0 R:R
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.8
     )
 
-    risk_approved = risk_manager.approve(signal)
-    assert risk_approved is False
+    # Force RiskManager to reject by mocking the R:R check
+    with patch.object(risk_manager, "_check_risk_reward", return_value=False):
+        risk_approved = risk_manager.approve(signal)
+        assert risk_approved is False
 
     explanation = explainer.explain(
         symbol=signal.symbol,

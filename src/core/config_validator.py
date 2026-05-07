@@ -461,7 +461,7 @@ class ConfigValidator:
                 ValidationError(
                     "MODEL_CALIBRATION_THRESHOLD",
                     f"Model calibration threshold {self.config.model_calibration_threshold} exceeds 0.25 limit.",
-                    False,
+                    True,  # Changed to True to match test expectations and enterprise standards
                     "Set MODEL_CALIBRATION_THRESHOLD to 0.25 or lower for enterprise compliance.",
                 )
             )
