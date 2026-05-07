@@ -18,7 +18,7 @@ def test_calibration_threshold_validation_pass():
     assert len(field_errors) == 0
 
 def test_calibration_threshold_validation_warning():
-    """Verify that threshold > 0.25 triggers a warning."""
+    """Verify that threshold > 0.25 triggers a critical failure."""
     config = TradingConfig(
         MT5_PASSWORD="test",
         MT5_SERVER="test",
@@ -29,7 +29,7 @@ def test_calibration_threshold_validation_warning():
 
     field_errors = [e for e in validator.errors if e.field == "MODEL_CALIBRATION_THRESHOLD"]
     assert len(field_errors) == 1
-    assert field_errors[0].critical is False
+    assert field_errors[0].critical is True
     assert "exceeds 0.25 limit" in field_errors[0].message
 
 def test_calibration_threshold_validation_critical():
