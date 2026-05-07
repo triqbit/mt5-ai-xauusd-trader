@@ -82,12 +82,12 @@ class ModelSignal(Base, AuditMixin):
 
 
 class Trade(Base, AuditMixin):
-    """Logs every executed trade."""
+    """Logs every executed or rejected trade."""
 
     __tablename__ = "trades"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    ticket: Mapped[int] = mapped_column(unique=True, index=True)
+    ticket: Mapped[int | None] = mapped_column(unique=True, index=True, nullable=True)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     direction: Mapped[int] = mapped_column(nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
@@ -95,7 +95,10 @@ class Trade(Base, AuditMixin):
     lot_size: Mapped[float] = mapped_column(Float, nullable=False)
     pnl: Mapped[float] = mapped_column(Float, default=0.0)
     drawdown_impact: Mapped[float | None] = mapped_column(Float)  # impact on total drawdown
-    status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
+    status: Mapped[str] = mapped_column(
+        String(20), default="OPEN", index=True
+    )  # OPEN, CLOSED, CANCELLED, REJECTED
+    signal_source: Mapped[str | None] = mapped_column(String(50))
 
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"))
     signal: Mapped["ModelSignal"] = relationship("ModelSignal", back_populates="trade")
@@ -165,17 +168,18 @@ class TradeLogger:
 
     def log_trade(
         self,
-        ticket: int,
         symbol: str,
         direction: int,
         entry_price: float,
         lot_size: float,
+        ticket: int | None = None,
         signal_id: int | None = None,
+        signal_source: str | None = None,
         status: str = "OPEN",
     ) -> int:
-        """Log a trade execution."""
-        # Invalidate cache if a new closed trade is logged (unlikely to be CLOSED immediately but for safety)
-        if status == "CLOSED":
+        """Log a trade execution or rejection."""
+        # Invalidate cache if a new closed trade is logged
+        if status in ("CLOSED", "REJECTED"):
             self._perf_cache = None
 
         with self.Session() as session:
@@ -186,6 +190,7 @@ class TradeLogger:
                 entry_price=entry_price,
                 lot_size=lot_size,
                 signal_id=signal_id,
+                signal_source=signal_source,
                 status=status,
             )
             session.add(trade)
