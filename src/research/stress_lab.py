@@ -48,6 +48,7 @@ class StressScenario(BaseModel):
 
     # Data stress
     missing_tick_prob: float = 0.0  # Probability of missing a price update
+    stale_data_prob: float = 0.0  # Probability of price data not updating (stale)
     price_noise_sigma: float = 0.0  # Gaussian noise added to OHLC
 
     # Market structure stress
@@ -59,6 +60,9 @@ class StressScenario(BaseModel):
 
     # Tail risk events
     flash_crash_prob: float = 0.0  # Probability of a sudden deep price dislocation
+
+    # Configuration overrides
+    lot_size: float = 0.1
 
 
 class StressTestMetrics(BaseModel):
@@ -79,6 +83,7 @@ class StressTestMetrics(BaseModel):
     execution_quality_score: float  # 0.0 to 1.0
     latency_impact: float  # Percentage impact of delays
     max_slippage_experienced: float = 0.0  # Max bps of slippage seen
+    sortino_ratio: float = 0.0
 
 
 class ResilienceReport(BaseModel):
@@ -89,6 +94,9 @@ class ResilienceReport(BaseModel):
     baseline_metrics: StressTestMetrics
     scenario_results: dict[str, StressTestMetrics]
     resilience_score: float  # Composite score 0-100
+    sharpe_decay: float = 0.0
+    sortino_decay: float = 0.0
+    win_rate_decay: float = 0.0
     fragility_indicators: list[str]
     failure_points: list[str]
     degradation_summary: str
@@ -137,10 +145,12 @@ class StressLab:
         strategy: BenchmarkStrategy,
         data: pd.DataFrame,
         initial_balance: float = 10000.0,
+        contract_multiplier: float = 100.0,  # Default for XAUUSD
     ):
         self.strategy = strategy
         self.data = data.copy()
         self.initial_balance = initial_balance
+        self.contract_multiplier = contract_multiplier
         self.results: dict[str, StressTestMetrics] = {}
 
     @staticmethod
@@ -270,12 +280,42 @@ class StressLab:
         # Calculate resilience score (0-100)
         # Average performance retention across all scenarios
         scores = []
+        sharpe_decays = []
+        sortino_decays = []
+        win_rate_decays = []
+
         for metrics in scenario_results.values():
-            retention = metrics.total_return / (baseline_metrics.total_return + 1e-9)
-            # Clip between 0 and 1.2
+            # Robust retention calculation handling negative baselines
+            b_ret = baseline_metrics.total_return
+            m_ret = metrics.total_return
+            if abs(b_ret) < 1e-9:
+                retention = 1.0 if m_ret >= 0 else 0.0
+            else:
+                # 1.0 means no change, <1.0 means worse, >1.0 means better
+                retention = 1.0 + (m_ret - b_ret) / abs(b_ret)
+
+            # Clip between 0 and 1.2 for the score
             scores.append(np.clip(retention, 0, 1.2))
 
+            # Calculate decays (percentage degradation relative to baseline magnitude)
+            def _calc_decay(b: float, m: float) -> float:
+                if abs(b) < 1e-9:
+                    return 0.0 if m >= b else 1.0
+                return (b - m) / abs(b)
+
+            s_decay = _calc_decay(baseline_metrics.sharpe_ratio, metrics.sharpe_ratio)
+            so_decay = _calc_decay(baseline_metrics.sortino_ratio, metrics.sortino_ratio)
+            wr_decay = _calc_decay(baseline_metrics.win_rate, metrics.win_rate)
+
+            # Record decays (allow negative if improved, but cap for aggregation)
+            sharpe_decays.append(max(-1.0, s_decay))
+            sortino_decays.append(max(-1.0, so_decay))
+            win_rate_decays.append(max(-1.0, wr_decay))
+
         resilience_score = float(np.mean(scores) * 100) if scores else 0.0
+        avg_sharpe_decay = float(np.mean(sharpe_decays)) if sharpe_decays else 0.0
+        avg_sortino_decay = float(np.mean(sortino_decays)) if sortino_decays else 0.0
+        avg_win_rate_decay = float(np.mean(win_rate_decays)) if win_rate_decays else 0.0
 
         # Identify fragility indicators
         fragility = []
@@ -304,6 +344,9 @@ class StressLab:
             baseline_metrics=baseline_metrics,
             scenario_results=scenario_results,
             resilience_score=resilience_score,
+            sharpe_decay=avg_sharpe_decay,
+            sortino_decay=avg_sortino_decay,
+            win_rate_decay=avg_win_rate_decay,
             fragility_indicators=fragility,
             failure_points=failure_points,
             degradation_summary=self._generate_summary(baseline_metrics, scenario_results),
@@ -366,10 +409,14 @@ class StressLab:
             df["high"] = df[["open", "close", "high"]].max(axis=1)
             df["low"] = df[["open", "close", "low"]].min(axis=1)
 
-        # 3. Choppy fake breakouts (Adversarial spikes)
+        # 3. Choppy fake breakouts (Adversarial spikes after consolidation)
         if scenario.choppy_breakout_prob > 0:
-            for i in range(2, len(df) - 2):
-                if rng.random() < scenario.choppy_breakout_prob:
+            # Calculate rolling range to find consolidation
+            price_range = (df["high"].rolling(5).max() - df["low"].rolling(5).min()) / atr
+
+            for i in range(5, len(df) - 2):
+                # Only trigger if in relative consolidation (range < 2 ATRs)
+                if price_range.iloc[i] < 2.0 and rng.random() < scenario.choppy_breakout_prob:
                     # Inject a fake breakout relative to ATR
                     spike_size = atr.iloc[i] * 3.0
                     direction = rng.choice([1, -1])
@@ -378,47 +425,63 @@ class StressLab:
                     next_idx = df.index[i + 1]
 
                     if direction == 1:
-                        df.at[idx, "high"] += spike_size
-                        df.at[idx, "close"] = df.at[idx, "open"] + (spike_size * 0.1)
-                        # Immediate reversal in next candle
-                        df.at[next_idx, "close"] = df.at[idx, "open"] - (spike_size * 0.5)
-                        df.at[next_idx, "low"] = df.at[next_idx, "close"] - (spike_size * 0.1)
+                        # Spike up, trap longs
+                        df.at[idx, "high"] = max(df.at[idx, "high"], df.at[idx, "open"] + spike_size)
+                        df.at[idx, "close"] = df.at[idx, "open"] + (spike_size * 0.2)
+                        # Violent reversal
+                        df.at[next_idx, "open"] = df.at[idx, "close"]
+                        df.at[next_idx, "close"] = df.at[idx, "open"] - (spike_size * 0.4)
+                        df.at[next_idx, "low"] = min(df.at[next_idx, "low"], df.at[next_idx, "close"] - 0.5)
                     else:
-                        df.at[idx, "low"] -= spike_size
-                        df.at[idx, "close"] = df.at[idx, "open"] - (spike_size * 0.1)
-                        # Immediate reversal
-                        df.at[next_idx, "close"] = df.at[idx, "open"] + (spike_size * 0.5)
-                        df.at[next_idx, "high"] = df.at[next_idx, "close"] + (spike_size * 0.1)
+                        # Spike down, trap shorts
+                        df.at[idx, "low"] = min(df.at[idx, "low"], df.at[idx, "open"] - spike_size)
+                        df.at[idx, "close"] = df.at[idx, "open"] - (spike_size * 0.2)
+                        # Violent reversal
+                        df.at[next_idx, "open"] = df.at[idx, "close"]
+                        df.at[next_idx, "close"] = df.at[idx, "open"] + (spike_size * 0.4)
+                        df.at[next_idx, "high"] = max(df.at[next_idx, "high"], df.at[next_idx, "close"] + 0.5)
 
-        # 4. Regime transitions (Simulate sudden volatility expansion or trend exhaustion)
+                    # Ensure continuity for the bar after reversal
+                    if i + 2 < len(df):
+                        df.at[df.index[i + 2], "open"] = df.at[next_idx, "close"]
+
+        # 4. Regime transitions (Sudden volatility expansion or trend reversals)
         if scenario.regime_flip_prob > 0:
-            i = 0
-            while i < len(df):
+            i = 10
+            while i < len(df) - 15:
                 if rng.random() < scenario.regime_flip_prob:
-                    window = min(30, len(df) - i)
-                    if window > 5:
-                        # Trend exhaustion: slow down then flip
-                        returns = df["close"].iloc[i : i + window].pct_change().fillna(0)
-                        # Flip and amplify volatility
-                        inverted_returns = -returns * 2.5
-                        base_price = df.at[df.index[i], "close"]
-                        new_prices = base_price * np.exp(np.cumsum(inverted_returns))
-                        df.loc[df.index[i : i + window], "close"] = new_prices.values
+                    # Detect current trend
+                    recent_return = (df["close"].iloc[i] - df["close"].iloc[i-10]) / df["close"].iloc[i-10]
 
-                        # Re-calculate high/low to be consistent and 'messy'
-                        for idx in range(i, i + window):
-                            local_vol = atr.iloc[idx] * 0.5
-                            df.at[df.index[idx], "high"] = (
-                                max(df.at[df.index[idx], "open"], df.at[df.index[idx], "close"])
-                                + local_vol
-                            )
-                            df.at[df.index[idx], "low"] = (
-                                min(df.at[df.index[idx], "open"], df.at[df.index[idx], "close"])
-                                - local_vol
-                            )
-                        i += window  # Skip the modified window
+                    window = min(15, len(df) - i)
+                    # Force a reversal if a trend exists, otherwise expand volatility
+                    if abs(recent_return) > 0.001:
+                        direction = -1 if recent_return > 0 else 1
+                        reversal_magnitude = atr.iloc[i] * 5.0 * direction
+
+                        base_price = df["close"].iloc[i]
+                        for j in range(window):
+                            idx = df.index[i + j]
+                            if j > 0:
+                                df.at[idx, "open"] = df.at[df.index[i + j - 1], "close"]
+                            # Linear reversal
+                            df.at[idx, "close"] = base_price + (reversal_magnitude * (j+1)/window)
+                            df.at[idx, "high"] = max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i+j]
+                            df.at[idx, "low"] = min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i+j]
                     else:
-                        i += 1
+                        # Volatility expansion (News Shock style)
+                        for j in range(window):
+                            idx = df.index[i + j]
+                            if j > 0:
+                                df.at[idx, "open"] = df.at[df.index[i + j - 1], "close"]
+                            noise = rng.normal(0, atr.iloc[i+j] * 2.0)
+                            df.at[idx, "close"] += noise
+                            df.at[idx, "high"] = max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i+j]*2
+                            df.at[idx, "low"] = min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i+j]*2
+
+                    if i + window < len(df):
+                        df.at[df.index[i + window], "open"] = df.at[df.index[i + window - 1], "close"]
+                    i += window
                 else:
                     i += 1
 
@@ -432,16 +495,37 @@ class StressLab:
                     df.at[df.index[i], "low"] -= drop_size
                     df.at[df.index[i], "close"] -= drop_size * 0.8
 
+                    if i + 1 < len(df):
+                        df.at[df.index[i+1], "open"] = df.at[df.index[i], "close"]
+
                     # Partial recovery in next 3 candles
                     for j in range(1, 4):
+                        curr_idx = df.index[i + j]
                         recovery = drop_size * rng.uniform(0.1, 0.2)
-                        df.at[df.index[i + j], "close"] += recovery
-                        df.at[df.index[i + j], "high"] = max(
-                            df.at[df.index[i + j], "high"], df.at[df.index[i + j], "close"] + 1.0
+                        df.at[curr_idx, "close"] += recovery
+                        df.at[curr_idx, "high"] = max(
+                            df.at[curr_idx, "high"], df.at[curr_idx, "close"] + 1.0
                         )
+                        if i + j + 1 < len(df):
+                            df.at[df.index[i+j+1], "open"] = df.at[curr_idx, "close"]
+
                     i += 5  # Skip ahead
                 else:
                     i += 1
+
+        # Capture "Real" Market state before applying observer perturbations
+        df["_real_close"] = df["close"]
+        df["_real_spread"] = df["spread"] if "spread" in df.columns else 0.25
+
+        # 6. Stale data (Observer sees old data, but execution is real)
+        if scenario.stale_data_prob > 0:
+            ohlc_cols = ["open", "high", "low", "close"]
+            for i in range(1, len(df)):
+                if rng.random() < scenario.stale_data_prob:
+                    # Trader sees previous bar's data
+                    df.iloc[i, df.columns.get_indexer(ohlc_cols)] = df.iloc[
+                        i - 1, df.columns.get_indexer(ohlc_cols)
+                    ]
 
         return df
 
@@ -449,13 +533,18 @@ class StressLab:
         self, df: pd.DataFrame, scenario: StressScenario
     ) -> StressTestMetrics:
         """Specialized backtest loop that accounts for slippage and delays."""
-        close = df["close"].values
+        # Execution prices (Real market)
+        close = df["_real_close"].values if "_real_close" in df.columns else df["close"].values
         n = len(df)
         initial_balance = self.initial_balance
         equity = np.ones(n) * initial_balance
         cash = initial_balance
         daily_returns = np.zeros(n)
         trade_pnls = []
+
+        # Institutional parameters
+        contract_multiplier = self.contract_multiplier
+        lot_size = scenario.lot_size
 
         # Predict signals on potentially perturbed data
         raw_signals = self.strategy.predict(df)
@@ -474,9 +563,12 @@ class StressLab:
 
         # Base spread for XAUUSD if not present
         base_spread = 0.25
-        spreads = (
-            df["spread"].values if "spread" in df.columns else np.ones(n) * base_spread
-        ) * scenario.spread_multiplier
+        if "_real_spread" in df.columns:
+            spreads = df["_real_spread"].values * scenario.spread_multiplier
+        else:
+            spreads = (
+                df["spread"].values if "spread" in df.columns else np.ones(n) * base_spread
+            ) * scenario.spread_multiplier
 
         rng = np.random.default_rng(42)
         latency_hits = 0
@@ -505,7 +597,7 @@ class StressLab:
                 entry_price = current_price + (spreads[i] / 2) + slippage
             elif current_sig == -1 and position == 1:  # Close Long
                 exit_price = current_price - (spreads[i] / 2) - slippage
-                pnl = exit_price - entry_price
+                pnl = (exit_price - entry_price) * lot_size * contract_multiplier
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
@@ -514,7 +606,7 @@ class StressLab:
                 entry_price = current_price - (spreads[i] / 2) - slippage
             elif current_sig == 1 and position == -1:  # Close Short
                 exit_price = current_price + (spreads[i] / 2) + slippage
-                pnl = entry_price - exit_price
+                pnl = (entry_price - exit_price) * lot_size * contract_multiplier
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
@@ -522,10 +614,14 @@ class StressLab:
             # Update Equity (Mark-to-Market including potential exit cost)
             exit_cost = (spreads[i] / 2) + slippage
             if position == 1:
-                unrealized = (current_price - exit_cost) - entry_price
+                unrealized = (
+                    (current_price - exit_cost) - entry_price
+                ) * lot_size * contract_multiplier
                 equity[i] = cash + unrealized
             elif position == -1:
-                unrealized = entry_price - (current_price + exit_cost)
+                unrealized = (
+                    entry_price - (current_price + exit_cost)
+                ) * lot_size * contract_multiplier
                 equity[i] = cash + unrealized
             else:
                 equity[i] = cash
@@ -540,8 +636,14 @@ class StressLab:
         max_drawdown = float(np.max(drawdown))
 
         sharpe = 0.0
+        sortino = 0.0
         if np.std(daily_returns) > 0:
             sharpe = float(np.mean(daily_returns) / np.std(daily_returns) * np.sqrt(252))
+
+            downside_returns = daily_returns[daily_returns < 0]
+            downside_std = np.std(downside_returns) if len(downside_returns) > 0 else 0
+            if downside_std > 0:
+                sortino = float(np.mean(daily_returns) / downside_std * np.sqrt(252))
 
         win_rate = len([p for p in trade_pnls if p > 0]) / (len(trade_pnls) + 1e-9)
 
@@ -564,4 +666,5 @@ class StressLab:
             execution_quality_score=1.0 - (latency_hits / n),
             latency_impact=latency_hits / n,
             max_slippage_experienced=max_slippage,
+            sortino_ratio=sortino,
         )
