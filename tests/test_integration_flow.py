@@ -227,23 +227,31 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
 
 def test_intelligence_ensemble_adaptation():
     """Model ensemble -> regime detection -> dynamic weighting -> trade decision"""
+    from src.models.regime_detector import RegimeInfo, MarketRegime
     model = EnsembleModel(device="cpu")
     initial_weights = model.weights.copy()
 
-    # Simulate performance of PPO
-    for _ in range(60):
-        model.record_return("ppo", 0.05) # Good performance
-        model.record_return("lstm", -0.02) # Bad performance
+    # Simulate performance metrics
+    metrics = {
+        "ppo": {"accuracy": 0.8, "drift_score": 0.02},
+        "lstm": {"accuracy": 0.4, "drift_score": 0.3}
+    }
+    regime = RegimeInfo(label=MarketRegime.TRENDING, confidence=0.9, transition_score=0.1, volatility_index=1.0)
 
-    # Weight rebalancing should have occurred (threshold 50)
+    # Update weights based on simulated metrics
+    model.dynamic_ensemble.update_weights(metrics, regime_info=regime)
+
+    # Weight rebalancing should have occurred
     assert model.weights["ppo"] > initial_weights["ppo"]
     assert model.weights["lstm"] < initial_weights["lstm"]
 
     # Predict with new weights
     obs = np.random.rand(140)
     # Mock models to ensure they participate
-    model._ppo_model = MagicMock()
-    model._ppo_model.predict.return_value = (1, None) # Buy
+    from src.models.base_model import Signal
+    from src.core.constants import SignalDirection
+    model.ppo_agent = MagicMock()
+    model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
 
     signal = model.predict(obs)
     assert "ppo" in signal.metadata["per_algo_votes"]
