@@ -302,7 +302,115 @@ def test_metrics_new_fields(sample_data):
 
     assert hasattr(metrics, "recovery_factor")
     assert hasattr(metrics, "profit_factor")
+    assert hasattr(metrics, "sortino_ratio")
     assert metrics.profit_factor >= 0
+
+
+def test_stale_data_simulation(sample_data):
+    """Verify that stale data probability impacts the strategy observation but not execution."""
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    scenario = StressScenario(
+        name="Stale",
+        description="High stale data probability",
+        stale_data_prob=1.0 # Force stale data for all steps after first
+    )
+
+    perturbed = lab._apply_perturbations(sample_data, scenario)
+
+    # After step 0, all following steps should have same OHLC as step 0 in the observer view
+    # But _real_close should match original sample_data (mostly)
+    assert perturbed["close"].iloc[1] == perturbed["close"].iloc[0]
+    assert perturbed["_real_close"].iloc[1] == sample_data["close"].iloc[1]
+
+    metrics = lab.run_scenario(scenario)
+    assert metrics.total_return is not None
+
+
+def test_institutional_pnl_scaling(sample_data):
+    """Verify that P&L correctly scales with lot size and contract multiplier."""
+    strategy = EMACrossoverStrategy()
+    # Explicitly set multiplier to avoid any ambiguity
+    lab = StressLab(strategy, sample_data, contract_multiplier=100.0)
+
+    # 1. Standard run (lot=0.1, multiplier=100) -> effective size = 10
+    scenario1 = StressScenario(name="Size10", description="test", lot_size=0.1)
+    metrics1 = lab.run_scenario(scenario1)
+
+    # 2. Doubled lot size (lot=0.2, multiplier=100) -> effective size = 20
+    scenario2 = StressScenario(name="Size20", description="test", lot_size=0.2)
+    metrics2 = lab.run_scenario(scenario2)
+
+    # PnL should be roughly double if trades were identical
+    # Since EMACrossover on same data should give same signals
+    if metrics1.num_trades > 0:
+        # total_return is pnl/initial_balance, so it should also double
+        assert np.isclose(metrics2.total_return, metrics1.total_return * 2, rtol=0.1)
+
+
+def test_report_decay_metrics_negative_baseline(sample_data):
+    """Verify that decay metrics are correctly calculated even with negative baselines."""
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=-0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=-1.0,
+        win_rate=0.3,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+        sortino_ratio=-1.2
+    )
+
+    # Mock a result that is even worse
+    lab.results["Worse"] = StressTestMetrics(
+        total_return=-0.2,
+        max_drawdown=0.1,
+        sharpe_ratio=-2.0,
+        win_rate=0.2,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+        sortino_ratio=-2.4
+    )
+
+    report = lab.generate_report(baseline)
+
+    # Sharpe decay should be ((-1) - (-2)) / |-1| = 1.0 (100% degradation)
+    assert report.sharpe_decay == 1.0
+    # Resilience score should be 0 because retention is 1 + (-0.2 - (-0.1)) / 0.1 = 0
+    assert report.resilience_score == 0.0
+
+
+def test_report_decay_metrics_positive_baseline(sample_data):
+    """Verify that the ResilienceReport includes decay metrics with positive baseline."""
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+        sortino_ratio=2.5
+    )
+
+    # Run a scenario that degrades performance
+    scenario = StressScenario(name="Degrade", description="test", slippage_bps=50.0)
+    lab.run_scenario(scenario)
+
+    report = lab.generate_report(baseline)
+
+    assert hasattr(report, "sharpe_decay")
+    assert hasattr(report, "sortino_decay")
+    assert hasattr(report, "win_rate_decay")
+    assert report.sharpe_decay >= 0
 
 
 def test_fragility_detection_negative_edge(sample_data):
