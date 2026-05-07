@@ -391,10 +391,7 @@ class EventIntelligence:
                         ]
                         and (event.timestamp - now) <= timedelta(minutes=60)
                     )
-                    or (
-                        event.impact == EventImpact.HIGH
-                        and (event.timestamp - now) <= timedelta(minutes=30)
-                    )
+                    or (event.impact == EventImpact.HIGH and (event.timestamp - now) <= timedelta(minutes=30))
                 ):
                     is_event_blocking = True
 
@@ -432,9 +429,11 @@ class EventIntelligence:
                     event_mult = 0.75
 
                 # Stricter multiplier for major events
-                if event.category in [EventCategory.FOMC, EventCategory.NFP, EventCategory.RATES]:
-                    if event.impact >= EventImpact.HIGH:
-                        event_mult = min(event_mult, 0.0 if event.impact == EventImpact.CRITICAL else 0.25)
+                if (
+                    event.category in [EventCategory.FOMC, EventCategory.NFP, EventCategory.RATES]
+                    and event.impact >= EventImpact.HIGH
+                ):
+                    event_mult = min(event_mult, 0.0 if event.impact == EventImpact.CRITICAL else 0.25)
 
                 min_multiplier = min(min_multiplier, event_mult)
 
