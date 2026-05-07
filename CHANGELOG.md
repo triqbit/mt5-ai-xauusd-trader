@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency Parity Guard:** Introduced `scripts/verify_dependencies.py` and `tests/test_verify_dependencies.py` to automate version synchronization checks across environment-specific requirements files.
 
 ### Fixed
+- **CI Pipeline Stabilization:** Resolved over 400 Ruff linting violations and standardized import sorting across the enterprise package.
 - **Enterprise Health Monitoring:** Refined the `src/core/health.py` system with robust liveness/readiness probes, multi-layered dependency checks (Database, MT5, Redis, Models, Audit), and a mandatory startup gate.
 - **Deployment Validation Gates:** Implemented a robust pre-deployment validation workflow in `.github/workflows/pre-deploy-validation.yml` to prevent unsafe releases.
 - **Environment Safety Checks:** Enhanced `scripts/validate_env.py` and synchronized `.env.example` to ensure configuration completeness before deployment.
