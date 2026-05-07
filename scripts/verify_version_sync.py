@@ -35,13 +35,14 @@ def extract_version_changelog(root: Path) -> str:
         return "OPTIONAL_MISSING"
     content = path.read_text()
     # Find the first header like ## [X.Y.Z] that is NOT [Unreleased]
-    match = re.search(r'## \[([^\]]+)\]', content)
-    if match:
-        if match.group(1).lower() == "unreleased":
-            # Search for the next one
-            match = re.search(r'## \[([^\]]+)\]', content[match.end():])
+    # We look for ## [ followed by something that isn't Unreleased
+    matches = re.finditer(r'## \[([^\]]+)\]', content)
+    for match in matches:
+        version = match.group(1)
+        if version.lower() != "unreleased":
+            return version
 
-    return match.group(1) if match else "NOT_FOUND"
+    return "NOT_FOUND"
 
 def main():
     root = Path(__file__).resolve().parents[1]
@@ -62,22 +63,29 @@ def main():
         "src/__init__.py": init_v,
     }
 
-    # If CHANGELOG exists, it must also match
-    if changelog_v != "OPTIONAL_MISSING":
-        authoritative["CHANGELOG.md"] = changelog_v
+    errors = []
+    for file, version in authoritative.items():
+        if version in ("MISSING", "NOT_FOUND"):
+            errors.append(f"CRITICAL: Version marker in {file} is {version}")
 
-    # Filter out missing/not found
-    valid_versions = {k: v for k, v in authoritative.items() if v not in ("MISSING", "NOT_FOUND")}
-
-    if len(valid_versions) < len(authoritative):
-        print("ERROR: One or more authoritative version files are missing or malformed.")
+    if errors:
+        for err in errors:
+            print(err)
         sys.exit(1)
 
-    unique_versions = set(valid_versions.values())
+    # If CHANGELOG exists, it must also match
+    if changelog_v not in ("OPTIONAL_MISSING", "NOT_FOUND"):
+        authoritative["CHANGELOG.md"] = changelog_v
+    elif changelog_v == "NOT_FOUND":
+         print("WARNING: No versioned headers found in CHANGELOG.md (only [Unreleased]?)")
+
+    unique_versions = set(authoritative.values())
 
     if len(unique_versions) > 1:
         print("❌ DEPLOYMENT BLOCKED: Version mismatch detected!")
-        print("Remediation: Ensure all shared version markers share the same semantic version.")
+        for file, version in authoritative.items():
+            print(f"  - {file}: {version}")
+        print("\nRemediation: Ensure all shared version markers share the same semantic version.")
         sys.exit(1)
 
     print("✅ SUCCESS: All version markers are synchronized.")
