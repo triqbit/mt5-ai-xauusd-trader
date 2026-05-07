@@ -30,7 +30,7 @@ jobs:
 
       - name: Install Validation Tools
         run: |
-          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses
+          pip install ruff==0.15.12 mypy==1.10.0 pip-audit==2.7.3 pip-licenses
 
       - name: Gate 1.1: Ruff Lint & Format Check
         run: |
@@ -58,6 +58,11 @@ jobs:
           echo "Checking CHANGELOG.md for [Unreleased] content..."
           python scripts/check_release_notes.py || { echo "::error::Release notes validation failed. Add your changes to the [Unreleased] section in CHANGELOG.md"; exit 1; }
 
+      - name: Gate 4.1: Verify Version Synchronization
+        run: |
+          echo "Verifying version consistency across metadata..."
+          python scripts/verify_version_sync.py || { echo "::error::Version synchronization failed. Ensure pyproject.toml, src/__init__.py, and CHANGELOG.md are aligned."; exit 1; }
+
       - name: Gate 4.5: Automated Pre-Prod Checklist Verification
         run: |
           echo "Verifying docs/PREPROD_CHECKLIST.md has no uncompleted items..."
@@ -80,6 +85,11 @@ jobs:
           echo "Scanning dependencies for vulnerabilities (CI & Prod)..."
           pip-audit --requirement requirements-ci.txt || { echo "::error::Security vulnerabilities found in CI requirements."; exit 1; }
           pip-audit --requirement requirements.txt || { echo "::error::Security vulnerabilities found in production requirements."; exit 1; }
+
+      - name: Gate 5.1: Verify Dependency Harmonization
+        run: |
+          echo "Verifying overlapping dependencies are harmonized..."
+          python scripts/verify_dependencies.py || { echo "::error::Dependency mismatch detected across requirements files. Harmonize versions."; exit 1; }
 
       - name: Gate 6: License Compliance Check
         run: |
