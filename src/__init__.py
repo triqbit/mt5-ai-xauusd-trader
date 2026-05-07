@@ -1,6 +1,6 @@
 """MT5 AI/ML Trading Bot package."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0-rc4"
 __author__ = "triqbit"
 __license__ = "MIT"
 

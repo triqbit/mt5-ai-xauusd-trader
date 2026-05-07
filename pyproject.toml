@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mt5-ai-xauusd-trader"
-version = "1.0.0"
+version = "1.1.0-rc4"
 description = "AI/ML Trading Bot for MetaTrader 5 - XAUUSD Gold Trading"
 authors = [{name = "triqbit"}]
 readme = "README.md"
