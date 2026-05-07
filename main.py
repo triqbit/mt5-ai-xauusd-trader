@@ -14,7 +14,6 @@ License: MIT
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import sys
 import time
@@ -77,21 +76,26 @@ from src.trading.risk_manager import RiskManager
 
 
 def configure_logging(level: str = "INFO") -> None:
+    import logging
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
             get_masking_processor(),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.BoundLogger,
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
+        logger_factory=structlog.stdlib.LoggerFactory(),
     )
+    # Redirect standard library logging to structlog
     logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
         level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
 
@@ -112,7 +116,7 @@ def _prepare_trade_signal(
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
     based on institutional risk and capital allocation.
     """
-    log = logging.getLogger("main.risk")
+    log = structlog.get_logger("main.risk")
 
     # 1. SL/TP Calculation
     stop_loss = price - (direction * 2 * atr)
@@ -177,9 +181,9 @@ def run_live(
     console: Optional[Console] = None,
     audit_logger: Optional[AuditLogger] = None,
 ) -> None:
-    log = logging.getLogger("main.live")
+    log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
-    log.info("Starting live trading loop | symbol=%s mode=%s", cfg.symbol, cfg.mode)
+    log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
@@ -209,7 +213,7 @@ def run_live(
                 if monitor:
                     monitor.log_equity(balance)
             except Exception as e:
-                log.error("Failed to update account metrics: %s", e)
+                log.error("Failed to update account metrics", error=str(e))
 
         # 0.1 Check for day change to trigger daily summary
         current_date = datetime.now(timezone.utc).date()
@@ -251,7 +255,7 @@ def run_live(
                             monitor.alert_liquidity_crisis(cfg.symbol, spread_pips)
 
                     except MT5DataError as e:
-                        log.error("Transient data retrieval error: %s. Skipping this iteration.", e)
+                        log.error("Transient data retrieval error", error=str(e))
                         time.sleep(poll_interval)
                         continue
                     except MT5ConnectionError:
@@ -265,9 +269,7 @@ def run_live(
                                 monitor.alert_broker_connection_restored()
                             continue
                         except MT5ConnectionError as reconnect_exc:
-                            log.critical(
-                                "Reconnection failed: %s. Waiting for next cycle.", reconnect_exc
-                            )
+                            log.critical("Reconnection failed", error=str(reconnect_exc))
                             time.sleep(poll_interval)
                             continue
 
@@ -307,7 +309,7 @@ def run_live(
                             else None,
                         )
 
-                log.debug("Signal | dir=%d conf=%.3f", direction, confidence)
+                log.debug("Model signal received", direction=direction, confidence=confidence)
 
                 signal_id = None
                 if trade_logger:
@@ -486,7 +488,7 @@ def run_live(
                         try:
                             ticket = connector.place_order(signal)
                         except MT5ExecutionError as e:
-                            log.error("Order execution FAILED: %s", e)
+                            log.error("Order execution FAILED", error=str(e))
                             if audit_logger:
                                 audit_logger.log_blocked_trade(
                                     symbol=cfg.symbol,
@@ -497,7 +499,7 @@ def run_live(
 
                         if ticket:
                             risk.open_positions[cfg.symbol] = ticket
-                            log.info("Order placed | ticket=%d", ticket)
+                            log.info("Order placed", ticket=ticket)
                             if trade_logger:
                                 trade_logger.log_trade(
                                     ticket=ticket,
@@ -516,7 +518,7 @@ def run_live(
                     for symbol, ticket in list(risk.open_positions.items()):
                         if symbol == cfg.symbol and ticket not in current_tickets:
                             # Position closed - in a real scenario we'd fetch deal history
-                            log.info("Position CLOSED | ticket=%d", ticket)
+                            log.info("Position CLOSED", ticket=ticket)
                             if trade_logger:
                                 # Retrieve trade info from DB to get correct direction
                                 trade_info = trade_logger.get_trade_by_ticket(ticket)
@@ -579,9 +581,7 @@ def get_system_version() -> str:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
-    p.add_argument(
-        "--version", action="version", version=f"%(prog)s {get_system_version()}"
-    )
+    p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
     p.add_argument(
         "--mode",
         choices=["demo", "live", "backtest"],
@@ -590,17 +590,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
-        help="Model algorithm to use for signal generation",
+        help="Algorithm to use for signal generation",
     )
     p.add_argument("--start", help="Start date for backtest (YYYY-MM-DD)", default="2023-01-01")
-    p.add_argument("--end", help="End date for backtest (YYYY-MM-DD)", default=datetime.now().strftime("%Y-%m-%d"))
+    p.add_argument(
+        "--end",
+        help="End date for backtest (YYYY-MM-DD)",
+        default=datetime.now().strftime("%Y-%m-%d"),
+    )
     p.add_argument("--train-window", type=int, default=500, help="Train window size for backtest")
     p.add_argument("--test-window", type=int, default=100, help="Test window size for backtest")
     p.add_argument("--step-size", type=int, default=100, help="Step size for backtest")
     p.add_argument("--spread", type=float, default=0.0001, help="Simulated spread for backtest")
-    p.add_argument(
-        "--commission", type=float, default=7.0, help="Commission per lot for backtest"
-    )
+    p.add_argument("--commission", type=float, default=7.0, help="Commission per lot for backtest")
     p.add_argument("--symbol", help="Trading symbol (e.g. XAUUSD)")
     p.add_argument("--timeframe", help="Trading timeframe (e.g. M5)")
     p.add_argument(
@@ -619,16 +621,9 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
     start_date = (
         datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
     )
-    end_date = (
-        datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
-    )
+    end_date = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
 
-    log.info(
-        "Starting Backtest | symbol=%s range=%s to %s",
-        cfg.symbol,
-        start_date.date(),
-        end_date.date(),
-    )
+    log.info("Starting Backtest", symbol=cfg.symbol, start=start_date.date(), end=end_date.date())
 
     connector = MT5Connector(cfg)
     try:
@@ -640,7 +635,7 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
             log.error("No data found for the specified range.")
             return 1
 
-        log.info("Fetched %d bars of data", len(df_raw))
+        log.info("Fetched historical data", bars=len(df_raw))
         df_raw.set_index("time", inplace=True)
 
         engine = BacktestEngine(
@@ -751,7 +746,7 @@ def main() -> int:
         return 1
 
     configure_logging(cfg.log_level)
-    log, console = logging.getLogger("main"), Console()
+    log, console = structlog.get_logger("main"), Console()
     get_masking_processor().update_secrets(cfg)
 
     # Re-verify if it was a Pydantic validation error if we somehow got past get_config()
@@ -886,7 +881,7 @@ def main() -> int:
                     border_style="red",
                 )
             )
-            log.critical("Cannot connect to MT5 terminal: %s. Aborting.", exc)
+            log.critical("Cannot connect to MT5 terminal", error=str(exc))
             return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(

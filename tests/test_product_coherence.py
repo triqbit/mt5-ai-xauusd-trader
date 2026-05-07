@@ -48,3 +48,19 @@ def test_event_intelligence_import_coherence():
 
     assert MacroEvent.model_fields["impact"].annotation == EventImpact
     assert MacroEvent.model_fields["category"].annotation == EventCategory
+
+
+def test_model_interface_polymorphism():
+    """Verify that all core models follow the polymorphic predict signature."""
+    from src.models.ppo_agent import PPOAgent
+    from src.models.lstm_model import LSTMModel
+    from src.models.transformer_model import TimeSeriesTransformer
+    from src.models.dreamer_agent import DreamerAgent
+    from src.models.ensemble import EnsembleModel
+    import inspect
+
+    models = [PPOAgent, LSTMModel, TimeSeriesTransformer, DreamerAgent, EnsembleModel]
+
+    for model_cls in models:
+        sig = inspect.signature(model_cls.predict)
+        assert "kwargs" in sig.parameters, f"{model_cls.__name__}.predict missing **kwargs"
