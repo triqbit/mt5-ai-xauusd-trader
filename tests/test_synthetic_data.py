@@ -42,16 +42,16 @@ def test_malformed_regime():
     df = gen.generate(n_steps=10, regime="malformed")
 
     # High < Low at index 0
-    assert df.loc[0, "high"] < df.loc[0, "low"]
+    assert df.iloc[0]["high"] < df.iloc[0]["low"]
 
     # Negative price at index 1
-    assert df.loc[1, "close"] < 0
+    assert df.iloc[1]["close"] < 0
 
     # NaN at index 2
-    assert np.isnan(df.loc[2, "open"])
+    assert np.isnan(df.iloc[2]["open"])
 
     # Zero volume at index 3
-    assert df.loc[3, "tick_volume"] == 0
+    assert df.iloc[3]["tick_volume"] == 0
 
 def test_whipsaw_regime():
     gen = ScenarioGenerator(seed=42)
@@ -93,3 +93,24 @@ def test_regime_shift_regime():
     first_half_vol = df["close"].iloc[:50].pct_change().std()
     second_half_vol = df["close"].iloc[50:].pct_change().std()
     assert second_half_vol > first_half_vol * 2
+
+def test_generate_with_holes():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate_with_holes(n_steps=100, hole_pct=0.2)
+
+    # Check that holes (NaNs) were injected
+    assert df.isnull().any().any()
+    # The last row should NEVER be a hole
+    assert not df.iloc[-1].isnull().any()
+
+def test_generate_stale_feed():
+    gen = ScenarioGenerator(seed=42)
+    stale_len = 5
+    n_steps = 100
+    df = gen.generate_stale_feed(n_steps=n_steps, stale_len=stale_len)
+
+    # The last 5 bars should be identical to the 6th from last bar
+    # Check closing prices specifically
+    last_bars = df["close"].iloc[-stale_len:]
+    base_bar_val = df["close"].iloc[n_steps - stale_len - 1]
+    assert (last_bars == base_bar_val).all()
