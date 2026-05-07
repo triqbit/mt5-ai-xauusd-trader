@@ -54,7 +54,7 @@ class ExecutionFilter:
 
     def __init__(
         self,
-        max_drawdown: float = 0.15,
+        max_drawdown: float = 0.12,
         rsi_period: int = 14,
         config: TradingConfig | None = None,
     ):
@@ -72,9 +72,10 @@ class ExecutionFilter:
         precomputed_metrics: dict[str, Any] | None = None,
         model_health: dict[str, Any] | None = None,
         trade_logger: Any | None = None,
+        **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 6-layer filter cascade.
+        Run the full 10-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -82,8 +83,9 @@ class ExecutionFilter:
             market_data: DataFrame with OHLCV and technical indicators.
             current_drawdown: Current account drawdown (0.0 to 1.0).
             timestamp: Evaluation time.
-            precomputed_metrics: Optional dictionary containing pre-calculated metrics
-                                 to bypass expensive DataFrame operations.
+            precomputed_metrics: Optional dictionary containing pre-calculated metrics.
+            model_health: Optional model health metrics.
+            trade_logger: Optional trade logger for win rate check.
         """
         if timestamp is None:
             timestamp = signal.timestamp or datetime.now(UTC)
@@ -96,7 +98,7 @@ class ExecutionFilter:
             market_data, precomputed=metrics.get("atr_volatility")
         )
         trace["atr_volatility"] = {
-            "passed": atr_passed,
+            "passed": bool(atr_passed),
             **atr_metrics,
         }
 
@@ -107,7 +109,7 @@ class ExecutionFilter:
             precomputed=metrics.get("trend_angle"),
         )
         trace["trend_angle"] = {
-            "passed": trend_passed,
+            "passed": bool(trend_passed),
             **trend_metrics,
         }
 
@@ -118,7 +120,7 @@ class ExecutionFilter:
             precomputed=metrics.get("ema_sequence"),
         )
         trace["ema_sequence"] = {
-            "passed": ema_passed,
+            "passed": bool(ema_passed),
             **ema_metrics,
         }
 
@@ -129,42 +131,36 @@ class ExecutionFilter:
             precomputed=metrics.get("momentum"),
         )
         trace["momentum"] = {
-            "passed": momentum_passed,
+            "passed": bool(momentum_passed),
             **momentum_metrics,
         }
 
         # Layer 5: Session/Time
         session_passed = self._check_session_time(timestamp)
         trace["session_time"] = {
-            "passed": session_passed,
+            "passed": bool(session_passed),
             "timestamp": timestamp.isoformat(),
         }
 
         # Layer 6: Drawdown
         drawdown_passed = self._check_drawdown_limit(current_drawdown)
         trace["drawdown_limit"] = {
-            "passed": drawdown_passed,
+            "passed": bool(drawdown_passed),
             "current_drawdown": current_drawdown,
             "max_drawdown": self.max_drawdown,
         }
 
-        # Layer 7: Model Stability (Optional)
+        # Layer 7: Model Stability
         stability_passed = True
-        stability_trace = {"passed": True}
+        stability_trace: dict[str, Any] = {"passed": True}
         if model_health:
             drift = model_health.get("drift", 0.0)
             accuracy = model_health.get("accuracy", 1.0)
-
-            drift_threshold = (
-                self.cfg.model_drift_threshold if self.cfg else 0.3
-            )
-            accuracy_floor = (
-                self.cfg.model_accuracy_floor if self.cfg else 0.5
-            )
-
+            drift_threshold = self.cfg.model_drift_threshold if self.cfg else 0.3
+            accuracy_floor = self.cfg.model_accuracy_floor if self.cfg else 0.5
             stability_passed = (drift < drift_threshold) and (accuracy >= accuracy_floor)
             stability_trace = {
-                "passed": stability_passed,
+                "passed": bool(stability_passed),
                 "drift": drift,
                 "accuracy": accuracy,
                 "drift_threshold": drift_threshold,
@@ -172,18 +168,16 @@ class ExecutionFilter:
             }
         trace["model_stability"] = stability_trace
 
-        # Layer 8: Performance Floor (Optional)
+        # Layer 8: Performance Floor
         perf_passed = True
-        perf_trace = {"passed": True}
+        perf_trace: dict[str, Any] = {"passed": True}
         if trade_logger:
             perf = trade_logger.read_performance_report()
             win_rate = perf.get("win_rate", 1.0)
-            win_rate_floor = (
-                self.cfg.model_win_rate_floor if self.cfg else 0.45
-            )
+            win_rate_floor = self.cfg.model_win_rate_floor if self.cfg else 0.45
             perf_passed = win_rate >= win_rate_floor
             perf_trace = {
-                "passed": perf_passed,
+                "passed": bool(perf_passed),
                 "win_rate": win_rate,
                 "win_rate_floor": win_rate_floor
             }
@@ -193,7 +187,7 @@ class ExecutionFilter:
         min_confidence = self.cfg.min_confidence if self.cfg else 0.6
         confidence_passed = signal.confidence >= min_confidence
         trace["confidence_threshold"] = {
-            "passed": confidence_passed,
+            "passed": bool(confidence_passed),
             "confidence": signal.confidence,
             "min_confidence": min_confidence
         }
@@ -203,7 +197,7 @@ class ExecutionFilter:
             signal.symbol, signal.direction
         )
         trace["signal_consistency"] = {
-            "passed": consistency_passed,
+            "passed": bool(consistency_passed),
             **consistency_metrics,
         }
 
@@ -211,22 +205,22 @@ class ExecutionFilter:
         is_approved = all(t["passed"] for t in trace.values())
         blocked_by = None
         if not is_approved:
-            # Identify first failure for backward compatibility in blocked_by field
+            # Order of precedence for blocked_by
             failure_order = [
-                "atr_volatility",
-                "trend_angle",
-                "ema_sequence",
-                "momentum",
-                "session_time",
-                "drawdown_limit",
-                "model_stability",
-                "performance_floor",
-                "confidence_threshold",
-                "signal_consistency",
+                ("atr_volatility", "ATR_VOLATILITY"),
+                ("trend_angle", "TREND_ANGLE"),
+                ("ema_sequence", "EMA_SEQUENCE"),
+                ("momentum", "MOMENTUM"),
+                ("session_time", "SESSION_CLOSED"),
+                ("drawdown_limit", "DRAWDOWN_LIMIT"),
+                ("model_stability", "MODEL_STABILITY"),
+                ("performance_floor", "PERFORMANCE_FLOOR"),
+                ("confidence_threshold", "CONFIDENCE_THRESHOLD"),
+                ("signal_consistency", "SIGNAL_CONSISTENCY"),
             ]
-            for layer in failure_order:
-                if not trace[layer]["passed"]:
-                    blocked_by = layer.upper()
+            for layer_key, reason in failure_order:
+                if not trace[layer_key]["passed"]:
+                    blocked_by = reason
                     break
 
         return ExecutionDecision(
@@ -238,9 +232,8 @@ class ExecutionFilter:
         )
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
-        """Original method - now delegates to metrics version."""
         passed, _ = self._check_atr_volatility_with_metrics(df, threshold)
-        return passed
+        return bool(passed)
 
     def _check_atr_volatility_with_metrics(
         self,
@@ -258,36 +251,23 @@ class ExecutionFilter:
             elif "atr" in df.columns:
                 atr = df["atr"]
             else:
-                # Fallback calculation if not in DF
-                lookback = 120
-                df_slice = df.iloc[-lookback:]
-                high = df_slice["high"]
-                low = df_slice["low"]
-                close = df_slice["close"]
-                tr = pd.concat(
-                    [
-                        high - low,
-                        (high - close.shift(1)).abs(),
-                        (low - close.shift(1)).abs(),
-                    ],
-                    axis=1,
-                ).max(axis=1)
+                if len(df) < 15: return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
+                high, low, close = df["high"], df["low"], df["close"]
+                tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
                 atr = tr.rolling(window=14).mean()
-
             current_atr = float(atr.iloc[-1])
             avg_atr = float(atr.rolling(window=100).mean().iloc[-1])
 
-        if np.isnan(current_atr) or np.isnan(avg_atr):
-            return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
+        if np.isnan(current_atr) or np.isnan(avg_atr) or avg_atr == 0:
+            return True, {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": 0.0}
 
-        ratio = current_atr / avg_atr if avg_atr > 0 else 0.0
+        ratio = current_atr / avg_atr
         passed = ratio <= threshold
-        return passed, {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": ratio}
+        return bool(passed), {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": ratio}
 
     def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
-        """Original method - now delegates to metrics version."""
         passed, _ = self._check_trend_angle_with_metrics(df, direction, window)
-        return passed
+        return bool(passed)
 
     def _check_trend_angle_with_metrics(
         self,
@@ -296,7 +276,7 @@ class ExecutionFilter:
         window: int = 20,
         precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
-        """Validates that the price trend matches signal direction using regression slope of EMA21."""
+        """Validates trend matches signal direction using regression slope of EMA21."""
         if precomputed:
             slope = precomputed.get("slope", 0.0)
         else:
@@ -304,32 +284,20 @@ class ExecutionFilter:
             if ema_col in df.columns:
                 ema_series = df[ema_col]
             elif "close" in df.columns:
-                ema_series = (
-                    df["close"].iloc[-(window + 50) :].ewm(span=21, adjust=False).mean()
-                )
+                ema_series = df["close"].iloc[-(window + 50) :].ewm(span=21, adjust=False).mean()
             else:
-                return True, {"slope": 0.0, "reason": "No EMA data"}
-
+                return True, {"slope": 0.0, "reason": "No data"}
             target_ema = ema_series.iloc[-window:]
-            if len(target_ema) < window:
-                return True, {"slope": 0.0, "reason": "Insufficient data"}
-
+            if len(target_ema) < window: return True, {"slope": 0.0, "reason": "Insufficient data"}
             x = np.arange(len(target_ema))
             slope, _, _, _, _ = stats.linregress(x, target_ema.values)
 
-        if direction > 0:  # BUY
-            passed = bool(slope > 0)
-        elif direction < 0:  # SELL
-            passed = bool(slope < 0)
-        else:
-            passed = False
-
-        return passed, {"slope": float(slope), "direction": direction}
+        passed = (direction > 0 and slope > 0) or (direction < 0 and slope < 0)
+        return bool(passed), {"slope": float(slope), "direction": direction}
 
     def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
-        """Original method - now delegates to metrics version."""
         passed, _ = self._check_ema_sequence_with_metrics(df, direction)
-        return passed
+        return bool(passed)
 
     def _check_ema_sequence_with_metrics(
         self,
@@ -348,27 +316,19 @@ class ExecutionFilter:
                 if col in df.columns:
                     emas[p] = float(df[col].iloc[-1])
                 else:
-                    emas[p] = float(
-                        df["close"]
-                        .iloc[-300:]
-                        .ewm(span=p, adjust=False)
-                        .mean()
-                        .iloc[-1]
-                    )
+                    emas[p] = float(df["close"].iloc[-300:].ewm(span=p, adjust=False).mean().iloc[-1])
 
-        if direction > 0:  # BUY
+        if direction > 0:
             passed = bool(emas[8] > emas[21] > emas[50] > emas[200])
-        elif direction < 0:  # SELL
+        elif direction < 0:
             passed = bool(emas[8] < emas[21] < emas[50] < emas[200])
         else:
             passed = False
-
-        return passed, {"emas": emas, "direction": direction}
+        return bool(passed), {"emas": emas, "direction": direction}
 
     def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
-        """Original method - now delegates to metrics version."""
         passed, _ = self._check_momentum_with_metrics(df, direction)
-        return passed
+        return bool(passed)
 
     def _check_momentum_with_metrics(
         self,
@@ -376,7 +336,7 @@ class ExecutionFilter:
         direction: int,
         precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
-        """Validates RSI is in a healthy momentum zone."""
+        """Validates RSI in healthy zones: BUY (50-75), SELL (25-50)."""
         if precomputed:
             rsi = precomputed.get("rsi", 0.0)
         else:
@@ -384,82 +344,41 @@ class ExecutionFilter:
             if col in df.columns:
                 rsi = float(df[col].iloc[-1])
             else:
-                lookback = self.rsi_period + 5
-                df_slice = df["close"].iloc[-lookback:]
-                delta = df_slice.diff()
-                gain = (
-                    (delta.where(delta > 0, 0))
-                    .rolling(window=self.rsi_period)
-                    .mean()
-                )
-                loss = (
-                    (-delta.where(delta < 0, 0))
-                    .rolling(window=self.rsi_period)
-                    .mean()
-                )
+                delta = df["close"].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
                 rs = gain / (loss + 1e-8)
                 rsi = float(100 - (100 / (1 + rs)).iloc[-1])
 
-        if np.isnan(rsi):
-            return True, {"rsi": 0.0}
-
-        if direction > 0:  # BUY
-            passed = bool(50 <= rsi <= 75)
-        elif direction < 0:  # SELL
-            passed = bool(25 <= rsi <= 50)
-        else:
-            passed = False
-
-        return passed, {"rsi": rsi, "direction": direction}
+        if np.isnan(rsi): return True, {"rsi": 50.0}
+        passed = (direction > 0 and 50 <= rsi <= 75) or (direction < 0 and 25 <= rsi <= 50)
+        return bool(passed), {"rsi": rsi, "direction": direction}
 
     def _check_session_time(self, timestamp: datetime) -> bool:
-        """Blocks outside institutional trading hours (Sun 17:00 - Fri 16:00 GMT)."""
-        weekday = timestamp.weekday()  # Mon=0, Sun=6
-        hour = timestamp.hour
-
-        if weekday == 5:  # Saturday
-            return False
-        if weekday == 6:  # Sunday
-            return hour >= 17
-        if weekday == 4:  # Friday
-            return hour < 16
-
+        """Blocks outside institutional hours (Sun 17:00 - Fri 16:00 GMT)."""
+        wd, hr = timestamp.weekday(), timestamp.hour
+        if wd == 5: return False
+        if wd == 6: return hr >= 17
+        if wd == 4: return hr < 16
         return True
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
-        """Blocks if account drawdown exceeds limit."""
         return current_drawdown < self.max_drawdown
 
     def _check_signal_consistency_with_metrics(
         self, symbol: str, direction: int
     ) -> tuple[bool, dict[str, Any]]:
-        """
-        Detects rapid oscillations (flickering) in signal direction.
-        Blocks if number of direction changes in the window exceeds threshold.
-        """
         window = self.cfg.signal_flicker_window if self.cfg else 6
         max_changes = self.cfg.max_signal_changes if self.cfg else 3
-
         if symbol not in self._signal_history:
             self._signal_history[symbol] = deque(maxlen=window)
-
         history = self._signal_history[symbol]
         history.append(int(direction))
-
-        if len(history) < 2:
-            return True, {"changes": 0, "window": window, "max_changes": max_changes}
-
-        # Count changes between consecutive signals in history
+        if len(history) < 2: return True, {"changes": 0, "window": window, "max_changes": max_changes}
         changes = 0
         h_list = list(history)
         for i in range(1, len(h_list)):
             if h_list[i] != h_list[i - 1]:
                 changes += 1
-
         passed = changes <= max_changes
-        return passed, {
-            "changes": changes,
-            "window": window,
-            "max_changes": max_changes,
-            "history": h_list,
-        }
+        return bool(passed), {"changes": changes, "window": window, "max_changes": max_changes, "history": h_list}
