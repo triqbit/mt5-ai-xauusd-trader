@@ -16,6 +16,8 @@ def mock_config():
     config.model_drift_threshold = 0.3
     config.model_accuracy_floor = 0.5
     config.model_win_rate_floor = 0.45
+    config.signal_flicker_window = 6
+    config.max_signal_changes = 3
     return config
 
 @pytest.fixture
