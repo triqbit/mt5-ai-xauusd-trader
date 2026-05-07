@@ -22,6 +22,17 @@ The research reporting system provides automated generation of institutional-gra
 9. **Rare Event Simulations:** Resilience against black-swan events (flash crashes, etc.).
 10. **Execution Quality:** Alpha decay and slippage analytics.
 
+## Execution Quality Analytics
+
+The `ExecutionAnalyzer` module (src/analytics/execution_quality.py) provides institutional-grade trade quality assessment:
+
+- **Execution Slippage:** Measures the difference between signal request price and actual market fill in pips.
+- **Fill Quality:** A sigmoid-based scoring model (0-1) that evaluates execution effectiveness relative to market spread and latency.
+- **Timing Efficiency:** Measures entry precision by comparing the fill price to the OHLC range of the execution candle.
+- **Edge Capture:** Spread-adjusted measurement of realized edge vs. theoretical strategy edge.
+- **Post-Entry Drift (Markouts):** Tracks price movement at fixed horizons (1m, 5m, 15m, 30m, 60m) after entry to distinguish alpha decay from execution drag.
+- **Blocked Signal Analysis:** Calculates the opportunity cost of signals rejected by risk management (MFE/MAE and simulated TP/SL outcomes).
+
 ## Usage
 
 To generate a validation report with mock data for the full system:
