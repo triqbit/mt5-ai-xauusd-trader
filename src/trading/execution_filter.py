@@ -251,7 +251,8 @@ class ExecutionFilter:
             elif "atr" in df.columns:
                 atr = df["atr"]
             else:
-                if len(df) < 15: return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
+                if len(df) < 15:
+                    return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
                 high, low, close = df["high"], df["low"], df["close"]
                 tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
                 atr = tr.rolling(window=14).mean()
@@ -288,7 +289,8 @@ class ExecutionFilter:
             else:
                 return True, {"slope": 0.0, "reason": "No data"}
             target_ema = ema_series.iloc[-window:]
-            if len(target_ema) < window: return True, {"slope": 0.0, "reason": "Insufficient data"}
+            if len(target_ema) < window:
+                return True, {"slope": 0.0, "reason": "Insufficient data"}
             x = np.arange(len(target_ema))
             slope, _, _, _, _ = stats.linregress(x, target_ema.values)
 
@@ -350,16 +352,20 @@ class ExecutionFilter:
                 rs = gain / (loss + 1e-8)
                 rsi = float(100 - (100 / (1 + rs)).iloc[-1])
 
-        if np.isnan(rsi): return True, {"rsi": 50.0}
+        if np.isnan(rsi):
+            return True, {"rsi": 50.0}
         passed = (direction > 0 and 50 <= rsi <= 75) or (direction < 0 and 25 <= rsi <= 50)
         return bool(passed), {"rsi": rsi, "direction": direction}
 
     def _check_session_time(self, timestamp: datetime) -> bool:
         """Blocks outside institutional hours (Sun 17:00 - Fri 16:00 GMT)."""
         wd, hr = timestamp.weekday(), timestamp.hour
-        if wd == 5: return False
-        if wd == 6: return hr >= 17
-        if wd == 4: return hr < 16
+        if wd == 5:
+            return False
+        if wd == 6:
+            return hr >= 17
+        if wd == 4:
+            return hr < 16
         return True
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
@@ -374,7 +380,8 @@ class ExecutionFilter:
             self._signal_history[symbol] = deque(maxlen=window)
         history = self._signal_history[symbol]
         history.append(int(direction))
-        if len(history) < 2: return True, {"changes": 0, "window": window, "max_changes": max_changes}
+        if len(history) < 2:
+            return True, {"changes": 0, "window": window, "max_changes": max_changes}
         changes = 0
         h_list = list(history)
         for i in range(1, len(h_list)):

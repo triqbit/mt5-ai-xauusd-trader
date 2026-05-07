@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -18,6 +18,9 @@ try:
 except ImportError:
     torch = None
     nn = None
+
+if TYPE_CHECKING:
+    import torch
 
 from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal

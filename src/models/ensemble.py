@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 import numpy as np
 
