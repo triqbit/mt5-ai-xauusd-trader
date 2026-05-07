@@ -14,7 +14,7 @@ The research reporting system provides automated generation of institutional-gra
 1. **Market Regime Analysis:** Statistical classification of market conditions.
 2. **Stress Test Outcomes:** Institutional-grade resilience testing under adversarial scenarios including choppy breakouts, regime flips, and stale data simulation.
 3. **Hyperparameter Robustness:** Stability analysis of optimized parameters.
-4. **Trade Pattern Findings:** Journal mining for behavioral risks and concentrations.
+4. **Trade Pattern Findings:** Journal mining for behavioral risks, toxic motifs, signal combinations, and attribute concentrations.
 5. **Model Drift Observations:** Statistical tracking of feature distribution shifts.
 6. **Capital Allocation Insights:** Portfolio heat and diversification analytics.
 7. **Benchmark Comparisons:** Performance relative to technical and passive baselines.
@@ -24,10 +24,16 @@ The research reporting system provides automated generation of institutional-gra
 
 ## Usage
 
-To generate a validation report with mock data:
+To generate a validation report with mock data for the full system:
 
 ```bash
 PYTHONPATH=. python scripts/verify_reporting_system.py
+```
+
+To verify the journal mining system specifically:
+
+```bash
+PYTHONPATH=. python scripts/verify_journal_mining.py
 ```
 
 ## Market Regime Detector
