@@ -77,7 +77,7 @@ def main():
 
     if len(unique_versions) > 1:
         print("❌ DEPLOYMENT BLOCKED: Version mismatch detected!")
-        print("Remediation: Ensure all three files share the same semantic version.")
+        print("Remediation: Ensure all shared version markers share the same semantic version.")
         sys.exit(1)
 
     print("✅ SUCCESS: All version markers are synchronized.")
