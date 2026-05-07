@@ -151,7 +151,7 @@ class ExecutionAnalyzer:
         if self.connector:
             props = self.connector.get_symbol_properties(symbol)
             if props:
-                if "pip_size" in props and props["pip_size"]:
+                if props.get("pip_size"):
                     return float(props["pip_size"])
                 if "digits" in props:
                     digits = props["digits"]
@@ -171,9 +171,9 @@ class ExecutionAnalyzer:
         if self.connector:
             props = self.connector.get_symbol_properties(symbol)
             if props:
-                if "trade_contract_size" in props and props["trade_contract_size"]:
+                if props.get("trade_contract_size"):
                     return float(props["trade_contract_size"])
-                if "contract_size" in props and props["contract_size"]:
+                if props.get("contract_size"):
                     return float(props["contract_size"])
 
         if any(x in symbol for x in ["XAUUSD", "GOLD"]):
