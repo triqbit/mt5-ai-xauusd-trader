@@ -124,7 +124,7 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     mock_macro_risk.risk_multiplier = 1.0
 
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
-    assert packet.decision_score == 100.0  # (1.0*40) + (1.0*30) + (1.0*20) + (1.0*10)
+    assert packet.decision_score == 100.0  # (1.0*40) + (1.0*30) + (20 + 10)
     assert packet.status_level == DecisionStatus.EXECUTE
     assert packet.sizing_multiplier == 1.0
 
@@ -139,19 +139,37 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
 
     # Consensus score: 0.5 * 40 = 20
     # Regime score: 0.5 * 30 = 15
-    # Risk score: 6.66
-    # Macro score: 5
+    # Risk score: 6.66 + 5 = 11.66
     # Total ~ 46.66
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     assert 46.0 < packet.decision_score < 47.0
     assert packet.status_level == DecisionStatus.CAUTION
-    assert packet.sizing_multiplier < 0.2  # (0.46^1.5) * 0.5 * 0.5
+    # Sizing: (0.4666^1.5) * 0.5 (CAUTION penalty) * 0.5 (Macro multiplier)
+    expected_sizing = (packet.decision_score / 100.0) ** 1.5 * 0.5 * 0.5
+    assert abs(packet.sizing_multiplier - expected_sizing) < 1e-6
 
     # 3. Blocked Case
     mock_explanation.risk_assessment.passed = False
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     assert packet.status_level == DecisionStatus.BLOCKED
     assert packet.sizing_multiplier == 0.0
+
+    # 4. Edge Case: Critical Macro Event (Macro multiplier = 0.25)
+    mock_explanation.risk_assessment.passed = True
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.9, weight=1.0)
+    ]
+    mock_regime.confidence = 1.0
+    mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+    mock_macro_risk.risk_multiplier = 0.25  # Severe reduction but not blocked
+
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    # Score: 40 (Consensus) + 30 (Regime) + 20 (R:R) + 2.5 (Macro Safety) = 92.5
+    assert packet.decision_score == 92.5
+    assert packet.status_level == DecisionStatus.EXECUTE
+    # Sizing: (0.925^1.5) * 1.0 (EXECUTE) * 0.25 (Macro)
+    expected_sizing = (0.925**1.5) * 0.25
+    assert abs(packet.sizing_multiplier - expected_sizing) < 1e-6
 
 
 def test_consensus_logic():
