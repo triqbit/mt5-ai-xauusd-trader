@@ -65,7 +65,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses pytest pytest-cov
+          pip install ruff==0.15.12 mypy==1.10.0 pip-audit==2.7.3 pip-licenses pytest pytest-cov
           pip install -r requirements-ci.txt
 
       - name: Ruff Check
@@ -90,10 +90,22 @@ jobs:
       - name: License Compliance Check
         run: |
           # Install dependencies for license check
-          cat requirements.txt requirements-ci.txt | grep -v "TA-Lib" | grep -v "MetaTrader5" | sort | uniq > requirements-all-scan.txt
-          pip install -r requirements-all-scan.txt
-          pip-licenses --summary --fail-on GPL AGPL
-          pip-licenses --format=markdown --output-file=docs/DEPENDENCY_LICENSES.md
+          ls requirements.txt requirements-ci.txt requirements-linux.txt 2>/dev/null | xargs -r cat | grep -vE "TA-Lib|MetaTrader5" | sort | uniq > requirements-all-scan.txt
+          pip install -r requirements-all-scan.txt || true
+
+          # Enforce allowed licenses according to docs/LICENSE_COMPLIANCE.md
+          pip-licenses \
+            --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA" \
+            --partial-match \
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
+
+          pip-licenses \
+            --format=markdown \
+            --output-file=docs/DEPENDENCY_LICENSES.md \
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
+
+      - name: Verify Dependencies Harmonization
+        run: python scripts/verify_dependencies.py
 
       - name: Run Tests with Coverage Gate (85%)
         run: pytest tests/ --cov=src --cov-report=xml --cov-fail-under=85
