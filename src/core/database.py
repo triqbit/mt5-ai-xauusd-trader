@@ -17,12 +17,12 @@ from typing import Any, Callable, TypeVar
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Engine,
     String,
     create_engine,
-    Engine,
 )
 from sqlalchemy.exc import OperationalError, StatementError
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 logger = logging.getLogger(__name__)
 

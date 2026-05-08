@@ -18,8 +18,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, sessionmaker
 
+from src.core.database import AuditMixin, Base, create_resilient_engine, with_db_retry
 from src.core.log_config import get_masking_processor
-from src.core.database import Base, AuditMixin, create_resilient_engine, with_db_retry
 
 logger = logging.getLogger(__name__)
 

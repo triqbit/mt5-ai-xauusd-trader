@@ -26,7 +26,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship, sessionmaker
 
 from src.core.audit_log import get_audit_logger
-from src.core.database import Base, AuditMixin, create_resilient_engine, with_db_retry
+from src.core.database import AuditMixin, Base, create_resilient_engine, with_db_retry
 
 logger = logging.getLogger(__name__)
 
