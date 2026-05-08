@@ -8,14 +8,15 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
+
+import structlog
 
 from src.core.constants import EventCategory, EventImpact
 from src.data.event_models import MacroEvent, RiskStatus
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 __all__ = [
     "BaseEventProvider",
@@ -88,7 +89,7 @@ class JSONEventProvider(BaseEventProvider):
 class TradingViewEventProvider(BaseEventProvider):
     """
     Mocked provider for TradingView economic calendar.
-    In a real implementation, this would use scraping or an unofficial API.
+    Generates realistic synthetic events for testing and integration.
     """
 
     def __init__(self):
@@ -99,8 +100,56 @@ class TradingViewEventProvider(BaseEventProvider):
         }
 
     def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
-        # Implementation left as mock for now, demonstrating multi-source capability.
-        return []
+        """
+        Generates synthetic macro events based on deterministic patterns.
+        Useful for pipeline verification without external API dependencies.
+        """
+        events = []
+        current = start_time.replace(minute=0, second=0, microsecond=0)
+
+        while current <= end_time:
+            # 1. NFP: First Friday of the month at 13:30 UTC
+            if current.weekday() == 4 and 1 <= current.day <= 7:
+                nfp_time = current.replace(hour=13, minute=30)
+                if start_time <= nfp_time <= end_time:
+                    events.append(
+                        MacroEvent(
+                            name="Non-Farm Payrolls (TV Mock)",
+                            category=EventCategory.NFP,
+                            impact=EventImpact.HIGH,
+                            timestamp=nfp_time,
+                        )
+                    )
+
+            # 2. CPI: Second Wednesday of the month at 12:30 UTC
+            if current.weekday() == 2 and 8 <= current.day <= 14:
+                cpi_time = current.replace(hour=12, minute=30)
+                if start_time <= cpi_time <= end_time:
+                    events.append(
+                        MacroEvent(
+                            name="CPI m/m (TV Mock)",
+                            category=EventCategory.CPI,
+                            impact=EventImpact.HIGH,
+                            timestamp=cpi_time,
+                        )
+                    )
+
+            # 3. Geopolitical: Random-ish but deterministic based on day
+            if current.day % 10 == 0 and current.hour == 9:
+                geo_time = current.replace(minute=0)
+                if start_time <= geo_time <= end_time:
+                    events.append(
+                        MacroEvent(
+                            name="Geopolitical Tension Alert (TV Mock)",
+                            category=EventCategory.GEOPOLITICAL,
+                            impact=EventImpact.MEDIUM,
+                            timestamp=geo_time,
+                        )
+                    )
+
+            current += timedelta(hours=24)
+
+        return events
 
 
 class MetaAPIEventProvider(BaseEventProvider):
@@ -117,14 +166,27 @@ class MetaAPIEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH,
             "critical": EventImpact.CRITICAL,
         }
+        self._session = self._init_session()
+
+    def _init_session(self):
+        import requests
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+
+        session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+        )
+        session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
+        return session
 
     def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
         """
-        Fetches events via MetaAPI's REST interface.
-        Note: This is a simplified implementation for the example.
+        Fetches events via MetaAPI's REST interface with retries and structured logging.
         """
-        import requests
-
         url = "https://calendar.metaapi.cloud/events"
         params = {
             "startTime": start_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -133,7 +195,13 @@ class MetaAPIEventProvider(BaseEventProvider):
         headers = {"auth-token": self.token}
 
         try:
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            logger.info(
+                "Fetching MetaAPI events",
+                start_time=start_time.isoformat(),
+                end_time=end_time.isoformat(),
+            )
+            # We use the persistent session for connection pooling and retries.
+            response = self._session.get(url, params=params, headers=headers, timeout=15)
             response.raise_for_status()
             data = response.json()
 
@@ -170,7 +238,12 @@ class MetaAPIEventProvider(BaseEventProvider):
             return macro_events
 
         except Exception as e:
-            logger.error(f"MetaAPI event fetch failed: {e}")
+            logger.error(
+                "MetaAPI event fetch failed",
+                error=str(e),
+                url=url,
+                start_time=start_time.isoformat(),
+            )
             return []
 
     def _guess_category(self, name: str) -> EventCategory:
@@ -243,10 +316,15 @@ class EventIntelligence:
         providers: list[BaseEventProvider],
         pre_event_minutes: dict[EventImpact, int] | None = None,
         post_event_minutes: dict[EventImpact, int] | None = None,
+        refresh_interval_minutes: int = 5,
+        fail_safe_blocked: bool = False,
     ):
         self.providers = providers
         self._cached_events: list[MacroEvent] = []
         self._last_successful_fetch: datetime | None = None
+        self.refresh_interval = timedelta(minutes=refresh_interval_minutes)
+        self.fail_safe_blocked = fail_safe_blocked
+
         # Default risk windows (minutes)
         self.pre_event_minutes = pre_event_minutes or {
             EventImpact.LOW: 5,
@@ -296,10 +374,18 @@ class EventIntelligence:
     def get_risk_status(self, current_time: datetime | None = None) -> RiskStatus:
         """
         Calculates the current risk status based on upcoming and recent events.
+        Uses cached data if it's within the refresh_interval.
         """
         now = current_time or datetime.now(UTC)
         if now.tzinfo is None:
             now = now.replace(tzinfo=UTC)
+
+        # Determine if we need to refresh cache
+        needs_refresh = (
+            self._last_successful_fetch is None
+            or (now - self._last_successful_fetch) > self.refresh_interval
+            or not self._cached_events
+        )
 
         # Look ahead and behind based on max windows
         max_pre = max(self.pre_event_minutes.values())
@@ -313,43 +399,48 @@ class EventIntelligence:
         start_lookback = now - timedelta(minutes=max_post + 1440)  # +1 day for long events
         end_lookahead = now + timedelta(minutes=max_pre + 1440)
 
-        events: list[MacroEvent] = []
-        all_fetch_failed = True
+        all_fetch_failed = False
+        if needs_refresh:
+            events: list[MacroEvent] = []
+            any_success = False
 
-        for provider in self.providers:
-            try:
-                provider_events = provider.get_upcoming_events(start_lookback, end_lookahead)
-                if provider_events is not None:
-                    events.extend(provider_events)
-                    all_fetch_failed = False
-            except Exception as e:
-                logger.error(f"Provider {provider.__class__.__name__} failed to fetch events: {e}")
+            for provider in self.providers:
+                try:
+                    provider_events = provider.get_upcoming_events(start_lookback, end_lookahead)
+                    if provider_events is not None:
+                        events.extend(provider_events)
+                        any_success = True
+                except Exception as e:
+                    logger.error(f"Provider {provider.__class__.__name__} failed to fetch events: {e}")
 
-        # De-duplicate events by name and timestamp
-        if not all_fetch_failed:
-            unique_events = {}
-            for e in events:
-                key = (e.name, e.timestamp)
-                if key not in unique_events:
-                    unique_events[key] = e
-            events = list(unique_events.values())
+            if any_success:
+                # De-duplicate events by name and timestamp
+                unique_events = {}
+                for e in events:
+                    key = (e.name, e.timestamp)
+                    if key not in unique_events:
+                        unique_events[key] = e
+                self._cached_events = list(unique_events.values())
+                self._last_successful_fetch = now
+            else:
+                all_fetch_failed = True
+                logger.warning("All providers failed or no events found during refresh. Using cache.")
 
-            # Update cache on success (if we got at least some events)
-            self._cached_events = events
-            self._last_successful_fetch = now
-        else:
-            logger.warning("All providers failed. Falling back to cached data.")
-            # Use cached events, filtering for the current relevant window
-            events = [
-                e
-                for e in self._cached_events
-                if (e.end_timestamp or e.timestamp) >= start_lookback and e.timestamp <= end_lookahead
-            ]
+        # Always filter the cache for the current relevant window
+        events = [
+            e
+            for e in self._cached_events
+            if (e.end_timestamp or e.timestamp) >= start_lookback and e.timestamp <= end_lookahead
+        ]
 
-        if not events and all_fetch_failed:
-            # If no cached data is available, return safe-mode status.
+        if not events and (all_fetch_failed or self._last_successful_fetch is None):
+            # If no data is available and providers failed (or haven't succeeded yet),
+            # return status based on fail_safe_blocked setting.
+            reason = "Event data unavailable (no cache)"
             return RiskStatus(
-                is_blocked=False, risk_multiplier=1.0, reason="Event data unavailable (no cache)"
+                is_blocked=self.fail_safe_blocked,
+                risk_multiplier=0.0 if self.fail_safe_blocked else 1.0,
+                reason=reason,
             )
 
         active_events = []
