@@ -98,6 +98,9 @@ pip install -r requirements.txt
 
 # [CRITICAL] Verify environment and dependencies
 python3 scripts/doctor.py
+
+# Perform a pre-flight health check (verifies .env and connectivity)
+python main.py --check
 ```
 
 ### 2. Configuration
