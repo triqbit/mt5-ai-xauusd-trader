@@ -123,6 +123,7 @@ def _prepare_trade_signal(
     df_raw: pd.DataFrame,
     risk: RiskManager,
     allocator: CapitalAllocator,
+    connector: MT5Connector,
     audit_logger: Optional[AuditLogger] = None,
 ) -> TradeSignal:
     """
@@ -168,6 +169,14 @@ def _prepare_trade_signal(
         approved_risk = alloc_result.allocated_risk_pct
 
     # 3. Lot Sizing (Unified RiskManager sizing)
+    props = connector.get_symbol_properties(cfg.symbol)
+    # pip_value for Gold (XAUUSD) is typically 100 ($ per lot per full point move)
+    pip_value = 100.0
+    if props and "trade_tick_value" in props and "trade_tick_size" in props:
+        # pip_value = dollar_per_point_per_lot
+        # Tick value is $/lot/tick_size
+        pip_value = props["trade_tick_value"] / props["trade_tick_size"]
+
     lot_size = (
         risk.size_position(
             symbol=cfg.symbol,
@@ -175,6 +184,7 @@ def _prepare_trade_signal(
             win_rate=0.58,
             avg_win=4 * atr,
             avg_loss=2 * atr,
+            pip_value=pip_value,
         )
         if approved_risk > 0
         else 0.0
@@ -394,6 +404,7 @@ def run_live(
                         df_raw=df_raw,
                         risk=risk,
                         allocator=allocator,
+                        connector=connector,
                         audit_logger=audit_logger,
                     )
                 lot_size = signal.lot_size

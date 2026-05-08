@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
@@ -29,7 +29,7 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-        current_positions: Optional[list[dict]] = None,
+        current_positions: Optional[List[Dict[str, Any]]] = None,
     ) -> bool:
         """
         Run the full institutional risk filter cascade.

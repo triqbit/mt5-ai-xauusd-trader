@@ -156,6 +156,7 @@ class RiskManager:
         win_rate: float = 0.58,
         avg_win: float = 0.0,
         avg_loss: float = 0.0,
+        pip_value: float = 100.0,
     ) -> float:
         """
         Institutional position sizing combining Kelly and ATR-based volatility scaling.
@@ -168,7 +169,16 @@ class RiskManager:
         current_atr = 0.0
         if market_data is not None and not market_data.empty:
             vol_multiplier = self.calculate_atr_size_multiplier(market_data)
-            current_atr = market_data["atr"].iloc[-1] if "atr" in market_data.columns else 0.0
+            # Use provided ATR or compute if missing
+            if "atr" in market_data.columns:
+                current_atr = market_data["atr"].iloc[-1]
+            else:
+                high, low, close = market_data["high"], market_data["low"], market_data["close"]
+                tr = pd.concat(
+                    [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
+                    axis=1,
+                ).max(axis=1)
+                current_atr = float(tr.rolling(window=14).mean().iloc[-1])
 
         # 3. Daily Loss Multiplier
         loss_multiplier = self.get_size_multiplier_from_loss()
@@ -182,20 +192,21 @@ class RiskManager:
             # Use Kelly Criterion if performance stats available
             kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
             kelly_fraction = max(0.0, min(kelly_fraction, 0.25))
-            lot_size = (risk_amount * kelly_fraction) / avg_loss
+            # (risk * kelly) / (loss_in_points * dollar_per_point_per_lot)
+            lot_size = (risk_amount * kelly_fraction) / (avg_loss * pip_value)
         elif current_atr > 0:
             # Fallback to ATR-based sizing (RISK_LIMITS.md standard)
-            # ATR * 100 converts gold ATR to $ per lot
-            lot_size = (risk_amount / (current_atr * 100)) * total_multiplier
+            # ATR * pip_value converts ATR to $ per lot
+            lot_size = (risk_amount / (current_atr * pip_value)) * total_multiplier
         else:
             # Default to minimum lot if no data
             lot_size = self.cfg.min_lot_size
 
         # 5. Cap at Max Position Size (10% of equity)
         max_notional = self.balance * self.cfg.max_position_size_pct
-        # Price estimate for gold
+        # Price estimate for gold (1 lot = 100 oz)
         price = market_data["close"].iloc[-1] if market_data is not None and not market_data.empty else 2300.0
-        max_lots = max_notional / (price * 100)
+        max_lots = max_notional / (price * pip_value)
 
         final_lots = min(lot_size, max_lots)
         final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
