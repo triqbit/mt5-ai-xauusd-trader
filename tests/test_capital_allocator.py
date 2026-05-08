@@ -572,3 +572,20 @@ def test_scaled_to_zero_rejection(allocator):
     result = allocator.request_allocation("s1", 0.01)
     assert result.is_allowed is False
     assert result.rejection_code == RejectionCode.SCALED_TO_ZERO
+
+
+def test_request_allocation_no_budget(allocator):
+    """Test rejection when total budget is zero."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+    )
+    allocator.add_strategy(config)
+    allocator.update_budget(0.0)
+
+    result = allocator.request_allocation("s1", 0.01)
+    assert result.is_allowed is False
+    assert result.rejection_code == RejectionCode.NO_BUDGET
+    assert result.rejection_reason == "Total budget is zero or negative"
