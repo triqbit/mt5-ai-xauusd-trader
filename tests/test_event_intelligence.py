@@ -193,8 +193,12 @@ def test_json_provider(tmp_path, now):
     assert events[0].name == "JSON Event"
     assert events[0].impact == EventImpact.HIGH
 
-@patch("requests.get")
-def test_metaapi_provider(mock_get, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
+def test_metaapi_provider(mock_init_session, now):
+    mock_session = MagicMock()
+    mock_init_session.return_value = mock_session
+    mock_get = mock_session.get
+
     mock_response = MagicMock()
     mock_response.status_code = 200
     # MetaAPI typically returns strings like "2023-01-01T12:30:00.000Z"
@@ -249,8 +253,12 @@ def test_guess_category_new_keywords():
     assert provider._guess_category("Geopolitical Tension") == EventCategory.GEOPOLITICAL
     assert provider._guess_category("US Treasury Bond Auction") == EventCategory.USD_MACRO
 
-@patch("requests.get")
-def test_metaapi_provider_filtering(mock_get, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
+def test_metaapi_provider_filtering(mock_init_session, now):
+    mock_session = MagicMock()
+    mock_init_session.return_value = mock_session
+    mock_get = mock_session.get
+
     mock_response = MagicMock()
     mock_response.status_code = 200
     event_time = now + timedelta(minutes=30)
@@ -306,8 +314,12 @@ def test_json_provider_error(tmp_path):
     provider = JSONEventProvider(str(file_path))
     assert provider.get_upcoming_events(datetime.now(), datetime.now()) == []
 
-@patch("requests.get")
-def test_metaapi_provider_error(mock_get, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
+def test_metaapi_provider_error(mock_init_session, now):
+    mock_session = MagicMock()
+    mock_init_session.return_value = mock_session
+    mock_get = mock_session.get
+
     mock_get.side_effect = Exception("Network Error")
     provider = MetaAPIEventProvider(token="fake")
     assert provider.get_upcoming_events(now, now) == []
