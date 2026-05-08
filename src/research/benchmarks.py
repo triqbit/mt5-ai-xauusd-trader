@@ -139,6 +139,32 @@ class RiskFilteredBaseline:
         return signals
 
 
+class MACDStrategy:
+    """Moving Average Convergence Divergence baseline."""
+
+    def __init__(
+        self, fast_window: int = 12, slow_window: int = 26, signal_window: int = 9
+    ):
+        self.fast_window = fast_window
+        self.slow_window = slow_window
+        self.signal_window = signal_window
+
+    @property
+    def name(self) -> str:
+        return f"MACD_{self.fast_window}_{self.slow_window}_{self.signal_window}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        exp1 = df["close"].ewm(span=self.fast_window, adjust=False).mean()
+        exp2 = df["close"].ewm(span=self.slow_window, adjust=False).mean()
+        macd = exp1 - exp2
+        signal_line = macd.ewm(span=self.signal_window, adjust=False).mean()
+
+        signals = np.zeros(len(df))
+        signals[macd > signal_line] = 1
+        signals[macd < signal_line] = -1
+        return signals
+
+
 class MeanReversionStrategy:
     """RSI-based Mean Reversion baseline."""
 
@@ -260,25 +286,60 @@ class BenchmarkEvaluator:
         # Final aggregate metrics
         total_return = (equity[-1] - self.initial_balance) / self.initial_balance
 
+        active_returns = daily_returns[1:] if len(daily_returns) > 1 else daily_returns
+
         sharpe = 0.0
         sortino = 0.0
-        if np.std(daily_returns) > 0:
-            # Use bars_per_year for annualization
-            avg_return = np.mean(daily_returns)
-            sharpe = avg_return / np.std(daily_returns) * np.sqrt(self.bars_per_year)
+        volatility = 0.0
+        skew = 0.0
+        kurt = 0.0
+        var_95 = 0.0
+        cvar_95 = 0.0
+        tail_ratio = 0.0
+        gain_to_pain = 0.0
 
-            downside_returns = daily_returns[daily_returns < 0]
-            downside_std = np.std(downside_returns) if len(downside_returns) > 0 else 0
+        if len(active_returns) > 0 and np.std(active_returns) > 0:
+            avg_return = np.mean(active_returns)
+            std_return = np.std(active_returns)
+            sharpe = avg_return / std_return * np.sqrt(self.bars_per_year)
+
+            downside_returns = active_returns[active_returns < 0]
+            downside_std = np.std(downside_returns) if len(downside_returns) > 1 else std_return
             if downside_std > 0:
                 sortino = avg_return / downside_std * np.sqrt(self.bars_per_year)
 
+            volatility = std_return * np.sqrt(self.bars_per_year)
+
+            # Institutional Stats
+            skew = float(stats.skew(active_returns))
+            kurt = float(stats.kurtosis(active_returns))
+            var_95 = float(np.percentile(active_returns, 5)) if len(active_returns) > 20 else 0.0
+            cvar_95 = (
+                float(active_returns[active_returns <= var_95].mean())
+                if len(active_returns) > 20
+                else 0.0
+            )
+
+            # Tail Ratio: 95th percentile / abs(5th percentile)
+            p95 = np.percentile(active_returns, 95) if len(active_returns) > 20 else 0.0
+            p5 = np.percentile(active_returns, 5) if len(active_returns) > 20 else 0.0
+            tail_ratio = abs(p95 / p5) if abs(p5) > 1e-9 else 0.0
+
+            # Gain-to-Pain Ratio: Sum(Gains) / Abs(Sum(Losses))
+            gains = active_returns[active_returns > 0].sum()
+            pains = abs(active_returns[active_returns < 0].sum())
+            gain_to_pain = gains / pains if pains > 1e-9 else 0.0
+
         peak = np.maximum.accumulate(equity)
-        drawdown = (peak - equity) / peak
+        drawdown = (peak - equity) / (peak + 1e-9)
         max_drawdown = np.max(drawdown) if len(drawdown) > 0 else 0
+        ulcer_index = float(np.sqrt(np.mean(np.square(drawdown))))
+        lake_ratio = float(np.mean(drawdown))
 
         win_rate = 0.0
         profit_factor = 0.0
         expectancy = 0.0
+        sqn = 0.0
         if len(trade_pnls) > 0:
             wins = [p for p in trade_pnls if p > 0]
             losses = [p for p in trade_pnls if p < 0]
@@ -293,15 +354,23 @@ class BenchmarkEvaluator:
             loss_rate = len(losses) / len(trade_pnls)
             expectancy = (avg_win * win_rate) - (avg_loss * loss_rate)
 
-        calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
-        volatility = np.std(daily_returns) * np.sqrt(self.bars_per_year)
-
-        sqn = 0.0
-        if len(trade_pnls) > 0:
             avg_pnl = np.mean(trade_pnls)
             std_pnl = np.std(trade_pnls)
             if std_pnl > 0:
                 sqn = np.sqrt(len(trade_pnls)) * avg_pnl / std_pnl
+
+        # Stability score: consistency of equity curve (R-squared of linear fit)
+        stability_score = 0.0
+        if len(equity) > 2:
+            x = np.arange(len(equity))
+            y = equity
+            slope, intercept = np.polyfit(x, y, 1)
+            line = slope * x + intercept
+            y_var = np.sum((y - y.mean()) ** 2)
+            stability_score = 1 - (np.sum((y - line) ** 2) / (y_var + 1e-9))
+
+        calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
+        common_sense_ratio = tail_ratio * (profit_factor if profit_factor != float("inf") else 1.0)
 
         # Store daily returns for statistical testing
         self.results[name + "_returns"] = daily_returns
@@ -311,7 +380,7 @@ class BenchmarkEvaluator:
             "Sharpe Ratio": sharpe,
             "Sortino Ratio": sortino,
             "Calmar Ratio": calmar,
-            "Recovery Factor": calmar,  # Alias for Calmar in this context
+            "Recovery Factor": calmar,
             "Volatility": volatility,
             "Max Drawdown": max_drawdown,
             "Win Rate": win_rate,
@@ -319,6 +388,16 @@ class BenchmarkEvaluator:
             "Expectancy": expectancy,
             "SQN": sqn,
             "Num Trades": len(trade_pnls),
+            "Skewness": skew,
+            "Kurtosis": kurt,
+            "VaR_95": var_95,
+            "CVaR_95": cvar_95,
+            "Ulcer Index": ulcer_index,
+            "Tail Ratio": tail_ratio,
+            "Common Sense Ratio": common_sense_ratio,
+            "Gain to Pain Ratio": gain_to_pain,
+            "Lake Ratio": lake_ratio,
+            "Stability Score": float(stability_score),
         }
 
     def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> dict[str, Any]:
@@ -386,6 +465,9 @@ class BenchmarkEvaluator:
                     sharpe=f"{metrics['Sharpe Ratio']:.2f}",
                     max_drawdown=f"{metrics['Max Drawdown'] * 100:.2f}%",
                     p_value=f"{comp.get('P-Value', 1.0):.4f}",
+                    profit_factor=f"{metrics['Profit Factor']:.2f}",
+                    sqn=f"{metrics['SQN']:.2f}",
+                    recovery_factor=f"{metrics['Recovery Factor']:.2f}",
                 )
             )
 
