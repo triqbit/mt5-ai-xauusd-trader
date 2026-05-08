@@ -180,6 +180,23 @@ class RareEventSection(BaseModel):
     insights: str
 
 
+class CalibrationBucket(BaseModel):
+    range: str
+    accuracy: float
+    confidence: float
+    samples: int
+
+
+class CalibrationSection(BaseModel):
+    brier_score: float
+    ece: float
+    mce: float
+    status: str
+    optimal_threshold: float
+    buckets: list[CalibrationBucket]
+    reliability_insight: str
+
+
 class ExecutionMetric(BaseModel):
     name: str
     value: str
@@ -215,6 +232,7 @@ class ResearchReport(BaseModel):
     benchmarks: BenchmarkSection | None = None
     rl_evaluation: RLSection | None = None
     rare_events: RareEventSection | None = None
+    calibration_analysis: CalibrationSection | None = None
     execution_quality: ExecutionQualitySection | None = None
 
     conclusion: str
@@ -441,8 +459,27 @@ class ResearchReporter:
                 )
             self.console.print(table)
 
+        if report.calibration_analysis:
+            self.console.print("\n[bold cyan]10. Confidence Calibration & Reliability[/]")
+            self.console.print(
+                f"ECE: [bold]{report.calibration_analysis.ece:.4f}[/] | "
+                f"Brier Score: [bold]{report.calibration_analysis.brier_score:.4f}[/] | "
+                f"Status: [bold]{report.calibration_analysis.status}[/]"
+            )
+            table = Table(box=None)
+            table.add_column("Confidence Range")
+            table.add_column("Accuracy")
+            table.add_column("Avg Confidence")
+            table.add_column("Samples")
+            for b in report.calibration_analysis.buckets:
+                table.add_row(
+                    b.range, f"{b.accuracy:.1%}", f"{b.confidence:.1%}", str(b.samples)
+                )
+            self.console.print(table)
+            self.console.print(f"[dim]Insight: {report.calibration_analysis.reliability_insight}[/]")
+
         if report.execution_quality:
-            self.console.print("\n[bold blue]10. Execution Quality & Alpha Decay[/]")
+            self.console.print("\n[bold blue]11. Execution Quality & Alpha Decay[/]")
             self.console.print(
                 f"Efficiency Score: [bold]{report.execution_quality.efficiency_score:.1f}/100[/]"
             )
@@ -509,6 +546,8 @@ class ResearchOrchestrator:
             self.report.rl_evaluation = section
         elif isinstance(section, RareEventSection):
             self.report.rare_events = section
+        elif isinstance(section, CalibrationSection):
+            self.report.calibration_analysis = section
         elif isinstance(section, ExecutionQualitySection):
             self.report.execution_quality = section
         else:

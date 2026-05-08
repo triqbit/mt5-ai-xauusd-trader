@@ -30,6 +30,8 @@
 {% set ns.count = ns.count + 1 %}{% endif %}
 {% if rare_events %}{{ ns.count }}. [Rare Event Simulations](#{{ ns.count }}-rare-event-simulations)
 {% set ns.count = ns.count + 1 %}{% endif %}
+{% if calibration_analysis %}{{ ns.count }}. [Confidence Calibration & Reliability](#{{ ns.count }}-confidence-calibration--reliability)
+{% set ns.count = ns.count + 1 %}{% endif %}
 {% if execution_quality %}{{ ns.count }}. [Execution Quality & Alpha Decay](#{{ ns.count }}-execution-quality--alpha-decay)
 {% set ns.count = ns.count + 1 %}{% endif %}
 {{ ns.count }}. [Conclusion & Recommendations](#conclusion--recommendations)
@@ -189,6 +191,22 @@
 {% for s in rare_events.scenarios %}
 | {{ s.event_type }} | {{ (s.peak_impact_pct * 100)|round(2) }}% | {{ s.realized_volatility|round(4) }} | {{ (s.recovery_attained * 100)|round(1) }}% |
 {% endfor %}
+{% endif %}
+
+{% if calibration_analysis %}
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Confidence Calibration & Reliability
+**Status:** {{ calibration_analysis.status }} | **ECE:** {{ calibration_analysis.ece|round(4) }} | **Brier Score:** {{ calibration_analysis.brier_score|round(4) }}
+
+| Confidence Range | Accuracy | Avg Confidence | Samples |
+|------------------|----------|----------------|---------|
+{% for b in calibration_analysis.buckets %}
+| {{ b.range }} | {{ (b.accuracy * 100)|round(1) }}% | {{ (b.confidence * 100)|round(1) }}% | {{ b.samples }} |
+{% endfor %}
+
+**Operational Insight:**
+{{ calibration_analysis.reliability_insight }}
+**Optimal Threshold Recommendation:** {{ calibration_analysis.optimal_threshold|round(2) }}
 {% endif %}
 
 {% if execution_quality %}
