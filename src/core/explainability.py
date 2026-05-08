@@ -174,6 +174,7 @@ class SignalExplainer:
             execution_data: Optional execution filter data or ExecutionDecision object.
             feature_impacts: Optional list of cluster impacts or dict of individual feature scores.
             model_confidences: Optional dictionary mapping model names to their individual confidence scores.
+            signal_id: Optional database ID of the signal for traceability.
 
         Returns:
             A structured SignalExplanation object.
