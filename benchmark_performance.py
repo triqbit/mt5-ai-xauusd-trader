@@ -1,10 +1,13 @@
 
+import os
 import time
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 from src.core.feature_engineering import FeatureEngineer
 from src.core.trade_logger import TradeLogger
-import os
+
 
 def benchmark_feature_engineering():
     print("Benchmarking Feature Engineering...")

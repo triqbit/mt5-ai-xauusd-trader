@@ -35,10 +35,9 @@ def get_vars_from_example():
     with open(example_path, "r") as f:
         for line in f:
             line = line.strip()
-            if line and not line.startswith("#"):
-                if "=" in line:
-                    var = line.split("=")[0].strip()
-                    vars.add(var.lower())
+            if line and not line.startswith("#") and "=" in line:
+                var = line.split("=")[0].strip()
+                vars.add(var.lower())
     return vars
 
 def validate():

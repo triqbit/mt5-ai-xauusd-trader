@@ -2,9 +2,8 @@
 Unit tests for the benchmarking framework.
 """
 
-from unittest.mock import MagicMock
-
 import importlib.util
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd

@@ -3,10 +3,11 @@ Tests for Monitor class.
 Ensures real-time tracking, metrics updates, and Telegram alerting work as expected.
 """
 import asyncio
+import contextlib
 import time
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.core.monitor import (
     CONFIDENCE_GAUGE,
@@ -183,10 +184,8 @@ class TestMonitor(unittest.TestCase):
         with patch.object(CPU_USAGE_GAUGE, "set") as mock_cpu_set, \
              patch.object(MEMORY_USAGE_GAUGE, "set") as mock_mem_set, \
              patch.object(DISK_USAGE_GAUGE, "set") as mock_disk_set:
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 asyncio.run(self.monitor._collect_system_metrics(interval=1))
-            except asyncio.CancelledError:
-                pass
 
             mock_cpu_set.assert_called_with(10.0)
             mock_mem_set.assert_called_with(50.0)

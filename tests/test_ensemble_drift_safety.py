@@ -1,10 +1,11 @@
 import unittest
 from unittest.mock import MagicMock
-import numpy as np
-from src.models.ensemble import EnsembleModel
+
+from src.core.config import TradingConfig
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
-from src.core.config import TradingConfig
+from src.models.ensemble import EnsembleModel
+
 
 class TestEnsembleDriftSafety(unittest.TestCase):
     def setUp(self):

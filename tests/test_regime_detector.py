@@ -114,7 +114,7 @@ class TestRegimeDetector(unittest.TestCase):
         })
 
         # Initial detect should use heuristics
-        info_pre = self.detector.detect(data.iloc[:50])
+        self.detector.detect(data.iloc[:50])
 
         # Fit GMM
         self.detector.fit(data, n_clusters=3)

@@ -1,13 +1,14 @@
 """
 Tests for structured execution filter traceability.
 """
-import pytest
+
 import pandas as pd
-import numpy as np
-from datetime import datetime, timezone
-from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
+import pytest
+
+from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.schemas import TradeSignal
-from src.core.audit_log import AuditLogger, AuditEntry
+from src.trading.execution_filter import ExecutionDecision, ExecutionFilter
+
 
 class MockConfig:
     def __init__(self):

@@ -2,11 +2,12 @@
 MT5 AI/ML Trading Bot - Jules UX Hardening Tests
 tests/test_jules_ux_enhancements.py
 """
-import os
-import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import pytest
-from main import parse_args, get_system_version
+
+from main import get_system_version, parse_args
+
 
 def test_argparse_help_strings():
     """Verify that argparse has the updated help strings and epilog."""
@@ -23,9 +24,8 @@ def test_system_version_retrieval():
 
 def test_cli_log_level_choices():
     """Verify that log-level only accepts specific choices."""
-    with patch("sys.argv", ["main.py", "--log-level", "INVALID"]):
-        with pytest.raises(SystemExit):
-            parse_args()
+    with patch("sys.argv", ["main.py", "--log-level", "INVALID"]), pytest.raises(SystemExit):
+        parse_args()
 
     with patch("sys.argv", ["main.py", "--log-level", "DEBUG"]):
         args = parse_args()

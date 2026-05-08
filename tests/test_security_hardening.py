@@ -1,5 +1,4 @@
 import os
-import stat
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -60,6 +59,7 @@ def test_audit_logger_redaction(tmp_path):
 
     # Check the database
     from sqlalchemy import create_engine, select
+
     from src.core.audit_log import AuditEntry
     engine = create_engine(db_url)
     with engine.connect() as conn:
