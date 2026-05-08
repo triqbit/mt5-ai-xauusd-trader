@@ -14,8 +14,12 @@ from src.data.event_intelligence import (
 def now():
     return datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-@patch("requests.get")
-def test_metaapi_provider_comprehensive(mock_get, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
+def test_metaapi_provider_comprehensive(mock_init_session, now):
+    mock_session = MagicMock()
+    mock_init_session.return_value = mock_session
+    mock_get = mock_session.get
+
     """Test MetaAPI provider with various event types and countries."""
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -156,8 +160,13 @@ def test_stricter_major_event_multipliers(now):
     status_major = intel_major.get_risk_status(now)
     assert status_major.risk_multiplier == 0.25
 
-def test_metaapi_provider_unsupported_impact(now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
+def test_metaapi_provider_unsupported_impact(mock_init_session, now):
     """Test fallback for unknown impact levels in MetaAPI."""
+    mock_session = MagicMock()
+    mock_init_session.return_value = mock_session
+    mock_get = mock_session.get
+
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = [
@@ -169,8 +178,9 @@ def test_metaapi_provider_unsupported_impact(now):
             "country": "US"
         }
     ]
-    with patch("requests.get", return_value=mock_response):
-        provider = MetaAPIEventProvider(token="fake")
-        events = provider.get_upcoming_events(now, now + timedelta(hours=1))
-        assert len(events) == 1
-        assert events[0].impact == EventImpact.LOW # Default fallback
+    mock_get.return_value = mock_response
+
+    provider = MetaAPIEventProvider(token="fake")
+    events = provider.get_upcoming_events(now, now + timedelta(hours=1))
+    assert len(events) == 1
+    assert events[0].impact == EventImpact.LOW # Default fallback
