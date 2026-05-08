@@ -347,7 +347,8 @@ class HealthChecker:
             return res
 
         try:
-            client = redis.from_url(self.cfg.redis_url, socket_timeout=2)
+            redis_url = self.cfg.redis_url.get_secret_value() if hasattr(self.cfg.redis_url, "get_secret_value") else self.cfg.redis_url
+            client = redis.from_url(redis_url, socket_timeout=2)
             if client.ping():
                 res = ComponentStatus(status=HealthStatus.HEALTHY, message="Redis reachable")
             else:

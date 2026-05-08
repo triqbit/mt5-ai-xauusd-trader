@@ -61,6 +61,19 @@ class SecretMaskingProcessor:
             if match:
                 self.secrets.add(match.group(2))
 
+        # Also specifically check redis_url for embedded passwords
+        redis_url = (
+            config.redis_url.get_secret_value()
+            if hasattr(config.redis_url, "get_secret_value")
+            else str(config.redis_url)
+        )
+        if redis_url and "@" in redis_url:
+            # Mask the password part of the URL specifically
+            # redis://:password@host:port/db or redis://user:password@host:port/db
+            match = re.search(r"://([^:]*):([^@]+)@", redis_url)
+            if match:
+                self.secrets.add(match.group(2))
+
     def redact_any(self, data: Any) -> Any:
         """
         Recursively redact secrets and sensitive fields from any data structure.
