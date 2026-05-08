@@ -52,7 +52,8 @@ Comprehensive security framework addressing data protection, API security, deplo
 
 ### 3.1 Credential Storage
 - **No Hardcoding**: All credentials stored in secure vault
-- **Environment Variables**: Use .env with local .gitignore
+- **Environment Variables**: Use .env with local .gitignore.
+- **Type-safe Secrets**: Use Pydantic `SecretStr` for all credentials (MT5, Redis, MetaAPI) to ensure automatic masking in logs and serialization.
 - **Secrets Rotation**: Automatic rotation every 30 days
 - **Audit Trail**: Track all credential access attempts
 - **Emergency Access**: Break-glass procedure for critical incidents
@@ -121,6 +122,7 @@ Comprehensive security framework addressing data protection, API security, deplo
 
 ### 6.1 Secure Coding
 - **Static Analysis**: SonarQube scanning on every commit
+- **Safe Deserialization**: Enforce `weights_only=True` for all `torch.load` calls to prevent remote code execution via malicious model files.
 - **Dependency Scanning**: OWASP Dependency-Check
 - **SAST**: Semgrep for Python security rules
 - **Code Review**: Security-focused peer reviews
