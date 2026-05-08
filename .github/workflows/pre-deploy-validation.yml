@@ -30,7 +30,7 @@ jobs:
 
       - name: Install Validation Tools
         run: |
-          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses
+          pip install ruff==0.15.12 mypy==1.10.0 pip-audit==2.7.3 pip-licenses
 
       - name: Gate 1.1: Ruff Lint & Format Check
         run: |
@@ -43,20 +43,25 @@ jobs:
           echo "Running Mypy static analysis..."
           mypy src/ main.py scripts/ --ignore-missing-imports || { echo "::error::Mypy type checks failed."; exit 1; }
 
-      - name: Gate 2: Secret Scanning (Gitleaks)
+      - name: Gate 2: Secret Scanning (No hardcoded secrets)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Gate 3: Validate Environment Config Template
+      - name: Gate 3: Environment Variable Completeness Check
         run: |
           echo "Verifying .env.example matches src/core/config.py..."
-          python scripts/validate_env.py || { echo "::error::Environment template validation failed. Sync .env.example with src/core/config.py"; exit 1; }
+          python scripts/validate_env.py || { echo "::error::Environment variable completeness check failed. Sync .env.example with src/core/config.py"; exit 1; }
 
-      - name: Gate 4: Validate Release Notes
+      - name: Gate 4: Release Notes Existence Check
         run: |
           echo "Checking CHANGELOG.md for [Unreleased] content..."
           python scripts/check_release_notes.py || { echo "::error::Release notes validation failed. Add your changes to the [Unreleased] section in CHANGELOG.md"; exit 1; }
+
+      - name: Gate 4.1: Verify Version Synchronization
+        run: |
+          echo "Verifying version consistency across metadata..."
+          python scripts/verify_version_sync.py || { echo "::error::Version synchronization failed. Ensure pyproject.toml, src/__init__.py, and CHANGELOG.md are aligned."; exit 1; }
 
       - name: Gate 4.5: Automated Pre-Prod Checklist Verification
         run: |
@@ -80,6 +85,11 @@ jobs:
           echo "Scanning dependencies for vulnerabilities (CI & Prod)..."
           pip-audit --requirement requirements-ci.txt || { echo "::error::Security vulnerabilities found in CI requirements."; exit 1; }
           pip-audit --requirement requirements.txt || { echo "::error::Security vulnerabilities found in production requirements."; exit 1; }
+
+      - name: Gate 5.1: Verify Dependency Harmonization
+        run: |
+          echo "Verifying overlapping dependencies are harmonized..."
+          python scripts/verify_dependencies.py || { echo "::error::Dependency mismatch detected across requirements files. Harmonize versions."; exit 1; }
 
       - name: Gate 6: License Compliance Check
         run: |
@@ -140,15 +150,15 @@ jobs:
           pip install pytest pytest-cov
           pip install -r requirements-ci.txt
 
-      - name: Gate 7: Database Migration Reversibility Check
+      - name: Gate 7: Database Migrations Valid and Reversible
         run: |
           echo "Verifying database migrations (up/down/up cycle)..."
-          python scripts/verify_migrations.py || { echo "::error::Migration reversibility check failed. Verify your Alembic scripts."; exit 1; }
+          python scripts/verify_migrations.py || { echo "::error::Database migration reversibility check failed. Verify your Alembic scripts."; exit 1; }
 
-      - name: Gate 8: Run Tests with Coverage Gate (85%)
+      - name: Gate 8: CI Tests and Coverage Thresholds (85%)
         run: |
           echo "Running unit and integration tests..."
-          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85 || { echo "::error::Tests failed or coverage below 85% gate."; exit 1; }
+          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85 || { echo "::error::CI checks failed: Tests failed or coverage below 85% threshold."; exit 1; }
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"
@@ -159,7 +169,7 @@ jobs:
   # STAGE 3: Artifact - Docker Build & Vulnerability Scan
   # -----------------------------------------------------------
   artifact-validation:
-    name: Artifact Validation (Docker & Security)
+    name: Artifact Validation (Docker Build & Scan)
     runs-on: ubuntu-latest
     needs: functional-validation
     steps:
@@ -168,7 +178,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Gate 9: Build Docker Image
+      - name: Gate 9: Docker Image Builds Successfully
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -178,7 +188,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Gate 10: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@v0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'triqbit/mt5-ai-xauusd-trader:validation-${{ github.sha }}'
           format: 'table'
