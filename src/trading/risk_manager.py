@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, Optional
 
+from src.core.audit_log import get_audit_logger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
@@ -169,6 +170,24 @@ class RiskManager:
         """Must be called at the start of each trading day."""
         if self.monitor:
             self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
+
+        # Audit logging of daily performance
+        try:
+            audit = get_audit_logger()
+            audit.log(
+                actor="risk_engine",
+                action="daily_summary",
+                details=f"Daily performance summary for {self.daily.date}",
+                metadata={
+                    "realised_pnl": self.daily.realised_pnl,
+                    "trade_count": self.daily.trade_count,
+                    "consecutive_losses": self.daily.consecutive_losses,
+                    "peak_equity": self.daily.peak_equity,
+                },
+            )
+        except (RuntimeError, ImportError):
+            pass
+
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 

@@ -144,6 +144,26 @@ class AuditLogger:
             },
         )
 
+    def log_model_outcome(
+        self,
+        symbol: str,
+        algorithm: str,
+        actual_direction: int,
+        metrics: dict[str, float],
+    ) -> int:
+        """Log the realized outcome and performance metrics for a model."""
+        return self.log(
+            actor="model",
+            action="prediction_outcome",
+            details=f"Outcome observed for {symbol} ({algorithm}): {actual_direction}",
+            metadata={
+                "symbol": symbol,
+                "algorithm": algorithm,
+                "actual_direction": actual_direction,
+                "metrics": metrics,
+            },
+        )
+
     def log_risk_decision(
         self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool
     ) -> int:
