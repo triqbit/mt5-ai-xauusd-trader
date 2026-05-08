@@ -60,6 +60,7 @@ CORE_DEPENDENCIES = {
     "numpy": "numpy",
     "pandas": "pandas",
     "pydantic": "pydantic",
+    "pydantic-settings": "pydantic_settings",
     "sqlalchemy": "sqlalchemy",
     "torch": "torch",
     "talib": "talib",

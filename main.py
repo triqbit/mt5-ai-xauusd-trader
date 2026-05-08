@@ -200,6 +200,7 @@ def run_live(
                             "metaapi_token",
                             "metaapi_account_id",
                             "database_url",
+                            "redis_url",
                             "telegram_token",
                         },
                     ),
@@ -875,6 +876,7 @@ def main() -> int:
                 "metaapi_token",
                 "metaapi_account_id",
                 "database_url",
+                "redis_url",
                 "telegram_token",
             },
         )
