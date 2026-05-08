@@ -520,15 +520,24 @@ class MT5Connector:
             return asyncio.run(_get_pos())
 
     def get_terminal_status(self) -> Dict[str, Any]:
-        """Retrieve terminal status (e.g., algo trading enabled)."""
+        """
+        Retrieve terminal status (e.g., algo trading enabled).
+        Ensures a consistent 'algo_trading' key is present.
+        """
         if not self._is_initialized:
-            return {}
+            return {"algo_trading": False}
         if not self.use_metaapi:
             info = mt5.terminal_info()
-            return info._asdict() if info else {}
+            if not info:
+                return {"algo_trading": False}
+            data = info._asdict()
+            # Map 'trade_allowed' (terminal-wide algo trading button) to 'algo_trading' for clarity
+            if "trade_allowed" in data:
+                data["algo_trading"] = data["trade_allowed"]
+            return data
         else:
             # MetaAPI doesn't have a direct equivalent for terminal 'algo_trading' button
-            # but we assume it's true if we can connect.
+            # but we assume it's true if we can connect and synchronize.
             return {"algo_trading": True}
 
     def get_symbol_properties(self, symbol: str) -> Optional[Dict[str, Any]]:
