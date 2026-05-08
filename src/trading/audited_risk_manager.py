@@ -29,6 +29,8 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        market_data: Optional[pd.DataFrame] = None,
+        open_positions_info: Optional[List[Dict[str, Any]]] = None,
     ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
@@ -37,14 +39,24 @@ class AuditedRiskManager(RiskManager):
         """
         decision_chain = {
             "circuit_breaker": self._check_circuit_breaker(),
-            "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
+            "daily_loss": self.get_daily_loss_level() < 4,
+            "max_positions": len(self.open_positions) < self.cfg.max_positions,
             "symbol_allocation": self._check_symbol_allocation(signal.symbol),
             "min_confidence": self._check_minimum_confidence(signal.confidence),
             "risk_reward": self._check_risk_reward(signal),
             "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
         }
+
+        # Add advanced exposure checks if data provided
+        if open_positions_info is not None:
+            decision_chain["directional_exposure"] = self._check_directional_exposure(
+                signal, open_positions_info
+            )
+            if market_data is not None:
+                decision_chain["total_notional"] = self._check_total_notional(
+                    signal, open_positions_info, market_data
+                )
 
         passed = all(decision_chain.values())
 

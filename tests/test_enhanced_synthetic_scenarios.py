@@ -1,17 +1,18 @@
 """
 Tests for enhanced synthetic scenarios and builders.
 """
+
 import pytest
-import pandas as pd
-from datetime import datetime, UTC
+
 from src.core.config import TradingConfig
+from src.models.regime_detector import MarketRegime, RegimeDetector
 from src.trading.execution_filter import ExecutionFilter
-from src.models.regime_detector import RegimeDetector, MarketRegime
 from src.utils.synthetic_data import (
-    ScenarioGenerator,
     ExecutionScenarioBuilder,
-    RegimeScenarioBuilder
+    RegimeScenarioBuilder,
+    ScenarioGenerator,
 )
+
 
 @pytest.fixture
 def config(monkeypatch):

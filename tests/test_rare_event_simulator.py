@@ -2,15 +2,15 @@
 Tests for RareEventSimulator.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 
 from src.research.rare_event_simulator import (
     RareEventConfig,
+    RareEventResult,
     RareEventSimulator,
     RareEventType,
-    RareEventResult,
 )
 
 
@@ -145,7 +145,7 @@ def test_dislocation_behavior(simulator):
 
 def test_vol_cluster_behavior(simulator):
     config = RareEventConfig(event_type=RareEventType.VOL_CLUSTER, n_steps=500)
-    df, result = simulator.generate_scenario(config)
+    df, _result = simulator.generate_scenario(config)
 
     returns = df["close"].pct_change().dropna()
     # Volatility should not be constant
@@ -199,7 +199,7 @@ def test_generate_suite(simulator):
 def test_custom_bars_per_day(simulator):
     # Test M1 frequency (1440 bars per day)
     config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=100, bars_per_day=1440)
-    df, result = simulator.generate_scenario(config)
+    df, _result = simulator.generate_scenario(config)
 
     # Frequency should be 60 seconds (1 minute)
     freq = (df.index[1] - df.index[0]).total_seconds()
@@ -207,7 +207,7 @@ def test_custom_bars_per_day(simulator):
 
     # Test H1 frequency (24 bars per day)
     config_h1 = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=100, bars_per_day=24)
-    df_h1, result_h1 = simulator.generate_scenario(config_h1)
+    df_h1, _result_h1 = simulator.generate_scenario(config_h1)
 
     freq_h1 = (df_h1.index[1] - df_h1.index[0]).total_seconds()
     assert freq_h1 == 3600

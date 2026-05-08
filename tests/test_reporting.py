@@ -9,17 +9,17 @@ import pytest
 from src.research.reporting import (
     AllocationEntry,
     AllocationSection,
-    RegimeSection,
-    RegimeSummary,
-    ResearchReport,
-    ResearchReporter,
-    StressedMetric,
-    StressTestSection,
-    ResearchOrchestrator,
     RareEventSection,
     RareEventSummary,
-    TradePatternSection,
+    RegimeSection,
+    RegimeSummary,
+    ResearchOrchestrator,
+    ResearchReport,
+    ResearchReporter,
     SignalMotif,
+    StressedMetric,
+    StressTestSection,
+    TradePatternSection,
 )
 
 

@@ -4,25 +4,32 @@ This log tracks architectural drift, code quality degradation, and fragmented lo
 
 ## Active Debt Items
 
-### Debt Item: Legacy Temporal Markers
+### Debt Item: Risk Management Fragmentation
+**Category:** Fragmentation
+**Impact:** High
+**Effort:** M
+**Resolution plan:** Consolidate `RiskEngine` (Institutional logic) and `RiskManager` (Core logic) into a unified `RiskManager`. Ensure `AuditedRiskManager` maintains traceability for the combined logic.
+**Owner:** Jules05 (Immediate cleanup)
+
+### Debt Item: Duplicated DailyStats
+**Category:** Duplication
+**Impact:** Low
+**Effort:** S
+**Resolution plan:** Centralize `DailyStats` dataclass in `src/trading/risk_manager.py` (or a shared constants/schemas module) to avoid redundant definitions.
+**Owner:** Jules05 (Immediate cleanup)
+
+### Debt Item: Linting Debt (Ruff)
+**Category:** Quality
+**Impact:** Medium
+**Effort:** M
+**Resolution plan:** Systematic application of `ruff --fix` and manual resolution of remaining errors (unused variables, ambiguous names).
+**Owner:** Jules05 (Immediate cleanup)
+
+### Debt Item: Legacy Temporal Markers (Review)
 **Category:** Quality
 **Impact:** Medium
 **Effort:** S
-**Resolution plan:** Replace all `datetime.utcnow()` calls with `datetime.now(timezone.utc)` for Python 3.12 compatibility and standardization.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Linting Debt (Ruff/UP)
-**Category:** Quality
-**Impact:** Low
-**Effort:** M
-**Resolution plan:** Systematic application of `ruff --fix` to resolve hundreds of `UP` (Upgrade), `I` (Import), and `F` (Pyflakes) errors.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Raw Print Statements
-**Category:** Quality
-**Impact:** Low
-**Effort:** S
-**Resolution plan:** Replace `print()` with `structlog` or `rich.console` across core modules (main.py, explainability, etc.).
+**Resolution plan:** Ensure no new `datetime.utcnow()` calls were introduced. Verify `src/` is clean of legacy datetime usage.
 **Owner:** Jules05 (Immediate cleanup)
 
 ### Debt Item: Fragmented Signal Mapping
@@ -32,26 +39,12 @@ This log tracks architectural drift, code quality degradation, and fragmented lo
 **Resolution plan:** Replace manual string/integer to SignalDirection mappings with `ModelAction(idx).to_direction()` or `SignalDirection` constants.
 **Owner:** Jules05 (Immediate cleanup)
 
-### Debt Item: Placeholder Secrets in Validator
-**Category:** Quality
-**Impact:** Medium
-**Effort:** S
-**Resolution plan:** Ensure `ConfigValidator` strictly rejects placeholder passwords ("password", "change_me") in production-like environments.
-**Owner:** Jules03 (Governance)
-
 ### Debt Item: Fragmented LSTM Architecture
 **Category:** Fragmentation
 **Impact:** High
 **Effort:** M
-**Resolution plan:** Relocate `LSTMAttentionModel` from `src/models/ensemble.py` to `src/models/lstm_model.py` to centralize sequence modeling logic.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Redundant Signal/Action Mapping
-**Category:** Duplication
-**Impact:** Medium
-**Effort:** S
-**Resolution plan:** Replace manual `IntEnum` to index mappings with centralized `ModelAction(idx).to_direction()` calls across the codebase.
-**Owner:** Jules05 (Immediate cleanup)
+**Resolution plan:** Relocate `LSTMAttentionModel` from `src/models/ensemble.py` to `src/models/lstm_model.py` to centralize sequence modeling logic. (Completed: May 8)
+**Owner:** Jules05
 
 ### Debt Item: Placeholder RL Agents (Dreamer/PPO stubs)
 **Category:** Fragmentation
@@ -66,10 +59,3 @@ This log tracks architectural drift, code quality degradation, and fragmented lo
 **Effort:** M
 **Resolution plan:** Standardize all model outputs to `[HOLD, BUY, SELL]` and remove legacy permutation logic in `EnsembleModel`.
 **Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Placeholder Reward Logic in Trading Environment
-**Category:** Quality
-**Impact:** Medium
-**Effort:** M
-**Resolution plan:** Schedule for Jules01/Jules04 to implement proper reward shaping based on risk-adjusted returns.
-**Owner:** Jules01/Jules04

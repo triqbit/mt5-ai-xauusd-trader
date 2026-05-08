@@ -2,8 +2,8 @@
 MT5 AI/ML Trading Bot - CLI and UX Tests
 tests/test_cli_ux.py
 """
-import os
 import logging
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest

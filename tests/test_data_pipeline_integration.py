@@ -65,8 +65,8 @@ def mock_ensemble():
          patch.object(ensemble, "LSTMModel", MagicMock()):
         model = EnsembleModel(device="cpu")
         model.ppo_agent = MagicMock()
-        from src.models.base_model import Signal
         from src.core.constants import SignalDirection
+        from src.models.base_model import Signal
         model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
         return model
 
@@ -137,7 +137,7 @@ def test_pipeline_resilience_to_malformed_data(data_generator, feature_engineer,
 
     if not features.empty:
         obs = features.iloc[-1].values
-        direction, confidence, _ = mock_ensemble.predict(obs)
+        direction, _confidence, _ = mock_ensemble.predict(obs)
         assert direction in SignalDirection
 
 def test_pipeline_insufficient_history(data_generator, feature_engineer):

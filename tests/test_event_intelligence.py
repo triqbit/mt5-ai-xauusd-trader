@@ -1,18 +1,20 @@
-import pytest
 import json
-import os
-from datetime import datetime, timedelta, UTC
-from unittest.mock import patch, MagicMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from src.data.event_intelligence import (
-    EventIntelligence,
-    MockEventProvider,
     BaseEventProvider,
-    JSONEventProvider,
-    MetaAPIEventProvider,
-    MacroEvent,
     EventCategory,
-    EventImpact
+    EventImpact,
+    EventIntelligence,
+    JSONEventProvider,
+    MacroEvent,
+    MetaAPIEventProvider,
+    MockEventProvider,
 )
+
 
 @pytest.fixture
 def now():
