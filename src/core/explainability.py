@@ -194,8 +194,13 @@ class SignalExplainer:
                         message=f"Blocked by {execution_data.blocked_by}"
                         if execution_data.blocked_by == name.upper()
                         else None,
-                        value=res.get("value") or res.get("ratio") or res.get("rsi") or res.get("slope"),
-                        threshold=res.get("threshold") or res.get("max_drawdown") or res.get("drift_threshold"),
+                        value=res.get("value")
+                        or res.get("ratio")
+                        or res.get("rsi")
+                        or res.get("slope"),
+                        threshold=res.get("threshold")
+                        or res.get("max_drawdown")
+                        or res.get("drift_threshold"),
                     )
                 )
             execution_summary = ExecutionSummary(

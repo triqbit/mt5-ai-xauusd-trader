@@ -582,7 +582,10 @@ class ConfigValidator:
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
         # 0. Database Choice
-        if self.config.mode == "live" and "sqlite" in self.config.database_url.get_secret_value().lower():
+        if (
+            self.config.mode == "live"
+            and "sqlite" in self.config.database_url.get_secret_value().lower()
+        ):
             self.errors.append(
                 ValidationError(
                     "DATABASE_URL",

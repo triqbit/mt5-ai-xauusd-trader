@@ -22,7 +22,9 @@ class MacroEvent(BaseModel):
     """
 
     name: str = Field(..., description="Human-readable name of the event (e.g., 'Core CPI m/m').")
-    category: EventCategory = Field(..., description="Functional category for specialized risk handling.")
+    category: EventCategory = Field(
+        ..., description="Functional category for specialized risk handling."
+    )
     impact: EventImpact = Field(..., description="Normalized impact score (1-4).")
     timestamp: datetime = Field(..., description="UTC start time of the event.")
     end_timestamp: datetime | None = Field(
@@ -93,9 +95,11 @@ class RiskStatus(BaseModel):
         1.0, ge=0.0, le=1.0, description="Sizing multiplier (0.0 to 1.0) to scale risk exposure."
     )
     active_events: list[MacroEvent] = Field(
-        default_factory=list, description="List of events currently in their active or cooldown window."
+        default_factory=list,
+        description="List of events currently in their active or cooldown window.",
     )
     blocking_events: list[MacroEvent] = Field(
-        default_factory=list, description="List of events specifically triggering an execution block."
+        default_factory=list,
+        description="List of events specifically triggering an execution block.",
     )
     reason: str | None = Field(None, description="Human-readable explanation for the risk state.")

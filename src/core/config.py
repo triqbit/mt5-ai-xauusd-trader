@@ -224,7 +224,7 @@ class TradingConfig(BaseSettings):
     )
     outcome_noise_threshold: float = Field(
         default=0.0001,
-        description="Threshold for price change to be considered significant for outcome tracking (e.g. 0.0001 = 1 pip for XAUUSD)"
+        description="Threshold for price change to be considered significant for outcome tracking (e.g. 0.0001 = 1 pip for XAUUSD)",
     )
 
     signal_flicker_window: int = Field(

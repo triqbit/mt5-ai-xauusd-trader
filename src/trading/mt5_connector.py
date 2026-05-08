@@ -127,8 +127,7 @@ class MT5Connector:
             MT5ConnectionError: If all connection paths fail after retries.
         """
         logger.info(
-            "Initializing MT5 connector | mode=%s | symbol=%s",
-            self.cfg.mode, self.cfg.symbol
+            "Initializing MT5 connector | mode=%s | symbol=%s", self.cfg.mode, self.cfg.symbol
         )
         self.use_metaapi = False  # Reset state
 
@@ -145,7 +144,8 @@ class MT5Connector:
                 if init_result:
                     logger.info(
                         "Native MT5 SDK initialized successfully | server=%s | login=%d",
-                        self.cfg.mt5_server, self.cfg.mt5_login
+                        self.cfg.mt5_server,
+                        self.cfg.mt5_login,
                     )
                     self.use_metaapi = False
                     self._is_initialized = True
@@ -153,18 +153,17 @@ class MT5Connector:
 
                 error_code, error_desc = mt5.last_error()
                 logger.warning(
-                    "Native mt5.initialize failed | error=%s | code=%d",
-                    error_desc, error_code
+                    "Native mt5.initialize failed | error=%s | code=%d", error_desc, error_code
                 )
             except Exception as e:
                 logger.exception("Native MT5 initialization encountered an unexpected error: %s", e)
         else:
-            logger.info("Native MetaTrader5 SDK not available on this platform (check OS or installation).")
+            logger.info(
+                "Native MetaTrader5 SDK not available on this platform (check OS or installation)."
+            )
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
-        metaapi_token = (
-            self.cfg.metaapi_token.get_secret_value() if self.cfg.metaapi_token else ""
-        )
+        metaapi_token = self.cfg.metaapi_token.get_secret_value() if self.cfg.metaapi_token else ""
         if METAAPI_AVAILABLE and metaapi_token and self.cfg.metaapi_account_id:
             logger.info("Attempting MetaAPI cloud fallback...")
             try:
@@ -197,8 +196,7 @@ class MT5Connector:
             except Exception as e:
                 logger.error("MetaAPI initialization failed | error=%s", e)
                 raise MT5ConnectionError(
-                    f"MetaAPI initialization failed: {e}",
-                    details={"error_type": type(e).__name__}
+                    f"MetaAPI initialization failed: {e}", details={"error_type": type(e).__name__}
                 ) from e
 
         msg = "All MT5 connection paths failed. Check credentials, network, and platform availability."
@@ -208,8 +206,8 @@ class MT5Connector:
             details={
                 "native_available": MT5_AVAILABLE,
                 "metaapi_available": METAAPI_AVAILABLE,
-                "platform": sys.platform
-            }
+                "platform": sys.platform,
+            },
         )
 
     def shutdown(self) -> None:
@@ -262,7 +260,9 @@ class MT5Connector:
                     err_code, err_desc = mt5.last_error()
                     # If it's a connection-related error, trigger re-init for next retry
                     if err_code in [-1, 10001, 10002]:  # Common connection/terminal errors
-                        logger.warning("MT5 connection failure detected (code %d). Resetting...", err_code)
+                        logger.warning(
+                            "MT5 connection failure detected (code %d). Resetting...", err_code
+                        )
                         self._is_initialized = False
 
                     is_retriable = err_code not in [-2, -5]
@@ -322,7 +322,9 @@ class MT5Connector:
                 if rates is None:
                     err_code, err_desc = mt5.last_error()
                     if err_code in [-1, 10001, 10002]:
-                        logger.warning("MT5 connection failure detected (code %d). Resetting...", err_code)
+                        logger.warning(
+                            "MT5 connection failure detected (code %d). Resetting...", err_code
+                        )
                         self._is_initialized = False
                     raise MT5DataError(f"Failed to copy rates range: {err_desc} (code: {err_code})")
                 df = pd.DataFrame(rates)
@@ -372,7 +374,9 @@ class MT5Connector:
                 if tick is None:
                     err_code, err_desc = mt5.last_error()
                     if err_code in [-1, 10001, 10002]:
-                        logger.warning("MT5 connection failure detected (code %d). Resetting...", err_code)
+                        logger.warning(
+                            "MT5 connection failure detected (code %d). Resetting...", err_code
+                        )
                         self._is_initialized = False
                     is_retriable = err_code not in [-2, -5]
                     raise MT5DataError(

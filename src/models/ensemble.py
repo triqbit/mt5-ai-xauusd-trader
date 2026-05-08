@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import numpy as np
@@ -91,6 +92,18 @@ class EnsembleModel(BaseModel):
             "calibration": 0.0,
         }
 
+    def load_ppo(self, path: str | Path) -> None:
+        """Load PPO model from path."""
+        self.ppo_agent = PPOAgent(model_path=path, device=self.device)
+
+    def load_lstm(self, path: str | Path) -> None:
+        """Load LSTM model from path."""
+        self.lstm_model = LSTMModel(model_path=path, device=self.device)
+
+    def load_dreamer(self, path: str | Path) -> None:
+        """Load Dreamer model from path."""
+        self.dreamer_agent = DreamerAgent(model_path=path, device=self.device)
+
     @property
     def weights(self) -> Dict[str, float]:
         """Expose weights from dynamic_ensemble."""
@@ -129,8 +142,11 @@ class EnsembleModel(BaseModel):
 
         # Update weights based on the new history
         self.dynamic_ensemble.update_weights()
-        logger.info("Ensemble outcome observed | actual=%s | new_weights=%s",
-                    actual_direction.name, self.weights)
+        logger.info(
+            "Ensemble outcome observed | actual=%s | new_weights=%s",
+            actual_direction.name,
+            self.weights,
+        )
 
     def aggregate_signals(self, signals: Dict[str, Signal], symbol: str = "unknown") -> Signal:
         """
@@ -178,7 +194,7 @@ class EnsembleModel(BaseModel):
             else:
                 weighted_hold_conf += sig.confidence * norm_weight
 
-        metadata = {
+        metadata: Dict[str, Any] = {
             "symbol": symbol,
             "weighted_probs": {
                 "BUY": weighted_buy_conf,
@@ -220,10 +236,13 @@ class EnsembleModel(BaseModel):
             drift_excess = (drift - penalty_trigger) / penalty_trigger
             drift_penalty = min(0.20, 0.20 * drift_excess)
             old_conf = confidence
-            confidence *= (1.0 - drift_penalty)
+            confidence *= 1.0 - drift_penalty
             logger.warning(
                 "Drift safeguard active | symbol=%s | drift=%.2f | confidence reduced: %.2f -> %.2f",
-                metadata.get("symbol", "unknown"), drift, old_conf, confidence
+                metadata.get("symbol", "unknown"),
+                drift,
+                old_conf,
+                confidence,
             )
             metadata["drift_penalty"] = drift_penalty
 
@@ -238,7 +257,10 @@ class EnsembleModel(BaseModel):
                 confidence *= 0.90
                 logger.warning(
                     "Entropy guard active | symbol=%s | conf_std=%.2f | confidence reduced: %.2f -> %.2f",
-                    metadata.get("symbol", "unknown"), conf_std, old_conf, confidence
+                    metadata.get("symbol", "unknown"),
+                    conf_std,
+                    old_conf,
+                    confidence,
                 )
                 metadata["entropy_penalty"] = 0.10
 

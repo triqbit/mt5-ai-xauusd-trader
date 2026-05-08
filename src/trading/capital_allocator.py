@@ -162,7 +162,10 @@ class CapitalAllocator:
             with contextlib.suppress(RuntimeError, ImportError):
                 get_audit_logger().log_config_change(
                     old_config={"strategy_id": strategy_id, "multiplier": old_multiplier},
-                    new_config={"strategy_id": strategy_id, "multiplier": config.performance_multiplier},
+                    new_config={
+                        "strategy_id": strategy_id,
+                        "multiplier": config.performance_multiplier,
+                    },
                     reason=f"Performance adjustment for {strategy_id} after trade outcome: {pnl:.2f}",
                 )
 

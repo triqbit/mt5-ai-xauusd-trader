@@ -142,7 +142,7 @@ class TradingEnv(gym.Env):
                 if self.position == 0:  # Open long
                     self.position = 1
                     self.entry_price = current_price + (spread + slippage)
-                    self.equity -= (spread + slippage)  # Immediate cost
+                    self.equity -= spread + slippage  # Immediate cost
 
             elif action == 2:  # SHORT
                 if self.position == 1:  # Close long
@@ -153,7 +153,7 @@ class TradingEnv(gym.Env):
                 if self.position == 0:  # Open short
                     self.position = -1
                     self.entry_price = current_price - (spread + slippage)
-                    self.equity -= (spread + slippage)  # Immediate cost
+                    self.equity -= spread + slippage  # Immediate cost
 
             elif action == 0:  # HOLD / CLOSE
                 # Production note: Decide if 0 means 'neutral' or 'do nothing'.

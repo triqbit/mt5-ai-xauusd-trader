@@ -154,7 +154,7 @@ class ExecutionFilter:
                 "drift": drift,
                 "accuracy": accuracy,
                 "drift_threshold": drift_threshold,
-                "accuracy_floor": accuracy_floor
+                "accuracy_floor": accuracy_floor,
             }
         trace["model_stability"] = stability_trace
 
@@ -169,7 +169,7 @@ class ExecutionFilter:
             perf_trace = {
                 "passed": bool(perf_passed),
                 "win_rate": win_rate,
-                "win_rate_floor": win_rate_floor
+                "win_rate_floor": win_rate_floor,
             }
         trace["performance_floor"] = perf_trace
 
@@ -179,7 +179,7 @@ class ExecutionFilter:
         trace["confidence_threshold"] = {
             "passed": bool(confidence_passed),
             "confidence": signal.confidence,
-            "min_confidence": min_confidence
+            "min_confidence": min_confidence,
         }
 
         # Layer 10: Signal Consistency (Flicker Guard)
@@ -244,7 +244,10 @@ class ExecutionFilter:
                 if len(df) < 15:
                     return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
                 high, low, close = df["high"], df["low"], df["close"]
-                tr = pd.concat([high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()], axis=1).max(axis=1)
+                tr = pd.concat(
+                    [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
+                    axis=1,
+                ).max(axis=1)
                 atr = tr.rolling(window=14).mean()
             current_atr = float(atr.iloc[-1])
             avg_atr = float(atr.rolling(window=100).mean().iloc[-1])
@@ -308,7 +311,9 @@ class ExecutionFilter:
                 if col in df.columns:
                     emas[p] = float(df[col].iloc[-1])
                 else:
-                    emas[p] = float(df["close"].iloc[-300:].ewm(span=p, adjust=False).mean().iloc[-1])
+                    emas[p] = float(
+                        df["close"].iloc[-300:].ewm(span=p, adjust=False).mean().iloc[-1]
+                    )
 
         if direction > 0:
             passed = bool(emas[8] > emas[21] > emas[50] > emas[200])
@@ -378,4 +383,9 @@ class ExecutionFilter:
             if h_list[i] != h_list[i - 1]:
                 changes += 1
         passed = changes <= max_changes
-        return bool(passed), {"changes": changes, "window": window, "max_changes": max_changes, "history": h_list}
+        return bool(passed), {
+            "changes": changes,
+            "window": window,
+            "max_changes": max_changes,
+            "history": h_list,
+        }

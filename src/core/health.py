@@ -50,6 +50,7 @@ def get_system_version() -> str:
     """Utility to retrieve application version."""
     try:
         from src import __version__
+
         return __version__
     except ImportError:
         return "unknown"
@@ -57,6 +58,7 @@ def get_system_version() -> str:
 
 class ComponentStatus(BaseModel):
     """Status of an individual system component."""
+
     status: HealthStatus
     message: str
     remedy: str = "N/A"
@@ -65,6 +67,7 @@ class ComponentStatus(BaseModel):
 
 class HealthReport(BaseModel):
     """Aggregate health report containing status of all components."""
+
     status: HealthStatus
     version: str = "unknown"
     environment: str = "production"
@@ -94,7 +97,11 @@ class HealthChecker:
 
     def _update_gauge(self, component: str, status: HealthStatus) -> None:
         """Update Prometheus health gauge for a component."""
-        val = 1.0 if status == HealthStatus.HEALTHY else (0.5 if status == HealthStatus.DEGRADED else 0.0)
+        val = (
+            1.0
+            if status == HealthStatus.HEALTHY
+            else (0.5 if status == HealthStatus.DEGRADED else 0.0)
+        )
         HEALTH_GAUGES.labels(component=component).set(val)
 
     def check_liveness(self) -> ComponentStatus:
@@ -114,6 +121,7 @@ class HealthChecker:
         hardware = "CPU"
         try:
             import torch
+
             if torch.cuda.is_available():
                 hardware = f"GPU (CUDA: {torch.cuda.get_device_name(0)})"
             elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -129,7 +137,11 @@ class HealthChecker:
     def check_database(self) -> ComponentStatus:
         """Verify primary database reachability."""
         if not self.trade_logger:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="TradeLogger not initialized", remedy="Ensure DB_URL is valid in .env")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message="TradeLogger not initialized",
+                remedy="Ensure DB_URL is valid in .env",
+            )
             self._update_gauge("database", res.status)
             return res
 
@@ -142,7 +154,11 @@ class HealthChecker:
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
-            res = ComponentStatus(status=HealthStatus.FAILED, message=f"Database unreachable: {e!s}", remedy="Check database service and connection string")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message=f"Database unreachable: {e!s}",
+                remedy="Check database service and connection string",
+            )
 
         self._update_gauge("database", res.status)
         return res
@@ -169,7 +185,9 @@ class HealthChecker:
             # 1. Account Info Check
             info = self.connector.get_account_info()
             if not info:
-                res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 failed to return account info")
+                res = ComponentStatus(
+                    status=HealthStatus.FAILED, message="MT5 failed to return account info"
+                )
                 self._update_gauge("mt5", res.status)
                 return res
 
@@ -217,7 +235,7 @@ class HealthChecker:
                 res = ComponentStatus(
                     status=overall_status,
                     message=" | ".join(messages),
-                    remedy="; ".join(remedies) if remedies else "N/A"
+                    remedy="; ".join(remedies) if remedies else "N/A",
                 )
 
         except Exception as e:
@@ -230,7 +248,9 @@ class HealthChecker:
     def check_models(self) -> ComponentStatus:
         """Verify AI models are loaded and healthy."""
         if not self.model:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="Model orchestrator not initialized")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED, message="Model orchestrator not initialized"
+            )
             self._update_gauge("models", res.status)
             return res
 
@@ -259,7 +279,9 @@ class HealthChecker:
             if hasattr(self.model, "get_health_metrics"):
                 with contextlib.suppress(Exception):
                     m = self.model.get_health_metrics()
-                    msg += f" | Health: acc={m.get('accuracy', 0):.2f}, drift={m.get('drift', 0):.2f}"
+                    msg += (
+                        f" | Health: acc={m.get('accuracy', 0):.2f}, drift={m.get('drift', 0):.2f}"
+                    )
             res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
 
         self._update_gauge("models", res.status)
@@ -278,7 +300,11 @@ class HealthChecker:
                 res = ComponentStatus(status=HealthStatus.HEALTHY, message="Configuration is valid")
         else:
             critical = [e.message for e in result.errors if e.critical]
-            res = ComponentStatus(status=HealthStatus.FAILED, message=f"Config invalid: {'; '.join(critical)}", remedy="Review .env and validation output")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message=f"Config invalid: {'; '.join(critical)}",
+                remedy="Review .env and validation output",
+            )
 
         self._update_gauge("config", res.status)
         return res
@@ -298,9 +324,15 @@ class HealthChecker:
         free_mb = usage.free / (1024 * 1024)
 
         if free_mb < min_mb:
-            res = ComponentStatus(status=HealthStatus.FAILED, message=f"Low disk: {free_mb:.1f}MB free", remedy="Clear old logs or increase disk quota")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message=f"Low disk: {free_mb:.1f}MB free",
+                remedy="Clear old logs or increase disk quota",
+            )
         else:
-            res = ComponentStatus(status=HealthStatus.HEALTHY, message=f"Disk space OK: {free_mb:.1f}MB free")
+            res = ComponentStatus(
+                status=HealthStatus.HEALTHY, message=f"Disk space OK: {free_mb:.1f}MB free"
+            )
 
         self._update_gauge("disk", res.status)
         return res
@@ -308,7 +340,9 @@ class HealthChecker:
     def check_redis(self) -> ComponentStatus:
         """Verify Redis connectivity if configured."""
         if not self.cfg.redis_url or not self.cfg.redis_url.get_secret_value():
-            res = ComponentStatus(status=HealthStatus.DEGRADED, message="Redis not configured (Optional)")
+            res = ComponentStatus(
+                status=HealthStatus.DEGRADED, message="Redis not configured (Optional)"
+            )
             self._update_gauge("redis", res.status)
             return res
 
@@ -360,7 +394,11 @@ class HealthChecker:
 
         failed = any(c.status == HealthStatus.FAILED for c in components.values())
         degraded = any(c.status == HealthStatus.DEGRADED for c in components.values())
-        overall = HealthStatus.FAILED if failed else (HealthStatus.DEGRADED if degraded else HealthStatus.HEALTHY)
+        overall = (
+            HealthStatus.FAILED
+            if failed
+            else (HealthStatus.DEGRADED if degraded else HealthStatus.HEALTHY)
+        )
 
         return HealthReport(
             status=overall,
@@ -414,10 +452,18 @@ class HealthChecker:
 router = APIRouter(prefix="/health", tags=["health"])
 _checker: Optional[HealthChecker] = None
 
-def init_health_checker(config: TradingConfig, connector: MT5Connector, trade_logger: TradeLogger, model: Any, audit_logger: Optional[AuditLogger] = None) -> HealthChecker:
+
+def init_health_checker(
+    config: TradingConfig,
+    connector: MT5Connector,
+    trade_logger: TradeLogger,
+    model: Any,
+    audit_logger: Optional[AuditLogger] = None,
+) -> HealthChecker:
     global _checker
     _checker = HealthChecker(config, connector, trade_logger, model, audit_logger)
     return _checker
+
 
 def get_health_checker() -> HealthChecker:
     global _checker
@@ -425,10 +471,12 @@ def get_health_checker() -> HealthChecker:
         _checker = HealthChecker(get_config())
     return _checker
 
+
 @router.get("/liveness", response_model=ComponentStatus)
 async def liveness():
     """Liveness probe: process heartbeat."""
     return get_health_checker().check_liveness()
+
 
 @router.get("/readiness", response_model=HealthReport)
 async def readiness():
@@ -438,10 +486,12 @@ async def readiness():
         raise HTTPException(status_code=503, detail=jsonable_encoder(report))
     return report
 
+
 @router.get("/full", response_model=HealthReport)
 async def full():
     """Full enterprise health report."""
     return get_health_checker().get_full_report()
+
 
 def create_health_app() -> FastAPI:
     """Create the health monitoring micro-app."""

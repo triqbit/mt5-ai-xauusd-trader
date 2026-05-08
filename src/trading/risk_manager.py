@@ -14,6 +14,7 @@ to ensure all signals entering the risk engine are technically valid.
 Author : triqbit
 License: MIT
 """
+
 from __future__ import annotations
 
 import logging
@@ -167,9 +168,7 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(
-                self.daily.realised_pnl, self.daily.trade_count
-            )
+            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -193,10 +192,14 @@ class RiskManager:
         calibration = float(health.get("calibration", 0.0))
 
         if drift > self.cfg.model_drift_threshold:
-            logger.warning("Model drift too high: %.2f > %.2f", drift, self.cfg.model_drift_threshold)
+            logger.warning(
+                "Model drift too high: %.2f > %.2f", drift, self.cfg.model_drift_threshold
+            )
             return False
         if accuracy < self.cfg.model_accuracy_floor:
-            logger.warning("Model accuracy too low: %.2f < %.2f", accuracy, self.cfg.model_accuracy_floor)
+            logger.warning(
+                "Model accuracy too low: %.2f < %.2f", accuracy, self.cfg.model_accuracy_floor
+            )
             return False
         if calibration > self.cfg.model_calibration_threshold:
             logger.warning(
@@ -247,13 +250,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(
-        self, confidence: float, threshold: float = 0.55
-    ) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
         if confidence < threshold:
-            logger.debug(
-                "Confidence %.2f below threshold %.2f", confidence, threshold
-            )
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
         return True
 

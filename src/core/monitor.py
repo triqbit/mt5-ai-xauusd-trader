@@ -62,7 +62,9 @@ TRADING_BLOCK_DURATION = Histogram(
 CONFIDENCE_GAUGE = Gauge("trading_model_confidence", "Latest model prediction confidence")
 MODEL_ACCURACY_GAUGE = Gauge("trading_model_accuracy", "Model prediction accuracy")
 MODEL_DRIFT_GAUGE = Gauge("trading_model_drift_score", "Statistical drift from baseline")
-MODEL_CALIBRATION_GAUGE = Gauge("trading_model_calibration_error", "Expected Calibration Error (ECE)")
+MODEL_CALIBRATION_GAUGE = Gauge(
+    "trading_model_calibration_error", "Expected Calibration Error (ECE)"
+)
 
 # 5. Data Quality Metrics
 DATA_FRESHNESS_GAUGE = Gauge(
@@ -212,7 +214,11 @@ class Monitor:
                 f"Threshold: {self.cfg.confidence_threshold:.3f}"
             )
             self.send_message(msg)
-            logger.warning("model_confidence_degradation", confidence=confidence, threshold=self.cfg.confidence_threshold)
+            logger.warning(
+                "model_confidence_degradation",
+                confidence=confidence,
+                threshold=self.cfg.confidence_threshold,
+            )
 
     def record_trade(self) -> None:
         """Increment the total trade counter."""

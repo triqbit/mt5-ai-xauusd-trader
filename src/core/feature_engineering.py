@@ -213,7 +213,14 @@ class FeatureEngineer:
         )
 
         slowk, slowd = talib.STOCH(
-            high, low, close, fastk_period=5, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0
+            high,
+            low,
+            close,
+            fastk_period=5,
+            slowk_period=3,
+            slowk_matype=0,
+            slowd_period=3,
+            slowd_matype=0,
         )
         indicators[f"{prefix}_stoch_k"] = slowk
         indicators[f"{prefix}_stoch_d"] = slowd
@@ -221,7 +228,9 @@ class FeatureEngineer:
         # Hilbert Transform (Institutional)
         indicators[f"{prefix}_ht_trendline"] = talib.HT_TRENDLINE(close)
         indicators[f"{prefix}_ht_dcperiod"] = talib.HT_DCPERIOD(close)
-        indicators[f"{prefix}_ht_phasor_inphase"], indicators[f"{prefix}_ht_phasor_quad"] = talib.HT_PHASOR(close)
+        indicators[f"{prefix}_ht_phasor_inphase"], indicators[f"{prefix}_ht_phasor_quad"] = (
+            talib.HT_PHASOR(close)
+        )
         indicators[f"{prefix}_ht_sine"], indicators[f"{prefix}_ht_leadsine"] = talib.HT_SINE(close)
         indicators[f"{prefix}_ht_trendmode"] = talib.HT_TRENDMODE(close).astype(np.float64)
 
@@ -248,7 +257,9 @@ class FeatureEngineer:
         col_prefix = f"{prefix}_" if prefix else "pattern_"
 
         for pattern in pattern_list:
-            patterns[f"{col_prefix}{pattern.lower()}"] = getattr(talib, pattern)(op, hi, lo, cl).astype(np.float64)
+            patterns[f"{col_prefix}{pattern.lower()}"] = getattr(talib, pattern)(
+                op, hi, lo, cl
+            ).astype(np.float64)
 
         return patterns
 
@@ -343,14 +354,29 @@ class FeatureEngineer:
         Ensures no look-ahead bias by shifting completion time.
         """
         tf_map = {
-            "M1": "1min", "M5": "5min", "M15": "15min", "M30": "30min",
-            "H1": "1h", "H4": "4h", "D1": "1D", "W1": "1W", "MN1": "1ME",
+            "M1": "1min",
+            "M5": "5min",
+            "M15": "15min",
+            "M30": "30min",
+            "H1": "1h",
+            "H4": "4h",
+            "D1": "1D",
+            "W1": "1W",
+            "MN1": "1ME",
         }
         freq = tf_map.get(tf, tf)
 
         resampled = (
             df.resample(freq)
-            .agg({"open": "first", "high": "max", "low": "min", "close": "last", "tick_volume": "sum"})
+            .agg(
+                {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "tick_volume": "sum",
+                }
+            )
             .dropna()
         )
 

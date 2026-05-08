@@ -202,7 +202,9 @@ class LSTMModel(BaseModel):
                     ).to(self.device)
                 else:
                     self.logger.info("Initializing LSTMPricePredictor...")
-                    self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(self.device)
+                    self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(
+                        self.device
+                    )
 
                 if model_path and Path(model_path).exists():
                     self.logger.info(f"Loading LSTM model from {model_path}")

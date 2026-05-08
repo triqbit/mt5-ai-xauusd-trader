@@ -221,7 +221,9 @@ class MetaAPIEventProvider(BaseEventProvider):
                 impact_str = item.get("impact", "low").lower()
                 impact = self._impact_map.get(impact_str, EventImpact.LOW)
 
-                if not (is_usd or is_geopolitical or (is_major_economy and impact >= EventImpact.HIGH)):
+                if not (
+                    is_usd or is_geopolitical or (is_major_economy and impact >= EventImpact.HIGH)
+                ):
                     continue
 
                 # MetaAPI uses UTC ISO strings
@@ -256,7 +258,9 @@ class MetaAPIEventProvider(BaseEventProvider):
             for kw in ["NON-FARM PAYROLL", "NFP", "UNEMPLOYMENT", "EMPLOYMENT", "JOBLESS"]
         ):
             return EventCategory.NFP
-        if any(kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT"]):
+        if any(
+            kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT"]
+        ):
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
@@ -411,7 +415,9 @@ class EventIntelligence:
                         events.extend(provider_events)
                         any_success = True
                 except Exception as e:
-                    logger.error(f"Provider {provider.__class__.__name__} failed to fetch events: {e}")
+                    logger.error(
+                        f"Provider {provider.__class__.__name__} failed to fetch events: {e}"
+                    )
 
             if any_success:
                 # De-duplicate events by name and timestamp
@@ -424,7 +430,9 @@ class EventIntelligence:
                 self._last_successful_fetch = now
             else:
                 all_fetch_failed = True
-                logger.warning("All providers failed or no events found during refresh. Using cache.")
+                logger.warning(
+                    "All providers failed or no events found during refresh. Using cache."
+                )
 
         # Always filter the cache for the current relevant window
         events = [
@@ -482,7 +490,10 @@ class EventIntelligence:
                         ]
                         and (event.timestamp - now) <= timedelta(minutes=60)
                     )
-                    or (event.impact == EventImpact.HIGH and (event.timestamp - now) <= timedelta(minutes=30))
+                    or (
+                        event.impact == EventImpact.HIGH
+                        and (event.timestamp - now) <= timedelta(minutes=30)
+                    )
                 ):
                     is_event_blocking = True
 
@@ -524,7 +535,9 @@ class EventIntelligence:
                     event.category in [EventCategory.FOMC, EventCategory.NFP, EventCategory.RATES]
                     and event.impact >= EventImpact.HIGH
                 ):
-                    event_mult = min(event_mult, 0.0 if event.impact == EventImpact.CRITICAL else 0.25)
+                    event_mult = min(
+                        event_mult, 0.0 if event.impact == EventImpact.CRITICAL else 0.25
+                    )
 
                 min_multiplier = min(min_multiplier, event_mult)
 
