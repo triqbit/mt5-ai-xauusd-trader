@@ -158,6 +158,7 @@ class SignalExplainer:
         execution_data: dict[str, Any] | ExecutionDecision | None = None,
         feature_impacts: list[dict[str, Any]] | dict[str, float] | None = None,
         model_confidences: dict[str, float] | None = None,
+        signal_id: int | None = None,
     ) -> SignalExplanation:
         """
         Generate a comprehensive explanation for a trade signal.
@@ -338,6 +339,10 @@ class SignalExplainer:
         if dominant_models:
             reasoning += f"Primary driver(s): {', '.join(dominant_models)}. "
         reasoning += f"Market is currently in a {regime_context.regime_name} regime. "
+        if regime_context.is_favorable:
+            reasoning += "Market state is considered favorable for this strategy. "
+        else:
+            reasoning += "Market state is UNFAVORABLE/CAUTIONARY for this strategy. "
 
         # Add key feature impacts if available
         high_impact_features = [c for c in contributions if c.impact_level == "High"]
@@ -368,6 +373,7 @@ class SignalExplainer:
         }
 
         return SignalExplanation(
+            signal_id=signal_id,
             symbol=symbol,
             direction=SignalDirection(direction),
             total_confidence=confidence,
