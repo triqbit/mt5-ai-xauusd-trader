@@ -17,6 +17,7 @@ import argparse
 import os
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -84,8 +85,11 @@ from src.trading.risk_manager import RiskManager
 
 def configure_logging(level: str = "INFO") -> None:
     import logging
+
+    import structlog.contextvars
     structlog.configure(
         processors=[
+            structlog.contextvars.merge_contextvars,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
@@ -188,6 +192,8 @@ def run_live(
     console: Optional[Console] = None,
     audit_logger: Optional[AuditLogger] = None,
 ) -> None:
+    import structlog.contextvars
+
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
@@ -196,6 +202,10 @@ def run_live(
     loop_count = 0
     last_price = None
     while True:
+        # 0. Generate unique trace ID for this iteration
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(trace_id=str(uuid.uuid4()))
+
         # 0. Periodic Audit of Configuration State
         if loop_count % 100 == 0 and audit_logger:
             audit_logger.log_config_snapshot(
