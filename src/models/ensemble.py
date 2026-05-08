@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import numpy as np
 
@@ -26,6 +26,9 @@ except ImportError:
 from src.core.constants import SignalDirection
 from src.core.profiler import profile
 from src.models.base_model import BaseModel, Signal
+
+if TYPE_CHECKING:
+    from src.core.config import TradingConfig
 from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMModel
@@ -50,6 +53,7 @@ class EnsembleModel(BaseModel):
         device: str = "cpu",
         consensus_threshold: float = 0.60,
         model_weights: Optional[Dict[str, float]] = None,
+        config: Optional[TradingConfig] = None,
     ) -> None:
         """
         Initialize the EnsembleModel.
@@ -58,9 +62,11 @@ class EnsembleModel(BaseModel):
             device: Computing device ('cpu', 'cuda', etc.).
             consensus_threshold: Required weighted agreement (default 60%).
             model_weights: Initial weights for each algorithm.
+            config: Optional trading configuration for risk thresholds.
         """
         super().__init__()
         self.device = device
+        self.cfg = config
         self.dynamic_ensemble = DynamicEnsemble(
             model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
         )
@@ -90,7 +96,43 @@ class EnsembleModel(BaseModel):
         """Expose weights from dynamic_ensemble."""
         return self.dynamic_ensemble.get_weights()
 
-    def aggregate_signals(self, signals: Dict[str, Signal]) -> Signal:
+    def get_health_metrics(self) -> Dict[str, float]:
+        """
+        Aggregate health metrics across the ensemble.
+        Calculates weighted averages of accuracy, drift, and calibration.
+        """
+        weights = self.weights
+        total_acc = 0.0
+        total_drift = 0.0
+        total_cal = 0.0
+
+        for name in self.ALGORITHMS:
+            m = self.dynamic_ensemble.calculate_metrics(name)
+            w = weights.get(name, 0.0)
+            total_acc += m.get("accuracy", 0.5) * w
+            total_drift += m.get("drift_score", 0.0) * w
+            total_cal += m.get("calibration_error", 0.0) * w
+
+        return {
+            "accuracy": total_acc,
+            "drift": total_drift,
+            "calibration": total_cal,
+        }
+
+    def observe_outcome(self, actual_direction: SignalDirection) -> None:
+        """
+        Record market outcome and update dynamic weights.
+        This enables autonomous drift monitoring and adaptive rebalancing.
+        """
+        for name in self.ALGORITHMS:
+            self.dynamic_ensemble.record_outcome(name, actual_direction)
+
+        # Update weights based on the new history
+        self.dynamic_ensemble.update_weights()
+        logger.info("Ensemble outcome observed | actual=%s | new_weights=%s",
+                    actual_direction.name, self.weights)
+
+    def aggregate_signals(self, signals: Dict[str, Signal], symbol: str = "unknown") -> Signal:
         """
         Aggregates pre-calculated signals from sub-models using weighted consensus.
 
@@ -137,6 +179,7 @@ class EnsembleModel(BaseModel):
                 weighted_hold_conf += sig.confidence * norm_weight
 
         metadata = {
+            "symbol": symbol,
             "weighted_probs": {
                 "BUY": weighted_buy_conf,
                 "SELL": weighted_sell_conf,
@@ -147,13 +190,59 @@ class EnsembleModel(BaseModel):
             "per_algo_signals": {k: s._asdict() for k, s in signals.items()},
         }
 
-        # 3. Consensus Threshold Check
+        # 3. Consensus Determination
+        direction = SignalDirection.HOLD
+        confidence = weighted_hold_conf
+
         if weighted_buy_conf >= self.consensus_threshold:
-            return Signal(direction=SignalDirection.BUY, confidence=weighted_buy_conf, metadata=metadata)
+            direction = SignalDirection.BUY
+            confidence = weighted_buy_conf
         elif weighted_sell_conf >= self.consensus_threshold:
-            return Signal(direction=SignalDirection.SELL, confidence=weighted_sell_conf, metadata=metadata)
-        else:
-            return Signal(direction=SignalDirection.HOLD, confidence=weighted_hold_conf, metadata=metadata)
+            direction = SignalDirection.SELL
+            confidence = weighted_sell_conf
+
+        if direction == SignalDirection.HOLD:
+            return Signal(direction=direction, confidence=confidence, metadata=metadata)
+
+        # 4. Defensive Safeguards (Risk Control & Drift Monitoring)
+
+        # 4.1 Drift-Aware Confidence Penalty
+        # If aggregate drift is rising, we proactively reduce confidence to trigger safer sizing
+        # or block trades before hard limits are hit.
+        health = self.get_health_metrics()
+        drift = health.get("drift", 0.0)
+        # Using 50% of the threshold as the trigger for the defensive penalty
+        drift_threshold = self.cfg.model_drift_threshold if self.cfg else 0.3
+        penalty_trigger = drift_threshold * 0.5
+
+        if drift > penalty_trigger:
+            # Scale penalty from 0 to 20% reduction in confidence
+            drift_excess = (drift - penalty_trigger) / penalty_trigger
+            drift_penalty = min(0.20, 0.20 * drift_excess)
+            old_conf = confidence
+            confidence *= (1.0 - drift_penalty)
+            logger.warning(
+                "Drift safeguard active | symbol=%s | drift=%.2f | confidence reduced: %.2f -> %.2f",
+                metadata.get("symbol", "unknown"), drift, old_conf, confidence
+            )
+            metadata["drift_penalty"] = drift_penalty
+
+        # 4.2 Entropy Guard (Consistency Check)
+        # If sub-models are highly divergent in their confidence, it indicates uncertainty.
+        winning_signals = [s for s in signals.values() if s.direction == direction]
+        if len(winning_signals) > 1:
+            conf_std = float(np.std([s.confidence for s in winning_signals]))
+            if conf_std > 0.25:
+                # 10% safety penalty for high entropy / internal disagreement
+                old_conf = confidence
+                confidence *= 0.90
+                logger.warning(
+                    "Entropy guard active | symbol=%s | conf_std=%.2f | confidence reduced: %.2f -> %.2f",
+                    metadata.get("symbol", "unknown"), conf_std, old_conf, confidence
+                )
+                metadata["entropy_penalty"] = 0.10
+
+        return Signal(direction=direction, confidence=confidence, metadata=metadata)
 
     def predict(
         self,
@@ -180,11 +269,17 @@ class EnsembleModel(BaseModel):
         if self.ppo_agent is not None:
             with profile("inference_ppo"):
                 votes["ppo"] = self.ppo_agent.predict(features, regime_info=regime_info)
+                self.dynamic_ensemble.record_prediction(
+                    "ppo", votes["ppo"].direction, votes["ppo"].confidence
+                )
 
         # Dreamer prediction
         if self.dreamer_agent is not None:
             with profile("inference_dreamer"):
                 votes["dreamer"] = self.dreamer_agent.predict(features, regime_info=regime_info)
+                self.dynamic_ensemble.record_prediction(
+                    "dreamer", votes["dreamer"].direction, votes["dreamer"].confidence
+                )
 
         # LSTM prediction
         if self.lstm_model is not None:
@@ -192,8 +287,11 @@ class EnsembleModel(BaseModel):
                 # Use seq if provided, otherwise fallback to features
                 lstm_input = seq if seq is not None else features
                 votes["lstm"] = self.lstm_model.predict(lstm_input, regime_info=regime_info)
+                self.dynamic_ensemble.record_prediction(
+                    "lstm", votes["lstm"].direction, votes["lstm"].confidence
+                )
 
-        return self.aggregate_signals(votes)
+        return self.aggregate_signals(votes, symbol=kwargs.get("symbol", "unknown"))
 
 
 __all__ = ["EnsembleModel"]
