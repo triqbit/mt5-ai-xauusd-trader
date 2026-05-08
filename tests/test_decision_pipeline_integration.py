@@ -133,8 +133,10 @@ def test_decision_pipeline_full_confluence(
     assert risk_approved is True
 
     # 4. Execution Filter
+    # Use a fixed Wednesday timestamp to avoid session violations in tests
+    valid_ts = datetime(2024, 5, 22, 12, 0, tzinfo=timezone.utc)
     filter_decision = execution_filter.validate(
-        signal, df, current_drawdown=0.02, timestamp=datetime.now(timezone.utc)
+        signal, df, current_drawdown=0.02, timestamp=valid_ts
     )
     assert filter_decision.is_approved is True
 

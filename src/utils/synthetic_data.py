@@ -347,6 +347,8 @@ class ExecutionScenarioBuilder:
             n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005
         )
         # Ensure enough data for indicators
+        # Use a fixed Wednesday timestamp to avoid session violations in tests
+        valid_ts = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         signal = TradeSignal(
             symbol=symbol,
             direction=1,
@@ -356,6 +358,7 @@ class ExecutionScenarioBuilder:
             lot_size=0.1,
             algorithm="ensemble",
             confidence=0.8,
+            timestamp=valid_ts,
         )
         return signal, df
 
@@ -367,6 +370,8 @@ class ExecutionScenarioBuilder:
         df.loc[last_idx, "high"] = df.loc[last_idx, "close"] + 50.0
         df.loc[last_idx, "low"] = df.loc[last_idx, "close"] - 50.0
 
+        # Use a fixed Wednesday timestamp to avoid session violations in tests
+        valid_ts = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         signal = TradeSignal(
             symbol=symbol,
             direction=1,
@@ -376,6 +381,7 @@ class ExecutionScenarioBuilder:
             lot_size=0.1,
             algorithm="ensemble",
             confidence=0.7,
+            timestamp=valid_ts,
         )
         return signal, df
 
@@ -437,6 +443,8 @@ class ExecutionScenarioBuilder:
     def trend_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
         """BUY signal in a BEARISH trend (Trend Angle failure)."""
         df = self.gen.generate(n_steps=200, regime="trending", trend_strength=-0.005)
+        # Use a fixed Wednesday timestamp to avoid session violations in tests
+        valid_ts = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         signal = TradeSignal(
             symbol=symbol,
             direction=1,
@@ -446,6 +454,7 @@ class ExecutionScenarioBuilder:
             lot_size=0.1,
             algorithm="ensemble",
             confidence=0.7,
+            timestamp=valid_ts,
         )
         return signal, df
 
@@ -470,6 +479,8 @@ class ExecutionScenarioBuilder:
         df.loc[last_idx, "base_M5_ema_8"] = val21
         df.loc[last_idx, "base_M5_ema_21"] = val8
 
+        # Use a fixed Wednesday timestamp to avoid session violations in tests
+        valid_ts = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         signal = TradeSignal(
             symbol=symbol,
             direction=1,
@@ -479,6 +490,7 @@ class ExecutionScenarioBuilder:
             lot_size=0.1,
             algorithm="ensemble",
             confidence=0.7,
+            timestamp=valid_ts,
         )
         return signal, df
 
@@ -494,6 +506,8 @@ class ExecutionScenarioBuilder:
         )
         df = pd.concat([df, df_spike]).iloc[-300:]
 
+        # Use a fixed Wednesday timestamp to avoid session violations in tests
+        valid_ts = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         signal = TradeSignal(
             symbol=symbol,
             direction=1,
@@ -503,6 +517,7 @@ class ExecutionScenarioBuilder:
             lot_size=0.1,
             algorithm="ensemble",
             confidence=0.7,
+            timestamp=valid_ts,
         )
         return signal, df
 

@@ -159,7 +159,9 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
 
     # 3. Execution Filter Validation (Should PASS)
     execution_filter = ExecutionFilter(config=mock_cfg)
-    ef_decision = execution_filter.validate(signal, df, current_drawdown=0.0)
+    # Use a fixed Wednesday timestamp to avoid session violations in tests
+    valid_ts = datetime(2024, 5, 22, 12, 0, tzinfo=timezone.utc)
+    ef_decision = execution_filter.validate(signal, df, current_drawdown=0.0, timestamp=valid_ts)
 
     assert ef_decision.is_approved is True
 
