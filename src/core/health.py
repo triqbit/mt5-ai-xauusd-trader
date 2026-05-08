@@ -326,8 +326,18 @@ class HealthChecker:
 
     def check_audit_log(self) -> ComponentStatus:
         """Verify AuditLogger is initialized."""
-        if not self.audit_logger or not self.audit_logger._initialized:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="AuditLogger inactive", remedy="Check audit database connection")
+        if not self.audit_logger:
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message="AuditLogger not initialized",
+                remedy="Check audit database connection",
+            )
+        elif not self.audit_logger._initialized:
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message="AuditLogger not properly initialized",
+                remedy="Check audit database connection",
+            )
         else:
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Audit trace active")
 
