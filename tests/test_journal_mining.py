@@ -383,3 +383,98 @@ def test_combination_motif_attributes(miner):
     assert motif.session == "London"
     assert motif.volatility_bucket == "High"
     assert motif.is_toxic is True
+
+
+def test_detect_revenge_trading(miner):
+    now = datetime.now(timezone.utc)
+    trades = pd.DataFrame(
+        [
+            {"id": 1, "pnl": -100.0, "lot_size": 0.1, "created_at": now},
+            {"id": 2, "pnl": 50.0, "lot_size": 0.2, "created_at": now + pd.Timedelta(minutes=10)},
+            {"id": 3, "pnl": -50.0, "lot_size": 0.1, "created_at": now + pd.Timedelta(hours=2)},
+            {"id": 4, "pnl": -20.0, "lot_size": 0.1, "created_at": now + pd.Timedelta(hours=2, minutes=5)},
+        ]
+    )
+
+    revenge = miner.detect_revenge_trading(trades)
+    assert len(revenge) == 2
+    # First revenge trade: id 2 after id 1 (10 mins, lot increase)
+    assert revenge[0]["trade_id"] == 2
+    assert revenge[0]["lot_increase"] is True
+    # Second revenge trade: id 4 after id 3 (5 mins, no lot increase)
+    assert revenge[1]["trade_id"] == 4
+    assert revenge[1]["lot_increase"] is False
+
+
+def test_profitable_patterns_extended(miner):
+    now = datetime.now(timezone.utc)
+    trades = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "pnl": 100.0,
+                "algorithm": "ensemble",
+                "volatility": 0.05,
+                "confidence": 0.85,
+                "created_at": now,
+            },
+            {
+                "id": 2,
+                "pnl": 50.0,
+                "algorithm": "ensemble",
+                "volatility": 0.06,
+                "confidence": 0.82,
+                "created_at": now + pd.Timedelta(minutes=5),
+            },
+        ]
+    )
+
+    patterns = miner.find_profitable_patterns(trades)
+    # Check algo_volatility
+    algo_vol = [p for p in patterns if p.attribute == "algo_volatility"]
+    assert len(algo_vol) == 1
+    assert algo_vol[0].value == "ensemble @ Low Vol"
+
+    # Check algo_confidence
+    algo_conf = [p for p in patterns if p.attribute == "algo_confidence"]
+    assert len(algo_conf) == 1
+    assert algo_conf[0].value == "ensemble @ High Conf"
+
+
+def test_report_mapping_includes_total_trades(miner):
+    from src.analytics.journal_mining import JournalReport, PatternConcentration
+
+    report = JournalReport(
+        session_analysis=[],
+        volatility_patterns=[],
+        drawdown_clusters=[],
+        profitable_concentrations=[
+            PatternConcentration(
+                attribute="algo", value="ppo", win_rate=0.6, profit_factor=2.1, total_trades=150
+            )
+        ],
+        risk_block_summary=[],
+    )
+
+    section = report.to_report_section()
+    assert section.concentrations[0].total_trades == 150
+
+
+def test_report_includes_revenge_trading_risk(miner):
+    from src.analytics.journal_mining import JournalReport
+
+    report = JournalReport(
+        session_analysis=[],
+        volatility_patterns=[],
+        drawdown_clusters=[],
+        profitable_concentrations=[],
+        risk_block_summary=[],
+        revenge_trades=[
+            {"trade_id": 2, "prev_trade_id": 1, "time_diff_min": 5.0, "lot_increase": True, "pnl": -50}
+        ],
+    )
+
+    section = report.to_report_section()
+    revenge_risk = next((r for r in section.behavioral_risks if r.type == "Revenge Trading"), None)
+    assert revenge_risk is not None
+    assert "TILT" in revenge_risk.description
