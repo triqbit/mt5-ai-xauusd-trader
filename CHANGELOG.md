@@ -39,6 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Environment Safety Checks:** Enhanced `scripts/validate_env.py` and synchronized `.env.example` to ensure configuration completeness before deployment.
 - **Release Readiness Auditing:** Integrated `scripts/check_release_notes.py` to mandate descriptive changelog entries for all new releases.
 
+### Security
+- No security changes in this section.
+
+### Deprecated
+- No deprecated items in this section.
+
+### Removed
+- No removed items in this section.
+
 ## [1.1.0-rc4] - 2026-05-05
 
 ### Added

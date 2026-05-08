@@ -46,8 +46,8 @@ To enable automated changelog generation and version bumping, all commits to the
 Indicate a breaking change by adding a `!` after the type/scope or by adding `BREAKING CHANGE:` in the footer of the commit message. This triggers a **MAJOR** version bump.
 *Example*: `feat!: overhaul risk management engine`
 
-## 3. Pull Request Labels (Optional)
-While Conventional Commits are the primary driver, PR labels can be used to override or supplement automation. This is particularly useful when a PR contains multiple commit types but should trigger a specific version increment.
+## 3. Pull Request Labels
+PR labels can be used to override or supplement automation. This is particularly useful when a PR contains multiple commit types but should trigger a specific version increment.
 
 - `release:major`: Forces a **MAJOR** version bump regardless of commit types.
 - `release:minor`: Forces a **MINOR** version bump.
@@ -65,7 +65,7 @@ If multiple labels are applied, the highest increment takes precedence (`major` 
 ### Pre-releases (Release Candidates)
 - **Tag Format**: `vMAJOR.MINOR.PATCH-rc.N` (e.g., `v1.1.0-rc.5`)
 - **Use Case**: Final validation before a stable release.
-- **Automation**: Triggered manually via the `Release Orchestration` workflow by setting the `prerelease` flag. Note: Automated version calculation will ignore pre-release suffixes and bump from the base `MAJOR.MINOR.PATCH` version.
+- **Automation**: Triggered manually via the `Release Orchestration` workflow.
 
 ### Alpha/Beta Releases
 - **Tag Format**: `vMAJOR.MINOR.PATCH-alpha.N` or `vMAJOR.MINOR.PATCH-beta.N`
@@ -75,9 +75,8 @@ If multiple labels are applied, the highest increment takes precedence (`major` 
 
 1. **Automated Changelog**: Every push to `main` triggers the `changelog.yml` workflow, which appends new conventional commits to the `CHANGELOG.md` file under the `[Unreleased]` section.
 2. **Commit Validation**: Every Pull Request is checked by the `commit-check.yml` workflow to ensure it meets Conventional Commit standards.
-3. **Local Enforcement**: A pre-commit hook ensures that local commits adhere to the standard before they are even pushed.
-4. **Version Bump Automation**: The `Release Orchestration` (`release.yml`) workflow:
-   - Calculates the next version based on commit history.
+3. **Version Bump Automation**: The `Release Orchestration` (`release.yml`) workflow:
+   - Calculates the next version based on commit history (or uses provided input).
    - Updates `pyproject.toml` and `src/__init__.py`.
    - Transitions `[Unreleased]` content in `CHANGELOG.md` to a new versioned header.
    - Creates a new Git tag and GitHub Release.

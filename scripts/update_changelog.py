@@ -170,6 +170,7 @@ def update_changelog(categories):
                 existing_entries = [line.strip() for line in lines[category_index+1:end_index] if line.strip().startswith("- ")]
                 for entry in entries:
                     if entry not in existing_entries:
+                        # Find the correct insertion point to maintain readability (before next header or at end)
                         lines.insert(end_index, entry)
                         end_index += 1
 
