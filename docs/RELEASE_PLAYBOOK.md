@@ -17,9 +17,10 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
     - Database migration reversibility checks (`scripts/verify_migrations.py`).
     - **Automated Pre-Prod Checklist Verification**: Ensures `docs/PREPROD_CHECKLIST.md` contains no unchecked items `[ ]`.
 
-2.  **Build Stage:**
+2.  **Build & Runtime Verification Stage:**
     - Multi-stage Docker image build.
     - Automated vulnerability scanning using Trivy (failing on CRITICAL or HIGH vulnerabilities).
+    - **Automated Runtime Smoke Test**: Spins up the freshly built container and verifies API liveness/readiness via `scripts/smoke_test.py`.
 
 3.  **Research & QA Stage (Jules02 Integration):**
     - Institutional Walk-Forward Optimization Verification.
