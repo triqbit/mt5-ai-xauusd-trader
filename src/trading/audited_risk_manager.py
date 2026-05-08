@@ -9,7 +9,9 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
@@ -29,6 +31,8 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        market_data: Optional[pd.DataFrame] = None,
+        open_positions_raw: Optional[List[Dict[str, Any]]] = None,
     ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
@@ -37,14 +41,24 @@ class AuditedRiskManager(RiskManager):
         """
         decision_chain = {
             "circuit_breaker": self._check_circuit_breaker(),
-            "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
-            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
-            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "daily_loss": self.get_daily_loss_level() < 4,
+            "max_positions": len(self.open_positions) < self.cfg.max_positions,
+            "symbol_allocation": signal.symbol == self.cfg.symbol,
+            "min_confidence": signal.confidence >= self.cfg.min_confidence,
             "risk_reward": self._check_risk_reward(signal),
             "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
         }
+
+        # Optional layered checks if data is provided
+        if open_positions_raw is not None:
+            decision_chain["directional_exposure"] = self._check_directional_exposure(
+                signal, open_positions_raw
+            )
+            if market_data is not None:
+                decision_chain["total_notional"] = self._check_total_notional(
+                    signal, open_positions_raw, market_data
+                )
 
         passed = all(decision_chain.values())
 
@@ -71,7 +85,7 @@ class AuditedRiskManager(RiskManager):
                 audit.log_operator_action(
                     operator="system",
                     action="daily_loss_limit_triggered",
-                    reason=f"Daily loss limit reached during signal validation for {signal.symbol}",
+                    reason=f"Daily loss limit reached (Level 4) during signal validation for {signal.symbol}",
                     metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
                 )
 
