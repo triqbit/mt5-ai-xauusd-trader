@@ -8,7 +8,6 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 
