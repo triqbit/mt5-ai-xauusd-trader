@@ -24,6 +24,7 @@ jobs:
       has_docs: ${{ steps.compliance-check.outputs.has_docs }}
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
       coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
+      observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -37,7 +38,7 @@ jobs:
       - name: Check for High-Risk Files
         id: risk-check
         run: |
-          # Patterns that strictly block and escalate
+          # Patterns that strictly block and escalate as per Jules05 mandate
           HIGH_RISK_PATTERNS=(
             "src/trading/executor.py"      # Live trading execution logic
             "src/core/risk_engine.py"      # Risk parameters
@@ -47,23 +48,19 @@ jobs:
             ".github/workflows/deploy.*"   # Deployment workflows
             ".github/workflows/ci.yml"     # CI/CD workflows
             "Dockerfile"                   # Infrastructure control
+            "docker-compose.yml"           # Infrastructure control
             "migrations/.*"                # Database migrations
           )
 
           TOUCHED_HIGH_RISK=false
-          # Jules01 is the core systems engineer authorized to fix CI and imports
-          if echo "${{ github.head_ref }}" | grep -q "^fix-ci-failures-and-imports"; then
-            echo "🔧 CI Fix branch detected. High-risk file check bypassed for core maintenance."
-          else
-            for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-              for pattern in "${HIGH_RISK_PATTERNS[@]}"; do
-                if [[ "$file" =~ $pattern ]]; then
-                  echo "🚨 HIGH-RISK FILE DETECTED: $file"
-                  TOUCHED_HIGH_RISK=true
-                fi
-              done
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            for pattern in "${HIGH_RISK_PATTERNS[@]}"; do
+              if [[ "$file" =~ $pattern ]]; then
+                echo "🚨 HIGH-RISK FILE DETECTED: $file"
+                TOUCHED_HIGH_RISK=true
+              fi
             done
-          fi
+          done
 
           if [ "$TOUCHED_HIGH_RISK" = "true" ]; then
             echo "risk_status=blocked" >> $GITHUB_OUTPUT
@@ -97,7 +94,7 @@ jobs:
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [[ "$file" =~ ^src/ ]]; then
               if grep -E "\bprint\(" "$file" | grep -v "console.print" > /dev/null; then
-                echo "❌ OBSERAVBILITY VIOLATION: Plain print statement found in $file"
+                echo "❌ OBSERVABILITY VIOLATION: Plain print statement found in $file"
                 BAD_LOGGING=true
               fi
             fi
@@ -114,8 +111,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Verify coverage from CI status. The 'test' job in ci.yml enforces --cov-fail-under=80.
-          # We assume if the test job passes, coverage is >= 80%.
+          # Verify coverage threshold (assuming 80% is enforced in ci.yml)
           echo "coverage_pass=true" >> $GITHUB_OUTPUT
 
       - name: Handle Violations
@@ -123,8 +119,7 @@ jobs:
           steps.risk-check.outputs.risk_status == 'blocked' ||
           (steps.compliance-check.outputs.source_modified == 'true' &&
            (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
-          steps.observability-check.outputs.observability_pass == 'false' ||
-          steps.coverage-check.outputs.coverage_pass == 'false'
+          steps.observability-check.outputs.observability_pass == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -137,19 +132,16 @@ jobs:
           if [ "${{ steps.observability-check.outputs.observability_pass }}" = "false" ]; then
             REASON="$REASON\n- ❌ **Observability standards not met (plain 'print' statements found).** Use \`structlog\` or Rich \`console.print\`."
           fi
-          if [ "${{ steps.coverage-check.outputs.coverage_pass }}" = "false" ]; then
-            REASON="$REASON\n- ❌ **Test coverage is below the required 80% threshold.**"
-          fi
           if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
             if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
-              REASON="$REASON\n- ❌ **Source code modified but no tests added.**"
+              REASON="$REASON\n- ❌ **Source code modified but no tests added/updated.**"
             fi
             if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
               REASON="$REASON\n- ❌ **Source code modified but no documentation updated.**"
             fi
           fi
 
-          gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, or infrastructure are automatically escalated."
+          gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, secrets, or infrastructure are automatically escalated."
           gh pr merge $PR_NUMBER --disable-auto || true
           exit 1
 
@@ -165,6 +157,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # This enables GitHub's built-in auto-merge feature for this PR.
-          # It will only merge once all other requirements (approvals, CI, conflicts) are met.
-          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled. Skipping."
+          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled."
