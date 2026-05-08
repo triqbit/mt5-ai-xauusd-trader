@@ -15,7 +15,7 @@ Fixes # (issue)
 These checks are required before the PR can be merged:
 - [ ] **Tests Passed:** `python3 -m pytest tests/` (All tests passed)
 - [ ] **Code Coverage:** Statement coverage ≥ 85% (Verified via `pytest-cov`)
-- [ ] **Security Scan:** `pip-audit` shows zero known vulnerabilities
+- [ ] **Security Scan:** `pip-audit` or `trivy` shows zero known vulnerabilities
 - [ ] **Documentation:** Updated `docs/` to reflect all source changes
 - [ ] **Type Safety:** `mypy src/` (Zero type errors)
 - [ ] **Linting:** `ruff check .` (Zero linting errors)
@@ -41,12 +41,13 @@ These checks are required before the PR can be merged:
 - [ ] Is there an audit trail record for significant state changes?
 
 ## 🧪 Verification Results
-Please provide evidence of testing and verification.
+Please provide explicit evidence of testing and verification.
 
 ### Testing Evidence
-- [ ] Test output attached/pasted below.
-- [ ] Screenshots of frontend changes (if applicable).
-- [ ] Backtest report (for trading logic changes).
+- [ ] **Test Output:** Attached or pasted below.
+- [ ] **Screenshots/Logs:** Visual evidence of successful execution.
+- [ ] **Backtest Results:** Required for any changes to trading or model logic.
+- [ ] **Manual Verification:** Steps taken to verify the change in a live/demo environment.
 
 ---
 *By submitting this PR, I confirm that my contribution is made under the terms of the project's MIT License.*

@@ -25,6 +25,18 @@ body:
     validations:
       required: true
   - type: dropdown
+    id: priority
+    attributes:
+      label: Implementation Priority
+      description: How urgent is this feature for the product roadmap?
+      options:
+        - Must Have (Critical for upcoming release)
+        - Should Have (High value, non-blocking)
+        - Could Have (Nice to have)
+        - Won't Have (for now)
+    validations:
+      required: true
+  - type: dropdown
     id: strategic-alignment
     attributes:
       label: Strategic Alignment
