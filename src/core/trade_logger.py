@@ -70,6 +70,7 @@ class ModelSignal(Base, AuditMixin):
     algorithm: Mapped[str | None] = mapped_column(String(50))
     confidence: Mapped[float | None] = mapped_column(Float)
     volatility: Mapped[float | None] = mapped_column(Float)
+    trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
     # Relationship
@@ -95,6 +96,7 @@ class Trade(Base, AuditMixin):
     lot_size: Mapped[float] = mapped_column(Float, nullable=False)
     pnl: Mapped[float] = mapped_column(Float, default=0.0)
     drawdown_impact: Mapped[float | None] = mapped_column(Float)  # impact on total drawdown
+    trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
 
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"))
@@ -146,6 +148,9 @@ class TradeLogger:
 
     def log_signal(self, signal_data: dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
+        import structlog.contextvars
+        trace_id = structlog.contextvars.get_contextvars().get("trace_id")
+
         with self.Session() as session:
             signal = ModelSignal(
                 symbol=signal_data["symbol"],
@@ -157,6 +162,7 @@ class TradeLogger:
                 algorithm=signal_data.get("algorithm"),
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
+                trace_id=trace_id,
                 timestamp=signal_data.get("timestamp", datetime.now(UTC)),
             )
             session.add(signal)
@@ -178,6 +184,9 @@ class TradeLogger:
         if status == "CLOSED":
             self._perf_cache = None
 
+        import structlog.contextvars
+        trace_id = structlog.contextvars.get_contextvars().get("trace_id")
+
         with self.Session() as session:
             trade = Trade(
                 ticket=ticket,
@@ -186,6 +195,7 @@ class TradeLogger:
                 entry_price=entry_price,
                 lot_size=lot_size,
                 signal_id=signal_id,
+                trace_id=trace_id,
                 status=status,
             )
             session.add(trade)
