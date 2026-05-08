@@ -221,7 +221,9 @@ class WalkForwardOptimizer:
         metrics = evaluator._calculate_metrics(strategy.predict(data), strategy.name)
         return metrics
 
-    def _calculate_stability_penalty(self, params: dict[str, Any], data: pd.DataFrame) -> float:
+    def _calculate_stability_penalty(
+        self, params: dict[str, Any], data: pd.DataFrame, perturbation_pct: float = 0.05
+    ) -> float:
         """
         Calculates a penalty for parameter instability by perturbing parameters.
 
@@ -231,32 +233,36 @@ class WalkForwardOptimizer:
         Args:
             params: Base parameters.
             data: Data to evaluate on (should be training/IS data).
+            perturbation_pct: Percentage to perturb parameters (default 5%).
 
         Returns:
             float: Standard deviation of Sharpe ratios under perturbation.
         """
         perturbations = []
+        base_sharpe = self._evaluate_strategy(data, params).get("Sharpe Ratio", 0.0)
+        perturbations.append(base_sharpe)
+
         for key, value in params.items():
             if isinstance(value, (int, float)) and not isinstance(value, bool):
-                # Small perturbation (5%)
                 original_val = value
                 is_int = isinstance(original_val, int)
 
+                # Small perturbation (e.g. 5%)
+                # Ensure a minimum delta for small or zero values
+                if is_int:
+                    delta = max(1, int(round(abs(original_val) * perturbation_pct)))
+                else:
+                    # For floats, use a small epsilon if value is 0
+                    delta = max(1e-4, abs(original_val) * perturbation_pct)
+
                 for direction in [-1, 1]:
                     perturbed_params = params.copy()
-                    delta = (
-                        max(1, int(abs(original_val) * 0.05))
-                        if is_int
-                        else original_val * 0.05
-                    )
-
                     new_val = original_val + (direction * delta)
 
-                    # Ensure type safety
                     if is_int:
-                        new_val = round(new_val)
+                        new_val = int(round(new_val))
 
-                    # If no change occurred (e.g. value was small and delta was 0), skip
+                    # Skip if no actual change
                     if new_val == original_val:
                         continue
 
@@ -264,16 +270,19 @@ class WalkForwardOptimizer:
 
                     try:
                         p_metrics = self._evaluate_strategy(data, perturbed_params)
-                        perturbations.append(p_metrics.get("Sharpe Ratio", 0.0))
+                        p_sharpe = p_metrics.get("Sharpe Ratio", 0.0)
+                        if not np.isnan(p_sharpe):
+                            perturbations.append(float(p_sharpe))
                     except Exception as e:
-                        logger.warning(f"Failed to evaluate perturbed params: {e}")
+                        logger.debug("Perturbation failed for %s=%s: %s", key, new_val, e)
                         continue
 
-        if not perturbations:
+        if len(perturbations) < 2:
             return 0.0
 
         # Penalty is the standard deviation of Sharpe ratios under perturbation
-        # This highlights "parameter cliffs" where small changes cause large performance swings
+        # Normalized by base Sharpe to handle scale difference? No, absolute SD is fine
+        # as it represents the 'volatility' of the result in parameter space.
         return float(np.std(perturbations))
 
     def _calculate_regime_consistency(
@@ -395,9 +404,13 @@ class WalkForwardOptimizer:
 
             # Robustness Components
             gap = max(0, is_mean - oos_mean)
-            # Use only the first train window for stability check during optimization for speed
-            # or use entire data. To be safe and disciplined, use the first window's training data.
-            stability = self._calculate_stability_penalty(params, windows[0][0])
+
+            # Performance Stability (Parameter Sensitivity)
+            # We evaluate stability on a representative training window.
+            # Middle window is often more representative than the first.
+            stability_window_idx = len(windows) // 2
+            stability = self._calculate_stability_penalty(params, windows[stability_window_idx][0])
+
             # Average regime consistency across all windows
             regime_cons = float(np.mean(regime_cons_list))
 
@@ -531,5 +544,6 @@ if __name__ == "__main__":
     logger.info(
         "Optimization complete",
         best_params=result.best_params,
-        score=result.metrics.robustness_score,
+        robustness_score=round(result.metrics.robustness_score, 4),
+        oos_sharpe_mean=round(result.metrics.oos_sharpe_mean, 4),
     )
