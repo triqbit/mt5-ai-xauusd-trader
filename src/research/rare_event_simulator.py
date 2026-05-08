@@ -43,6 +43,7 @@ class RareEventConfig(BaseModel):
         0.5, ge=0, le=1.0, description="Proportion of event impact recovered"
     )
     bars_per_day: int = Field(288, ge=1, description="Number of bars per trading day (default 5m)")
+    start_date: str = Field("2024-01-01", description="Start date for the simulation")
     seed: int | None = None
 
 
@@ -174,18 +175,20 @@ class RareEventSimulator:
                 "low": lows,
                 "close": closes,
                 "tick_volume": self.rng.poisson(base_volume, n),
+                "real_volume": self.rng.poisson(base_volume * 10, n),
                 "spread": spreads,
             }
         )
 
-        # Add a dummy timestamp index. Use freq relative to bars_per_day if possible.
-        # Defaulting to 1 day / bars_per_day
+        # Add a timestamp index. Use freq relative to bars_per_day if possible.
         total_seconds = 24 * 60 * 60
         seconds_per_bar = 300
+        start_date = "2024-01-01"
         if config_ref:
             seconds_per_bar = total_seconds // config_ref.bars_per_day
+            start_date = config_ref.start_date
 
-        df.index = pd.date_range(start="2024-01-01", periods=n, freq=f"{seconds_per_bar}s")
+        df.index = pd.date_range(start=start_date, periods=n, freq=f"{seconds_per_bar}s")
 
         return df
 

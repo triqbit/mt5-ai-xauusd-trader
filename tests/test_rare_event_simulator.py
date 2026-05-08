@@ -26,7 +26,7 @@ def test_simulator_basic_structure(simulator):
     assert isinstance(df, pd.DataFrame)
     assert isinstance(result, RareEventResult)
     assert len(df) == 200
-    assert all(col in df.columns for col in ["open", "high", "low", "close", "tick_volume", "spread"])
+    assert all(col in df.columns for col in ["open", "high", "low", "close", "tick_volume", "real_volume", "spread"])
     assert not df.isnull().values.any()
 
 
@@ -197,3 +197,11 @@ def test_custom_bars_per_day(simulator):
 
     freq_h1 = (df_h1.index[1] - df_h1.index[0]).total_seconds()
     assert freq_h1 == 3600
+
+
+def test_start_date_config(simulator):
+    start_date = "2023-06-01"
+    config = RareEventConfig(event_type=RareEventType.VOL_CLUSTER, n_steps=100, start_date=start_date)
+    df, _ = simulator.generate_scenario(config)
+
+    assert df.index[0].strftime("%Y-%m-%d") == start_date
