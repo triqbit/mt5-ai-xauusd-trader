@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/trade_logger.py
-Trade logging system using SQLAlchemy ORM with SQLite.
+Trade logging system using SQLAlchemy ORM with SQLite/PostgreSQL.
 Author : triqbit
 License: MIT
 """
@@ -14,7 +14,6 @@ from typing import Any
 
 import numpy as np
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -22,37 +21,14 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
     select,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+from sqlalchemy.orm import Mapped, mapped_column, relationship, sessionmaker
 
 from src.core.audit_log import get_audit_logger
+from src.core.database import Base, AuditMixin, create_resilient_engine, with_db_retry
 
 logger = logging.getLogger(__name__)
-
-
-class Base(DeclarativeBase):
-    """Base class for SQLAlchemy models."""
-    pass
-
-
-class AuditMixin:
-    """Audit columns as per DATABASE_STANDARDS.md."""
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-        nullable=False,
-    )
-    created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    updated_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
 class ModelSignal(Base, AuditMixin):
@@ -134,16 +110,19 @@ class PerformanceMetric(Base, AuditMixin):
 
 
 class TradeLogger:
-    """Enterprise trade logging interface."""
+    """Enterprise trade logging interface with resilient database handling."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
-        self.engine = create_engine(db_url)
-        # Create tables if they don't exist
-        Base.metadata.create_all(self.engine)
+        self.engine = create_resilient_engine(db_url)
+        # In production, we favor Alembic migrations, but for ease of use/testing:
+        if "sqlite" in db_url:
+            Base.metadata.create_all(self.engine)
+
         self.Session = sessionmaker(bind=self.engine)
         # Caching performance report to avoid O(N) DB queries on every signal
         self._perf_cache: dict[str, float] | None = None
 
+    @with_db_retry()
     def log_signal(self, signal_data: dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
         with self.Session() as session:
@@ -163,6 +142,7 @@ class TradeLogger:
             session.commit()
             return signal.id
 
+    @with_db_retry()
     def log_trade(
         self,
         ticket: int,
@@ -174,7 +154,7 @@ class TradeLogger:
         status: str = "OPEN",
     ) -> int:
         """Log a trade execution."""
-        # Invalidate cache if a new closed trade is logged (unlikely to be CLOSED immediately but for safety)
+        # Invalidate cache if a new closed trade is logged
         if status == "CLOSED":
             self._perf_cache = None
 
@@ -192,6 +172,7 @@ class TradeLogger:
             session.commit()
             return trade.id
 
+    @with_db_retry()
     def update_trade(
         self,
         ticket: int,
@@ -215,7 +196,6 @@ class TradeLogger:
                     trade.pnl = pnl
                 else:
                     # Basic P&L calculation: (exit - entry) * direction * lot_size * contract_size
-                    # For XAUUSD, contract size is often 100.
                     contract_size = 100
                     trade.pnl = (
                         (exit_price - trade.entry_price)
@@ -246,6 +226,7 @@ class TradeLogger:
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
 
+    @with_db_retry()
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
@@ -255,6 +236,7 @@ class TradeLogger:
                 .first()
             )
 
+    @with_db_retry()
     def log_risk_event(
         self,
         event_type: str,
@@ -273,20 +255,16 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
+    @with_db_retry()
     def read_performance_report(self, persist: bool = False) -> dict[str, float]:
         """
         Calculate key performance metrics from closed trades.
-        Returns Sharpe Ratio, Profit Factor, and Max Drawdown.
-
-        Args:
-            persist: Whether to save the calculated metrics to the database.
         """
         # Return cached report if available and not persisting
         if self._perf_cache is not None and not persist:
             return self._perf_cache
 
         with self.Session() as session:
-            # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
                     select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
@@ -307,7 +285,7 @@ class TradeLogger:
             gross_loss = abs(np.sum(pnls[pnls < 0]))
             profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
-            # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
+            # Sharpe Ratio
             if len(pnls) > 1:
                 avg_ret = np.mean(pnls)
                 std_ret = np.std(pnls)
