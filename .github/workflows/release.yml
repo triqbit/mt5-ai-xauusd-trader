@@ -124,6 +124,23 @@ jobs:
       - name: Validate Release Notes
         run: python scripts/check_release_notes.py
 
+      - name: Research & QA Vitals
+        run: |
+          python scripts/verify_hyperopt_walkforward.py
+          python scripts/verify_stress_lab.py
+          python scripts/verify_reporting_system.py
+          python scripts/verify_rare_event_reporting.py
+          python scripts/verify_benchmarking.py
+
+      - name: Upload Research Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-vitals-reports
+          path: |
+            walkforward_verification_report.md
+            research_verification_report.md
+            research_verification_report.html
+
       - name: Verify Version Synchronization
         run: python scripts/verify_version_sync.py
 

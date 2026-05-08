@@ -21,7 +21,14 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
     - Multi-stage Docker image build.
     - Automated vulnerability scanning using Trivy (failing on CRITICAL or HIGH vulnerabilities).
 
-3.  **Release Stage:**
+3.  **Research & QA Stage (Jules02 Integration):**
+    - Institutional Walk-Forward Optimization Verification.
+    - StressLab resilience testing against extreme volatility.
+    - Rare-event simulation (Flash Crash/Liquidity Vacuum).
+    - Benchmarking against technical and random baselines.
+    - Automated Research Report generation and archival.
+
+4.  **Release Stage:**
     - Automated version bumping and `CHANGELOG.md` finalization.
     - Git tagging.
     - Artifact packaging with SHA256 integrity checksums.
@@ -50,16 +57,24 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
 
 ---
 
-## 3. Pre-Production Acceptance Gate
+## 3. Governance & Multi-Signature Approval
+
+As defined in [CONTRIBUTING.md](CONTRIBUTING.md), any release affecting **Sensitive Zones** (Trading, Models, Core) requires mandatory multi-signature approval.
+
+- **Domain Lead Approval**: Review by the lead of the affected module (e.g., `@maintainer-trading`).
+- **Governance Sign-off**: Final approval and sign-off by the Release/Governance lead (@andonly1348).
+- **QA Verification**: Confirmation from the Quality Lead (@maintainer-quality) that all Research Vitals and test gates have passed.
+
+## 4. Pre-Production Acceptance Gate
 
 Before any production release, the operator **MUST** update `docs/PREPROD_CHECKLIST.md`.
 - All mandatory items must be checked `[x]`.
 - The CI workflow will automatically fail if any `[ ]` markers are found.
-- Ensure backtest results are attached to the release or linked in the changelog.
+- Ensure backtest and Research Vitals reports are attached to the release or linked in the changelog.
 
 ---
 
-## 4. Post-Release Verification Checklist
+## 5. Post-Release Verification Checklist
 
 Immediately following a deployment, the operator MUST perform the following checks:
 
@@ -71,7 +86,7 @@ Immediately following a deployment, the operator MUST perform the following chec
 
 ---
 
-## 5. Rollback Procedures
+## 6. Rollback Procedures
 
 Rollback decisions are governed by the Stability Freeze protocol defined in [SLO Targets](SLO_TARGETS.md).
 
@@ -104,8 +119,8 @@ If a schema change causes data corruption or application failure:
 2.  Downgrade the schema by one version: `alembic downgrade -1`.
 3.  Verify the current version: `alembic current`.
 
-### C. MT5 Emergency Kill-Switch
-In case of catastrophic trading behavior (e.g., rogue orders, risk limit bypass):
+### C. Emergency Protocols & MT5 Kill-Switch
+In case of catastrophic trading behavior, risk limit breaches, or circuit breaker activation (e.g., rogue orders, risk limit bypass):
 1.  **Immediate Halt:** Stop the Docker container: `docker stop trading-bot`.
 2.  **Physical Disconnect:** If possible, disconnect the internet connection of the host/VPS.
 3.  **Terminal Force Quit:**
@@ -116,7 +131,7 @@ In case of catastrophic trading behavior (e.g., rogue orders, risk limit bypass)
 
 ---
 
-## 6. Disaster Recovery Integration
+## 7. Disaster Recovery Integration
 
 If the deployment causes unrecoverable database state:
 1.  Follow the [Disaster Recovery Plan](DISASTER_RECOVERY.md).
