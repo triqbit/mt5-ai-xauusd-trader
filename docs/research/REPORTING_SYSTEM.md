@@ -7,6 +7,7 @@ The research reporting system provides automated generation of institutional-gra
 - **Multi-Domain Analysis:** Covers 10 distinct research domains including Regime Analysis, Stress Testing, Model Drift, and Execution Quality.
 - **Institutional Metrics:** Calculates advanced metrics such as Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio.
 - **Professional Visualization:** High-fidelity HTML reports with interactive elements (TOC, back-to-top) and color-coded status indicators.
+- **Accessibility & Print Optimization:** Hardened HTML with ARIA labels, skip-links, and `@media print` CSS for professional PDF exports.
 - **Gold Standard Verification:** Integrated pipeline validation via `scripts/verify_reporting_system.py`.
 
 ## Domains Covered
@@ -43,6 +44,20 @@ The `RLEvaluator` module (src/research/rl_evaluation.py) provides comprehensive 
 - **Reward Decomposition:** Breaks down returns into gross profit, net profit, and commission drag, with concentration analysis on the top 10% of trades.
 - **Vectorized Evaluation:** Optimized evaluation loop using pre-calculated regime labels for the entire dataset to ensure high-performance research iterations.
 - **Baseline Comparison:** Automated comparison against technical baselines (Momentum, Mean Reversion) and Supervised Learning wrappers.
+
+## Accessibility & Print Optimization
+
+The HTML reporting template (`src/research/templates/research_report.html.j2`) implements institutional accessibility and presentation standards:
+
+- **Keyboard Accessibility:** A "Skip to main content" link allows keyboard and screen reader users to bypass navigation.
+- **Semantic Structure:** The report content is wrapped in a `<main>` tag with appropriate ARIA roles (`role="banner"`, `role="navigation"`) to improve document outline and screen reader compatibility.
+- **Screen Reader Support:** All interactive elements, including the "Back to top" button and progress bars, have descriptive ARIA labels (`aria-label`, `aria-valuenow`). Decorative icons are hidden via `aria-hidden="true"`.
+- **Print Optimization:** The report includes a dedicated `@media print` style block that:
+    - Hides non-essential UI elements (sticky navigation, back-to-top, print button).
+    - Removes box shadows and adds subtle borders for better printer/PDF clarity.
+    - Ensures sections do not break mid-page where possible.
+    - Forces consistent black text for high-contrast readability on paper.
+- **Direct PDF Export:** A "Print PDF" button is integrated into the sticky navigation for one-click access to the system print dialog.
 
 ## Usage
 
