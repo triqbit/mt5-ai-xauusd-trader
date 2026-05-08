@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, List, Optional
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import sessionmaker
 
 # Add src to path to import models
@@ -231,32 +231,7 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
     now = datetime.now(timezone.utc)
 
     with Session() as session:
-        # 1. Cleanup Unlinked Model Signals (older than 90 days)
-        # We must exclude signals that are linked to trades OR risk events
-        signal_cutoff = now - timedelta(days=RETENTION_UNLINKED_SIGNALS)
-
-        # Subqueries for linked signals
-        linked_trade_signals = select(Trade.signal_id).where(Trade.signal_id.is_not(None))
-        linked_risk_signals = select(RiskEvent.signal_id).where(RiskEvent.signal_id.is_not(None))
-
-        unlinked_signals_query = (
-            select(ModelSignal)
-            .where(ModelSignal.created_at < signal_cutoff)
-            .where(ModelSignal.id.not_in(linked_trade_signals))
-            .where(ModelSignal.id.not_in(linked_risk_signals))
-        )
-
-        unlinked_records = session.execute(unlinked_signals_query).scalars().all()
-        results["model_signals"] = len(unlinked_records)
-
-        if unlinked_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_records)} unlinked signals older than {signal_cutoff.date()}")
-            if not dry_run:
-                # No archival for unlinked signals as per policy (ephemeral)
-                for obj in unlinked_records:
-                    session.delete(obj)
-
-        # 2. Cleanup Risk Events (older than 2 years)
+        # 1. Cleanup Risk Events (older than 2 years)
         risk_cutoff = now - timedelta(days=RETENTION_RISK_EVENTS)
         risk_query = select(RiskEvent).where(RiskEvent.created_at < risk_cutoff)
         risk_records = session.execute(risk_query).scalars().all()
@@ -267,8 +242,15 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
             if not dry_run:
                 # Archiving risk events (Audit 2-year category, archived before purge)
                 if archive_records(risk_records, "risk_events", archive_dir):
-                    for obj in risk_records:
-                        session.delete(obj)
+                    # Also archive associated signals before deleting risk events
+                    signal_ids = {r.signal_id for r in risk_records if r.signal_id}
+                    if signal_ids:
+                        signals_to_archive = session.execute(select(ModelSignal).where(ModelSignal.id.in_(signal_ids))).scalars().all()
+                        archive_records(signals_to_archive, "linked_risk_signals", archive_dir)
+
+                    # Bulk delete
+                    ids_to_delete = [r.id for r in risk_records]
+                    session.execute(delete(RiskEvent).where(RiskEvent.id.in_(ids_to_delete)))
                 else:
                     logger.error("Skipping deletion of risk events due to archival failure.")
 
@@ -283,8 +265,8 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
             if not dry_run:
                 # Archiving performance metrics (Operational 2-year category, archived before purge)
                 if archive_records(perf_records, "performance_metrics", archive_dir):
-                    for obj in perf_records:
-                        session.delete(obj)
+                    ids_to_delete = [p.id for p in perf_records]
+                    session.execute(delete(PerformanceMetric).where(PerformanceMetric.id.in_(ids_to_delete)))
                 else:
                     logger.error("Skipping deletion of performance metrics due to archival failure.")
 
@@ -300,15 +282,41 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
                 # Mandatory archival for Compliance data
                 if archive_records(trade_records, "trades", archive_dir):
                     # Also archive associated signals before deleting trades
-                    signal_ids = [t.signal_id for t in trade_records if t.signal_id]
+                    signal_ids = {t.signal_id for t in trade_records if t.signal_id}
                     if signal_ids:
                         signals_to_archive = session.execute(select(ModelSignal).where(ModelSignal.id.in_(signal_ids))).scalars().all()
                         archive_records(signals_to_archive, "linked_signals", archive_dir)
 
-                    for obj in trade_records:
-                        session.delete(obj)
+                    ids_to_delete = [t.id for t in trade_records]
+                    session.execute(delete(Trade).where(Trade.id.in_(ids_to_delete)))
                 else:
                     logger.error("Skipping deletion of trades due to archival failure.")
+
+        # 4. Cleanup Unlinked Model Signals (older than 90 days)
+        # We must exclude signals that are STILL linked to any remaining trades OR risk events.
+        signal_cutoff = now - timedelta(days=RETENTION_UNLINKED_SIGNALS)
+
+        # Subqueries for linked signals that are NOT being deleted
+        # A signal is "kept" if it's linked to a Trade or RiskEvent that is NOT in the deletion list
+        kept_trade_signals = select(Trade.signal_id).where(Trade.signal_id.is_not(None), Trade.created_at >= trade_cutoff)
+        kept_risk_signals = select(RiskEvent.signal_id).where(RiskEvent.signal_id.is_not(None), RiskEvent.created_at >= risk_cutoff)
+
+        unlinked_signals_query = (
+            select(ModelSignal)
+            .where(ModelSignal.created_at < signal_cutoff)
+            .where(ModelSignal.id.not_in(kept_trade_signals))
+            .where(ModelSignal.id.not_in(kept_risk_signals))
+        )
+
+        unlinked_records = session.execute(unlinked_signals_query).scalars().all()
+        results["model_signals"] = len(unlinked_records)
+
+        if unlinked_records:
+            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_records)} unlinked signals older than {signal_cutoff.date()}")
+            if not dry_run:
+                # No archival for unlinked signals as per policy (ephemeral)
+                ids_to_delete = [s.id for s in unlinked_records]
+                session.execute(delete(ModelSignal).where(ModelSignal.id.in_(ids_to_delete)))
 
         if not dry_run:
             session.commit()
@@ -333,8 +341,8 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
             if not dry_run:
                 # Mandatory archival for Audit data
                 if archive_records(audit_records, "audit_log", archive_dir):
-                    for obj in audit_records:
-                        session.delete(obj)
+                    ids_to_delete = [a.id for a in audit_records]
+                    session.execute(delete(AuditEntry).where(AuditEntry.id.in_(ids_to_delete)))
                 else:
                     logger.error("Skipping deletion of audit logs due to archival failure.")
 
