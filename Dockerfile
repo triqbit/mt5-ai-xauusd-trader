@@ -5,9 +5,10 @@
 # ============================================================
 
 # --- Stage 1: builder ------------------------------------------
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim AS builder
 
 ARG TARGETARCH
+ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
 # System dependencies for building TA-Lib and Python packages
@@ -22,18 +23,20 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Build TA-Lib from source
 RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz && \
     tar xf ta-lib-0.6.4-src.tar.gz && \
-    cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j$(nproc) && make install
+    cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j$(nproc) && make install && \
+    cd .. && rm -rf ta-lib-0.6.4*
 
 # Prepare requirements
 COPY requirements-docker.txt .
 
 # Architecture-specific adjustments for PyTorch
+# This ensures we get the CPU-optimized version for amd64
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        # ARM64 (Apple Silicon / AWS Graviton): PyPI provides valid CPU wheels
+        # ARM64: PyPI provides valid CPU wheels
         sed -i '/--extra-index-url/d' requirements-docker.txt && \
         sed -i 's/+cpu//g' requirements-docker.txt; \
     else \
-        # AMD64: Explicitly use the CPU-optimized wheels from PyTorch's dedicated index
+        # AMD64: Explicitly use the CPU-optimized wheels
         sed -i 's/torch==2.3.1/torch==2.3.1+cpu/g' requirements-docker.txt && \
         sed -i 's/torchvision==0.18.1/torchvision==0.18.1+cpu/g' requirements-docker.txt; \
     fi
@@ -48,7 +51,14 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.11-slim AS runtime
+
+LABEL maintainer="triqbit"
+LABEL description="XAUUSD MT5 AI Trading Bot"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
@@ -60,28 +70,24 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy TA-Lib shared libraries and headers from builder
+# Copy TA-Lib shared libraries from builder
 COPY --from=builder /usr/lib/libta_lib* /usr/lib/
 COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
 RUN ldconfig
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+
+# Setup non-root user
+RUN useradd -m -u 1000 trader && \
+    mkdir -p /app/logs /app/models && \
+    chown -R trader:trader /app
 
 # Copy application source and assets
-COPY src/ ./src/
-COPY migrations/ ./migrations/
-COPY main.py .
-COPY alembic.ini .
-
-# Setup non-root user for production security
-RUN useradd -m -u 1000 trader
-
-# Create log directory and ensure correct ownership
-RUN mkdir -p /app/logs && \
-    chown -R trader:trader /app && \
-    chmod 755 /app/logs
+COPY --chown=trader:trader src/ ./src/
+COPY --chown=trader:trader migrations/ ./migrations/
+COPY --chown=trader:trader main.py .
+COPY --chown=trader:trader alembic.ini .
 
 USER trader
 

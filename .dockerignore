@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+ENV/
+env/
+
+# Data and Logs
+logs/
+models/
+*.db
+*.sqlite
+
+# Configuration and Secrets
+.env
+*.local
+
+# Documentation and meta
+docs/
+scripts/
+tests/
+CHANGELOG.md
+README.md
+Makefile
+# pyproject.toml is NOT needed at runtime if we use requirements.txt
+# but it might be useful for metadata.
+# In our Dockerfile we only COPY specific files.
+
+# Keep requirements files as they are used in builder
+# Keep migrations/ as it is used in runtime
+# Keep src/ as it is used in runtime
+# Keep main.py as it is used in runtime
+# Keep alembic.ini as it is used in runtime
