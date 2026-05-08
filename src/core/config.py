@@ -152,7 +152,7 @@ class TradingConfig(BaseSettings):
         default="postgresql://trader:password@localhost:5432/mt5_trades",
         description="SQLAlchemy-compatible connection string for the primary database",
     )
-    redis_url: str = Field(
+    redis_url: SecretStr = Field(
         default="redis://localhost:6379/0",
         description="Connection URL for the Redis instance used for caching/queuing",
     )

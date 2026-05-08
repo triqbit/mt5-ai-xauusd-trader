@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src import __version__
+from pydantic import SecretStr
 from src.core.config import TradingConfig
 from src.core.health import (
     ComponentStatus,
@@ -35,9 +36,12 @@ def mock_config():
     cfg.mt5_password = "TestPassword"
     cfg.mode = "demo"
     cfg.symbol = "XAUUSD"
-    cfg.database_url = "sqlite:///:memory:"
-    cfg.redis_url = "redis://localhost:6379/0"
-    cfg.telegram_token = ""
+    cfg.database_url = MagicMock(spec=SecretStr)
+    cfg.database_url.get_secret_value.return_value = "sqlite:///:memory:"
+    cfg.redis_url = MagicMock(spec=SecretStr)
+    cfg.redis_url.get_secret_value.return_value = "redis://localhost:6379/0"
+    cfg.telegram_token = MagicMock(spec=SecretStr)
+    cfg.telegram_token.get_secret_value.return_value = ""
     cfg.risk_per_trade = 0.01
     cfg.max_daily_loss = 0.05
     cfg.max_positions = 3
