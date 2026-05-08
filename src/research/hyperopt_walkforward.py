@@ -541,6 +541,9 @@ if __name__ == "__main__":
     )
 
     result = optimizer.run_optimization()
-    print(f"Optimization complete. Best Params: {result.best_params}")
-    print(f"Robustness Score: {result.metrics.robustness_score:.4f}")
-    print(f"OOS Sharpe Mean: {result.metrics.oos_sharpe_mean:.4f}")
+    logger.info(
+        "Optimization complete",
+        best_params=result.best_params,
+        robustness_score=round(result.metrics.robustness_score, 4),
+        oos_sharpe_mean=round(result.metrics.oos_sharpe_mean, 4),
+    )
