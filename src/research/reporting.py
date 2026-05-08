@@ -154,6 +154,8 @@ class RLMetric(BaseModel):
     tail_ratio: float = 0.0
     common_sense_ratio: float = 0.0
     gain_to_pain_ratio: float = 0.0
+    lake_ratio: float = 0.0
+    portfolio_heat: float = 0.0
 
 
 class RLSection(BaseModel):

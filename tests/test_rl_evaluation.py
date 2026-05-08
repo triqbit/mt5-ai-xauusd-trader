@@ -153,6 +153,8 @@ def test_to_report_section(trading_env):
     assert isinstance(section, RLSection)
     assert section.best_agent == "Simple"
     assert len(section.metrics) == 1
+    assert hasattr(section.metrics[0], "lake_ratio")
+    assert hasattr(section.metrics[0], "portfolio_heat")
 
 
 def test_extract_trades():
@@ -389,6 +391,39 @@ def test_regime_stability_metric():
     assert stability_stable.regime_stability_score > stability_unstable.regime_stability_score
 
 
+def test_lake_ratio_calculation():
+    evaluator = RLEvaluator(env=MagicMock())
+    # 50% drawdown for all steps
+    df = pd.DataFrame({"balances": [100, 50, 50, 50]})
+    # peak: 100. drawdowns: [0, 0.5, 0.5, 0.5]
+    # lake ratio = mean(drawdowns) = 1.5 / 4 = 0.375
+    stability = evaluator._calculate_stability(df, [], 0.5)
+    assert stability.lake_ratio == pytest.approx(0.375)
+
+
+def test_exposure_metrics():
+    evaluator = RLEvaluator(env=MagicMock())
+    df = pd.DataFrame({"positions": [0, 1, 1, 0, 2]})
+    exposure = evaluator._calculate_exposure(df)
+    # Positions: [0, 1, 1, 0, 2]
+    # mean abs: (0+1+1+0+2)/5 = 0.8
+    # max: 2
+    # time at risk: 3/5 = 60%
+    assert exposure.avg_portfolio_heat == 0.8
+    assert exposure.max_portfolio_heat == 2.0
+    assert exposure.time_at_risk_pct == 60.0
+
+
+def test_risk_adjusted_pnl():
+    evaluator = RLEvaluator(env=MagicMock())
+    df = pd.DataFrame({"balances": [1000, 1100], "commissions": [0, 10]})
+    # net_pnl = 100. gross = 110. comm = 10.
+    # risk_adjusted_pnl = 100 - 0.1 * vol * 1000
+    # if vol = 0.5, penalty = 50. adjusted = 50.
+    decomp = evaluator._calculate_reward_decomposition(df, [], volatility=0.5)
+    assert decomp.risk_adjusted_pnl == 50.0
+
+
 def test_supervised_baseline():
     from src.research.rl_evaluation import SupervisedBaseline
     mock_model = MagicMock()
@@ -412,3 +447,21 @@ def test_extract_trades_at_step_0():
     assert len(trades) == 1
     assert trades[0]["pnl"] == 5.0
     assert trades[0]["hold_time"] == 2
+
+
+def test_empty_dataframe_handling():
+    evaluator = RLEvaluator(env=MagicMock())
+    df = pd.DataFrame(columns=["balances", "positions", "actions", "commissions"])
+
+    # These should not crash
+    drawdown = evaluator._calculate_drawdown(df)
+    assert drawdown.max_drawdown == 0.0
+
+    turnover = evaluator._calculate_turnover(df, [])
+    assert turnover.total_trades == 0
+
+    exposure = evaluator._calculate_exposure(df)
+    assert exposure.avg_portfolio_heat == 0.0
+
+    decomp = evaluator._calculate_reward_decomposition(df, [])
+    assert decomp.net_pnl == 0.0

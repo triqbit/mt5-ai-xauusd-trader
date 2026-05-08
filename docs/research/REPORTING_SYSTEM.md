@@ -49,10 +49,11 @@ The `ExecutionAnalyzer` module (src/analytics/execution_quality.py) provides ins
 
 The `RLEvaluator` module (src/research/rl_evaluation.py) provides comprehensive performance auditing for reinforcement learning agents:
 
-- **Stability Analysis:** Beyond simple reward, it calculates institutional metrics including Tail Ratio, Common Sense Ratio, Gain-to-Pain Ratio, and System Quality Number (SQN).
+- **Stability Analysis:** Beyond simple reward, it calculates institutional metrics including Tail Ratio, Common Sense Ratio, Gain-to-Pain Ratio, System Quality Number (SQN), and **Lake Ratio** (drawdown-area efficiency).
 - **Regime Stability:** Calculates a stability score based on the consistency of Sharpe ratios across different market regimes (inverse of Coefficient of Variation).
 - **Turnover & Policy Health:** Tracks trade frequency, average hold times, and **Action Entropy** to detect policy collapse or excessive stagnation.
-- **Reward Decomposition:** Breaks down returns into gross profit, net profit, and commission drag, with concentration analysis on the top 10% of trades.
+- **Exposure Analytics:** Measures **Portfolio Heat** (time-weighted position size) and Time-at-Risk to quantify capital utilization.
+- **Reward Decomposition:** Breaks down returns into gross profit, net profit, and commission drag, with concentration analysis on the top 10% of trades and **Risk-Adjusted PnL**.
 - **Vectorized Evaluation:** Optimized evaluation loop using pre-calculated regime labels for the entire dataset to ensure high-performance research iterations.
 - **Baseline Comparison:** Automated comparison against technical baselines (Momentum, Mean Reversion) and Supervised Learning wrappers.
 
