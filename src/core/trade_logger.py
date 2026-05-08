@@ -8,6 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -243,7 +244,7 @@ class TradeLogger:
                 session.commit()
 
                 # Audit the outcome
-                try:
+                with contextlib.suppress(RuntimeError, ImportError):
                     audit = get_audit_logger()
                     audit.log_trade_outcome(
                         ticket=ticket,
@@ -256,8 +257,6 @@ class TradeLogger:
                             "lots": trade.lot_size,
                         },
                     )
-                except (RuntimeError, ImportError):
-                    pass
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
 
