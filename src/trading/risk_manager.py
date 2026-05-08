@@ -17,6 +17,7 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from datetime import date
@@ -172,7 +173,7 @@ class RiskManager:
             self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
 
         # Audit logging of daily performance
-        try:
+        with contextlib.suppress(RuntimeError, ImportError):
             audit = get_audit_logger()
             audit.log(
                 actor="risk_engine",
@@ -185,8 +186,6 @@ class RiskManager:
                     "peak_equity": self.daily.peak_equity,
                 },
             )
-        except (RuntimeError, ImportError):
-            pass
 
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
