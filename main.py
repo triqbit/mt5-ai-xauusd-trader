@@ -28,14 +28,20 @@ try:
     from rich.panel import Panel
     from rich.table import Table
 except ImportError as e:
-    print("=" * 60)
+    import platform
+    print("=" * 70)
     print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
-    print("=" * 60)
-    print(f"Error: {e}")
-    print("\nREMEDIATION:")
-    print("1. Run 'pip install -r requirements.txt'")
-    print("2. Run 'python3 scripts/doctor.py' to diagnose your environment.")
-    print("=" * 60)
+    print("=" * 70)
+    print(f"Details: {e}")
+    print(f"Platform: {platform.system()} {platform.release()}")
+    print(f"Python:   {sys.version.split()[0]}")
+    print("\nREMEDIATION STEPS:")
+    print("1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics.")
+    print("2. Run 'pip install -r requirements.txt' to install all required libraries.")
+    if platform.system() == "Linux":
+        print("3. On Linux, if TA-Lib is missing, ensure the C-library is installed:")
+        print("   'sudo apt-get install libta-lib0' or equivalent.")
+    print("-" * 70)
     sys.exit(1)
 
 try:
@@ -565,8 +571,14 @@ def run_live(
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
-                # Wait for next interval
-                time.sleep(poll_interval)
+                # Wait for next interval with operator feedback
+                if console:
+                    with console.status("[bold blue]Waiting for next signal evaluation...") as status:
+                        for i in range(poll_interval, 0, -1):
+                            status.update(f"[bold blue]Waiting for next signal evaluation ({i}s remaining)...")
+                            time.sleep(1)
+                else:
+                    time.sleep(poll_interval)
             except KeyboardInterrupt:
                 log.info("Interrupted by user - shutting down")
                 if audit_logger:
@@ -603,37 +615,80 @@ def get_system_version() -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="MT5 AI/ML Trading Bot - Enterprise Edition")
+    p = argparse.ArgumentParser(
+        description="MT5 AI/ML Trading Bot - Enterprise Edition",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage Examples:
+  # Perform a pre-flight health check (recommended before starting)
+  python main.py --check
+
+  # Start trading in DEMO mode with Ensemble algorithm
+  python main.py --mode demo --symbol XAUUSD --algo ensemble
+
+  # Start LIVE trading (requires explicit confirmation)
+  python main.py --mode live --algo ensemble --confirm-live
+
+  # Run a walk-forward backtest for a specific period
+  python main.py --mode backtest --start 2023-01-01 --end 2024-01-01 --algo ppo
+        """,
+    )
     p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
     p.add_argument(
         "--mode",
         choices=["demo", "live", "backtest"],
-        help="Execution mode (demo, live, or backtest)",
+        help="Execution mode: 'demo' for paper trading, 'live' for real execution, or 'backtest' for historical simulation.",
     )
     p.add_argument(
         "--algo",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
-        help="Algorithm to use for signal generation",
+        help="Machine Learning algorithm architecture to use for signal generation.",
     )
-    p.add_argument("--start", help="Start date for backtest (YYYY-MM-DD)", default="2023-01-01")
+    p.add_argument(
+        "--start", help="Historical start date for backtest (YYYY-MM-DD)", default="2023-01-01"
+    )
     p.add_argument(
         "--end",
-        help="End date for backtest (YYYY-MM-DD)",
+        help="Historical end date for backtest (YYYY-MM-DD)",
         default=datetime.now().strftime("%Y-%m-%d"),
     )
-    p.add_argument("--train-window", type=int, default=500, help="Train window size for backtest")
-    p.add_argument("--test-window", type=int, default=100, help="Test window size for backtest")
-    p.add_argument("--step-size", type=int, default=100, help="Step size for backtest")
-    p.add_argument("--spread", type=float, default=0.0001, help="Simulated spread for backtest")
-    p.add_argument("--commission", type=float, default=7.0, help="Commission per lot for backtest")
-    p.add_argument("--symbol", help="Trading symbol (e.g. XAUUSD)")
-    p.add_argument("--timeframe", help="Trading timeframe (e.g. M5)")
     p.add_argument(
-        "--model-dir", type=Path, default=Path("models/trained"), help="Directory for model weights"
+        "--train-window", type=int, default=500, help="Number of bars for walk-forward training window"
     )
-    p.add_argument("--log-level", default="INFO", help="Logging level")
-    p.add_argument("--check", action="store_true", help="Perform pre-flight health checks and exit")
-    p.add_argument("--confirm-live", action="store_true", help="Explicitly confirm live trading")
+    p.add_argument(
+        "--test-window", type=int, default=100, help="Number of bars for walk-forward testing window"
+    )
+    p.add_argument(
+        "--step-size", type=int, default=100, help="Number of bars to slide the window per iteration"
+    )
+    p.add_argument(
+        "--spread", type=float, default=0.0001, help="Fixed simulated spread for backtest environment"
+    )
+    p.add_argument(
+        "--commission", type=float, default=7.0, help="Commission cost per round-turn lot"
+    )
+    p.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD)")
+    p.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1)")
+    p.add_argument(
+        "--model-dir",
+        type=Path,
+        default=Path("models/trained"),
+        help="Local directory containing trained model weight files",
+    )
+    p.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Granularity of output logging",
+    )
+    p.add_argument(
+        "--check", action="store_true", help="Perform comprehensive pre-flight health checks and exit"
+    )
+    p.add_argument(
+        "--confirm-live",
+        action="store_true",
+        help="Explicitly acknowledge and confirm LIVE trading execution",
+    )
     return p.parse_args()
 
 
@@ -803,7 +858,7 @@ def main() -> int:
 
     # ── Startup Summary ────────────────────────────────────────────────────────
     import platform
-    summary = Table.grid(expand=True)
+    summary = Table.grid(expand=True, padding=(0, 1))
     summary.add_column(style="cyan", justify="right")
     summary.add_column(style="white", justify="left")
 
@@ -815,6 +870,7 @@ def main() -> int:
         hw = "GPU (MPS)"
 
     summary.add_row("[bold underline]Environment[/]", "")
+    summary.add_row("Version:  ", f"[bold green]{get_system_version()}[/]")
     summary.add_row("OS:  ", f"{platform.system()} {platform.release()}")
     summary.add_row("Python:  ", platform.python_version())
     summary.add_row("Hardware:  ", hw)
@@ -892,20 +948,21 @@ def main() -> int:
             diag = Table.grid(expand=True)
             diag.add_column(style="cyan", justify="right")
             diag.add_column(style="white", justify="left")
-            diag.add_row("Server:  ", cfg.mt5_server)
-            diag.add_row("Login:  ", str(cfg.mt5_login))
-            diag.add_row("Path:  ", cfg.mt5_path)
-            diag.add_row("Platform:  ", sys.platform)
+            diag.add_row("Broker Server:  ", cfg.mt5_server)
+            diag.add_row("Account Login:  ", str(cfg.mt5_login))
+            diag.add_row("Terminal Path:  ", cfg.mt5_path)
+            diag.add_row("OS Platform:    ", sys.platform)
+            diag.add_row("MetaAPI Config: ", "Present" if cfg.metaapi_token and cfg.metaapi_account_id else "Missing")
 
             console.print(
                 Panel(
                     diag,
-                    title="[bold red]Connection Diagnostics[/]",
-                    subtitle="Sanitized connection settings",
+                    title="[bold red]MT5 Connection Diagnostics[/]",
+                    subtitle="Please verify these settings in your .env file",
                     border_style="red",
                 )
             )
-            log.critical("Cannot connect to MT5 terminal", error=str(exc))
+            log.critical("FAILED TO CONNECT: The system could not establish a session with MetaTrader 5 or MetaAPI.", error=str(exc))
             return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
@@ -1002,6 +1059,24 @@ def main() -> int:
 
     if args.check:
         log.info("Pre-flight check COMPLETE. System is healthy.")
+
+        next_steps = Table.grid(expand=True)
+        next_steps.add_column(style="cyan", justify="right")
+        next_steps.add_column(style="white", justify="left")
+
+        next_steps.add_row("Demo Trading:  ", f"python main.py --mode demo --algo {cfg.algorithm}")
+        next_steps.add_row("Live Trading:  ", f"python main.py --mode live --algo {cfg.algorithm} --confirm-live")
+        next_steps.add_row("Backtesting:   ", f"python main.py --mode backtest --algo {cfg.algorithm} --start 2023-01-01")
+
+        console.print(
+            Panel(
+                next_steps,
+                title="[bold green]Ready for Execution[/]",
+                subtitle="Use the commands below to start the bot",
+                border_style="green",
+                expand=False
+            )
+        )
         return 0
 
     # Record successful deployment/startup
