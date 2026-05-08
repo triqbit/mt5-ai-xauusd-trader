@@ -53,6 +53,21 @@ class StabilityMetrics(BaseModel):
     regime_stability_score: float = Field(
         default=0.0, description="Consistency of performance across different market regimes"
     )
+    lake_ratio: float = Field(
+        default=0.0, description="Ratio of drawdown area to total duration (Lake Ratio)"
+    )
+
+
+class ExposureMetrics(BaseModel):
+    """Metrics assessing portfolio exposure and time-at-risk."""
+
+    avg_portfolio_heat: float = Field(
+        ..., description="Average time-weighted position size (lots/units)"
+    )
+    max_portfolio_heat: float = Field(..., description="Maximum position size held")
+    time_at_risk_pct: float = Field(
+        ..., description="Percentage of time spent with an open position"
+    )
 
 
 class TurnoverMetrics(BaseModel):
@@ -105,6 +120,9 @@ class RewardDecomposition(BaseModel):
     profit_concentration: float = Field(
         default=0.0, description="Ratio of top 10% of trades to total net profit"
     )
+    risk_adjusted_pnl: float = Field(
+        default=0.0, description="PnL penalized by variance of returns"
+    )
 
 
 class RLReport(BaseModel):
@@ -116,6 +134,7 @@ class RLReport(BaseModel):
     stability: StabilityMetrics
     turnover: TurnoverMetrics
     drawdown: DrawdownMetrics
+    exposure: ExposureMetrics
     regime_sensitivity: list[RegimePerformance]
     reward_decomposition: RewardDecomposition
     overall_win_rate: float
@@ -402,6 +421,8 @@ class RLEvaluator:
                     tail_ratio=report.stability.tail_ratio,
                     common_sense_ratio=report.stability.common_sense_ratio,
                     gain_to_pain_ratio=report.stability.gain_to_pain_ratio,
+                    lake_ratio=report.stability.lake_ratio,
+                    portfolio_heat=report.exposure.avg_portfolio_heat,
                 )
             )
 
@@ -471,18 +492,22 @@ class RLEvaluator:
         regime_sensitivity = self._calculate_regime_sensitivity(df)
         stability = self._calculate_stability(df, trades, drawdown.max_drawdown, regime_sensitivity)
         turnover = self._calculate_turnover(df, trades)
-        reward_decomp = self._calculate_reward_decomposition(df, trades)
+        exposure = self._calculate_exposure(df)
+        reward_decomp = self._calculate_reward_decomposition(df, trades, stability.volatility)
 
         trade_pnls = [t["pnl"] for t in trades]
         win_rate = len([p for p in trade_pnls if p > 0]) / len(trade_pnls) if trade_pnls else 0.0
 
+        initial_balance = float(df["balances"].iloc[0]) if len(df) > 0 else 0.0
+
         return RLReport(
             agent_name=agent_name,
             total_steps=len(df),
-            initial_balance=float(df["balances"].iloc[0]),
+            initial_balance=initial_balance,
             stability=stability,
             turnover=turnover,
             drawdown=drawdown,
+            exposure=exposure,
             regime_sensitivity=regime_sensitivity,
             reward_decomposition=reward_decomp,
             overall_win_rate=win_rate,
@@ -552,6 +577,7 @@ class RLEvaluator:
                 expectancy=0.0,
                 profit_factor=0.0,
                 stability_score=0.0,
+                lake_ratio=0.0,
             )
 
         mean_ret = returns.mean()
@@ -643,6 +669,9 @@ class RLEvaluator:
         pains = abs(returns[returns < 0].sum())
         gain_to_pain_ratio = gains / pains if pains > 1e-9 else 0.0
 
+        # Lake Ratio: area of drawdown relative to duration
+        lake_ratio = np.mean(drawdowns)
+
         # Regime stability: inverse of CoV of Sharpe across regimes
         regime_stability = 0.0
         if regime_perf:
@@ -673,6 +702,7 @@ class RLEvaluator:
             common_sense_ratio=float(common_sense_ratio),
             gain_to_pain_ratio=float(gain_to_pain_ratio),
             regime_stability_score=float(regime_stability),
+            lake_ratio=float(lake_ratio),
         )
 
     def _calculate_turnover(
@@ -698,6 +728,9 @@ class RLEvaluator:
             counts = df["actions"].value_counts(normalize=True).values
             action_entropy = -np.sum(counts * np.log(counts + 1e-9))
 
+        initial_balance = df["balances"].iloc[0] if len(df) > 0 else 1.0
+        turnover_ratio = (num_trades * 1.0) / (initial_balance)
+
         return TurnoverMetrics(
             trade_frequency=float(trade_freq),
             avg_hold_time=float(avg_hold_time),
@@ -708,11 +741,32 @@ class RLEvaluator:
             action_entropy=float(action_entropy),
         )
 
+    def _calculate_exposure(self, df: pd.DataFrame) -> ExposureMetrics:
+        """Assess portfolio exposure and time-at-risk."""
+        if len(df) == 0:
+            return ExposureMetrics(
+                avg_portfolio_heat=0.0, max_portfolio_heat=0.0, time_at_risk_pct=0.0
+            )
+
+        positions = df["positions"].abs().values
+        avg_heat = np.mean(positions)
+        max_heat = np.max(positions)
+        time_at_risk = np.mean(positions > 0) * 100
+
+        return ExposureMetrics(
+            avg_portfolio_heat=float(avg_heat),
+            max_portfolio_heat=float(max_heat),
+            time_at_risk_pct=float(time_at_risk),
+        )
+
     def _calculate_drawdown(self, df: pd.DataFrame) -> DrawdownMetrics:
         """Assess downside risk and recovery."""
+        if len(df) == 0:
+            return DrawdownMetrics(max_drawdown=0.0, max_drawdown_duration=0, avg_drawdown=0.0)
+
         balances = df["balances"].values
         peak = np.maximum.accumulate(balances)
-        drawdowns = (peak - balances) / peak
+        drawdowns = (peak - balances) / (peak + 1e-9)
 
         max_dd = np.max(drawdowns)
         avg_dd = np.mean(drawdowns[drawdowns > 0]) if np.any(drawdowns > 0) else 0.0
@@ -813,7 +867,10 @@ class RLEvaluator:
         return regime_stats
 
     def _calculate_reward_decomposition(
-        self, df: pd.DataFrame, trades: list[dict[str, Any]]
+        self,
+        df: pd.DataFrame,
+        trades: list[dict[str, Any]],
+        volatility: float = 0.0,
     ) -> RewardDecomposition:
         """Breakdown of returns into gross profit and costs, with concentration analysis."""
         total_commissions = df["commissions"].iloc[-1] if len(df) > 0 else 0.0
@@ -823,6 +880,12 @@ class RLEvaluator:
         gross_pnl = net_pnl + total_commissions
 
         comm_drag = (total_commissions / (gross_pnl + 1e-9) * 100) if gross_pnl > 0 else 0.0
+
+        # Risk-adjusted PnL: simple version (net_pnl - penalty * volatility)
+        # Using a penalty proportional to the initial balance and volatility
+        initial_balance = df["balances"].iloc[0] if len(df) > 0 else 0.0
+        risk_penalty = 0.1 * volatility * initial_balance
+        risk_adjusted_pnl = net_pnl - risk_penalty
 
         trade_pnls = [t["pnl"] for t in trades]
         wins = [p for p in trade_pnls if p > 0]
@@ -848,4 +911,5 @@ class RLEvaluator:
             avg_win=float(avg_win),
             avg_loss=float(avg_loss),
             profit_concentration=float(profit_concentration),
+            risk_adjusted_pnl=float(risk_adjusted_pnl),
         )
