@@ -26,25 +26,41 @@ except ImportError:
     print("Error: 'httpx' library is required. Run 'pip install httpx'.")
     sys.exit(1)
 
-def check_api_health(base_url: str) -> Dict[str, Any]:
-    """Check liveness and readiness endpoints."""
+def check_api_health(base_url: str, retries: int = 1, delay: int = 5) -> Dict[str, Any]:
+    """Check liveness and readiness endpoints with optional retries."""
     results = {"liveness": False, "readiness": False, "components": {}}
 
-    try:
-        # 1. Liveness
-        resp = httpx.get(f"{base_url}/health/liveness", timeout=5.0)
-        results["liveness"] = resp.status_code == 200
+    for attempt in range(1, retries + 1):
+        try:
+            # 1. Liveness
+            resp = httpx.get(f"{base_url}/health/liveness", timeout=5.0)
+            results["liveness"] = resp.status_code == 200
 
-        # 2. Readiness (Detailed)
-        resp = httpx.get(f"{base_url}/health/readiness", timeout=10.0)
-        results["readiness"] = resp.status_code == 200
-        if resp.status_code in (200, 503):
-            data = resp.json()
-            results["version"] = data.get("version", "unknown")
-            results["components"] = data.get("components", {})
+            # 2. Readiness (Detailed)
+            resp = httpx.get(f"{base_url}/health/readiness", timeout=10.0)
+            results["readiness"] = resp.status_code == 200
+            if resp.status_code in (200, 503):
+                data = resp.json()
+                results["version"] = data.get("version", "unknown")
+                results["components"] = data.get("components", {})
 
-    except Exception as e:
-        print(f"❌ API Connection Failed: {e}")
+            # If both are healthy, we're done
+            if results["liveness"] and results["readiness"]:
+                if attempt > 1:
+                    print(f"✅ Connection established on attempt {attempt}.")
+                break
+
+        except Exception as e:
+            if attempt < retries:
+                print(f"⚠️ Attempt {attempt}/{retries} failed: {e}. Retrying in {delay}s...")
+                time.sleep(delay)
+            else:
+                print(f"❌ API Connection Failed after {retries} attempts: {e}")
+
+        # If not successful but still have attempts, wait
+        if not (results["liveness"] and results["readiness"]) and attempt < retries:
+            print(f"⚠️ Service not ready on attempt {attempt}/{retries}. Retrying in {delay}s...")
+            time.sleep(delay)
 
     return results
 
@@ -86,6 +102,8 @@ def main():
     parser.add_argument("--url", default="http://localhost:8000", help="Base URL of the running bot")
     parser.add_argument("--audit-db", default="audit.db", help="Path to audit.db")
     parser.add_argument("--wait", type=int, default=0, help="Wait N seconds before starting (for startup)")
+    parser.add_argument("--retries", type=int, default=1, help="Number of times to retry API checks")
+    parser.add_argument("--delay", type=int, default=5, help="Delay between retries in seconds")
     args = parser.parse_args()
 
     if args.wait > 0:
@@ -94,7 +112,7 @@ def main():
 
     print(f"--- MT5 Bot Smoke Test: {args.url} ---")
 
-    api_results = check_api_health(args.url)
+    api_results = check_api_health(args.url, retries=args.retries, delay=args.delay)
     metrics_ok = check_metrics(args.url)
     audit_ok = check_audit_trail(args.audit_db)
 
