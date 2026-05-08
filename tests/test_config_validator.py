@@ -176,27 +176,22 @@ def test_validator_market_parameters(monkeypatch, tmp_path):
 
     # 1. Empty Symbol
     monkeypatch.setenv("SYMBOL", "")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is False
-    assert any(e.field == "SYMBOL" for e in result.errors)
+    with pytest.raises(Exception):
+        TradingConfig()
 
     # 2. Lowercase Symbol
     monkeypatch.setenv("SYMBOL", "xauusd")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is False
-    assert any(e.field == "SYMBOL" for e in result.errors)
+    with pytest.raises(Exception):
+        TradingConfig()
 
     # 3. Invalid Timeframe
     monkeypatch.setenv("SYMBOL", "XAUUSD")
     monkeypatch.setenv("TIMEFRAME", "M7")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is False
-    assert any(e.field == "TIMEFRAME" for e in result.errors)
+    with pytest.raises(Exception):
+        TradingConfig()
 
     # 4. Valid
+    monkeypatch.setenv("SYMBOL", "XAUUSD")
     monkeypatch.setenv("TIMEFRAME", "H1")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()

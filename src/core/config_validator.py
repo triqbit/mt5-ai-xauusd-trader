@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from src.core.config import TradingConfig
+from src.core.constants import VALID_TIMEFRAME_LIST
 
 
 class ValidationError(NamedTuple):
@@ -152,17 +153,13 @@ class ConfigValidator:
             )
 
         # 2. Timeframe Validation
-        valid_timeframes = [
-            "M1", "M2", "M3", "M4", "M5", "M6", "M10", "M12", "M15", "M20", "M30",
-            "H1", "H2", "H3", "H4", "H6", "H8", "H12", "D1", "W1", "MN1"
-        ]
-        if self.config.timeframe not in valid_timeframes:
+        if self.config.timeframe not in VALID_TIMEFRAME_LIST:
             self.errors.append(
                 ValidationError(
                     "TIMEFRAME",
                     f"Invalid timeframe '{self.config.timeframe}'.",
                     True,
-                    f"Choose one of: {', '.join(valid_timeframes)}",
+                    f"Choose one of: {', '.join(VALID_TIMEFRAME_LIST)}",
                 )
             )
 
