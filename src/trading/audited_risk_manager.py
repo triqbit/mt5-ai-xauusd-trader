@@ -64,7 +64,7 @@ class AuditedRiskManager(RiskManager):
                     operator="system",
                     action="circuit_breaker_triggered",
                     reason=f"Hard drawdown limit hit during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain}
+                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
                 )
 
             if not decision_chain.get("daily_loss", True):
@@ -72,7 +72,7 @@ class AuditedRiskManager(RiskManager):
                     operator="system",
                     action="daily_loss_limit_triggered",
                     reason=f"Daily loss limit reached during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain}
+                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
                 )
 
         except (RuntimeError, ImportError):

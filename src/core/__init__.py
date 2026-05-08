@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING
 
+from src.core.audit_log import AuditLogger, get_audit_logger
 from src.core.config import TradingConfig, get_config
 from src.core.decision_support import DecisionPacket, DecisionSupportSystem
 from src.core.explainability import SignalExplainer, SignalExplanation
@@ -21,6 +22,7 @@ else:
 
 
 __all__ = [
+    "AuditLogger",
     "DecisionPacket",
     "DecisionSupportSystem",
     "FeatureEngineer",
@@ -28,6 +30,7 @@ __all__ = [
     "SignalExplainer",
     "SignalExplanation",
     "TradingConfig",
+    "get_audit_logger",
     "get_config",
     "profile",
 ]

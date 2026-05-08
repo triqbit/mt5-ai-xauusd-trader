@@ -200,8 +200,16 @@ class ExecutionAnalyzer:
             slippage_pips = slippage_price / pip_size
 
             # 2. Latency calculation
-            t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
-            s_timestamp = signal.timestamp.replace(tzinfo=UTC) if signal.timestamp.tzinfo is None else signal.timestamp
+            t_created = (
+                trade.created_at.replace(tzinfo=UTC)
+                if trade.created_at.tzinfo is None
+                else trade.created_at
+            )
+            s_timestamp = (
+                signal.timestamp.replace(tzinfo=UTC)
+                if signal.timestamp.tzinfo is None
+                else signal.timestamp
+            )
             latency_td = t_created - s_timestamp
             latency_ms = max(0.0, latency_td.total_seconds() * 1000.0)
 
@@ -329,8 +337,16 @@ class ExecutionAnalyzer:
 
         pip_size = self._get_pip_size(trade.symbol)
 
-        t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
-        s_timestamp = signal.timestamp.replace(tzinfo=UTC) if signal.timestamp.tzinfo is None else signal.timestamp
+        t_created = (
+            trade.created_at.replace(tzinfo=UTC)
+            if trade.created_at.tzinfo is None
+            else trade.created_at
+        )
+        s_timestamp = (
+            signal.timestamp.replace(tzinfo=UTC)
+            if signal.timestamp.tzinfo is None
+            else signal.timestamp
+        )
 
         # Movement between signal price and execution price that is NOT slippage
         # In this context, let's define it as the price movement in the market
@@ -376,7 +392,11 @@ class ExecutionAnalyzer:
             return {"spread_pips": 0.0}
 
         pip_size = self._get_pip_size(trade.symbol)
-        t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
+        t_created = (
+            trade.created_at.replace(tzinfo=UTC)
+            if trade.created_at.tzinfo is None
+            else trade.created_at
+        )
 
         # Fetch data around execution time
         df = self.connector.get_rates_range(
@@ -405,7 +425,11 @@ class ExecutionAnalyzer:
         if not self.connector:
             return 0.5
 
-        t_created = trade.created_at.replace(tzinfo=UTC) if trade.created_at.tzinfo is None else trade.created_at
+        t_created = (
+            trade.created_at.replace(tzinfo=UTC)
+            if trade.created_at.tzinfo is None
+            else trade.created_at
+        )
 
         # Fetch exactly the candle where the trade was created
         df = self.connector.get_rates_range(

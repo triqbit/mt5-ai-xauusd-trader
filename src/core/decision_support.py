@@ -60,7 +60,9 @@ class DecisionPacket(BaseModel):
     direction: SignalDirection = Field(
         ..., description="Consolidated signal direction from the ensemble."
     )
-    consensus: str = Field(..., description="Qualitative consensus level (e.g., 💪 Strong Majority).")
+    consensus: str = Field(
+        ..., description="Qualitative consensus level (e.g., 💪 Strong Majority)."
+    )
     status_level: DecisionStatus = Field(
         DecisionStatus.BLOCKED, description="Augmented execution status for operator safety."
     )
@@ -147,9 +149,7 @@ class DecisionSupportSystem:
 
         # Calculate Consensus and Score
         consensus = self._calculate_consensus(explanation)
-        decision_score = self._calculate_decision_score(
-            explanation, regime_info, macro_risk
-        )
+        decision_score = self._calculate_decision_score(explanation, regime_info, macro_risk)
 
         # Determine Augmented Status Level
         status_level = DecisionStatus.BLOCKED
@@ -403,7 +403,9 @@ class DecisionSupportSystem:
             if packet.macro_risk.reason:
                 macro_content.append(f"\nInsight: {packet.macro_risk.reason}", style="italic")
 
-            macro_panel = Panel(macro_content, title="🌍 Macro Intelligence", border_style=macro_color)
+            macro_panel = Panel(
+                macro_content, title="🌍 Macro Intelligence", border_style=macro_color
+            )
 
             # 4. Attribution Summary (Text)
             attribution_summary = Panel(

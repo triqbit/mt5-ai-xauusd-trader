@@ -173,7 +173,11 @@ class ScenarioGenerator:
         prices = np.zeros(n_steps)
         prices[0] = start_price
         for i in range(1, n_steps):
-            prices[i] = start_price + (start_price * 0.01 * (1 if i % 2 == 0 else -1)) + self.rng.normal(0, 0.0001 * start_price)
+            prices[i] = (
+                start_price
+                + (start_price * 0.01 * (1 if i % 2 == 0 else -1))
+                + self.rng.normal(0, 0.0001 * start_price)
+            )
 
         # Force high z-score at the end: sudden jump
         prices[-1] = start_price * 1.05
@@ -188,7 +192,9 @@ class ScenarioGenerator:
         # Generate some high volatility first, then drop it.
         mid = n_steps // 2
         returns_high_vol = self.rng.normal(0, 0.01, mid)
-        returns_drift = np.full(n_steps - mid, 0.00004) + self.rng.normal(0, 0.000001, n_steps - mid)
+        returns_drift = np.full(n_steps - mid, 0.00004) + self.rng.normal(
+            0, 0.000001, n_steps - mid
+        )
         returns = np.concatenate([returns_high_vol, returns_drift])
         return self._generate_base(n_steps, start_price, returns)
 
@@ -198,7 +204,7 @@ class ScenarioGenerator:
         # Generate 100 steps of very low vol, then a massive spike
         n_steps = max(n_steps, 101)
         returns = self.rng.normal(0, 0.00005, n_steps)
-        returns[-1] = 0.1 # 10% move in one bar
+        returns[-1] = 0.1  # 10% move in one bar
         return self._generate_base(n_steps, start_price, returns)
 
     def _generate_malformed(self, n_steps: int, start_price: float) -> pd.DataFrame:
@@ -337,7 +343,9 @@ class ExecutionScenarioBuilder:
     def passing_buy(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
         """A clean BUY signal in a moderate bullish trend."""
         # Lower trend strength to avoid RSI > 75
-        df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005)
+        df = self.gen.generate(
+            n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005
+        )
         # Ensure enough data for indicators
         signal = TradeSignal(
             symbol=symbol,
@@ -371,7 +379,9 @@ class ExecutionScenarioBuilder:
         )
         return signal, df
 
-    def session_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, datetime]:
+    def session_violation(
+        self, symbol: str = "XAUUSD"
+    ) -> tuple[TradeSignal, pd.DataFrame, datetime]:
         """BUY signal on a Saturday (market closed)."""
         signal, df = self.passing_buy(symbol)
         # 2024-06-01 is a Saturday
@@ -401,16 +411,19 @@ class ExecutionScenarioBuilder:
                     symbol=symbol,
                     direction=direction,
                     entry_price=base_price,
-                    stop_loss=base_price - (100 * direction), # Large SL to avoid price-based violations
+                    stop_loss=base_price
+                    - (100 * direction),  # Large SL to avoid price-based violations
                     take_profit=base_price + (200 * direction),
                     lot_size=0.1,
                     algorithm="ensemble",
-                    confidence=0.7, # Lower confidence to avoid RSI-like failures, but above 0.6
+                    confidence=0.7,  # Lower confidence to avoid RSI-like failures, but above 0.6
                 )
             )
         return signals
 
-    def performance_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, Any]:
+    def performance_violation(
+        self, symbol: str = "XAUUSD"
+    ) -> tuple[TradeSignal, pd.DataFrame, Any]:
         """Signal with a mocked trade logger reporting low win rate."""
         signal, df = self.passing_buy(symbol)
 
@@ -476,7 +489,9 @@ class ExecutionScenarioBuilder:
         df = self.gen.generate(n_steps=300, regime="trending", trend_strength=0.0005)
         # Spike the very end to push RSI over 75 without blowing up EMA sequence too much
         # or just use a very strong trend that eventually hits RSI 80+
-        df_spike = self.gen.generate(n_steps=50, regime="trending", trend_strength=0.01, start_price=df["close"].iloc[-1])
+        df_spike = self.gen.generate(
+            n_steps=50, regime="trending", trend_strength=0.01, start_price=df["close"].iloc[-1]
+        )
         df = pd.concat([df, df_spike]).iloc[-300:]
 
         signal = TradeSignal(
@@ -515,6 +530,7 @@ class ModelHealthGenerator:
         """Breaches calibration threshold."""
         return {"drift": 0.02, "accuracy": 0.85, "calibration": 0.45}
 
+
 class RegimeScenarioBuilder:
     """
     Generates deterministic datasets specifically designed to trigger each MarketRegime.
@@ -525,7 +541,9 @@ class RegimeScenarioBuilder:
 
     def trending(self) -> pd.DataFrame:
         """Triggers MarketRegime.TRENDING."""
-        return self.gen.generate(n_steps=150, regime="trending", trend_strength=0.002, volatility=0.0005)
+        return self.gen.generate(
+            n_steps=150, regime="trending", trend_strength=0.002, volatility=0.0005
+        )
 
     def ranging(self) -> pd.DataFrame:
         """Triggers MarketRegime.RANGING."""

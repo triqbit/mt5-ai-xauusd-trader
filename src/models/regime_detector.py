@@ -250,7 +250,9 @@ class RegimeDetector:
 
         # Calculate durations per regime
         analysis_df = df.copy()
-        analysis_df["regime_group"] = (analysis_df["regime"] != analysis_df["regime"].shift()).cumsum()
+        analysis_df["regime_group"] = (
+            analysis_df["regime"] != analysis_df["regime"].shift()
+        ).cumsum()
         durations = analysis_df.groupby("regime_group")["regime"].agg(["first", "count"])
         avg_durations = durations.groupby("first")["count"].mean()
 

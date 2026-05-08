@@ -290,14 +290,21 @@ class BacktestEngine:
         self._close_all_trades(active_trades, close_vals[-1], time_vals[-1])
         return self._calculate_performance()
 
-    def _record_equity(self, timestamp: datetime, current_price: float, active_trades: list[dict[str, Any]]) -> None:
+    def _record_equity(
+        self, timestamp: datetime, current_price: float, active_trades: list[dict[str, Any]]
+    ) -> None:
         """Records current portfolio equity (Balance + Unrealized PnL)."""
         unrealized_pnl = 0.0
         contract_multiplier = 100 if "XAU" in self.symbol else 1
 
         for t in active_trades:
             dir = int(t["signal"].direction)
-            unrealized_pnl += (current_price - t["entry_price"]) * dir * t["signal"].lot_size * contract_multiplier
+            unrealized_pnl += (
+                (current_price - t["entry_price"])
+                * dir
+                * t["signal"].lot_size
+                * contract_multiplier
+            )
 
         current_equity = self.balance + unrealized_pnl
         self.equity_curve.append((timestamp, current_equity))
@@ -327,9 +334,15 @@ class BacktestEngine:
 
         # If no future bars, trade remains open until engine closes it
         if len(future_high) == 0:
-            active_trades.append({
-                "signal": signal, "entry_price": entry_price, "mae": 0.0, "mfe": 0.0, "exit_abs_idx": np.inf
-            })
+            active_trades.append(
+                {
+                    "signal": signal,
+                    "entry_price": entry_price,
+                    "mae": 0.0,
+                    "mfe": 0.0,
+                    "exit_abs_idx": np.inf,
+                }
+            )
             return
 
         # Vectorized hit detection
@@ -344,9 +357,15 @@ class BacktestEngine:
 
         if not hits.any():
             # Trade survives until end of dataset
-            active_trades.append({
-                "signal": signal, "entry_price": entry_price, "mae": 0.0, "mfe": 0.0, "exit_abs_idx": np.inf
-            })
+            active_trades.append(
+                {
+                    "signal": signal,
+                    "entry_price": entry_price,
+                    "mae": 0.0,
+                    "mfe": 0.0,
+                    "exit_abs_idx": np.inf,
+                }
+            )
             return
 
         # Find first exit index and price
@@ -368,15 +387,17 @@ class BacktestEngine:
             mfe = float(entry_price - np.min(trade_lows))
 
         # Queue trade for closing at exit_abs_idx
-        active_trades.append({
-            "signal": signal,
-            "entry_price": entry_price,
-            "mae": max(0.0, mae),
-            "mfe": max(0.0, mfe),
-            "exit_abs_idx": exit_abs_idx,
-            "exit_price": exit_price,
-            "exit_time": exit_time,
-        })
+        active_trades.append(
+            {
+                "signal": signal,
+                "entry_price": entry_price,
+                "mae": max(0.0, mae),
+                "mfe": max(0.0, mfe),
+                "exit_abs_idx": exit_abs_idx,
+                "exit_price": exit_price,
+                "exit_time": exit_time,
+            }
+        )
 
     def _update_active_trades(self, active_trades: list[dict[str, Any]], abs_idx: int) -> None:
         """Finalizes trades whose simulated exit time has arrived."""
@@ -398,7 +419,12 @@ class BacktestEngine:
         exit_price_adj = exit_price - (direction * self.spread / 2)
 
         contract_multiplier = 100 if "XAU" in self.symbol else 1
-        raw_pnl = (exit_price_adj - trade["entry_price"]) * direction * signal.lot_size * contract_multiplier
+        raw_pnl = (
+            (exit_price_adj - trade["entry_price"])
+            * direction
+            * signal.lot_size
+            * contract_multiplier
+        )
 
         # Transaction costs: commission
         commission = signal.lot_size * self.commission_per_lot
@@ -421,7 +447,9 @@ class BacktestEngine:
         )
         self.balance += final_pnl
 
-    def _close_all_trades(self, active_trades: list[dict[str, Any]], last_close: float, last_time: datetime) -> None:
+    def _close_all_trades(
+        self, active_trades: list[dict[str, Any]], last_close: float, last_time: datetime
+    ) -> None:
         """Force-close remaining positions at end of backtest."""
         for trade in active_trades:
             self._record_trade(trade, last_close, last_time)

@@ -764,9 +764,7 @@ class JournalMiner:
             if sigs["created_at"].dt.tz is None:
                 sigs["created_at"] = sigs["created_at"].dt.tz_localize(UTC)
 
-            mask = (sigs["created_at"] >= start_window) & (
-                sigs["created_at"] < cluster.start_time
-            )
+            mask = (sigs["created_at"] >= start_window) & (sigs["created_at"] < cluster.start_time)
             pre_cluster_signals.append(sigs[mask])
 
         if not pre_cluster_signals:
@@ -808,7 +806,9 @@ class JournalMiner:
         if trades_df is not None and not trades_df.empty:
             trades_df = trades_df.copy()
             if trades_df["created_at"].dt.tz is None:
-                trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_localize(UTC)
+                trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_localize(
+                    UTC
+                )
             else:
                 trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_convert(UTC)
 
@@ -995,8 +995,7 @@ class JournalMiner:
             start_window = cluster_start - pd.Timedelta(minutes=window_minutes)
 
             pre_cluster = sigs[
-                (sigs["created_at"] >= start_window)
-                & (sigs["created_at"] <= cluster_start)
+                (sigs["created_at"] >= start_window) & (sigs["created_at"] <= cluster_start)
             ]
 
             if len(pre_cluster) >= 2:

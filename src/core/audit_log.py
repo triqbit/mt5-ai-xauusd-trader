@@ -99,6 +99,7 @@ class AuditLogger:
 
         # Automatically extract trace_id from structlog context if available
         import structlog.contextvars
+
         context = structlog.contextvars.get_contextvars()
         trace_id = context.get("trace_id")
 

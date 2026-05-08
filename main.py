@@ -30,6 +30,7 @@ try:
     from rich.table import Table
 except ImportError as e:
     import platform
+
     print("=" * 70)
     print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
     print("=" * 70)
@@ -87,6 +88,7 @@ def configure_logging(level: str = "INFO") -> None:
     import logging
 
     import structlog.contextvars
+
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -210,18 +212,18 @@ def run_live(
         if loop_count % 100 == 0 and audit_logger:
             audit_logger.log_config_snapshot(
                 cfg.model_dump(
-                        mode="json",
-                        exclude={
-                            "mt5_password",
-                            "metaapi_token",
-                            "metaapi_account_id",
-                            "database_url",
-                            "redis_url",
-                            "telegram_token",
-                        },
-                    ),
-                    reason=f"periodic_check_loop_{loop_count}"
-                )
+                    mode="json",
+                    exclude={
+                        "mt5_password",
+                        "metaapi_token",
+                        "metaapi_account_id",
+                        "database_url",
+                        "redis_url",
+                        "telegram_token",
+                    },
+                ),
+                reason=f"periodic_check_loop_{loop_count}",
+            )
         loop_count += 1
 
         # 0. Update account metrics at start of loop
@@ -271,7 +273,11 @@ def run_live(
 
                         if monitor and not df_raw.empty:
                             # Monitor data freshness using latest bar timestamp
-                            latest_bar_time = df_raw.index[-1] if isinstance(df_raw.index, pd.DatetimeIndex) else df_raw["time"].iloc[-1]
+                            latest_bar_time = (
+                                df_raw.index[-1]
+                                if isinstance(df_raw.index, pd.DatetimeIndex)
+                                else df_raw["time"].iloc[-1]
+                            )
                             monitor.log_data_freshness(latest_bar_time)
 
                         # Check for liquidity crisis (extreme spread)
@@ -287,7 +293,9 @@ def run_live(
                             spread_pips = raw_spread / pip_size if pip_size > 0 else raw_spread
                         else:
                             # Fallback for XAUUSD
-                            spread_pips = raw_spread * 10.0 if "XAUUSD" in cfg.symbol else raw_spread
+                            spread_pips = (
+                                raw_spread * 10.0 if "XAUUSD" in cfg.symbol else raw_spread
+                            )
 
                         if monitor and spread_pips > cfg.spread_halt_pips:
                             monitor.alert_liquidity_crisis(cfg.symbol, spread_pips)
@@ -326,10 +334,7 @@ def run_live(
                         seq = torch.from_numpy(df_features.values[-60:]).float()
 
                     signal_obj = model.predict(
-                        obs,
-                        seq=seq,
-                        regime_info=regime_info,
-                        symbol=cfg.symbol
+                        obs, seq=seq, regime_info=regime_info, symbol=cfg.symbol
                     )
 
                     direction = signal_obj.direction
@@ -377,7 +382,7 @@ def run_live(
                         atr=atr,
                         risk=risk,
                         allocator=allocator,
-                        audit_logger=audit_logger
+                        audit_logger=audit_logger,
                     )
                 lot_size = signal.lot_size
 
@@ -433,7 +438,8 @@ def run_live(
                         risk_data = {
                             "passed": risk_approved,
                             "rejection_reasons": [],
-                            "risk_reward": abs(signal.take_profit - price) / abs(price - signal.stop_loss)
+                            "risk_reward": abs(signal.take_profit - price)
+                            / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
                             "summary": "Passed all risk gates"
@@ -493,7 +499,7 @@ def run_live(
                                     "risk_data": risk_data,
                                     "regime_data": regime_data,
                                     "execution_data": execution_data,
-                                }
+                                },
                             )
 
                         # Use a stub for macro risk since we don't have a live feed in this loop yet
@@ -583,9 +589,13 @@ def run_live(
 
                 # Wait for next interval with operator feedback
                 if console:
-                    with console.status("[bold blue]Waiting for next signal evaluation...") as status:
+                    with console.status(
+                        "[bold blue]Waiting for next signal evaluation..."
+                    ) as status:
                         for i in range(poll_interval, 0, -1):
-                            status.update(f"[bold blue]Waiting for next signal evaluation ({i}s remaining)...")
+                            status.update(
+                                f"[bold blue]Waiting for next signal evaluation ({i}s remaining)..."
+                            )
                             time.sleep(1)
                 else:
                     time.sleep(poll_interval)
@@ -619,6 +629,7 @@ def get_system_version() -> str:
     """Retrieve application version from src package."""
     try:
         from src import __version__
+
         return __version__
     except ImportError:
         return "unknown"
@@ -663,16 +674,28 @@ Usage Examples:
         default=datetime.now().strftime("%Y-%m-%d"),
     )
     p.add_argument(
-        "--train-window", type=int, default=500, help="Number of bars for walk-forward training window"
+        "--train-window",
+        type=int,
+        default=500,
+        help="Number of bars for walk-forward training window",
     )
     p.add_argument(
-        "--test-window", type=int, default=100, help="Number of bars for walk-forward testing window"
+        "--test-window",
+        type=int,
+        default=100,
+        help="Number of bars for walk-forward testing window",
     )
     p.add_argument(
-        "--step-size", type=int, default=100, help="Number of bars to slide the window per iteration"
+        "--step-size",
+        type=int,
+        default=100,
+        help="Number of bars to slide the window per iteration",
     )
     p.add_argument(
-        "--spread", type=float, default=0.0001, help="Fixed simulated spread for backtest environment"
+        "--spread",
+        type=float,
+        default=0.0001,
+        help="Fixed simulated spread for backtest environment",
     )
     p.add_argument(
         "--commission", type=float, default=7.0, help="Commission cost per round-turn lot"
@@ -692,7 +715,9 @@ Usage Examples:
         help="Granularity of output logging",
     )
     p.add_argument(
-        "--check", action="store_true", help="Perform comprehensive pre-flight health checks and exit"
+        "--check",
+        action="store_true",
+        help="Perform comprehensive pre-flight health checks and exit",
     )
     p.add_argument(
         "--confirm-live",
@@ -706,9 +731,7 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
     """Bridge for running the walk-forward backtesting engine."""
     from src.trading.backtester import BacktestEngine
 
-    start_date = (
-        datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
-    )
+    start_date = datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
     end_date = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
 
     log.info("Starting Backtest", symbol=cfg.symbol, start=start_date.date(), end=end_date.date())
@@ -759,7 +782,11 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
         perf_table.add_row("MFE Avg", f"{bt_report.mfe_avg:.2f}")
         perf_table.add_row("Period", f"{start_date.date()} to {end_date.date()}")
 
-        console.print(Panel(perf_table, title="[bold]Institutional Performance Summary[/]", border_style="green"))
+        console.print(
+            Panel(
+                perf_table, title="[bold]Institutional Performance Summary[/]", border_style="green"
+            )
+        )
         return 0
     finally:
         connector.disconnect()
@@ -868,6 +895,7 @@ def main() -> int:
 
     # ── Startup Summary ────────────────────────────────────────────────────────
     import platform
+
     summary = Table.grid(expand=True, padding=(0, 1))
     summary.add_column(style="cyan", justify="right")
     summary.add_column(style="white", justify="left")
@@ -901,21 +929,21 @@ def main() -> int:
     # Risk summary row
     summary.add_row("[bold underline]Risk Controls[/]", "")
     risk_color = (
-        "red"
-        if cfg.risk_per_trade > 0.02
-        else "yellow"
-        if cfg.risk_per_trade > 0.01
-        else "green"
+        "red" if cfg.risk_per_trade > 0.02 else "yellow" if cfg.risk_per_trade > 0.01 else "green"
     )
     summary.add_row("Risk/Trade:  ", f"[{risk_color}]{cfg.risk_per_trade:.1%}[/]")
 
-    daily_loss_color = "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    daily_loss_color = (
+        "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+    )
     summary.add_row("Daily Stop:  ", f"[{daily_loss_color}]{cfg.max_daily_loss:.1%}[/]")
 
     pos_color = "red" if cfg.max_positions > 10 else "yellow" if cfg.max_positions > 5 else "green"
     summary.add_row("Max Positions:  ", f"[{pos_color}]{cfg.max_positions}[/]")
 
-    conf_color = "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    conf_color = (
+        "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+    )
     summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
 
     console.print(
@@ -962,7 +990,10 @@ def main() -> int:
             diag.add_row("Account Login:  ", str(cfg.mt5_login))
             diag.add_row("Terminal Path:  ", cfg.mt5_path)
             diag.add_row("OS Platform:    ", sys.platform)
-            diag.add_row("MetaAPI Config: ", "Present" if cfg.metaapi_token and cfg.metaapi_account_id else "Missing")
+            diag.add_row(
+                "MetaAPI Config: ",
+                "Present" if cfg.metaapi_token and cfg.metaapi_account_id else "Missing",
+            )
 
             console.print(
                 Panel(
@@ -972,7 +1003,10 @@ def main() -> int:
                     border_style="red",
                 )
             )
-            log.critical("FAILED TO CONNECT: The system could not establish a session with MetaTrader 5 or MetaAPI.", error=str(exc))
+            log.critical(
+                "FAILED TO CONNECT: The system could not establish a session with MetaTrader 5 or MetaAPI.",
+                error=str(exc),
+            )
             return 1
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
@@ -1016,10 +1050,10 @@ def main() -> int:
             model.load_lstm(lstm_path)
     elif cfg.algorithm == "ppo":
         ppo_path = args.model_dir / "ppo_xauusd.zip"
-        model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)
+        model = PPOAgent(model_path=ppo_path if ppo_path.exists() else None)  # type: ignore
     elif cfg.algorithm == "lstm":
         lstm_path = args.model_dir / "lstm_xauusd.pt"
-        model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)
+        model = LSTMModel(model_path=lstm_path if lstm_path.exists() else None)  # type: ignore
     elif cfg.algorithm == "transformer":
         transformer_path = args.model_dir / "transformer_xauusd.pt"
         # Standard input_dim is 140 for the current feature engineer
@@ -1058,9 +1092,7 @@ def main() -> int:
             if comp.status == HealthStatus.DEGRADED
             else "red"
         )
-        table.add_row(
-            name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy
-        )
+        table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy)
     console.print(table)
 
     if report.status == HealthStatus.FAILED:
@@ -1075,8 +1107,13 @@ def main() -> int:
         next_steps.add_column(style="white", justify="left")
 
         next_steps.add_row("Demo Trading:  ", f"python main.py --mode demo --algo {cfg.algorithm}")
-        next_steps.add_row("Live Trading:  ", f"python main.py --mode live --algo {cfg.algorithm} --confirm-live")
-        next_steps.add_row("Backtesting:   ", f"python main.py --mode backtest --algo {cfg.algorithm} --start 2023-01-01")
+        next_steps.add_row(
+            "Live Trading:  ", f"python main.py --mode live --algo {cfg.algorithm} --confirm-live"
+        )
+        next_steps.add_row(
+            "Backtesting:   ",
+            f"python main.py --mode backtest --algo {cfg.algorithm} --start 2023-01-01",
+        )
 
         console.print(
             Panel(
@@ -1084,19 +1121,25 @@ def main() -> int:
                 title="[bold green]Ready for Execution[/]",
                 subtitle="Use the commands below to start the bot",
                 border_style="green",
-                expand=False
+                expand=False,
             )
         )
         return 0
 
     # Record successful deployment/startup
     from src import __version__
+
     audit_logger.log_deployment(version=__version__, environment=cfg.mode)
     audit_logger.log_operator_action(
         operator="system",
         action="trading_engine_started",
         reason=f"System transition to RUNNING state in {cfg.mode} mode",
-        metadata={"mode": cfg.mode, "algo": cfg.algorithm, "symbol": cfg.symbol, "version": __version__}
+        metadata={
+            "mode": cfg.mode,
+            "algo": cfg.algorithm,
+            "symbol": cfg.symbol,
+            "version": __version__,
+        },
     )
 
     try:
@@ -1124,7 +1167,7 @@ def main() -> int:
             audit_logger.log_operator_action(
                 operator="system",
                 action="shutdown_initiated",
-                reason="Cleaning up resources and disconnecting"
+                reason="Cleaning up resources and disconnecting",
             )
         if connector._is_initialized:
             connector.disconnect()
@@ -1132,7 +1175,7 @@ def main() -> int:
             audit_logger.log_operator_action(
                 operator="system",
                 action="shutdown_completed",
-                reason="System shutdown sequence finished"
+                reason="System shutdown sequence finished",
             )
     return 0
 

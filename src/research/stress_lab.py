@@ -367,7 +367,9 @@ class StressLab:
         """
         stressed_scenarios = [m.total_return for name, m in results.items() if name != "Baseline"]
         num_stressed = len(stressed_scenarios)
-        summary = f"Strategy '{self.strategy.name}' evaluated against {num_stressed} stress scenarios.\n"
+        summary = (
+            f"Strategy '{self.strategy.name}' evaluated against {num_stressed} stress scenarios.\n"
+        )
         avg_return = np.mean(stressed_scenarios) if stressed_scenarios else 0.0
         summary += (
             f"Baseline Return: {baseline.total_return:.2%}, Avg Stressed Return: {avg_return:.2%}\n"
@@ -426,12 +428,16 @@ class StressLab:
 
                     if direction == 1:
                         # Spike up, trap longs
-                        df.at[idx, "high"] = max(df.at[idx, "high"], df.at[idx, "open"] + spike_size)
+                        df.at[idx, "high"] = max(
+                            df.at[idx, "high"], df.at[idx, "open"] + spike_size
+                        )
                         df.at[idx, "close"] = df.at[idx, "open"] + (spike_size * 0.2)
                         # Violent reversal
                         df.at[next_idx, "open"] = df.at[idx, "close"]
                         df.at[next_idx, "close"] = df.at[idx, "open"] - (spike_size * 0.4)
-                        df.at[next_idx, "low"] = min(df.at[next_idx, "low"], df.at[next_idx, "close"] - 0.5)
+                        df.at[next_idx, "low"] = min(
+                            df.at[next_idx, "low"], df.at[next_idx, "close"] - 0.5
+                        )
                     else:
                         # Spike down, trap shorts
                         df.at[idx, "low"] = min(df.at[idx, "low"], df.at[idx, "open"] - spike_size)
@@ -439,7 +445,9 @@ class StressLab:
                         # Violent reversal
                         df.at[next_idx, "open"] = df.at[idx, "close"]
                         df.at[next_idx, "close"] = df.at[idx, "open"] + (spike_size * 0.4)
-                        df.at[next_idx, "high"] = max(df.at[next_idx, "high"], df.at[next_idx, "close"] + 0.5)
+                        df.at[next_idx, "high"] = max(
+                            df.at[next_idx, "high"], df.at[next_idx, "close"] + 0.5
+                        )
 
                     # Ensure continuity for the bar after reversal
                     if i + 2 < len(df):
@@ -451,7 +459,9 @@ class StressLab:
             while i < len(df) - 15:
                 if rng.random() < scenario.regime_flip_prob:
                     # Detect current trend
-                    recent_return = (df["close"].iloc[i] - df["close"].iloc[i-10]) / df["close"].iloc[i-10]
+                    recent_return = (df["close"].iloc[i] - df["close"].iloc[i - 10]) / df[
+                        "close"
+                    ].iloc[i - 10]
 
                     window = min(15, len(df) - i)
                     # Force a reversal if a trend exists, otherwise expand volatility
@@ -465,22 +475,34 @@ class StressLab:
                             if j > 0:
                                 df.at[idx, "open"] = df.at[df.index[i + j - 1], "close"]
                             # Linear reversal
-                            df.at[idx, "close"] = base_price + (reversal_magnitude * (j+1)/window)
-                            df.at[idx, "high"] = max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i+j]
-                            df.at[idx, "low"] = min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i+j]
+                            df.at[idx, "close"] = base_price + (
+                                reversal_magnitude * (j + 1) / window
+                            )
+                            df.at[idx, "high"] = (
+                                max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i + j]
+                            )
+                            df.at[idx, "low"] = (
+                                min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i + j]
+                            )
                     else:
                         # Volatility expansion (News Shock style)
                         for j in range(window):
                             idx = df.index[i + j]
                             if j > 0:
                                 df.at[idx, "open"] = df.at[df.index[i + j - 1], "close"]
-                            noise = rng.normal(0, atr.iloc[i+j] * 2.0)
+                            noise = rng.normal(0, atr.iloc[i + j] * 2.0)
                             df.at[idx, "close"] += noise
-                            df.at[idx, "high"] = max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i+j]*2
-                            df.at[idx, "low"] = min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i+j]*2
+                            df.at[idx, "high"] = (
+                                max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i + j] * 2
+                            )
+                            df.at[idx, "low"] = (
+                                min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i + j] * 2
+                            )
 
                     if i + window < len(df):
-                        df.at[df.index[i + window], "open"] = df.at[df.index[i + window - 1], "close"]
+                        df.at[df.index[i + window], "open"] = df.at[
+                            df.index[i + window - 1], "close"
+                        ]
                     i += window
                 else:
                     i += 1
@@ -496,7 +518,7 @@ class StressLab:
                     df.at[df.index[i], "close"] -= drop_size * 0.8
 
                     if i + 1 < len(df):
-                        df.at[df.index[i+1], "open"] = df.at[df.index[i], "close"]
+                        df.at[df.index[i + 1], "open"] = df.at[df.index[i], "close"]
 
                     # Partial recovery in next 3 candles
                     for j in range(1, 4):
@@ -507,7 +529,7 @@ class StressLab:
                             df.at[curr_idx, "high"], df.at[curr_idx, "close"] + 1.0
                         )
                         if i + j + 1 < len(df):
-                            df.at[df.index[i+j+1], "open"] = df.at[curr_idx, "close"]
+                            df.at[df.index[i + j + 1], "open"] = df.at[curr_idx, "close"]
 
                     i += 5  # Skip ahead
                 else:
@@ -615,13 +637,13 @@ class StressLab:
             exit_cost = (spreads[i] / 2) + slippage
             if position == 1:
                 unrealized = (
-                    (current_price - exit_cost) - entry_price
-                ) * lot_size * contract_multiplier
+                    ((current_price - exit_cost) - entry_price) * lot_size * contract_multiplier
+                )
                 equity[i] = cash + unrealized
             elif position == -1:
                 unrealized = (
-                    entry_price - (current_price + exit_cost)
-                ) * lot_size * contract_multiplier
+                    (entry_price - (current_price + exit_cost)) * lot_size * contract_multiplier
+                )
                 equity[i] = cash + unrealized
             else:
                 equity[i] = cash
@@ -650,10 +672,16 @@ class StressLab:
         # Profit Factor
         gross_profit = sum([p for p in trade_pnls if p > 0])
         gross_loss = abs(sum([p for p in trade_pnls if p < 0]))
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else (10.0 if gross_profit > 0 else 0.0)
+        profit_factor = (
+            gross_profit / gross_loss if gross_loss > 0 else (10.0 if gross_profit > 0 else 0.0)
+        )
 
         # Recovery Factor
-        recovery_factor = net_pnl / (max_drawdown * initial_balance) if max_drawdown > 0 else (5.0 if net_pnl > 0 else 0.0)
+        recovery_factor = (
+            net_pnl / (max_drawdown * initial_balance)
+            if max_drawdown > 0
+            else (5.0 if net_pnl > 0 else 0.0)
+        )
 
         return StressTestMetrics(
             total_return=total_return,

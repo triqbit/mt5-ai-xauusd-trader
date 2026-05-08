@@ -29,12 +29,19 @@ class DreamerAgent(BaseModel):
         state: Optional latent state for the recurrent world model.
     """
 
-    def __init__(self, config: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        config: dict[str, Any] | None = None,
+        model_path: str | Path | None = None,
+        device: str = "cpu",
+    ) -> None:
         """
         Initializes the DreamerAgent placeholder.
 
         Args:
             config: Optional configuration dictionary.
+            model_path: Optional path to model weights.
+            device: Device for inference.
         """
         self.logger = logging.getLogger(__name__)
         self.config = config or {}

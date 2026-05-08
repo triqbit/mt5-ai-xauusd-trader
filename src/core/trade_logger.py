@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
+
     pass
 
 
@@ -97,7 +98,9 @@ class Trade(Base, AuditMixin):
     pnl: Mapped[float] = mapped_column(Float, default=0.0)
     drawdown_impact: Mapped[float | None] = mapped_column(Float)  # impact on total drawdown
     trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
-    status: Mapped[str] = mapped_column(String(20), default="OPEN", index=True)  # OPEN, CLOSED, CANCELLED
+    status: Mapped[str] = mapped_column(
+        String(20), default="OPEN", index=True
+    )  # OPEN, CLOSED, CANCELLED
 
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"))
     signal: Mapped["ModelSignal"] = relationship("ModelSignal", back_populates="trade")
@@ -149,6 +152,7 @@ class TradeLogger:
     def log_signal(self, signal_data: dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
         import structlog.contextvars
+
         trace_id = structlog.contextvars.get_contextvars().get("trace_id")
 
         with self.Session() as session:
@@ -185,6 +189,7 @@ class TradeLogger:
             self._perf_cache = None
 
         import structlog.contextvars
+
         trace_id = structlog.contextvars.get_contextvars().get("trace_id")
 
         with self.Session() as session:
