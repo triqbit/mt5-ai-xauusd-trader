@@ -9,14 +9,13 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["ConfidenceBucket", "CalibrationResult", "CalibrationEngine"]
+__all__ = ["CalibrationEngine", "CalibrationResult", "ConfidenceBucket"]
 
 
 class ConfidenceBucket(BaseModel):
