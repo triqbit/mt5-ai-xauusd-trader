@@ -15,6 +15,7 @@ from src.core.monitor import Monitor
 @pytest.fixture
 def mock_config():
     cfg = MagicMock(spec=TradingConfig)
+    cfg.symbol = "XAUUSD"
     cfg.max_daily_loss = 0.05
     cfg.max_positions = 5
     cfg.risk_per_trade = 0.01
@@ -23,6 +24,8 @@ def mock_config():
     cfg.model_drift_threshold = 0.3
     cfg.model_accuracy_floor = 0.5
     cfg.model_calibration_threshold = 0.25
+    cfg.max_drawdown = 0.15
+    cfg.max_trades_per_day = 50
     cfg.telegram_token = MagicMock()
     cfg.telegram_token.get_secret_value.return_value = ""
     return cfg

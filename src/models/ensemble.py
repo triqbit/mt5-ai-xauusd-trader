@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from src.core.config import TradingConfig
 from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
-from src.models.lstm_model import LSTMModel
+from src.models.lstm_model import LSTMAttentionModel, LSTMModel
 from src.models.ppo_agent import PPOAgent
 
 logger = logging.getLogger(__name__)
@@ -316,4 +316,4 @@ class EnsembleModel(BaseModel):
         return self.aggregate_signals(votes, symbol=kwargs.get("symbol", "unknown"))
 
 
-__all__ = ["EnsembleModel"]
+__all__ = ["EnsembleModel", "LSTMAttentionModel"]

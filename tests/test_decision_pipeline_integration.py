@@ -133,8 +133,10 @@ def test_decision_pipeline_full_confluence(
     assert risk_approved is True
 
     # 4. Execution Filter
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=timezone.utc)
     filter_decision = execution_filter.validate(
-        signal, df, current_drawdown=0.02, timestamp=datetime.now(timezone.utc)
+        signal, df, current_drawdown=0.02, timestamp=mid_week_time
     )
     assert filter_decision.is_approved is True
 
@@ -253,7 +255,9 @@ def test_decision_pipeline_execution_block(
         confidence=0.7
     )
 
-    filter_decision = execution_filter.validate(signal, df, current_drawdown=0.0)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=timezone.utc)
+    filter_decision = execution_filter.validate(signal, df, current_drawdown=0.0, timestamp=mid_week_time)
     assert filter_decision.is_approved is False
     assert filter_decision.blocked_by == "TREND_ANGLE"
 

@@ -27,9 +27,12 @@ def config(monkeypatch):
 def filter_svc(config):
     return ExecutionFilter(config=config)
 
+from datetime import UTC, datetime
 def test_passing_scenario(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
-    decision = filter_svc.validate(signal, df, current_drawdown=0.0)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=UTC)
+    decision = filter_svc.validate(signal, df, current_drawdown=0.0, timestamp=mid_week_time)
 
     assert decision.is_approved is True
     assert decision.blocked_by is None
@@ -67,7 +70,9 @@ def test_momentum_failure_scenario(filter_svc, execution_builder):
 def test_model_health_drift_failure(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
     health = ModelHealthGenerator.degraded_drift()
-    decision = filter_svc.validate(signal, df, current_drawdown=0.0, model_health=health)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=UTC)
+    decision = filter_svc.validate(signal, df, current_drawdown=0.0, model_health=health, timestamp=mid_week_time)
 
     assert decision.is_approved is False
     assert decision.blocked_by == "MODEL_STABILITY"
@@ -77,7 +82,9 @@ def test_model_health_drift_failure(filter_svc, execution_builder):
 def test_model_health_accuracy_failure(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
     health = ModelHealthGenerator.degraded_accuracy()
-    decision = filter_svc.validate(signal, df, current_drawdown=0.0, model_health=health)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=UTC)
+    decision = filter_svc.validate(signal, df, current_drawdown=0.0, model_health=health, timestamp=mid_week_time)
 
     assert decision.is_approved is False
     assert decision.blocked_by == "MODEL_STABILITY"
