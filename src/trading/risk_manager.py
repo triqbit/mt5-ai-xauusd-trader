@@ -20,7 +20,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -81,9 +83,10 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        current_positions: Optional[List[Dict[str, Any]]] = None,
     ) -> bool:
         """
-        Run the full 8-layer risk filter cascade.
+        Run the full institutional risk filter cascade.
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
@@ -92,11 +95,15 @@ class RiskManager:
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
         elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
+            rejection_reason = "Max concurrent positions reached"
+        elif current_positions is not None and not self._check_directional_exposure(signal, current_positions):
+            rejection_reason = "Max directional exposure reached"
+        elif current_positions is not None and not self._check_total_notional(signal, current_positions):
+            rejection_reason = "Total notional exposure limit reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
         elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
+            rejection_reason = f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
         elif not self._check_consecutive_losses():
@@ -121,38 +128,109 @@ class RiskManager:
                 )
         return passed
 
+    def calculate_atr_size_multiplier(self, market_data: pd.DataFrame) -> float:
+        """
+        ATR-based volatility scaling multiplier.
+        """
+        if market_data.empty or "atr" not in market_data.columns:
+            return 1.0
+
+        current_atr = market_data["atr"].iloc[-1]
+        # Approx 30 days of M5 if 24/5 trading
+        avg_atr = market_data["atr"].tail(8640).mean()
+
+        ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
+
+        if ratio > self.cfg.volatility_extreme_threshold:
+            return 0.0
+        elif ratio > self.cfg.volatility_very_high_threshold:
+            return 0.5
+        elif ratio > self.cfg.volatility_high_threshold:
+            return 0.75
+        return 1.0
+
     def size_position(
         self,
         symbol: str,
-        win_rate: float,
-        avg_win: float,
-        avg_loss: float,
-        pip_value: float = 1.0,
+        market_data: Optional[pd.DataFrame] = None,
+        win_rate: float = 0.58,
+        avg_win: float = 0.0,
+        avg_loss: float = 0.0,
+        pip_value: float = 100.0,
     ) -> float:
         """
-        Fractional Kelly Criterion position sizing.
-        Returns lot size capped at max risk per trade.
+        Institutional position sizing combining Kelly and ATR-based volatility scaling.
         """
-        if avg_loss == 0:
-            return 0.01  # minimum lot
-        kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
-        kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
-        lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
-        lot_size = max(0.01, round(lot_size, 2))
-        logger.debug(
-            "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
-            kelly_fraction,
-            risk_capital,
-            lot_size,
-        )
-        return lot_size
+        # 1. Base Sizing (1% of balance)
+        risk_amount = self.balance * self.cfg.risk_per_trade
 
-    def update_equity(self, current_equity: float) -> None:
+        # 2. ATR Multiplier (Volatility Scaling)
+        vol_multiplier = 1.0
+        current_atr = 0.0
+        if market_data is not None and not market_data.empty:
+            vol_multiplier = self.calculate_atr_size_multiplier(market_data)
+            # Use provided ATR or compute if missing
+            if "atr" in market_data.columns:
+                current_atr = market_data["atr"].iloc[-1]
+            else:
+                high, low, close = market_data["high"], market_data["low"], market_data["close"]
+                tr = pd.concat(
+                    [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
+                    axis=1,
+                ).max(axis=1)
+                current_atr = float(tr.rolling(window=14).mean().iloc[-1])
+
+        # 3. Daily Loss Multiplier
+        loss_multiplier = self.get_size_multiplier_from_loss()
+
+        total_multiplier = vol_multiplier * loss_multiplier
+        if total_multiplier <= 0:
+            return 0.0
+
+        # 4. Calculate Lots
+        if avg_loss > 0 and win_rate > 0:
+            # Use Kelly Criterion if performance stats available
+            kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
+            kelly_fraction = max(0.0, min(kelly_fraction, 0.25))
+            # (risk * kelly) / (loss_in_points * dollar_per_point_per_lot)
+            lot_size = (risk_amount * kelly_fraction) / (avg_loss * pip_value)
+        elif current_atr > 0:
+            # Fallback to ATR-based sizing (RISK_LIMITS.md standard)
+            # ATR * pip_value converts ATR to $ per lot
+            lot_size = (risk_amount / (current_atr * pip_value)) * total_multiplier
+        else:
+            # Default to minimum lot if no data
+            lot_size = self.cfg.min_lot_size
+
+        # 5. Cap at Max Position Size (10% of equity)
+        max_notional = self.balance * self.cfg.max_position_size_pct
+        # Price estimate for gold (1 lot = 100 oz)
+        price = market_data["close"].iloc[-1] if market_data is not None and not market_data.empty else 2300.0
+        max_lots = max_notional / (price * pip_value)
+
+        final_lots = min(lot_size, max_lots)
+        final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
+
+        logger.debug(
+            "Sizing | symbol=%s | mult=%.2f | lots=%.2f",
+            symbol, total_multiplier, final_lots
+        )
+        return final_lots
+
+    def update_equity(self, current_equity: float, realised_pnl: float = 0.0) -> None:
         """Call after every closed trade or on heartbeat."""
         self.balance = current_equity
         if current_equity > self.peak_equity:
             self.peak_equity = current_equity
+
+        if realised_pnl != 0:
+            self.daily.realised_pnl += realised_pnl
+            self.daily.trade_count += 1
+            if realised_pnl < 0:
+                self.daily.consecutive_losses += 1
+            else:
+                self.daily.consecutive_losses = 0
+
         if current_equity > self.daily.peak_equity:
             self.daily.peak_equity = current_equity
 
@@ -164,6 +242,31 @@ class RiskManager:
             self.daily.consecutive_losses += 1
         else:
             self.daily.consecutive_losses = 0
+
+    def get_daily_loss_level(self) -> int:
+        """
+        Layer 2: Daily Loss Level (0-4).
+        """
+        if self.daily.peak_equity <= 0 or self.daily.realised_pnl >= 0:
+            return 0
+
+        loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
+
+        if loss_pct >= self.cfg.max_daily_loss:
+            return 4
+        if loss_pct >= self.cfg.daily_loss_lvl3:
+            return 3
+        if loss_pct >= self.cfg.daily_loss_lvl2:
+            return 2
+        if loss_pct >= self.cfg.daily_loss_lvl1:
+            return 1
+        return 0
+
+    def get_size_multiplier_from_loss(self) -> float:
+        """Multiplier based on daily loss level."""
+        level = self.get_daily_loss_level()
+        mapping = {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.25, 4: 0.0}
+        return mapping.get(level, 0.0)
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
@@ -229,11 +332,47 @@ class RiskManager:
         return True
 
     def _check_daily_loss(self) -> bool:
-        if self.daily.peak_equity == 0:
-            return True
-        loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
+        level = self.get_daily_loss_level()
+        if level >= 4:
+            logger.warning("Daily loss limit hit (Level 4)")
+            return False
+        return True
+
+    def _check_directional_exposure(
+        self, signal: TradeSignal, current_positions: List[Dict[str, Any]]
+    ) -> bool:
+        """Layer 4: 30% net directional exposure."""
+        net_lots = 0.0
+        for pos in current_positions:
+            vol = pos.get("volume", 0.0)
+            if pos.get("type") == 0:  # BUY
+                net_lots += vol
+            else:  # SELL
+                net_lots -= vol
+
+        # Factor in the new signal
+        net_lots += self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
+
+        # Gold price estimate for notional calculation if not available via market data
+        price_estimate = signal.entry_price or 2300.0
+        notional = abs(net_lots) * price_estimate * 100
+        exposure_pct = notional / self.balance if self.balance > 0 else 1.0
+
+        if exposure_pct > self.cfg.max_single_direction_pct:
+            logger.warning("Max directional exposure reached: %.1f%%", exposure_pct * 100)
+            return False
+        return True
+
+    def _check_total_notional(
+        self, signal: TradeSignal, current_positions: List[Dict[str, Any]]
+    ) -> bool:
+        """Layer 4: Total notional < 100% equity."""
+        total_lots = sum(pos.get("volume", 0.0) for pos in current_positions) + self.cfg.min_lot_size
+        price = signal.entry_price or 2300.0
+        total_notional = total_lots * price * 100
+        limit = self.balance * self.cfg.max_total_notional_pct
+        if total_notional >= limit:
+            logger.warning("Total notional exposure exceeds equity: %.1f >= %.1f", total_notional, limit)
             return False
         return True
 

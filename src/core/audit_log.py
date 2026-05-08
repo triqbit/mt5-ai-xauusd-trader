@@ -149,7 +149,7 @@ class AuditLogger:
     ) -> int:
         """Log the full risk engine decision chain."""
         return self.log(
-            actor="risk_engine",
+            actor="risk_manager",
             action="risk_decision",
             details=f"Risk decision for {symbol} {direction}: {'PASSED' if passed else 'FAILED'}",
             metadata={

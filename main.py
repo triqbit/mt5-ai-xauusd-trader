@@ -120,9 +120,10 @@ def _prepare_trade_signal(
     direction: int,
     confidence: float,
     price: float,
-    atr: float,
+    df_raw: pd.DataFrame,
     risk: RiskManager,
     allocator: CapitalAllocator,
+    connector: MT5Connector,
     audit_logger: Optional[AuditLogger] = None,
 ) -> TradeSignal:
     """
@@ -131,7 +132,19 @@ def _prepare_trade_signal(
     """
     log = structlog.get_logger("main.risk")
 
-    # 1. SL/TP Calculation
+    # 1. ATR Calculation (Centralized)
+    # Ensure ATR is available in df_raw
+    if "atr" not in df_raw.columns:
+        high, low, close = df_raw["high"], df_raw["low"], df_raw["close"]
+        tr = pd.concat(
+            [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
+            axis=1,
+        ).max(axis=1)
+        df_raw["atr"] = tr.rolling(window=14).mean()
+
+    atr = float(df_raw["atr"].iloc[-1])
+
+    # 1.1 SL/TP Calculation (2x/4x ATR Institutional Standard)
     stop_loss = price - (direction * 2 * atr)
     take_profit = price + (direction * 4 * atr)
 
@@ -155,13 +168,23 @@ def _prepare_trade_signal(
     else:
         approved_risk = alloc_result.allocated_risk_pct
 
-    # 3. Lot Sizing
+    # 3. Lot Sizing (Unified RiskManager sizing)
+    props = connector.get_symbol_properties(cfg.symbol)
+    # pip_value for Gold (XAUUSD) is typically 100 ($ per lot per full point move)
+    pip_value = 100.0
+    if props and "trade_tick_value" in props and "trade_tick_size" in props:
+        # pip_value = dollar_per_point_per_lot
+        # Tick value is $/lot/tick_size
+        pip_value = props["trade_tick_value"] / props["trade_tick_size"]
+
     lot_size = (
         risk.size_position(
-            cfg.symbol,
+            symbol=cfg.symbol,
+            market_data=df_raw,
             win_rate=0.58,
             avg_win=4 * atr,
             avg_loss=2 * atr,
+            pip_value=pip_value,
         )
         if approved_risk > 0
         else 0.0
@@ -371,7 +394,6 @@ def run_live(
 
                 # 4. Signal Preparation & Institutional Risk
                 price = tick["ask"] if direction == 1 else tick["bid"]
-                atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
                 with profile("signal_preparation"):
                     signal = _prepare_trade_signal(
@@ -379,9 +401,10 @@ def run_live(
                         direction=direction,
                         confidence=confidence,
                         price=price,
-                        atr=atr,
+                        df_raw=df_raw,
                         risk=risk,
                         allocator=allocator,
+                        connector=connector,
                         audit_logger=audit_logger,
                     )
                 lot_size = signal.lot_size
@@ -389,8 +412,14 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
+                    current_positions = connector.get_positions(cfg.symbol)
                     risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                        risk.approve(
+                            signal,
+                            signal_id=signal_id,
+                            model_health=health,
+                            current_positions=current_positions,
+                        )
                         if direction != 0
                         else False
                     )

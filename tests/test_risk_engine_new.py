@@ -1,30 +1,30 @@
 import pytest
 import pandas as pd
-from src.trading.risk_engine import RiskEngine
+from src.trading.risk_manager import RiskManager
 from src.core.config import TradingConfig
 
 @pytest.fixture
-def risk_engine():
+def risk_manager():
     cfg = TradingConfig(MT5_PASSWORD="test", MT5_SERVER="test")
-    return RiskEngine(cfg, 10000.0)
+    return RiskManager(cfg, 10000.0)
 
-def test_drawdown_breaker(risk_engine):
-    risk_engine.update_metrics(6000.0) # 40% drawdown
-    assert not risk_engine._check_drawdown_breaker()
+def test_drawdown_breaker(risk_manager):
+    risk_manager.update_equity(6000.0) # 40% drawdown
+    assert not risk_manager._check_circuit_breaker()
 
-def test_daily_loss_breaker(risk_engine):
-    risk_engine.update_metrics(10000.0, realized_pnl=-600.0) # 6% loss
-    assert risk_engine.get_daily_loss_level() >= 4
+def test_daily_loss_breaker(risk_manager):
+    risk_manager.update_equity(10000.0, realised_pnl=-600.0) # 6% loss
+    assert risk_manager.get_daily_loss_level() >= 4
 
-def test_calculate_position_size(risk_engine):
+def test_calculate_position_size(risk_manager):
     data = pd.DataFrame({
         "atr": [1.0] * 100,
         "close": [2300.0] * 100
     })
-    size = risk_engine.calculate_position_size("XAUUSD", data)
+    size = risk_manager.size_position("XAUUSD", market_data=data)
     assert size >= 0.01
 
-def test_validate_signal_rejection(risk_engine):
+def test_validate_signal_rejection(risk_manager):
     from src.core.schemas import TradeSignal
     from src.core.constants import SignalDirection
 
@@ -39,7 +39,6 @@ def test_validate_signal_rejection(risk_engine):
         confidence=0.4 # Below default 0.55
     )
 
-    data = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
-    decision = risk_engine.validate_signal(signal, data, [])
-    assert not decision.is_approved
-    assert "Confidence" in decision.reason
+    # Use approve() instead of validate_signal
+    approved = risk_manager.approve(signal)
+    assert not approved

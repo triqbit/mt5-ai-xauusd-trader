@@ -16,6 +16,12 @@ from src.core.monitor import Monitor
 def mock_config():
     cfg = MagicMock(spec=TradingConfig)
     cfg.max_daily_loss = 0.05
+    cfg.daily_loss_lvl1 = 0.02
+    cfg.daily_loss_lvl2 = 0.03
+    cfg.daily_loss_lvl3 = 0.04
+    cfg.daily_loss_lvl1 = 0.02
+    cfg.daily_loss_lvl2 = 0.03
+    cfg.daily_loss_lvl3 = 0.04
     cfg.max_positions = 5
     cfg.risk_per_trade = 0.01
     cfg.min_confidence = 0.55

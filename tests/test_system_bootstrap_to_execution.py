@@ -230,7 +230,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
         pred = session.execute(select(AuditEntry).where(AuditEntry.action == "prediction")).scalars().first()
         assert pred is not None
 
-        risk_audit = session.execute(select(AuditEntry).where(AuditEntry.actor == "risk_engine")).scalars().first()
+        risk_audit = session.execute(select(AuditEntry).where(AuditEntry.actor == "risk_manager")).scalars().first()
         assert risk_audit is not None
         assert risk_audit.metadata_json["passed"] is True
 
@@ -275,7 +275,7 @@ def test_system_failure_handling_risk_rejection(system_env):
     with audit_logger.Session() as session:
         # Check risk decision entry
         entry = session.execute(
-            select(AuditEntry).where(AuditEntry.actor == "risk_engine", AuditEntry.action == "risk_decision")
+            select(AuditEntry).where(AuditEntry.actor == "risk_manager", AuditEntry.action == "risk_decision")
         ).scalars().first()
         assert entry is not None
         assert entry.metadata_json["passed"] is False
