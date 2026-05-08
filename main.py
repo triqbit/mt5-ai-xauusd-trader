@@ -198,7 +198,6 @@ def run_live(
                             "metaapi_token",
                             "metaapi_account_id",
                             "database_url",
-                            "redis_url",
                             "telegram_token",
                         },
                     ),
@@ -854,7 +853,6 @@ def main() -> int:
                 "metaapi_token",
                 "metaapi_account_id",
                 "database_url",
-                "redis_url",
                 "telegram_token",
             },
         )
@@ -936,7 +934,7 @@ def main() -> int:
         # Standard input_dim is 140 for the current feature engineer
         model = TimeSeriesTransformer(input_dim=140)
         if torch and transformer_path.exists():
-            model.load_state_dict(torch.load(transformer_path, map_location="cpu", weights_only=True))
+            model.load_state_dict(torch.load(transformer_path, map_location="cpu"))
     else:
         # This branch should rarely be hit if Literal choices are enforced by Pydantic
         log.warning(
