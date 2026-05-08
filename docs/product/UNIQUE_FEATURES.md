@@ -293,5 +293,40 @@ Generic bots use fixed lot sizes or simple ATR-based sizing regardless of the un
 
 ---
 
+## 9. Institutional Liquidity & Order Flow Heatmap
+
+### What it is and why it matters
+The **Institutional Liquidity & Order Flow Heatmap** is a real-time visualization and analytical engine that tracks the Depth of Market (DOM) and the distribution of limit orders across the XAUUSD price ladder. It identifies "Liquidity Pools"—concentrations of buy and sell orders where institutional "smart money" is likely to enter or exit.
+
+For institutional traders, price doesn't just move; it is *drawn* to liquidity. Understanding where the resting orders are located allows the AI to avoid entering "no-man's land" and instead align its entries and exits with significant market support and resistance levels that are visible *before* price reaches them.
+
+### How it differentiates from generic trading bots
+Generic bots use lagging indicators (RSI, Moving Averages) that only react after a move has occurred. The MT5 AI Trader with the Liquidity Heatmap uses *leading* data. It can detect "Spoofing" (fake orders) and "Absorption" (where large sell orders are being swallowed by buyers at a specific level), providing a significant edge in predicting reversals and breakout validity that purely price-based bots miss.
+
+### Architecture Outline
+1.  **DOM Ingestor**: A high-frequency service in `src/data/mt5_connector.py` that streams the top 10-20 levels of the XAUUSD order book from MetaTrader 5.
+2.  **Order Flow Processor**: A module that calculates the "Order Imbalance" and "Volume-at-Price" to identify significant liquidity clusters.
+3.  **Heatmap Generator**: A visualization layer for the **Decision Cockpit** that renders the price ladder with color-coded intensity representing order volume.
+4.  **Liquidity-Aware Filter**: A hook in the `ExecutionFilter` that adjusts the "Slip-Probability" based on the thickness of the order book at the requested entry price.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Real-time tracking of the top 10 bid/ask levels for XAUUSD. |
+| **Functional** | Identification of "Liquidity Gaps" (price levels with zero or very low resting orders). |
+| **Technical** | DOM data processing latency must be < 50ms. |
+| **Operational** | Heatmap visualization must be integrated into the Decision Cockpit TUI. |
+| **Release Readiness** | Must demonstrate the ability to "veto" entries into low-liquidity gaps during backtests. |
+
+### Implementation Lane
+*   **Jules01 (Core Development)**: Lead on MT5 DOM streaming and high-frequency data ingestion.
+*   **Jules04 (Quant Research)**: Lead on order-imbalance mathematics and liquidity-clustering algorithms.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires a broker that provides Level 2 (Depth of Market) data via the MT5 terminal.
+*   **Constraints**: High-frequency DOM data can be bandwidth-intensive; the ingestor must use efficient binary serialization.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Institutional Liquidity Heatmap** (Identifying "Smart Money" resting orders)
+- **Sentiment-Driven Order Routing** (Analyzing retail vs. institutional positioning)
