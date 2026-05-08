@@ -36,6 +36,18 @@ def test_log_prediction(audit_logger):
         assert entry.metadata_json["confidence"] == 0.95
         assert entry.metadata_json["model_context"] == metadata
 
+def test_log_model_outcome(audit_logger):
+    metrics = {"accuracy": 0.8, "drift": 0.05}
+    entry_id = audit_logger.log_model_outcome("XAUUSD", "ppo", 1, metrics)
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+        assert entry.action == "prediction_outcome"
+        assert entry.metadata_json["symbol"] == "XAUUSD"
+        assert entry.metadata_json["algorithm"] == "ppo"
+        assert entry.metadata_json["actual_direction"] == 1
+        assert entry.metadata_json["metrics"] == metrics
+
 def test_log_risk_decision(audit_logger):
     decision_chain = {"circuit_breaker": True, "daily_loss": False}
     entry_id = audit_logger.log_risk_decision("XAUUSD", -1, decision_chain, False)

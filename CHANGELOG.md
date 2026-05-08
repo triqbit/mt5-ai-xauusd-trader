@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enterprise Audit Trail:** Comprehensive system-wide audit tracing in `src/core/audit_log.py` capturing model outcomes, technical filter rejections, broker connection events, and daily performance summaries.
 - **Configuration Security Hardening:** Converted `redis_url` to `SecretStr` in `TradingConfig` to prevent credential leakage in logs and audit snapshots. Integrated deep redaction for sensitive connection strings.
 - **Monitoring & Alerting System:** Comprehensive real-time monitoring in `src/core/monitor.py` including equity curve tracking, Prometheus metrics export, and Telegram bot integration for critical alerts (circuit breakers, margin calls, liquidity crises) and daily performance summaries.
 - **Production-Ready Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces, probability extraction, and architecture switching in `src/models/`.

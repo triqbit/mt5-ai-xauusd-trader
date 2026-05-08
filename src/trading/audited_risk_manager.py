@@ -8,6 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import Optional
 
@@ -49,7 +50,7 @@ class AuditedRiskManager(RiskManager):
         passed = all(decision_chain.values())
 
         # Log to Audit Trail
-        try:
+        with contextlib.suppress(RuntimeError, ImportError):
             audit = get_audit_logger()
             audit.log_risk_decision(
                 symbol=signal.symbol,
@@ -74,9 +75,6 @@ class AuditedRiskManager(RiskManager):
                     reason=f"Daily loss limit reached during signal validation for {signal.symbol}",
                     metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
                 )
-
-        except (RuntimeError, ImportError):
-            logger.debug("AuditLogger not available for risk decision logging")
 
         if not passed:
             rejection_reasons = [k for k, v in decision_chain.items() if not v]

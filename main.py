@@ -267,7 +267,7 @@ def run_live(
                             elif current_price < last_price * (1 - noise_thresh):
                                 actual_dir = SignalDirection.SELL
 
-                            model.observe_outcome(actual_dir)
+                            model.observe_outcome(actual_dir, symbol=cfg.symbol)
 
                         last_price = current_price
 
@@ -299,6 +299,13 @@ def run_live(
 
                         if monitor and spread_pips > cfg.spread_halt_pips:
                             monitor.alert_liquidity_crisis(cfg.symbol, spread_pips)
+                            if audit_logger:
+                                audit_logger.log_operator_action(
+                                    operator="system",
+                                    action="liquidity_crisis",
+                                    reason=f"Spread {spread_pips:.2f} pips exceeded halt threshold {cfg.spread_halt_pips}",
+                                    metadata={"symbol": cfg.symbol, "spread": spread_pips},
+                                )
 
                     except MT5DataError as e:
                         log.error("Transient data retrieval error", error=str(e))
@@ -308,11 +315,23 @@ def run_live(
                         log.warning("Connection lost. Attempting reconnection...")
                         if monitor:
                             monitor.alert_broker_connection_lost()
+                        if audit_logger:
+                            audit_logger.log_operator_action(
+                                operator="system",
+                                action="connection_lost",
+                                reason="MT5ConnectionError during data fetch",
+                            )
                         try:
                             connector.connect()
                             log.info("Reconnection successful.")
                             if monitor:
                                 monitor.alert_broker_connection_restored()
+                            if audit_logger:
+                                audit_logger.log_operator_action(
+                                    operator="system",
+                                    action="connection_restored",
+                                    reason="Reconnection successful after connection loss",
+                                )
                             continue
                         except MT5ConnectionError as reconnect_exc:
                             log.critical("Reconnection failed", error=str(reconnect_exc))
@@ -423,6 +442,15 @@ def run_live(
                                 cfg.symbol,
                                 filter_decision.blocked_by,
                             )
+                            if audit_logger:
+                                audit_logger.log_blocked_trade(
+                                    symbol=cfg.symbol,
+                                    reason=f"Technical filter blocked: {filter_decision.blocked_by}",
+                                    context={
+                                        "blocked_by": filter_decision.blocked_by,
+                                        "trace": filter_decision.trace,
+                                    },
+                                )
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
@@ -610,11 +638,23 @@ def run_live(
                 log.error("Critical connection failure: %s. Re-initializing...", exc)
                 if monitor:
                     monitor.alert_broker_connection_lost()
+                if audit_logger:
+                    audit_logger.log_operator_action(
+                        operator="system",
+                        action="connection_lost",
+                        reason=f"Critical connection failure: {exc}",
+                    )
                 time.sleep(5)
                 try:
                     connector.connect()
                     if monitor:
                         monitor.alert_broker_connection_restored()
+                    if audit_logger:
+                        audit_logger.log_operator_action(
+                            operator="system",
+                            action="connection_restored",
+                            reason="Re-initialization successful during outer loop recovery",
+                        )
                 except MT5ConnectionError:
                     log.error("Re-initialization failed during outer loop recovery.")
             except Exception as exc:
