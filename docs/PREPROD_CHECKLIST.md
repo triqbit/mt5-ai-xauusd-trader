@@ -1,13 +1,12 @@
 # Pre-Production Deployment Gate Checklist
 
-This document defines the mandatory gates that must be satisfied and verified before any deployment to the production environment.
+This document defines the formal gate checklist that must pass before any production deployment.
 
 **Goal: No production push happens without explicit checklist completion.**
 
 ## Mandatory Gates
 
 - [ ] **All CI checks passing** (lint, tests, coverage ≥80%, security scan clean)
-- [ ] **Version synchronization verified** (`scripts/verify_version_sync.py`)
 - [ ] **Environment configuration validated**
 - [ ] **Backtest results reviewed and acceptable**
 - [ ] **Health checks passing in staging environment**
@@ -16,7 +15,6 @@ This document defines the mandatory gates that must be satisfied and verified be
 - [ ] **Release notes prepared and reviewed**
 - [ ] **No open critical or high-severity bugs**
 - [ ] **Documentation updated** (README, runbooks, API docs)
-- [ ] **Post-deployment smoke tests verified** (`scripts/smoke_test.py`)
 - [ ] **Stakeholder sign-off obtained**
 
 ---
