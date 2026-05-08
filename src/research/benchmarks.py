@@ -465,9 +465,9 @@ class BenchmarkEvaluator:
                     sharpe=f"{metrics['Sharpe Ratio']:.2f}",
                     max_drawdown=f"{metrics['Max Drawdown'] * 100:.2f}%",
                     p_value=f"{comp.get('P-Value', 1.0):.4f}",
-                    profit_factor=f"{metrics['Profit Factor']:.2f}",
-                    sqn=f"{metrics['SQN']:.2f}",
-                    recovery_factor=f"{metrics['Recovery Factor']:.2f}",
+                    profit_factor=f"{metrics.get('Profit Factor', 0.0):.2f}",
+                    sqn=f"{metrics.get('SQN', 0.0):.2f}",
+                    recovery_factor=f"{metrics.get('Recovery Factor', 0.0):.2f}",
                 )
             )
 
