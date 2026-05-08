@@ -20,7 +20,7 @@ The research reporting system provides automated generation of institutional-gra
 6. **Capital Allocation Insights:** Portfolio heat and diversification analytics.
 7. **Benchmark Comparisons:** Performance relative to technical and passive baselines.
 8. **RL Agent Evaluation:** Specialized DRL agent performance auditing including stability, turnover, and regime-sensitivity analysis.
-9. **Rare Event Simulations:** Resilience against black-swan events (flash crashes, etc.).
+9. **Rare Event Simulations:** Resilience against black-swan events (flash crashes, etc.). Detailed documentation available in [RARE_EVENT_SIMULATOR.md](RARE_EVENT_SIMULATOR.md).
 10. **Execution Quality:** Alpha decay and slippage analytics.
 
 ## Execution Quality Analytics
