@@ -41,6 +41,7 @@ class ConfigValidator:
         self._check_placeholder_secrets()
         self._check_model_settings()
         self._check_risk_parameters()
+        self._check_exposure_limits()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -65,6 +66,16 @@ class ConfigValidator:
             )
 
         mt5_server = self.config.mt5_server.upper() if self.config.mt5_server else ""
+        if self.config.mode == "live" and "DEMO" in mt5_server:
+            self.errors.append(
+                ValidationError(
+                    "MT5_SERVER",
+                    f"Demo server '{self.config.mt5_server}' used in LIVE mode.",
+                    True,
+                    "Use a live trading server when MODE=live.",
+                )
+            )
+
         if (
             not mt5_server
             or mt5_server in full_match_placeholders
@@ -178,6 +189,9 @@ class ConfigValidator:
             "123456789",
             "YOUR_SERVER_HERE",
             "YOUR_PASSWORD_HERE",
+            "YOUR_PASSWORD",
+            "PASSWORD",
+            "SECRET",
         ]
 
         # Check database URL
@@ -312,6 +326,77 @@ class ConfigValidator:
                     "Set MAX_DAILY_LOSS to 0.05 for compliance with enterprise standards.",
                 )
             )
+
+        # 2.1 Daily Loss Hierarchy (RISK_LIMITS.md 11.1)
+        # Ensure L1 < L2 < L3 < L4 (max_daily_loss) < Hard Stop
+        levels = [
+            ("DAILY_LOSS_LVL1", self.config.daily_loss_lvl1),
+            ("DAILY_LOSS_LVL2", self.config.daily_loss_lvl2),
+            ("DAILY_LOSS_LVL3", self.config.daily_loss_lvl3),
+            ("MAX_DAILY_LOSS", self.config.max_daily_loss),
+            ("DAILY_LOSS_HARD_STOP", self.config.daily_loss_hard_stop),
+        ]
+
+        for i in range(len(levels) - 1):
+            if levels[i][1] >= levels[i + 1][1]:
+                self.errors.append(
+                    ValidationError(
+                        levels[i + 1][0],
+                        f"{levels[i+1][0]} ({levels[i+1][1]}) must be greater than {levels[i][0]} ({levels[i][1]}).",
+                        True,
+                        "Correct the daily loss hierarchy in .env.",
+                    )
+                )
+
+        # 2.2 Weekly/Monthly Loss Limits (RISK_LIMITS.md 3.1, 3.2)
+        if self.config.max_weekly_loss > 0.15:
+            self.errors.append(
+                ValidationError(
+                    "MAX_WEEKLY_LOSS",
+                    f"Max weekly loss {self.config.max_weekly_loss*100}% exceeds 15% safety limit.",
+                    True,
+                    "Reduce MAX_WEEKLY_LOSS to 0.15 or less.",
+                )
+            )
+
+        if self.config.max_monthly_loss > 0.25:
+            self.errors.append(
+                ValidationError(
+                    "MAX_MONTHLY_LOSS",
+                    f"Max monthly loss {self.config.max_monthly_loss*100}% exceeds 25% safety limit.",
+                    True,
+                    "Reduce MAX_MONTHLY_LOSS to 0.25 or less.",
+                )
+            )
+
+        if self.config.max_weekly_loss >= self.config.max_monthly_loss:
+            self.errors.append(
+                ValidationError(
+                    "MAX_MONTHLY_LOSS",
+                    f"Max monthly loss ({self.config.max_monthly_loss}) must be greater than weekly loss ({self.config.max_weekly_loss}).",
+                    True,
+                    "Correct the loss limit hierarchy in .env.",
+                )
+            )
+
+        # 2.3 Spread Hierarchy (RISK_LIMITS.md 5.2)
+        spread_levels = [
+            ("MIN_SPREAD_PIPS", self.config.min_spread_pips),
+            ("SPREAD_ALERT_PIPS", self.config.spread_alert_pips),
+            ("SPREAD_REDUCE_PIPS", self.config.spread_reduce_pips),
+            ("SPREAD_HALT_PIPS", self.config.spread_halt_pips),
+        ]
+
+        for i in range(len(spread_levels) - 1):
+            if spread_levels[i][1] >= spread_levels[i + 1][1]:
+                self.errors.append(
+                    ValidationError(
+                        spread_levels[i + 1][0],
+                        f"{spread_levels[i+1][0]} ({spread_levels[i+1][1]}) must be greater than {spread_levels[i][0]} ({spread_levels[i][1]}).",
+                        True,
+                        "Correct the spread limit hierarchy in .env.",
+                    )
+                )
 
         # 3. Confidence Threshold (RISK_LIMITS.md 4.1)
         if self.config.min_confidence < 0.50:
@@ -454,6 +539,46 @@ class ConfigValidator:
                     f"Model calibration threshold {self.config.model_calibration_threshold} exceeds 0.25 limit.",
                     True,
                     "Set MODEL_CALIBRATION_THRESHOLD to 0.25 or lower for enterprise compliance.",
+                )
+            )
+
+    def _check_exposure_limits(self) -> None:
+        """Verify exposure and notional limits (RISK_LIMITS.md 1.2)."""
+        if self.config.max_single_direction_pct > 0.50:
+            self.errors.append(
+                ValidationError(
+                    "MAX_SINGLE_DIRECTION_PCT",
+                    f"Max single direction exposure {self.config.max_single_direction_pct*100}% is too high.",
+                    True,
+                    "Reduce MAX_SINGLE_DIRECTION_PCT to 0.50 or less (Policy is 0.30).",
+                )
+            )
+        elif self.config.max_single_direction_pct > 0.30:
+            self.errors.append(
+                ValidationError(
+                    "MAX_SINGLE_DIRECTION_PCT",
+                    f"Max single direction exposure {self.config.max_single_direction_pct*100}% exceeds 30% policy.",
+                    False,
+                    "Set MAX_SINGLE_DIRECTION_PCT to 0.30 for compliance.",
+                )
+            )
+
+        if self.config.max_total_notional_pct > 1.50:
+            self.errors.append(
+                ValidationError(
+                    "MAX_TOTAL_NOTIONAL_PCT",
+                    f"Max total notional {self.config.max_total_notional_pct*100}% is dangerously high.",
+                    True,
+                    "Reduce MAX_TOTAL_NOTIONAL_PCT to 1.50 or less.",
+                )
+            )
+        elif self.config.max_total_notional_pct > 1.00:
+            self.errors.append(
+                ValidationError(
+                    "MAX_TOTAL_NOTIONAL_PCT",
+                    f"Max total notional {self.config.max_total_notional_pct*100}% exceeds 100% equity.",
+                    False,
+                    "Set MAX_TOTAL_NOTIONAL_PCT to 1.00 for enterprise safety.",
                 )
             )
 
