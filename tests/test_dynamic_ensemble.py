@@ -64,6 +64,28 @@ class TestDynamicEnsemble(unittest.TestCase):
 
         self.assertLess(w_high, w_low)
 
+    def test_volatility_scoring_threshold(self):
+        """Verify the 2.0 volatility threshold for extra calibration penalty."""
+        # Model with high calibration error
+        metrics = {"ppo": {"accuracy": 0.5, "calibration_error": 1.0}}
+
+        # 1. Volatility = 1.9 (No extra penalty)
+        regime_low = RegimeInfo(label=MarketRegime.UNKNOWN, confidence=1.0, transition_score=0.0, volatility_index=1.9)
+        self.ensemble.update_weights(metrics, regime_info=regime_low)
+        w_low = self.ensemble.weights["ppo"]
+
+        # Reset
+        self.ensemble.weights = dict.fromkeys(self.models, 1.0/3.0)
+        self.ensemble._target_weights = self.ensemble.weights.copy()
+
+        # 2. Volatility = 2.1 (Extra penalty)
+        regime_high = RegimeInfo(label=MarketRegime.UNKNOWN, confidence=1.0, transition_score=0.0, volatility_index=2.1)
+        self.ensemble.update_weights(metrics, regime_info=regime_high)
+        w_high = self.ensemble.weights["ppo"]
+
+        # w_high should be lower than w_low because of the extra -0.3 * cal penalty
+        self.assertLess(w_high, w_low)
+
     def test_explicit_volatility_context(self):
         """Verify that volatility_context override works and slows down adaptation."""
         metrics = {
@@ -218,6 +240,27 @@ class TestDynamicEnsemble(unittest.TestCase):
         step_news = w_news - (1.0/3.0)
 
         self.assertGreater(step_trending, step_news)
+
+    def test_news_shock_alpha_halving(self):
+        """Verify that NEWS_SHOCK specifically halves the adaptation rate."""
+        metrics = {"ppo": {"accuracy": 1.0}}
+
+        # UNKNOWN regime, vol=1.0 -> alpha = smoothing_factor * (2/(1+1)) = smoothing_factor
+        regime_normal = RegimeInfo(label=MarketRegime.UNKNOWN, confidence=1.0, transition_score=0.0, volatility_index=1.0)
+        self.ensemble.update_weights(metrics, regime_info=regime_normal)
+        step_normal = self.ensemble.weights["ppo"] - (1.0/3.0)
+
+        # Reset
+        self.ensemble.weights = dict.fromkeys(self.models, 1.0/3.0)
+        self.ensemble._target_weights = self.ensemble.weights.copy()
+
+        # NEWS_SHOCK regime, vol=1.0 -> alpha = smoothing_factor * 0.5
+        regime_news = RegimeInfo(label=MarketRegime.NEWS_SHOCK, confidence=1.0, transition_score=0.0, volatility_index=1.0)
+        self.ensemble.update_weights(metrics, regime_info=regime_news)
+        step_news = self.ensemble.weights["ppo"] - (1.0/3.0)
+
+        # Should be exactly half (allowing for floating point)
+        self.assertAlmostEqual(step_news, step_normal * 0.5, places=5)
 
     def test_ema_decay_logic(self):
         # Verify that weights move towards the target incrementally (EMA decay)
