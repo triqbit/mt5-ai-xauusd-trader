@@ -175,6 +175,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -196,3 +202,53 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+
+      - name: Gate 11: Runtime Smoke Test (Containerized)
+        run: |
+          echo "Starting the containerized bot for runtime validation..."
+
+          # 1. Create a dummy .env for the test
+          cp .env.example .env
+          sed -i 's/MT5_LOGIN=.*/MT5_LOGIN=999999/' .env
+          sed -i 's/MT5_PASSWORD=.*/MT5_PASSWORD=test/' .env
+          sed -i 's/MT5_SERVER=.*/MT5_SERVER=test/' .env
+          sed -i 's/MODE=.*/MODE=demo/' .env
+
+          # 2. Run the container in the background
+          # We use docker run directly to avoid docker-compose complexities in CI for a single-image test
+          docker run -d --name validation-bot \
+            -p 8000:8000 \
+            --env-file .env \
+            triqbit/mt5-ai-xauusd-trader:validation-${{ github.sha }} \
+            --check
+
+          # 3. Wait and verify using smoke_test.py
+          # The --check flag in main.py performs health checks and exits.
+          # For a continuous smoke test, we might want to run it without --check but with dummy credentials.
+          # However, main.py with --check is a perfect "Startup Gate" test.
+          # Let's run it normally (without --check) to test the actual long-running API.
+
+          docker stop validation-bot || true
+          docker rm validation-bot || true
+
+          docker run -d --name validation-bot \
+            -p 8000:8000 \
+            --env-file .env \
+            triqbit/mt5-ai-xauusd-trader:validation-${{ github.sha }} \
+            --mode demo --algo ensemble
+
+          # Run smoke test with retries (Wait up to 30s)
+          pip install httpx
+          python scripts/smoke_test.py --url http://localhost:8000 --retries 6 --delay 5 || {
+            echo "::error::Runtime smoke test failed. Inspecting container logs..."
+            docker logs validation-bot
+            exit 1
+          }
+
+          echo "SUCCESS: Runtime smoke test passed."
+
+      - name: Cleanup Validation Container
+        if: always()
+        run: |
+          docker stop validation-bot || true
+          docker rm validation-bot || true
