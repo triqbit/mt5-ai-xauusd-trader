@@ -22,6 +22,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from src.core.constants import SignalDirection
 from src.core.feature_engineering import FeatureEngineer
 from src.core.schemas import TradeSignal
 from src.trading.execution_filter import ExecutionFilter
@@ -234,7 +235,7 @@ class BacktestEngine:
                             # 3. Prepare Signal and Validate with Filter Cascade
                             signal = TradeSignal(
                                 symbol=self.symbol,
-                                direction=direction,
+                                direction=SignalDirection(direction),
                                 entry_price=current_price,
                                 stop_loss=current_price - (direction * 2 * atr),
                                 take_profit=current_price + (direction * 4 * atr),

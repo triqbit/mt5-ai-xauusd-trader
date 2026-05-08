@@ -123,6 +123,7 @@ def _prepare_trade_signal(
     atr: float,
     risk: RiskManager,
     allocator: CapitalAllocator,
+    market_data: pd.DataFrame,
     audit_logger: Optional[AuditLogger] = None,
 ) -> TradeSignal:
     """
@@ -159,9 +160,7 @@ def _prepare_trade_signal(
     lot_size = (
         risk.size_position(
             cfg.symbol,
-            win_rate=0.58,
-            avg_win=4 * atr,
-            avg_loss=2 * atr,
+            market_data,
         )
         if approved_risk > 0
         else 0.0
@@ -169,7 +168,7 @@ def _prepare_trade_signal(
 
     return TradeSignal(
         symbol=cfg.symbol,
-        direction=direction,
+        direction=SignalDirection(direction),
         entry_price=price,
         stop_loss=stop_loss,
         take_profit=take_profit,
@@ -382,6 +381,7 @@ def run_live(
                         atr=atr,
                         risk=risk,
                         allocator=allocator,
+                        market_data=df_raw,
                         audit_logger=audit_logger,
                     )
                 lot_size = signal.lot_size
@@ -389,8 +389,15 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
+                    current_positions = connector.get_positions(cfg.symbol)
                     risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                        risk.approve(
+                            signal,
+                            signal_id=signal_id,
+                            model_health=health,
+                            market_data=df_raw,
+                            open_positions_raw=current_positions,
+                        )
                         if direction != 0
                         else False
                     )

@@ -76,7 +76,7 @@ class RiskManager:
         self,
         signal: TradeSignal,
         signal_id: Optional[int] = None,
-        model_health: Optional[dict] = None,
+        model_health: Optional[Dict[str, Any]] = None,
         market_data: Optional[pd.DataFrame] = None,
         open_positions_raw: Optional[List[Dict[str, Any]]] = None,
     ) -> bool:
@@ -109,7 +109,7 @@ class RiskManager:
         signal: TradeSignal,
         market_data: Optional[pd.DataFrame] = None,
         open_positions: Optional[List[Dict[str, Any]]] = None,
-        model_health: Optional[dict] = None,
+        model_health: Optional[Dict[str, Any]] = None,
     ) -> RiskDecision:
         """
         Institutional 8-layer validation cascade.
@@ -205,7 +205,7 @@ class RiskManager:
         max_lots = max_notional / (price * 100)
 
         final_lots = min(lot_size, max_lots)
-        final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
+        final_lots = float(max(self.cfg.min_lot_size, round(final_lots, 2)))
 
         logger.debug(
             "ATR sizing | ratio=%.2f vol_mult=%.2f loss_mult=%.2f lots=%.2f",
@@ -260,7 +260,7 @@ class RiskManager:
     def _check_consecutive_losses(self) -> bool:
         return self.daily.consecutive_losses < self.cfg.max_losing_streak
 
-    def _check_model_health(self, health: Optional[dict]) -> bool:
+    def _check_model_health(self, health: Optional[Dict[str, Any]]) -> bool:
         if health is None:
             return True
         drift = float(health.get("drift", 0.0))
@@ -304,8 +304,8 @@ class RiskManager:
         total_lots = sum(pos.get("volume", 0.0) for pos in open_positions) + self.cfg.min_lot_size
         price = market_data["close"].iloc[-1] if not market_data.empty else 2350.0
         total_notional = total_lots * price * 100
-        max_total_pct = getattr(self.cfg, "max_total_notional_pct", 10.0)
-        return total_notional < (self.balance * max_total_pct)
+        max_total_pct = float(getattr(self.cfg, "max_total_notional_pct", 10.0))
+        return bool(total_notional < (self.balance * max_total_pct))
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
         risk = abs(signal.entry_price - signal.stop_loss)

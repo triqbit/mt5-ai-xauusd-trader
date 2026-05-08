@@ -30,7 +30,7 @@ class AuditedRiskManager(RiskManager):
         self,
         signal: TradeSignal,
         signal_id: Optional[int] = None,
-        model_health: Optional[dict] = None,
+        model_health: Optional[Dict[str, Any]] = None,
         market_data: Optional[pd.DataFrame] = None,
         open_positions_raw: Optional[List[Dict[str, Any]]] = None,
     ) -> bool:
