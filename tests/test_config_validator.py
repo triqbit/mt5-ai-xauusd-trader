@@ -610,3 +610,120 @@ def test_validator_sqlite_live_warning(monkeypatch, tmp_path):
     result = ConfigValidator(cfg).validate()
     assert result.success is True
     assert any(e.field == "DATABASE_URL" and not e.critical for e in result.errors)
+
+def test_validator_mt5_server_demo_live(monkeypatch, tmp_path):
+    """Test validator fails with demo server in LIVE mode."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "12345")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker-Demo")
+    monkeypatch.setenv("MODE", "live")
+    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MT5_SERVER" and "Demo server" in e.message for e in result.errors)
+
+def test_validator_daily_loss_hierarchy(monkeypatch, tmp_path):
+    """Test validator detects daily loss hierarchy violations."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # L1 >= L2
+    monkeypatch.setenv("DAILY_LOSS_LVL1", "0.03")
+    monkeypatch.setenv("DAILY_LOSS_LVL2", "0.02")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "DAILY_LOSS_LVL2" for e in result.errors)
+
+def test_validator_weekly_monthly_loss_limits(monkeypatch, tmp_path):
+    """Test validator detects unsafe weekly/monthly loss limits."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Weekly critical (> 15%)
+    monkeypatch.setenv("MAX_WEEKLY_LOSS", "0.20")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_WEEKLY_LOSS" and e.critical for e in result.errors)
+
+    # Monthly critical (> 25%)
+    monkeypatch.setenv("MAX_WEEKLY_LOSS", "0.10")
+    monkeypatch.setenv("MAX_MONTHLY_LOSS", "0.30")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_MONTHLY_LOSS" and e.critical for e in result.errors)
+
+def test_validator_exposure_limits(monkeypatch, tmp_path):
+    """Test validator detects unsafe exposure limits."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Single direction critical (> 50%)
+    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.60")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_SINGLE_DIRECTION_PCT" and e.critical for e in result.errors)
+
+    # Single direction warning (> 30%)
+    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.40")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
+    assert any(e.field == "MAX_SINGLE_DIRECTION_PCT" and not e.critical for e in result.errors)
+
+    # Total notional critical (> 150%)
+    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.30")
+    monkeypatch.setenv("MAX_TOTAL_NOTIONAL_PCT", "1.60")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_TOTAL_NOTIONAL_PCT" and e.critical for e in result.errors)
+
+    # Total notional warning (> 100%)
+    monkeypatch.setenv("MAX_TOTAL_NOTIONAL_PCT", "1.20")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
+    assert any(e.field == "MAX_TOTAL_NOTIONAL_PCT" and not e.critical for e in result.errors)
+
+def test_validator_spread_hierarchy(monkeypatch, tmp_path):
+    """Test validator detects spread hierarchy violations."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Alert >= Reduce
+    monkeypatch.setenv("SPREAD_ALERT_PIPS", "2.0")
+    monkeypatch.setenv("SPREAD_REDUCE_PIPS", "1.5")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "SPREAD_REDUCE_PIPS" for e in result.errors)
