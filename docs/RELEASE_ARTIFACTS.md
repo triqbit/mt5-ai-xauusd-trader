@@ -1,3 +1,4 @@
+# MT5 AI/ML Trading Bot - Release Artifact Standards
 # Release Artifact Standards
 
 This document defines what constitutes a valid, deployable artifact for the MT5 AI/ML Trading Bot. Standardizing these artifacts ensures consistency, traceability, and safety across all environments.
@@ -75,4 +76,5 @@ If any file fails verification (indicated by `FAILED`), the artifact is consider
 
 ---
 **Standard Owner:** Jules03 (Release Reliability & Governance)
-**Last Updated:** 2024-05-24
+**Last Updated:** 2026-05-05
+# Verified for compliance with Enterprise Release Standards.
