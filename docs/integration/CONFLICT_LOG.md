@@ -151,3 +151,26 @@
 - **Impact**: High. System could theoretically exceed 30% directional exposure limit without being blocked or audited.
 - **Resolution**: Integrate all exposure checks into `AuditedRiskManager`'s decision chain.
 - **Owner**: Jules05
+
+## [2026-05-08] - Risk Management & Position Sizing Fragmentation
+
+### 1. Risk Logic Fragmentation (RiskManager vs RiskEngine)
+- **Conflict**: `RiskManager` (Jules01) and `RiskEngine` (Jules02) implement overlapping but distinct risk validation cascades. `RiskManager` is the primary entrypoint but lacks the institutional exposure limits (directional/notional) and cascading daily loss levels defined in `RISK_LIMITS.md` and implemented in `RiskEngine`.
+- **Agents**: Jules01, Jules02
+- **Impact**: High. Operational risk due to inconsistent enforcement of hard risk limits.
+- **Resolution**: Harmonize by merging `RiskEngine` institutional logic into `RiskManager` and `AuditedRiskManager`. Deprecate `RiskEngine`.
+- **Owner**: Jules05
+
+### 2. Sizing Methodology Inconsistency
+- **Conflict**: `main.py` utilizes `RiskManager.size_position` which implements Fractional Kelly Criterion, while `RiskEngine` implements ATR-based volatility scaling. `main.py` also hardcodes SL/TP multipliers (2x/4x ATR) instead of deriving them from centralized risk policy.
+- **Agents**: Jules01, Jules02, Jules05
+- **Impact**: Medium. Inconsistent position sizing behavior across different execution modes.
+- **Resolution**: Unify sizing logic in `RiskManager` to support both Kelly and ATR-based scaling, controlled by configuration. Move SL/TP derivation to `RiskManager` or a shared helper.
+- **Owner**: Jules05
+
+### 3. Missing Exposure Limits in Audited Path
+- **Conflict**: `AuditedRiskManager` (the production-ready, traceable manager) is missing the directional and notional exposure limits implemented in the standalone `RiskEngine`.
+- **Agents**: Jules01, Jules02
+- **Impact**: High. System could theoretically exceed 30% directional exposure limit without being blocked or audited.
+- **Resolution**: Integrate all exposure checks into `AuditedRiskManager`'s decision chain.
+- **Owner**: Jules05
