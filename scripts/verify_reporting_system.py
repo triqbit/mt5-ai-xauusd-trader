@@ -151,12 +151,12 @@ def main():
             RLMetric(
                 agent_name="PPO_Agent_V4", sharpe=2.45, sortino=3.1, profit_factor=2.2, max_dd=0.045, win_rate=0.58,
                 recovery_factor=4.5, var_95=0.012, tail_ratio=1.85, common_sense_ratio=4.07, gain_to_pain_ratio=1.9,
-                sqn=6.2, ulcer_index=0.015, calmar=5.4
+                sqn=6.2, ulcer_index=0.015, calmar=5.4, lake_ratio=1.8, portfolio_heat=0.45
             ),
             RLMetric(
                 agent_name="Dreamer_V3", sharpe=1.92, sortino=2.2, profit_factor=1.7, max_dd=0.082, win_rate=0.52,
                 recovery_factor=2.1, var_95=0.018, tail_ratio=1.45, common_sense_ratio=2.46, gain_to_pain_ratio=1.4,
-                sqn=3.8, ulcer_index=0.032, calmar=2.3
+                sqn=3.8, ulcer_index=0.032, calmar=2.3, lake_ratio=1.2, portfolio_heat=0.35
             ),
         ]
     ))
@@ -187,8 +187,11 @@ def main():
     report = orchestrator.build()
     reporter = ResearchReporter()
 
-    md_path = "research_verification_report.md"
-    html_path = "research_verification_report.html"
+    sample_dir = os.path.join("docs", "research", "samples")
+    os.makedirs(sample_dir, exist_ok=True)
+
+    md_path = os.path.join(sample_dir, "research_verification_report.md")
+    html_path = os.path.join(sample_dir, "research_verification_report.html")
 
     reporter.save_markdown(report, md_path)
     reporter.save_html(report, html_path)

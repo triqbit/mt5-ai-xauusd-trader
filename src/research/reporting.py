@@ -154,6 +154,8 @@ class RLMetric(BaseModel):
     tail_ratio: float = 0.0
     common_sense_ratio: float = 0.0
     gain_to_pain_ratio: float = 0.0
+    lake_ratio: float = 0.0
+    portfolio_heat: float = 0.0
 
 
 class RLSection(BaseModel):
@@ -394,20 +396,22 @@ class ResearchReporter:
             table = Table(box=None)
             table.add_column("Agent")
             table.add_column("Sharpe")
-            table.add_column("Sortino")
             table.add_column("PF")
             table.add_column("MaxDD")
-            table.add_column("VaR(95)")
-            table.add_column("SQN")
+            table.add_column("Recov")
+            table.add_column("Lake")
+            table.add_column("G2P")
+            table.add_column("Heat")
             for m in report.rl_evaluation.metrics:
                 table.add_row(
                     m.agent_name,
                     f"{m.sharpe:.2f}",
-                    f"{m.sortino:.2f}",
                     f"{m.profit_factor:.2f}",
                     f"{m.max_dd:.2%}",
-                    f"{m.var_95:.2%}",
-                    f"{m.sqn:.2f}",
+                    f"{m.recovery_factor:.2f}",
+                    f"{m.lake_ratio:.2f}",
+                    f"{m.gain_to_pain_ratio:.2f}",
+                    f"{m.portfolio_heat:.1%}",
                 )
             self.console.print(table)
 

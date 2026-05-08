@@ -254,7 +254,10 @@ def test_rl_evaluation_reporting():
                 profit_factor=1.8,
                 max_dd=0.12,
                 win_rate=0.6,
-                recovery_factor=4.2
+                recovery_factor=4.2,
+                lake_ratio=1.5,
+                gain_to_pain_ratio=2.1,
+                portfolio_heat=0.35
             )
         ]
     )
@@ -273,7 +276,9 @@ def test_rl_evaluation_reporting():
     assert "RL Agent Evaluation" in md
     assert "Agent_V2" in md
     assert "2.5" in md
-    assert "4.2" in md
+    assert "1.5" in md
+    assert "2.1" in md
+    assert "35.0%" in md
 
     assert "RL Agent Evaluation" in html
     assert "Agent_V2" in html

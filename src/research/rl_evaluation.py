@@ -50,6 +50,9 @@ class StabilityMetrics(BaseModel):
     gain_to_pain_ratio: float = Field(
         default=0.0, description="Sum of gains / Abs(Sum of losses) per month/period"
     )
+    lake_ratio: float = Field(
+        default=0.0, description="Total Return / Average Drawdown (Efficiency metric)"
+    )
     regime_stability_score: float = Field(
         default=0.0, description="Consistency of performance across different market regimes"
     )
@@ -64,6 +67,7 @@ class TurnoverMetrics(BaseModel):
     min_hold_time: int = Field(default=0, description="Minimum steps held for a single trade")
     total_trades: int
     turnover_ratio: float = Field(..., description="Total traded volume relative to balance")
+    avg_exposure: float = Field(default=0.0, description="Average percentage of capital at risk")
     action_entropy: float = Field(
         default=0.0, description="Entropy of action distribution (detects policy collapse)"
     )
@@ -402,6 +406,8 @@ class RLEvaluator:
                     tail_ratio=report.stability.tail_ratio,
                     common_sense_ratio=report.stability.common_sense_ratio,
                     gain_to_pain_ratio=report.stability.gain_to_pain_ratio,
+                    lake_ratio=report.stability.lake_ratio,
+                    portfolio_heat=report.turnover.avg_exposure,
                 )
             )
 
@@ -643,6 +649,10 @@ class RLEvaluator:
         pains = abs(returns[returns < 0].sum())
         gain_to_pain_ratio = gains / pains if pains > 1e-9 else 0.0
 
+        # Lake Ratio: Total Return / Average Drawdown
+        avg_dd = np.mean(drawdowns)
+        lake_ratio = total_return / (avg_dd + 1e-9)
+
         # Regime stability: inverse of CoV of Sharpe across regimes
         regime_stability = 0.0
         if regime_perf:
@@ -672,6 +682,7 @@ class RLEvaluator:
             tail_ratio=float(tail_ratio),
             common_sense_ratio=float(common_sense_ratio),
             gain_to_pain_ratio=float(gain_to_pain_ratio),
+            lake_ratio=float(lake_ratio),
             regime_stability_score=float(regime_stability),
         )
 
@@ -692,6 +703,10 @@ class RLEvaluator:
         # In this env, each trade is 1.0 unit.
         turnover_ratio = (num_trades * 1.0) / (df["balances"].iloc[0]) if len(df) > 0 else 0.0
 
+        # Average exposure: mean of absolute positions
+        # Assuming position is already normalized or represents units
+        avg_exposure = df["positions"].abs().mean() if "positions" in df.columns else 0.0
+
         # Action entropy: H(X) = -sum(p(x) * log(p(x)))
         action_entropy = 0.0
         if "actions" in df.columns and len(df) > 0:
@@ -705,6 +720,7 @@ class RLEvaluator:
             min_hold_time=int(min_hold_time),
             total_trades=num_trades,
             turnover_ratio=float(turnover_ratio),
+            avg_exposure=float(avg_exposure),
             action_entropy=float(action_entropy),
         )
 
