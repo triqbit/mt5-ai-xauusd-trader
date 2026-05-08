@@ -353,41 +353,40 @@ class RegimeDetector:
             entropy = -np.sum(probs * np.log(probs + 1e-9), axis=1)
             transition_scores = entropy / 1.79
         else:
-            # Vectorized heuristic (simplified for performance)
+            # Fully Vectorized Heuristic
             atr_ratio = features["atr_ratio"].values
             er = features["efficiency_ratio"].values
             slope = features["slope"].values
             z_score = features["z_score"].values
 
-            regimes = [MarketRegime.RANGING.value] * len(df)
-            confidences = 1.0 - er
-
-            # Masks for different regimes
-            news_mask = (atr_ratio > 2.5) & (er > 0.7)
-            breakout_mask = (atr_ratio > 1.25) & (er > 0.5)
-            trending_mask = (er > 0.4) & (np.abs(slope) > 0.00006)
-            mean_rev_mask = (np.abs(z_score) > 1.8) & (er < 0.4)
-            drift_mask = (atr_ratio < 0.9) & (np.abs(slope) > 0.00003)
-
-            # Apply in order of precedence
-            for i in range(len(regimes)):
-                if news_mask[i]:
-                    regimes[i] = MarketRegime.NEWS_SHOCK.value
-                    confidences[i] = min(atr_ratio[i] / 5.0, 1.0)
-                elif breakout_mask[i]:
-                    regimes[i] = MarketRegime.VOLATILE_BREAKOUT.value
-                    confidences[i] = er[i]
-                elif trending_mask[i]:
-                    regimes[i] = MarketRegime.TRENDING.value
-                    confidences[i] = er[i]
-                elif mean_rev_mask[i]:
-                    regimes[i] = MarketRegime.MEAN_REVERSION.value
-                    confidences[i] = min(abs(z_score[i]) / 4.0, 1.0)
-                elif drift_mask[i]:
-                    regimes[i] = MarketRegime.LOW_VOLATILITY_DRIFT.value
-                    confidences[i] = 0.7
-
+            # Pre-calculate transition scores
             transition_scores = np.abs(atr_ratio - 1.0) * 0.4 + np.abs(er - 0.5) * 0.4
+
+            # Masks for different regimes (ordered by precedence)
+            conditions = [
+                (atr_ratio > 2.5) & (er > 0.7),
+                (atr_ratio > 1.25) & (er > 0.5),
+                (er > 0.4) & (np.abs(slope) > 0.00006),
+                (np.abs(z_score) > 1.8) & (er < 0.4),
+                (atr_ratio < 0.9) & (np.abs(slope) > 0.00003),
+            ]
+            regime_choices = [
+                MarketRegime.NEWS_SHOCK.value,
+                MarketRegime.VOLATILE_BREAKOUT.value,
+                MarketRegime.TRENDING.value,
+                MarketRegime.MEAN_REVERSION.value,
+                MarketRegime.LOW_VOLATILITY_DRIFT.value,
+            ]
+            conf_choices = [
+                np.minimum(atr_ratio / 5.0, 1.0),
+                er,
+                er,
+                np.minimum(np.abs(z_score) / 4.0, 1.0),
+                np.full_like(er, 0.7),
+            ]
+
+            regimes = np.select(conditions, regime_choices, default=MarketRegime.RANGING.value)
+            confidences = np.select(conditions, conf_choices, default=1.0 - er)
 
         # Mask out burn-in period
         regimes[: self.long_window - 1] = [MarketRegime.UNKNOWN.value] * (self.long_window - 1)
@@ -402,7 +401,10 @@ class RegimeDetector:
         return df
 
     def _extract_features(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Extracts statistical features for clustering or detection."""
+        """
+        Extracts statistical features for clustering or detection.
+        Optimized via vectorized operations.
+        """
         if len(data) < self.long_window:
             return pd.DataFrame()
 
@@ -411,11 +413,17 @@ class RegimeDetector:
         high = data["high"]
         low = data["low"]
 
-        # 1. Volatility
-        tr = np.maximum(
-            high - low,
-            np.maximum(np.abs(high - close.shift(1)), np.abs(low - close.shift(1))),
-        ).fillna(high - low)
+        # 1. Volatility (ATR Ratio)
+        # First TR calculation needs special care for the first element to match iterative logic
+        tr_rest = np.maximum(
+            (high - low).iloc[1:],
+            np.maximum(
+                np.abs(high.iloc[1:] - close.shift(1).iloc[1:]),
+                np.abs(low.iloc[1:] - close.shift(1).iloc[1:])
+            )
+        )
+        tr_first = (high - low).iloc[0]
+        tr = pd.concat([pd.Series([tr_first], index=[high.index[0]]), tr_rest])
         atr_short = tr.rolling(window=self.window).mean()
         atr_long = tr.rolling(window=self.long_window).mean()
         atr_ratio = atr_short / (atr_long + 1e-9)
@@ -425,23 +433,31 @@ class RegimeDetector:
         abs_changes = (close - close.shift(1)).abs().rolling(window=self.window - 1).sum()
         er = net_change / (abs_changes + 1e-9)
 
-        # 3. Returns and derived stats
+        # 3. Returns and derived stats (Optimized via native pandas rolling)
         returns = close.pct_change().fillna(0)
-        kurt = returns.rolling(window=self.window).apply(
-            lambda x: stats.kurtosis(x, fisher=True), raw=True
-        )
-        skew = returns.rolling(window=self.window).apply(lambda x: stats.skew(x), raw=True)
+        kurt = returns.rolling(window=self.window).kurt()
+        skew = returns.rolling(window=self.window).skew()
 
-        # 4. Slope and Z-Score
+        # 4. Z-Score (Optimized via native pandas rolling)
+        # Note: pandas .std() uses ddof=1 by default, but numpy and our iterative detect() use ddof=0
         ma = close.rolling(window=self.window).mean()
-        std = close.rolling(window=self.window).std()
+        std = close.rolling(window=self.window).std(ddof=0)
         z_score = (close - ma) / (std + 1e-9)
 
-        # For slope, we'll use a simpler version for vectorization or just apply our method
-        def get_slope(x):
-            return self._calculate_slope(x)
+        # 5. Optimized Vectorized Slope Calculation via Convolution
+        # linear regression slope = (sum(x*y) - n*x_mean*y_mean) / sum((x-x_mean)^2)
+        # simplified to: sum((x - x_mean) * y) / sum((x - x_mean)^2)
+        n = self.window
+        x = np.arange(n)
+        x_mean = np.mean(x)
+        denom = np.sum((x - x_mean) ** 2)
+        weights = (x - x_mean) / (denom + 1e-8)
 
-        slope = close.rolling(window=self.window).apply(get_slope, raw=True)
+        # Convolve close prices with slope weights
+        conv = np.convolve(close.values, weights[::-1], mode="valid")
+        slope_raw = np.concatenate([np.full(n - 1, np.nan), conv])
+        # Normalize by price to make it scale-invariant as per self._calculate_slope
+        slope = slope_raw / (close.shift(n - 1).values + 1e-9)
 
         features = pd.DataFrame(
             {
