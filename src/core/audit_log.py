@@ -9,30 +9,22 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
-    DateTime,
     String,
     Text,
-    create_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import Mapped, mapped_column, sessionmaker
 
+from src.core.database import AuditMixin, Base, create_resilient_engine, with_db_retry
 from src.core.log_config import get_masking_processor
 
 logger = logging.getLogger(__name__)
 
 
-class Base(DeclarativeBase):
-    """SQLAlchemy 2.0 DeclarativeBase."""
-
-    pass
-
-
-class AuditEntry(Base):
+class AuditEntry(Base, AuditMixin):
     """
     Audit log entry for recording system actions and events.
     Aligned with enterprise traceability requirements.
@@ -41,14 +33,6 @@ class AuditEntry(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), index=True
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
-    )
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -57,7 +41,7 @@ class AuditEntry(Base):
 
 class AuditLogger:
     """
-    Singleton AuditLogger for managing system audit traces.
+    Singleton AuditLogger for managing system audit traces with resilient DB handling.
     """
 
     _instance: AuditLogger | None = None
@@ -75,12 +59,16 @@ class AuditLogger:
         if not db_url:
             raise ValueError("AuditLogger must be initialized with a db_url")
 
-        self.engine = create_engine(db_url)
-        Base.metadata.create_all(self.engine)
+        self.engine = create_resilient_engine(db_url)
+        # In production, we favor Alembic migrations, but for ease of use/testing:
+        if "sqlite" in db_url:
+            Base.metadata.create_all(self.engine)
+
         self.Session = sessionmaker(bind=self.engine)
         self._initialized = True
-        logger.info("AuditLogger initialized with database: %s", db_url)
+        logger.info("AuditLogger initialized with resilient engine: %s", db_url.split('@')[-1] if '@' in db_url else db_url)
 
+    @with_db_retry()
     def log(
         self,
         actor: str,
