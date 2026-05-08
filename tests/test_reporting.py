@@ -190,6 +190,31 @@ def test_html_ux_enhancements(sample_report):
     assert 'fill-high' in html
     assert 'aria-label="Strategy resilience score: 85.5 out of 100"' in html
 
+def test_html_accessibility_hardening(sample_report):
+    """Verify accessibility and print hardening in HTML."""
+    reporter = ResearchReporter()
+    html = reporter.generate_html(sample_report)
+
+    # Skip to main content link
+    assert 'class="skip-link"' in html
+    assert 'href="#main-content"' in html
+    assert 'Skip to main content' in html
+
+    # Semantic main tag
+    assert '<main id="main-content">' in html
+    assert '</main>' in html
+
+    # ARIA labels
+    assert 'role="banner"' in html
+    assert 'aria-label="Main Navigation"' in html
+    assert 'aria-label="Print research report"' in html
+    assert 'aria-hidden="true"' in html  # For the back-to-top icon
+
+    # Print styles
+    assert '@media print' in html
+    assert '.print-btn' in html
+    assert 'window[\'print\']()' in html
+
 def test_trade_pattern_motifs():
     trade_section = TradePatternSection(
         primary_insight="Insight",
