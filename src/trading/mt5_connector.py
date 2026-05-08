@@ -102,6 +102,7 @@ class MT5Connector:
         self.metaapi_account: Any | None = None
         self.metaapi_connection: Any | None = None
         self._is_initialized: bool = False
+        self._background_tasks: set[asyncio.Task] = set()
 
     def connect(self) -> bool:
         """Alias for initialize() to support legacy calls."""
@@ -190,7 +191,9 @@ class MT5Connector:
 
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    loop.create_task(_init_metaapi())
+                    task = loop.create_task(_init_metaapi())
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
                 else:
                     asyncio.run(_init_metaapi())
                 self.use_metaapi = True
