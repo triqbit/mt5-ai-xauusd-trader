@@ -22,6 +22,7 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 5.  **Dislocation**: A sudden price shift leading into a completely different market regime (higher volatility, different drift).
 6.  **Volatility Cluster**: An abnormal cluster of high volatility with multiple decaying shocks, approximated using GARCH(1,1) logic.
 7.  **Multi-Session Dislocation**: A sequence of regime shifts across multiple sessions, testing a strategy's multi-day adaptability.
+8.  **News Shock**: A violent directional move followed by sustained high volatility and erratic behavior.
 
 ## Configuration
 

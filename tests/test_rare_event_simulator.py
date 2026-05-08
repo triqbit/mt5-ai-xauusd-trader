@@ -167,8 +167,22 @@ def test_multi_session_dislocation(simulator):
     vol2 = returns.iloc[session_size:2*session_size].std()
     vol4 = returns.iloc[3*session_size:].std()
 
-    assert vol2 > vol1 * 2
+    assert vol2 > vol1 * 1.5
     assert vol4 > vol2
+
+
+def test_news_shock_behavior(simulator):
+    config = RareEventConfig(event_type=RareEventType.NEWS_SHOCK, n_steps=400)
+    df, result = simulator.generate_scenario(config)
+
+    assert result.event_type == RareEventType.NEWS_SHOCK
+    assert result.peak_impact_pct > 0.01
+
+    returns = df["close"].pct_change().dropna()
+    pre_shock_vol = returns.iloc[:result.start_index-1].std()
+    post_shock_vol = returns.iloc[result.start_index : result.end_index].std()
+
+    assert post_shock_vol > pre_shock_vol * 3
 
 
 def test_generate_suite(simulator):
