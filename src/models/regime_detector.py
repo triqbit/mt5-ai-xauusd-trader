@@ -48,6 +48,9 @@ class RegimeDetector:
     Optimized for XAUUSD M5/M15 timeframes.
     """
 
+    # Scaling factor for trend angle calculation (normalized slope -> degrees)
+    ANGLE_SCALE: float = 1000.0
+
     def __init__(self, window: int = 20, long_window: int = 100) -> None:
         self.window = window
         self.long_window = long_window
@@ -84,7 +87,7 @@ class RegimeDetector:
     def _calculate_angle(self, slope: float) -> float:
         """Calculates trend angle in degrees from normalized slope."""
         # Scale slope for human-readable angle (heuristic scaling)
-        return float(np.degrees(np.arctan(slope * 1000)))
+        return float(np.degrees(np.arctan(slope * self.ANGLE_SCALE)))
 
     def _calculate_kurtosis(self, returns: np.ndarray) -> float:
         """Measures 'fat tails' in return distribution."""
@@ -98,10 +101,14 @@ class RegimeDetector:
             return 0.0
         return float(stats.skew(returns))
 
-    def _calculate_vol_of_vol(self, returns: np.ndarray, window: int = 10) -> float:
+    def _calculate_vol_of_vol(self, returns: np.ndarray, window: int | None = None) -> float:
         """Calculates volatility of volatility."""
-        if len(returns) < window + 2:
+        n = len(returns)
+        if n < 4:
             return 0.0
+        if window is None:
+            window = max(2, n // 2)
+
         # Rolling standard deviation
         rolling_vol = pd.Series(returns).rolling(window=window).std().dropna().values
         if len(rolling_vol) < 2:
@@ -112,7 +119,7 @@ class RegimeDetector:
         """
         Calculates volatility clustering via autocorrelation of absolute returns.
         """
-        if len(returns) < 10:
+        if len(returns) < 5:
             return 0.0
         abs_rets = np.abs(returns)
 
@@ -161,17 +168,19 @@ class RegimeDetector:
         # 2. Efficiency Ratio
         er = self._calculate_efficiency_ratio(close[-self.window :])
 
-        # 3. Price Slope
+        # 3. Price Slope & Angle
         slope = self._calculate_slope(close[-self.window :])
+        angle = self._calculate_angle(slope)
 
         # 4. Z-Score
         ma = np.mean(close[-self.window :])
         std = np.std(close[-self.window :]) + 1e-9
         z_score = (close[-1] - ma) / std
 
-        # 5. Volatility Clustering
+        # 5. Volatility Clustering & Vol-of-Vol
         returns = np.diff(close) / (close[:-1] + 1e-9)
         vc = self._calculate_volatility_clustering(returns[-self.window :])
+        vov = self._calculate_vol_of_vol(returns[-self.window :])
 
         # 6. Higher-order stats
         kurt = self._calculate_kurtosis(returns[-self.window :])
@@ -179,7 +188,7 @@ class RegimeDetector:
 
         if self._gmm is not None:
             # Clustering-based detection
-            X = np.array([[atr_ratio, er, slope, z_score, kurt, skew]])
+            X = np.array([[atr_ratio, er, slope, z_score, kurt, skew, vov, vc]])
             probs = self._gmm.predict_proba(X)[0]
             cluster_idx = int(np.argmax(probs))
             label = self._cluster_to_regime.get(cluster_idx, MarketRegime.RANGING)
@@ -192,7 +201,7 @@ class RegimeDetector:
         else:
             # Heuristic-based detection
             label, confidence, transition_score = self._apply_regime_logic(
-                atr_ratio, er, slope, z_score, vc
+                atr_ratio, er, slope, z_score, vc, angle, vov
             )
 
         regime_info = RegimeInfo(
@@ -209,32 +218,51 @@ class RegimeDetector:
         return regime_info
 
     def _apply_regime_logic(
-        self, atr_ratio: float, er: float, slope: float, z_score: float, vc: float
+        self,
+        atr_ratio: float,
+        er: float,
+        slope: float,
+        z_score: float,
+        vc: float,
+        angle: float,
+        vov: float,
     ) -> tuple[MarketRegime, float, float]:
         """Heuristic logic to classify market regime."""
         label = MarketRegime.RANGING
         confidence = 0.5
 
-        if atr_ratio > 2.5 and er > 0.7:
+        # NEWS_SHOCK: Extreme volatility spike + high efficiency + high vol-of-vol
+        if atr_ratio > 2.0 and er > 0.7 and vov > 1.2:
             label = MarketRegime.NEWS_SHOCK
             confidence = min(atr_ratio / 5.0, 1.0)
+        # VOLATILE_BREAKOUT: High volatility + high efficiency
         elif atr_ratio > 1.25 and er > 0.5:
             label = MarketRegime.VOLATILE_BREAKOUT
             confidence = er
-        elif er > 0.4 and abs(slope) > 0.00006:
+        # TRENDING: High efficiency + clear angle
+        elif er > 0.4 and abs(angle) > 15.0:
             label = MarketRegime.TRENDING
             confidence = er
-        elif abs(z_score) > 1.8 and er < 0.4:
+        # MEAN_REVERSION: Extreme deviation + low efficiency
+        elif abs(z_score) > 1.8 and er < 0.35:
             label = MarketRegime.MEAN_REVERSION
             confidence = min(abs(z_score) / 4.0, 1.0)
-        elif atr_ratio < 0.9 and abs(slope) > 0.00003:
+        # LOW_VOLATILITY_DRIFT: Low volatility + steady slope + low vol-of-vol
+        elif atr_ratio < 1.1 and abs(angle) > 2.0 and vov < 1.3:
             label = MarketRegime.LOW_VOLATILITY_DRIFT
             confidence = 0.7
+        # RANGING: Default state
         else:
             label = MarketRegime.RANGING
             confidence = 1.0 - er
 
-        transition_score = abs(atr_ratio - 1.0) * 0.4 + abs(er - 0.5) * 0.4 + abs(vc) * 0.2
+        # Transition score heuristic
+        transition_score = (
+            abs(atr_ratio - 1.0) * 0.3
+            + abs(er - 0.5) * 0.3
+            + abs(vc) * 0.2
+            + min(vov / 3.0, 0.2)
+        )
         return label, confidence, transition_score
 
     def generate_summary(self, df: pd.DataFrame) -> Any:
@@ -355,41 +383,50 @@ class RegimeDetector:
             entropy = -np.sum(probs * np.log(probs + 1e-9), axis=1)
             transition_scores = entropy / 1.79
         else:
-            # Vectorized heuristic (simplified for performance)
+            # Vectorized heuristic (fully aligned with _apply_regime_logic)
             atr_ratio = features["atr_ratio"].values
             er = features["efficiency_ratio"].values
             slope = features["slope"].values
             z_score = features["z_score"].values
+            angle = np.degrees(np.arctan(slope * self.ANGLE_SCALE))
+            vov = features["vol_of_vol"].values
+            vc = features["vol_clustering"].values
 
-            regimes = [MarketRegime.RANGING.value] * len(df)
+            regimes = np.array([MarketRegime.RANGING.value] * len(df), dtype=object)
             confidences = 1.0 - er
 
-            # Masks for different regimes
-            news_mask = (atr_ratio > 2.5) & (er > 0.7)
+            # Masks for different regimes (ordered by precedence)
+            news_mask = (atr_ratio > 2.0) & (er > 0.7) & (vov > 1.2)
             breakout_mask = (atr_ratio > 1.25) & (er > 0.5)
-            trending_mask = (er > 0.4) & (np.abs(slope) > 0.00006)
-            mean_rev_mask = (np.abs(z_score) > 1.8) & (er < 0.4)
-            drift_mask = (atr_ratio < 0.9) & (np.abs(slope) > 0.00003)
+            trending_mask = (er > 0.4) & (np.abs(angle) > 15.0)
+            mean_rev_mask = (np.abs(z_score) > 1.8) & (er < 0.35)
+            drift_mask = (atr_ratio < 1.1) & (np.abs(angle) > 2.0) & (vov < 1.3)
 
-            # Apply in order of precedence
-            for i in range(len(regimes)):
-                if news_mask[i]:
-                    regimes[i] = MarketRegime.NEWS_SHOCK.value
-                    confidences[i] = min(atr_ratio[i] / 5.0, 1.0)
-                elif breakout_mask[i]:
-                    regimes[i] = MarketRegime.VOLATILE_BREAKOUT.value
-                    confidences[i] = er[i]
-                elif trending_mask[i]:
-                    regimes[i] = MarketRegime.TRENDING.value
-                    confidences[i] = er[i]
-                elif mean_rev_mask[i]:
-                    regimes[i] = MarketRegime.MEAN_REVERSION.value
-                    confidences[i] = min(abs(z_score[i]) / 4.0, 1.0)
-                elif drift_mask[i]:
-                    regimes[i] = MarketRegime.LOW_VOLATILITY_DRIFT.value
-                    confidences[i] = 0.7
+            # Apply masks in REVERSE precedence because later assignments overwrite earlier ones
+            # Actually, standard order with 'if/elif' logic is better for clarity.
+            # Let's use a prioritized update approach.
 
-            transition_scores = np.abs(atr_ratio - 1.0) * 0.4 + np.abs(er - 0.5) * 0.4
+            regimes[drift_mask] = MarketRegime.LOW_VOLATILITY_DRIFT.value
+            confidences[drift_mask] = 0.7
+
+            regimes[mean_rev_mask] = MarketRegime.MEAN_REVERSION.value
+            confidences[mean_rev_mask] = np.clip(np.abs(z_score[mean_rev_mask]) / 4.0, 0, 1.0)
+
+            regimes[trending_mask] = MarketRegime.TRENDING.value
+            confidences[trending_mask] = er[trending_mask]
+
+            regimes[breakout_mask] = MarketRegime.VOLATILE_BREAKOUT.value
+            confidences[breakout_mask] = er[breakout_mask]
+
+            regimes[news_mask] = MarketRegime.NEWS_SHOCK.value
+            confidences[news_mask] = np.clip(atr_ratio[news_mask] / 5.0, 0, 1.0)
+
+            transition_scores = (
+                np.abs(atr_ratio - 1.0) * 0.3
+                + np.abs(er - 0.5) * 0.3
+                + np.abs(vc) * 0.2
+                + np.clip(vov / 3.0, 0, 0.2)
+            )
 
         # Mask out burn-in period
         regimes[: self.long_window - 1] = [MarketRegime.UNKNOWN.value] * (self.long_window - 1)
@@ -445,6 +482,16 @@ class RegimeDetector:
 
         slope = close.rolling(window=self.window).apply(get_slope, raw=True)
 
+        # Vol-of-vol and Vol Clustering (Vectorized)
+        def get_vov(x):
+            return self._calculate_vol_of_vol(x, window=max(2, self.window // 2))
+
+        def get_vc(x):
+            return self._calculate_volatility_clustering(x)
+
+        vov = returns.rolling(window=self.window).apply(get_vov, raw=True)
+        vc = returns.rolling(window=self.window).apply(get_vc, raw=True)
+
         features = pd.DataFrame(
             {
                 "atr_ratio": atr_ratio,
@@ -453,6 +500,8 @@ class RegimeDetector:
                 "z_score": z_score,
                 "kurtosis": kurt,
                 "skewness": skew,
+                "vol_of_vol": vov,
+                "vol_clustering": vc,
             }
         ).fillna(0)
 
@@ -481,20 +530,21 @@ class RegimeDetector:
 
     def _map_clusters(self, centroids: np.ndarray) -> None:
         """Maps GMM clusters to MarketRegime enum using centroid heuristics."""
-        # Feature order: atr_ratio, efficiency_ratio, slope, z_score, kurtosis, skewness
+        # Feature order: atr_ratio, efficiency_ratio, slope, z_score, kurtosis, skewness, vol_of_vol, vol_clustering
         self._cluster_to_regime = {}
         for i, center in enumerate(centroids):
-            atr_ratio, er, slope, z_score, _kurt, _skew = center
+            atr_ratio, er, slope, z_score, _kurt, _skew, vov, _vc = center
+            angle = self._calculate_angle(slope)
 
-            if atr_ratio > 1.8 and er > 0.6:
+            if atr_ratio > 1.8 and er > 0.6 and vov > 1.2:
                 self._cluster_to_regime[i] = MarketRegime.NEWS_SHOCK
             elif atr_ratio > 1.2 and er > 0.4:
                 self._cluster_to_regime[i] = MarketRegime.VOLATILE_BREAKOUT
-            elif er > 0.4 and abs(slope) > 0.00005:
+            elif er > 0.35 and abs(angle) > 10.0:
                 self._cluster_to_regime[i] = MarketRegime.TRENDING
             elif abs(z_score) > 1.5 and er < 0.3:
                 self._cluster_to_regime[i] = MarketRegime.MEAN_REVERSION
-            elif atr_ratio < 0.9 and abs(slope) > 0.00002:
+            elif atr_ratio < 1.0 and abs(angle) > 3.0 and vov < 1.2:
                 self._cluster_to_regime[i] = MarketRegime.LOW_VOLATILITY_DRIFT
             else:
                 self._cluster_to_regime[i] = MarketRegime.RANGING
