@@ -72,7 +72,7 @@ def test_check_redis_exception(mock_config):
 
         status = checker.check_redis()
         assert status.status == HealthStatus.DEGRADED
-        assert "Connection refused" in status.message
+        assert "Redis unreachable" in status.message
 
 def test_check_audit_log_success(mock_config):
     mock_audit = MagicMock()
@@ -81,7 +81,7 @@ def test_check_audit_log_success(mock_config):
 
     status = checker.check_audit_log()
     assert status.status == HealthStatus.HEALTHY
-    assert "initialized" in status.message
+    assert "active" in status.message
 
 def test_check_audit_log_failure(mock_config):
     mock_audit = MagicMock()
