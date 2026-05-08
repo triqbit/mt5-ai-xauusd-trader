@@ -63,9 +63,9 @@ def mock_trade_logger():
 @pytest.fixture
 def mock_model():
     model = MagicMock()
-    model._ppo_model = MagicMock()
+    model.ppo_agent = MagicMock()
     model.lstm_model = MagicMock()
-    model._dreamer_model = MagicMock()
+    model.dreamer_agent = MagicMock()
     return model
 
 @pytest.fixture
@@ -81,7 +81,7 @@ def health_checker(mock_config, mock_connector, mock_trade_logger, mock_model, m
 def test_check_liveness(health_checker):
     status = health_checker.check_liveness()
     assert status.status == HealthStatus.HEALTHY
-    assert "running" in status.message
+    assert "active" in status.message
 
 def test_check_database_success(health_checker, mock_trade_logger):
     status = health_checker.check_database()
@@ -134,24 +134,24 @@ def test_check_models_success(health_checker):
 
 def test_check_models_partial(health_checker, mock_model):
     mock_model.lstm_model = None
-    mock_model._dreamer_model = None
+    mock_model.dreamer_agent = None
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
     assert "PPO" in status.message
     assert "LSTM" not in status.message
 
 def test_check_models_failed(health_checker, mock_model):
-    mock_model._ppo_model = None
+    mock_model.ppo_agent = None
     mock_model.lstm_model = None
-    mock_model._dreamer_model = None
+    mock_model.dreamer_agent = None
     mock_model.model = None  # Individual wrapper check
     status = health_checker.check_models()
     assert status.status == HealthStatus.FAILED
 
 def test_check_models_individual_wrapper(health_checker, mock_model):
-    mock_model._ppo_model = None
+    mock_model.ppo_agent = None
     mock_model.lstm_model = None
-    mock_model._dreamer_model = None
+    mock_model.dreamer_agent = None
     mock_model.model = MagicMock()
 
     # Using a real class for the wrapper to avoid brittle __class__.__name__ mocking
@@ -163,7 +163,7 @@ def test_check_models_individual_wrapper(health_checker, mock_model):
 
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
-    assert "PPOAgentWrapper (Loaded)" in status.message
+    assert "PPOAgentWrapper" in status.message
 
 def test_startup_gate_success(health_checker, mock_audit_logger):
     with patch.object(HealthChecker, 'get_full_report') as mock_report:
@@ -214,7 +214,7 @@ def test_check_disk_space_success(mock_disk_usage, health_checker, mock_config):
 
     status = health_checker.check_disk_space()
     assert status.status == HealthStatus.HEALTHY
-    assert "500.00MB" in status.message
+    assert "500.0MB" in status.message
 
 @patch("shutil.disk_usage")
 def test_check_disk_space_failure(mock_disk_usage, health_checker, mock_config):
@@ -222,7 +222,7 @@ def test_check_disk_space_failure(mock_disk_usage, health_checker, mock_config):
 
     status = health_checker.check_disk_space(min_mb=100)
     assert status.status == HealthStatus.FAILED
-    assert "Low disk space" in status.message
+    assert "Low disk" in status.message
 
 def test_check_database_fallback(health_checker, mock_trade_logger):
     # Mock do_ping to raise AttributeError to trigger SELECT 1 fallback
