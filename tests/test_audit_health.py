@@ -18,7 +18,10 @@ def mock_config():
     cfg = MagicMock(spec=TradingConfig)
     cfg.logs_dir = MagicMock(spec=Path)
     cfg.logs_dir.exists.return_value = True
-    cfg.redis_url = "redis://localhost:6379/0"
+
+    mock_redis_url = MagicMock()
+    mock_redis_url.get_secret_value.return_value = "redis://localhost:6379/0"
+    cfg.redis_url = mock_redis_url
     return cfg
 
 def test_audit_logger_singleton(db_url):

@@ -14,8 +14,11 @@ Located in `src/utils/synthetic_data.py`, the `ScenarioGenerator` provides deter
 - **gapping**: Price with occasional large percentage gaps (2%).
 - **whipsaw**: A bullish breakout followed by an immediate, sharp bearish reversal. Useful for testing trailing stop resilience and "fake-out" detection.
 - **stale**: Frozen price action (zero returns). Useful for testing system behavior during low liquidity or data feed freezes.
-- **flash_crash** (New): Extreme drop followed by partial recovery. Essential for validating circuit breaker response and emergency halt triggers.
-- **regime_shift** (New): Transition from a stable/ranging regime to a highly volatile one. Used for testing model adaptability and risk multiplier adjustments.
+- **flash_crash**: Extreme drop followed by partial recovery. Essential for validating circuit breaker response and emergency halt triggers.
+- **regime_shift**: Transition from a stable/ranging regime to a highly volatile one. Used for testing model adaptability and risk multiplier adjustments.
+- **mean_reversion**: Oscillating price process with high z-score and low efficiency ratio.
+- **low_volatility_drift**: Small constant trend with minimal noise and low ATR.
+- **news_shock**: Extreme spike at the end to trigger news-like volatility checks.
 - **malformed**: Data with intentional errors (NaNs, negative prices, High < Low) to test pipeline resilience.
 
 ## ExecutionScenarioBuilder
@@ -29,6 +32,24 @@ Located in `src/utils/synthetic_data.py`, the `ExecutionScenarioBuilder` generat
 - **trend_failure**: A BUY signal generated during a bearish trend, designed to trigger the Trend Angle filter.
 - **ema_out_of_sequence**: A scenario where EMAs are not correctly stacked (e.g., EMA8 < EMA21 for BUY), designed to trigger the EMA Sequence filter.
 - **momentum_failure**: A scenario where RSI is in an overbought zone, designed to trigger the Momentum filter.
+- **session_violation**: BUY signal on a Saturday (market closed).
+- **drawdown_violation**: Signal with excessive drawdown (e.g., 0.15) to trigger risk halts.
+- **confidence_violation**: Signal with confidence below threshold (0.4) to trigger rejection.
+- **signal_flicker_violation**: A sequence of oscillating signals (BUY, SELL, BUY, SELL, ...) to trigger Flicker Guard.
+- **performance_violation**: Signal with a mocked trade logger reporting low win rate to trigger Performance Floor.
+
+## RegimeScenarioBuilder
+
+Located in `src/utils/synthetic_data.py`, the `RegimeScenarioBuilder` generates deterministic datasets specifically designed to trigger each `MarketRegime` label in the `RegimeDetector`.
+
+### Key Methods
+
+- **trending()**: Triggers `MarketRegime.TRENDING`.
+- **ranging()**: Triggers `MarketRegime.RANGING`.
+- **mean_reversion()**: Triggers `MarketRegime.MEAN_REVERSION`.
+- **volatile_breakout()**: Triggers `MarketRegime.VOLATILE_BREAKOUT`.
+- **low_volatility_drift()**: Triggers `MarketRegime.LOW_VOLATILITY_DRIFT`.
+- **news_shock()**: Triggers `MarketRegime.NEWS_SHOCK`.
 
 ## ModelHealthGenerator
 
