@@ -16,6 +16,8 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.core.constants import SYMBOL_PATTERN, VALID_TIMEFRAMES
+
 ROOT = Path(__file__).resolve().parents[2]  # repo root
 
 
@@ -55,10 +57,11 @@ class TradingConfig(BaseSettings):
     # ── Trading parameters ─────────────────────────────────────────────────────
     symbol: str = Field(
         default="XAUUSD",
+        pattern=SYMBOL_PATTERN,
         description="The financial instrument to trade (e.g., XAUUSD)",
         validation_alias="SYMBOL",
     )
-    timeframe: str = Field(
+    timeframe: VALID_TIMEFRAMES = Field(
         default="M5", description="The chart timeframe for analysis (e.g., M5, H1)"
     )
     mode: Literal["demo", "live", "backtest"] = Field(

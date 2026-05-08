@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -18,22 +17,13 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from src.core.schemas import ExecutionDecision
+
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ExecutionDecision:
-    """Result of the execution filter cascade."""
-
-    signal: TradeSignal
-    is_approved: bool
-    confidence_score: float
-    blocked_by: str | None = None
-    trace: dict[str, Any] = field(default_factory=dict)
 
 
 class ExecutionFilter:
