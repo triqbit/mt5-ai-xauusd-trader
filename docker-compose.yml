@@ -12,7 +12,7 @@ services:
       - "8000:8000"  # Prometheus metrics / API
       - "8050:8050"  # Dash dashboard
     volumes:
-      - ./.env:/app/.env:ro
+      - .env:/app/.env:ro
       - ./logs:/app/logs
       - ./models:/app/models:ro
     environment:
@@ -27,3 +27,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
