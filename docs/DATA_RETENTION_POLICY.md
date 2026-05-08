@@ -24,7 +24,13 @@ The following data must be preserved for the full 7-year compliance window:
 - **Audit Log**: System actions, configuration changes, and operator events in the `audit_log` table.
 - **Linked Signals**: Any `model_signals` record referenced by a `trade` record via `signal_id` OR a `risk_event` record via `signal_id`.
 
-### 3.2 Ephemeral Data (Rotate/Purge)
+### 3.2 Retention for Linked Data
+To maintain referential integrity and auditability:
+- A `model_signals` record is considered "Linked" if it is associated with at least one `trade` or `risk_event`.
+- Linked signals inherit the maximum retention period of their associated records (e.g., 7 years if linked to a trade).
+- When a parent record (Trade/RiskEvent) is purged, the cleanup script must verify if the associated signal is still required by another active record before deletion.
+
+### 3.3 Ephemeral Data (Rotate/Purge)
 The following data can be purged more frequently to manage storage:
 - **Unlinked Signals**: AI predictions that did not result in an executed trade.
 - **Application Logs**: Standard output and error logs from the trading engine.
@@ -54,6 +60,6 @@ The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a
 The primary mechanism for enforcement is the `scripts/data_cleanup.py` tool. It uses the `database_url` and `logs_dir` from the system configuration to target the correct data stores.
 
 ---
-**Version**: 1.3.0
-**Effective Date**: 2026-05-22
+**Version**: 1.3.1
+**Effective Date**: 2026-05-24
 **Owner**: Release Reliability & Governance (Jules03)
