@@ -58,14 +58,29 @@
         .back-to-top { position: fixed; bottom: 30px; right: 30px; background: var(--primary); color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.3s, background 0.3s, opacity 0.3s, visibility 0.3s; z-index: 1000; font-weight: bold; opacity: 0; visibility: hidden; }
         .back-to-top.visible { opacity: 1; visibility: visible; }
         .back-to-top:hover { transform: translateY(-3px); background: var(--secondary); color: white; }
-        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .metadata { flex-direction: column; gap: 5px; } .back-to-top { bottom: 20px; right: 20px; width: 40px; height: 40px; } }
+        .skip-link { position: absolute; top: -40px; left: 0; background: var(--secondary); color: white; padding: 8px; z-index: 2000; transition: top 0.3s; }
+        .skip-link:focus { top: 0; }
+        .print-btn { background: var(--secondary); color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-left: 20px; transition: background 0.2s; }
+        .print-btn:hover { background: var(--primary); }
+        @media print {
+            .sticky-nav, .back-to-top, .print-btn, .skip-link { display: none !important; }
+            body { padding: 0; background: white; max-width: 100%; }
+            section, .toc, .executive-summary, header { box-shadow: none; border: 1px solid #eee; break-inside: avoid; }
+            h1, h2, h3 { color: black; }
+            .toc ul { display: block; }
+            .toc li { margin-bottom: 5px; }
+            a { color: black; text-decoration: none; }
+            .progress-bar { border: 1px solid #ccc; }
+        }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } .metadata { flex-direction: column; gap: 5px; } .back-to-top { bottom: 20px; right: 20px; width: 40px; height: 40px; } .print-btn { display: none; } }
     </style>
 </head>
 <body>
-    <div class="sticky-nav">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div class="sticky-nav" role="banner">
         <div class="sticky-nav-container">
             <span style="font-weight: 800; font-size: 1.1rem;">triqbit | Research</span>
-            <nav>
+            <nav aria-label="Main Navigation">
                 <a href="#executive-summary">Summary</a>
                 {% if regime_analysis %}<a href="#regime-analysis">Regime</a>{% endif %}
                 {% if stress_tests %}<a href="#stress-tests">Stress</a>{% endif %}
@@ -78,9 +93,12 @@
                 {% if rare_events %}<a href="#rare-events">Rare</a>{% endif %}
                 {% if execution_quality %}<a href="#execution-quality">Execution</a>{% endif %}
                 <a href="#conclusion">Conclusion</a>
+                <button class="print-btn" onclick="window['print']()" aria-label="Print research report">Print PDF</button>
             </nav>
         </div>
     </div>
+
+    <main id="main-content">
 
     {% set ns = namespace(count=1) %}
     <header>
@@ -583,9 +601,10 @@
         </ul>
         {% endif %}
     </section>
+    </main>
 
     <a href="#" class="back-to-top" title="Back to top" aria-label="Scroll back to top">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
     </a>
 
     <script>

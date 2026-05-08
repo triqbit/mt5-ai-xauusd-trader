@@ -105,6 +105,18 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config.model_calibration_threshold = 0.25
     config.redis_url = ""
     config.log_level = "INFO"
+    config.daily_loss_lvl1 = 0.01
+    config.daily_loss_lvl2 = 0.02
+    config.daily_loss_lvl3 = 0.03
+    config.daily_loss_hard_stop = 0.07
+    config.max_weekly_loss = 0.1
+    config.max_monthly_loss = 0.2
+    config.min_spread_pips = 1.0
+    config.spread_alert_pips = 2.0
+    config.spread_reduce_pips = 3.0
+    config.spread_halt_pips = 5.0
+    config.max_single_direction_pct = 0.2
+    config.max_total_notional_pct = 0.5
 
     validator = ConfigValidator(config)
 
