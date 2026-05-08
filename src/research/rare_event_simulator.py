@@ -27,6 +27,7 @@ class RareEventType(str, Enum):
     DISLOCATION = "dislocation"
     VOL_CLUSTER = "vol_cluster"
     MULTI_SESSION_DISLOCATION = "multi_session_dislocation"
+    NEWS_SHOCK = "news_shock"
 
 
 class RareEventConfig(BaseModel):
@@ -88,6 +89,19 @@ class RareEventSimulator:
         """
         self.rng = np.random.default_rng(seed)
 
+    def _generate_t_returns(
+        self, n: int, drift: float, vol: float, df: float = 5.0
+    ) -> np.ndarray:
+        """
+        Generate returns following a Student's t-distribution to capture 'fat tails'
+        observed in real market data.
+        """
+        # Variance of standard t-distribution is df / (df - 2) for df > 2
+        if df > 2:
+            scale = vol * np.sqrt((df - 2) / df)
+            return drift + self.rng.standard_t(df, n) * scale
+        return drift + self.rng.standard_t(df, n) * vol
+
     def generate_scenario(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """
         Generates a synthetic OHLCV DataFrame containing the specified rare event.
@@ -123,6 +137,8 @@ class RareEventSimulator:
             return self._simulate_vol_cluster(config)
         if config.event_type == RareEventType.MULTI_SESSION_DISLOCATION:
             return self._simulate_multi_session_dislocation(config)
+        if config.event_type == RareEventType.NEWS_SHOCK:
+            return self._simulate_news_shock(config)
         raise ValueError(f"Unknown rare event type: {config.event_type}")
 
     def _generate_base_ohlc(
@@ -133,13 +149,17 @@ class RareEventSimulator:
         base_volume: int,
         gaps: np.ndarray | None = None,
         spread_multiplier: float = 1.0,
+        vols: np.ndarray | None = None,
     ) -> pd.DataFrame:
-        config_ref = getattr(self, "_current_config", None)
         """
         Helper to convert a returns series into a valid OHLCV DataFrame.
         Ensures price continuity: open[i] = close[i-1] unless gap requested.
         """
+        config_ref = getattr(self, "_current_config", None)
         n = len(returns)
+        if vols is None:
+            vols = np.full(n, base_vol)
+
         opens = np.zeros(n)
         highs = np.zeros(n)
         lows = np.zeros(n)
@@ -154,10 +174,8 @@ class RareEventSimulator:
 
             closes[i] = opens[i] * np.exp(returns[i])
 
-            # Intraday range
-            # Generate two random deviations for high and low
-            # Scale by volatility and the actual move in the bar
-            noise = self.rng.rayleigh(base_vol * opens[i], 2)
+            # Intraday range scaled by local volatility
+            noise = self.rng.rayleigh(vols[i] * opens[i], 2)
 
             highs[i] = max(opens[i], closes[i]) + noise[0]
             lows[i] = min(opens[i], closes[i]) - noise[1]
@@ -166,7 +184,12 @@ class RareEventSimulator:
 
         # Generate spread: base XAUUSD spread ~0.2-0.4, plus volatility noise
         base_spread = 0.25 * spread_multiplier
-        spreads = base_spread + self.rng.exponential(base_vol * 100, n)
+        # Spread increases with local volatility
+        spreads = base_spread + self.rng.exponential(vols * 100, n)
+
+        # Volume correlates with absolute returns and volatility
+        vol_factor = 1.0 + (np.abs(returns) / (vols + 1e-9)) * 0.5
+        adj_volume = np.clip(base_volume * vol_factor, 1, 10000).astype(int)
 
         df = pd.DataFrame(
             {
@@ -174,8 +197,8 @@ class RareEventSimulator:
                 "high": highs,
                 "low": lows,
                 "close": closes,
-                "tick_volume": self.rng.poisson(base_volume, n),
-                "real_volume": self.rng.poisson(base_volume * 10, n),
+                "tick_volume": self.rng.poisson(adj_volume),
+                "real_volume": self.rng.poisson(adj_volume * 10),
                 "spread": spreads,
             }
         )
@@ -197,7 +220,8 @@ class RareEventSimulator:
     ) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a rapid price collapse and partial/full recovery."""
         n = config.n_steps
-        returns = self.rng.normal(config.drift, config.base_volatility, n)
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
 
         start_idx = n // 2
         crash_duration = int(10 * config.event_magnitude)
@@ -210,6 +234,7 @@ class RareEventSimulator:
             idx = start_idx + i
             if idx < n:
                 returns[idx] += (impact / crash_duration) * (1 + i / crash_duration)
+                vols[idx] *= 2.5 * config.event_magnitude
 
         # Recovery phase
         recovered_total_pct = 0.0
@@ -222,9 +247,10 @@ class RareEventSimulator:
                 step_recovery = recovery_per_step * self.rng.uniform(0.5, 1.5)
                 returns[idx] += step_recovery
                 recovered_total_pct += step_recovery
+                vols[idx] *= 1.8 * config.event_magnitude
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume
+            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
         )
 
         # Volume Surge during crash
@@ -253,7 +279,8 @@ class RareEventSimulator:
     ) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a period of erratic price jumps and extreme spreads."""
         n = config.n_steps
-        returns = self.rng.normal(config.drift, config.base_volatility, n)
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
 
         start_idx = n // 3
         duration = int(40 * config.event_magnitude)
@@ -261,16 +288,17 @@ class RareEventSimulator:
         for i in range(duration):
             idx = start_idx + i
             if idx < n:
-                # Fat tails via T-distribution
+                # Fat tails via T-distribution with very low degrees of freedom
                 returns[idx] = (
-                    self.rng.standard_t(df=1.5)
+                    self.rng.standard_t(df=1.2)
                     * config.base_volatility
-                    * 12
+                    * 15
                     * config.event_magnitude
                 )
+                vols[idx] *= 4.0 * config.event_magnitude
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume
+            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
         )
 
         vacuum_mask = (np.arange(n) >= start_idx) & (np.arange(n) < start_idx + duration)
@@ -305,7 +333,8 @@ class RareEventSimulator:
     def _simulate_gold_gap(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates discontinuous price jumps."""
         n = config.n_steps
-        returns = self.rng.normal(config.drift, config.base_volatility, n)
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
 
         gap_idx = n // 2
         gap_magnitude_pct = 0.02 * config.event_magnitude * self.rng.choice([-1, 1])
@@ -319,9 +348,15 @@ class RareEventSimulator:
         for i in range(post_gap_duration):
             if gap_idx + i < n:
                 returns[gap_idx + i] *= vol_boost
+                vols[gap_idx + i] *= vol_boost
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, gaps=gaps
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            gaps=gaps,
+            vols=vols,
         )
 
         result = RareEventResult(
@@ -340,7 +375,8 @@ class RareEventSimulator:
     ) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a strong trend followed by an abrupt reversal."""
         n = config.n_steps
-        returns = self.rng.normal(config.drift, config.base_volatility, n)
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
 
         start_idx = n // 5
         trend_duration = n // 4
@@ -355,9 +391,10 @@ class RareEventSimulator:
             idx = reversal_idx + i
             if idx < n:
                 returns[idx] -= 0.004 * config.event_magnitude * (1 + i / 15)
+                vols[idx] *= 2.0 * config.event_magnitude
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume
+            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
         )
 
         # Peak impact is the reversal magnitude from the peak reached during the trend
@@ -381,22 +418,26 @@ class RareEventSimulator:
     ) -> tuple[pd.DataFrame, RareEventResult]:
         """Simulates a regime shift."""
         n = config.n_steps
-        returns = self.rng.normal(config.drift, config.base_volatility, n)
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
 
         dislocation_idx = n // 3
 
         # Shift
         returns[dislocation_idx] -= 0.03 * config.event_magnitude
+        vols[dislocation_idx] *= 5.0 * config.event_magnitude
 
         # New regime
         new_vol = config.base_volatility * 3.0 * config.event_magnitude
         new_drift = config.drift - 0.0005 * config.event_magnitude
 
-        for i in range(dislocation_idx + 1, n):
-            returns[i] = self.rng.normal(new_drift, new_vol)
+        n_new = n - (dislocation_idx + 1)
+        if n_new > 0:
+            returns[dislocation_idx + 1 :] = self._generate_t_returns(n_new, new_drift, new_vol)
+            vols[dislocation_idx + 1 :] = new_vol
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume
+            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
         )
 
         event_prices = df["close"].iloc[dislocation_idx:]
@@ -442,9 +483,10 @@ class RareEventSimulator:
             )
             vols[i] = current_vol
 
-        returns = self.rng.normal(config.drift, vols, n)
+        # Generate base returns then scale noise by the volatility cluster
+        returns = config.drift + self._generate_t_returns(n, 0.0, 1.0) * vols
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume
+            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
         )
 
         # For Vol Cluster, peak impact is the max absolute price deviation from start
@@ -479,6 +521,51 @@ class RareEventSimulator:
             suite[event_type.value] = self.generate_scenario(config)
         return suite
 
+    def _simulate_news_shock(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
+        """
+        Simulates a violent directional move (News Shock) followed by sustained
+        high volatility and erratic behavior.
+        """
+        n = config.n_steps
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
+
+        shock_idx = n // 3
+        shock_magnitude = 0.015 * config.event_magnitude * self.rng.choice([-1, 1])
+
+        # Phase 1: The Shock
+        returns[shock_idx] += shock_magnitude
+        vols[shock_idx] *= 10.0 * config.event_magnitude
+
+        # Phase 2: Sustained Volatility and erratic follow-through
+        shock_duration = int(50 * config.event_magnitude)
+        for i in range(1, shock_duration):
+            idx = shock_idx + i
+            if idx < n:
+                # Decay volatility but keep it high
+                decay_factor = np.exp(-i / (20 * config.event_magnitude))
+                vols[idx] = config.base_volatility * (1 + 5.0 * config.event_magnitude * decay_factor)
+                returns[idx] = self._generate_t_returns(1, config.drift, vols[idx], df=2.5)[0]
+
+        df = self._generate_base_ohlc(
+            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+        )
+
+        event_prices = df["close"].iloc[shock_idx : shock_idx + shock_duration]
+        start_price_val = df["close"].iloc[shock_idx - 1] if shock_idx > 0 else df["close"].iloc[0]
+        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
+
+        result = RareEventResult(
+            event_type=RareEventType.NEWS_SHOCK,
+            config=config,
+            start_index=shock_idx,
+            end_index=min(n - 1, shock_idx + shock_duration),
+            peak_impact_pct=peak_impact,
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
+            recovery_attained=0.0,
+        )
+        return df, result
+
     def _simulate_multi_session_dislocation(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
@@ -511,10 +598,12 @@ class RareEventSimulator:
             end = (i + 1) * session_size if i < 3 else n
             vols[start:end] = regimes[i]["vol"]
             drifts[start:end] = regimes[i]["drift"]
-            returns[start:end] = self.rng.normal(drifts[start:end], vols[start:end])
+            returns[start:end] = self._generate_t_returns(
+                end - start, drifts[start:end].mean(), vols[start:end].mean()
+            )
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume
+            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
         )
 
         # Max percentage deviation from the very beginning of the multi-session event
