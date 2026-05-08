@@ -52,6 +52,7 @@ def test_trade_execution_quality_model():
         "execution_latency_ms": 150.0,
         "fill_quality_score": 0.9,
         "edge_capture": 0.8,
+        "session": "London",
         "post_entry_drift_5m": 2.0,
         "post_entry_drift_15m": 5.0,
         "timing_efficiency": 0.7,
@@ -190,7 +191,8 @@ def test_generate_summary_report(analyzer):
         mock_at.return_value = TradeExecutionQuality(
             trade_id=1, ticket=1, symbol="XAUUSD", slippage_pips=1.0,
             execution_latency_ms=100.0, fill_quality_score=0.9,
-            edge_capture=0.5, post_entry_drift_5m=1.0, post_entry_drift_15m=2.0,
+            edge_capture=0.5, session="London",
+            post_entry_drift_5m=1.0, post_entry_drift_15m=2.0,
             timing_efficiency=0.8, spread_at_execution=2.0,
             slippage_to_spread_ratio=0.5, alpha_decay_pips=0.1,
             execution_cost_pips=2.0, markout_pnls={"5m": 1.0}
@@ -284,3 +286,98 @@ def test_execution_spread_dynamic_point(analyzer, mock_connector):
     # = (20 * 0.05) / 0.1 = 1.0 / 0.1 = 10.0
     spread_info = analyzer._get_execution_spread(trade)
     assert spread_info["spread_pips"] == 10.0
+
+def test_market_session_detection(analyzer):
+    """Test that market sessions are correctly identified."""
+    # Asian: 04:00 UTC
+    dt_asian = datetime(2024, 1, 1, 4, 0, tzinfo=timezone.utc)
+    assert analyzer._get_market_session(dt_asian) == "Asian"
+
+    # London: 10:00 UTC
+    dt_london = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    assert analyzer._get_market_session(dt_london) == "London"
+
+    # London-NY Overlap: 14:00 UTC
+    dt_overlap = datetime(2024, 1, 1, 14, 0, tzinfo=timezone.utc)
+    assert analyzer._get_market_session(dt_overlap) == "London-NY"
+
+    # NY: 18:00 UTC
+    dt_ny = datetime(2024, 1, 1, 18, 0, tzinfo=timezone.utc)
+    assert analyzer._get_market_session(dt_ny) == "NY"
+
+def test_execution_quality_persistence(analyzer):
+    """Test that execution quality metrics can be persisted to DB."""
+    quality_data = TradeExecutionQuality(
+        trade_id=1,
+        ticket=1001,
+        symbol="XAUUSD",
+        slippage_pips=1.2,
+        execution_latency_ms=250.0,
+        fill_quality_score=0.85,
+        edge_capture=0.6,
+        session="London",
+        post_entry_drift_5m=0.5,
+        post_entry_drift_15m=1.2,
+        timing_efficiency=0.75,
+        spread_at_execution=2.0,
+        slippage_to_spread_ratio=0.6,
+        alpha_decay_pips=0.3,
+        execution_cost_pips=2.2,
+        markout_pnls={"5m": 0.5, "15m": 1.2}
+    )
+
+    analyzer.save_execution_quality(quality_data)
+
+    from src.core.trade_logger import ExecutionQuality
+    with analyzer.Session() as session:
+        saved = session.query(ExecutionQuality).filter_by(trade_id=1).first()
+        assert saved is not None
+        assert saved.slippage_pips == 1.2
+        assert saved.session == "London"
+        assert "5m" in saved.markout_data
+
+def test_tick_based_calculations(analyzer, mock_connector):
+    """Test that analyzer uses tick data when available."""
+    trade = MagicMock(spec=Trade)
+    trade.symbol = "XAUUSD"
+    trade.created_at = datetime(2024, 1, 1, 12, 0, 5, tzinfo=timezone.utc)
+    trade.direction = 1
+
+    signal = MagicMock(spec=ModelSignal)
+    signal.timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    signal.direction = 1
+
+    # Mock ticks: 2300.0/2301.0 at signal, 2300.5/2301.5 at trade
+    # mid: 2300.5 -> 2301.0 (move = +0.5)
+    # alpha decay = 0.5 / 0.1 = 5.0 pips
+    mock_ticks = pd.DataFrame([
+        {"time": signal.timestamp, "bid": 2300.0, "ask": 2301.0},
+        {"time": trade.created_at, "bid": 2300.5, "ask": 2301.5}
+    ])
+    mock_connector.get_ticks_range.return_value = mock_ticks
+
+    decay = analyzer.calculate_alpha_decay(trade, signal)
+    assert decay == 5.0
+    mock_connector.get_ticks_range.assert_called()
+
+def test_blocked_signal_persistence(analyzer):
+    """Test that blocked signal analysis can be persisted to DB."""
+    blocked_data = BlockedSignalQuality(
+        signal_id=10,
+        symbol="XAUUSD",
+        rejection_reason="Max Drawdown Reached",
+        opportunity_cost_pnl=150.0,
+        max_favorable_excursion=2.5,
+        max_adverse_excursion=0.5,
+        would_have_won=True
+    )
+
+    analyzer.save_blocked_analysis(blocked_data)
+
+    from src.core.trade_logger import BlockedSignalAnalysis
+    with analyzer.Session() as session:
+        saved = session.query(BlockedSignalAnalysis).filter_by(signal_id=10).first()
+        assert saved is not None
+        assert saved.opportunity_cost_pnl == 150.0
+        assert saved.rejection_reason == "Max Drawdown Reached"
+        assert saved.would_have_won is True

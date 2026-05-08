@@ -76,6 +76,9 @@ class ModelSignal(Base, AuditMixin):
 
     # Relationship
     trade: Mapped["Trade"] = relationship("Trade", back_populates="signal", uselist=False)
+    blocked_analysis: Mapped["BlockedSignalAnalysis"] = relationship(
+        "BlockedSignalAnalysis", back_populates="signal", uselist=False
+    )
 
     __table_args__ = (
         CheckConstraint("entry_price > 0", name="check_signal_entry_price_positive"),
@@ -105,10 +108,57 @@ class Trade(Base, AuditMixin):
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"))
     signal: Mapped["ModelSignal"] = relationship("ModelSignal", back_populates="trade")
 
+    # Execution analytics relationship
+    execution_quality: Mapped["ExecutionQuality"] = relationship(
+        "ExecutionQuality", back_populates="trade", uselist=False
+    )
+
     __table_args__ = (
         CheckConstraint("entry_price > 0", name="check_trade_entry_price_positive"),
         CheckConstraint("lot_size > 0", name="check_trade_lot_size_positive"),
     )
+
+
+class BlockedSignalAnalysis(Base, AuditMixin):
+    """Opportunity cost analytics for signals that were rejected."""
+
+    __tablename__ = "blocked_signal_analysis"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    signal_id: Mapped[int] = mapped_column(ForeignKey("model_signals.id"), nullable=False, unique=True)
+
+    opportunity_cost_pnl: Mapped[float] = mapped_column(Float, nullable=False)
+    max_favorable_excursion: Mapped[float] = mapped_column(Float, nullable=False)
+    max_adverse_excursion: Mapped[float] = mapped_column(Float, nullable=False)
+    would_have_won: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    rejection_reason: Mapped[str | None] = mapped_column(String(200))
+
+    # Relationship
+    signal: Mapped["ModelSignal"] = relationship("ModelSignal", back_populates="blocked_analysis")
+
+
+class ExecutionQuality(Base, AuditMixin):
+    """Stores high-precision execution analytics for each trade."""
+
+    __tablename__ = "execution_qualities"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    trade_id: Mapped[int] = mapped_column(ForeignKey("trades.id"), nullable=False, unique=True)
+
+    slippage_pips: Mapped[float] = mapped_column(Float, nullable=False)
+    execution_latency_ms: Mapped[float] = mapped_column(Float, nullable=False)
+    fill_quality_score: Mapped[float] = mapped_column(Float, nullable=False)
+    edge_capture: Mapped[float] = mapped_column(Float, nullable=False)
+    timing_efficiency: Mapped[float] = mapped_column(Float, nullable=False)
+    alpha_decay_pips: Mapped[float] = mapped_column(Float, nullable=False)
+    execution_cost_pips: Mapped[float] = mapped_column(Float, nullable=False)
+    session: Mapped[str | None] = mapped_column(String(20))
+
+    # Detailed markouts (stored as JSON string for simplicity in SQLite)
+    markout_data: Mapped[str | None] = mapped_column(Text)
+
+    # Relationship
+    trade: Mapped["Trade"] = relationship("Trade", back_populates="execution_quality")
 
 
 class RiskEvent(Base, AuditMixin):
