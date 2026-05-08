@@ -43,7 +43,9 @@ SLIPPAGE_HISTOGRAM = Histogram(
     "trading_slippage_pips", "Difference between expected and actual price"
 )
 FILL_RATE_GAUGE = Gauge("trading_fill_rate", "Percentage of orders filled at intended price")
-REJECTED_ORDER_COUNTER = Counter("trading_orders_rejected_total", "Total number of rejected orders")
+REJECTED_ORDER_COUNTER = Counter(
+    "trading_orders_rejected_total", "Total number of rejected orders", ["reason"]
+)
 
 # 3. System Health Metrics
 CPU_USAGE_GAUGE = Gauge("system_cpu_usage_percent", "System CPU utilization percentage")
@@ -297,9 +299,19 @@ class Monitor:
             fill_rate=fill_rate,
         )
 
+        if latency_ms > 1000:
+            msg = f"🚨 CRITICAL: High Execution Latency!\nLatency: {latency_ms:.0f}ms (Threshold: 1000ms)"
+            self.send_message(msg)
+            logger.error("high_execution_latency_alert", latency_ms=latency_ms)
+
+    def log_drawdown(self, drawdown: float) -> None:
+        """Update drawdown metric for real-time tracking."""
+        DRAWDOWN_GAUGE.set(drawdown * 100)
+        logger.debug("drawdown_logged", drawdown_pct=drawdown * 100)
+
     def record_rejection(self, reason: str) -> None:
         """Record a rejected order."""
-        REJECTED_ORDER_COUNTER.inc()
+        REJECTED_ORDER_COUNTER.labels(reason=reason).inc()
         logger.warning("order_rejected", reason=reason)
 
     def log_model_performance(
