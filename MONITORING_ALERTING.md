@@ -9,7 +9,7 @@ Comprehensive real-time monitoring and intelligent alerting system providing 24/
 ### 1.1 Monitoring Stack
 - **Metrics Collection**: Prometheus for time-series metrics
 - **Log Aggregation**: ELK Stack (Elasticsearch, Logstash, Kibana)
-- **Tracing**: Jaeger for distributed tracing
+- **Tracing**: Jaeger for distributed tracing and internal end-to-end trace correlation using UUIDs
 - **Visualization**: Grafana for dashboards
 - **Alerting**: Prometheus AlertManager + PagerDuty
 - **Data Retention**: 30 days hot, 1 year cold storage
@@ -78,6 +78,7 @@ Comprehensive real-time monitoring and intelligent alerting system providing 24/
 - **Missing Data Points**: Count of missing candles
 - **Data Latency**: End-to-end data pipeline delay
 - **Reconciliation Mismatches**: Broker vs local balance differences
+- **Trace Correlation**: Consistency of UUID propagation across logs and database records
 
 ## 3. Dashboards
 

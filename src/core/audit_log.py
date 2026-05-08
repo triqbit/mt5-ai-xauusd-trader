@@ -52,6 +52,7 @@ class AuditEntry(Base):
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
 
@@ -96,11 +97,17 @@ class AuditLogger:
         if metadata:
             redacted_metadata = get_masking_processor().redact_any(metadata)
 
+        # Automatically extract trace_id from structlog context if available
+        import structlog.contextvars
+        context = structlog.contextvars.get_contextvars()
+        trace_id = context.get("trace_id")
+
         with self.Session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
                 details=details,
+                trace_id=trace_id,
                 metadata_json=redacted_metadata,
             )
             session.add(entry)
