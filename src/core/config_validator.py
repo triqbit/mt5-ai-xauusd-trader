@@ -344,7 +344,7 @@ class ConfigValidator:
                         levels[i + 1][0],
                         f"{levels[i+1][0]} ({levels[i+1][1]}) must be greater than {levels[i][0]} ({levels[i][1]}).",
                         True,
-                        f"Correct the daily loss hierarchy in .env.",
+                        "Correct the daily loss hierarchy in .env.",
                     )
                 )
 
