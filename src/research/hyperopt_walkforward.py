@@ -250,7 +250,7 @@ class WalkForwardOptimizer:
                 # Small perturbation (e.g. 5%)
                 # Ensure a minimum delta for small or zero values
                 if is_int:
-                    delta = max(1, int(round(abs(original_val) * perturbation_pct)))
+                    delta = max(1, round(abs(original_val) * perturbation_pct))
                 else:
                     # For floats, use a small epsilon if value is 0
                     delta = max(1e-4, abs(original_val) * perturbation_pct)
@@ -260,7 +260,7 @@ class WalkForwardOptimizer:
                     new_val = original_val + (direction * delta)
 
                     if is_int:
-                        new_val = int(round(new_val))
+                        new_val = round(new_val)
 
                     # Skip if no actual change
                     if new_val == original_val:

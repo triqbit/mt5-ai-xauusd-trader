@@ -134,12 +134,11 @@ class RiskManager:
         if active_pos_count >= self.cfg.max_positions:
             return RiskDecision(False, "Max concurrent positions reached")
 
-        if open_positions is not None:
-            if not self._check_directional_exposure(signal, open_positions):
-                return RiskDecision(False, "Max directional exposure reached (30%)")
-            if market_data is not None:
-                if not self._check_total_notional(signal, open_positions, market_data):
-                    return RiskDecision(False, "Total notional exposure exceeds limit")
+        if open_positions is not None and not self._check_directional_exposure(signal, open_positions):
+            return RiskDecision(False, "Max directional exposure reached (30%)")
+
+        if open_positions is not None and market_data is not None and not self._check_total_notional(signal, open_positions, market_data):
+            return RiskDecision(False, "Total notional exposure exceeds limit")
 
         # Layer 5: Symbol Allocation
         if signal.symbol != self.cfg.symbol:
@@ -259,9 +258,7 @@ class RiskManager:
 
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:
-        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
-            return False
-        return True
+        return self.daily.consecutive_losses < self.cfg.max_losing_streak
 
     def _check_model_health(self, health: Optional[dict]) -> bool:
         if health is None:
@@ -273,9 +270,7 @@ class RiskManager:
             return False
         if accuracy < self.cfg.model_accuracy_floor:
             return False
-        if calibration > self.cfg.model_calibration_threshold:
-            return False
-        return True
+        return calibration <= self.cfg.model_calibration_threshold
 
     def _check_circuit_breaker(self) -> bool:
         if self.peak_equity <= 0:

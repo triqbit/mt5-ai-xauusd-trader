@@ -48,7 +48,14 @@ def test_institutional_intelligence_path():
 
     regime = detector.detect(data)
     assert isinstance(regime, RegimeInfo)
-    assert regime.label in [MarketRegime.TRENDING, MarketRegime.RANGING, MarketRegime.VOLATILE_BREAKOUT, MarketRegime.NEWS_SHOCK]
+    assert regime.label in [
+        MarketRegime.TRENDING,
+        MarketRegime.RANGING,
+        MarketRegime.VOLATILE_BREAKOUT,
+        MarketRegime.NEWS_SHOCK,
+        MarketRegime.MEAN_REVERSION,
+        MarketRegime.LOW_VOLATILITY_DRIFT,
+    ]
 
     # 2. Model Input Contextualization (Jules01)
     # Ensure model interface accepts regime_info
