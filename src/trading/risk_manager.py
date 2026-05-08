@@ -119,8 +119,6 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-            if self.monitor:
-                self.monitor.record_rejection(rejection_reason)
         return passed
 
     def size_position(
