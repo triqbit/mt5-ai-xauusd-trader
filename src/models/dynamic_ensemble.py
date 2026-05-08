@@ -2,6 +2,7 @@
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/models/dynamic_ensemble.py
 Dynamic weighting engine for model ensembles.
+Improved adaptation with regime-aware stability controls.
 Author : triqbit
 License: MIT
 """
