@@ -8,15 +8,16 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import platform
 import shutil
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import redis
-from fastapi import APIRouter, FastAPI, HTTPException, status
+from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from prometheus_client import Gauge, make_asgi_app
 from pydantic import BaseModel, Field
@@ -149,12 +150,18 @@ class HealthChecker:
     def check_mt5(self) -> ComponentStatus:
         """Verify MT5/MetaAPI connection and terminal trading status."""
         if not self.connector:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="MT5Connector not initialized")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED, message="MT5Connector not initialized"
+            )
             self._update_gauge("mt5", res.status)
             return res
 
         if not self.connector._is_initialized:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="MT5 connection not initialized", remedy="Check credentials and network")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message="MT5 connection not initialized",
+                remedy="Check credentials and network",
+            )
             self._update_gauge("mt5", res.status)
             return res
 
@@ -241,15 +248,18 @@ class HealthChecker:
             loaded.append(self.model.__class__.__name__)
 
         if not loaded:
-            res = ComponentStatus(status=HealthStatus.FAILED, message="No models loaded in memory", remedy="Ensure model weights exist in models/trained/")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message="No models loaded in memory",
+                remedy="Ensure model weights exist in models/trained/",
+            )
         else:
             msg = f"Models loaded: {', '.join(loaded)}"
             # Optional: integration with model performance tracking
             if hasattr(self.model, "get_health_metrics"):
-                try:
+                with contextlib.suppress(Exception):
                     m = self.model.get_health_metrics()
                     msg += f" | Health: acc={m.get('accuracy', 0):.2f}, drift={m.get('drift', 0):.2f}"
-                except Exception: pass
             res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
 
         self._update_gauge("models", res.status)
@@ -277,7 +287,8 @@ class HealthChecker:
         """Ensure log directory has sufficient space."""
         logs_dir = self.cfg.logs_dir
         if not logs_dir.exists():
-            try: logs_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                logs_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
                 res = ComponentStatus(status=HealthStatus.FAILED, message=f"Log dir error: {e}")
                 self._update_gauge("disk", res.status)
@@ -359,27 +370,31 @@ class HealthChecker:
             msg = f"CRITICAL: Startup Health Gate FAILED. Components: {', '.join(failed)}"
             logger.critical(msg)
             if self.audit_logger:
-                try:
+                with contextlib.suppress(Exception):
                     self.audit_logger.log_operator_action(
-                        operator="system", action="startup_gate_failure", reason=msg, metadata={"failed": failed}
+                        operator="system",
+                        action="startup_gate_failure",
+                        reason=msg,
+                        metadata={"failed": failed},
                     )
-                except Exception: pass
             raise RuntimeError(msg)
 
         if report.status == HealthStatus.DEGRADED:
-            warnings = [n for n, c in report.components.items() if c.status == HealthStatus.DEGRADED]
+            warnings = [
+                n for n, c in report.components.items() if c.status == HealthStatus.DEGRADED
+            ]
             msg = f"Startup Health Gate PASSED with warnings in: {', '.join(warnings)}"
             logger.warning(msg)
             if self.audit_logger:
-                try:
+                with contextlib.suppress(Exception):
                     self.audit_logger.log("system", "startup_gate_warning", msg)
-                except Exception: pass
         else:
             logger.info("Startup Health Gate PASSED successfully")
             if self.audit_logger:
-                try:
-                    self.audit_logger.log("system", "startup_gate_success", "All health checks passed")
-                except Exception: pass
+                with contextlib.suppress(Exception):
+                    self.audit_logger.log(
+                        "system", "startup_gate_success", "All health checks passed"
+                    )
 
         return report
 
@@ -396,7 +411,8 @@ def init_health_checker(config: TradingConfig, connector: MT5Connector, trade_lo
 
 def get_health_checker() -> HealthChecker:
     global _checker
-    if _checker is None: _checker = HealthChecker(get_config())
+    if _checker is None:
+        _checker = HealthChecker(get_config())
     return _checker
 
 @router.get("/liveness", response_model=ComponentStatus)
