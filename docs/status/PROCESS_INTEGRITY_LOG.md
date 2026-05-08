@@ -279,3 +279,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **PR Purge:** Jules05 should urgently close the 394 stale PRs to reduce noise and force rebases to the current baseline.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - Persistent History Destruction).
+
+## 2026-05-08 17:45 GMT+4
+
+**Summary:** Ninth consecutive day of history destruction. PR #874 performs another total system swap, further entrenching the "Graft-and-Swap" model as the standard operating procedure.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The 'main' branch has been reset with a single monolithic graft commit ('f6e7494') for the ninth consecutive day. The repository history remains at a count of 1, effectively disabling all standard Git features for auditing, branching, and merging.
+- **Extreme Labeling Drift (PR #874):** Commit 'f6e7494' is titled "ci: 🎯 jules05: merge queue update 2026-05-08 (#874)", but it replaces the entire repository (386 files, ~55,000 lines). Core trading logic, risk management, and research frameworks are being completely overwritten under a "CI/Merge Queue" label.
+- **Critical PR Backlog Expansion:** Open PRs have increased to 409. These PRs are functionally decoupled from the 'main' branch, as they lack the 'f6e7494' graft in their ancestry. This creates an unmanageable technical debt for contributors.
+- **Bypassed Safety Gates:** A 55,000-line change cannot be safely reviewed in a single PR. The current process bypasses the granular oversight required for institutional-grade trading systems.
+
+**PRs/Commits Involved:**
+- 'main' branch: Commit 'f6e7494' (replaces 'c01ed66' and all prior history).
+- PR #874: Used as the vehicle for the ninth system-wide swap.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #874 used).
+- [ ] CI must pass before merge (CI state for the total system swap is unverifiable via history).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the codebase, including high-risk trading and risk engine components, is being swapped daily with zero traceability).
+
+**Recommended Follow-ups:**
+- **URGENT — Human Intervention Required:** The autonomous workflow has completely diverged from standard Git-based governance. A human must intervene to stop history grafting and restore a linear, traceable commit history.
+- **Audit:** Line-by-line validation of 'src/trading/' and 'src/core/risk_manager.py' against known trusted baselines is mandatory to ensure no unsafe logic was introduced.
+- **PR Purge:** Jules05 must urgently close the 409 stale PRs to reduce noise and force a total project re-synchronization.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - Ninth Consecutive Day of History Destruction).
