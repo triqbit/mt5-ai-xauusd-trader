@@ -395,9 +395,12 @@ class JournalMiner:
                 if 0 < time_diff <= window_minutes:
                     # Check for lot size increase if available
                     lot_increase = False
-                    if "lot_size" in curr_trade and "lot_size" in prev_trade:
-                        if curr_trade["lot_size"] > prev_trade["lot_size"]:
-                            lot_increase = True
+                    if (
+                        "lot_size" in curr_trade
+                        and "lot_size" in prev_trade
+                        and curr_trade["lot_size"] > prev_trade["lot_size"]
+                    ):
+                        lot_increase = True
 
                     revenge_trades.append(
                         {

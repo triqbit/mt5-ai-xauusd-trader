@@ -15,13 +15,24 @@ The research reporting system provides automated generation of institutional-gra
 1. **Market Regime Analysis:** Statistical classification of market conditions.
 2. **Stress Test Outcomes:** Institutional-grade resilience testing under adversarial scenarios including choppy breakouts, regime flips, and stale data simulation.
 3. **Hyperparameter Robustness:** Stability analysis of optimized parameters.
-4. **Trade Pattern Findings:** Journal mining for behavioral risks, toxic motifs, signal combinations, and attribute concentrations.
+4. **Trade Pattern Findings:** Journal mining for behavioral risks (e.g., Revenge Trading), toxic motifs, signal combinations, and attribute concentrations across volatility and confidence dimensions.
 5. **Model Drift Observations:** Statistical tracking of feature distribution shifts.
 6. **Capital Allocation Insights:** Portfolio heat and diversification analytics.
 7. **Benchmark Comparisons:** Performance relative to technical and passive baselines.
 8. **RL Agent Evaluation:** Specialized DRL agent performance auditing including stability, turnover, and regime-sensitivity analysis.
 9. **Rare Event Simulations:** Resilience against black-swan events (flash crashes, etc.). Detailed documentation available in [RARE_EVENT_SIMULATOR.md](RARE_EVENT_SIMULATOR.md).
 10. **Execution Quality:** Alpha decay and slippage analytics.
+
+## Trade Pattern Mining
+
+The `JournalMiner` module (src/analytics/journal_mining.py) performs deep behavioral and statistical analysis on trade history:
+
+- **Revenge Trading Detection (Tilt):** Identifies trades occurring shortly after a loss (default < 30m), specifically highlighting those with increased lot sizes—a key indicator of emotional 'tilt'.
+- **Multi-Dimensional Concentration:** Beyond simple symbol or hour analysis, it correlates performance with:
+  - **Algorithm + Volatility:** Pinpoints which market regimes are optimal for specific models.
+  - **Algorithm + Confidence:** Validates if model confidence scores translate to realized alpha.
+- **Toxic Motifs & Combinations:** Detects recurring patterns of signals from multiple algorithms that frequently precede significant drawdown clusters.
+- **Session-Aware Overtrading:** Monitors trade frequency across global sessions (London, New York, Tokyo, Sydney) to identify session-specific strategy exhaustion.
 
 ## Execution Quality Analytics
 
