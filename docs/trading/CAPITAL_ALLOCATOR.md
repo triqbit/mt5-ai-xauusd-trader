@@ -9,7 +9,7 @@ The `CapitalAllocator` system (src/trading/capital_allocator.py) provides instit
 - **Adaptive Sizing:** Utilizes performance multipliers to reward winning strategies and apply cooling-off floors to losing ones.
 - **Concentration Limits:** Enforces hard safety limits on a per-symbol and per-model-family basis.
 - **Dynamic Budgeting:** Supports real-time updates to the total trading budget via `update_budget`.
-- **Granular Rejection Tracking:** Provides detailed feedback through typed `AllocationResult` and programmatic `RejectionCode` (e.g., `SCALED_TO_ZERO`, `TOTAL_HEAT_LIMIT`).
+- **Granular Rejection Tracking:** Provides detailed feedback through typed `AllocationResult` and programmatic `RejectionCode` (e.g., `SCALED_TO_ZERO`, `TOTAL_HEAT_LIMIT`, `NO_BUDGET`).
 
 ## Technical Components
 

@@ -29,6 +29,7 @@ class RejectionCode(str, Enum):
     FAMILY_CONCENTRATION_LIMIT = "FAMILY_CONCENTRATION_LIMIT"
     CAPITAL_CAP_REACHED = "CAPITAL_CAP_REACHED"
     SCALED_TO_ZERO = "SCALED_TO_ZERO"
+    NO_BUDGET = "NO_BUDGET"
 
 
 class StrategyConfig(BaseModel):
@@ -308,6 +309,18 @@ class CapitalAllocator:
         If allow_scaling is True, instead of rejecting due to heat limits,
         it will return the maximum possible allocation that fits within limits.
         """
+        if self.total_budget <= 0:
+            self._record_rejection(RejectionCode.NO_BUDGET)
+            return AllocationResult(
+                strategy_id=strategy_id,
+                allocated_amount=0.0,
+                allocated_risk_pct=0.0,
+                requested_risk_pct=risk_pct,
+                is_allowed=False,
+                rejection_reason="Total budget is zero or negative",
+                rejection_code=RejectionCode.NO_BUDGET,
+            )
+
         if strategy_id not in self.strategies:
             self._record_rejection(RejectionCode.STRATEGY_NOT_FOUND)
             return AllocationResult(
@@ -364,6 +377,9 @@ class CapitalAllocator:
 
         def _calculate_soft_scale(current: float, limit: float, buffer: float) -> float:
             """Linearly scale down if within the buffer zone of a limit."""
+            if buffer <= 0:
+                return 1.0 if current <= limit else 0.0
+
             soft_limit = limit - buffer
             if current <= soft_limit:
                 return 1.0
