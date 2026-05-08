@@ -12,6 +12,7 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections import deque
 from pathlib import Path
@@ -139,10 +140,8 @@ class EnsembleModel(BaseModel):
         This enables autonomous drift monitoring and adaptive rebalancing.
         """
         audit = None
-        try:
+        with contextlib.suppress(RuntimeError):
             audit = get_audit_logger()
-        except RuntimeError:
-            pass
 
         for name in self.ALGORITHMS:
             self.dynamic_ensemble.record_outcome(name, actual_direction)
