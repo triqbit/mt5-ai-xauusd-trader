@@ -104,6 +104,7 @@ class JournalReport(BaseModel):
     recurring_motifs: list[SignalMotif] = Field(default_factory=list)
     pre_drawdown_motifs: list[SignalMotif] = Field(default_factory=list)
     combination_motifs: list[CombinationMotif] = Field(default_factory=list)
+    revenge_trades: list[dict[str, Any]] = Field(default_factory=list)
     avg_win_duration: float = 0.0
     avg_loss_duration: float = 0.0
 
@@ -125,6 +126,7 @@ class JournalReport(BaseModel):
                     value=c.value,
                     win_rate=c.win_rate,
                     profit_factor=c.profit_factor,
+                    total_trades=c.total_trades,
                 )
             )
 
@@ -185,6 +187,20 @@ class JournalReport(BaseModel):
                 BehavioralRisk(
                     type="Toxic Combination",
                     description=f"Signals {motif.patterns} occurred {motif.frequency} times before drawdowns in {motif.session} session.",
+                )
+            )
+
+        # Revenge Trading Risks
+        if self.revenge_trades:
+            high_lot_revenge = [r for r in self.revenge_trades if r.get("lot_increase")]
+            description = f"Detected {len(self.revenge_trades)} potential revenge trades."
+            if high_lot_revenge:
+                description += f" {len(high_lot_revenge)} involved lot size increases (TILT)."
+
+            risks.append(
+                BehavioralRisk(
+                    type="Revenge Trading",
+                    description=description,
                 )
             )
 
@@ -344,6 +360,56 @@ class JournalMiner:
             )
 
         return results
+
+    def detect_revenge_trading(
+        self, trades_df: pd.DataFrame, window_minutes: int = 30
+    ) -> list[dict[str, Any]]:
+        """
+        Detect potential 'revenge trading' (tilt).
+        Defined as trades occurring shortly after a loss.
+
+        Args:
+            trades_df: DataFrame of executed trades.
+            window_minutes: Lookback window after a loss.
+
+        Returns:
+            List of dictionaries containing revenge trade details.
+        """
+        if trades_df.empty or len(trades_df) < 2:
+            return []
+
+        df = trades_df.sort_values("created_at").copy()
+        # Ensure UTC
+        if df["created_at"].dt.tz is None:
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(UTC)
+
+        revenge_trades = []
+        for i in range(1, len(df)):
+            prev_trade = df.iloc[i - 1]
+            curr_trade = df.iloc[i]
+
+            if prev_trade["pnl"] < 0:
+                time_diff = (
+                    curr_trade["created_at"] - prev_trade["created_at"]
+                ).total_seconds() / 60.0
+                if 0 < time_diff <= window_minutes:
+                    # Check for lot size increase if available
+                    lot_increase = False
+                    if "lot_size" in curr_trade and "lot_size" in prev_trade:
+                        if curr_trade["lot_size"] > prev_trade["lot_size"]:
+                            lot_increase = True
+
+                    revenge_trades.append(
+                        {
+                            "trade_id": int(curr_trade["id"]),
+                            "prev_trade_id": int(prev_trade["id"]),
+                            "time_diff_min": float(time_diff),
+                            "lot_increase": lot_increase,
+                            "pnl": float(curr_trade["pnl"]),
+                        }
+                    )
+
+        return revenge_trades
 
     def detect_drawdown_clusters(self, trades_df: pd.DataFrame) -> list[DrawdownCluster]:
         """Detect clusters of 3+ consecutive losing trades."""
@@ -532,6 +598,66 @@ class JournalMiner:
                     PatternConcentration(
                         attribute="algo_session",
                         value=f"{algo} @ {sess}",
+                        win_rate=win_rate,
+                        profit_factor=profit_factor,
+                        total_trades=trade_count,
+                    )
+                )
+
+        # Multi-attribute: Algorithm + Volatility
+        if "algorithm" in trades_df.columns and "volatility" in trades_df.columns:
+            df = trades_df.copy()
+            df["vol_bucket"] = df["volatility"].apply(self._extract_volatility_bucket)
+            combos = df.groupby(["algorithm", "vol_bucket"])
+            for (algo, vol), group in combos:
+                trade_count = len(group)
+                if trade_count < 2:
+                    continue
+                wins = group[group["pnl"] > 0]
+                losses = group[group["pnl"] < 0]
+                win_rate = len(wins) / trade_count
+                gross_profit = wins["pnl"].sum()
+                gross_loss = abs(losses["pnl"].sum())
+                profit_factor = (
+                    gross_profit / gross_loss
+                    if gross_loss > 0
+                    else (float("inf") if gross_profit > 0 else 0.0)
+                )
+
+                results.append(
+                    PatternConcentration(
+                        attribute="algo_volatility",
+                        value=f"{algo} @ {vol} Vol",
+                        win_rate=win_rate,
+                        profit_factor=profit_factor,
+                        total_trades=trade_count,
+                    )
+                )
+
+        # Multi-attribute: Algorithm + Confidence
+        if "algorithm" in trades_df.columns and "confidence" in trades_df.columns:
+            df = trades_df.copy()
+            df["conf_bucket"] = df["confidence"].apply(self._extract_confidence_bucket)
+            combos = df.groupby(["algorithm", "conf_bucket"])
+            for (algo, conf), group in combos:
+                trade_count = len(group)
+                if trade_count < 2:
+                    continue
+                wins = group[group["pnl"] > 0]
+                losses = group[group["pnl"] < 0]
+                win_rate = len(wins) / trade_count
+                gross_profit = wins["pnl"].sum()
+                gross_loss = abs(losses["pnl"].sum())
+                profit_factor = (
+                    gross_profit / gross_loss
+                    if gross_loss > 0
+                    else (float("inf") if gross_profit > 0 else 0.0)
+                )
+
+                results.append(
+                    PatternConcentration(
+                        attribute="algo_confidence",
+                        value=f"{algo} @ {conf} Conf",
                         win_rate=win_rate,
                         profit_factor=profit_factor,
                         total_trades=trade_count,
@@ -937,6 +1063,9 @@ class JournalMiner:
                         "created_at": t.created_at,
                         "algorithm": t.signal.algorithm if t.signal else "Unknown",
                         "signal_id": t.signal_id,
+                        "lot_size": t.lot_size,
+                        "volatility": t.signal.volatility if t.signal else None,
+                        "confidence": t.signal.confidence if t.signal else None,
                     }
                     for t in trades_raw
                 ]
@@ -981,6 +1110,7 @@ class JournalMiner:
                 recurring_motifs=self.find_frequent_motifs(signals_df, trades_df),
                 pre_drawdown_motifs=self.detect_pre_drawdown_motifs(signals_df, trades_df),
                 combination_motifs=self.find_combination_motifs(signals_df, trades_df),
+                revenge_trades=self.detect_revenge_trading(trades_df),
                 avg_win_duration=durations["avg_win_duration"],
                 avg_loss_duration=durations["avg_loss_duration"],
             )
