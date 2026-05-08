@@ -22,10 +22,20 @@ The following table summarizes the backup and retention strategy for all critica
 *Note: All backups must be encrypted at rest in off-site storage.*
 
 ## 4. Archival Policy
-To ensure long-term data durability and compliance:
-- **Daily Off-site Sync**: Backups from the local `backups/` directory are synchronized to secure off-site storage (e.g., AWS S3 with Glacier Instant Retrieval) daily.
-- **Compliance Archival**: Trade records and audit logs are exported to compressed Parquet/CSV format annually and stored in Immutable Storage for 7 years.
-- **Archival Integrity**: Off-site archives must have their SHA256 checksums verified quarterly against the original backup records.
+
+### 4.1 Trade Logs and Audit Trails
+To ensure regulatory compliance and long-term traceability:
+- **Annual Export**: Every year, all records from `trades` and `audit_log` tables older than 1 year are exported to compressed CSV/Parquet format.
+- **Immutable Storage**: These exports are moved to WORM (Write Once, Read Many) storage for a minimum of 7 years.
+- **Checksum Manifest**: Each export is accompanied by a SHA256 checksum manifest to ensure immutability.
+
+### 4.2 Performance Reports
+- **Monthly Roll-up**: Performance snapshots in `reports/` are rolled up into monthly archives (`.tar.gz`).
+- **Retention**: Local retention is 30 days; off-site archival is maintained for 2 years to support multi-year trend analysis.
+
+### 4.3 Off-site Synchronization
+- **Daily Sync**: The `backups/` directory is synchronized to secure off-site storage (e.g., AWS S3 with Glacier Instant Retrieval) every 24 hours.
+- **Verification**: Integrity of off-site archives is verified quarterly by performing a test restoration of a random archive.
 
 ## 5. Backup Strategy
 
@@ -38,7 +48,7 @@ The primary tool for backups is `scripts/backup_verify.sh`. It should be schedul
 ### 5.2. Backup Integrity Checks
 The automated script performs the following checks for every backup:
 1. **SQLite Integrity Check**: Runs `PRAGMA integrity_check;` on the backup file.
-2. **Schema Validation**: Attempts to query critical tables (e.g., `trades`, `audit_log`) to ensure the backup is functional.
+2. **Schema Validation**: Attempts to query critical tables (e.g., `trades`, `risk_events`, `performance_metrics`, `model_signals` for `trades.db`; `audit_log` for `audit.db`) to ensure the backup is functional.
 3. **Checksum Generation**: Creates a `.sha256` manifest for each artifact.
 4. **Archive Verification**: Tests the integrity of compressed log and report archives using `tar -tf`.
 
@@ -109,11 +119,16 @@ The automated script performs the following checks for every backup:
 5. Verify health: `python3 scripts/doctor.py`.
 6. Restart services: `docker-compose up -d`.
 
-## 7. Disaster Recovery Drills
+## 7. Crisis Management & Escalation
+In the event of a major disaster (e.g., total data loss, persistent corruption):
+1. **Incident Declaration**: Immediately log the incident in the audit trail (if available) or external incident tracker.
+2. **Execution Halt**: Use the emergency stop if any trading processes are still active.
+3. **Escalation Path**:
+   - **Primary**: Jules03 (Release Reliability & Governance) - `@andonly1348`
+   - **Secondary**: Jules02 (Security & CI Lead) - `@xnessom`
+4. **Post-Mortem**: A mandatory post-mortem must be conducted within 48 hours of recovery, documented in `docs/audits/INCIDENT_YYYYMMDD.md`.
+
+## 8. Disaster Recovery Drills
 To ensure the effectiveness of this plan, the following drills are mandated:
 - **Quarterly Full Restore**: Once every quarter, the latest backup must be restored to a non-production environment and verified for full functionality.
 - **Drill Documentation**: Results of the drill, including any issues found and corrective actions taken, must be logged in `docs/audits/DR_DRILL_YYYY_QX.md`.
-
-## 8. Escalation Path
-1. **Primary**: Jules03 (Release Reliability & Governance) - `@andonly1348`
-2. **Secondary**: Jules02 (Security & CI Lead) - `@xnessom`
