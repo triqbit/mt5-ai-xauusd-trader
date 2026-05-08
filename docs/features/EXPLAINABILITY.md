@@ -29,7 +29,7 @@ Attributes decisions to specific feature clusters.
 Provides the environmental background for the signal.
 - **Detected Regime**: (e.g., Trending, Ranging, News Shock).
 - **Regime Confidence**: Reliability of the regime classification.
-- **Favorable Check**: Whether the strategy is optimized for the current state.
+- **Favorable Check**: Explicitly flags whether the strategy is optimized for the current state (e.g., "Market state is considered favorable" vs "Market state is UNFAVORABLE/CAUTIONARY").
 
 ### 5. Risk Assessment
 The final gate where signals are validated against institutional risk constraints.
@@ -65,7 +65,9 @@ explanation = explainer.explain(
     risk_data={"passed": True, "risk_reward": 2.5, "summary": "Risk within limits"},
     regime_info=regime,
     # Supports automated feature clustering from raw scores
-    feature_impacts={"base_M5_rsi": 0.8, "base_M5_slope": 0.7}
+    feature_impacts={"base_M5_rsi": 0.8, "base_M5_slope": 0.7},
+    # Pass optional signal_id for end-to-end traceability
+    signal_id=42
 )
 ```
 
