@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Semantic TUI Visuals:** Enhanced the Decision Support System cockpit with semantic emojis (📈, 📉, ✅, ⚠️, 🛑) and panel icons for improved scannability and accessibility.
 - **Enterprise Core Scaffolding:** Refined `src/` package structure and core modules (`config.py`, `mt5_connector.py`, `risk_engine.py`, `ensemble.py`) to meet institutional enterprise standards with full type hints, docstrings, and unit tests.
 - **Institutional Backtesting Engine:** Implemented a high-performance, vectorized walk-forward backtesting engine in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission) and path-dependent metrics (MAE/MFE).
+- **Backtest Performance Optimization:** Refactored `BacktestEngine` to use O(1) incremental peak tracking for drawdown calculations, eliminating O(N^2) complexity in walk-forward simulations.
 - **Institutional Risk Notifications:** Integrated real-time alerts for circuit breaker triggers, margin calls, account balance mismatches, and liquidity (spread) crises into the primary trading loop.
 - **Automated Daily Performance Summaries:** Added logic to detect day changes and trigger automated Telegram summaries capturing daily P&L and trade counts.
 - **Model Health Monitoring:** Implemented confidence degradation warnings and drift detection alerts to ensure institutional model reliability during live execution.
