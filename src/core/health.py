@@ -307,13 +307,13 @@ class HealthChecker:
 
     def check_redis(self) -> ComponentStatus:
         """Verify Redis connectivity if configured."""
-        if not self.cfg.redis_url:
+        if not self.cfg.redis_url or not self.cfg.redis_url.get_secret_value():
             res = ComponentStatus(status=HealthStatus.DEGRADED, message="Redis not configured (Optional)")
             self._update_gauge("redis", res.status)
             return res
 
         try:
-            client = redis.from_url(self.cfg.redis_url, socket_timeout=2)
+            client = redis.from_url(self.cfg.redis_url.get_secret_value(), socket_timeout=2)
             if client.ping():
                 res = ComponentStatus(status=HealthStatus.HEALTHY, message="Redis reachable")
             else:

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Configuration Security Hardening:** Converted `redis_url` to `SecretStr` in `TradingConfig` to prevent credential leakage in logs and audit snapshots. Integrated deep redaction for sensitive connection strings.
 - **Monitoring & Alerting System:** Comprehensive real-time monitoring in `src/core/monitor.py` including equity curve tracking, Prometheus metrics export, and Telegram bot integration for critical alerts (circuit breakers, margin calls, liquidity crises) and daily performance summaries.
 - **Production-Ready Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces, probability extraction, and architecture switching in `src/models/`.
 - **Improved Trading Environment:** Refined `TradingEnv` in `src/trading/trading_env.py` with institutional reward skeleton and Gymnasium compatibility.
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency Parity Guard:** Introduced `scripts/verify_dependencies.py` and `tests/test_verify_dependencies.py` to automate version synchronization checks across environment-specific requirements files.
 
 ### Changed
+- **CI Dependency Pinning:** Pinned type stub dependencies (`types-redis`, `types-requests`, `types-python-dateutil`, `types-setuptools`, `types-PyYAML`) in `requirements-ci.txt` to stable versions for environment reproducibility and build stability.
 - **Dependency Harmonization:** Aligned core dependencies (`pandas==2.3.2`, `fastapi==0.136.1`, `starlette==0.49.1`) across all environments to resolve security vulnerabilities and satisfy `pandas-ta` requirements.
 - **Hardened Risk Validation:** Tightened startup configuration checks to treat `model_calibration_threshold` breaches (> 0.25) as critical failures, ensuring runtime alignment with `RISK_LIMITS.md`.
 
