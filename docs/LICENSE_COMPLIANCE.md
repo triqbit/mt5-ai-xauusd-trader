@@ -53,5 +53,5 @@ If the automated scanner detects a risky or incompatible license:
    - `peewee` (UNKNOWN by scanner, but MIT licensed).
 
 ---
-*Last Updated: 2025-05-15*
+*Last Updated: 2025-06-01*
 *Owner: Jules03 (Release & Governance Lead)*
