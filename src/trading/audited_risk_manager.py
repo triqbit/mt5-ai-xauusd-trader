@@ -94,4 +94,6 @@ class AuditedRiskManager(RiskManager):
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+            if self.monitor:
+                self.monitor.record_rejection(f"Risk filters: {reason_str}")
         return passed

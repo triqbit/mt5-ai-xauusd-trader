@@ -213,18 +213,38 @@ class TestMonitor(unittest.TestCase):
         self.assertIn("50.00%", msg)
 
     def test_log_execution_quality(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
         with patch.object(EXECUTION_LATENCY_HISTOGRAM, "observe") as mock_latency, \
              patch.object(SLIPPAGE_HISTOGRAM, "observe") as mock_slippage, \
              patch.object(FILL_RATE_GAUGE, "set") as mock_fill:
+
+            # Case 1: Normal latency
             self.monitor.log_execution_quality(150.0, 0.5, 0.95)
-            mock_latency.assert_called_once_with(0.15)
-            mock_slippage.assert_called_once_with(0.5)
-            mock_fill.assert_called_once_with(95.0)
+            mock_latency.assert_called_with(0.15)
+            mock_slippage.assert_called_with(0.5)
+            mock_fill.assert_called_with(95.0)
+            self.assertFalse(self.monitor.bot.send_message.called)
+
+            # Case 2: High latency alert
+            self.monitor.log_execution_quality(1200.0, 0.5, 0.95)
+            self.assertTrue(self.monitor.bot.send_message.called)
+            msg = self.monitor.bot.send_message.call_args[1]["text"]
+            self.assertIn("High Execution Latency", msg)
+            self.assertIn("1200ms", msg)
+
+    def test_log_drawdown(self):
+        with patch.object(DRAWDOWN_GAUGE, "set") as mock_set:
+            self.monitor.log_drawdown(0.05)
+            mock_set.assert_called_once_with(5.0)
 
     def test_record_rejection(self):
-        with patch.object(REJECTED_ORDER_COUNTER, "inc") as mock_inc:
+        with patch.object(REJECTED_ORDER_COUNTER, "labels") as mock_labels:
+            mock_counter = MagicMock()
+            mock_labels.return_value = mock_counter
             self.monitor.record_rejection("Test reason")
-            mock_inc.assert_called_once()
+            mock_labels.assert_called_once_with(reason="Test reason")
+            mock_counter.inc.assert_called_once()
 
     def test_log_model_performance(self):
         self.monitor.bot = MagicMock()

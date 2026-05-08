@@ -119,6 +119,8 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
+            if self.monitor:
+                self.monitor.record_rejection(rejection_reason)
         return passed
 
     def size_position(
@@ -156,6 +158,11 @@ class RiskManager:
         if current_equity > self.daily.peak_equity:
             self.daily.peak_equity = current_equity
 
+        if self.monitor:
+            self.monitor.log_equity(current_equity)
+            drawdown = (self.peak_equity - self.balance) / self.peak_equity if self.peak_equity > 0 else 0
+            self.monitor.log_drawdown(drawdown)
+
     def record_pnl(self, pnl: float) -> None:
         """Accumulate intraday realised PnL."""
         self.daily.realised_pnl += pnl
@@ -164,6 +171,9 @@ class RiskManager:
             self.daily.consecutive_losses += 1
         else:
             self.daily.consecutive_losses = 0
+
+        if self.monitor:
+            self.monitor.log_pnl(self.daily.realised_pnl)
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""

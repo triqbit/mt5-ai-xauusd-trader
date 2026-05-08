@@ -124,6 +124,7 @@ def _prepare_trade_signal(
     risk: RiskManager,
     allocator: CapitalAllocator,
     audit_logger: Optional[AuditLogger] = None,
+    monitor: Optional[Monitor] = None,
 ) -> TradeSignal:
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -151,6 +152,8 @@ def _prepare_trade_signal(
                 reason=f"Capital allocation rejected: {alloc_result.rejection_reason}",
                 context={"strategy_id": strat_id},
             )
+        if monitor:
+            monitor.record_rejection(f"Allocation rejected: {alloc_result.rejection_reason}")
         approved_risk = 0.0
     else:
         approved_risk = alloc_result.allocated_risk_pct
@@ -383,12 +386,19 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
+                        monitor=monitor,
                     )
                 lot_size = signal.lot_size
 
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
+                    if monitor and health:
+                        monitor.log_model_performance(
+                            accuracy=health.get("accuracy", 1.0),
+                            drift_score=health.get("drift", 0.0),
+                            calibration_error=health.get("calibration", 0.0),
+                        )
                     risk_approved = (
                         risk.approve(signal, signal_id=signal_id, model_health=health)
                         if direction != 0
@@ -424,6 +434,8 @@ def run_live(
                                 filter_decision.blocked_by,
                             )
                             risk_approved = False
+                            if monitor:
+                                monitor.record_rejection(filter_decision.blocked_by)
 
                 # 8. Decision Support System (Cockpit)
                 if direction != 0:
@@ -540,6 +552,8 @@ def run_live(
                                     reason=f"Order execution failure: {e!s}",
                                     context={"direction": direction, "lot_size": lot_size},
                                 )
+                            if monitor:
+                                monitor.record_rejection(f"Execution failed: {e!s}")
                             ticket = None
 
                         if ticket:
