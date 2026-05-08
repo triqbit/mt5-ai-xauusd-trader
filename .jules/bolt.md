@@ -13,3 +13,7 @@
 ## 2025-05-23 - [Vectorized Rolling Linear Regression Slope in Backtester]
 **Learning:** Manual Python loops for rolling statistics (like linear regression slope) are a major bottleneck in backtesting. Replacing a (N \cdot W)$ loop with a vectorized dot product using `np.convolve` with reversed weights (`weights[::-1]`) provides a ~200x speedup.
 **Action:** Ensure vectorized output array length parity with input by using explicit length checks (`if n >= window`) and padding, especially for small $ cases.
+
+## 2026-05-08 - [Incremental Peak Tracking for Drawdown]
+**Learning:** Calculating peak equity using `max()` on a growing list inside a loop creates an O(N^2) complexity bottleneck. For 50,000 bars, this results in significant slowdowns. Tracking the peak incrementally in O(1) reduces total complexity to O(N).
+**Action:** Always maintain running statistics (max, min, sum) for metrics used inside iterative loops instead of re-scanning historical lists.

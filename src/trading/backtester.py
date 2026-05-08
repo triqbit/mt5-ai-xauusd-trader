@@ -90,6 +90,7 @@ class BacktestEngine:
         self.max_positions = max_positions
 
         self.balance = initial_balance
+        self.max_equity = initial_balance
         self.trades: list[BacktestTrade] = []
         self.equity_curve: list[tuple[datetime, float]] = []
         self.results: PerformanceReport | None = None
@@ -243,10 +244,10 @@ class BacktestEngine:
                                 timestamp=bar_time,
                             )
 
-                            # Dynamic Drawdown for Layer 6
+                            # Dynamic Drawdown for Layer 6 (O(1) lookup)
                             current_drawdown = 0.0
                             if self.equity_curve:
-                                peak = max(e[1] for e in self.equity_curve)
+                                peak = self.max_equity
                                 current_equity = self.equity_curve[-1][1]
                                 current_drawdown = (peak - current_equity) / (peak + 1e-8)
 
@@ -298,7 +299,9 @@ class BacktestEngine:
             dir = int(t["signal"].direction)
             unrealized_pnl += (current_price - t["entry_price"]) * dir * t["signal"].lot_size * contract_multiplier
 
-        self.equity_curve.append((timestamp, self.balance + unrealized_pnl))
+        current_equity = self.balance + unrealized_pnl
+        self.equity_curve.append((timestamp, current_equity))
+        self.max_equity = max(self.max_equity, current_equity)
 
     def _open_and_simulate_trade(
         self,
