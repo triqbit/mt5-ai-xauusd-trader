@@ -25,12 +25,13 @@ We use a role-based governance model where specific leads oversee different doma
 - **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models, core).
 
 ### 2. Implementation
-- **Branching Strategy:** We enforce a strict branching strategy. Use descriptive branch names prefixed by type:
-  - `feature/` for new features (e.g., `feature/ppo-optim-v2`)
-  - `bugfix/` for bug fixes (e.g., `bugfix/mt5-conn-leak`)
-  - `hotfix/` for emergency production fixes
-  - `docs/` for documentation-only changes
-- **Conventional Commits:** We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`).
+- **Branching Strategy:** We enforce a strict branching strategy to ensure traceability. All development must occur on branches prefixed by type:
+  - `feature/`: New capabilities or enhancements (e.g., `feature/ppo-optim-v2`)
+  - `bugfix/`: Fixes for identified issues (e.g., `bugfix/mt5-conn-leak`)
+  - `hotfix/`: Emergency production patches directly against `main`
+  - `docs/`: Documentation-only improvements
+  - `refactor/`: Code reorganization without functional changes
+- **Conventional Commits:** All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`, `security:`). This enables automated changelog generation and versioning.
 - **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](../ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
 
 ### 3. Pull Request Lifecycle
@@ -39,7 +40,7 @@ We use a role-based governance model where specific leads oversee different doma
 3.  **Governance Template:** Complete the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) in full.
 4.  **Evidence:** Attach test logs, coverage reports, and backtest evidence.
 5.  **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required.
-6.  **Multi-Signature Sign-off:** Changes to **Sensitive Zones** require sign-off from both the domain lead and the Release/Governance lead (Jules03).
+6.  **Multi-Signature Sign-off:** Changes to **Sensitive Zones** (Trading, Models, Core) require mandatory multi-signature approval from both the relevant domain lead and the Release/Governance lead (@andonly1348).
 7.  **Merge:** Once all criteria are met, the branch is merged into `develop` (or `main` for hotfixes).
 
 ---
@@ -52,7 +53,7 @@ Every Pull Request must pass the following gates before merge:
 2.  **Code Coverage:** Minimum **85%** statement coverage. New code must include unit tests.
 3.  **Type Safety:** `mypy` must return zero errors for all modified files.
 4.  **Linting:** `ruff check .` must return zero errors.
-5.  **Security Scan:** `pip-audit` must show zero vulnerabilities in dependencies.
+5.  **Security Scan:** `pip-audit` or `trivy` must show zero vulnerabilities in dependencies.
 6.  **License Compliance:** All new dependencies must comply with [docs/LICENSE_COMPLIANCE.md](./LICENSE_COMPLIANCE.md).
 7.  **Documentation:** Documentation in `docs/` must be updated to reflect any source code changes.
 
