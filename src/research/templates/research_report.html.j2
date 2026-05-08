@@ -443,19 +443,25 @@
         <thead>
             <tr>
                 <th scope="col">Strategy</th>
-                <th scope="col">Total Return</th>
-                <th scope="col">Sharpe Ratio</th>
-                <th scope="col">Max Drawdown</th>
+                <th scope="col">Return</th>
+                <th scope="col">Sharpe</th>
+                <th scope="col">MaxDD</th>
+                <th scope="col">PF</th>
+                <th scope="col">SQN</th>
+                <th scope="col">Recovery</th>
                 <th scope="col">P-Value</th>
             </tr>
         </thead>
         <tbody>
             {% for b in benchmarks.comparisons %}
             <tr>
-                <td>{{ b.name }}</td>
+                <td><strong>{{ b.name }}</strong></td>
                 <td>{{ b.total_return }}</td>
                 <td>{{ b.sharpe }}</td>
                 <td>{{ b.max_drawdown }}</td>
+                <td>{{ b.profit_factor }}</td>
+                <td>{{ b.sqn }}</td>
+                <td>{{ b.recovery_factor }}</td>
                 <td>{{ b.p_value }}</td>
             </tr>
             {% endfor %}

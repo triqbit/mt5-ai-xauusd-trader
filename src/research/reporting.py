@@ -130,6 +130,9 @@ class BenchmarkComparison(BaseModel):
     sharpe: str
     max_drawdown: str
     p_value: str
+    profit_factor: str = "0.00"
+    sqn: str = "0.00"
+    recovery_factor: str = "0.00"
 
 
 class BenchmarkSection(BaseModel):
@@ -385,9 +388,22 @@ class ResearchReporter:
             table.add_column("Strategy")
             table.add_column("Return")
             table.add_column("Sharpe")
+            table.add_column("MaxDD")
+            table.add_column("PF")
+            table.add_column("SQN")
+            table.add_column("Recov")
             table.add_column("P-Value")
             for b in report.benchmarks.comparisons:
-                table.add_row(b.name, b.total_return, b.sharpe, b.p_value)
+                table.add_row(
+                    b.name,
+                    b.total_return,
+                    b.sharpe,
+                    b.max_drawdown,
+                    b.profit_factor,
+                    b.sqn,
+                    b.recovery_factor,
+                    b.p_value,
+                )
             self.console.print(table)
 
         if report.rl_evaluation:

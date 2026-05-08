@@ -20,6 +20,7 @@ from src.research.benchmarks import (
     EMACrossoverStrategy,
     EnsembleAdapter,
     LSTMAdapter,
+    MACDStrategy,
     MeanReversionStrategy,
     MomentumStrategy,
     NaiveDirectionalStrategy,
@@ -91,6 +92,13 @@ def test_mean_reversion_signals(sample_data):
     assert np.all(np.isin(signals, [0, 1, -1]))
 
 
+def test_macd_signals(sample_data):
+    strategy = MACDStrategy(5, 10, 3)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+
+
 def test_evaluator_metrics(sample_data):
     evaluator = BenchmarkEvaluator(sample_data)
     strategies = [
@@ -98,16 +106,27 @@ def test_evaluator_metrics(sample_data):
         MomentumStrategy(5),
         VolatilityBreakoutStrategy(10),
         RiskFilteredBaseline(5, 10, 0.02),
+        MACDStrategy(5, 10, 3),
     ]
     results = evaluator.evaluate_all(strategies)
     assert isinstance(results, pd.DataFrame)
-    assert len(results) == 4
+    assert len(results) == 5
     assert "Total Return" in results.columns
     assert "Sharpe Ratio" in results.columns
     assert "Sortino Ratio" in results.columns
     assert "Profit Factor" in results.columns
     assert "Calmar Ratio" in results.columns
     assert "Expectancy" in results.columns
+    assert "Skewness" in results.columns
+    assert "Kurtosis" in results.columns
+    assert "VaR_95" in results.columns
+    assert "CVaR_95" in results.columns
+    assert "Ulcer Index" in results.columns
+    assert "Tail Ratio" in results.columns
+    assert "Common Sense Ratio" in results.columns
+    assert "Gain to Pain Ratio" in results.columns
+    assert "Lake Ratio" in results.columns
+    assert "Stability Score" in results.columns
 
 
 def test_comparison_logic(sample_data):

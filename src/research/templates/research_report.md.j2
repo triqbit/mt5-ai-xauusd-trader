@@ -157,10 +157,10 @@
 {% if benchmarks %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Benchmark Comparisons
-| Strategy | Total Return | Sharpe Ratio | Max Drawdown | P-Value (vs Baseline) |
-|----------|--------------|--------------|--------------|-----------------------|
+| Strategy | Total Return | Sharpe | MaxDD | PF | SQN | Recov | P-Value |
+|----------|--------------|--------|-------|----|-----|-------|---------|
 {% for b in benchmarks.comparisons %}
-| {{ b.name }} | {{ b.total_return }} | {{ b.sharpe }} | {{ b.max_drawdown }} | {{ b.p_value }} |
+| {{ b.name }} | {{ b.total_return }} | {{ b.sharpe }} | {{ b.max_drawdown }} | {{ b.profit_factor }} | {{ b.sqn }} | {{ b.recovery_factor }} | {{ b.p_value }} |
 {% endfor %}
 
 **Statistical Significance:**
