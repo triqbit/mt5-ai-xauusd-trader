@@ -46,6 +46,7 @@ except ImportError:
 from src.core import profile
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
+from src.core.constants import SignalDirection
 from src.core.decision_support import DecisionSupportSystem
 from src.core.exceptions import (
     MT5ConnectionError,
@@ -231,6 +232,10 @@ def run_live(
                         # Fetch more bars to satisfy FeatureEngineer and RegimeDetector windows
                         df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=500)
                         tick = connector.get_tick(cfg.symbol)
+                        if not tick or "bid" not in tick:
+                            log.error("Failed to retrieve valid tick for outcome tracking")
+                            time.sleep(poll_interval)
+                            continue
 
                         # 1.1 Record market outcome for drift tracking
                         current_price = tick["bid"]  # Use bid as reference for mid-market
@@ -306,7 +311,8 @@ def run_live(
                     signal_obj = model.predict(
                         obs,
                         seq=seq,
-                        regime_info=regime_info
+                        regime_info=regime_info,
+                        symbol=cfg.symbol
                     )
 
                     direction = signal_obj.direction

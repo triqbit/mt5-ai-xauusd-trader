@@ -132,7 +132,7 @@ class EnsembleModel(BaseModel):
         logger.info("Ensemble outcome observed | actual=%s | new_weights=%s",
                     actual_direction.name, self.weights)
 
-    def aggregate_signals(self, signals: Dict[str, Signal]) -> Signal:
+    def aggregate_signals(self, signals: Dict[str, Signal], symbol: str = "unknown") -> Signal:
         """
         Aggregates pre-calculated signals from sub-models using weighted consensus.
 
@@ -179,6 +179,7 @@ class EnsembleModel(BaseModel):
                 weighted_hold_conf += sig.confidence * norm_weight
 
         metadata = {
+            "symbol": symbol,
             "weighted_probs": {
                 "BUY": weighted_buy_conf,
                 "SELL": weighted_sell_conf,
@@ -290,7 +291,7 @@ class EnsembleModel(BaseModel):
                     "lstm", votes["lstm"].direction, votes["lstm"].confidence
                 )
 
-        return self.aggregate_signals(votes)
+        return self.aggregate_signals(votes, symbol=kwargs.get("symbol", "unknown"))
 
 
 __all__ = ["EnsembleModel"]
