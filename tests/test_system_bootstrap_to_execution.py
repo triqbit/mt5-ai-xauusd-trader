@@ -189,11 +189,13 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     assert risk_approved is True
 
     drawdown = (risk_manager.peak_equity - risk_manager.balance) / risk_manager.peak_equity
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=timezone.utc)
     filter_decision = execution_filter.validate(
         signal,
         df_features,
         current_drawdown=drawdown,
-        timestamp=datetime.now(timezone.utc)
+        timestamp=mid_week_time
     )
     assert filter_decision.is_approved is True
 

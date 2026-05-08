@@ -26,6 +26,8 @@ def execution_filter(mock_config):
 
 @pytest.fixture
 def valid_signal():
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=UTC)
     return TradeSignal(
         symbol="XAUUSD",
         direction=1,
@@ -35,7 +37,7 @@ def valid_signal():
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.7,
-        timestamp=datetime.now(UTC)
+        timestamp=mid_week_time
     )
 
 @pytest.fixture

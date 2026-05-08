@@ -51,14 +51,18 @@ def test_session_violation(filter_svc, execution_builder):
 
 def test_drawdown_violation(filter_svc, execution_builder):
     signal, df, dd = execution_builder.drawdown_violation()
-    decision = filter_svc.validate(signal, df, current_drawdown=dd)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=UTC)
+    decision = filter_svc.validate(signal, df, current_drawdown=dd, timestamp=mid_week_time)
 
     assert decision.is_approved is False
     assert decision.blocked_by == "DRAWDOWN_LIMIT"
 
 def test_confidence_violation(filter_svc, execution_builder):
     signal, df = execution_builder.confidence_violation()
-    decision = filter_svc.validate(signal, df, current_drawdown=0.0)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=UTC)
+    decision = filter_svc.validate(signal, df, current_drawdown=0.0, timestamp=mid_week_time)
 
     assert decision.is_approved is False
     assert decision.blocked_by == "CONFIDENCE_THRESHOLD"
@@ -81,7 +85,9 @@ def test_signal_flicker_violation(filter_svc, execution_builder):
 
 def test_performance_violation(filter_svc, execution_builder):
     signal, df, mock_logger = execution_builder.performance_violation()
-    decision = filter_svc.validate(signal, df, current_drawdown=0.0, trade_logger=mock_logger)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=UTC)
+    decision = filter_svc.validate(signal, df, current_drawdown=0.0, trade_logger=mock_logger, timestamp=mid_week_time)
 
     assert decision.is_approved is False
     assert decision.blocked_by == "PERFORMANCE_FLOOR"

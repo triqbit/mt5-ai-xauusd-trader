@@ -37,9 +37,9 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
     """Verify that RiskManager halts trading when synthetic volatile data causes a drawdown."""
     risk = RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger)
 
-    # Simulate a series of equity updates reflecting a crash
+    # Force a drawdown that exceeds mock_cfg.max_drawdown (default 0.3)
     risk.update_equity(10000.0)  # Peak
-    risk.update_equity(8400.0)  # 16% drawdown (limit is 15%)
+    risk.update_equity(6500.0)   # 35% drawdown (limit is 30%)
 
     signal = TradeSignal(
         symbol="XAUUSD",

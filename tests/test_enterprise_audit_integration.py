@@ -35,7 +35,7 @@ with patch.dict("sys.modules", {
     from src.core.constants import SignalDirection
     from src.trading.audited_risk_manager import AuditedRiskManager
     from src.trading.execution_filter import ExecutionFilter
-    from src.trading.risk_manager import TradeSignal
+    from src.core.schemas import TradeSignal
 
 @pytest.fixture(autouse=True)
 def reset_audit_logger():
@@ -88,7 +88,9 @@ def test_enterprise_audit_flow_double_rejection(mock_cfg, audit_logger):
 
     # 3. Execution Filter Validation (Should fail TREND_ANGLE)
     execution_filter = ExecutionFilter(config=mock_cfg)
-    ef_decision = execution_filter.validate(signal, df, current_drawdown=0.0)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=timezone.utc)
+    ef_decision = execution_filter.validate(signal, df, current_drawdown=0.0, timestamp=mid_week_time)
 
     assert ef_decision.is_approved is False
     assert ef_decision.blocked_by == "TREND_ANGLE"
@@ -159,7 +161,9 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
 
     # 3. Execution Filter Validation (Should PASS)
     execution_filter = ExecutionFilter(config=mock_cfg)
-    ef_decision = execution_filter.validate(signal, df, current_drawdown=0.0)
+    # Tuesday May 12, 2026 10:00 UTC (Mid-week, mid-day)
+    mid_week_time = datetime(2026, 5, 12, 10, 0, 0, tzinfo=timezone.utc)
+    ef_decision = execution_filter.validate(signal, df, current_drawdown=0.0, timestamp=mid_week_time)
 
     assert ef_decision.is_approved is True
 
