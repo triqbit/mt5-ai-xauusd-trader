@@ -6,7 +6,8 @@ Deterministic scenario generator for testing system robustness across market reg
 
 from __future__ import annotations
 
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -37,6 +38,9 @@ class ScenarioGenerator:
             "stale",
             "flash_crash",
             "regime_shift",
+            "mean_reversion",
+            "low_volatility_drift",
+            "news_shock",
         ] = "ranging",
         start_price: float = 2300.0,
         trend_strength: float = 0.001,
@@ -63,6 +67,12 @@ class ScenarioGenerator:
             return self._generate_flash_crash(n_steps, start_price, volatility)
         if regime == "regime_shift":
             return self._generate_regime_shift(n_steps, start_price, volatility)
+        if regime == "mean_reversion":
+            return self._generate_mean_reversion(n_steps, start_price, volatility)
+        if regime == "low_volatility_drift":
+            return self._generate_low_volatility_drift(n_steps, start_price)
+        if regime == "news_shock":
+            return self._generate_news_shock(n_steps, start_price)
         raise ValueError(f"Unknown regime: {regime}")
 
     def _generate_base(self, n_steps: int, start_price: float, returns: np.ndarray) -> pd.DataFrame:
@@ -153,6 +163,42 @@ class ScenarioGenerator:
         returns_ranging = self.rng.normal(0, volatility, mid)
         returns_volatile = self.rng.normal(0, volatility * 4, n_steps - mid)
         returns = np.concatenate([returns_ranging, returns_volatile])
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_mean_reversion(
+        self, n_steps: int, start_price: float, volatility: float
+    ) -> pd.DataFrame:
+        """Oscillating price process with high z-score and low efficiency ratio."""
+        # Oscillate around start_price
+        prices = np.zeros(n_steps)
+        prices[0] = start_price
+        for i in range(1, n_steps):
+            prices[i] = start_price + (start_price * 0.01 * (1 if i % 2 == 0 else -1)) + self.rng.normal(0, 0.0001 * start_price)
+
+        # Force high z-score at the end: sudden jump
+        prices[-1] = start_price * 1.05
+
+        returns = np.diff(prices) / prices[:-1]
+        returns = np.insert(returns, 0, 0)
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_low_volatility_drift(self, n_steps: int, start_price: float) -> pd.DataFrame:
+        """Small constant trend with minimal noise and low ATR."""
+        # Aim for ATR ratio < 0.9. We need to reduce current volatility relative to historical.
+        # Generate some high volatility first, then drop it.
+        mid = n_steps // 2
+        returns_high_vol = self.rng.normal(0, 0.01, mid)
+        returns_drift = np.full(n_steps - mid, 0.00004) + self.rng.normal(0, 0.000001, n_steps - mid)
+        returns = np.concatenate([returns_high_vol, returns_drift])
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_news_shock(self, n_steps: int, start_price: float) -> pd.DataFrame:
+        """Extreme spike at the end to trigger NEWS_SHOCK (> 2.5 ATR ratio)."""
+        # We need a very low-vol background to make the spike stand out
+        # Generate 100 steps of very low vol, then a massive spike
+        n_steps = max(n_steps, 101)
+        returns = self.rng.normal(0, 0.00005, n_steps)
+        returns[-1] = 0.1 # 10% move in one bar
         return self._generate_base(n_steps, start_price, returns)
 
     def _generate_malformed(self, n_steps: int, start_price: float) -> pd.DataFrame:
@@ -325,6 +371,56 @@ class ExecutionScenarioBuilder:
         )
         return signal, df
 
+    def session_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, datetime]:
+        """BUY signal on a Saturday (market closed)."""
+        signal, df = self.passing_buy(symbol)
+        # 2024-06-01 is a Saturday
+        sat = datetime(2024, 6, 1, 12, 0, tzinfo=UTC)
+        signal.timestamp = sat
+        return signal, df, sat
+
+    def drawdown_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, float]:
+        """Signal with excessive drawdown (e.g., 0.15)."""
+        signal, df = self.passing_buy(symbol)
+        return signal, df, 0.15
+
+    def confidence_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
+        """Signal with confidence below threshold (0.4)."""
+        signal, df = self.passing_buy(symbol)
+        signal.confidence = 0.4
+        return signal, df
+
+    def signal_flicker_violation(self, symbol: str = "XAUUSD") -> list[TradeSignal]:
+        """A sequence of oscillating signals (BUY, SELL, BUY, SELL, ...)."""
+        signals = []
+        base_price = 2300.0
+        for i in range(10):
+            direction = 1 if i % 2 == 0 else -1
+            signals.append(
+                TradeSignal(
+                    symbol=symbol,
+                    direction=direction,
+                    entry_price=base_price,
+                    stop_loss=base_price - (100 * direction), # Large SL to avoid price-based violations
+                    take_profit=base_price + (200 * direction),
+                    lot_size=0.1,
+                    algorithm="ensemble",
+                    confidence=0.7, # Lower confidence to avoid RSI-like failures, but above 0.6
+                )
+            )
+        return signals
+
+    def performance_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, Any]:
+        """Signal with a mocked trade logger reporting low win rate."""
+        signal, df = self.passing_buy(symbol)
+
+        # We define a simple dummy class to avoid importing MagicMock at the top level of src
+        class DummyLogger:
+            def read_performance_report(self):
+                return {"win_rate": 0.3}
+
+        return signal, df, DummyLogger()
+
     def trend_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
         """BUY signal in a BEARISH trend (Trend Angle failure)."""
         df = self.gen.generate(n_steps=200, regime="trending", trend_strength=-0.005)
@@ -418,3 +514,41 @@ class ModelHealthGenerator:
     def degraded_calibration() -> dict[str, float]:
         """Breaches calibration threshold."""
         return {"drift": 0.02, "accuracy": 0.85, "calibration": 0.45}
+
+class RegimeScenarioBuilder:
+    """
+    Generates deterministic datasets specifically designed to trigger each MarketRegime.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def trending(self) -> pd.DataFrame:
+        """Triggers MarketRegime.TRENDING."""
+        return self.gen.generate(n_steps=150, regime="trending", trend_strength=0.002, volatility=0.0005)
+
+    def ranging(self) -> pd.DataFrame:
+        """Triggers MarketRegime.RANGING."""
+        return self.gen.generate(n_steps=150, regime="ranging", volatility=0.0005)
+
+    def mean_reversion(self) -> pd.DataFrame:
+        """Triggers MarketRegime.MEAN_REVERSION."""
+        return self.gen.generate(n_steps=150, regime="mean_reversion", volatility=0.001)
+
+    def volatile_breakout(self) -> pd.DataFrame:
+        """Triggers MarketRegime.VOLATILE_BREAKOUT."""
+        # Need ATR ratio > 1.25 and ER > 0.5.
+        mid = 100
+        n_steps = 150
+        returns_low = self.gen.rng.normal(0, 0.0001, mid)
+        returns_high = self.gen.rng.normal(0.005, 0.005, n_steps - mid)
+        returns = np.concatenate([returns_low, returns_high])
+        return self.gen._generate_base(n_steps, 2300.0, returns)
+
+    def low_volatility_drift(self) -> pd.DataFrame:
+        """Triggers MarketRegime.LOW_VOLATILITY_DRIFT."""
+        return self.gen.generate(n_steps=150, regime="low_volatility_drift")
+
+    def news_shock(self) -> pd.DataFrame:
+        """Triggers MarketRegime.NEWS_SHOCK."""
+        return self.gen.generate(n_steps=150, regime="news_shock")
