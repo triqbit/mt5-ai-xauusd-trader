@@ -91,6 +91,7 @@
                 {% if benchmarks %}<a href="#benchmarks">Benchmarks</a>{% endif %}
                 {% if rl_evaluation %}<a href="#rl-evaluation">RL</a>{% endif %}
                 {% if rare_events %}<a href="#rare-events">Rare</a>{% endif %}
+                {% if calibration_analysis %}<a href="#calibration">Calibration</a>{% endif %}
                 {% if execution_quality %}<a href="#execution-quality">Execution</a>{% endif %}
                 <a href="#conclusion">Conclusion</a>
                 <button class="print-btn" onclick="window['print']()" aria-label="Print research report">Print PDF</button>
@@ -133,6 +134,12 @@
             <span class="kpi-label">Execution Efficiency</span>
         </div>
         {% endif %}
+        {% if calibration_analysis %}
+        <div class="kpi-card" style="border-top-color: var(--primary);">
+            <span class="kpi-value">{{ calibration_analysis.ece|round(3) }}</span>
+            <span class="kpi-label">Expected Calib. Error</span>
+        </div>
+        {% endif %}
         {% if allocation_insights %}
         <div class="kpi-card" style="border-top-color: var(--success);">
             <span class="kpi-value">{{ allocation_insights.diversification_score|round(2) }}</span>
@@ -155,6 +162,7 @@
             {% if benchmarks %}<li><a href="#benchmarks">{{ ns.count }}. Benchmark Comparisons</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if rl_evaluation %}<li><a href="#rl-evaluation">{{ ns.count }}. RL Agent Evaluation</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if rare_events %}<li><a href="#rare-events">{{ ns.count }}. Rare Event Simulations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if calibration_analysis %}<li><a href="#calibration">{{ ns.count }}. Confidence Calibration</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if execution_quality %}<li><a href="#execution-quality">{{ ns.count }}. Execution Quality</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             <li><a href="#conclusion">{{ ns.count }}. Conclusion & Recommendations</a></li>
         </ul>
@@ -537,6 +545,43 @@
                 {% endfor %}
             </tbody>
         </table>
+    </section>
+    {% endif %}
+
+    {% if calibration_analysis %}
+    {% set ns.count = ns.count + 1 %}
+    <section id="calibration">
+        <h2>{{ ns.count }}. Confidence Calibration & Reliability</h2>
+        <div style="display: flex; gap: 40px; margin-bottom: 20px;">
+            <div>Status: <span class="status-badge {% if calibration_analysis.status == 'VERIFIED' %}status-verified{% elif calibration_analysis.status == 'CRITICAL' %}status-rejected{% else %}status-provisional{% endif %}">{{ calibration_analysis.status }}</span></div>
+            <div>ECE: <strong style="font-size: 1.2rem;">{{ calibration_analysis.ece|round(4) }}</strong></div>
+            <div>Brier Score: <strong style="font-size: 1.2rem;">{{ calibration_analysis.brier_score|round(4) }}</strong></div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Confidence Range</th>
+                    <th scope="col">Accuracy</th>
+                    <th scope="col">Avg Confidence</th>
+                    <th scope="col">Samples</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in calibration_analysis.buckets %}
+                <tr>
+                    <td>{{ b.range }}</td>
+                    <td>{{ (b.accuracy * 100)|round(1) }}%</td>
+                    <td>{{ (b.confidence * 100)|round(1) }}%</td>
+                    <td>{{ b.samples }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="insight-box" style="margin-top: 1.5rem;">
+            <strong>Operational Insight:</strong><br>
+            {{ calibration_analysis.reliability_insight }}<br><br>
+            <strong>Recommended Threshold:</strong> <code>{{ calibration_analysis.optimal_threshold|round(2) }}</code>
+        </div>
     </section>
     {% endif %}
 

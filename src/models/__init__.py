@@ -6,6 +6,7 @@ import contextlib
 from typing import TYPE_CHECKING
 
 from src.models.base_model import BaseModel, Signal
+from src.models.calibration import CalibrationEngine, CalibrationResult
 
 if TYPE_CHECKING:
     from src.models.dreamer_agent import DreamerAgent
@@ -30,6 +31,8 @@ with contextlib.suppress(ImportError):
 
 __all__ = [
     "BaseModel",
+    "CalibrationEngine",
+    "CalibrationResult",
     "DreamerAgent",
     "DynamicEnsemble",
     "EnsembleModel",
