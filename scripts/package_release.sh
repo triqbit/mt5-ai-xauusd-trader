@@ -87,6 +87,8 @@ python3 scripts/verify_migrations.py
 
 echo "Validating release notes in CHANGELOG.md..."
 python3 scripts/check_release_notes.py
+echo "Verifying version synchronization..."
+python3 scripts/verify_version_sync.py
 
 echo "Verifying dependencies harmonization..."
 python3 scripts/verify_dependencies.py
