@@ -42,7 +42,7 @@ class TestHealthExtended(unittest.TestCase):
         status = self.checker.check_mt5()
         self.assertEqual(status.status, HealthStatus.FAILED)
         self.assertIn("Symbol 'XAUUSD' not found", status.message)
-        self.assertIn("Suggestions: GOLD, XAUUSD.m", status.message)
+        self.assertIn("GOLD, XAUUSD.m", status.message)
         self.assertIn("Check SYMBOL in .env", status.remedy)
 
 if __name__ == "__main__":
