@@ -1,11 +1,11 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
-# Dockerfile (Python 3.11 slim, multi-stage build)
+# Dockerfile (Python 3.12 slim, multi-stage build)
 # Supporting linux/amd64 and linux/arm64
 # ============================================================
 
 # --- Stage 1: builder ------------------------------------------
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.12-slim AS runtime
 
 LABEL maintainer="triqbit"
 LABEL description="XAUUSD MT5 AI Trading Bot"
