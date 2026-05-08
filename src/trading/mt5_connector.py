@@ -102,6 +102,7 @@ class MT5Connector:
         self.metaapi_account: Any | None = None
         self.metaapi_connection: Any | None = None
         self._is_initialized: bool = False
+        self._background_tasks: set[asyncio.Task] = set()
 
     def connect(self) -> bool:
         """Alias for initialize() to support legacy calls."""
@@ -188,7 +189,13 @@ class MT5Connector:
                     await self.metaapi_connection.connect()
                     await self.metaapi_connection.wait_synchronized()
 
-                asyncio.run(_init_metaapi())
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    task = loop.create_task(_init_metaapi())
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
+                else:
+                    asyncio.run(_init_metaapi())
                 self.use_metaapi = True
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured and connected successfully.")
@@ -234,6 +241,20 @@ class MT5Connector:
         """Alias for get_rates() to support legacy calls."""
         return self.get_rates(symbol, timeframe, n_bars)
 
+    def _run_async(self, coro):
+        """Helper to run a coroutine in the appropriate event loop."""
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # This is tricky because we want the result synchronously in this sync method.
+                # nest_asyncio.apply() was called at the top, so we should be able to use asyncio.run
+                # or a loop.run_until_complete if we are in a thread.
+                return loop.run_until_complete(coro)
+            else:
+                return asyncio.run(coro)
+        except RuntimeError:
+            return asyncio.run(coro)
+
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_rates(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """
@@ -275,13 +296,9 @@ class MT5Connector:
                 return df
             else:
 
-                async def _get_rates():
-                    candles = await self.metaapi_connection.get_historical_candles(
-                        symbol, timeframe, None, n_bars
-                    )
-                    return candles
-
-                candles = asyncio.run(_get_rates())
+                candles = self._run_async(
+                    self.metaapi_connection.get_historical_candles(symbol, timeframe, None, n_bars)
+                )
                 df = pd.DataFrame(candles)
                 if not df.empty:
                     df["time"] = pd.to_datetime(df["time"])
@@ -293,6 +310,51 @@ class MT5Connector:
             logger.exception("Unexpected error in get_rates: %s", e)
             self._is_initialized = False
             raise MT5DataError(f"Unexpected data retrieval error: {e}") from e
+
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
+    def get_ticks_range(
+        self, symbol: str, date_from: datetime, date_to: datetime
+    ) -> pd.DataFrame:
+        """
+        Fetch historical tick data for a specific date range.
+
+        Args:
+            symbol: Trading symbol.
+            date_from: Start date.
+            date_to: End date.
+
+        Returns:
+            pd.DataFrame: Tick data (time, bid, ask, last, volume, etc.)
+        """
+        if not self._is_initialized:
+            self.initialize()
+
+        try:
+            if not self.use_metaapi:
+                # Native MT5
+                ticks = mt5.copy_ticks_range(symbol, date_from, date_to, mt5.COPY_TICKS_ALL)
+                if ticks is None:
+                    err_code, err_desc = mt5.last_error()
+                    if err_code in [-1, 10001, 10002]:
+                        self._is_initialized = False
+                    raise MT5DataError(f"Failed to copy ticks range: {err_desc} (code: {err_code})")
+                df = pd.DataFrame(ticks)
+                df["time"] = pd.to_datetime(df["time"], unit="s")
+                return df
+            else:
+                ticks = self._run_async(
+                    self.metaapi_connection.get_historical_ticks(symbol, date_from, date_to)
+                )
+                df = pd.DataFrame(ticks)
+                if not df.empty:
+                    df["time"] = pd.to_datetime(df["time"])
+                return df
+        except Exception as e:
+            if isinstance(e, (MT5DataError, MT5ConnectionError)):
+                raise
+            logger.exception("Unexpected error in get_ticks_range: %s", e)
+            self._is_initialized = False
+            raise MT5DataError(f"Unexpected tick range retrieval error: {e}") from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_rates_range(
@@ -331,18 +393,12 @@ class MT5Connector:
                 df["time"] = pd.to_datetime(df["time"], unit="s")
                 return df
             else:
-
-                async def _get_rates():
-                    # MetaAPI uses ISO strings or dates
-                    # Note: get_historical_candles(symbol, timeframe, startTime, limit)
-                    # We use get_historical_candles(symbol, timeframe, startTime, endTime) if supported
-                    # or limit if preferred.
-                    candles = await self.metaapi_connection.get_historical_candles(
+                # MetaAPI uses ISO strings or dates
+                candles = self._run_async(
+                    self.metaapi_connection.get_historical_candles(
                         symbol, timeframe, date_from, date_to
                     )
-                    return candles
-
-                candles = asyncio.run(_get_rates())
+                )
                 df = pd.DataFrame(candles)
                 if not df.empty:
                     df["time"] = pd.to_datetime(df["time"])
@@ -385,16 +441,12 @@ class MT5Connector:
                     )
                 return {"bid": tick.bid, "ask": tick.ask, "spread": tick.ask - tick.bid}
             else:
-
-                async def _get_tick():
-                    price = await self.metaapi_connection.get_symbol_price(symbol)
-                    return {
-                        "bid": price["bid"],
-                        "ask": price["ask"],
-                        "spread": price["ask"] - price["bid"],
-                    }
-
-                return asyncio.run(_get_tick())
+                price = self._run_async(self.metaapi_connection.get_symbol_price(symbol))
+                return {
+                    "bid": price["bid"],
+                    "ask": price["ask"],
+                    "spread": price["ask"] - price["bid"],
+                }
         except Exception as e:
             if isinstance(e, (MT5DataError, MT5ConnectionError)):
                 raise
@@ -469,11 +521,10 @@ class MT5Connector:
             logger.info("Order executed successfully | ticket=%d", result.order)
             return int(result.order)
         else:
-
-            async def _place_order():
-                action = "BUY" if signal.direction > 0 else "SELL"
-                try:
-                    result = await self.metaapi_connection.create_market_order(
+            action = "BUY" if signal.direction > 0 else "SELL"
+            try:
+                result = self._run_async(
+                    self.metaapi_connection.create_market_order(
                         signal.symbol,
                         action,
                         signal.lot_size,
@@ -481,13 +532,12 @@ class MT5Connector:
                         signal.take_profit,
                         {"comment": f"AI:{signal.algorithm}"},
                     )
-                    return int(result["orderId"])
-                except Exception as e:
-                    raise MT5ExecutionError(f"MetaAPI order placement failed: {e}") from e
-
-            ticket = asyncio.run(_place_order())
-            logger.info("MetaAPI order executed successfully | ticket=%d", ticket)
-            return ticket
+                )
+                ticket = int(result["orderId"])
+                logger.info("MetaAPI order executed successfully | ticket=%d", ticket)
+                return ticket
+            except Exception as e:
+                raise MT5ExecutionError(f"MetaAPI order placement failed: {e}") from e
 
     def get_account_balance(self) -> float:
         """Retrieve current account balance."""
@@ -503,11 +553,7 @@ class MT5Connector:
             acc = mt5.account_info()
             return acc._asdict() if acc else {}
         else:
-
-            async def _get_acc():
-                return await self.metaapi_connection.get_account_information()
-
-            return asyncio.run(_get_acc())
+            return self._run_async(self.metaapi_connection.get_account_information())
 
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve open positions."""
@@ -517,11 +563,7 @@ class MT5Connector:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
             return [p._asdict() for p in positions] if positions else []
         else:
-
-            async def _get_pos():
-                return await self.metaapi_connection.get_positions()
-
-            return asyncio.run(_get_pos())
+            return self._run_async(self.metaapi_connection.get_positions())
 
     def get_terminal_status(self) -> Dict[str, Any]:
         """
@@ -561,12 +603,8 @@ class MT5Connector:
                 "trade_contract_size": info.trade_contract_size,
             }
         else:
-
-            async def _get_info():
-                return await self.metaapi_connection.get_symbol_specification(symbol)
-
             try:
-                spec = asyncio.run(_get_info())
+                spec = self._run_async(self.metaapi_connection.get_symbol_specification(symbol))
                 return {
                     "name": spec["symbol"],
                     "tradable": True,  # MetaAPI symbols are usually tradable if found

@@ -8,8 +8,9 @@ License: MIT
 
 from __future__ import annotations
 
+import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
 import numpy as np
@@ -17,7 +18,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
+from src.core.trade_logger import (
+    Base,
+    BlockedSignalAnalysis,
+    ExecutionQuality,
+    ModelSignal,
+    RiskEvent,
+    Trade,
+)
 from src.trading.mt5_connector import MT5Connector
 
 logger = logging.getLogger(__name__)
@@ -35,6 +43,7 @@ class TradeExecutionQuality(BaseModel):
     execution_latency_ms: float = Field(..., description="Time between signal and execution in ms")
     fill_quality_score: float = Field(..., description="Normalized score 0-1 of fill quality")
     edge_capture: float = Field(..., description="Realized edge vs. theoretical edge")
+    session: str = Field(..., description="Market session (Asian, London, NY)")
     post_entry_drift_5m: float = Field(..., description="Price drift 5 mins after entry")
     post_entry_drift_15m: float = Field(..., description="Price drift 15 mins after entry")
     timing_efficiency: float = Field(
@@ -180,7 +189,7 @@ class ExecutionAnalyzer:
             return 100.0
         return 100000.0
 
-    def analyze_trade(self, trade_id: int) -> TradeExecutionQuality | None:
+    def analyze_trade(self, trade_id: int, persist: bool = False) -> TradeExecutionQuality | None:
         """
         Analyze execution quality for a specific trade.
         Compares requested signal price vs actual execution price.
@@ -237,11 +246,14 @@ class ExecutionAnalyzer:
             # 6. Timing Efficiency
             timing_eff = self._calculate_timing_efficiency(trade)
 
-            # 7. Alpha Decay and Total Cost
+            # 7. Session Detection
+            market_session = self._get_market_session(trade.created_at)
+
+            # 8. Alpha Decay and Total Cost
             alpha_decay = self.calculate_alpha_decay(trade, signal)
             execution_cost = abs(slippage_pips) + (spread_pips / 2.0)
 
-            return TradeExecutionQuality(
+            quality = TradeExecutionQuality(
                 trade_id=trade.id,
                 ticket=trade.ticket,
                 symbol=symbol,
@@ -249,6 +261,7 @@ class ExecutionAnalyzer:
                 execution_latency_ms=float(latency_ms),
                 fill_quality_score=float(fill_quality),
                 edge_capture=float(edge_capture),
+                session=market_session,
                 post_entry_drift_5m=float(markouts.get("5m", 0.0)),
                 post_entry_drift_15m=float(markouts.get("15m", 0.0)),
                 timing_efficiency=float(timing_eff),
@@ -258,6 +271,11 @@ class ExecutionAnalyzer:
                 execution_cost_pips=float(execution_cost),
                 markout_pnls=markouts,
             )
+
+            if persist:
+                self.save_execution_quality(quality)
+
+            return quality
 
     def calculate_drift(
         self, symbol: str, start_time: datetime, direction: int, minutes: int
@@ -348,9 +366,19 @@ class ExecutionAnalyzer:
             else signal.timestamp
         )
 
-        # Movement between signal price and execution price that is NOT slippage
-        # In this context, let's define it as the price movement in the market
-        # during the latency period.
+        # 1. Try high-precision tick data first
+        try:
+            ticks = self.connector.get_ticks_range(trade.symbol, s_timestamp, t_created)
+            if not ticks.empty and len(ticks) >= 2:
+                # Use mid-price for alpha decay to avoid spread noise
+                start_mid = (ticks.iloc[0]["bid"] + ticks.iloc[0]["ask"]) / 2.0
+                end_mid = (ticks.iloc[-1]["bid"] + ticks.iloc[-1]["ask"]) / 2.0
+                market_move = (end_mid - start_mid) * signal.direction
+                return float(market_move / pip_size)
+        except Exception:
+            logger.debug("Tick data not available for alpha decay, falling back to M1")
+
+        # 2. Fallback to M1 rates
         df = self.connector.get_rates_range(trade.symbol, "M1", s_timestamp, t_created)
         if df.empty or len(df) < 2:
             return 0.0
@@ -398,7 +426,18 @@ class ExecutionAnalyzer:
             else trade.created_at
         )
 
-        # Fetch data around execution time
+        # 1. Try high-precision tick data first
+        try:
+            ticks = self.connector.get_ticks_range(
+                trade.symbol, t_created - timedelta(seconds=10), t_created + timedelta(seconds=10)
+            )
+            if not ticks.empty:
+                avg_spread = (ticks["ask"] - ticks["bid"]).mean()
+                return {"spread_pips": float(avg_spread / pip_size)}
+        except Exception:
+            logger.debug("Tick data not available for spread calculation, falling back to M1")
+
+        # 2. Fallback to M1 rates around execution time
         df = self.connector.get_rates_range(
             trade.symbol, "M1", t_created - timedelta(minutes=1), t_created
         )
@@ -416,6 +455,96 @@ class ExecutionAnalyzer:
         spread_pips = (avg_spread_points * point_size) / pip_size
 
         return {"spread_pips": float(spread_pips)}
+
+    def _get_market_session(self, dt: datetime) -> str:
+        """
+        Identify the market session for a given UTC datetime.
+        Asian: 00:00 - 09:00 UTC
+        London: 08:00 - 17:00 UTC
+        NY: 13:00 - 22:00 UTC
+        """
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        else:
+            dt = dt.astimezone(UTC)
+
+        t = dt.time()
+
+        # Check for overlaps and prioritize active sessions
+        # London/NY overlap is the most liquid
+        if time(13, 0) <= t <= time(17, 0):
+            return "London-NY"
+        if time(8, 0) <= t <= time(13, 0):
+            return "London"
+        if time(17, 0) <= t <= time(22, 0):
+            return "NY"
+        if time(0, 0) <= t <= time(8, 0):
+            return "Asian"
+
+        return "Late-NY"
+
+    def save_blocked_analysis(self, analysis: BlockedSignalQuality) -> None:
+        """Persist blocked signal analysis to the database."""
+        with self.Session() as session:
+            existing = (
+                session.query(BlockedSignalAnalysis)
+                .filter(BlockedSignalAnalysis.signal_id == analysis.signal_id)
+                .first()
+            )
+            if existing:
+                existing.opportunity_cost_pnl = analysis.opportunity_cost_pnl
+                existing.max_favorable_excursion = analysis.max_favorable_excursion
+                existing.max_adverse_excursion = analysis.max_adverse_excursion
+                existing.would_have_won = analysis.would_have_won
+                existing.rejection_reason = analysis.rejection_reason
+            else:
+                db_record = BlockedSignalAnalysis(
+                    signal_id=analysis.signal_id,
+                    opportunity_cost_pnl=analysis.opportunity_cost_pnl,
+                    max_favorable_excursion=analysis.max_favorable_excursion,
+                    max_adverse_excursion=analysis.max_adverse_excursion,
+                    would_have_won=analysis.would_have_won,
+                    rejection_reason=analysis.rejection_reason,
+                )
+                session.add(db_record)
+            session.commit()
+
+    def save_execution_quality(self, quality: TradeExecutionQuality) -> None:
+        """Persist execution quality metrics to the database."""
+        with self.Session() as session:
+            existing = (
+                session.query(ExecutionQuality)
+                .filter(ExecutionQuality.trade_id == quality.trade_id)
+                .first()
+            )
+            if existing:
+                # Update existing record
+                existing.slippage_pips = quality.slippage_pips
+                existing.execution_latency_ms = quality.execution_latency_ms
+                existing.fill_quality_score = quality.fill_quality_score
+                existing.edge_capture = quality.edge_capture
+                existing.timing_efficiency = quality.timing_efficiency
+                existing.alpha_decay_pips = quality.alpha_decay_pips
+                existing.execution_cost_pips = quality.execution_cost_pips
+                existing.session = quality.session
+                existing.markout_data = json.dumps(quality.markout_pnls)
+            else:
+                # Create new record
+                db_record = ExecutionQuality(
+                    trade_id=quality.trade_id,
+                    slippage_pips=quality.slippage_pips,
+                    execution_latency_ms=quality.execution_latency_ms,
+                    fill_quality_score=quality.fill_quality_score,
+                    edge_capture=quality.edge_capture,
+                    timing_efficiency=quality.timing_efficiency,
+                    alpha_decay_pips=quality.alpha_decay_pips,
+                    execution_cost_pips=quality.execution_cost_pips,
+                    session=quality.session,
+                    markout_data=json.dumps(quality.markout_pnls),
+                )
+                session.add(db_record)
+
+            session.commit()
 
     def _calculate_timing_efficiency(self, trade: Trade) -> float:
         """
@@ -454,7 +583,9 @@ class ExecutionAnalyzer:
 
         return float(np.clip(efficiency, 0.0, 1.0))
 
-    def analyze_blocked_signals(self, start_time: datetime) -> list[BlockedSignalQuality]:
+    def analyze_blocked_signals(
+        self, start_time: datetime, persist: bool = False
+    ) -> list[BlockedSignalQuality]:
         """
         Evaluate opportunity cost of signals rejected by risk management.
         Calculates what would have happened if the trade was taken.
@@ -482,6 +613,8 @@ class ExecutionAnalyzer:
                 analysis = self._evaluate_opportunity_cost(signal, event.description)
                 if analysis:
                     results.append(analysis)
+                    if persist:
+                        self.save_blocked_analysis(analysis)
 
         return results
 
@@ -566,7 +699,7 @@ class ExecutionAnalyzer:
             would_have_won=would_win,
         )
 
-    def generate_summary_report(self, days: int = 7) -> ExecutionSummary:
+    def generate_summary_report(self, days: int = 7, persist: bool = False) -> ExecutionSummary:
         """Aggregate execution quality metrics into a summary report."""
         from datetime import timedelta
 
@@ -577,11 +710,11 @@ class ExecutionAnalyzer:
 
             qualities = []
             for t in trades:
-                q = self.analyze_trade(t.id)
+                q = self.analyze_trade(t.id, persist=persist)
                 if q:
                     qualities.append(q)
 
-            blocked = self.analyze_blocked_signals(start_time)
+            blocked = self.analyze_blocked_signals(start_time, persist=persist)
 
             if not qualities:
                 return ExecutionSummary(
