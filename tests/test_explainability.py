@@ -464,3 +464,51 @@ def test_signal_explainer_mixed_votes():
     assert lstm_attr.confidence == 0.5
     assert ppo_attr.is_dominant is True
     assert lstm_attr.is_dominant is False
+
+
+def test_signal_explainer_with_signal_id():
+    """Test that SignalExplainer correctly handles and passes through signal_id."""
+    explainer = SignalExplainer()
+    signal_id = 12345
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.9,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        signal_id=signal_id,
+    )
+
+    assert explanation.signal_id == signal_id
+
+
+def test_signal_explainer_summary_regime_favorability():
+    """Test that the summary explicitly mentions market favorability."""
+    explainer = SignalExplainer()
+
+    # Case 1: Favorable Regime
+    exp_favorable = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending", "is_favorable": True},
+    )
+    assert "Market state is considered favorable for this strategy" in exp_favorable.human_readable_summary
+
+    # Case 2: Unfavorable Regime
+    exp_unfavorable = explainer.explain(
+        symbol="XAUUSD",
+        direction=-1,
+        confidence=0.6,
+        model_votes={"ppo": 2},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Volatile", "is_favorable": False},
+    )
+    assert "Market state is UNFAVORABLE/CAUTIONARY for this strategy" in exp_unfavorable.human_readable_summary
