@@ -27,6 +27,23 @@ def verify_migrations():
         print("--- Step 1: Upgrading to head ---")
         command.upgrade(alembic_cfg, "head")
 
+        # 1.5. Check for drift (models vs migrations)
+        print("--- Step 1.5: Checking for model-migration drift ---")
+        try:
+            command.check(alembic_cfg)
+            print("✅ Models and migrations are synchronized.")
+        except Exception as e:
+            print("=" * 60)
+            print("  DEPLOYMENT BLOCKED: MODEL-MIGRATION DRIFT DETECTED")
+            print("=" * 60)
+            print(f"Error: {e}")
+            print("\nRemediation:")
+            print("Your SQLAlchemy models are out of sync with your Alembic migrations.")
+            print("Run the following command to generate a new migration:")
+            print("  alembic revision --autogenerate -m \"Describe your changes\"")
+            print("=" * 60)
+            return False
+
         # 2. Downgrade to base (full reversal)
         print("--- Step 2: Downgrading to base ---")
         command.downgrade(alembic_cfg, "base")
