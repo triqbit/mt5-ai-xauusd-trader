@@ -222,6 +222,10 @@ class TradingConfig(BaseSettings):
     data_freshness_threshold: int = Field(
         default=300, ge=60, description="Maximum age of market data in seconds before alerting"
     )
+    outcome_noise_threshold: float = Field(
+        default=0.0001,
+        description="Threshold for price change to be considered significant for outcome tracking (e.g. 0.0001 = 1 pip for XAUUSD)"
+    )
 
     signal_flicker_window: int = Field(
         default=6, ge=2, le=20, description="Window size for signal flicker detection"

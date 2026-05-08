@@ -187,6 +187,7 @@ def run_live(
     poll_interval = 60  # seconds between signal evaluations
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
+    last_price = None
     while True:
         # 0. Periodic Audit of Configuration State
         if loop_count % 100 == 0 and audit_logger:
@@ -230,6 +231,21 @@ def run_live(
                         # Fetch more bars to satisfy FeatureEngineer and RegimeDetector windows
                         df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=500)
                         tick = connector.get_tick(cfg.symbol)
+
+                        # 1.1 Record market outcome for drift tracking
+                        current_price = tick["bid"]  # Use bid as reference for mid-market
+                        if last_price is not None and hasattr(model, "observe_outcome"):
+                            # Determine actual direction since last prediction
+                            actual_dir = SignalDirection.HOLD
+                            noise_thresh = getattr(cfg, "outcome_noise_threshold", 0.0001)
+                            if current_price > last_price * (1 + noise_thresh):
+                                actual_dir = SignalDirection.BUY
+                            elif current_price < last_price * (1 - noise_thresh):
+                                actual_dir = SignalDirection.SELL
+
+                            model.observe_outcome(actual_dir)
+
+                        last_price = current_price
 
                         if monitor and not df_raw.empty:
                             # Monitor data freshness using latest bar timestamp
@@ -916,7 +932,7 @@ def main() -> int:
 
     # Model Factory based on configured algorithm
     if cfg.algorithm == "ensemble":
-        model = EnsembleModel(device="cpu")
+        model = EnsembleModel(device="cpu", config=cfg)
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         if ppo_path.exists():
