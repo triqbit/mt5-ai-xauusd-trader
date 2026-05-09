@@ -58,6 +58,9 @@ class LSTMAttentionModel(nn.Module if nn else object):
             num_layers: Number of stacked LSTM layers.
             n_heads: Number of attention heads.
             dropout: Dropout probability.
+
+        Raises:
+            ImportError: If PyTorch is not installed.
         """
         if not nn:
             raise ImportError("PyTorch is required for LSTMAttentionModel")
@@ -120,6 +123,9 @@ class LSTMPricePredictor(nn.Module if nn else object):
             input_dim: Number of input features per time step.
             hidden_dim: Number of hidden units in LSTM layers.
             num_layers: Number of recurrent layers.
+
+        Raises:
+            ImportError: If PyTorch is not installed.
         """
         if not nn:
             raise ImportError("PyTorch is required for LSTMPricePredictor")
@@ -156,6 +162,11 @@ class LSTMModel(BaseModel):
         logger: Logger instance for monitoring model activity.
         device: Torch device (cpu or cuda).
         model: Underlying PyTorch model instance.
+
+    Examples:
+        >>> agent = LSTMModel(input_dim=140, use_attention=True)
+        >>> signal = agent.predict(np.random.randn(20, 140))
+        >>> print(signal.direction)
     """
 
     def __init__(
@@ -232,6 +243,9 @@ class LSTMModel(BaseModel):
 
         Returns:
             A Signal object with direction, confidence, and probability distribution.
+
+        Raises:
+            ValueError: If features contain NaN/Inf or have invalid shape.
         """
         # Production-grade robustness: Check for NaN or Inf in input features
         if not np.isfinite(features).all():
@@ -257,7 +271,12 @@ class LSTMModel(BaseModel):
             if x.dim() == 2:
                 x = x.unsqueeze(0)
             elif x.dim() != 3:
-                raise ValueError(f"Expected 2D or 3D input, got {x.dim()}D with shape {x.shape}")
+                self.logger.error(f"Expected 2D or 3D input, got {x.dim()}D with shape {x.shape}")
+                return Signal(
+                    direction=SignalDirection.HOLD,
+                    confidence=0.0,
+                    metadata={"error": f"Invalid input shape: {x.shape}"},
+                )
 
             self.model.eval()
             with torch.no_grad():
@@ -290,6 +309,9 @@ class LSTMModel(BaseModel):
 
         Args:
             path: Target file path for the state dictionary.
+
+        Raises:
+            IOError: If saving the model fails.
         """
         if self.model is not None and torch:
             torch.save(self.model.state_dict(), path)

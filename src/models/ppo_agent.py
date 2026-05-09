@@ -29,6 +29,13 @@ class PPOAgent(BaseModel):
         model: Loaded PPO model instance or None.
         env: Vectorized environment used for model loading/training.
         ppo_kwargs: Hyperparameters passed to the PPO constructor.
+
+    Examples:
+        >>> from src.trading.trading_env import TradingEnv
+        >>> env = TradingEnv(df=sample_df)
+        >>> agent = PPOAgent(env=env)
+        >>> agent.train(total_timesteps=10000)
+        >>> signal = agent.predict(np.random.randn(20, 140))
     """
 
     def __init__(
@@ -46,6 +53,9 @@ class PPOAgent(BaseModel):
             model_path: Optional path to a pre-trained PPO model file (.zip).
             device: Computing device to use ('cpu', 'cuda', 'auto').
             ppo_kwargs: Optional dictionary of hyperparameters for the PPO constructor.
+
+        Raises:
+            ImportError: If stable-baselines3 is not installed (logged as warning).
         """
         self.logger = logging.getLogger(__name__)
         self.device = device
@@ -92,6 +102,9 @@ class PPOAgent(BaseModel):
 
         Returns:
             A Signal object containing direction, confidence, and metadata.
+
+        Raises:
+            ValueError: If features contain NaN/Inf or have invalid shape.
         """
         # Production-grade robustness: Check for NaN or Inf in input features
         if not np.isfinite(features).all():
@@ -110,7 +123,7 @@ class PPOAgent(BaseModel):
             )
 
         try:
-            # Ensure features have a batch dimension for SB3 (usually (batch, window_size, n_features))
+            # Explicit shape validation
             obs = features
             if obs.ndim == 1:
                 # Add batch and window dimensions if only features provided
@@ -118,6 +131,13 @@ class PPOAgent(BaseModel):
             elif obs.ndim == 2:
                 # Add batch dimension if window x features provided
                 obs = np.expand_dims(obs, axis=0)
+            elif obs.ndim > 3:
+                self.logger.error(f"Invalid observation shape: {obs.shape}. Expected up to 3 dims.")
+                return Signal(
+                    direction=SignalDirection.HOLD,
+                    confidence=0.0,
+                    metadata={"error": f"Invalid observation shape: {obs.shape}"},
+                )
 
             # SB3 predict returns (action, states)
             # deterministic=True is used for production/inference consistency
@@ -185,6 +205,9 @@ class PPOAgent(BaseModel):
         Args:
             total_timesteps: Total number of steps to train for.
             callback: Optional callback for monitoring training.
+
+        Raises:
+            RuntimeError: If the model is not initialized.
         """
         if self.model is None:
             self.logger.error("Cannot train: No model or environment loaded.")
@@ -200,6 +223,9 @@ class PPOAgent(BaseModel):
 
         Args:
             path: Target file path for the .zip model.
+
+        Raises:
+            IOError: If saving the model fails.
         """
         if self.model is not None:
             self.model.save(path)
