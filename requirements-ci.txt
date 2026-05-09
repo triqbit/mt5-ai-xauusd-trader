@@ -24,7 +24,7 @@ starlette==0.49.1
 
 # -- Testing -------------------------------------------------------
 optuna==4.2.1
-pytest==8.3.4
+pytest==9.0.3
 pytest-asyncio==0.25.3
 pytest-cov==6.0.0
 pytest-mock==3.14.0
