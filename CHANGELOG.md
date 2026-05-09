@@ -40,7 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Release Readiness Auditing:** Integrated `scripts/check_release_notes.py` to mandate descriptive changelog entries for all new releases.
 
 ### Security
-- No security changes in this section.
+- **Safe PyTorch Deserialization:** Enforced `weights_only=True` in all `torch.load` calls across the codebase (including `main.py` and `src/models/lstm_model.py`) to prevent arbitrary code execution (RCE) from untrusted model files.
+- **Security Regression Guard:** Introduced a static analysis test to ensure any future PyTorch model loading points adhere to the `weights_only` security standard.
 
 ### Deprecated
 - No deprecated items in this section.
