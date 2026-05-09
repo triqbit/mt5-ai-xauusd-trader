@@ -641,7 +641,9 @@ class PortfolioScenarioBuilder:
         requests = [
             AllocationRequest(strategy_id="gold_rl_1", risk_pct=0.15),
             AllocationRequest(strategy_id="gold_rl_2", risk_pct=0.15),
-            AllocationRequest(strategy_id="gold_rl_3", risk_pct=0.15),  # Should hit XAUUSD 0.4 limit
+            AllocationRequest(
+                strategy_id="gold_rl_3", risk_pct=0.15
+            ),  # Should hit XAUUSD 0.4 limit
             AllocationRequest(strategy_id="eur_rl_1", risk_pct=0.15),  # Should hit RL 0.4 limit
         ]
         return configs, requests
@@ -663,13 +665,15 @@ class PortfolioScenarioBuilder:
         Generates requests that push total portfolio heat toward and past 0.7 limit.
         """
         configs = [
-            StrategyConfig(strategy_id=f"strat_{i}", symbol=f"SYM_{i}", model_family=f"FAM_{i}", capital_cap=100000)
+            StrategyConfig(
+                strategy_id=f"strat_{i}",
+                symbol=f"SYM_{i}",
+                model_family=f"FAM_{i}",
+                capital_cap=100000,
+            )
             for i in range(5)
         ]
-        requests = [
-            AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15)
-            for i in range(5)
-        ]
+        requests = [AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15) for i in range(5)]
         # 5 * 0.15 = 0.75 (> 0.7)
         return configs, requests
 

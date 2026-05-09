@@ -315,7 +315,6 @@ class MT5Connector:
                 df["time"] = pd.to_datetime(df["time"], unit="s")
                 return df
             else:
-
                 candles = self._run_async(
                     self.metaapi_connection.get_historical_candles(symbol, timeframe, None, n_bars)
                 )
@@ -332,9 +331,7 @@ class MT5Connector:
             raise MT5DataError(f"Unexpected data retrieval error: {e}") from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
-    def get_ticks_range(
-        self, symbol: str, date_from: datetime, date_to: datetime
-    ) -> pd.DataFrame:
+    def get_ticks_range(self, symbol: str, date_from: datetime, date_to: datetime) -> pd.DataFrame:
         """
         Fetch historical tick data for a specific date range.
 
