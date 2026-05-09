@@ -21,9 +21,11 @@ Provides a weighted breakdown of contributions from the ensemble's constituent m
 
 ### 3. Feature Contributions
 Attributes decisions to specific feature clusters.
-- **Trend Cluster**: Contribution from moving averages and price action.
-- **Volatility Cluster**: Impact of ATR and Bollinger Band features.
-- **Liquidity Cluster**: Influence of volume and order book depth.
+- **Trend Cluster**: Contribution from moving averages (EMA), ADX, and Hilbert Transform (`ht_`) trendlines.
+- **Momentum Cluster**: Impact of RSI, MFI, MACD, Stochastic, and price velocity indicators (returns, log returns, and distance from moving averages).
+- **Volatility Cluster**: Impact of ATR, Bollinger Band width, Keltner Channels, and price action range features (`body_size`, `day_range`).
+- **Volume Cluster**: Influence of relative volume (`rvol`), OBV, VWAP distance, and volume profile proxies.
+- **Pattern Cluster**: Contribution from candle pattern recognition (e.g., Hammer, Engulfing).
 
 ### 4. Market Regime Context
 Provides the environmental background for the signal.
