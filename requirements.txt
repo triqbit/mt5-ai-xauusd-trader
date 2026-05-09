@@ -12,7 +12,7 @@ gymnasium==1.2.3
 numpy==2.2.6
 scipy==1.15.2
 scikit-learn==1.6.1
-pandas==2.2.3
+pandas==3.0.2
 
 # ── Deep Learning Extras ────────────────────────────────────
 transformers==5.0.0rc3
@@ -61,7 +61,7 @@ pydantic-settings==2.7.1
 tomli==2.2.1
 
 # ── Testing ─────────────────────────────────────────────────
-pytest==9.0.3
+pytest==8.3.5
 pytest-asyncio==0.25.3
 pytest-mock==3.14.0
 pytest-cov==6.0.0
