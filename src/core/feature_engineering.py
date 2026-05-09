@@ -98,10 +98,14 @@ class FeatureEngineer:
                         continue
                     with profile_context(f"fe_mtf_{tf}"):
                         mtf_features = self._compute_mtf_features(df, tf)
-                        mtf_blocks.append(mtf_features)
+                        if not mtf_features.empty:
+                            mtf_blocks.append(mtf_features)
 
             # Concatenate all blocks to avoid fragmentation
-            full_df = pd.concat([df, base_features_df, *mtf_blocks], axis=1)
+            if mtf_blocks:
+                full_df = pd.concat([df, base_features_df, *mtf_blocks], axis=1)
+            else:
+                full_df = pd.concat([df, base_features_df], axis=1)
 
             # Optimization: Filter by base and MTF columns
             base_cols = [
@@ -366,6 +370,7 @@ class FeatureEngineer:
         }
         freq = tf_map.get(tf, tf)
 
+        # Resample
         resampled = (
             df.resample(freq)
             .agg(
@@ -380,6 +385,9 @@ class FeatureEngineer:
             .dropna()
         )
 
+        if resampled.empty:
+            return pd.DataFrame()
+
         mtf_all = {}
         mtf_all.update(self._get_technical_indicators(resampled, prefix=f"mtf_{tf}"))
         mtf_all.update(self._get_candle_patterns(resampled, prefix=f"mtf_{tf}"))
@@ -388,7 +396,7 @@ class FeatureEngineer:
 
         # Shift resampled data forward by one timeframe period.
         # A bar starting at 00:00 is only completed and available at 00:05 (for M5).
-        combined_mtf = combined_mtf.shift(1, freq=freq)
+        combined_mtf = combined_mtf.shift(1)
 
         # Reindex to base timeframe index and forward-fill values
         combined_mtf = combined_mtf.reindex(df.index, method="ffill")

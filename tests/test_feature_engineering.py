@@ -35,8 +35,6 @@ def test_compute_features_shape(synthetic_ohlcv):
     features = fe.compute_features(synthetic_ohlcv)
 
     # Should have many features (140+ requested)
-    # Base indicators ~ 40, Candle patterns ~ 60, Price action ~ 7, Volume ~ 15
-    # MTF M5 ~ 100+
     assert features.shape[1] >= 140
     assert not features.empty
 
@@ -51,19 +49,37 @@ def test_normalization_zscore(synthetic_ohlcv):
     features = fe.compute_features(synthetic_ohlcv)
 
     assert not features.empty
-    # Mocks return zeros, so means will be 0 and std will be replaced by 1.0
     means = features.mean()
-    assert np.all(np.abs(means.dropna()) < 1.0)
+    # In a reasonably large sample, normalized means should be close to 0
+    # Use a slightly larger tolerance for real-world signals, but most should be near 0
+    assert np.all(np.abs(means.dropna()) < 0.2)
+
+    stds = features.std()
+    # Features with variation should have std close to 1.0
+    # Candle patterns are often 0 if no pattern is found, so we skip them for std check
+    pattern_cols = [c for c in features.columns if "pattern_" in c or "cdl" in c]
+    varied_cols = [c for c in features.columns if c not in pattern_cols]
+
+    # Also check if varied columns actually have any variance in the raw data
+    # Some indicators might return constant values in certain regimes
+    for col in varied_cols:
+        col_std = stds[col]
+        if not np.isnan(col_std) and col_std > 0:
+            assert np.abs(col_std - 1.0) < 0.1, f"Column {col} has std {col_std}"
 
 
 def test_stateful_normalization(synthetic_ohlcv):
     """Test saving and loading normalization stats."""
+    # Split data
+    train_df = synthetic_ohlcv.iloc[:2000]
+    test_df = synthetic_ohlcv.iloc[2000:]
+
     fe1 = FeatureEngineer(base_timeframe="M1", normalize=True, method="zscore")
-    fe1.compute_features(synthetic_ohlcv)
+    fe1.compute_features(train_df)
     stats = fe1.get_normalization_stats()
 
     assert stats["means"] is not None
-    assert "base_M1_rsi" in stats["means"]
+    assert f"base_M1_rsi" in stats["means"]
 
     fe2 = FeatureEngineer(base_timeframe="M1", normalize=True, method="zscore")
     fe2.set_normalization_stats(stats)
@@ -73,7 +89,7 @@ def test_stateful_normalization(synthetic_ohlcv):
     assert fe2.means["base_M1_rsi"] == fe1.means["base_M1_rsi"]
 
     # Compute with loaded stats
-    features2 = fe2.compute_features(synthetic_ohlcv)
+    features2 = fe2.compute_features(test_df)
     assert not features2.empty
 
 
@@ -124,15 +140,14 @@ def test_no_look_ahead_bias(synthetic_ohlcv):
     df1 = synthetic_ohlcv.copy()
     features1 = fe.compute_features(df1)
 
+    # Change the last bar in the raw data
     df2 = synthetic_ohlcv.copy()
-    # Change the last bar
     df2.iloc[-1, df2.columns.get_loc("close")] += 100.0
 
     fe2 = FeatureEngineer(base_timeframe="M1", timeframes=["M5"], normalize=False)
     features2 = fe2.compute_features(df2)
 
-    # Check the bar before the last one. It should NOT be affected by the change in the last bar.
-    # Note: compute_features drops some rows at the beginning.
+    # The second to last bar of features should be IDENTICAL
     idx = -2
     pd.testing.assert_series_equal(features1.iloc[idx], features2.iloc[idx])
 
@@ -140,9 +155,14 @@ def test_no_look_ahead_bias(synthetic_ohlcv):
 def test_full_mtf_suite(synthetic_ohlcv):
     """Test that all requested timeframes generate features."""
     tfs = ["M1", "M5", "M15", "H1", "H4", "D1"]
-    # If base is M5, it should compute MTF for M1, M15, H1, H4, D1
+
+    # Use a larger dataset for this test to ensure D1 has enough lookback
+    gen = ScenarioGenerator(seed=42)
+    large_df = gen.generate(n_steps=25000, regime="ranging")
+    large_df.index = pd.date_range(start="2024-01-01", periods=25000, freq="1min")
+
     fe = FeatureEngineer(base_timeframe="M5", timeframes=tfs, normalize=False)
-    features = fe.compute_features(synthetic_ohlcv)
+    features = fe.compute_features(large_df)
 
     assert not features.empty
     for tf in ["M1", "M15", "H1", "H4", "D1"]:
