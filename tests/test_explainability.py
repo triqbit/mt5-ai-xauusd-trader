@@ -299,6 +299,50 @@ def test_signal_explainer_feature_clustering():
     assert momentum.impact_level == "High"
 
 
+def test_signal_explainer_new_keywords_categorization():
+    """Test that newly added institutional feature keywords are correctly categorized."""
+    explainer = SignalExplainer()
+    feature_impacts = {
+        "base_M5_ht_trendline": 0.5,
+        "base_M5_log_returns": 0.6,
+        "base_M5_dist_ema_21": 0.4,
+        "base_M5_body_size": 0.3,
+        "base_M5_rvol": 0.7,
+    }
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        feature_impacts=feature_impacts,
+    )
+
+    clusters = {c.cluster_name: c for c in explanation.feature_contributions}
+
+    assert "Trend" in clusters
+    assert "Momentum" in clusters
+    assert "Volatility" in clusters
+    assert "Volume" in clusters
+
+    # Verification of specific mappings
+    # log_returns and dist_ema are Momentum
+    momentum_score = (0.6 + 0.4) / 2
+    assert clusters["Momentum"].contribution_score == momentum_score
+
+    # ht_ is Trend
+    assert clusters["Trend"].contribution_score == 0.5
+
+    # body_size is Volatility
+    assert clusters["Volatility"].contribution_score == 0.3
+
+    # rvol is Volume
+    assert clusters["Volume"].contribution_score == 0.7
+
+
 def test_signal_explainer_structured_inputs():
     """Test explain with RegimeInfo and ExecutionDecision objects."""
     explainer = SignalExplainer()
