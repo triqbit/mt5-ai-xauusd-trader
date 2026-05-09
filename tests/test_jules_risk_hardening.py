@@ -23,6 +23,7 @@ def mock_config():
     cfg.model_drift_threshold = 0.3
     cfg.model_accuracy_floor = 0.5
     cfg.model_calibration_threshold = 0.25
+    cfg.min_lot_size = 0.01
     cfg.telegram_token = MagicMock()
     cfg.telegram_token.get_secret_value.return_value = ""
     return cfg
