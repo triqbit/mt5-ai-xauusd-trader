@@ -6,18 +6,29 @@ import uuid
 import structlog
 import pytest
 from sqlalchemy import select
+from src.core.database import DatabaseManager, Base, get_db_manager
 from src.core.audit_log import AuditLogger, AuditEntry
 from src.core.trade_logger import TradeLogger, ModelSignal, Trade
 
 @pytest.fixture
-def audit_logger(tmp_path):
-    db_path = tmp_path / "audit.db"
-    return AuditLogger(db_url=f"sqlite:///{db_path}")
+def db_manager(tmp_path):
+    # Reset singleton for testing
+    if DatabaseManager._instance:
+        DatabaseManager._instance._initialized = False
+    db_path = tmp_path / "test_trace.db"
+    manager = DatabaseManager(db_url=f"sqlite:///{db_path}")
+    Base.metadata.create_all(manager.engine)
+    return manager
 
 @pytest.fixture
-def trade_logger(tmp_path):
-    db_path = tmp_path / "trades.db"
-    return TradeLogger(db_url=f"sqlite:///{db_path}")
+def audit_logger(db_manager):
+    AuditLogger._instance = None
+    AuditLogger._initialized = False
+    return AuditLogger()
+
+@pytest.fixture
+def trade_logger(db_manager):
+    return TradeLogger()
 
 def test_trace_id_propagation(audit_logger, trade_logger):
     # 1. Setup structlog with contextvars
@@ -57,17 +68,17 @@ def test_trace_id_propagation(audit_logger, trade_logger):
     )
 
     # 5. Verify AuditEntry has the correct trace_id
-    with audit_logger.Session() as session:
+    with get_db_manager().get_session() as session:
         entry = session.execute(select(AuditEntry).where(AuditEntry.action == "test_action")).scalar_one()
         assert entry.trace_id == trace_id
 
     # 6. Verify ModelSignal has the correct trace_id
-    with trade_logger.Session() as session:
+    with get_db_manager().get_session() as session:
         signal = session.execute(select(ModelSignal).where(ModelSignal.id == signal_id)).scalar_one()
         assert signal.trace_id == trace_id
 
     # 7. Verify Trade has the correct trace_id
-    with trade_logger.Session() as session:
+    with get_db_manager().get_session() as session:
         trade = session.execute(select(Trade).where(Trade.ticket == 12345)).scalar_one()
         assert trade.trace_id == trace_id
 
@@ -86,7 +97,7 @@ def test_trace_id_isolation(audit_logger):
     structlog.contextvars.bind_contextvars(trace_id=trace_id_2)
     audit_logger.log(actor="actor2", action="action2")
 
-    with audit_logger.Session() as session:
+    with get_db_manager().get_session() as session:
         entry1 = session.execute(select(AuditEntry).where(AuditEntry.action == "action1")).scalar_one()
         entry2 = session.execute(select(AuditEntry).where(AuditEntry.action == "action2")).scalar_one()
 

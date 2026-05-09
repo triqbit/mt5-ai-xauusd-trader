@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from src import __version__
 from pydantic import SecretStr
 from src.core.config import TradingConfig
+from src.core.database import DatabaseManager, Base
 from src.core.health import (
     ComponentStatus,
     HealthChecker,
@@ -48,20 +49,27 @@ def mock_config():
     return cfg
 
 @pytest.fixture
+def db_manager():
+    if DatabaseManager._instance:
+        DatabaseManager._instance._initialized = False
+    manager = DatabaseManager(db_url="sqlite:///:memory:")
+    Base.metadata.create_all(manager.engine)
+    return manager
+
+@pytest.fixture
 def mock_connector():
     connector = MagicMock()
     connector._is_initialized = True
     connector.use_metaapi = False
     connector.symbol = "XAUUSD"
+    connector.get_account_info.return_value = {"trade_allowed": True}
+    connector.get_terminal_status.return_value = {"algo_trading": True}
+    connector.get_symbol_properties.return_value = {"tradable": True}
     return connector
 
 @pytest.fixture
 def mock_trade_logger():
     logger = MagicMock()
-    # Mocking SQLAlchemy engine connection
-    mock_conn = MagicMock()
-    logger.engine.connect.return_value.__enter__.return_value = mock_conn
-    logger.engine.dialect.do_ping.return_value = True
     return logger
 
 @pytest.fixture
@@ -79,7 +87,7 @@ def mock_audit_logger():
     return logger
 
 @pytest.fixture
-def health_checker(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger):
+def health_checker(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger, db_manager):
     return HealthChecker(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger)
 
 def test_check_liveness(health_checker):
@@ -87,20 +95,19 @@ def test_check_liveness(health_checker):
     assert status.status == HealthStatus.HEALTHY
     assert "active" in status.message
 
-def test_check_database_success(health_checker, mock_trade_logger):
+def test_check_database_success(health_checker, db_manager):
     status = health_checker.check_database()
     assert status.status == HealthStatus.HEALTHY
     assert "reachable" in status.message
-    mock_trade_logger.engine.connect.assert_called_once()
 
-def test_check_database_failure(health_checker, mock_trade_logger):
-    mock_trade_logger.engine.connect.side_effect = Exception("DB error")
-    status = health_checker.check_database()
-    assert status.status == HealthStatus.FAILED
-    assert "DB error" in status.message
+def test_check_database_failure(health_checker, db_manager):
+    with patch.object(db_manager.engine, 'connect', side_effect=Exception("DB error")):
+        status = health_checker.check_database()
+        assert status.status == HealthStatus.FAILED
+        assert "DB error" in status.message
 
 def test_check_mt5_success(health_checker, mock_connector):
-    mock_connector.get_account_info.return_value = {"balance": 1000}
+    mock_connector.get_account_info.return_value = {"balance": 1000, "trade_allowed": True}
     status = health_checker.check_mt5()
     assert status.status == HealthStatus.HEALTHY
     assert "active" in status.message
@@ -228,18 +235,9 @@ def test_check_disk_space_failure(mock_disk_usage, health_checker, mock_config):
     assert status.status == HealthStatus.FAILED
     assert "Low disk" in status.message
 
-def test_check_database_fallback(health_checker, mock_trade_logger):
-    # Mock do_ping to raise AttributeError to trigger SELECT 1 fallback
-    mock_trade_logger.engine.dialect.do_ping.side_effect = AttributeError("No do_ping")
-
-    status = health_checker.check_database()
-    assert status.status == HealthStatus.HEALTHY
-    assert "reachable" in status.message
-    # Verification of SQL execution is implicit as it didn't raise exception
-
 def test_check_mt5_metaapi_active_success(health_checker, mock_connector):
     mock_connector.use_metaapi = True
-    mock_connector.get_account_info.return_value = {"balance": 1000}
+    mock_connector.get_account_info.return_value = {"balance": 1000, "trade_allowed": True}
 
     status = health_checker.check_mt5()
     assert status.status == HealthStatus.HEALTHY
@@ -269,7 +267,7 @@ def test_get_full_report(health_checker, mock_config):
 # --- FastAPI Endpoint Tests ---
 
 @pytest.fixture
-def client(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger):
+def client(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger, db_manager):
     app = FastAPI()
     app.include_router(router)
     init_health_checker(mock_config, mock_connector, mock_trade_logger, mock_model, mock_audit_logger)

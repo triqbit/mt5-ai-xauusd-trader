@@ -62,8 +62,10 @@ class DatabaseManager:
         else:
             # For SQLite, StaticPool is often used for in-memory,
             # but for file-based, we might want NullPool or just default.
-            # However, for consistency in the app:
+            # However, for consistency in the app and to support multi-threading:
             pool_kwargs["poolclass"] = pool.StaticPool
+            # Important for SQLite multi-threaded access (e.g. in tests with FastAPI TestClient)
+            pool_kwargs["connect_args"] = {"check_same_thread": False}
 
         self.engine = create_engine(db_url, **pool_kwargs)
         self.Session = sessionmaker(bind=self.engine, expire_on_commit=False)

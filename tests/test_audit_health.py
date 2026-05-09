@@ -7,11 +7,20 @@ import pytest
 from src.core.audit_log import AuditLogger, AuditEntry
 from src.core.health import HealthChecker, HealthStatus
 from src.core.config import TradingConfig
+from src.core.database import DatabaseManager, Base, get_db_manager
 from pathlib import Path
 
 @pytest.fixture
 def db_url():
     return "sqlite:///:memory:"
+
+@pytest.fixture
+def db_manager(db_url):
+    if DatabaseManager._instance:
+        DatabaseManager._instance._initialized = False
+    manager = DatabaseManager(db_url=db_url)
+    Base.metadata.create_all(manager.engine)
+    return manager
 
 @pytest.fixture
 def mock_config():
@@ -24,25 +33,25 @@ def mock_config():
     cfg.redis_url = mock_redis_url
     return cfg
 
-def test_audit_logger_singleton(db_url):
+def test_audit_logger_singleton(db_manager):
     # Reset singleton for testing
     AuditLogger._instance = None
     AuditLogger._initialized = False
 
-    logger1 = AuditLogger(db_url)
-    logger2 = AuditLogger(db_url)
+    logger1 = AuditLogger()
+    logger2 = AuditLogger()
     assert logger1 is logger2
     assert logger1._initialized is True
 
-def test_audit_log_entry(db_url):
+def test_audit_log_entry(db_manager):
     AuditLogger._instance = None
     AuditLogger._initialized = False
-    logger = AuditLogger(db_url)
+    logger = AuditLogger()
 
     entry_id = logger.log("test_actor", "test_action", "test_details")
     assert entry_id is not None
 
-    with logger.Session() as session:
+    with get_db_manager().get_session() as session:
         entry = session.get(AuditEntry, entry_id)
         assert entry.actor == "test_actor"
         assert entry.action == "test_action"

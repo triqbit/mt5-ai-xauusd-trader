@@ -184,10 +184,7 @@ class HealthChecker:
 
         try:
             with db_manager.engine.connect() as conn:
-                try:
-                    conn.execute(db_manager.engine.dialect.do_ping(conn.connection))
-                except (AttributeError, Exception):
-                    conn.execute(text("SELECT 1"))
+                conn.execute(text("SELECT 1"))
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
             logger.error("Health check - Database failure: %s", e)
