@@ -4,7 +4,8 @@ tests/test_execution_filter.py
 Unit tests for the 6-layer execution filter.
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
@@ -74,7 +75,11 @@ def filter_engine():
     return ExecutionFilter(max_drawdown=0.12)
 
 @pytest.fixture
-def buy_signal():
+def valid_timestamp():
+    return datetime(2023, 10, 10, 10, 0, 0, tzinfo=UTC) # Tuesday
+
+@pytest.fixture
+def buy_signal(valid_timestamp):
     return TradeSignal(
         symbol="XAUUSD",
         direction=1,
@@ -83,11 +88,12 @@ def buy_signal():
         take_profit=1870,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.8
+        confidence=0.8,
+        timestamp=valid_timestamp
     )
 
 @pytest.fixture
-def sell_signal():
+def sell_signal(valid_timestamp):
     return TradeSignal(
         symbol="XAUUSD",
         direction=-1,
@@ -96,7 +102,8 @@ def sell_signal():
         take_profit=1830,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.8
+        confidence=0.8,
+        timestamp=valid_timestamp
     )
 
 # --- Layer 1: ATR Volatility ---
@@ -109,7 +116,7 @@ def test_atr_volatility_pass(filter_engine, base_data):
 
 def test_atr_volatility_fail(filter_engine, base_data):
     df = base_data.copy()
-    # Mock ATR: 1.0 avg, 10.0 current
+    # Mock ATR: 1.0 avg, 10.0 current (ratio 10 > 3)
     df["base_M5_atr"] = [1.0] * 199 + [10.0]
     passed, metrics = filter_engine._check_atr_volatility_with_metrics(df)
     assert passed is False
@@ -142,8 +149,8 @@ def test_ema_sequence_sell_pass(filter_engine, bearish_data):
     assert passed is True
 
 def test_ema_sequence_fail(filter_engine, bullish_data):
-    # Mess up the sequence
-    bullish_data.loc[bullish_data.index[-1], "base_M5_ema_8"] = 0
+    # Mess up the sequence by making EMA 8 small
+    bullish_data.loc[bullish_data.index[-1], "base_M5_ema_8"] = 100.0
     passed, _ = filter_engine._check_ema_sequence_with_metrics(bullish_data, direction=1)
     assert passed is False
 
@@ -165,12 +172,20 @@ def test_momentum_fail(filter_engine, bullish_data):
 
 # --- Layer 5: Session/Time ---
 def test_session_time_pass(filter_engine):
-    dt = datetime(2023, 10, 10, 10, 0, 0) # Tue
+    dt = datetime(2023, 10, 10, 10, 0, 0, tzinfo=UTC) # Tuesday
     assert filter_engine._check_session_time(dt) is True
 
-def test_session_time_fail(filter_engine):
-    dt = datetime(2023, 10, 14, 10, 0, 0) # Sat
+def test_session_time_fail_saturday(filter_engine):
+    dt = datetime(2023, 10, 14, 10, 0, 0, tzinfo=UTC) # Saturday
     assert filter_engine._check_session_time(dt) is False
+
+def test_session_time_fail_friday_late(filter_engine):
+    dt = datetime(2023, 10, 13, 17, 0, 0, tzinfo=UTC) # Friday 17:00
+    assert filter_engine._check_session_time(dt) is False
+
+def test_session_time_pass_sunday_late(filter_engine):
+    dt = datetime(2023, 10, 15, 18, 0, 0, tzinfo=UTC) # Sunday 18:00
+    assert filter_engine._check_session_time(dt) is True
 
 # --- Layer 6: Drawdown ---
 def test_drawdown_pass(filter_engine):
@@ -179,21 +194,76 @@ def test_drawdown_pass(filter_engine):
 def test_drawdown_fail(filter_engine):
     assert filter_engine._check_drawdown_limit(0.13) is False
 
+# --- Layer 7: Model Stability ---
+def test_model_stability_pass(filter_engine, buy_signal, bullish_data):
+    health = {"drift": 0.1, "accuracy": 0.8}
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05, model_health=health)
+    assert decision.trace["model_stability"]["passed"] is True
+
+def test_model_stability_fail_drift(filter_engine, buy_signal, bullish_data):
+    health = {"drift": 0.4, "accuracy": 0.8}
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05, model_health=health)
+    assert decision.trace["model_stability"]["passed"] is False
+    assert decision.blocked_by == "MODEL_STABILITY"
+
+# --- Layer 8: Performance Floor ---
+def test_performance_floor_pass(filter_engine, buy_signal, bullish_data):
+    mock_logger = MagicMock()
+    mock_logger.read_performance_report.return_value = {"win_rate": 0.6, "total_trades": 25}
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05, trade_logger=mock_logger)
+    assert decision.trace["performance_floor"]["passed"] is True
+
+def test_performance_floor_fail(filter_engine, buy_signal, bullish_data):
+    mock_logger = MagicMock()
+    mock_logger.read_performance_report.return_value = {"win_rate": 0.3, "total_trades": 25}
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05, trade_logger=mock_logger)
+    assert decision.trace["performance_floor"]["passed"] is False
+    assert decision.blocked_by == "PERFORMANCE_FLOOR"
+
+def test_performance_floor_ignored_if_few_trades(filter_engine, buy_signal, bullish_data):
+    mock_logger = MagicMock()
+    mock_logger.read_performance_report.return_value = {"win_rate": 0.1, "total_trades": 5}
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05, trade_logger=mock_logger)
+    assert decision.trace["performance_floor"]["passed"] is True
+
+# --- Layer 9: Confidence Threshold ---
+def test_confidence_fail(filter_engine, bullish_data, valid_timestamp):
+    low_conf_signal = TradeSignal(
+        symbol="XAUUSD", direction=1, entry_price=1850, stop_loss=1840, take_profit=1870,
+        lot_size=0.1, algorithm="ensemble", confidence=0.4, timestamp=valid_timestamp
+    )
+    decision = filter_engine.validate(low_conf_signal, bullish_data, 0.05)
+    assert decision.trace["confidence_threshold"]["passed"] is False
+    assert decision.blocked_by == "CONFIDENCE_THRESHOLD"
+
+# --- Layer 10: Signal Consistency ---
+def test_signal_consistency_fail(filter_engine, buy_signal, bullish_data):
+    # Simulate flipping signals: 1, -1, 1, -1, 1
+    filter_engine.validate(buy_signal, bullish_data, 0.05) # 1
+    sell_sig = buy_signal.model_copy(update={"direction": -1, "stop_loss": 1860, "take_profit": 1830})
+    filter_engine.validate(sell_sig, bullish_data, 0.05) # -1
+    filter_engine.validate(buy_signal, bullish_data, 0.05) # 1
+    filter_engine.validate(sell_sig, bullish_data, 0.05) # -1
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05) # 1
+    # Changes: 1->-1, -1->1, 1->-1, -1->1 => 4 changes. Default max is 3.
+    assert decision.trace["signal_consistency"]["passed"] is False
+    assert decision.blocked_by == "SIGNAL_CONSISTENCY"
+
 # --- Full Cascade ---
 def test_full_cascade_pass(filter_engine, buy_signal, bullish_data):
-    ts = datetime(2023, 10, 10, 10, 0, 0)
+    ts = datetime(2023, 10, 10, 10, 0, 0, tzinfo=UTC)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is True
     assert decision.blocked_by is None
 
 def test_full_cascade_blocked_by_session(filter_engine, buy_signal, bullish_data):
-    ts = datetime(2023, 10, 14, 10, 0, 0) # Sat
+    ts = datetime(2023, 10, 14, 10, 0, 0, tzinfo=UTC) # Saturday
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "SESSION_CLOSED"
 
 def test_full_cascade_blocked_by_drawdown(filter_engine, buy_signal, bullish_data):
-    ts = datetime(2023, 10, 10, 10, 0, 0)
+    ts = datetime(2023, 10, 10, 10, 0, 0, tzinfo=UTC)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.15, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "DRAWDOWN_LIMIT"
