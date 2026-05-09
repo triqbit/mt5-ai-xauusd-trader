@@ -109,7 +109,11 @@ class TradingEnv(gym.Env):
         """
         Executes one step in the environment.
 
-        The reward function is based on log returns of the equity.
+        The default reward function is based on log returns of the equity.
+        For production, consider reward shaping:
+        - Penalizing drawdowns
+        - Scaling by volatility (Sharpe-like)
+        - Adding small penalties for excessive switching (transaction costs)
 
         Args:
             action: The action to take (0=HOLD, 1=BUY, 2=SELL).
@@ -120,9 +124,10 @@ class TradingEnv(gym.Env):
         self.current_step += 1
 
         # XAUUSD specific parameters (configurable in production)
-        # Assuming prices are in points or standard units
-        spread = 0.02  # 20 points spread for Gold
-        slippage = 0.01
+        # For Gold (XAUUSD), 1 point is typically 0.01 USD.
+        # institutional spread is often 15-30 points (0.15 - 0.30 USD).
+        spread = 0.20  # 20 points spread for Gold
+        slippage = 0.05
 
         reward = 0.0
         if self._data is not None and self.current_step < len(self._data):

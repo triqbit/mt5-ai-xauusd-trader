@@ -205,11 +205,17 @@ class PPOAgent(BaseModel):
             callback: Optional callback for monitoring training.
 
         Raises:
-            RuntimeError: If the model is not initialized.
+            RuntimeError: If the model is not initialized or environment is missing.
         """
         if self.model is None:
-            self.logger.error("Cannot train: No model or environment loaded.")
-            return
+            error_msg = "Cannot train: Model not initialized."
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        if self.model.get_env() is None:
+            error_msg = "Cannot train: No environment set in the PPO model."
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
         self.logger.info(f"Starting PPO training for {total_timesteps} timesteps...")
         self.model.learn(total_timesteps=total_timesteps, callback=callback)
@@ -226,8 +232,12 @@ class PPOAgent(BaseModel):
             IOError: If saving the model fails.
         """
         if self.model is not None:
-            self.model.save(path)
-            self.logger.info(f"PPO model saved to {path}")
+            save_path = Path(path)
+            # Ensure target directory exists before saving
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+
+            self.model.save(save_path)
+            self.logger.info(f"PPO model saved to {save_path}")
         else:
             self.logger.error("Attempted to save PPOAgent but no model is loaded.")
 
