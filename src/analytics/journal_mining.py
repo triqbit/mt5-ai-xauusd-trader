@@ -92,6 +92,16 @@ class SignalMotif(BaseModel):
     cluster_frequency: int = 0
 
 
+class RevengeTrade(BaseModel):
+    """Details of a potential revenge trade (tilt)."""
+
+    trade_id: int
+    prev_trade_id: int
+    time_diff_min: float
+    lot_increase: bool
+    pnl: float
+
+
 class JournalReport(BaseModel):
     """Final analytical report from journal mining."""
 
@@ -104,7 +114,7 @@ class JournalReport(BaseModel):
     recurring_motifs: list[SignalMotif] = Field(default_factory=list)
     pre_drawdown_motifs: list[SignalMotif] = Field(default_factory=list)
     combination_motifs: list[CombinationMotif] = Field(default_factory=list)
-    revenge_trades: list[dict[str, Any]] = Field(default_factory=list)
+    revenge_trades: list[RevengeTrade] = Field(default_factory=list)
     avg_win_duration: float = 0.0
     avg_loss_duration: float = 0.0
 
@@ -192,7 +202,7 @@ class JournalReport(BaseModel):
 
         # Revenge Trading Risks
         if self.revenge_trades:
-            high_lot_revenge = [r for r in self.revenge_trades if r.get("lot_increase")]
+            high_lot_revenge = [r for r in self.revenge_trades if r.lot_increase]
             description = f"Detected {len(self.revenge_trades)} potential revenge trades."
             if high_lot_revenge:
                 description += f" {len(high_lot_revenge)} involved lot size increases (TILT)."
@@ -254,12 +264,10 @@ class JournalMiner:
         hour = dt.hour
         active = []
         for name, (start, end) in self.sessions.items():
-            if start < end:
-                if start <= hour < end:
-                    active.append(name)
-            else:  # Crosses midnight
-                if hour >= start or hour < end:
-                    active.append(name)
+            if start < end and start <= hour < end:
+                active.append(name)
+            elif start >= end and (hour >= start or hour < end):  # Crosses midnight
+                active.append(name)
         return active
 
     def get_session_stats(self, trades_df: pd.DataFrame) -> list[SessionAnalysis]:
@@ -363,7 +371,7 @@ class JournalMiner:
 
     def detect_revenge_trading(
         self, trades_df: pd.DataFrame, window_minutes: int = 30
-    ) -> list[dict[str, Any]]:
+    ) -> list[RevengeTrade]:
         """
         Detect potential 'revenge trading' (tilt).
         Defined as trades occurring shortly after a loss.
@@ -373,7 +381,7 @@ class JournalMiner:
             window_minutes: Lookback window after a loss.
 
         Returns:
-            List of dictionaries containing revenge trade details.
+            List of RevengeTrade objects containing tilt details.
         """
         if trades_df.empty or len(trades_df) < 2:
             return []
@@ -388,29 +396,28 @@ class JournalMiner:
             prev_trade = df.iloc[i - 1]
             curr_trade = df.iloc[i]
 
-            if prev_trade["pnl"] < 0:
-                time_diff = (
-                    curr_trade["created_at"] - prev_trade["created_at"]
-                ).total_seconds() / 60.0
-                if 0 < time_diff <= window_minutes:
-                    # Check for lot size increase if available
-                    lot_increase = False
-                    if (
-                        "lot_size" in curr_trade
-                        and "lot_size" in prev_trade
-                        and curr_trade["lot_size"] > prev_trade["lot_size"]
-                    ):
-                        lot_increase = True
+            time_diff = (
+                curr_trade["created_at"] - prev_trade["created_at"]
+            ).total_seconds() / 60.0
+            if prev_trade["pnl"] < 0 and 0 < time_diff <= window_minutes:
+                # Check for lot size increase if available
+                lot_increase = False
+                if (
+                    "lot_size" in curr_trade
+                    and "lot_size" in prev_trade
+                    and curr_trade["lot_size"] > prev_trade["lot_size"]
+                ):
+                    lot_increase = True
 
-                    revenge_trades.append(
-                        {
-                            "trade_id": int(curr_trade["id"]),
-                            "prev_trade_id": int(prev_trade["id"]),
-                            "time_diff_min": float(time_diff),
-                            "lot_increase": lot_increase,
-                            "pnl": float(curr_trade["pnl"]),
-                        }
+                revenge_trades.append(
+                    RevengeTrade(
+                        trade_id=int(curr_trade["id"]),
+                        prev_trade_id=int(prev_trade["id"]),
+                        time_diff_min=float(time_diff),
+                        lot_increase=lot_increase,
+                        pnl=float(curr_trade["pnl"]),
                     )
+                )
 
         return revenge_trades
 
@@ -434,16 +441,17 @@ class JournalMiner:
         for trade in trades:
             if trade["pnl"] < 0:
                 current_cluster.append(trade)
-            else:
-                if len(current_cluster) >= 3:
-                    clusters.append(
-                        DrawdownCluster(
-                            start_time=current_cluster[0]["created_at"],
-                            end_time=current_cluster[-1]["created_at"],
-                            trade_count=len(current_cluster),
-                            total_loss=sum(t["pnl"] for t in current_cluster),
-                        )
+            elif len(current_cluster) >= 3:
+                clusters.append(
+                    DrawdownCluster(
+                        start_time=current_cluster[0]["created_at"],
+                        end_time=current_cluster[-1]["created_at"],
+                        trade_count=len(current_cluster),
+                        total_loss=sum(t["pnl"] for t in current_cluster),
                     )
+                )
+                current_cluster = []
+            else:
                 current_cluster = []
 
         # Check last cluster
@@ -690,11 +698,14 @@ class JournalMiner:
         for reason, count in counts.items():
             # Find algorithms impacted by this reason if signal_id is present
             impacted_algos = []
-            if not signals_df.empty and "signal_id" in risk_events_df.columns:
+            if (
+                not signals_df.empty
+                and "signal_id" in risk_events_df.columns
+                and "algorithm" in signals_df.columns
+            ):
                 event_signals = risk_events_df[risk_events_df["event_type"] == reason]["signal_id"]
                 relevant_signals = signals_df[signals_df["id"].isin(event_signals)]
-                if "algorithm" in relevant_signals.columns:
-                    impacted_algos = list(relevant_signals["algorithm"].unique())
+                impacted_algos = list(relevant_signals["algorithm"].unique())
 
             results.append(
                 BlockReasonSummary(
@@ -837,11 +848,12 @@ class JournalMiner:
                     c_end = c_end.replace(tzinfo=UTC)
 
                 # Find trades in this cluster
-                cluster_trades = trades_df[
+                mask = (
                     (trades_df["created_at"] >= c_start)
                     & (trades_df["created_at"] <= c_end)
                     & (trades_df["pnl"] < 0)
-                ]
+                )
+                cluster_trades = trades_df[mask]
                 if "signal_id" in trades_df.columns:
                     cluster_signal_ids.update(cluster_trades["signal_id"].unique())
 
