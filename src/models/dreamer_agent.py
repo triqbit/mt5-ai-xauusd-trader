@@ -145,7 +145,10 @@ class DreamerAgent(BaseModel):
         Args:
             path: Target file path.
         """
-        self.logger.info(f"DreamerAgent.save called for {path} (placeholder).")
+        save_path = Path(path)
+        # Ensure target directory exists before saving (placeholder)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"DreamerAgent.save called for {save_path} (placeholder).")
 
 
 __all__ = ["DreamerAgent"]

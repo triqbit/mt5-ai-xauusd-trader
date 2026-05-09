@@ -48,6 +48,7 @@ class LSTMAttentionModel(nn.Module if nn else object):
         num_layers: int = 2,
         n_heads: int = 8,
         dropout: float = 0.2,
+        **kwargs: Any,
     ) -> None:
         """
         Initializes the Attention-based LSTM model.
@@ -115,7 +116,13 @@ class LSTMPricePredictor(nn.Module if nn else object):
         fc: Fully connected layer for classification (HOLD, BUY, SELL).
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2) -> None:
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int = 64,
+        num_layers: int = 2,
+        **kwargs: Any,
+    ) -> None:
         """
         Initializes the standard LSTM architecture.
 
@@ -176,6 +183,7 @@ class LSTMModel(BaseModel):
         model_path: str | Path | None = None,
         device: str = "cpu",
         use_attention: bool = False,
+        **model_kwargs: Any,
     ) -> None:
         """
         Initializes the LSTMModel wrapper.
@@ -187,6 +195,8 @@ class LSTMModel(BaseModel):
             model_path: Optional path to a pre-trained model checkpoint (.pt or .pth).
             device: Computing device to use ('cpu', 'cuda', 'auto').
             use_attention: Whether to use the Attention-based LSTM architecture.
+            **model_kwargs: Additional parameters for the underlying PyTorch model
+                            (e.g., dropout, n_heads).
         """
         self.logger = logging.getLogger(__name__)
 
@@ -209,12 +219,13 @@ class LSTMModel(BaseModel):
                         n_features=input_dim,
                         hidden_size=hidden_dim,
                         num_layers=num_layers,
+                        **model_kwargs,
                     ).to(self.device)
                 else:
                     self.logger.info("Initializing LSTMPricePredictor...")
-                    self.model = LSTMPricePredictor(input_dim, hidden_dim, num_layers).to(
-                        self.device
-                    )
+                    self.model = LSTMPricePredictor(
+                        input_dim, hidden_dim, num_layers, **model_kwargs
+                    ).to(self.device)
 
                 if model_path and Path(model_path).exists():
                     self.logger.info(f"Loading LSTM model from {model_path}")
@@ -311,8 +322,12 @@ class LSTMModel(BaseModel):
             IOError: If saving the model fails.
         """
         if self.model is not None and torch:
-            torch.save(self.model.state_dict(), path)
-            self.logger.info(f"LSTM model saved to {path}")
+            save_path = Path(path)
+            # Ensure target directory exists before saving
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+
+            torch.save(self.model.state_dict(), save_path)
+            self.logger.info(f"LSTM model saved to {save_path}")
         else:
             self.logger.error("Attempted to save LSTMModel but no model is loaded.")
 
