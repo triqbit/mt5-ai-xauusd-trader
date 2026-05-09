@@ -35,6 +35,7 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 - **Dynamic Ensemble Engine:** Adaptive model weighting system that adjusts model influence based on real-time performance (Sharpe/Accuracy), confidence calibration, and market regime context.
 - **Explainability System:** Structured attribution breakdowns for every trade signal, providing institutional-grade transparency into model and risk decisions.
 - **Dynamic Feature Engineering:** 140+ market indicators including multi-timeframe TA-Lib features and macro-sentiment integration.
+- **Standardized Model Interface:** All AI models implement a unified `BaseModel` interface for seamless integration and ensemble voting.
 
 ### 🛡️ Institutional Risk Management
 - **Ray Dalio All-Weather Allocation:** Scenario-based risk parity across multi-currency pairs.
@@ -77,7 +78,7 @@ mt5-ai-xauusd-trader/
 ├── src/                  # Core Package Content
 │   ├── core/             # Environment-driven Configuration (Pydantic)
 │   ├── models/           # AI/ML Architectures (Ensemble, LSTM, DRL)
-│   └── trading/          # MT5 SDK Connectors & Risk Engines
+│   └── trading/          # MT5 Connectors, Risk Engines & Env
 ├── tests/                # Comprehensive Unit & Integration Suite
 ├── main.py               # Unified CLI Entrypoint
 ├── Dockerfile            # Multi-stage Production Build

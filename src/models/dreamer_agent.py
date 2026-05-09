@@ -27,6 +27,11 @@ class DreamerAgent(BaseModel):
         logger: Logger instance for monitoring agent activity.
         config: Configuration dictionary for the Dreamer model.
         state: Optional latent state for the recurrent world model.
+
+    Examples:
+        >>> agent = DreamerAgent()
+        >>> signal = agent.predict(np.random.randn(20, 140))
+        >>> agent.observe(np.random.randn(20, 140), 1, 0.5, False)
     """
 
     def __init__(

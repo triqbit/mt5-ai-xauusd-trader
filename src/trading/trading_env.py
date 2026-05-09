@@ -20,13 +20,20 @@ class TradingEnv(gym.Env):
     Custom environment for trading XAUUSD.
 
     Follows Gymnasium API. Optimized for high-frequency RL training.
+    This environment simulates trading Gold (XAUUSD) using historical OHLCV data.
 
     Attributes:
         df: DataFrame containing historical market data.
         window_size: Number of past time steps to include in the observation.
-        initial_balance: Starting account balance.
-        action_space: Gymnasium action space (0=HOLD, 1=BUY, 2=SELL).
-        observation_space: Gymnasium observation space (window_size x num_features).
+        initial_balance: Starting account balance in USD.
+        action_space: Discrete(3) - 0: HOLD/NEUTRAL, 1: BUY/LONG, 2: SELL/SHORT.
+        observation_space: Box(window_size, num_features) - Historical price/indicator window.
+
+    Examples:
+        >>> env = TradingEnv(df=price_df, window_size=20)
+        >>> obs, info = env.reset()
+        >>> action = env.action_space.sample()
+        >>> obs, reward, terminated, truncated, info = env.step(action)
     """
 
     metadata = {"render_modes": ["human"]}
@@ -42,6 +49,7 @@ class TradingEnv(gym.Env):
 
         Args:
             df: Optional DataFrame containing historical market data.
+                Required columns: 'Open', 'High', 'Low', 'Close', 'Volume' (at minimum).
             window_size: Number of past time steps to include in the observation.
             initial_balance: Starting account balance.
         """
@@ -85,7 +93,7 @@ class TradingEnv(gym.Env):
             options: Optional dictionary of options.
 
         Returns:
-            A tuple containing the initial observation and an empty info dictionary.
+            A tuple containing the initial observation and an info dictionary.
         """
         super().reset(seed=seed)
         self.current_step = self.window_size
@@ -100,6 +108,8 @@ class TradingEnv(gym.Env):
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         """
         Executes one step in the environment.
+
+        The reward function is based on log returns of the equity.
 
         Args:
             action: The action to take (0=HOLD, 1=BUY, 2=SELL).
@@ -156,10 +166,14 @@ class TradingEnv(gym.Env):
                     self.equity -= spread + slippage  # Immediate cost
 
             elif action == 0:  # HOLD / CLOSE
-                # Production note: Decide if 0 means 'neutral' or 'do nothing'.
-                # Standard RL trading envs often use 0=CLOSE, 1=BUY, 2=SELL
-                # or -1, 0, 1 mapping.
-                pass
+                # Implementation choice: 0 closes all positions
+                if self.position != 0:
+                    if self.position == 1:
+                        realized_pnl = current_price - self.entry_price - (spread + slippage)
+                    else:
+                        realized_pnl = self.entry_price - current_price - (spread + slippage)
+                    self.balance += realized_pnl
+                    self.position = 0
 
         terminated = False
         if self._data is not None and self.current_step >= len(self._data) - 1:
@@ -200,9 +214,12 @@ class TradingEnv(gym.Env):
 
     def render(self) -> None:
         """
-        Renders the current state of the environment (not implemented).
+        Renders the current state of the environment for debugging.
         """
-        pass
+        self.logger.info(
+            f"Step: {self.current_step} | Balance: {self.balance:.2f} | "
+            f"Equity: {self.equity:.2f} | Position: {self.position}"
+        )
 
 
 __all__ = ["TradingEnv"]
