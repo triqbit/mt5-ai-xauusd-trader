@@ -332,6 +332,40 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
     assert "[bold red]0.20" in perf_text_low
 
 
+def test_high_conviction_labeling(mock_explanation, mock_regime, mock_macro_risk, mocker):
+    """Verify that [HIGH CONVICTION] label appears for high-score executable signals."""
+    from rich.panel import Panel
+
+    dss = DecisionSupportSystem()
+    mock_console = MagicMock()
+
+    # Setup for high score (100.0)
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
+    ]
+    mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+    mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
+
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert packet.decision_score == 100.0
+    assert packet.is_executable is True
+
+    mock_panel_cls = mocker.patch("rich.panel.Panel", side_effect=Panel)
+    dss.format_for_operator(packet, console=mock_console)
+
+    # Find the augmentation panel call
+    label_found = False
+    for call in mock_panel_cls.call_args_list:
+        if call.kwargs.get("title") == "🎯 Augmentation Metrics":
+            content = call.args[0]
+            if "[HIGH CONVICTION] 💎" in str(content):
+                label_found = True
+                break
+
+    assert label_found is True
+
+
 def test_packet_immutability():
     """Verify that DecisionPacket and PerformanceContext are frozen (immutable)."""
     with pytest.raises(Exception):

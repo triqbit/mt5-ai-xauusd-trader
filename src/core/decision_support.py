@@ -238,11 +238,11 @@ class DecisionSupportSystem:
         # 3. Risk & Safety Score (0-30)
         # Weights: 20% for Risk/Reward quality, 10% for Macro safety
         rr = explanation.risk_assessment.risk_reward_ratio
-        rr_quality = min(rr / 3.0, 1.0) * 20.0
-        macro_safety = macro_risk.risk_multiplier * 10.0
+        rr_quality = min(max(rr, 0.0) / 3.0, 1.0) * 20.0
+        macro_safety = max(macro_risk.risk_multiplier, 0.0) * 10.0
         risk_score = rr_quality + macro_safety
 
-        return float(consensus_score + regime_score + risk_score)
+        return float(min(max(consensus_score + regime_score + risk_score, 0.0), 100.0))
 
     def _calculate_sizing_multiplier(
         self, score: float, status: DecisionStatus, macro_risk: RiskStatus
@@ -371,6 +371,9 @@ class DecisionSupportSystem:
             score_content.append(f"{packet.decision_score:.1f}/100", style=f"bold {score_color}")
             score_content.append("  |  Sizing Recommendation: ", style="bold")
             score_content.append(f"{packet.sizing_multiplier:.1%}", style="bold cyan")
+
+            if packet.decision_score >= 90.0 and packet.is_executable:
+                score_content.append("  |  [HIGH CONVICTION] 💎", style="bold green")
 
             augmentation_panel = Panel(
                 score_content, title="🎯 Augmentation Metrics", border_style="blue"
