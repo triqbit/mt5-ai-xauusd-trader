@@ -79,7 +79,7 @@ for DB_FILE in "${DB_FILES[@]}"; do
         log_message "Validating schema for ${BACKUP_FILE}..."
         REQUIRED_TABLES=()
         if [ "${DB_BASE}" == "trades" ]; then
-            REQUIRED_TABLES=("trades" "risk_events" "performance_metrics" "model_signals")
+            REQUIRED_TABLES=("trades" "risk_events" "performance_metrics" "model_signals" "blocked_signal_analysis" "execution_qualities")
         elif [ "${DB_BASE}" == "audit" ]; then
             REQUIRED_TABLES=("audit_log")
         fi
@@ -99,6 +99,23 @@ for DB_FILE in "${DB_FILES[@]}"; do
         else
             log_message "FAILURE: Schema validation failed for ${BACKUP_FILE}. Required table not found."
             exit 1
+        fi
+
+        # 2.2 Data Access Test (Restore Dry-run)
+        log_message "Performing Data Access Test for ${BACKUP_FILE}..."
+        TEST_TABLE=""
+        if [ "${DB_BASE}" == "trades" ]; then TEST_TABLE="trades"; fi
+        if [ "${DB_BASE}" == "audit" ]; then TEST_TABLE="audit_log"; fi
+
+        if [ -n "${TEST_TABLE}" ]; then
+            # Attempt to count rows in the primary table to ensure the database is actually functional
+            ROW_COUNT=$(sqlite3 "${BACKUP_FILE}" "SELECT count(*) FROM ${TEST_TABLE};" 2>/dev/null || echo "ERROR")
+            if [[ "${ROW_COUNT}" =~ ^[0-9]+$ ]]; then
+                log_message "SUCCESS: Data Access Test passed for ${BACKUP_FILE} (${ROW_COUNT} rows in ${TEST_TABLE})."
+            else
+                log_message "FAILURE: Data Access Test failed for ${BACKUP_FILE}. Could not read from ${TEST_TABLE}."
+                exit 1
+            fi
         fi
 
         # 3. Checksum Generation

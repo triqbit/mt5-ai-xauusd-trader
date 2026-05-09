@@ -139,6 +139,7 @@ python main.py --mode live --algo ensemble --confirm-live
 | [**SLO & Reliability Targets**](./docs/SLO_TARGETS.md) | **Measurable reliability standards and error budget framework.** |
 | [**Contributing Guide**](./docs/CONTRIBUTING.md) | **How to contribute safely and effectively.** |
 | [**Contribution Map**](./docs/CONTRIBUTION_MAP.md) | **Safe vs. Sensitive zone navigation.** |
+| [**Disaster Recovery Plan**](./docs/DISASTER_RECOVERY.md) | **Procedures for database, log, and operational data recovery.** |
 
 ---
 

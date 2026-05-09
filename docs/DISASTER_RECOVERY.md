@@ -48,9 +48,29 @@ The primary tool for backups is `scripts/backup_verify.sh`. It should be schedul
 ### 5.2. Backup Integrity Checks
 The automated script performs the following checks for every backup:
 1. **SQLite Integrity Check**: Runs `PRAGMA integrity_check;` on the backup file.
-2. **Schema Validation**: Attempts to query critical tables (e.g., `trades`, `risk_events`, `performance_metrics`, `model_signals` for `trades.db`; `audit_log` for `audit.db`) to ensure the backup is functional.
+2. **Schema Validation**: Attempts to query critical tables to ensure the backup is functional.
 3. **Checksum Generation**: Creates a `.sha256` manifest for each artifact.
 4. **Archive Verification**: Tests the integrity of compressed log and report archives using `tar -tf`.
+
+### 5.3 Restore Test (Automated Dry-run)
+The `scripts/backup_verify.sh` script performs a mandatory "Restore Test" for every database backup:
+1. **Structural Verification**: `PRAGMA integrity_check` ensures the SQLite file is not corrupt.
+2. **Schema Validation**: Explicitly verifies the presence of all required tables (see below).
+3. **Data Access Test**: Performs a count query on primary tables to ensure the data is readable.
+
+### 5.4 Database Schema Reference
+For manual verification, ensure the following tables are present in the restored databases:
+
+**Trading Database (`trades.db`):**
+- `trades`: Primary trade execution records.
+- `model_signals`: AI/ML model predictions and confidence scores.
+- `risk_events`: Rejections and circuit breaker activations.
+- `performance_metrics`: Periodic performance snapshots (Sharpe, DD, etc.).
+- `blocked_signal_analysis`: Opportunity cost analytics for rejected signals.
+- `execution_qualities`: High-precision execution analytics and slippage.
+
+**Audit Database (`audit.db`):**
+- `audit_log`: System actions, configuration changes, and operator events.
 
 ## 6. Restoration Procedures
 
@@ -85,8 +105,10 @@ The automated script performs the following checks for every backup:
    sqlite3 trades.db "PRAGMA integrity_check;"
    sqlite3 audit.db "PRAGMA integrity_check;"
 
-   # Verify data presence
+   # Verify data presence and schema
+   sqlite3 trades.db ".tables"
    sqlite3 trades.db "SELECT count(*) FROM trades;"
+   sqlite3 trades.db "SELECT count(*) FROM model_signals;"
    sqlite3 audit.db "SELECT count(*) FROM audit_log;"
    ```
 
