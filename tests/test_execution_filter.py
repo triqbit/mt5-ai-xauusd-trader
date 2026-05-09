@@ -12,6 +12,7 @@ import pytest
 
 from src.trading.execution_filter import ExecutionFilter
 from src.core.schemas import TradeSignal
+from src.core.config import TradingConfig
 
 
 @pytest.fixture
@@ -115,6 +116,20 @@ def test_atr_volatility_fail(filter_engine, base_data):
     assert passed is False
     assert metrics["ratio"] > 3.0
 
+def test_atr_volatility_exact_limit(filter_engine):
+    # Use precomputed to test exact ratio logic
+    precomputed = {"current_atr": 3.0, "avg_atr": 1.0}
+    passed, metrics = filter_engine._check_atr_volatility_with_metrics(None, precomputed=precomputed)
+    assert passed is True
+    assert metrics["ratio"] == 3.0
+
+def test_atr_volatility_just_above_limit(filter_engine):
+    # Use precomputed to test exact ratio logic
+    precomputed = {"current_atr": 3.1, "avg_atr": 1.0}
+    passed, metrics = filter_engine._check_atr_volatility_with_metrics(None, precomputed=precomputed)
+    assert passed is False
+    assert metrics["ratio"] == 3.1
+
 # --- Layer 2: Trend Angle ---
 def test_trend_angle_buy_pass(filter_engine, bullish_data):
     passed, metrics = filter_engine._check_trend_angle_with_metrics(bullish_data, direction=1)
@@ -168,9 +183,25 @@ def test_session_time_pass(filter_engine):
     dt = datetime(2023, 10, 10, 10, 0, 0) # Tue
     assert filter_engine._check_session_time(dt) is True
 
-def test_session_time_fail(filter_engine):
+def test_session_time_fail_saturday(filter_engine):
     dt = datetime(2023, 10, 14, 10, 0, 0) # Sat
     assert filter_engine._check_session_time(dt) is False
+
+def test_session_time_friday_before_close(filter_engine):
+    dt = datetime(2023, 10, 13, 15, 59, 0) # Fri 15:59
+    assert filter_engine._check_session_time(dt) is True
+
+def test_session_time_friday_after_close(filter_engine):
+    dt = datetime(2023, 10, 13, 16, 1, 0) # Fri 16:01
+    assert filter_engine._check_session_time(dt) is False
+
+def test_session_time_sunday_before_open(filter_engine):
+    dt = datetime(2023, 10, 15, 16, 59, 0) # Sun 16:59
+    assert filter_engine._check_session_time(dt) is False
+
+def test_session_time_sunday_after_open(filter_engine):
+    dt = datetime(2023, 10, 15, 17, 1, 0) # Sun 17:01
+    assert filter_engine._check_session_time(dt) is True
 
 # --- Layer 6: Drawdown ---
 def test_drawdown_pass(filter_engine):
@@ -179,12 +210,17 @@ def test_drawdown_pass(filter_engine):
 def test_drawdown_fail(filter_engine):
     assert filter_engine._check_drawdown_limit(0.13) is False
 
+def test_drawdown_exact_limit_fail(filter_engine):
+    # filter_engine.max_drawdown is 0.12 by default
+    assert filter_engine._check_drawdown_limit(0.12) is False
+
 # --- Full Cascade ---
 def test_full_cascade_pass(filter_engine, buy_signal, bullish_data):
     ts = datetime(2023, 10, 10, 10, 0, 0)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is True
     assert decision.blocked_by is None
+    assert decision.confidence_score == buy_signal.confidence
 
 def test_full_cascade_blocked_by_session(filter_engine, buy_signal, bullish_data):
     ts = datetime(2023, 10, 14, 10, 0, 0) # Sat
@@ -197,6 +233,27 @@ def test_full_cascade_blocked_by_drawdown(filter_engine, buy_signal, bullish_dat
     decision = filter_engine.validate(buy_signal, bullish_data, 0.15, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "DRAWDOWN_LIMIT"
+
+def test_config_integration(buy_signal):
+    """Verifies that ExecutionFilter correctly uses parameters from TradingConfig."""
+    config = TradingConfig(
+        max_drawdown=0.05,
+        volatility_extreme_threshold=2.0,
+        MT5_PASSWORD="fake_password",
+        MT5_SERVER="fake_server"
+    )
+    ef = ExecutionFilter(config=config)
+
+    # Test drawdown limit from config
+    assert ef._check_drawdown_limit(0.04) is True
+    assert ef._check_drawdown_limit(0.05) is False
+
+    # Test ATR volatility threshold from config
+    # ratio 2.1 should fail with threshold 2.0
+    precomputed = {"current_atr": 2.1, "avg_atr": 1.0}
+    passed, metrics = ef._check_atr_volatility_with_metrics(None, precomputed=precomputed)
+    assert passed is False
+    assert metrics["ratio"] == 2.1
 
 def test_validate_with_precomputed_metrics_only(filter_engine, buy_signal):
     """Verifies optimization path: validate works with None market_data if metrics are provided."""
