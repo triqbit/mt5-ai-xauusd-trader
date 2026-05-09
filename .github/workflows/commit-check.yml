@@ -23,6 +23,7 @@ jobs:
           types: |
             feat
             fix
+            security
             perf
             docs
             refactor

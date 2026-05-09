@@ -41,12 +41,22 @@ releases/v<VERSION>/
 
 ## 3. Automated Validation
 
-The `scripts/package_release.sh` script enforces the following validation rules:
+The `scripts/package_release.sh` script enforces a strict multi-gate validation process:
 
-1.  **Existence**: All seven mandatory components must be present in the target directory.
-2.  **Size**: All generated files must be non-zero in size (detects empty configs or logs).
-3.  **Integrity**: The script performs a self-verification by running `sha256sum -c checksums.sha256` after generation.
-4.  **Version Match**: The artifact directory name must match the `version` field in `pyproject.toml`.
+1.  **Prerequisite Check**: Verifies that all required Python dependencies (`alembic`, `pydantic`, etc.) are installed.
+2.  **Validation Gates**: Executes five mandatory verification scripts:
+    - `validate_env.py`: Ensures `.env.example` matches the current configuration schema.
+    - `verify_migrations.py`: Confirms database migrations are reversible (Up/Down/Up cycle).
+    - `check_release_notes.py`: Ensures `CHANGELOG.md` has descriptive content for the version.
+    - `verify_version_sync.py`: Verifies version alignment across `pyproject.toml`, `src/__init__.py`, and `CHANGELOG.md`.
+    - `verify_dependencies.py`: Checks for harmonized dependencies across requirements files.
+3.  **Artifact Existence**: All seven mandatory components must be present in the target directory.
+4.  **Component Integrity**:
+    - **Metadata**: Validates that `docker_info.json` is a valid JSON object.
+    - **Migrations**: Verifies the presence of the `versions/` directory and migration scripts.
+    - **Size**: All generated files must be non-zero in size (detects empty configs or logs).
+5.  **Checksum Manifest**: The script generates SHA256 hashes for all files and performs a self-verification (`sha256sum -c checksums.sha256`) after generation.
+6.  **Version Consistency**: The artifact directory name (`vX.Y.Z`) must match the `version` field in `pyproject.toml`.
 
 ## 4. Deployment and Verification
 
@@ -76,5 +86,5 @@ If any file fails verification (indicated by `FAILED`), the artifact is consider
 
 ---
 **Standard Owner:** Jules03 (Release Reliability & Governance)
-**Last Updated:** 2026-05-05
+**Last Updated:** 2024-05-22
 # Verified for compliance with Enterprise Release Standards.
