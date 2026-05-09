@@ -62,9 +62,10 @@ Changes to these directories affect the core financial and operational safety of
 
 ## 🛠️ How to Pick Your First Task
 
-1.  **Run `make doctor`:** If any check fails on your system, improving that check or the documentation around it is a great first contribution.
-2.  **Check `docs/status/PR_TRIAGE_DAILY.md`:** Look for PRs labeled as "Safe Surface" to see what others are working on in low-risk areas.
-3.  **Audit `tests/`:** Find a module with low coverage (check `make test` output) and add missing unit tests.
+1.  **Read [Your First Real Contribution](./FIRST_REAL_CONTRIBUTION.md):** Follow our step-by-step guide to making a low-risk, high-impact first contribution.
+2.  **Run `make doctor`:** If any check fails on your system, improving that check or the documentation around it is a great first contribution.
+3.  **Check `docs/status/PR_TRIAGE_DAILY.md`:** Look for PRs labeled as "Safe Surface" to see what others are working on in low-risk areas.
+4.  **Audit `tests/`:** Find a module with low coverage (check `make test` output) and add missing unit tests.
 
 ---
 *This map is maintained by Jules06 (qufuwan). If you are unsure where your change fits, please open a discussion or tag a maintainer.*
