@@ -12,12 +12,12 @@ import os
 from enum import Enum
 from typing import Any
 
+import joblib
 import numpy as np
 import pandas as pd
 import structlog
 from pydantic import BaseModel, Field
 from scipy import stats
-import joblib
 from sklearn.mixture import GaussianMixture
 
 logger = structlog.get_logger(__name__)
