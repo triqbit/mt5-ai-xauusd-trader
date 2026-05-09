@@ -4,8 +4,9 @@
 - **Behavior:**
     - Immediately following a `TradeSignal` generation, the system must simulate the trade's outcome under at least three discrete scenarios:
         1. **Base Case:** Current market conditions (spread, volatility).
-        2. **Execution Stress:** 3x spread widening and 5 pips of negative slippage.
+        2. **Execution Stress:** Dynamically calibrated based on realized slippage (30-day rolling mean) + 3x spread widening.
         3. **Market Shock:** A sudden 50-pip move against the position (Flash Crash scenario).
+    - **Slippage Feedback Loop:** The system must automatically ingest the last 30 days of realized slippage from `TradeLogger` to set the baseline for the "Execution Stress" scenario.
     - For each scenario, the system must calculate:
         - **Projected PnL:** Realized outcome if the scenario occurs.
         - **Drawdown Impact:** Percentage impact on the current daily and total equity peak.
@@ -22,6 +23,7 @@
 - **Test Coverage:**
     - Unit tests for the impact calculation logic.
     - Integration tests with `RareEventSimulator` to ensure scenario data is correctly ingested.
+    - Integration tests with `TradeLogger` verifying that the simulator correctly calculates the 30-day rolling mean slippage.
     - Performance benchmark: Total simulation time must be < 300ms.
 - **Performance:**
     - Must use vectorized calculations where possible to maintain low latency.

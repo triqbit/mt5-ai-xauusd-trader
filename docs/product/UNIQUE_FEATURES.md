@@ -90,14 +90,16 @@ Generic bots execute blindly based on the current price. The MT5 AI Trader, with
 
 ### Architecture Outline
 1.  **Scenario Engine**: Integrates with `src/research/rare_event_simulator.py` to generate "micro-scenarios" based on historical volatility and rare-event distributions.
-2.  **Impact Calculator**: A module that evaluates the `TradeSignal` against these scenarios to compute "Scenario PnL," "Margin Impact," and "Probability of Stop-out."
-3.  **Sensitivity Visualizer**: Integrated into the **Decision Cockpit**, it renders a "Risk-of-Ruin" heatmap and a scenario distribution chart.
-4.  **Safety Interlock**: A gate in `src/trading/risk_manager.py` that can automatically reject trades if the "Worst-Case Scenario" exceeds a configurable percentage of the remaining daily loss limit.
+2.  **Adaptive Feedback Loop**: Ingests real-time realized slippage and fill quality metrics from the `TradeLogger` to calibrate "High Slippage" scenario parameters dynamically.
+3.  **Impact Calculator**: A module that evaluates the `TradeSignal` against these scenarios to compute "Scenario PnL," "Margin Impact," and "Probability of Stop-out."
+4.  **Sensitivity Visualizer**: Integrated into the **Decision Cockpit**, it renders a "Risk-of-Ruin" heatmap and a scenario distribution chart.
+5.  **Safety Interlock**: A gate in `src/trading/risk_manager.py` that can automatically reject trades if the "Worst-Case Scenario" exceeds a configurable percentage of the remaining daily loss limit.
 
 ### Acceptance Criteria
 | Category | Requirement |
 | :--- | :--- |
 | **Functional** | Must simulate at least 3 scenarios (Normal, High Slippage, Flash Crash) within 300ms of signal generation. |
+| **Functional** | **Slippage Feedback**: "High Slippage" scenario must be automatically calibrated using the 30-day rolling mean slippage from `TradeLogger`. |
 | **Functional** | Must calculate the impact of the trade on total portfolio "heat" and drawdown. |
 | **Technical** | Scenario generation must be deterministic given a specific seed for auditability. |
 | **Operational** | Results must be visible as a dedicated "Stress Rehearsal" panel in the Decision Cockpit. |
@@ -105,10 +107,11 @@ Generic bots execute blindly based on the current price. The MT5 AI Trader, with
 
 ### Implementation Lane
 *   **Jules04 (Quant Research)**: Lead on scenario generation logic, impact mathematics, and rare-event distributions.
+*   **Jules01 (Core Development)**: Lead on integrating the `TradeLogger` slippage feedback loop into the simulator engine.
 *   **Jules02 (Observability)**: Lead on visualizing the sensitivity analysis and stress results in the TUI/Cockpit.
 
 ### Dependencies and Constraints
-*   **Dependencies**: Requires the `RareEventSimulator` research module and `RiskManager` to be operational.
+*   **Dependencies**: Requires the `RareEventSimulator` research module, `TradeLogger` (with historical data), and `RiskManager` to be operational.
 *   **Constraints**: Total simulation time must not exceed 300ms to avoid price staleness in fast-moving XAUUSD markets.
 
 ---
