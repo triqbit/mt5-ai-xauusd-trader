@@ -333,3 +333,4 @@ Features to generate:
 5. Begin Phase 3 data collection and feature engineering.
 6. ✅ Implement production-ready model stubs (PPO, LSTM, DreamerV3).
 7. ✅ Enhance Gymnasium-compatible XAUUSD trading environment.
+8. ✅ Implement deterministic PortfolioScenarioBuilder for institutional risk and capital allocation testing.

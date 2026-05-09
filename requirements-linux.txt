@@ -9,7 +9,7 @@ torch==2.5.1
 torchvision==0.20.1
 stable-baselines3==2.4.0
 gymnasium==1.0.0
-numpy==2.2.3
+numpy==1.26.4
 scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
@@ -26,7 +26,7 @@ mplfinance==0.12.10b0
 
 # ── Data Acquisition ────────────────────────────────────────
 yfinance==0.2.54
-requests==2.32.3
+requests==2.32.4
 aiohttp==3.11.12
 httpx==0.28.1
 
@@ -37,14 +37,14 @@ alembic==1.14.1
 redis==5.2.1
 
 # ── Monitoring & Logging ────────────────────────────────────
-starlette==0.45.3
+starlette==0.47.2
 prometheus-client==0.21.1
 structlog==25.1.0
 rich==13.9.4
 tqdm==4.67.1
 
 # ── Dashboard / API ─────────────────────────────────────────
-fastapi==0.115.8
+fastapi==0.136.1
 uvicorn[standard]==0.34.0
 dash==2.18.2
 plotly==6.0.0
@@ -56,7 +56,7 @@ pydantic-settings==2.7.1
 tomli==2.2.1
 
 # ── Testing ─────────────────────────────────────────────────
-pytest==8.3.4
+pytest==8.3.5
 pytest-asyncio==0.25.3
 pytest-cov==6.0.0
 hypothesis==6.125.2
