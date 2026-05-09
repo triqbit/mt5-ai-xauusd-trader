@@ -50,13 +50,16 @@ class CircuitBreaker:
     @property
     def state(self) -> CircuitState:
         """Determines the current state based on failures and timeout."""
-        if self._state == CircuitState.OPEN and self._last_failure_time:
-            if (time.time() - self._last_failure_time) > self.recovery_timeout:
-                logger.info(
-                    "Circuit Breaker [%s] transitioning OPEN -> HALF_OPEN due to timeout.",
-                    self.name,
-                )
-                self._state = CircuitState.HALF_OPEN
+        if (
+            self._state == CircuitState.OPEN
+            and self._last_failure_time
+            and (time.time() - self._last_failure_time) > self.recovery_timeout
+        ):
+            logger.info(
+                "Circuit Breaker [%s] transitioning OPEN -> HALF_OPEN due to timeout.",
+                self.name,
+            )
+            self._state = CircuitState.HALF_OPEN
         return self._state
 
     def _handle_success(self):

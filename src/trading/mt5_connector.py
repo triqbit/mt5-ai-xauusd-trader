@@ -41,7 +41,6 @@ from src.core.exceptions import (
     MT5ConnectionError,
     MT5DataError,
     MT5ExecutionError,
-    CircuitBreakerError,
 )
 from src.core.resilience import CircuitBreaker
 from src.core.retry import with_retry

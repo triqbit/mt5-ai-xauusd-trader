@@ -57,10 +57,10 @@ from src.core.config_validator import ConfigValidator
 from src.core.constants import SignalDirection
 from src.core.decision_support import DecisionSupportSystem
 from src.core.exceptions import (
+    CircuitBreakerError,
     MT5ConnectionError,
     MT5DataError,
     MT5ExecutionError,
-    CircuitBreakerError,
 )
 from src.core.explainability import SignalExplainer
 from src.core.feature_engineering import FeatureEngineer
