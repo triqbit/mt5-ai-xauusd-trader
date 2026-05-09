@@ -131,6 +131,11 @@ jobs:
           python scripts/verify_reporting_system.py
           python scripts/verify_rare_event_reporting.py
           python scripts/verify_benchmarking.py
+          python scripts/verify_allocator_reporting.py
+          python scripts/verify_backtest_audit.py
+          python scripts/verify_journal_mining.py
+          # Generate consolidated audit report
+          python scripts/generate_research_report.py
 
       - name: Upload Research Reports
         uses: actions/upload-artifact@v4
@@ -140,6 +145,8 @@ jobs:
             walkforward_verification_report.md
             research_verification_report.md
             research_verification_report.html
+            research_audit_report.md
+            research_audit_report.html
 
       - name: Verify Version Synchronization
         run: python scripts/verify_version_sync.py
@@ -188,8 +195,8 @@ jobs:
 
       - name: Install Release Tools
         run: |
-          pip install pydantic pydantic-settings sqlalchemy alembic
-          # Required for generate_config_docs.py and package_release.sh validations
+          pip install pydantic pydantic-settings sqlalchemy alembic httpx
+          # Required for generate_config_docs.py, smoke_test.py, and package_release.sh validations
 
       - name: Calculate Next Version
         id: tag_action
@@ -224,6 +231,10 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
 
+          # 1. Update unreleased section with latest commits
+          python scripts/update_changelog.py
+
+          # 2. Transition unreleased to versioned header
           chmod +x scripts/bump_version.py
           python scripts/bump_version.py "${VERSION}"
 
@@ -270,6 +281,35 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
+      - name: Final Runtime Smoke Test
+        run: |
+          echo "Starting the production-ready bot image for final smoke test..."
+
+          # 1. Create a dummy .env
+          cp .env.example .env
+          sed -i 's/MT5_LOGIN=.*/MT5_LOGIN=999999/' .env
+          sed -i 's/MT5_PASSWORD=.*/MT5_PASSWORD=test/' .env
+          sed -i 's/MT5_SERVER=.*/MT5_SERVER=test/' .env
+          sed -i 's/MODE=.*/MODE=demo/' .env
+
+          # 2. Run the container
+          docker run -d --name release-smoke-test \
+            -p 8000:8000 \
+            --env-file .env \
+            triqbit/mt5-ai-xauusd-trader:${{ steps.version.outputs.TAG }} \
+            --mode demo --algo ensemble
+
+          # 3. Wait and verify using smoke_test.py
+          python scripts/smoke_test.py --url http://localhost:8000 --retries 6 --delay 5 || {
+            echo "::error::Final runtime smoke test failed. Inspecting container logs..."
+            docker logs release-smoke-test
+            exit 1
+          }
+
+          docker stop release-smoke-test
+          docker rm release-smoke-test
+          echo "SUCCESS: Final runtime smoke test passed."
+
       - name: Download Compliance Report
         uses: actions/download-artifact@v4
         with:
@@ -284,12 +324,27 @@ jobs:
           export SKIP_DOCKER_BUILD=true
           ./scripts/package_release.sh
 
-          # Append Rollback Link to RELEASE_NOTES.md
-          echo -e "\n\n## Rollback Procedures\nFor detailed rollback and emergency procedures, refer to [RELEASE_PLAYBOOK.md](https://github.com/${{ github.repository }}/blob/main/docs/RELEASE_PLAYBOOK.md#5-rollback-procedures)" >> "releases/v${VERSION}/RELEASE_NOTES.md"
-
+          # Build local artifact zip
           cd releases
-          zip -r "mt5-ai-xauusd-trader-v${VERSION}.zip" "v${VERSION}"
-          sha256sum "mt5-ai-xauusd-trader-v${VERSION}.zip" > "checksums.txt"
+          ZIP_NAME="mt5-ai-xauusd-trader-v${VERSION}.zip"
+          zip -r "$ZIP_NAME" "v${VERSION}"
+          CHECKSUM=$(sha256sum "$ZIP_NAME" | cut -d ' ' -f 1)
+          echo "$CHECKSUM  $ZIP_NAME" > "checksums.txt"
+
+          # Append Rollback Link and Integrity info to RELEASE_NOTES.md (which is the body of GH Release)
+          {
+            echo -e "\n\n## 🔐 Integrity & Verification"
+            echo "- **SHA256**: \`${CHECKSUM}\`"
+            echo "- **Artifact**: \`${ZIP_NAME}\`"
+            echo -e "\n## 🔄 Rollback Procedures"
+            echo "For detailed rollback and emergency procedures, refer to [RELEASE_PLAYBOOK.md](https://github.com/${{ github.repository }}/blob/main/docs/RELEASE_PLAYBOOK.md#6-rollback-procedures)"
+            echo -e "\n### Quick Rollback (Docker)"
+            echo "\`\`\`bash"
+            echo "docker stop trading-bot"
+            echo "docker run -d --name trading-bot triqbit/mt5-ai-xauusd-trader:<PREVIOUS_VERSION>"
+            echo "\`\`\`"
+          } >> "v${VERSION}/RELEASE_NOTES.md"
+
           cd ..
 
       - name: Create GitHub Release
