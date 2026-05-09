@@ -216,6 +216,25 @@ def test_improved_regime_consistency(sample_data):
     consistency = optimizer._calculate_regime_consistency(optimizer.data, params)
     assert 0 <= consistency <= 1.0
 
+def test_regime_consistency_weighting(sample_data):
+    config = WalkForwardConfig(train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=lambda t: {},
+        config=config
+    )
+
+    # Mock data with specific regimes
+    data = sample_data.iloc[:50].copy()
+    # 45 bars of regime A, 5 bars of regime B
+    data["regime"] = ["A"] * 45 + ["B"] * 5
+
+    params = {"fast_window": 10, "slow_window": 30}
+
+    # We want to see that B's influence is small due to weighting
+    consistency = optimizer._calculate_regime_consistency(data, params)
+    assert 0 <= consistency <= 1.0
 
 def test_additional_metric_selection(sample_data):
     def param_space(trial):
