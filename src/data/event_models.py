@@ -2,6 +2,11 @@
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/data/event_models.py
 Typed models for macroeconomic events and risk status.
+
+These models provide a standardized interface for macroeconomic risk data.
+They are immutable (frozen) to ensure that risk assessments remain consistent
+throughout the decision-making pipeline.
+
 Author : triqbit
 License: MIT
 """
@@ -9,8 +14,9 @@ License: MIT
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.core.constants import EventCategory, EventImpact
 
@@ -19,7 +25,11 @@ class MacroEvent(BaseModel):
     """
     Typed model for a macroeconomic or geopolitical event.
     Standardizes event data across multiple providers for institutional-grade risk analysis.
+
+    This model is immutable (frozen) and forbids extra fields.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str = Field(..., description="Human-readable name of the event (e.g., 'Core CPI m/m').")
     category: EventCategory = Field(
@@ -50,43 +60,68 @@ class MacroEvent(BaseModel):
             return self.timestamp <= now <= self.end_timestamp
         return False
 
-    @model_validator(mode="after")
-    def validate_timestamps(self) -> MacroEvent:
+    @model_validator(mode="before")
+    @classmethod
+    def validate_and_assign_defaults(cls, data: Any) -> Any:
         """
         Ensure timestamps are timezone-aware UTC and end_timestamp is after timestamp.
         Assigns sensible default durations if end_timestamp is missing.
         """
-        if self.timestamp.tzinfo is None:
-            self.timestamp = self.timestamp.replace(tzinfo=UTC)
+        if not isinstance(data, dict):
+            return data
 
-        if self.end_timestamp is None:
-            # Category-based default durations
-            if self.category == EventCategory.GEOPOLITICAL:
-                # Geopolitical events usually have longer tail risks
+        ts = data.get("timestamp")
+        if isinstance(ts, str):
+            ts = datetime.fromisoformat(ts)
+
+        if isinstance(ts, datetime):
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+            data["timestamp"] = ts
+
+        ets = data.get("end_timestamp")
+        if isinstance(ets, str):
+            ets = datetime.fromisoformat(ets)
+
+        if ets is None and ts is not None:
+            category = data.get("category")
+            # Handle string category if passed
+            if isinstance(category, str):
+                try:
+                    category = EventCategory(category)
+                except ValueError:
+                    pass
+
+            if category == EventCategory.GEOPOLITICAL:
                 duration = timedelta(hours=24)
-            elif self.category in [EventCategory.FOMC, EventCategory.RATES]:
-                # Central bank events have extended impact
+            elif category in [EventCategory.FOMC, EventCategory.RATES]:
                 duration = timedelta(hours=4)
             else:
-                # Default duration for standard macro releases
                 duration = timedelta(hours=1)
-            self.end_timestamp = self.timestamp + duration
-        elif self.end_timestamp.tzinfo is None:
-            self.end_timestamp = self.end_timestamp.replace(tzinfo=UTC)
+            data["end_timestamp"] = ts + duration
+        elif isinstance(ets, datetime):
+            if ets.tzinfo is None:
+                ets = ets.replace(tzinfo=UTC)
+            data["end_timestamp"] = ets
 
-        if self.end_timestamp <= self.timestamp:
-            raise ValueError(
-                f"end_timestamp ({self.end_timestamp}) must be after timestamp ({self.timestamp})"
-            )
+        if data.get("end_timestamp") and data.get("timestamp"):
+            if data["end_timestamp"] <= data["timestamp"]:
+                raise ValueError(
+                    f"end_timestamp ({data['end_timestamp']}) must be after timestamp ({data['timestamp']})"
+                )
 
-        return self
+        return data
 
 
 class RiskStatus(BaseModel):
     """
     Consolidated risk state derived from current macroeconomic activity.
     Used by execution filters and capital allocators to modulate trading activity.
+
+    This model is immutable (frozen) and forbids extra fields.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     is_blocked: bool = Field(
         False, description="Binary flag indicating if execution is strictly prohibited."
@@ -103,3 +138,20 @@ class RiskStatus(BaseModel):
         description="List of events specifically triggering an execution block.",
     )
     reason: str | None = Field(None, description="Human-readable explanation for the risk state.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_block_consistency(cls, data: Any) -> Any:
+        """
+        Enforce technical trust: if is_blocked is True, risk_multiplier must be 0.0.
+        Also ensures a reason is provided if blocked.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        if data.get("is_blocked"):
+            if data.get("risk_multiplier", 1.0) > 0.0:
+                data["risk_multiplier"] = 0.0
+            if not data.get("reason"):
+                raise ValueError("A blocked risk status must provide a reason.")
+        return data
