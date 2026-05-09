@@ -264,9 +264,7 @@ class JournalMiner:
         hour = dt.hour
         active = []
         for name, (start, end) in self.sessions.items():
-            if start < end and start <= hour < end:
-                active.append(name)
-            elif start >= end and (hour >= start or hour < end):  # Crosses midnight
+            if (start < end and start <= hour < end) or (start >= end and (hour >= start or hour < end)):
                 active.append(name)
         return active
 
