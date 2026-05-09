@@ -1,48 +1,64 @@
-# Enterprise Health Checks
+# Enterprise Health Check System
 
-The MT5 AI/ML Trading Bot includes an enterprise-grade health check system for production monitoring and startup gating.
+## Overview
 
-## Endpoints
+The MT5 Trading Bot implements a multi-tiered, enterprise-grade health check system to ensure operational reliability, production safety, and observability. This system is centered around the `HealthChecker` class in `src/core/health.py` and is integrated into the application startup sequence and production monitoring API.
 
-The health check endpoints are exposed via FastAPI (default port 8000, prefix `/health`). The system also includes a standalone metrics endpoint (`GET /metrics`) for Prometheus monitoring.
+## Core Components
 
-### 1. Liveness Probe (`GET /health/liveness`)
-**Purpose:** Indicates if the application process is alive.
-- **Success (200 OK):** Application is running.
-- **Use case:** Kubernetes liveness probe to restart "hung" containers.
+### 1. HealthChecker
 
-### 2. Readiness Probe (`GET /health/readiness`)
-**Purpose:** Indicates if the application is ready to handle trading requests.
-- **Success (200 OK):** All critical components (MT5, Database, Models, Audit Log) are healthy.
-- **Failure (503 Service Unavailable):** One or more critical components failed.
-- **Use case:** Kubernetes readiness probe, Load Balancer health check.
+The `HealthChecker` performs deep diagnostics across several dimensions:
 
-### 3. Full Report (`GET /health/full`)
-**Purpose:** Provides a detailed breakdown of all system components.
-- **Status:** `healthy`, `degraded`, or `failed`.
-- **Components tracked:**
-    - `liveness`: Process status.
-    - `environment`: OS, Python version, and hardware acceleration (CUDA/MPS).
-    - `database`: Primary trade database connectivity.
-    - `mt5`: MetaTrader 5 terminal/cloud connection, terminal-level 'Algo Trading' permission, broker account trading permission, and symbol tradability validation (including auto-suggestions for typos).
-    - `models`: Loading status of AI models (PPO, LSTM, Dreamer).
-    - `config`: Environment and risk limit validation.
-    - `disk`: Sufficient space in the `logs/` directory.
-    - `redis`: (Optional) Redis cache connectivity.
-    - `audit_log`: Enterprise traceability initialization.
+-   **Liveness**: Heartbeat check to confirm the process is active and responsive.
+-   **Readiness**: Aggregates all dependency and resource checks to determine if the bot is ready to handle trading operations.
+-   **Dependency Health**:
+    -   **Database**: Validates reachability of the primary trade database.
+    -   **MT5/MetaAPI**: Verifies connection status, account permissions, and symbol tradability.
+    -   **Models**: Ensures required AI model weights (PPO, LSTM, etc.) are loaded in memory.
+    -   **Audit Log**: Verifies initialization of the enterprise audit trail.
+-   **System Resources**:
+    -   **CPU Usage**: Monitors CPU utilization with non-blocking checks.
+    -   **Memory**: Monitors RAM availability.
+    -   **Disk Space**: Ensures the log directory has sufficient space for operation.
+-   **Environment**: Reports OS, Python version, and hardware acceleration (CUDA/MPS/CPU).
+-   **Configuration**: Runs the `ConfigValidator` to ensure `.env` and runtime settings are valid.
 
-## Startup Health Gate
+### 2. Startup Health Gate
 
-The application performs a mandatory full health check during startup (`main.py`) using the `HealthChecker.startup_gate()` method.
+The bot enforces a "fail-fast" policy through the `startup_gate()` method. During initialization, the application executes all critical health checks. If any mandatory dependency (MT5, Database, Models, Config) fails, the application raises a `RuntimeError` and refuses to start. This prevents "ghost" deployments where the bot runs but is unable to trade or log data correctly.
 
-- **CRITICAL FAILURE:** If any component returns a `FAILED` status, the application will log a `CRITICAL` error and refuse to start (exit code 1). The gate returns a `HealthReport` which is reused to display diagnostic information without re-running expensive checks.
-- **DEGRADED STATUS:** If components return a `DEGRADED` status (e.g., optional Redis unreachable), the application will log a `WARNING` but continue to start.
+### 3. Monitoring API
+
+A FastAPI-based micro-app provides standardized endpoints for production monitoring (e.g., Kubernetes, Datadog, Prometheus):
+
+-   **`/health/liveness`**: Returns `200 OK` if the process is alive.
+-   **`/health/readiness`**: Returns `200 OK` with a full report if all critical checks pass, or `503 Service Unavailable` if any check fails.
+-   **`/health/full`**: Provides a detailed JSON report of all components, messages, and suggested remedies.
+-   **`/metrics`**: Exposes Prometheus metrics for component health gauges.
 
 ## Prometheus Metrics
 
-Health status is exported to Prometheus via the `system_component_health` gauge.
-- `1.0`: Healthy
-- `0.5`: Degraded
-- `0.0`: Failed
+The system exports health status as gauges under the `system_component_health` metric:
 
-Labels: `component` (e.g., `mt5`, `database`).
+-   **1.0**: Healthy
+-   **0.5**: Degraded (Warnings present, but still operational)
+-   **0.0**: Failed (Critical dependency down)
+
+Labels are used to distinguish components: `liveness`, `database`, `mt5`, `models`, `config`, `disk`, `redis`, `audit_log`, and `system_resources`.
+
+## Operational Use
+
+### Pre-flight Check
+You can manually trigger a full health diagnostic using the CLI:
+```bash
+python main.py --check
+```
+
+### Local Development
+The health API can be started independently for testing or monitoring:
+```python
+from src.core.health import create_health_app
+app = create_health_app()
+# Run with uvicorn
+```

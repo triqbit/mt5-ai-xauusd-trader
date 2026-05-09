@@ -15,11 +15,40 @@ class TestHealthExtended(unittest.TestCase):
     def test_check_environment(self):
         with patch("platform.python_version", return_value="3.10.0"), \
              patch("platform.system", return_value="Linux"), \
-             patch("platform.release", return_value="5.4.0"):
+             patch("platform.release", return_value="5.4.0"), \
+             patch("platform.machine", return_value="x86_64"):
             status = self.checker.check_environment()
             self.assertEqual(status.status, HealthStatus.HEALTHY)
             self.assertIn("Python 3.10.0", status.message)
             self.assertIn("Linux 5.4.0", status.message)
+            self.assertIn("x86_64", status.message)
+
+    def test_check_system_resources_healthy(self):
+        with patch("psutil.cpu_percent", return_value=10.0), \
+             patch("psutil.virtual_memory") as mock_mem:
+            mock_mem.return_value.percent = 20.0
+            status = self.checker.check_system_resources()
+            self.assertEqual(status.status, HealthStatus.HEALTHY)
+            self.assertIn("CPU: 10.0%", status.message)
+            self.assertIn("MEM: 20.0%", status.message)
+
+    def test_check_system_resources_degraded_cpu(self):
+        with patch("psutil.cpu_percent", return_value=95.0), \
+             patch("psutil.virtual_memory") as mock_mem:
+            mock_mem.return_value.percent = 20.0
+            status = self.checker.check_system_resources()
+            self.assertEqual(status.status, HealthStatus.DEGRADED)
+            self.assertIn("CPU: 95.0%", status.message)
+            self.assertIn("runaway processes", status.remedy)
+
+    def test_check_system_resources_degraded_mem(self):
+        with patch("psutil.cpu_percent", return_value=10.0), \
+             patch("psutil.virtual_memory") as mock_mem:
+            mock_mem.return_value.percent = 95.0
+            status = self.checker.check_system_resources()
+            self.assertEqual(status.status, HealthStatus.DEGRADED)
+            self.assertIn("MEM: 95.0%", status.message)
+            self.assertIn("memory leaks", status.remedy)
 
     def test_check_mt5_algo_trading_disabled(self):
         self.connector._is_initialized = True
