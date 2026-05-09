@@ -13,6 +13,7 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -87,10 +88,8 @@ class MacroEvent(BaseModel):
             category = data.get("category")
             # Handle string category if passed
             if isinstance(category, str):
-                try:
+                with contextlib.suppress(ValueError):
                     category = EventCategory(category)
-                except ValueError:
-                    pass
 
             if category == EventCategory.GEOPOLITICAL:
                 duration = timedelta(hours=24)
@@ -104,11 +103,10 @@ class MacroEvent(BaseModel):
                 ets = ets.replace(tzinfo=UTC)
             data["end_timestamp"] = ets
 
-        if data.get("end_timestamp") and data.get("timestamp"):
-            if data["end_timestamp"] <= data["timestamp"]:
-                raise ValueError(
-                    f"end_timestamp ({data['end_timestamp']}) must be after timestamp ({data['timestamp']})"
-                )
+        if data.get("end_timestamp") and data.get("timestamp") and data["end_timestamp"] <= data["timestamp"]:
+            raise ValueError(
+                f"end_timestamp ({data['end_timestamp']}) must be after timestamp ({data['timestamp']})"
+            )
 
         return data
 
