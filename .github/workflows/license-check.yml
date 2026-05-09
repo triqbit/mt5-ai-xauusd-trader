@@ -25,11 +25,15 @@ jobs:
           # Install torch/torchvision from CPU index to save time/space
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
-          # Create a unified requirements file for scanning, excluding TA-Lib and MetaTrader5 which are platform-specific
-          ls requirements.txt requirements-ci.txt requirements-linux.txt 2>/dev/null | xargs -r cat | grep -vE "TA-Lib|MetaTrader5" | sort | uniq > requirements-all-scan.txt
-
-          # Install dependencies for scanning. Ignore failures as some platform-specific pins may fail on Linux.
-          pip install -r requirements-all-scan.txt || true
+          # Install dependencies from available requirements files
+          # Ignore failures for platform-specific pins (like MetaTrader5 on Linux)
+          # We use --no-deps to avoid massive recursive installations during the scan-prep
+          for f in requirements.txt requirements-ci.txt requirements-linux.txt; do
+            if [ -f "$f" ]; then
+              grep -vE "TA-Lib|MetaTrader5" "$f" > "${f}.scan"
+              pip install -r "${f}.scan" || true
+            fi
+          done
 
       - name: Run License Scan
         run: |
@@ -39,6 +43,7 @@ jobs:
           # Note: We use --partial-match to handle variations like "MIT License" or "BSD-3-Clause".
           # pip-licenses uses a semicolon-separated list for --allow-only.
           pip-licenses \
+            --from=all \
             --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA" \
             --partial-match \
             --ignore-packages pip pip-licenses prettytable wcwidth setuptools
@@ -46,6 +51,7 @@ jobs:
       - name: Generate Compliance Report
         run: |
           pip-licenses \
+            --from=all \
             --with-authors \
             --with-urls \
             --format=markdown \
