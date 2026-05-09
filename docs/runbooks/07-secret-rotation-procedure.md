@@ -1,5 +1,5 @@
 # Runbook 07: Secret Rotation Procedure
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 ## Overview
 Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Telegram Bot Token) safely to maintain system security and compliance.
@@ -41,7 +41,11 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
    # Look for successful connection messages
    docker logs xauusd_trader --tail 100 | grep -E "MT5|MetaAPI|Telegram"
    ```
-4. **Readiness Check:**
+4. **Smoke Test:**
+   ```bash
+   python scripts/smoke_test.py
+   ```
+5. **Readiness Check:**
    ```bash
    curl -f http://localhost:8000/health/readiness
    ```
@@ -58,6 +62,7 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
 ## Verification Commands
 - `python scripts/validate_env.py`
 - `python scripts/doctor.py`
+- `python scripts/smoke_test.py`
 - `curl -i http://localhost:8000/health/readiness`
 - `docker logs xauusd_trader --tail 50`
 

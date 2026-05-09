@@ -1,5 +1,5 @@
 # Runbook 03: Circuit Breaker Triggered
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 ## Overview
 Critical response procedure for when the automated `RiskManager` circuit breaker halts trading due to safety breaches (e.g., 15% equity drawdown, extreme spread, or model calibration failure).
@@ -27,10 +27,10 @@ Critical response procedure for when the automated `RiskManager` circuit breaker
   ```
 - Check `audit_log` for the `risk_decision` that preceded the halt:
   ```bash
-  sqlite3 audit.db "SELECT * FROM audit_log WHERE action LIKE '%risk%' ORDER BY timestamp DESC LIMIT 10;"
+  sqlite3 audit.db "SELECT * FROM audit_log WHERE action LIKE '%risk%' ORDER BY created_at DESC LIMIT 10;"
   ```
 - **Common Trigger Causes:**
-  - **Equity Drawdown:** Cumulative losses exceeded the daily/weekly/monthly threshold defined in `RISK_LIMITS.md`.
+  - **Equity Drawdown:** Cumulative losses exceeded the daily/weekly/monthly threshold defined in `docs/SLO_TARGETS.md` or `src/core/config.py`.
   - **Spread Alert:** Market liquidity vanished, triggering a safety halt.
   - **Model Drift:** Model accuracy dropped below 0.50 or calibration error exceeded 0.25.
 
@@ -53,7 +53,7 @@ Critical response procedure for when the automated `RiskManager` circuit breaker
 
 ## Expected Outcomes
 - All open risk is neutralized immediately.
-- A detailed incident report is generated and archived in `docs/audits/`.
+- A detailed incident report is generated and archived.
 - Circuit breaker state is cleared only after formal root cause analysis and stakeholder approval.
 
 ## Verification Commands
