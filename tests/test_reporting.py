@@ -305,3 +305,46 @@ def test_pattern_concentration_total_trades():
         total_trades=100
     )
     assert pc.total_trades == 100
+
+
+def test_terminal_dynamic_numbering(mocker):
+    """Verify that terminal output uses dynamic numbering for sections."""
+    from src.research.reporting import (
+        RegimeSection,
+        ResearchReport,
+        ResearchReporter,
+        RLSection,
+    )
+
+    # Mock console.print to capture output
+    mock_console = mocker.patch("src.research.reporting.Console")
+    reporter = ResearchReporter()
+    reporter.console = mock_console.return_value
+
+    report = ResearchReport(
+        title="Test Report",
+        executive_summary="Summary",
+        conclusion="Conclusion",
+    )
+
+    # Add only Regime Analysis (Section 1) and RL Evaluation (should be Section 2, not 8)
+    report.regime_analysis = RegimeSection(
+        summary="Regime summary", regimes=[], transition_insights="None"
+    )
+    report.rl_evaluation = RLSection(
+        comparison_summary="RL summary", best_agent="PPO", performance_gap=0.0, metrics=[]
+    )
+
+    reporter.format_for_terminal(report)
+
+    # Check that console.print was called with sequential numbers
+    calls = [c[0][0] for c in reporter.console.print.call_args_list if isinstance(c[0][0], str)]
+
+    # We expect "1. Market Regime Analysis" and "2. RL Agent Evaluation"
+    # Note: reporting.py uses f"\n[bold cyan]{section_idx}. Market Regime Analysis[/]"
+
+    found_regime = any("1. Market Regime Analysis" in s for s in calls)
+    found_rl = any("2. RL Agent Evaluation" in s for s in calls)
+
+    assert found_regime, f"Regime analysis header not found in: {calls}"
+    assert found_rl, f"RL Evaluation should be section 2, but header not found correctly in: {calls}"

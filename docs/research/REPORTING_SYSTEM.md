@@ -6,7 +6,7 @@ The research reporting system provides automated generation of institutional-gra
 
 - **Multi-Domain Analysis:** Covers 10 distinct research domains including Regime Analysis, Stress Testing, Model Drift, and Execution Quality.
 - **Institutional Metrics:** Calculates advanced metrics such as Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio.
-- **Professional Visualization:** High-fidelity HTML reports with interactive elements (TOC, back-to-top) and color-coded status indicators.
+- **Professional Visualization:** High-fidelity HTML reports with interactive elements (TOC, back-to-top) and color-coded status indicators. Terminal reports feature dynamic section numbering for logical indexing.
 - **Accessibility & Print Optimization:** Hardened HTML with ARIA labels, skip-links, and `@media print` CSS for professional PDF exports.
 - **Gold Standard Verification:** Integrated pipeline validation via `scripts/verify_reporting_system.py`.
 
@@ -78,6 +78,13 @@ To generate a validation report with mock data for the full system:
 ```bash
 PYTHONPATH=. python scripts/verify_reporting_system.py
 ```
+
+### Terminal UX Features
+
+The `ResearchReporter` (src/research/reporting.py) optimizes terminal output for human-in-the-loop auditing:
+
+- **Dynamic Numbering:** Section indices are calculated at runtime. If optional analytical domains (e.g., Rare Events) are omitted, subsequent sections are automatically re-indexed to maintain a sequential sequence (1, 2, 3...) rather than skipping indices.
+- **Rich Formatting:** Utilizes the `rich` library for high-fidelity tables, color-coded status badges, and panels to improve information density and scannability for the operator.
 
 To verify the journal mining system specifically:
 

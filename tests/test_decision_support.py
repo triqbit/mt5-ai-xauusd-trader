@@ -260,3 +260,71 @@ def test_format_for_operator(mock_explanation, mock_regime, mock_macro_risk):
     assert isinstance(output, str)
     assert "XAUUSD" in output
     assert any(s in output for s in ["EXECUTE", "CAUTION", "BLOCKED"])
+
+
+def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_macro_risk, mocker):
+    """Verify that performance metrics are color-coded in terminal output."""
+    from rich.panel import Panel
+
+    dss = DecisionSupportSystem()
+    mock_console = MagicMock()
+
+    # 1. Test High Performance (Should be Green)
+    packet_high = dss.assemble_packet(
+        symbol="XAUUSD",
+        explanation=mock_explanation,
+        regime_info=mock_regime,
+        macro_risk=mock_macro_risk,
+        performance_metrics={"sharpe_ratio": 2.5, "profit_factor": 2.2, "recovery_factor": 2.1}
+    )
+
+    dss.format_for_operator(packet_high, console=mock_console)
+    dashboard = mock_console.print.call_args[0][0]
+
+    # Find perf_panel in the dashboard Group
+    perf_panel = None
+    for r in dashboard.renderables:
+        # overview_table is a Table, which contains Panels in its rows
+        if hasattr(r, "columns"): # Likely the Table
+            # Table doesn't directly expose rows easily in a mockable way without deep diving
+            # But we can check all Panels created during the call if we mock Panel
+            pass
+
+    # Alternative: Mock Panel where it's used. Since it's imported locally,
+    # we patch the 'rich.panel.Panel' class directly.
+    mock_panel_cls = mocker.patch("rich.panel.Panel", side_effect=Panel)
+
+    dss.format_for_operator(packet_high, console=mock_console)
+
+    # Find the panel call for "Recent Performance"
+    perf_text = ""
+    for call in mock_panel_cls.call_args_list:
+        if call.kwargs.get("title") == "📊 Recent Performance":
+            perf_text = call.args[0]
+            break
+
+    assert "[bold green]2.50" in perf_text
+    assert "[bold green]2.20" in perf_text
+    assert "[bold green]2.10" in perf_text
+
+    # 2. Test Low Performance (Should be Red)
+    packet_low = dss.assemble_packet(
+        symbol="XAUUSD",
+        explanation=mock_explanation,
+        regime_info=mock_regime,
+        macro_risk=mock_macro_risk,
+        performance_metrics={"sharpe_ratio": 0.5, "profit_factor": 0.8, "recovery_factor": 0.2}
+    )
+
+    mock_panel_cls.reset_mock()
+    dss.format_for_operator(packet_low, console=mock_console)
+
+    perf_text_low = ""
+    for call in mock_panel_cls.call_args_list:
+        if call.kwargs.get("title") == "📊 Recent Performance":
+            perf_text_low = call.args[0]
+            break
+
+    assert "[bold red]0.50" in perf_text_low
+    assert "[bold red]0.80" in perf_text_low
+    assert "[bold red]0.20" in perf_text_low

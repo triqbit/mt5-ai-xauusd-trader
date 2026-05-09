@@ -290,8 +290,10 @@ class ResearchReporter:
         self.console.print("\n[bold]Executive Summary[/]")
         self.console.print(report.executive_summary)
 
+        section_idx = 1
         if report.regime_analysis:
-            self.console.print("\n[bold cyan]1. Market Regime Analysis[/]")
+            self.console.print(f"\n[bold cyan]{section_idx}. Market Regime Analysis[/]")
+            section_idx += 1
             table = Table(box=None)
             table.add_column("Regime")
             table.add_column("Frequency")
@@ -301,7 +303,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.stress_tests:
-            self.console.print("\n[bold red]2. Stress Test Outcomes[/]")
+            self.console.print(f"\n[bold red]{section_idx}. Stress Test Outcomes[/]")
+            section_idx += 1
             self.console.print(
                 f"Resilience Score: [bold]{report.stress_tests.resilience_score}/100[/]"
             )
@@ -332,7 +335,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.hyperparameter_robustness:
-            self.console.print("\n[bold magenta]3. Hyperparameter Robustness[/]")
+            self.console.print(f"\n[bold magenta]{section_idx}. Hyperparameter Robustness[/]")
+            section_idx += 1
             self.console.print(
                 f"Stability Score: [bold]{report.hyperparameter_robustness.stability_score}/100[/]"
             )
@@ -345,7 +349,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.trade_patterns:
-            self.console.print("\n[bold yellow]4. Trade Pattern Findings[/]")
+            self.console.print(f"\n[bold yellow]{section_idx}. Trade Pattern Findings[/]")
+            section_idx += 1
             self.console.print(f"Insight: {report.trade_patterns.primary_insight}")
             self.console.print(
                 f"[dim]Avg Win Duration: {report.trade_patterns.avg_win_duration:.1f}m | "
@@ -378,7 +383,8 @@ class ResearchReporter:
                 self.console.print(m_table)
 
         if report.model_drift:
-            self.console.print("\n[bold blue]5. Model Drift Observations[/]")
+            self.console.print(f"\n[bold blue]{section_idx}. Model Drift Observations[/]")
+            section_idx += 1
             table = Table(box=None)
             table.add_column("Metric")
             table.add_column("Drift %")
@@ -388,7 +394,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.allocation_insights:
-            self.console.print("\n[bold green]6. Capital Allocation[/]")
+            self.console.print(f"\n[bold green]{section_idx}. Capital Allocation[/]")
+            section_idx += 1
             self.console.print(
                 f"Total Heat: {report.allocation_insights.total_heat_pct}% | Diversification: {report.allocation_insights.diversification_score:.2f}"
             )
@@ -401,7 +408,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.benchmarks:
-            self.console.print("\n[bold white]7. Benchmark Comparisons[/]")
+            self.console.print(f"\n[bold white]{section_idx}. Benchmark Comparisons[/]")
+            section_idx += 1
             table = Table(box=None)
             table.add_column("Strategy")
             table.add_column("Return")
@@ -425,7 +433,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.rl_evaluation:
-            self.console.print("\n[bold magenta]8. RL Agent Evaluation[/]")
+            self.console.print(f"\n[bold magenta]{section_idx}. RL Agent Evaluation[/]")
+            section_idx += 1
             self.console.print(f"Summary: {report.rl_evaluation.comparison_summary}")
             table = Table(box=None)
             table.add_column("Agent")
@@ -448,7 +457,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.rare_events:
-            self.console.print("\n[bold red]9. Rare Event Simulations[/]")
+            self.console.print(f"\n[bold red]{section_idx}. Rare Event Simulations[/]")
+            section_idx += 1
             table = Table(box=None)
             table.add_column("Event Type")
             table.add_column("Impact")
@@ -460,7 +470,8 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.calibration_analysis:
-            self.console.print("\n[bold cyan]10. Confidence Calibration & Reliability[/]")
+            self.console.print(f"\n[bold cyan]{section_idx}. Confidence Calibration & Reliability[/]")
+            section_idx += 1
             self.console.print(
                 f"ECE: [bold]{report.calibration_analysis.ece:.4f}[/] | "
                 f"Brier Score: [bold]{report.calibration_analysis.brier_score:.4f}[/] | "
@@ -479,7 +490,8 @@ class ResearchReporter:
             self.console.print(f"[dim]Insight: {report.calibration_analysis.reliability_insight}[/]")
 
         if report.execution_quality:
-            self.console.print("\n[bold blue]11. Execution Quality & Alpha Decay[/]")
+            self.console.print(f"\n[bold blue]{section_idx}. Execution Quality & Alpha Decay[/]")
+            section_idx += 1
             self.console.print(
                 f"Efficiency Score: [bold]{report.execution_quality.efficiency_score:.1f}/100[/]"
             )
