@@ -68,6 +68,53 @@ def test_log_risk_event(logger):
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
 
+def test_log_rejected_trade(logger):
+    signal_id = logger.log_signal({
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0
+    })
+    trade_id = logger.log_trade(
+        ticket=None,
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000.0,
+        lot_size=0.1,
+        signal_id=signal_id,
+        status="REJECTED",
+        signal_source="execution_filter",
+        drawdown_impact=0.05
+    )
+    assert trade_id > 0
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade
+        trade = session.get(Trade, trade_id)
+        assert trade.ticket is None
+        assert trade.status == "REJECTED"
+        assert trade.signal_source == "execution_filter"
+        assert trade.drawdown_impact == 0.05
+
+def test_performance_report_ignores_rejected(logger):
+    # Log a closed trade
+    logger.log_trade(1, "XAUUSD", 1, 2000.0, 0.1, status="OPEN")
+    logger.update_trade(1, 2010.0, 100.0)
+
+    # Log a rejected trade
+    logger.log_trade(
+        ticket=None,
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000.0,
+        lot_size=0.1,
+        status="REJECTED"
+    )
+
+    report = logger.read_performance_report()
+    assert report["total_trades"] == 1
+    assert report["max_drawdown"] == 0.0
+    assert "sharpe_ratio" in report
+    assert "profit_factor" in report
+
 def test_audit_columns(logger):
     signal_id = logger.log_signal({
         "symbol": "XAUUSD",
