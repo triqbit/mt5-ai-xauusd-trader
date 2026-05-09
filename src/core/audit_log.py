@@ -17,19 +17,13 @@ from sqlalchemy import (
     DateTime,
     String,
     Text,
-    create_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import Mapped, mapped_column
 
+from src.core.database import Base, get_db_manager
 from src.core.log_config import get_masking_processor
 
 logger = logging.getLogger(__name__)
-
-
-class Base(DeclarativeBase):
-    """SQLAlchemy 2.0 DeclarativeBase."""
-
-    pass
 
 
 class AuditEntry(Base):
@@ -73,14 +67,9 @@ class AuditLogger:
         if self._initialized:
             return
 
-        if not db_url:
-            raise ValueError("AuditLogger must be initialized with a db_url")
-
-        self.engine = create_engine(db_url)
-        Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
+        self.db_manager = get_db_manager()
         self._initialized = True
-        logger.info("AuditLogger initialized with database: %s", db_url)
+        logger.info("AuditLogger initialized with unified DatabaseManager")
 
     def log(
         self,
@@ -103,7 +92,7 @@ class AuditLogger:
         context = structlog.contextvars.get_contextvars()
         trace_id = context.get("trace_id")
 
-        with self.Session() as session:
+        with self.db_manager.get_session() as session:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
@@ -112,7 +101,7 @@ class AuditLogger:
                 metadata_json=redacted_metadata,
             )
             session.add(entry)
-            session.commit()
+            session.flush()  # To get the ID before commit (which is handled by get_session)
             return entry.id
 
     def log_config_snapshot(self, config_data: dict[str, Any], reason: str = "startup") -> int:

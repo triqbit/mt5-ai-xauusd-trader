@@ -33,9 +33,18 @@ with patch.dict("sys.modules", {
     from src.core.audit_log import AuditEntry, AuditLogger
     from src.core.config import get_config
     from src.core.constants import SignalDirection
+    from src.core.database import DatabaseManager, Base, get_db_manager
     from src.trading.audited_risk_manager import AuditedRiskManager
     from src.trading.execution_filter import ExecutionFilter
     from src.trading.risk_manager import TradeSignal
+
+@pytest.fixture(autouse=True)
+def reset_db_manager():
+    """Reset the DatabaseManager singleton before each test."""
+    if DatabaseManager._instance:
+        DatabaseManager._instance._initialized = False
+    DatabaseManager("sqlite:///:memory:")
+    Base.metadata.create_all(DatabaseManager.get_instance().engine)
 
 @pytest.fixture(autouse=True)
 def reset_audit_logger():
@@ -45,8 +54,8 @@ def reset_audit_logger():
 
 @pytest.fixture
 def audit_logger():
-    """Provide a fresh in-memory AuditLogger."""
-    return AuditLogger(db_url="sqlite:///:memory:")
+    """Provide a fresh AuditLogger."""
+    return AuditLogger()
 
 @pytest.fixture
 def mock_cfg():
@@ -112,7 +121,7 @@ def test_enterprise_audit_flow_double_rejection(mock_cfg, audit_logger):
         assert risk_approved is False
 
     # 5. Verify Audit Persistence
-    with audit_logger.Session() as session:
+    with get_db_manager().get_session() as session:
         # Check Execution Decision Entry
         ef_entry = session.execute(
             select(AuditEntry).where(AuditEntry.action == "execution_decision")
@@ -181,7 +190,7 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
         assert risk_approved is False
 
     # 5. Verify Audit Persistence
-    with audit_logger.Session() as session:
+    with get_db_manager().get_session() as session:
         # Check Execution Decision (Passed)
         ef_entry = session.execute(
             select(AuditEntry).where(AuditEntry.action == "execution_decision")

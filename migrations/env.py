@@ -20,7 +20,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.core.trade_logger import Base
+from src.core.database import Base
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

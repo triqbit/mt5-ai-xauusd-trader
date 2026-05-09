@@ -55,6 +55,7 @@ from src.core import profile
 from src.core.audit_log import AuditLogger
 from src.core.config_validator import ConfigValidator
 from src.core.constants import SignalDirection
+from src.core.database import DatabaseManager
 from src.core.decision_support import DecisionSupportSystem
 from src.core.exceptions import (
     CircuitBreakerError,
@@ -968,10 +969,12 @@ def main() -> int:
     )
 
     # Initialise components
-    # 1. Audit Logger (Mandatory for enterprise traceability)
+    # 0. Centralized Database Manager
     database_url = cfg.database_url.get_secret_value()
-    audit_db_url = database_url if "sqlite" in database_url else "sqlite:///audit.db"
-    audit_logger = AuditLogger(db_url=audit_db_url)
+    DatabaseManager(db_url=database_url)
+
+    # 1. Audit Logger (Mandatory for enterprise traceability)
+    audit_logger = AuditLogger()
 
     # Log sanitized configuration snapshot
     audit_logger.log_config_snapshot(
@@ -1021,9 +1024,7 @@ def main() -> int:
             )
             return 1
     balance = connector.get_account_balance()
-    trade_logger = TradeLogger(
-        db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
-    )
+    trade_logger = TradeLogger()
     monitor = Monitor(cfg)
     # Note: Monitor's start_metrics_server is legacy;
     # Enterprise deployments use the FastAPI health app which includes /metrics.

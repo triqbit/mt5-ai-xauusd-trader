@@ -2,21 +2,26 @@
 Integration tests for TradeLogger.
 """
 import os
-
 import pytest
-
+from src.core.database import DatabaseManager, Base
 from src.core.trade_logger import TradeLogger
-
 
 @pytest.fixture
 def logger():
     db_path = "test_trades.db"
     if os.path.exists(db_path):
         os.remove(db_path)
-    logger = TradeLogger(db_url=f"sqlite:///{db_path}")
-    from src.core.trade_logger import Base
-    Base.metadata.create_all(logger.engine)
+
+    # Initialize singleton DatabaseManager
+    if DatabaseManager._instance:
+        DatabaseManager._instance._initialized = False # Force re-init
+
+    DatabaseManager(db_url=f"sqlite:///{db_path}")
+    Base.metadata.create_all(DatabaseManager.get_instance().engine)
+
+    logger = TradeLogger()
     yield logger
+
     if os.path.exists(db_path):
         os.remove(db_path)
 
@@ -63,7 +68,8 @@ def test_performance_report(logger):
 def test_log_risk_event(logger):
     logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")
     # No exception means success, we could query DB to be sure
-    with logger.Session() as session:
+    from src.core.database import get_db_manager
+    with get_db_manager().get_session() as session:
         from src.core.trade_logger import RiskEvent
         event = session.query(RiskEvent).first()
         assert event.event_type == "CIRCUIT_BREAKER"
@@ -74,7 +80,8 @@ def test_audit_columns(logger):
         "direction": 1,
         "entry_price": 2000.0
     })
-    with logger.Session() as session:
+    from src.core.database import get_db_manager
+    with get_db_manager().get_session() as session:
         from src.core.trade_logger import ModelSignal
         signal = session.get(ModelSignal, signal_id)
         assert signal.created_at is not None
@@ -84,8 +91,9 @@ def test_audit_columns(logger):
 def test_constraints(logger):
     from sqlalchemy.exc import IntegrityError
     # Test price constraint
+    from src.core.database import get_db_manager
     with pytest.raises(IntegrityError):
-        with logger.Session() as session:
+        with get_db_manager().get_session() as session:
             from src.core.trade_logger import ModelSignal
             bad_signal = ModelSignal(
                 symbol="XAUUSD",

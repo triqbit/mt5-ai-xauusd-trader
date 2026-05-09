@@ -27,6 +27,7 @@ from sqlalchemy import text
 from src.core.audit_log import AuditLogger
 from src.core.config import TradingConfig, get_config
 from src.core.config_validator import ConfigValidator
+from src.core.database import get_db_manager
 from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector
 
@@ -170,19 +171,21 @@ class HealthChecker:
 
     def check_database(self) -> ComponentStatus:
         """Verify primary database reachability."""
-        if not self.trade_logger:
+        try:
+            db_manager = get_db_manager()
+        except RuntimeError as e:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
-                message="TradeLogger not initialized",
+                message=f"DatabaseManager not initialized: {e!s}",
                 remedy="Ensure DATABASE_URL is valid in .env and Database service is running",
             )
             self._update_gauge("database", res.status)
             return res
 
         try:
-            with self.trade_logger.engine.connect() as conn:
+            with db_manager.engine.connect() as conn:
                 try:
-                    conn.execute(self.trade_logger.engine.dialect.do_ping(conn.connection))
+                    conn.execute(db_manager.engine.dialect.do_ping(conn.connection))
                 except (AttributeError, Exception):
                     conn.execute(text("SELECT 1"))
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
