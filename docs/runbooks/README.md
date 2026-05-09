@@ -1,5 +1,5 @@
 # Operational Runbooks
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 This directory contains enterprise-grade operational runbooks for the MT5 AI/ML Trading Bot. These documents provide standardized procedures for responding to common failure scenarios, ensuring production safety, auditability, and rapid recovery.
 
@@ -19,9 +19,10 @@ This directory contains enterprise-grade operational runbooks for the MT5 AI/ML 
 
 1. **Safety First:** Capital preservation is our primary mission. When in doubt, halt trading and engage Runbook 03.
 2. **Audit Everything:** Every manual intervention and recovery action must be traceable. Restarts and config changes are automatically logged.
-3. **Verify Before Resuming:** Always use `scripts/doctor.py` and `/health/readiness` to verify system state before resuming automated trading.
+3. **Verify Before Resuming:** Always use `scripts/doctor.py`, `scripts/smoke_test.py`, and `/health/readiness` to verify system state before resuming automated trading.
 4. **No Manual Overrides:** Critical risk limits (Circuit Breakers) should not be bypassed without executive approval and a documented post-mortem.
 5. **RPO/RTO Enforcement:** All recovery actions should aim for a 1-hour Recovery Point Objective (RPO) and a 15-minute Recovery Time Objective (RTO).
+6. **Automation-Led Response:** Prioritize the use of standardized diagnostic and recovery scripts (`scripts/doctor.py`, `scripts/backup_verify.sh`, `scripts/generate_incident_report.py`) to reduce human error.
 
 ## Support & Escalation
 

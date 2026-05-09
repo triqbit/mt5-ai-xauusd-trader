@@ -1,5 +1,5 @@
 # Runbook 04: Database Corruption Recovery
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 ## Overview
 Procedures for recovering from SQLite corruption in `trades.db` or `audit.db`. This runbook leverages the built-in backup and verification framework defined in `docs/DISASTER_RECOVERY.md`.
@@ -43,14 +43,21 @@ If in-place repair fails or the file is physically corrupted/missing:
    sqlite3 ../../trades.db "PRAGMA integrity_check;"
    ```
 
-### 3. Verification & Cleanup
+### 3. Proactive Verification
+Run the backup verification script to ensure all existing backups are healthy:
+```bash
+bash scripts/backup_verify.sh
+```
+- Review `logs/backup.log` for any failures.
+
+### 4. Verification & Cleanup
 - Run the system doctor to ensure the bot can connect to the restored database:
   ```bash
   python scripts/doctor.py
   ```
 - Check the audit log to identify the last recorded transaction and ensure minimal data loss (RPO < 1h):
   ```bash
-  sqlite3 audit.db "SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 5;"
+  sqlite3 audit.db "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 5;"
   ```
 - Once verified, restart the bot: `docker start xauusd_trader`.
 
@@ -62,6 +69,7 @@ If in-place repair fails or the file is physically corrupted/missing:
 ## Verification Commands
 - `sqlite3 trades.db "PRAGMA integrity_check;"`
 - `sqlite3 audit.db "PRAGMA integrity_check;"`
+- `bash scripts/backup_verify.sh`
 - `python scripts/doctor.py`
 - `curl -s http://localhost:8000/health/readiness`
 
