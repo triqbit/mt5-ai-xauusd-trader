@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Institutional Feature Engineering:** Implemented a scalable pipeline for 140+ technical indicators with multi-timeframe support (M1-D1) and no look-ahead bias in `src/core/feature_engineering.py`.
+- **Stateful Feature Normalization:** Added production-ready Z-score and Min-Max normalization with persistence support for consistent inference.
 - **6-Layer Execution Filter Cascade:** Implemented a streamlined validation system for trading signals (ATR, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown).
 - **Structured Execution Decisions:** Introduced a typed `ExecutionDecision` dataclass for granular audit tracing and clear rejection reasons.
 - **Enhanced Filter Unit Tests:** Added 27 comprehensive tests covering edge cases for all 6 validation layers.
