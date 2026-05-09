@@ -18,14 +18,17 @@ def get_commits_since_last_tag():
     last_tag = run_command(["git", "describe", "--tags", "--abbrev=0"])
     if not last_tag:
         # Fallback to all commits if no tag exists
-        cmd = ["git", "log", "--pretty=format:%s"]
+        cmd = ["git", "log", "--pretty=format:%B%n-DELIMITER-"]
     else:
-        cmd = ["git", "log", f"{last_tag}..HEAD", "--pretty=format:%s"]
+        cmd = ["git", "log", f"{last_tag}..HEAD", "--pretty=format:%B%n-DELIMITER-"]
 
     output = run_command(cmd)
     if not output:
         return []
-    return output.splitlines()
+
+    # Split by delimiter and filter empty entries
+    commits = [c.strip() for c in output.split("-DELIMITER-") if c.strip()]
+    return commits
 
 
 def categorize_commits(commits, labels=None):
@@ -74,12 +77,25 @@ def categorize_commits(commits, labels=None):
                 label_to_cat[label.lower()] = cat
 
     for commit in commits:
-        # Ignore automated changelog updates and release commits
-        if "docs: update CHANGELOG.md" in commit or "chore: release v" in commit:
+        # Split into lines to separate subject from body
+        lines = commit.splitlines()
+        if not lines:
             continue
 
-        # Try to parse conventional commit
-        match = re.match(r"^(\w+)(?:\(.+\))?(!?): (.+)$", commit)
+        subject = lines[0]
+        # Filter out metadata lines from body (Co-authored-by, etc.)
+        body_lines = [
+            l for l in lines[1:]
+            if not any(marker in l for marker in ["Co-authored-by:", "Signed-off-by:", "PR-URL:", "---------"])
+        ]
+        body = "\n".join(body_lines).strip()
+
+        # Ignore automated changelog updates and release commits
+        if "docs: update CHANGELOG.md" in subject or "chore: release v" in subject:
+            continue
+
+        # Try to parse conventional commit from subject
+        match = re.match(r"^(\w+)(?:\(.+\))?(!?): (.+)$", subject)
         if match:
             ctype, breaking, message = match.groups()
             category = mapping.get(ctype, "Changed")
@@ -87,18 +103,24 @@ def categorize_commits(commits, labels=None):
             # Capitalize first letter of message
             message = message[0].upper() + message[1:]
 
+            is_breaking = breaking == "!" or "BREAKING CHANGE:" in body or "BREAKING-CHANGE:" in body
+
             entry = f"- {message}"
-            if breaking == "!":
+            if is_breaking:
                 entry = f"- **BREAKING CHANGE**: {message}"
 
             if entry not in categories[category]:
                 categories[category].append(entry)
         else:
             # Non-conventional commit
-            if commit.strip() and not commit.startswith("Merge "):
-                message = commit.strip()
+            if subject.strip() and not subject.startswith("Merge "):
+                message = subject.strip()
                 message = message[0].upper() + message[1:]
+
+                is_breaking = "BREAKING CHANGE:" in body or "BREAKING-CHANGE:" in body
                 entry = f"- {message}"
+                if is_breaking:
+                    entry = f"- **BREAKING CHANGE**: {message}"
 
                 # Determine category: labels > default (Changed)
                 category = "Changed"
