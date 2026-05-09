@@ -32,7 +32,7 @@ def filter_svc(config):
 def test_passing_scenario(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
     # Ensure open market time
-    signal.timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
+    signal = signal.model_copy(update={"timestamp": datetime(2024, 5, 22, 12, 0, tzinfo=UTC)})
     decision = filter_svc.validate(signal, df, current_drawdown=0.0)
 
     assert decision.is_approved is True
@@ -70,7 +70,7 @@ def test_momentum_failure_scenario(filter_svc, execution_builder):
 
 def test_model_health_drift_failure(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
-    signal.timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
+    signal = signal.model_copy(update={"timestamp": datetime(2024, 5, 22, 12, 0, tzinfo=UTC)})
     health = ModelHealthGenerator.degraded_drift()
     decision = filter_svc.validate(signal, df, current_drawdown=0.0, model_health=health)
 
@@ -81,7 +81,7 @@ def test_model_health_drift_failure(filter_svc, execution_builder):
 
 def test_model_health_accuracy_failure(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
-    signal.timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
+    signal = signal.model_copy(update={"timestamp": datetime(2024, 5, 22, 12, 0, tzinfo=UTC)})
     health = ModelHealthGenerator.degraded_accuracy()
     decision = filter_svc.validate(signal, df, current_drawdown=0.0, model_health=health)
 

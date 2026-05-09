@@ -89,7 +89,7 @@ def test_filter_low_historical_win_rate(execution_filter, valid_signal, mock_mar
 
 def test_filter_low_confidence_threshold(execution_filter, valid_signal, mock_market_data):
     execution_filter.cfg.min_confidence = 0.8
-    valid_signal.confidence = 0.7
+    valid_signal = valid_signal.model_copy(update={"confidence": 0.7})
     decision = execution_filter.validate(valid_signal, mock_market_data, 0.05)
     assert decision.is_approved is False
     assert decision.blocked_by == "CONFIDENCE_THRESHOLD"
