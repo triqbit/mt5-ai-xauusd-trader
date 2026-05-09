@@ -369,11 +369,22 @@ class DecisionSupportSystem:
             )
             regime_panel = Panel(regime_content, title="🌐 Market Regime", border_style="cyan")
 
-            # Right Column: Performance
+            # Right Column: Performance with Color-Coded Metrics
+            def get_metric_color(val: float) -> str:
+                if val >= 2.0:
+                    return "green"
+                if val >= 1.0:
+                    return "yellow"
+                return "red"
+
+            sharpe_color = get_metric_color(packet.performance.sharpe_ratio)
+            pf_color = get_metric_color(packet.performance.profit_factor)
+            rf_color = get_metric_color(packet.performance.recovery_factor)
+
             perf_content = (
-                f"Sharpe: [bold]{packet.performance.sharpe_ratio:.2f}[/bold]\n"
-                f"Profit Factor: [bold]{packet.performance.profit_factor:.2f}[/bold]\n"
-                f"Recov. Factor: [bold]{packet.performance.recovery_factor:.2f}[/bold]\n"
+                f"Sharpe: [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
+                f"Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
+                f"Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
                 f"Win Rate: [bold]{packet.performance.win_rate:.1%}[/bold]\n"
                 f"W/L Ratio: [bold]{packet.performance.win_loss_ratio:.2f}[/bold]\n"
                 f"Total Trades: {packet.performance.total_trades}"
