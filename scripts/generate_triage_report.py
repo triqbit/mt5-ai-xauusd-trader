@@ -60,6 +60,45 @@ def get_ci_status(sha):
         return status_data['state']
     return 'unknown'
 
+def get_domains(files):
+    if not files:
+        return ["Unknown"]
+
+    domains = set()
+    mapping = {
+        "docs/": "docs",
+        "README.md": "docs",
+        "tests/": "tests",
+        ".github/": "infra/CI",
+        "scripts/": "infra/scripts",
+        "src/trading/": "core trading",
+        "src/risk/": "risk",
+        "src/models/": "AI models",
+        "src/core/": "core architecture",
+        "src/research/": "research",
+        "src/analytics/": "analytics",
+        "Makefile": "infra",
+        "Dockerfile": "infra",
+        "requirements": "dependencies",
+        "pyproject.toml": "dependencies",
+        "migrations/": "database",
+        "SECURITY": "security"
+    }
+
+    for f in files:
+        matched = False
+        for pattern, domain in mapping.items():
+            if pattern in f:
+                # Avoid false positives for dependencies like requirements.md
+                if pattern == "requirements" and not (f.endswith(".txt") or f.endswith(".pip")):
+                    continue
+                domains.add(domain)
+                matched = True
+        if not matched:
+            domains.add("other")
+
+    return sorted(list(domains))
+
 def classify_risk(files, title=""):
     high_risk_patterns = [
         "src/trading/",
@@ -102,6 +141,18 @@ def classify_risk(files, title=""):
                 return "Medium Risk", f"Touches core/research/analytics/risk: {f}"
 
     return "Safe Surface", "Only documentation, tests, or non-critical configurations."
+
+def get_recommendation(risk, domains, ci_status):
+    if risk == "High Risk":
+        return "High-risk — needs domain expert review"
+
+    if ci_status != "success":
+        return "Needs CI success before merge"
+
+    if "tests" not in domains and risk != "Safe Surface":
+        return "Needs tests/docs before merge"
+
+    return "Ready for detailed review"
 
 def generate_report():
     print("Fetching PRs...")
@@ -166,9 +217,11 @@ def generate_report():
             ci_status = get_ci_status(sha)
             files = get_all_pr_files(num)
             risk, reason = classify_risk(files, title)
+            domains = get_domains(files)
         else:
             ci_status = "unknown"
             risk, reason = classify_risk([], title)
+            domains = ["Triage Required"]
             if risk == "Unknown":
                 risk = "Triage Required"
 
@@ -181,7 +234,8 @@ def generate_report():
             'risk': risk,
             'ci_status': ci_status,
             'reason': reason,
-            'flag': status_flag
+            'flag': status_flag,
+            'domains': domains
         })
 
     # Determine Top 3 (Prioritize "New" PRs over "Stale")
@@ -248,12 +302,18 @@ def generate_report():
     else:
         for i, c in enumerate(top_3):
             checklist += f"## {i+1}. PR #{c['number']}: {c['title']}\n"
-            checklist += f"- **Scope**: {c['risk']} update\n"
-            checklist += f"- **Status**: Ready for detailed review (CI: {c['ci_status']})\n"
-            checklist += f"- **Risk**: {c['risk']}\n"
-            checklist += f"- **Why**: {c['reason']}\n"
-            checklist += "- **Missing Items**: None identified from triage heuristics.\n"
-            checklist += "- **Recommendation**: Jules05 or human review candidate.\n\n"
+            checklist += f"- **Short scope summary**: {c['risk']} update implementing '{c['title']}'\n"
+            checklist += f"- **Domains touched**: {', '.join(c['domains'])}\n"
+            checklist += f"- **CI status**: {c['ci_status']}\n"
+
+            missing = []
+            if "tests" not in c['domains'] and c['risk'] != "Safe Surface":
+                missing.append("tests")
+            if "docs" not in c['domains'] and c['risk'] != "Safe Surface":
+                missing.append("docs")
+
+            checklist += f"- **Missing items**: { ', '.join(missing) if missing else 'None identified' }\n"
+            checklist += f"- **Recommendation**: {get_recommendation(c['risk'], c['domains'], c['ci_status'])}\n\n"
 
     checklist += "---\n*Prepared by Jules06 (qufuwan) for Jules05 and human review.*\n"
 
