@@ -87,7 +87,8 @@ class BacktestEngine:
         self.spread = spread
         self.commission_per_lot = commission_per_lot
         self.leverage = leverage
-        self.fe = feature_engineer or FeatureEngineer()
+        # Disable internal normalization to handle it per-window in walk-forward
+        self.fe = feature_engineer or FeatureEngineer(normalize=False)
         self.ef = execution_filter or ExecutionFilter()
         self.max_positions = max_positions
 
@@ -137,8 +138,11 @@ class BacktestEngine:
 
         # 1. Pre-calculate all possible features for the entire dataset
         logger.info("Pre-calculating features for the entire dataset...")
-        # Note: drop_ohlcv=False allows using high/low/close for trade simulation
+        # Ensure we get raw features for proper walk-forward normalization
+        original_norm = self.fe.normalize
+        self.fe.normalize = False
         df_features = self.fe.compute_features(data, drop_ohlcv=False)
+        self.fe.normalize = original_norm
 
         if df_features.empty:
             logger.error("Feature engineering returned empty DataFrame. Insufficient data?")
@@ -225,6 +229,13 @@ class BacktestEngine:
         while start + train_window + test_window <= n:
             test_start_idx = start + train_window
 
+            # Institutional Walk-Forward: Compute normalization stats from train window ONLY
+            # to strictly prevent look-ahead bias in the test window.
+            train_slice = feature_vals[start:test_start_idx]
+            train_mean = np.nanmean(train_slice, axis=0)
+            train_std = np.nanstd(train_slice, axis=0)
+            train_std[train_std == 0] = 1.0  # Avoid division by zero
+
             for i in range(test_window):
                 abs_idx = test_start_idx + i
 
@@ -240,7 +251,10 @@ class BacktestEngine:
 
                 # 2. Evaluation Logic: If slot available, check for new signals
                 if len(active_trades) < self.max_positions:
-                    obs = feature_vals[abs_idx]
+                    # Apply train-window normalization to the current observation
+                    obs_raw = feature_vals[abs_idx]
+                    obs = (obs_raw - train_mean) / (train_std + 1e-8)
+
                     try:
                         # Standard Signal object or fallback to raw int
                         signal_obj = model.predict(obs)
