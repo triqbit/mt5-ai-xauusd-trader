@@ -13,8 +13,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import talib
 
+import talib
 from src.core.profiler import profile as profile_context
 
 logger = logging.getLogger(__name__)
