@@ -427,7 +427,9 @@ class MT5Connector:
                     err_code, err_desc = mt5.last_error()
                     if err_code in [-1, 10001, 10002, 10003, 10004]:
                         logger.warning(
-                            "MT5 connection failure detected (code %d). Resetting...", err_code
+                            "mt5_connection_failure_detected",
+                            code=err_code,
+                            action="resetting_initialized_state",
                         )
                         self._is_initialized = False
                     raise MT5DataError(f"Failed to copy rates range: {err_desc} (code: {err_code})")
@@ -448,7 +450,7 @@ class MT5Connector:
         except Exception as e:
             if isinstance(e, (MT5DataError, MT5ConnectionError)):
                 raise
-            logger.exception("Unexpected error in get_rates_range: %s", e)
+            logger.exception("unexpected_error_in_get_rates_range", error=str(e))
             self._is_initialized = False
             raise MT5DataError(f"Unexpected data range retrieval error: {e}") from e
 
