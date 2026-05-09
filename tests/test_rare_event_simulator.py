@@ -159,16 +159,27 @@ def test_multi_session_dislocation(simulator):
 
     assert len(df) == 600
     assert result.event_type == RareEventType.MULTI_SESSION_DISLOCATION
+    assert "sessions" in result.description
 
-    # Check that different sessions have different volatilities
+    # Since sessions are dynamic, we just check that volatility is not uniform
     returns = df["close"].pct_change().dropna()
-    session_size = 600 // 4
-    vol1 = returns.iloc[:session_size].std()
-    vol2 = returns.iloc[session_size:2*session_size].std()
-    vol4 = returns.iloc[3*session_size:].std()
+    # Chunk returns and check standard deviation variation
+    chunks = np.array_split(returns, 6)
+    vols = [c.std() for c in chunks]
+    assert max(vols) > min(vols) * 1.5
 
-    assert vol2 > vol1 * 1.5
-    assert vol4 > vol2
+
+def test_reporting_integration(simulator):
+    from src.research.reporting import RareEventSection, RareEventSummary
+
+    suite = simulator.generate_suite(n_steps=200)
+    section = simulator.generate_report_section(suite)
+
+    assert isinstance(section, RareEventSection)
+    assert len(section.scenarios) == len(RareEventType)
+    assert isinstance(section.scenarios[0], RareEventSummary)
+    assert section.insights != ""
+    assert all(s.description != "" for s in section.scenarios)
 
 
 def test_news_shock_behavior(simulator):
