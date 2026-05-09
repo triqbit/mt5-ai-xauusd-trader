@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -17,18 +18,31 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.core.schemas import ExecutionDecision
-
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
+
+
+@dataclass
+class ExecutionDecision:
+    """Result of the 6-layer execution filter cascade."""
+
+    signal: TradeSignal
+    confidence_score: float
+    blocked_by: str | None
+    trace: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_approved(self) -> bool:
+        """Returns True if the signal passed all 6 layers."""
+        return self.blocked_by is None
 
 logger = logging.getLogger(__name__)
 
 
 class ExecutionFilter:
     """
-    Implements a 10-layer validation cascade for trading signals.
+    Implements a 6-layer validation cascade for trading signals.
     Layers:
         1. ATR Volatility Threshold
         2. Trend Angle Confirmation
@@ -36,10 +50,6 @@ class ExecutionFilter:
         4. Momentum Filter
         5. Session/Time Filter
         6. Drawdown Circuit Breaker
-        7. Model Stability (Drift/Accuracy)
-        8. Performance Floor (Win Rate)
-        9. Confidence Threshold
-        10. Signal Consistency (Flicker Guard)
     """
 
     def __init__(
@@ -48,9 +58,11 @@ class ExecutionFilter:
         rsi_period: int = 14,
         config: TradingConfig | None = None,
     ):
-        self.max_drawdown = max_drawdown
-        self.rsi_period = rsi_period
         self.cfg = config
+        self.max_drawdown = (
+            config.max_drawdown if config and hasattr(config, "max_drawdown") else max_drawdown
+        )
+        self.rsi_period = rsi_period
         self._signal_history: dict[str, deque[int]] = {}
 
     def validate(
@@ -60,12 +72,10 @@ class ExecutionFilter:
         current_drawdown: float = 0.0,
         timestamp: datetime | None = None,
         precomputed_metrics: dict[str, Any] | None = None,
-        model_health: dict[str, Any] | None = None,
-        trade_logger: Any | None = None,
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 10-layer filter cascade.
+        Run the full 6-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -74,8 +84,6 @@ class ExecutionFilter:
             current_drawdown: Current account drawdown (0.0 to 1.0).
             timestamp: Evaluation time.
             precomputed_metrics: Optional dictionary containing pre-calculated metrics.
-            model_health: Optional model health metrics.
-            trade_logger: Optional trade logger for win rate check.
         """
         if timestamp is None:
             timestamp = signal.timestamp or datetime.now(UTC)
@@ -140,82 +148,23 @@ class ExecutionFilter:
             "max_drawdown": self.max_drawdown,
         }
 
-        # Layer 7: Model Stability
-        stability_passed = True
-        stability_trace: dict[str, Any] = {"passed": True}
-        if model_health:
-            drift = model_health.get("drift", 0.0)
-            accuracy = model_health.get("accuracy", 1.0)
-            drift_threshold = self.cfg.model_drift_threshold if self.cfg else 0.3
-            accuracy_floor = self.cfg.model_accuracy_floor if self.cfg else 0.5
-            stability_passed = (drift < drift_threshold) and (accuracy >= accuracy_floor)
-            stability_trace = {
-                "passed": bool(stability_passed),
-                "drift": drift,
-                "accuracy": accuracy,
-                "drift_threshold": drift_threshold,
-                "accuracy_floor": accuracy_floor,
-            }
-        trace["model_stability"] = stability_trace
-
-        # Layer 8: Performance Floor
-        perf_passed = True
-        perf_trace: dict[str, Any] = {"passed": True}
-        if trade_logger:
-            perf = trade_logger.read_performance_report()
-            win_rate = perf.get("win_rate", 1.0)
-            win_rate_floor = self.cfg.model_win_rate_floor if self.cfg else 0.45
-            perf_passed = win_rate >= win_rate_floor
-            perf_trace = {
-                "passed": bool(perf_passed),
-                "win_rate": win_rate,
-                "win_rate_floor": win_rate_floor,
-            }
-        trace["performance_floor"] = perf_trace
-
-        # Layer 9: Confidence Threshold
-        min_confidence = self.cfg.min_confidence if self.cfg else 0.6
-        confidence_passed = signal.confidence >= min_confidence
-        trace["confidence_threshold"] = {
-            "passed": bool(confidence_passed),
-            "confidence": signal.confidence,
-            "min_confidence": min_confidence,
-        }
-
-        # Layer 10: Signal Consistency (Flicker Guard)
-        consistency_passed, consistency_metrics = self._check_signal_consistency_with_metrics(
-            signal.symbol, signal.direction
-        )
-        trace["signal_consistency"] = {
-            "passed": bool(consistency_passed),
-            **consistency_metrics,
-        }
-
-        # Determine final approval
-        is_approved = all(t["passed"] for t in trace.values())
+        # Determine final approval and blocked_by reason
         blocked_by = None
-        if not is_approved:
-            # Order of precedence for blocked_by
-            failure_order = [
-                ("atr_volatility", "ATR_VOLATILITY"),
-                ("trend_angle", "TREND_ANGLE"),
-                ("ema_sequence", "EMA_SEQUENCE"),
-                ("momentum", "MOMENTUM"),
-                ("session_time", "SESSION_CLOSED"),
-                ("drawdown_limit", "DRAWDOWN_LIMIT"),
-                ("model_stability", "MODEL_STABILITY"),
-                ("performance_floor", "PERFORMANCE_FLOOR"),
-                ("confidence_threshold", "CONFIDENCE_THRESHOLD"),
-                ("signal_consistency", "SIGNAL_CONSISTENCY"),
-            ]
-            for layer_key, reason in failure_order:
-                if not trace[layer_key]["passed"]:
-                    blocked_by = reason
-                    break
+        failure_order = [
+            ("atr_volatility", "ATR_VOLATILITY"),
+            ("trend_angle", "TREND_ANGLE"),
+            ("ema_sequence", "EMA_SEQUENCE"),
+            ("momentum", "MOMENTUM"),
+            ("session_time", "SESSION_CLOSED"),
+            ("drawdown_limit", "DRAWDOWN_LIMIT"),
+        ]
+        for layer_key, reason in failure_order:
+            if not trace[layer_key]["passed"]:
+                blocked_by = reason
+                break
 
         return ExecutionDecision(
             signal=signal,
-            is_approved=is_approved,
             confidence_score=signal.confidence,
             blocked_by=blocked_by,
             trace=trace,
@@ -228,10 +177,17 @@ class ExecutionFilter:
     def _check_atr_volatility_with_metrics(
         self,
         df: pd.DataFrame | None,
-        threshold: float = 3.0,
+        threshold: float | None = None,
         precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
         """Blocks if current ATR is > threshold * average ATR."""
+        if threshold is None:
+            threshold = (
+                self.cfg.volatility_extreme_threshold
+                if self.cfg and hasattr(self.cfg, "volatility_extreme_threshold")
+                else 3.0
+            )
+
         if precomputed:
             current_atr = precomputed.get("current_atr", 0.0)
             avg_atr = precomputed.get("avg_atr", 1.0)
