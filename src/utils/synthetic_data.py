@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from src.core.schemas import TradeSignal
+from src.trading.capital_allocator import AllocationRequest, StrategyConfig
 
 
 class ScenarioGenerator:
@@ -45,10 +46,15 @@ class ScenarioGenerator:
         start_price: float = 2300.0,
         trend_strength: float = 0.001,
         volatility: float = 0.002,
+        start_date: datetime | str | None = None,
+        freq: str = "5min",
     ) -> pd.DataFrame:
         """
         Main entry point for data generation.
         """
+        self._current_start_date = start_date
+        self._current_freq = freq
+
         if regime == "trending":
             return self._generate_trending(n_steps, start_price, trend_strength, volatility)
         if regime == "ranging":
@@ -94,6 +100,12 @@ class ScenarioGenerator:
         # Ensure high is actually the highest and low is the lowest
         df["high"] = df[["open", "close", "high"]].max(axis=1)
         df["low"] = df[["open", "close", "low"]].min(axis=1)
+
+        # Apply datetime index if provided
+        if hasattr(self, "_current_start_date") and self._current_start_date:
+            df.index = pd.date_range(
+                start=self._current_start_date, periods=n_steps, freq=self._current_freq
+            )
 
         return df
 
@@ -594,3 +606,97 @@ class RegimeScenarioBuilder:
     def news_shock(self) -> pd.DataFrame:
         """Triggers MarketRegime.NEWS_SHOCK."""
         return self.gen.generate(n_steps=150, regime="news_shock")
+
+
+class PortfolioScenarioBuilder:
+    """
+    Generates deterministic multi-strategy portfolio states and request sequences
+    for testing the CapitalAllocator and RiskManager.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.rng = np.random.default_rng(seed)
+
+    def concentration_risk_cascade(self) -> tuple[list[StrategyConfig], list[AllocationRequest]]:
+        """
+        Creates a scenario where multiple strategies hit symbol and family limits.
+        - 3 strategies on XAUUSD (Symbol concentration)
+        - 3 strategies in RL family (Family concentration)
+        """
+        configs = [
+            StrategyConfig(
+                strategy_id="gold_rl_1", symbol="XAUUSD", model_family="RL", capital_cap=100000
+            ),
+            StrategyConfig(
+                strategy_id="gold_rl_2", symbol="XAUUSD", model_family="RL", capital_cap=100000
+            ),
+            StrategyConfig(
+                strategy_id="gold_rl_3", symbol="XAUUSD", model_family="RL", capital_cap=100000
+            ),
+            StrategyConfig(
+                strategy_id="eur_rl_1", symbol="EURUSD", model_family="RL", capital_cap=100000
+            ),
+        ]
+        # Sequential requests that should eventually trigger concentration limits
+        requests = [
+            AllocationRequest(strategy_id="gold_rl_1", risk_pct=0.15),
+            AllocationRequest(strategy_id="gold_rl_2", risk_pct=0.15),
+            AllocationRequest(strategy_id="gold_rl_3", risk_pct=0.15),  # Should hit XAUUSD 0.4 limit
+            AllocationRequest(strategy_id="eur_rl_1", risk_pct=0.15),  # Should hit RL 0.4 limit
+        ]
+        return configs, requests
+
+    def performance_rebalancing_sequence(self) -> list[dict]:
+        """
+        Returns a sequence of (strategy_id, pnl, request_risk) to test adaptive rebalancing.
+        """
+        return [
+            {"strategy_id": "strat_a", "pnl": 500.0, "request": 0.02},  # Win -> Scale up
+            {"strategy_id": "strat_a", "pnl": 600.0, "request": 0.02},  # Win -> Scale up more
+            {"strategy_id": "strat_a", "pnl": -1000.0, "request": 0.02},  # Loss -> Scale down
+            {"strategy_id": "strat_a", "pnl": -1000.0, "request": 0.02},  # Loss -> Scale down
+            {"strategy_id": "strat_a", "pnl": -1000.0, "request": 0.02},  # Hits cooling-off
+        ]
+
+    def high_heat_portfolio(self) -> tuple[list[StrategyConfig], list[AllocationRequest]]:
+        """
+        Generates requests that push total portfolio heat toward and past 0.7 limit.
+        """
+        configs = [
+            StrategyConfig(strategy_id=f"strat_{i}", symbol=f"SYM_{i}", model_family=f"FAM_{i}", capital_cap=100000)
+            for i in range(5)
+        ]
+        requests = [
+            AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15)
+            for i in range(5)
+        ]
+        # 5 * 0.15 = 0.75 (> 0.7)
+        return configs, requests
+
+    def diversified_unbalanced_setup(self) -> list[StrategyConfig]:
+        """
+        Mixed performance states for testing diversification score and report generation.
+        """
+        return [
+            StrategyConfig(
+                strategy_id="alpha",
+                symbol="XAUUSD",
+                model_family="RL",
+                performance_multiplier=1.8,
+                capital_cap=100000,
+            ),
+            StrategyConfig(
+                strategy_id="beta",
+                symbol="EURUSD",
+                model_family="LSTM",
+                performance_multiplier=0.6,
+                capital_cap=100000,
+            ),
+            StrategyConfig(
+                strategy_id="gamma",
+                symbol="GBPUSD",
+                model_family="Transformer",
+                performance_multiplier=1.0,
+                capital_cap=100000,
+            ),
+        ]
