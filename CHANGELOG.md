@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **6-Layer Execution Filter Cascade:** Implemented a streamlined validation system for trading signals (ATR, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown).
 - **Structured Execution Decisions:** Introduced a typed `ExecutionDecision` dataclass for granular audit tracing and clear rejection reasons.
 - **Enhanced Filter Unit Tests:** Added 27 comprehensive tests covering edge cases for all 6 validation layers.
+- Implement monitoring system and Telegram alerting (#962)
+
+* feat: implement comprehensive monitoring and alerting system
+
+Implemented the monitoring system described in MONITORING_ALERTING.md.
+- Added `execution_latency_threshold` to `TradingConfig`.
+- Enhanced `Monitor` in `src/core/monitor.py` with:
+    - High execution latency Telegram alerts (>1000ms by default).
+    - Granular rejection tracking via Prometheus labels (`reason`).
+    - New gauges for monthly returns and average trade duration.
+    - Partial fill counter.
+    - Dedicated model health alerts: inference timeout, missing features, stale model, and training failures.
+- Updated `tests/test_monitor.py` with 30 unit tests mocking Telegram API.
+- Ensured thread-safe async Telegram bot calls for both sync and async contexts.
+
+Verified all changes with `pytest`.
+
+Co-authored-by: triqbit <242833443+triqbit@users.noreply.github.com>
+
+* feat: implement monitoring system and resolve CI issues
+
+- Implemented comprehensive monitoring and alerting system in `src/core/monitor.py`.
+- Resolved dependency vulnerabilities by upgrading `pytest` to 9.0.3 and `pytest-asyncio` to 1.3.0.
+- Synchronized dependencies in `requirements.txt` and `requirements-ci.txt`.
+- Added `execution_latency_threshold` to `TradingConfig`.
+- Updated `CHANGELOG.md` with the new monitoring system entry.
+- Verified all 30 monitoring unit tests pass.
+
+Co-authored-by: triqbit <242833443+triqbit@users.noreply.github.com>
+
+---------
+
+Co-authored-by: google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>
+Co-authored-by: triqbit <242833443+triqbit@users.noreply.github.com>
 
 ## [1.1.0-rc7] - 2026-05-09
 
