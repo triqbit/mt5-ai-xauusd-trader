@@ -144,20 +144,19 @@ class RiskManager:
             return RiskDecision(False, "Daily loss limit reached (Level 4)")
 
         # Layer 3: Activity Limits
-        if not self._check_max_positions():
+        active_positions = open_positions or []
+        if not self._check_max_positions(len(active_positions)):
             return RiskDecision(False, "Max concurrent positions reached")
         if not self._check_consecutive_losses():
             return RiskDecision(False, "Max consecutive losses reached")
 
         # Layer 4: Exposure Limits
-        active_positions = open_positions or []
-        if active_positions:
-            if not self._check_directional_exposure(signal, active_positions):
-                return RiskDecision(False, "Max directional exposure reached (30%)")
-            if market_data is not None and not self._check_total_notional(
-                signal, active_positions, market_data
-            ):
-                return RiskDecision(False, "Total notional exposure exceeds equity")
+        if not self._check_directional_exposure(signal, active_positions):
+            return RiskDecision(False, "Max directional exposure reached (30%)")
+        if market_data is not None and not self._check_total_notional(
+            signal, active_positions, market_data
+        ):
+            return RiskDecision(False, "Total notional exposure exceeds equity")
 
         # Layer 5: Symbol Allocation
         if not self._check_symbol_allocation(signal.symbol):
@@ -395,8 +394,13 @@ class RiskManager:
         limit_pct = getattr(self.cfg, "max_total_notional_pct", 1.0)
         return total_notional < (self.balance * limit_pct)
 
-    def _check_max_positions(self) -> bool:
-        if len(self.open_positions) >= self.cfg.max_positions:
+    def _check_max_positions(self, open_positions_count: Optional[int] = None) -> bool:
+        count = (
+            open_positions_count
+            if open_positions_count is not None
+            else len(self.open_positions)
+        )
+        if count >= self.cfg.max_positions:
             logger.debug("Max positions reached (%d)", self.cfg.max_positions)
             return False
         return True
