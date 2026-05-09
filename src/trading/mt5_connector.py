@@ -42,6 +42,7 @@ from src.core.exceptions import (
     MT5DataError,
     MT5ExecutionError,
 )
+from src.core.resilience import CircuitBreaker
 from src.core.retry import with_retry
 from src.core.schemas import TradeSignal
 
@@ -104,6 +105,19 @@ class MT5Connector:
         self._is_initialized: bool = False
         self._background_tasks: set[asyncio.Task] = set()
 
+        # Circuit Breaker for connection and data retrieval
+        self.breaker = CircuitBreaker(
+            name="MT5Connector",
+            failure_threshold=5,
+            recovery_timeout=60.0,
+            expected_exceptions=(MT5ConnectionError, MT5DataError),
+        )
+
+    @property
+    def circuit_state(self) -> str:
+        """Return the current state of the circuit breaker."""
+        return self.breaker.state.value
+
     def connect(self) -> bool:
         """Alias for initialize() to support legacy calls."""
         return self.initialize()
@@ -126,7 +140,13 @@ class MT5Connector:
 
         Raises:
             MT5ConnectionError: If all connection paths fail after retries.
+            CircuitBreakerError: If the circuit is OPEN.
         """
+        # Circuit Breaker check
+        return self.breaker(self._initialize_logic)()
+
+    def _initialize_logic(self) -> bool:
+        """Internal initialization logic wrapped by circuit breaker."""
         logger.info(
             "Initializing MT5 connector | mode=%s | symbol=%s", self.cfg.mode, self.cfg.symbol
         )
@@ -189,13 +209,9 @@ class MT5Connector:
                     await self.metaapi_connection.connect()
                     await self.metaapi_connection.wait_synchronized()
 
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    task = loop.create_task(_init_metaapi())
-                    self._background_tasks.add(task)
-                    task.add_done_callback(self._background_tasks.discard)
-                else:
-                    asyncio.run(_init_metaapi())
+                # Robust async execution ensuring we wait for completion
+                self._run_async(_init_metaapi())
+
                 self.use_metaapi = True
                 self._is_initialized = True
                 logger.info("MetaAPI fallback configured and connected successfully.")
@@ -268,6 +284,10 @@ class MT5Connector:
         Returns:
             pd.DataFrame: OHLCV data.
         """
+        return self.breaker(self._get_rates_logic)(symbol, timeframe, n_bars)
+
+    def _get_rates_logic(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
+        """Internal data retrieval logic wrapped by circuit breaker."""
         if not self._is_initialized:
             logger.info("Connector not initialized. Attempting auto-initialization...")
             self.initialize()
@@ -280,13 +300,13 @@ class MT5Connector:
                 if rates is None:
                     err_code, err_desc = mt5.last_error()
                     # If it's a connection-related error, trigger re-init for next retry
-                    if err_code in [-1, 10001, 10002]:  # Common connection/terminal errors
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
                         logger.warning(
                             "MT5 connection failure detected (code %d). Resetting...", err_code
                         )
                         self._is_initialized = False
 
-                    is_retriable = err_code not in [-2, -5]
+                    is_retriable = err_code not in [-2, -5, 10018]  # 10018: Market closed
                     raise MT5DataError(
                         f"Failed to copy rates: {err_desc} (code: {err_code})",
                         is_retriable=is_retriable,
@@ -326,6 +346,11 @@ class MT5Connector:
         Returns:
             pd.DataFrame: Tick data (time, bid, ask, last, volume, etc.)
         """
+        return self.breaker(self._get_ticks_range_logic)(symbol, date_from, date_to)
+
+    def _get_ticks_range_logic(
+        self, symbol: str, date_from: datetime, date_to: datetime
+    ) -> pd.DataFrame:
         if not self._is_initialized:
             self.initialize()
 
@@ -335,7 +360,7 @@ class MT5Connector:
                 ticks = mt5.copy_ticks_range(symbol, date_from, date_to, mt5.COPY_TICKS_ALL)
                 if ticks is None:
                     err_code, err_desc = mt5.last_error()
-                    if err_code in [-1, 10001, 10002]:
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
                         self._is_initialized = False
                     raise MT5DataError(f"Failed to copy ticks range: {err_desc} (code: {err_code})")
                 df = pd.DataFrame(ticks)
@@ -372,6 +397,11 @@ class MT5Connector:
         Returns:
             pd.DataFrame: OHLCV data.
         """
+        return self.breaker(self._get_rates_range_logic)(symbol, timeframe, date_from, date_to)
+
+    def _get_rates_range_logic(
+        self, symbol: str, timeframe: str, date_from: datetime, date_to: datetime
+    ) -> pd.DataFrame:
         if not self._is_initialized:
             self.initialize()
 
@@ -383,7 +413,7 @@ class MT5Connector:
                 rates = mt5.copy_rates_range(symbol, tf, date_from, date_to)
                 if rates is None:
                     err_code, err_desc = mt5.last_error()
-                    if err_code in [-1, 10001, 10002]:
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
                         logger.warning(
                             "MT5 connection failure detected (code %d). Resetting...", err_code
                         )
@@ -421,6 +451,9 @@ class MT5Connector:
         Returns:
             Dict[str, float]: Bid, Ask, and Spread.
         """
+        return self.breaker(self._get_tick_logic)(symbol)
+
+    def _get_tick_logic(self, symbol: str) -> Dict[str, float]:
         if not self._is_initialized:
             self.initialize()
 
@@ -429,14 +462,14 @@ class MT5Connector:
                 tick = mt5.symbol_info_tick(symbol)
                 if tick is None:
                     err_code, err_desc = mt5.last_error()
-                    if err_code in [-1, 10001, 10002]:
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
                         logger.warning(
                             "MT5 connection failure detected (code %d). Resetting...", err_code
                         )
                         self._is_initialized = False
                     is_retriable = err_code not in [-2, -5]
                     raise MT5DataError(
-                        f"Failed to get tick: {err_desc} (code: {err_code})",
+                        f"Failed to get_tick: {err_desc} (code: {err_code})",
                         is_retriable=is_retriable,
                     )
                 return {"bid": tick.bid, "ask": tick.ask, "spread": tick.ask - tick.bid}

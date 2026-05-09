@@ -57,6 +57,7 @@ from src.core.config_validator import ConfigValidator
 from src.core.constants import SignalDirection
 from src.core.decision_support import DecisionSupportSystem
 from src.core.exceptions import (
+    CircuitBreakerError,
     MT5ConnectionError,
     MT5DataError,
     MT5ExecutionError,
@@ -318,6 +319,17 @@ def run_live(
                             log.critical("Reconnection failed", error=str(reconnect_exc))
                             time.sleep(poll_interval)
                             continue
+                    except CircuitBreakerError as e:
+                        wait_time = e.details.get("wait_time_remaining", 60)
+                        log.error(
+                            "MT5 CONNECTOR BLOCKED",
+                            error=str(e),
+                            remedy=f"Wait {wait_time:.0f}s for circuit breaker to enter HALF_OPEN state.",
+                        )
+                        if monitor:
+                            monitor.log_system_error("MT5Connector", f"Circuit OPEN: {e}")
+                        time.sleep(poll_interval)
+                        continue
 
                 # 2. Institutional Feature Engineering & Regime Detection
                 with profile("institutional_context"):
