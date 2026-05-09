@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vectorized Feature Engineering:** Optimized `FeatureEngineer` by refactoring internal methods to return dictionaries of NumPy arrays and using TA-Lib vectorization (`SMA`, `SUM`, `ROCP`), achieving ~20% overall speedup.
 - **Dependency Parity Guard:** Introduced `scripts/verify_dependencies.py` and `tests/test_verify_dependencies.py` to automate version synchronization checks across environment-specific requirements files.
 - **End-to-End Trace Correlation:** Implemented a unique `trace_id` (UUID) propagation system linking logs, audit trails, and database records (signals/trades) for every iteration of the trading loop.
+- **Institutional Walk-Forward Backtester:** Created a production-grade backtesting engine with strict normalization to prevent look-ahead bias, realistic transaction cost simulation, and institutional metrics (MAE/MFE, Sharpe, CAGR, MDD).
 
 ### Changed
 - **CI Dependency Pinning:** Pinned type stub dependencies (`types-redis`, `types-requests`, `types-python-dateutil`, `types-setuptools`, `types-PyYAML`) in `requirements-ci.txt` to stable versions for environment reproducibility and build stability.

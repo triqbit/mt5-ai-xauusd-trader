@@ -403,7 +403,8 @@ class ExecutionScenarioBuilder:
         signal, df = self.passing_buy(symbol)
         # 2024-06-01 is a Saturday
         sat = datetime(2024, 6, 1, 12, 0, tzinfo=UTC)
-        signal.timestamp = sat
+        # Handle frozen Pydantic model
+        signal = signal.model_copy(update={"timestamp": sat})
         return signal, df, sat
 
     def drawdown_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, float]:
@@ -414,9 +415,10 @@ class ExecutionScenarioBuilder:
     def confidence_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
         """Signal with confidence below threshold (0.4)."""
         signal, df = self.passing_buy(symbol)
-        # Ensure open market time
-        signal.timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
-        signal.confidence = 0.4
+        # Ensure open market time and handle frozen Pydantic model
+        signal = signal.model_copy(
+            update={"timestamp": datetime(2024, 5, 22, 12, 0, tzinfo=UTC), "confidence": 0.4}
+        )
         return signal, df
 
     def signal_flicker_violation(self, symbol: str = "XAUUSD") -> list[TradeSignal]:

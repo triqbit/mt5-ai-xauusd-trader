@@ -651,7 +651,7 @@ Usage Examples:
   python main.py --mode live --algo ensemble --confirm-live
 
   # Run a walk-forward backtest for a specific period
-  python main.py --mode backtest --start 2023-01-01 --end 2024-01-01 --algo ppo
+  python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
         """,
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
@@ -666,12 +666,12 @@ Usage Examples:
         help="Machine Learning algorithm architecture to use for signal generation.",
     )
     p.add_argument(
-        "--start", help="Historical start date for backtest (YYYY-MM-DD)", default="2023-01-01"
+        "--start", help="Historical start date for backtest (YYYY-MM-DD)", default="2017-01-01"
     )
     p.add_argument(
         "--end",
         help="Historical end date for backtest (YYYY-MM-DD)",
-        default=datetime.now().strftime("%Y-%m-%d"),
+        default="2026-03-30",
     )
     p.add_argument(
         "--train-window",
@@ -731,8 +731,8 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
     """Bridge for running the walk-forward backtesting engine."""
     from src.trading.backtester import BacktestEngine
 
-    start_date = datetime.strptime(args.start, "%Y-%m-%d") if args.start else datetime(2023, 1, 1)
-    end_date = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
+    start_date = datetime.strptime(args.start, "%Y-%m-%d")
+    end_date = datetime.strptime(args.end, "%Y-%m-%d")
 
     log.info("Starting Backtest", symbol=cfg.symbol, start=start_date.date(), end=end_date.date())
 
@@ -1059,7 +1059,9 @@ def main() -> int:
         # Standard input_dim is 140 for the current feature engineer
         model = TimeSeriesTransformer(input_dim=140)
         if torch and transformer_path.exists():
-            model.load_state_dict(torch.load(transformer_path, map_location="cpu", weights_only=True))
+            model.load_state_dict(
+                torch.load(transformer_path, map_location="cpu", weights_only=True)
+            )
     else:
         # This branch should rarely be hit if Literal choices are enforced by Pydantic
         log.warning(
@@ -1112,7 +1114,7 @@ def main() -> int:
         )
         next_steps.add_row(
             "Backtesting:   ",
-            f"python main.py --mode backtest --algo {cfg.algorithm} --start 2023-01-01",
+            f"python main.py --mode backtest --algo {cfg.algorithm} --start 2017-01-01 --end 2026-03-30",
         )
 
         console.print(
