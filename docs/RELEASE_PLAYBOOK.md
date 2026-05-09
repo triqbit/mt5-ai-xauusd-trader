@@ -17,23 +17,26 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
     - Database migration reversibility checks (`scripts/verify_migrations.py`).
     - **Automated Pre-Prod Checklist Verification**: Ensures `docs/PREPROD_CHECKLIST.md` contains no unchecked items `[ ]`.
 
-2.  **Build & Runtime Verification Stage:**
-    - Multi-stage Docker image build.
-    - Automated vulnerability scanning using Trivy (failing on CRITICAL or HIGH vulnerabilities).
-    - **Automated Runtime Smoke Test**: Spins up the freshly built container and verifies API liveness/readiness via `scripts/smoke_test.py`.
-
-3.  **Research & QA Stage (Jules02 Integration):**
+2.  **Research & QA Stage (Jules02 Integration):**
     - Institutional Walk-Forward Optimization Verification.
     - StressLab resilience testing against extreme volatility.
     - Rare-event simulation (Flash Crash/Liquidity Vacuum).
     - Benchmarking against technical and random baselines.
-    - Automated Research Report generation and archival.
+    - **Capital Allocation Reporting** verification.
+    - **Backtest Audit Traceability** verification.
+    - **Journal Mining & Pattern Detection** verification.
+    - **Consolidated Research Audit Report** generation (`research_audit_report.md`).
+
+3.  **Build & Runtime Verification Stage:**
+    - Multi-stage Docker image build.
+    - Automated vulnerability scanning using Trivy (failing on CRITICAL or HIGH vulnerabilities).
+    - **Automated Runtime Smoke Test**: Spins up the freshly built container and verifies API liveness/readiness via `scripts/smoke_test.py`.
 
 4.  **Release Stage:**
     - Automated version bumping and `CHANGELOG.md` finalization.
     - Git tagging.
     - Artifact packaging with SHA256 integrity checksums.
-    - Creation of a GitHub Release with version-specific notes and rollback links.
+    - Creation of a GitHub Release with version-specific notes, integrity verification, and quick-rollback links.
 
 ---
 
@@ -91,22 +94,27 @@ Immediately following a deployment, the operator MUST perform the following chec
 
 Rollback decisions are governed by the Stability Freeze protocol defined in [SLO Targets](SLO_TARGETS.md).
 
-### A. Container Image Rollback
+### A. Container Image Rollback (Fastest)
 If the new version exhibits unstable behavior (high latency, frequent crashes, memory leaks):
 1.  **Identify Stable Version**: Find the last known stable tag from the [Releases](https://github.com/triqbit/mt5-ai-xauusd-trader/releases) page (e.g., `v1.2.2`).
-2.  **Update Manifest**: Modify your `docker-compose.yml` or K8s deployment to point to the stable image:
-    ```yaml
-    image: triqbit/mt5-ai-xauusd-trader:v1.2.2
-    ```
-3.  **Redeploy**: Restart the service:
+2.  **Redeploy**: Run the following command on the production host:
     ```bash
-    docker-compose up -d --force-recreate
+    # Stop the current unstable container
+    docker stop trading-bot
+
+    # Start the previous stable version
+    docker run -d \
+      --name trading-bot \
+      --restart always \
+      --env-file .env \
+      -v $(pwd)/data:/app/data \
+      triqbit/mt5-ai-xauusd-trader:v1.2.2
     ```
-4.  **Verify**: Check health status immediately: `curl http://localhost:8000/health/readiness`.
+3.  **Verify**: Check health status immediately: `curl http://localhost:8000/health/readiness`.
 
 ### B. Code/Git Rollback
 If the release contains functional bugs or logic errors that require a full revert:
-1.  **Revert Tag**: If the tag was created erroneously, delete it (carefully):
+1.  **Revert Tag**: If the tag was created erroneously, delete it:
     ```bash
     git tag -d v1.2.3
     git push --delete origin v1.2.3
@@ -120,7 +128,7 @@ If a schema change causes data corruption or application failure:
 2.  Downgrade the schema by one version: `alembic downgrade -1`.
 3.  Verify the current version: `alembic current`.
 
-### C. Emergency Protocols & MT5 Kill-Switch
+### D. Emergency Protocols & MT5 Kill-Switch
 In case of catastrophic trading behavior, risk limit breaches, or circuit breaker activation (e.g., rogue orders, risk limit bypass):
 1.  **Immediate Halt:** Stop the Docker container: `docker stop trading-bot`.
 2.  **Physical Disconnect:** If possible, disconnect the internet connection of the host/VPS.
@@ -132,7 +140,16 @@ In case of catastrophic trading behavior, risk limit breaches, or circuit breake
 
 ---
 
-## 7. Disaster Recovery Integration
+## 7. Troubleshooting Release Failures
+
+- **Validation Gate Failure**: Check CI logs for the specific gate (e.g., Ruff, Mypy, Pytest). Fix the issues in the source branch and re-run.
+- **Trivy Security Failure**: Update the base image or vulnerable library in `requirements.txt`.
+- **Smoke Test Failure**: Review container logs using `docker logs <container_id>`. Common issues include missing environment variables or database connection timeouts.
+- **Checksum Mismatch**: Ensure no manual changes were made to the `releases/vX.Y.Z/` directory after `package_release.sh` finished.
+
+---
+
+## 8. Disaster Recovery Integration
 
 If the deployment causes unrecoverable database state:
 1.  Follow the [Disaster Recovery Plan](DISASTER_RECOVERY.md).
