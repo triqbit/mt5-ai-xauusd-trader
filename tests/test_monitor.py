@@ -21,6 +21,8 @@ from src.core.monitor import (
     MEMORY_USAGE_GAUGE,
     MODEL_ACCURACY_GAUGE,
     MODEL_DRIFT_GAUGE,
+    MONTHLY_RETURN_GAUGE,
+    PARTIAL_FILL_COUNTER,
     REJECTED_ORDER_COUNTER,
     SHARPE_RATIO_GAUGE,
     SLIPPAGE_HISTOGRAM,
@@ -28,6 +30,7 @@ from src.core.monitor import (
     TRADE_COUNTER,
     TRADING_BLOCK_DURATION,
     WIN_RATE_GAUGE,
+    AVG_TRADE_DURATION_GAUGE,
     Monitor,
 )
 
@@ -43,6 +46,7 @@ class TestMonitor(unittest.TestCase):
         self.config.model_drift_threshold = 0.3
         self.config.model_calibration_threshold = 0.25
         self.config.data_freshness_threshold = 300
+        self.config.execution_latency_threshold = 1.0
 
         with patch('telegram.Bot'):
             self.monitor = Monitor(self.config)
@@ -66,6 +70,16 @@ class TestMonitor(unittest.TestCase):
         with patch.object(DAILY_PNL_GAUGE, 'set') as mock_set:
             self.monitor.log_pnl(250.0)
             mock_set.assert_called_once_with(250.0)
+
+    def test_log_monthly_return(self):
+        with patch.object(MONTHLY_RETURN_GAUGE, 'set') as mock_set:
+            self.monitor.log_monthly_return(1500.0)
+            mock_set.assert_called_once_with(1500.0)
+
+    def test_log_trade_duration(self):
+        with patch.object(AVG_TRADE_DURATION_GAUGE, 'set') as mock_set:
+            self.monitor.log_trade_duration(3600.0)
+            mock_set.assert_called_once_with(3600.0)
 
     @patch("asyncio.run")
     @patch("asyncio.get_running_loop")
@@ -213,17 +227,41 @@ class TestMonitor(unittest.TestCase):
         self.assertIn("50.00%", msg)
 
     def test_log_execution_quality(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+
         with patch.object(EXECUTION_LATENCY_HISTOGRAM, "observe") as mock_latency, \
              patch.object(SLIPPAGE_HISTOGRAM, "observe") as mock_slippage, \
              patch.object(FILL_RATE_GAUGE, "set") as mock_fill:
+
+            # Case 1: Normal latency
             self.monitor.log_execution_quality(150.0, 0.5, 0.95)
-            mock_latency.assert_called_once_with(0.15)
-            mock_slippage.assert_called_once_with(0.5)
-            mock_fill.assert_called_once_with(95.0)
+            mock_latency.assert_called_with(0.15)
+            mock_slippage.assert_called_with(0.5)
+            mock_fill.assert_called_with(95.0)
+            self.assertFalse(self.monitor.bot.send_message.called)
+
+            # Case 2: High latency alert
+            self.monitor.log_execution_quality(1500.0, 0.5, 0.95)
+            mock_latency.assert_called_with(1.5)
+            self.assertTrue(self.monitor.bot.send_message.called)
+            msg = self.monitor.bot.send_message.call_args[1]["text"]
+            self.assertIn("High Execution Latency", msg)
+            self.assertIn("1500.00ms", msg)
 
     def test_record_rejection(self):
-        with patch.object(REJECTED_ORDER_COUNTER, "inc") as mock_inc:
-            self.monitor.record_rejection("Test reason")
+        with patch.object(REJECTED_ORDER_COUNTER, "labels") as mock_labels:
+            mock_counter = MagicMock()
+            mock_labels.return_value = mock_counter
+
+            self.monitor.record_rejection("insufficient_margin")
+
+            mock_labels.assert_called_once_with(reason="insufficient_margin")
+            mock_counter.inc.assert_called_once()
+
+    def test_record_partial_fill(self):
+        with patch.object(PARTIAL_FILL_COUNTER, "inc") as mock_inc:
+            self.monitor.record_partial_fill()
             mock_inc.assert_called_once()
 
     def test_log_model_performance(self):
@@ -308,6 +346,41 @@ class TestMonitor(unittest.TestCase):
         self.assertTrue(self.monitor.bot.send_message.called)
         msg = self.monitor.bot.send_message.call_args[1]["text"]
         self.assertIn("Broker Connection Restored", msg)
+
+    def test_alert_inference_timeout(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+        self.monitor.alert_inference_timeout(150.0, 100.0)
+        self.assertTrue(self.monitor.bot.send_message.called)
+        msg = self.monitor.bot.send_message.call_args[1]["text"]
+        self.assertIn("Inference Timeout", msg)
+
+    def test_alert_feature_missing(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+        self.monitor.alert_feature_missing("RSI")
+        self.assertTrue(self.monitor.bot.send_message.called)
+        msg = self.monitor.bot.send_message.call_args[1]["text"]
+        self.assertIn("Missing Model Feature", msg)
+        self.assertIn("RSI", msg)
+
+    def test_alert_stale_model(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+        self.monitor.alert_stale_model(8.5)
+        self.assertTrue(self.monitor.bot.send_message.called)
+        msg = self.monitor.bot.send_message.call_args[1]["text"]
+        self.assertIn("Stale Model Detected", msg)
+        self.assertIn("8.5 days", msg)
+
+    def test_alert_training_failed(self):
+        self.monitor.bot = MagicMock()
+        self.monitor.bot.send_message = AsyncMock()
+        self.monitor.alert_training_failed("Disk full")
+        self.assertTrue(self.monitor.bot.send_message.called)
+        msg = self.monitor.bot.send_message.call_args[1]["text"]
+        self.assertIn("Model Retraining Failed", msg)
+        self.assertIn("Disk full", msg)
 
 if __name__ == '__main__':
     unittest.main()
