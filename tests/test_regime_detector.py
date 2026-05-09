@@ -167,5 +167,79 @@ class TestRegimeDetector(unittest.TestCase):
         self.assertTrue(len(summary.regimes) > 0)
         self.assertIn("Stability", summary.transition_insights)
 
+    def test_performance_benchmarking(self):
+        import time
+        np.random.seed(42)
+        # Generate a larger dataset
+        size = 5000
+        data = pd.DataFrame({
+            'close': 2000.0 + np.cumsum(np.random.randn(size) * 0.1),
+            'high': 2000.0 + np.cumsum(np.random.randn(size) * 0.1) + 0.1,
+            'low': 2000.0 + np.cumsum(np.random.randn(size) * 0.1) - 0.1
+        })
+
+        # Benchmarking label_history (vectorized)
+        start_vec = time.time()
+        self.detector.label_history(data, use_vectorized=True)
+        end_vec = time.time()
+        vec_time = end_vec - start_vec
+
+        # Benchmarking label_history (iterative) - only on a subset to avoid excessive test time
+        subset_size = 200
+        start_iter = time.time()
+        self.detector.label_history(data.iloc[:subset_size], use_vectorized=False)
+        end_iter = time.time()
+        iter_time_per_bar = (end_iter - start_iter) / subset_size
+
+        # Extrapolate iterative time for full dataset
+        extrapolated_iter_time = iter_time_per_bar * size
+
+        print(f"\nPerformance Benchmark ({size} bars):")
+        print(f"Vectorized Time: {vec_time:.4f}s")
+        print(f"Iterative Time (Extrapolated): {extrapolated_iter_time:.4f}s")
+        print(f"Speedup: {extrapolated_iter_time / vec_time:.1f}x")
+
+        self.assertLess(vec_time, 1.0) # Should be fast
+        self.assertLess(vec_time, extrapolated_iter_time)
+
+    def test_model_persistence(self):
+        import os
+        import tempfile
+        np.random.seed(42)
+        # Generate some data to fit
+        data = pd.DataFrame({
+            'close': 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
+            'high': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) + 0.1,
+            'low': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) - 0.1
+        })
+
+        self.detector.fit(data, n_clusters=3)
+        self.assertIsNotNone(self.detector._gmm)
+
+        info_orig = self.detector.detect(data.iloc[-self.detector.long_window:])
+
+        with tempfile.NamedTemporaryFile(suffix=".joblib", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            self.detector.save_model(tmp_path)
+            self.assertTrue(os.path.exists(tmp_path))
+
+            new_detector = RegimeDetector(window=self.detector.window, long_window=self.detector.long_window)
+            new_detector.load_model(tmp_path)
+
+            self.assertIsNotNone(new_detector._gmm)
+            self.assertEqual(new_detector._cluster_to_regime, self.detector._cluster_to_regime)
+
+            info_loaded = new_detector.detect(data.iloc[-self.detector.long_window:])
+
+            self.assertEqual(info_orig.label, info_loaded.label)
+            self.assertAlmostEqual(info_orig.confidence, info_loaded.confidence)
+            self.assertAlmostEqual(info_orig.transition_score, info_loaded.transition_score)
+
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
 if __name__ == '__main__':
     unittest.main()

@@ -8,17 +8,19 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
+import os
 from enum import Enum
 from typing import Any
 
+import joblib
 import numpy as np
 import pandas as pd
+import structlog
 from pydantic import BaseModel, Field
 from scipy import stats
 from sklearn.mixture import GaussianMixture
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class MarketRegime(str, Enum):
@@ -57,6 +59,7 @@ class RegimeDetector:
         self._last_regime: MarketRegime = MarketRegime.UNKNOWN
         self._gmm: GaussianMixture | None = None
         self._cluster_to_regime: dict[int, MarketRegime] = {}
+        self.transition_matrix: pd.DataFrame | None = None
 
     def _calculate_efficiency_ratio(self, prices: np.ndarray) -> float:
         """Kaufman Efficiency Ratio: net change / sum of absolute changes."""
@@ -138,6 +141,12 @@ class RegimeDetector:
     def detect(self, data: pd.DataFrame) -> RegimeInfo:
         """
         Detect current market regime from OHLCV data.
+
+        Args:
+            data: DataFrame with OHLCV columns ('open', 'high', 'low', 'close', 'tick_volume').
+
+        Returns:
+            RegimeInfo object containing detected label, confidence, and transition score.
         """
         if len(data) < self.long_window:
             return RegimeInfo(
@@ -189,6 +198,10 @@ class RegimeDetector:
         if self._gmm is not None:
             # Clustering-based detection
             X = np.array([[atr_ratio, er, slope, z_score, kurt, skew, vov, vc]])
+            # Ensure no NaNs in input
+            if np.isnan(X).any():
+                X = np.nan_to_num(X)
+
             probs = self._gmm.predict_proba(X)[0]
             cluster_idx = int(np.argmax(probs))
             label = self._cluster_to_regime.get(cluster_idx, MarketRegime.RANGING)
@@ -198,6 +211,14 @@ class RegimeDetector:
             # Max entropy for 6 clusters is ln(6) approx 1.79
             entropy = -np.sum(probs * np.log(probs + 1e-9))
             transition_score = float(entropy / 1.79)
+
+            # Adjust transition score with historical transition probability if available
+            if self.transition_matrix is not None and self._last_regime != MarketRegime.UNKNOWN:
+                from_regime = self._last_regime.value
+                to_regime = label.value
+                if from_regime in self.transition_matrix.index and to_regime in self.transition_matrix.columns:
+                    prob = self.transition_matrix.loc[from_regime, to_regime]
+                    transition_score = (transition_score + (1.0 - prob)) / 2.0
         else:
             # Heuristic-based detection
             label, confidence, transition_score = self._apply_regime_logic(
@@ -212,7 +233,13 @@ class RegimeDetector:
         )
 
         if label != self._last_regime:
-            logger.debug("Regime transition: %s -> %s", self._last_regime, label)
+            logger.info(
+                "regime_transition",
+                previous=str(self._last_regime),
+                current=str(label),
+                confidence=regime_info.confidence,
+                transition_score=regime_info.transition_score
+            )
             self._last_regime = label
 
         return regime_info
@@ -370,6 +397,9 @@ class RegimeDetector:
         if self._gmm is not None:
             # Use GMM for vectorized labeling
             X = features.values
+            # Handle NaNs in features
+            X = np.nan_to_num(X)
+
             probs = self._gmm.predict_proba(X)
             cluster_indices = np.argmax(probs, axis=1)
 
@@ -402,10 +432,7 @@ class RegimeDetector:
             mean_rev_mask = (np.abs(z_score) > 1.8) & (er < 0.35)
             drift_mask = (atr_ratio < 1.1) & (np.abs(angle) > 2.0) & (vov < 1.3)
 
-            # Apply masks in REVERSE precedence because later assignments overwrite earlier ones
-            # Actually, standard order with 'if/elif' logic is better for clarity.
-            # Let's use a prioritized update approach.
-
+            # Apply masks in precedence
             regimes[drift_mask] = MarketRegime.LOW_VOLATILITY_DRIFT.value
             confidences[drift_mask] = 0.7
 
@@ -441,7 +468,10 @@ class RegimeDetector:
         return df
 
     def _extract_features(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Extracts statistical features for clustering or detection."""
+        """
+        Extracts statistical features for clustering or detection.
+        Fully vectorized implementation for institutional performance.
+        """
         if len(data) < self.long_window:
             return pd.DataFrame()
 
@@ -450,7 +480,7 @@ class RegimeDetector:
         high = data["high"]
         low = data["low"]
 
-        # 1. Volatility
+        # 1. Volatility (ATR Ratio)
         tr = np.maximum(
             high - low,
             np.maximum(np.abs(high - close.shift(1)), np.abs(low - close.shift(1))),
@@ -459,38 +489,46 @@ class RegimeDetector:
         atr_long = tr.rolling(window=self.long_window).mean()
         atr_ratio = atr_short / (atr_long + 1e-9)
 
-        # 2. Efficiency Ratio (matches iterative: window bars -> window-1 intervals)
+        # 2. Efficiency Ratio
         net_change = (close - close.shift(self.window - 1)).abs()
         abs_changes = (close - close.shift(1)).abs().rolling(window=self.window - 1).sum()
         er = net_change / (abs_changes + 1e-9)
 
         # 3. Returns and derived stats
         returns = close.pct_change().fillna(0)
-        kurt = returns.rolling(window=self.window).apply(
-            lambda x: stats.kurtosis(x, fisher=True), raw=True
-        )
-        skew = returns.rolling(window=self.window).apply(lambda x: stats.skew(x), raw=True)
+        # Fast vectorized higher-order moments
+        kurt = returns.rolling(window=self.window).kurt().fillna(0)
+        skew = returns.rolling(window=self.window).skew().fillna(0)
 
         # 4. Slope and Z-Score
+        # Vectorized linear regression slope: (n*sum(xy) - sum(x)*sum(y)) / (n*sum(x^2) - (sum(x))^2)
+        n = self.window
+        indices = np.arange(len(close))
+        s_x = n * (n - 1) / 2.0
+        s_x2 = n * (n - 1) * (2 * n - 1) / 6.0
+        s_y = close.rolling(window=n).sum()
+        s_iy = (close * indices).rolling(window=n).sum()
+        start_indices = indices - n + 1
+        sum_relative_iy = s_iy - start_indices * s_y
+        slope_num = n * sum_relative_iy - s_x * s_y
+        slope_den = n * s_x2 - s_x**2
+        slope = (slope_num / (slope_den + 1e-9)) / (close.shift(n - 1) + 1e-9)
+
         ma = close.rolling(window=self.window).mean()
         std = close.rolling(window=self.window).std()
         z_score = (close - ma) / (std + 1e-9)
 
-        # For slope, we'll use a simpler version for vectorization or just apply our method
-        def get_slope(x):
-            return self._calculate_slope(x)
+        # 5. Vol-of-vol and Vol Clustering
+        # Vol-of-vol: std(rolling_vol) / mean(rolling_vol)
+        vov_window = max(2, self.window // 2)
+        rolling_vol = returns.rolling(window=vov_window).std()
+        vov = rolling_vol.rolling(window=self.window).std() / (
+            rolling_vol.rolling(window=self.window).mean() + 1e-9
+        )
 
-        slope = close.rolling(window=self.window).apply(get_slope, raw=True)
-
-        # Vol-of-vol and Vol Clustering (Vectorized)
-        def get_vov(x):
-            return self._calculate_vol_of_vol(x, window=max(2, self.window // 2))
-
-        def get_vc(x):
-            return self._calculate_volatility_clustering(x)
-
-        vov = returns.rolling(window=self.window).apply(get_vov, raw=True)
-        vc = returns.rolling(window=self.window).apply(get_vc, raw=True)
+        # Volatility Clustering: Correlation of absolute returns with lagged absolute returns
+        abs_rets = returns.abs()
+        vc = abs_rets.rolling(window=self.window).corr(abs_rets.shift(1))
 
         features = pd.DataFrame(
             {
@@ -510,14 +548,20 @@ class RegimeDetector:
     def fit(self, data: pd.DataFrame, n_clusters: int = 6) -> None:
         """
         Trains GMM on historical data to learn market regimes.
+        Automatically maps clusters to labels and calculates a transition matrix.
+
+        Args:
+            data: Historical OHLCV DataFrame for training.
+            n_clusters: Number of clusters for Gaussian Mixture Model (default 6).
         """
         features = self._extract_features(data)
         if features.empty or len(features) < self.long_window * 2:
             logger.warning("Insufficient data for fitting GMM")
             return
 
-        # Skip the burn-in period
+        # Skip the burn-in period and handle NaNs
         X = features.iloc[self.long_window :].values
+        X = np.nan_to_num(X)
 
         self._gmm = GaussianMixture(
             n_components=n_clusters, covariance_type="full", random_state=42, n_init=5
@@ -526,7 +570,64 @@ class RegimeDetector:
 
         # Automated cluster-to-regime mapping based on centroids
         self._map_clusters(self._gmm.means_)
-        logger.info("RegimeDetector GMM fitted with %d clusters", n_clusters)
+
+        # Calculate transition matrix from training data
+        self._calculate_transition_matrix(features.iloc[self.long_window :])
+
+        logger.info("gmm_fit_complete", n_clusters=n_clusters)
+
+    def save_model(self, filepath: str) -> None:
+        """
+        Persists the GMM model and cluster mappings to disk.
+        """
+        if self._gmm is None:
+            logger.warning("No GMM model to save.")
+            return
+
+        state = {
+            "gmm": self._gmm,
+            "cluster_to_regime": self._cluster_to_regime,
+            "transition_matrix": self.transition_matrix,
+            "window": self.window,
+            "long_window": self.long_window,
+        }
+        joblib.dump(state, filepath)
+        logger.info("model_saved", path=filepath)
+
+    def load_model(self, filepath: str) -> None:
+        """
+        Loads a persisted GMM model and state from disk.
+        """
+        if not os.path.exists(filepath):
+            logger.error("Model file not found: %s", filepath)
+            return
+
+        state = joblib.load(filepath)
+        self._gmm = state.get("gmm")
+        self._cluster_to_regime = state.get("cluster_to_regime", {})
+        self.transition_matrix = state.get("transition_matrix")
+        self.window = state.get("window", self.window)
+        self.long_window = state.get("long_window", self.long_window)
+        logger.info("model_loaded", path=filepath)
+
+    def _calculate_transition_matrix(self, features: pd.DataFrame) -> None:
+        """Calculates transition probability matrix from fitted GMM on training data."""
+        if self._gmm is None:
+            return
+
+        X = features.values
+        X = np.nan_to_num(X)
+        probs = self._gmm.predict_proba(X)
+        cluster_indices = np.argmax(probs, axis=1)
+        regimes = [
+            self._cluster_to_regime.get(idx, MarketRegime.RANGING).value
+            for idx in cluster_indices
+        ]
+
+        regime_series = pd.Series(regimes)
+        self.transition_matrix = pd.crosstab(
+            regime_series, regime_series.shift(-1), normalize="index"
+        )
 
     def _map_clusters(self, centroids: np.ndarray) -> None:
         """Maps GMM clusters to MarketRegime enum using centroid heuristics."""
