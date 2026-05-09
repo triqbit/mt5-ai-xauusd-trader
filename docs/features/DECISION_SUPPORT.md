@@ -64,3 +64,5 @@ The system is implemented in `src/core/decision_support.py` and integrates with:
 
 ## Usage in Loop
 When running in "Active Review" mode, the system will pause and display the Decision Dashboard for each signal, requiring operator confirmation before sending the order to MetaTrader 5.
+
+This system ensures that every trade is backed by verifiable intelligence across multiple analytical domains.
