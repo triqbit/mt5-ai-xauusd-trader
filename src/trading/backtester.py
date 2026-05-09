@@ -39,6 +39,7 @@ class PerformanceReport:
     sharpe_ratio: float = 0.0
     max_drawdown: float = 0.0
     profit_factor: float = 0.0
+    recovery_factor: float = 0.0
     mae_avg: float = 0.0  # Maximum Adverse Excursion
     mfe_avg: float = 0.0  # Maximum Favorable Excursion
     total_trades: int = 0
@@ -551,11 +552,15 @@ class BacktestEngine:
         else:
             ann_return = total_return
 
+        # Recovery Factor (Net Profit / Max Drawdown)
+        recovery_factor = total_return / max_drawdown if max_drawdown > 0 else 0.0
+
         report = PerformanceReport(
             annualized_return=ann_return,
             sharpe_ratio=sharpe,
             max_drawdown=max_drawdown,
             profit_factor=profit_factor,
+            recovery_factor=recovery_factor,
             mae_avg=np.mean([t.mae for t in self.trades]),
             mfe_avg=np.mean([t.mfe for t in self.trades]),
             total_trades=len(self.trades),

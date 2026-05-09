@@ -98,7 +98,7 @@ cd mt5-ai-xauusd-trader
 pip install -r requirements.txt
 
 # [CRITICAL] Verify environment and dependencies
-python3 scripts/doctor.py
+python main.py --doctor
 
 # Perform a pre-flight health check (verifies .env and connectivity)
 python main.py --check
@@ -115,6 +115,12 @@ MODE=demo
 
 ### 3. Execution
 ```bash
+# Verify environment and dependencies
+python main.py --doctor
+
+# Show current sanitized configuration
+python main.py --show-config
+
 # Perform a pre-flight health check (connectivity, database, models)
 python main.py --check
 
