@@ -277,26 +277,36 @@ class WalkForwardOptimizer:
                         logger.debug("Perturbation failed for %s=%s: %s", key, new_val, e)
                         continue
 
-        if len(perturbations) < 2:
-            return 0.0
+        # Filter out NaNs
+        perturbations = [p for p in perturbations if not np.isnan(p)]
 
-        # Penalty is the standard deviation of Sharpe ratios under perturbation
-        # Normalized by base Sharpe to handle scale difference? No, absolute SD is fine
-        # as it represents the 'volatility' of the result in parameter space.
-        return float(np.std(perturbations))
+        if len(perturbations) < 2:
+            # High penalty for failure to calculate stability (indicates extreme fragility)
+            return 10.0
+
+        # Use Coefficient of Variation (CV) for a normalized stability metric
+        # This makes the penalty scale-invariant across different performance levels.
+        mean_sharpe = np.mean(perturbations)
+        std_sharpe = np.std(perturbations)
+
+        if abs(mean_sharpe) < 1e-9:
+            return float(std_sharpe)  # Fallback to absolute SD if mean is near zero
+
+        return float(std_sharpe / abs(mean_sharpe))
 
     def _calculate_regime_consistency(
         self, data: pd.DataFrame, strategy_params: dict[str, Any]
     ) -> float:
         """
-        Measures how consistent performance (Sharpe Ratio) is across different detected regimes.
+        Measures how consistent performance (Sharpe Ratio) is across different detected regimes,
+        weighted by the frequency of each regime.
 
         Args:
             data: Data containing 'regime' column (typically the training/IS window).
             strategy_params: Strategy parameters.
 
         Returns:
-            float: Consistency score (1 - Coefficient of Variation), clipped at [0, 1].
+            float: Consistency score (1 - Weighted CV), clipped at [0, 1].
         """
         strategy = self.strategy_factory(**strategy_params)
         evaluator = BenchmarkEvaluator(
@@ -311,21 +321,27 @@ class WalkForwardOptimizer:
         temp_df = pd.DataFrame({"returns": returns, "regime": data["regime"]})
 
         def calc_sharpe(x):
+            if len(x) < 2:
+                return 0.0
             std = x.std()
             if std < 1e-9:
                 return 0.0
             return float(x.mean() / std * np.sqrt(self.config.bars_per_year))
 
-        regime_sharpes = temp_df.groupby("regime")["returns"].apply(calc_sharpe)
+        regime_stats = temp_df.groupby("regime")["returns"].agg([calc_sharpe, "count"])
+        regime_sharpes = regime_stats["calc_sharpe"]
+        regime_counts = regime_stats["count"]
+        regime_weights = regime_counts / regime_counts.sum()
 
         if len(regime_sharpes) < 2:
             return 1.0  # Not enough regimes to judge
 
-        # Return 1 - CV of Sharpe ratios across regimes (higher is more consistent)
-        mean_sharpe = np.mean(regime_sharpes)
-        std_sharpe = np.std(regime_sharpes)
+        # Calculate weighted mean and weighted standard deviation
+        weighted_mean = np.average(regime_sharpes, weights=regime_weights)
+        weighted_var = np.average((regime_sharpes - weighted_mean) ** 2, weights=regime_weights)
+        weighted_std = np.sqrt(weighted_var)
 
-        cv = std_sharpe / (abs(mean_sharpe) + 1e-9)
+        cv = weighted_std / (abs(weighted_mean) + 1e-9)
         return float(np.clip(1.0 - cv, 0.0, 1.0))
 
     def run_optimization(self) -> WalkForwardResult:
