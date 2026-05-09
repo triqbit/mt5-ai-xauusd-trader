@@ -129,7 +129,7 @@ class RiskManager:
         self,
         signal: TradeSignal,
         market_data: Optional[pd.DataFrame] = None,
-        open_positions: List[Dict[str, Any]] = [],
+        open_positions: Optional[List[Dict[str, Any]]] = None,
         model_health: Optional[dict] = None,
     ) -> RiskDecision:
         """
@@ -150,11 +150,12 @@ class RiskManager:
             return RiskDecision(False, "Max consecutive losses reached")
 
         # Layer 4: Exposure Limits
-        if open_positions:
-            if not self._check_directional_exposure(signal, open_positions):
+        active_positions = open_positions or []
+        if active_positions:
+            if not self._check_directional_exposure(signal, active_positions):
                 return RiskDecision(False, "Max directional exposure reached (30%)")
             if market_data is not None and not self._check_total_notional(
-                signal, open_positions, market_data
+                signal, active_positions, market_data
             ):
                 return RiskDecision(False, "Total notional exposure exceeds equity")
 
