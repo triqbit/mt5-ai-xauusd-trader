@@ -57,6 +57,39 @@ def test_trade_signal_invalid_rr_ratio():
         )
     assert "risk-reward ratio" in str(exc.value).lower()
 
+def test_trade_signal_frozen():
+    """Verify TradeSignal is immutable."""
+    signal = TradeSignal(
+        symbol="XAUUSD",
+        direction=SignalDirection.BUY,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
+        lot_size=0.1,
+        algorithm="ensemble",
+        confidence=0.85
+    )
+    with pytest.raises(ValidationError) as exc:
+        signal.symbol = "BTCUSD" # type: ignore
+    assert "frozen" in str(exc.value).lower() or "immutable" in str(exc.value).lower()
+
+def test_trade_signal_extra_forbid():
+    """Verify TradeSignal forbids extra fields."""
+    with pytest.raises(ValidationError) as exc:
+        TradeSignal(
+            symbol="XAUUSD",
+            direction=SignalDirection.BUY,
+            entry_price=2300.0,
+            stop_loss=2290.0,
+            take_profit=2320.0,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.85,
+            extra_field="untrusted" # type: ignore
+        )
+    # Pydantic 2 error message changed slightly, but extra_forbidden is part of the type
+    assert "extra inputs are not permitted" in str(exc.value).lower()
+
 def test_execution_decision_blocking_invariant():
     """Verify that a blocked decision must have a reason."""
     signal = TradeSignal(
@@ -80,8 +113,6 @@ def test_execution_decision_blocking_invariant():
     )
     assert decision.blocked_by == "ATR_VOLATILITY"
 
-    # Invalid: Approved but blocked_by is None (this is fine, but check the opposite)
-
     # Invalid: Not approved but blocked_by is None
     with pytest.raises(ValidationError) as exc:
         ExecutionDecision(
@@ -92,6 +123,29 @@ def test_execution_decision_blocking_invariant():
             trace={}
         )
     assert "blocked decision must provide a 'blocked_by' reason" in str(exc.value).lower()
+
+def test_execution_decision_approved_consistency():
+    """Verify that an approved decision cannot have a blocked_by reason."""
+    signal = TradeSignal(
+        symbol="XAUUSD",
+        direction=SignalDirection.BUY,
+        entry_price=2300.0,
+        stop_loss=2280.0,
+        take_profit=2350.0,
+        lot_size=0.1,
+        algorithm="ensemble",
+        confidence=0.85
+    )
+
+    with pytest.raises(ValidationError) as exc:
+        ExecutionDecision(
+            signal=signal,
+            is_approved=True,
+            confidence_score=0.85,
+            blocked_by="SOME_FILTER",
+            trace={}
+        )
+    assert "approved decision cannot have a 'blocked_by' reason" in str(exc.value).lower()
 
 def test_trading_config_validation(monkeypatch):
     """Verify TradingConfig enforces SYMBOL_PATTERN and VALID_TIMEFRAMES."""

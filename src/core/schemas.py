@@ -6,6 +6,10 @@ Centralized Pydantic schemas for data validation and technical trust.
 This module defines the core data structures used throughout the system,
 ensuring strict runtime validation and price sanity checks.
 
+All schemas in this module are immutable (frozen) to ensure that once a signal
+or decision is generated, it cannot be modified by downstream components,
+preserving the integrity of the audit trail.
+
 Author : triqbit
 License: MIT
 """
@@ -15,7 +19,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.core.constants import SYMBOL_PATTERN, SignalDirection
 
@@ -24,7 +28,12 @@ class TradeSignal(BaseModel):
     """
     Enterprise-grade validated trading signal schema.
     Enforces strict constraints to ensure technical trust in model outputs.
+
+    This model is immutable (frozen) and forbids extra fields to prevent
+    the injection of untrusted or malformed data into the trading pipeline.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     symbol: str = Field(
         ...,
@@ -116,7 +125,11 @@ class ExecutionDecision(BaseModel):
     """
     Structured result of the execution filter cascade.
     Enforces technical trust by ensuring every rejection has an explicit reason.
+
+    This model is immutable (frozen) and forbids extra fields.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     signal: TradeSignal = Field(..., description="The trade signal being evaluated")
     is_approved: bool = Field(..., description="Final decision: True if passed all filters")
@@ -132,7 +145,15 @@ class ExecutionDecision(BaseModel):
 
     @model_validator(mode="after")
     def validate_rejection_reason(self) -> "ExecutionDecision":
-        """Ensure blocked_by is populated if execution is not approved."""
-        if not self.is_approved and not self.blocked_by:
-            raise ValueError("A blocked decision must provide a 'blocked_by' reason.")
+        """
+        Ensure consistency between is_approved and blocked_by.
+        If not approved, blocked_by must be provided.
+        If approved, blocked_by must be None.
+        """
+        if not self.is_approved:
+            if not self.blocked_by:
+                raise ValueError("A blocked decision must provide a 'blocked_by' reason.")
+        else:
+            if self.blocked_by:
+                raise ValueError("An approved decision cannot have a 'blocked_by' reason.")
         return self

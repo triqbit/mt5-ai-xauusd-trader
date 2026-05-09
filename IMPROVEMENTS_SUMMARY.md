@@ -61,6 +61,7 @@
 - **RBAC**: 4-tier role-based access control
 - **Audit Trail**: Immutable logging of all trades and decisions
 - **Secrets Management**: HashiCorp Vault integration
+- **Schema Hardening**: Frozen Pydantic models with strict field validation (`extra='forbid'`) for all core signals and decisions.
 
 ### 3. Performance Optimization
 - **Execution Latency**: Target <100ms (signal to execution)
@@ -142,6 +143,7 @@
 | **Compliance** | Not addressed | Complete audit trail |
 | **Scalability** | Limited | Multi-region Kubernetes |
 | **Profitability** | Speculative | Realistic 60-100% annual returns |
+| **Data Integrity** | Implicit assumptions | Frozen schemas + strict validation |
 
 ---
 
