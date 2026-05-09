@@ -1,7 +1,10 @@
 
 import os
 from datetime import UTC, datetime
+import structlog
 from src.core.trade_logger import TradeLogger
+
+log = structlog.get_logger()
 
 def verify():
     db_path = "verify_trades.db"
@@ -9,7 +12,7 @@ def verify():
         os.remove(db_path)
 
     logger = TradeLogger(db_url=f"sqlite:///{db_path}")
-    print("TradeLogger initialized.")
+    log.info("TradeLogger initialized")
 
     # 1. Log Signal
     signal_id = logger.log_signal({
@@ -18,7 +21,7 @@ def verify():
         "entry_price": 2000.0,
         "algorithm": "ppo"
     })
-    print(f"Logged Signal ID: {signal_id}")
+    log.info("Logged signal", signal_id=signal_id)
 
     # 2. Log Trade (Executed)
     trade_id = logger.log_trade(
@@ -30,11 +33,11 @@ def verify():
         signal_id=signal_id,
         drawdown_impact=0.01
     )
-    print(f"Logged Trade ID: {trade_id}")
+    log.info("Logged trade", trade_id=trade_id)
 
     # 3. Update Trade (Closed)
     logger.update_trade(12345, 2010.0, pnl=100.0) # should NOT overwrite 0.01 with 0.0
-    print("Updated Trade 12345 to CLOSED with PnL 100.0")
+    log.info("Updated trade to CLOSED", ticket=12345, pnl=100.0)
 
     # 4. Log Trade (Rejected)
     rejected_id = logger.log_trade(
@@ -48,11 +51,11 @@ def verify():
         drawdown_impact=0.05,
         timestamp=datetime.now(UTC)
     )
-    print(f"Logged Rejected Trade ID: {rejected_id}")
+    log.info("Logged rejected trade", rejected_id=rejected_id)
 
     # 5. Read Performance Report
     report = logger.read_performance_report(persist=True)
-    print(f"Performance Report: {report}")
+    log.info("Performance Report", report=report)
 
     assert report["total_trades"] == 1
     assert report["profit_factor"] == float('inf')
@@ -62,7 +65,7 @@ def verify():
     with logger.Session() as session:
         from src.core.trade_logger import Trade, PerformanceMetric
         trade = session.get(Trade, trade_id)
-        print(f"Trade drawdown_impact: {trade.drawdown_impact}")
+        log.info("Verified trade", drawdown_impact=trade.drawdown_impact)
         assert trade.drawdown_impact == 0.01
 
         rej_trade = session.get(Trade, rejected_id)
@@ -75,7 +78,7 @@ def verify():
         assert metric is not None
         assert metric.total_trades == 1
 
-    print("Verification successful!")
+    log.info("Verification successful")
     if os.path.exists(db_path):
         os.remove(db_path)
 
