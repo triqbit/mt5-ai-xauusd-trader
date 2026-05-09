@@ -7,12 +7,12 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.5.1
 torchvision==0.20.1
-stable-baselines3==2.4.0
-gymnasium==1.0.0
-numpy==1.26.4
+stable-baselines3==2.8.0
+gymnasium==1.2.3
+numpy==2.2.6
 scipy==1.15.2
 scikit-learn==1.6.1
-pandas==2.2.3
+pandas==3.0.2
 
 # -- Deep Learning Extras ------------------------------------
 transformers==5.0.0rc3

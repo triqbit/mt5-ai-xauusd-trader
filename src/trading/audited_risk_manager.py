@@ -9,7 +9,9 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
@@ -29,12 +31,15 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        open_positions: Optional[List[Dict[str, Any]]] = None,
+        market_data: Optional[pd.DataFrame] = None,
     ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
         Returns True only if ALL layers pass.
         Logs the full decision chain to the audit log.
         """
+        # Maintain a decision chain for legacy audit logging compatibility
         decision_chain = {
             "circuit_breaker": self._check_circuit_breaker(),
             "daily_loss": self._check_daily_loss(),
@@ -46,7 +51,14 @@ class AuditedRiskManager(RiskManager):
             "model_health": self._check_model_health(model_health),
         }
 
-        passed = all(decision_chain.values())
+        # Use unified validation logic
+        decision = self.validate_signal(
+            signal,
+            market_data=market_data,
+            open_positions=open_positions or [],
+            model_health=model_health,
+        )
+        passed = decision.is_approved
 
         # Log to Audit Trail
         try:

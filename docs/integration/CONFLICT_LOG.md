@@ -76,6 +76,22 @@
 - **Resolution**: Refactor `TimeSeriesTransformer` and `TransformerAdapter` to align with `ModelAction`.
 - **Owner**: Jules05
 
+## [2026-05-09] - Risk Management Consolidation & Logging Standardization
+
+### 1. Residual Risk Management Fragmentation
+- **Conflict**: `src/trading/risk_engine.py` existed alongside `src/trading/risk_manager.py`, causing confusion and logic duplication (cascading losses, ATR sizing).
+- **Agents**: Jules01, Jules05
+- **Impact**: High. Architectural drift and inconsistent risk enforcement.
+- **Resolution**: Ported all institutional logic (cascading daily losses, ATR-based position sizing, directional exposure checks) from `RiskEngine` to `RiskManager`. Deleted redundant `risk_engine.py`.
+- **Owner**: Jules05
+
+### 2. Logging Standard Violations (structlog TypeErrors)
+- **Conflict**: `src/trading/mt5_connector.py` used positional arguments in `logger.warning/exception` calls, which conflicts with the enterprise `structlog` configuration.
+- **Agents**: Jules01
+- **Impact**: Medium. Broken observability and potential runtime crashes in logging paths.
+- **Resolution**: Refactored all logging calls in `mt5_connector.py` to use keyword arguments exclusively.
+- **Owner**: Jules05
+
 ## [2026-05-07] - Model Interface Harmonization & System Coherence
 
 ### 1. `BaseModel.predict` Signature Mismatch
