@@ -22,20 +22,14 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
     select,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.audit_log import get_audit_logger
+from src.core.database import Base, get_db_manager
 
 logger = logging.getLogger(__name__)
-
-
-class Base(DeclarativeBase):
-    """Base class for SQLAlchemy models."""
-
-    pass
 
 
 class AuditMixin:
@@ -192,10 +186,8 @@ class TradeLogger:
     """Enterprise trade logging interface."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
-        self.engine = create_engine(db_url)
-        # Create tables if they don't exist
-        Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
+        self.db_manager = get_db_manager()
+        self.engine = self.db_manager.engine
         # Caching performance report to avoid O(N) DB queries on every signal
         self._perf_cache: dict[str, float] | None = None
 
@@ -205,7 +197,7 @@ class TradeLogger:
 
         trace_id = structlog.contextvars.get_contextvars().get("trace_id")
 
-        with self.Session() as session:
+        with self.db_manager.get_session() as session:
             signal = ModelSignal(
                 symbol=signal_data["symbol"],
                 direction=signal_data["direction"],
@@ -220,7 +212,7 @@ class TradeLogger:
                 timestamp=signal_data.get("timestamp", datetime.now(UTC)),
             )
             session.add(signal)
-            session.commit()
+            session.flush()
             return signal.id
 
     def log_trade(
@@ -242,7 +234,7 @@ class TradeLogger:
 
         trace_id = structlog.contextvars.get_contextvars().get("trace_id")
 
-        with self.Session() as session:
+        with self.db_manager.get_session() as session:
             trade = Trade(
                 ticket=ticket,
                 symbol=symbol,
@@ -254,7 +246,7 @@ class TradeLogger:
                 status=status,
             )
             session.add(trade)
-            session.commit()
+            session.flush()
             return trade.id
 
     def update_trade(
@@ -268,7 +260,7 @@ class TradeLogger:
         # Invalidate cache since a trade is being closed
         self._perf_cache = None
 
-        with self.Session() as session:
+        with self.db_manager.get_session() as session:
             trade = (
                 session.query(Trade)
                 .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
@@ -290,7 +282,7 @@ class TradeLogger:
                     )
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
-                session.commit()
+                session.flush()
 
                 # Audit the outcome
                 try:
@@ -313,7 +305,7 @@ class TradeLogger:
 
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""
-        with self.Session() as session:
+        with self.db_manager.get_session() as session:
             return (
                 session.query(Trade)
                 .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
@@ -328,7 +320,7 @@ class TradeLogger:
         signal_id: int | None = None,
     ) -> None:
         """Log a risk-related event."""
-        with self.Session() as session:
+        with self.db_manager.get_session() as session:
             event = RiskEvent(
                 event_type=event_type,
                 description=description,
@@ -336,7 +328,6 @@ class TradeLogger:
                 signal_id=signal_id,
             )
             session.add(event)
-            session.commit()
 
     def read_performance_report(self, persist: bool = False) -> dict[str, float]:
         """
@@ -350,7 +341,7 @@ class TradeLogger:
         if self._perf_cache is not None and not persist:
             return self._perf_cache
 
-        with self.Session() as session:
+        with self.db_manager.get_session() as session:
             # Optimized: only fetch pnl column for active closed trades
             pnls = np.array(
                 session.execute(
@@ -408,6 +399,5 @@ class TradeLogger:
                     win_rate=metrics["win_rate"],
                 )
                 session.add(metric_record)
-                session.commit()
 
             return metrics
