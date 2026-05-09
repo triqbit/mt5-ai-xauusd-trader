@@ -44,7 +44,7 @@ jobs:
           # pip-licenses uses a semicolon-separated list for --allow-only.
           pip-licenses \
             --from=all \
-            --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA" \
+            --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA;Dual License" \
             --partial-match \
             --ignore-packages pip pip-licenses prettytable wcwidth setuptools
 
