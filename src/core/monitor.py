@@ -30,10 +30,14 @@ logger = structlog.get_logger(__name__)
 # 1. Trading Performance Metrics
 EQUITY_GAUGE = Gauge("trading_equity", "Current account equity")
 DAILY_PNL_GAUGE = Gauge("trading_pnl_daily", "Realized P&L for the current day")
+MONTHLY_RETURN_GAUGE = Gauge("trading_return_monthly", "Cumulative return for the current month")
 TRADE_COUNTER = Counter("trading_trades_total", "Total number of trades executed")
 DRAWDOWN_GAUGE = Gauge("trading_drawdown_percent", "Current account drawdown percentage")
 SHARPE_RATIO_GAUGE = Gauge("trading_sharpe_ratio", "Annualized Sharpe Ratio")
 WIN_RATE_GAUGE = Gauge("trading_win_rate", "Trading win rate percentage")
+AVG_TRADE_DURATION_GAUGE = Gauge(
+    "trading_avg_trade_duration_seconds", "Mean trade holding time in seconds"
+)
 
 # 2. Execution Metrics
 EXECUTION_LATENCY_HISTOGRAM = Histogram(
@@ -43,7 +47,10 @@ SLIPPAGE_HISTOGRAM = Histogram(
     "trading_slippage_pips", "Difference between expected and actual price"
 )
 FILL_RATE_GAUGE = Gauge("trading_fill_rate", "Percentage of orders filled at intended price")
-REJECTED_ORDER_COUNTER = Counter("trading_orders_rejected_total", "Total number of rejected orders")
+REJECTED_ORDER_COUNTER = Counter(
+    "trading_orders_rejected_total", "Total number of rejected orders", ["reason"]
+)
+PARTIAL_FILL_COUNTER = Counter("trading_partial_fills_total", "Total number of partial fills")
 
 # 3. System Health Metrics
 CPU_USAGE_GAUGE = Gauge("system_cpu_usage_percent", "System CPU utilization percentage")
@@ -154,6 +161,16 @@ class Monitor:
         """Update daily P&L metric."""
         DAILY_PNL_GAUGE.set(pnl)
         logger.debug("pnl_logged", pnl=pnl)
+
+    def log_monthly_return(self, monthly_return: float) -> None:
+        """Update monthly return metric."""
+        MONTHLY_RETURN_GAUGE.set(monthly_return)
+        logger.debug("monthly_return_logged", monthly_return=monthly_return)
+
+    def log_trade_duration(self, avg_duration_seconds: float) -> None:
+        """Update average trade duration metric."""
+        AVG_TRADE_DURATION_GAUGE.set(avg_duration_seconds)
+        logger.debug("trade_duration_logged", avg_duration=avg_duration_seconds)
 
     def send_message(self, text: str) -> None:
         """
@@ -287,7 +304,8 @@ class Monitor:
         self, latency_ms: float, slippage_pips: float, fill_rate: float
     ) -> None:
         """Log execution quality metrics to Prometheus."""
-        EXECUTION_LATENCY_HISTOGRAM.observe(latency_ms / 1000.0)
+        latency_seconds = latency_ms / 1000.0
+        EXECUTION_LATENCY_HISTOGRAM.observe(latency_seconds)
         SLIPPAGE_HISTOGRAM.observe(slippage_pips)
         FILL_RATE_GAUGE.set(fill_rate * 100)
         logger.debug(
@@ -297,10 +315,24 @@ class Monitor:
             fill_rate=fill_rate,
         )
 
+        if latency_seconds > self.cfg.execution_latency_threshold:
+            msg = (
+                f"🚨 CRITICAL: High Execution Latency!\n"
+                f"Latency: {latency_ms:.2f}ms\n"
+                f"Threshold: {self.cfg.execution_latency_threshold * 1000:.2f}ms"
+            )
+            self.send_message(msg)
+            logger.error("high_execution_latency_alert", latency_ms=latency_ms)
+
     def record_rejection(self, reason: str) -> None:
         """Record a rejected order."""
-        REJECTED_ORDER_COUNTER.inc()
+        REJECTED_ORDER_COUNTER.labels(reason=reason).inc()
         logger.warning("order_rejected", reason=reason)
+
+    def record_partial_fill(self) -> None:
+        """Record a partial fill."""
+        PARTIAL_FILL_COUNTER.inc()
+        logger.info("partial_fill_recorded")
 
     def log_model_performance(
         self, accuracy: float, drift_score: float, calibration_error: float = 0.0
@@ -368,6 +400,30 @@ class Monitor:
             msg = f"⚠️ WARNING: Data Stale!\nLast Data Point: {age / 60:.1f} minutes ago."
             self.send_message(msg)
             logger.warning("stale_data_alert", age_seconds=age)
+
+    def alert_inference_timeout(self, latency_ms: float, threshold_ms: float) -> None:
+        """Send warning for model inference timeout."""
+        msg = f"⚠️ WARNING: Model Inference Timeout!\nLatency: {latency_ms:.2f}ms\nThreshold: {threshold_ms:.2f}ms"
+        self.send_message(msg)
+        logger.warning("model_inference_timeout_alert", latency_ms=latency_ms)
+
+    def alert_feature_missing(self, feature_name: str) -> None:
+        """Send warning for missing model feature."""
+        msg = f"⚠️ WARNING: Missing Model Feature: {feature_name}"
+        self.send_message(msg)
+        logger.warning("missing_feature_alert", feature=feature_name)
+
+    def alert_stale_model(self, age_days: float) -> None:
+        """Send warning for stale model weights."""
+        msg = f"⚠️ WARNING: Stale Model Detected!\nAge: {age_days:.1f} days."
+        self.send_message(msg)
+        logger.warning("stale_model_alert", age_days=age_days)
+
+    def alert_training_failed(self, error: str) -> None:
+        """Send critical alert for model retraining failure."""
+        msg = f"❌ CRITICAL: Model Retraining Failed!\nError: {error}"
+        self.send_message(msg)
+        logger.error("model_training_failed_alert", error=error)
 
     @contextmanager
     def track_block_duration(self, label: str) -> Generator[None, None, None]:
