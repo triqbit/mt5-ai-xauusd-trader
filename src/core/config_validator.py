@@ -43,6 +43,7 @@ class ConfigValidator:
         self._check_model_settings()
         self._check_risk_parameters()
         self._check_exposure_limits()
+        self._check_margin_and_volatility_limits()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -189,6 +190,11 @@ class ConfigValidator:
             "YOUR_PASSWORD",
             "PASSWORD",
             "SECRET",
+            "ENTER_YOUR",
+            "REPLACE_WITH",
+            "EXAMPLE_TOKEN",
+            "DUMMY",
+            "FAKE",
         ]
 
         # Check database URL
@@ -578,6 +584,67 @@ class ConfigValidator:
                     "Set MAX_TOTAL_NOTIONAL_PCT to 1.00 for enterprise safety.",
                 )
             )
+
+        # Max Trades Per Day validation (Plan requirement)
+        if self.config.max_trades_per_day > 50:
+            self.errors.append(
+                ValidationError(
+                    "MAX_TRADES_PER_DAY",
+                    f"Max trades per day ({self.config.max_trades_per_day}) exceeds institutional limit of 50.",
+                    True,
+                    "Reduce MAX_TRADES_PER_DAY to 50 or less.",
+                )
+            )
+
+        # Min Lot Size validation (Plan requirement)
+        if self.config.min_lot_size < 0.01:
+            self.errors.append(
+                ValidationError(
+                    "MIN_LOT_SIZE",
+                    f"Min lot size ({self.config.min_lot_size}) is below 0.01.",
+                    True,
+                    "Set MIN_LOT_SIZE to 0.01 or higher to avoid rounding issues.",
+                )
+            )
+
+    def _check_margin_and_volatility_limits(self) -> None:
+        """Verify margin and volatility hierarchy levels (RISK_LIMITS.md 1.2, 5.1)."""
+        # 1. Margin Hierarchy (Note: These are utilization percentages, not MT5 Margin Level %)
+        # As risk increases, utilization grows: Alert (70%) < Halt (80%) < Liquidation (90%)
+        margin_levels = [
+            ("MARGIN_ALERT_PCT", self.config.margin_alert_pct),
+            ("MARGIN_HALT_PCT", self.config.margin_halt_pct),
+            ("MARGIN_LIQUIDATION_PCT", self.config.margin_liquidation_pct),
+        ]
+
+        for i in range(len(margin_levels) - 1):
+            if margin_levels[i][1] >= margin_levels[i + 1][1]:
+                self.errors.append(
+                    ValidationError(
+                        margin_levels[i + 1][0],
+                        f"{margin_levels[i+1][0]} ({margin_levels[i+1][1]}) must be greater than {margin_levels[i][0]} ({margin_levels[i][1]}).",
+                        True,
+                        "Correct the margin limit hierarchy in .env.",
+                    )
+                )
+
+        # 2. Volatility Hierarchy
+        vol_levels = [
+            ("VOLATILITY_HIGH_THRESHOLD", self.config.volatility_high_threshold),
+            ("VOLATILITY_VERY_HIGH_THRESHOLD", self.config.volatility_very_high_threshold),
+            ("VOLATILITY_EXTREME_THRESHOLD", self.config.volatility_extreme_threshold),
+        ]
+
+        for i in range(len(vol_levels) - 1):
+            if vol_levels[i][1] >= vol_levels[i + 1][1]:
+                self.errors.append(
+                    ValidationError(
+                        vol_levels[i + 1][0],
+                        f"{vol_levels[i+1][0]} ({vol_levels[i+1][1]}) must be greater than {vol_levels[i][0]} ({vol_levels[i][1]}).",
+                        True,
+                        "Correct the volatility threshold hierarchy in .env.",
+                    )
+                )
 
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""

@@ -722,3 +722,130 @@ def test_validator_spread_hierarchy(monkeypatch, tmp_path):
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "SPREAD_REDUCE_PIPS" for e in result.errors)
+
+def test_validator_margin_hierarchy(monkeypatch, tmp_path):
+    """Test validator detects margin hierarchy violations."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Alert >= Halt
+    monkeypatch.setenv("MARGIN_ALERT_PCT", "0.85")
+    monkeypatch.setenv("MARGIN_HALT_PCT", "0.80")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MARGIN_HALT_PCT" for e in result.errors)
+
+def test_validator_volatility_hierarchy(monkeypatch, tmp_path):
+    """Test validator detects volatility hierarchy violations."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # High >= Very High
+    monkeypatch.setenv("VOLATILITY_HIGH_THRESHOLD", "2.5")
+    monkeypatch.setenv("VOLATILITY_VERY_HIGH_THRESHOLD", "2.0")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "VOLATILITY_VERY_HIGH_THRESHOLD" for e in result.errors)
+
+def test_validator_max_trades_per_day(monkeypatch, tmp_path):
+    """Test validator detects unsafe max trades per day."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Exceeds institutional limit of 50
+    monkeypatch.setenv("MAX_TRADES_PER_DAY", "60")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_TRADES_PER_DAY" and e.critical for e in result.errors)
+
+def test_validator_min_lot_size(monkeypatch, tmp_path):
+    """Test validator detects too small min lot size."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+
+    # Below 0.01
+    monkeypatch.setenv("MIN_LOT_SIZE", "0.005")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MIN_LOT_SIZE" and e.critical for e in result.errors)
+
+def test_validator_file_permissions(monkeypatch, tmp_path):
+    """Test validator detects insecure file permissions on Linux/Mac."""
+    if sys.platform == "win32":
+        pytest.skip("Linux/Mac-only test")
+
+    import os
+    import stat
+
+    # Create a dummy .env file with insecure permissions (e.g., 666)
+    env_file = tmp_path / ".env"
+    env_file.write_text("MT5_PASSWORD=secure")
+    os.chmod(env_file, 0o666)
+
+    # Mock TradingConfig to use this .env file
+    # TradingConfig.model_config is a dict in Pydantic v2
+    # But wait, it's a SettingsConfigDict.
+    # Actually, ConfigValidator uses self.config.model_config.get("env_file")
+
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+
+    # We need to make sure TradingConfig uses our tmp_path/.env
+    # The TradingConfig class defines ROOT / ".env"
+    # But we can monkeypatch the config object passed to validator.
+
+    cfg = TradingConfig()
+    validator = ConfigValidator(cfg)
+
+    # Mock os.stat and Path.exists to simulate insecure permissions for .env
+    original_stat = os.stat
+    def mocked_stat(path, *args, **kwargs):
+        if str(path).endswith(".env"):
+            class MockStat:
+                st_mode = stat.S_IFREG | 0o666
+            return MockStat()
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "stat", mocked_stat)
+
+    # We also mock Path.exists to ensure the validator thinks .env exists
+    from pathlib import Path
+    original_exists = Path.exists
+    def mocked_exists(self):
+        if self.name == ".env":
+            return True
+        return original_exists(self)
+
+    monkeypatch.setattr(Path, "exists", mocked_exists)
+
+    result = validator.validate()
+
+    # It should give a warning (not critical)
+    assert any(e.field == "FILE_PERMISSION" and ".env" in e.message for e in result.errors)
+    assert all(not e.critical for e in result.errors if e.field == "FILE_PERMISSION")
