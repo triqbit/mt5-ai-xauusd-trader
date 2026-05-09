@@ -521,7 +521,7 @@ class BacktestEngine:
 
         pnls = np.array([t.pnl for t in self.trades])
         total_return = (self.balance - self.initial_balance) / self.initial_balance
-        win_rate = np.sum(pnls > 0) / len(pnls)
+        win_rate = np.sum(pnls > 0) / len(pnls) if len(pnls) > 0 else 0.0
 
         gross_profit = np.sum(pnls[pnls > 0])
         gross_loss = abs(np.sum(pnls[pnls < 0]))
