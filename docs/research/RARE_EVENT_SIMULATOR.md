@@ -56,6 +56,20 @@ config = RareEventConfig(
 df, result = simulator.generate_scenario(config)
 print(df.head())
 print(f"Peak Impact: {result.peak_impact_pct:.2%}")
+print(f"Description: {result.description}")
+```
+
+## Suite Generation and Reporting
+
+For comprehensive testing, you can generate a suite of all supported rare events and aggregate them into a report section:
+
+```python
+# Generate a full suite of scenarios
+suite = simulator.generate_suite(n_steps=500, magnitude=1.5)
+
+# Convert to a reporting section for ResearchReporter
+report_section = simulator.generate_report_section(suite)
+print(report_section.insights)
 ```
 
 ## Integration
