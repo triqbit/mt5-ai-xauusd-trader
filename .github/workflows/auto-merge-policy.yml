@@ -23,8 +23,9 @@ jobs:
       has_tests: ${{ steps.compliance-check.outputs.has_tests }}
       has_docs: ${{ steps.compliance-check.outputs.has_docs }}
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
-      coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
       observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
+      approval_status: ${{ steps.approval-check.outputs.approval_status }}
+      ci_status: ${{ steps.ci-check.outputs.ci_status }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -106,20 +107,69 @@ jobs:
             echo "observability_pass=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check Coverage
-        id: coverage-check
+      - name: Verify Approvals
+        id: approval-check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Verify coverage threshold (assuming 80% is enforced in ci.yml)
-          echo "coverage_pass=true" >> $GITHUB_OUTPUT
+          # Check for at least one approval (simulating code owner approval check)
+          APPROVALS=$(gh pr view $PR_NUMBER --json reviews --jq '.reviews | map(select(.state == "APPROVED")) | length')
+          if [ "$APPROVALS" -gt 0 ]; then
+            echo "approval_status=pass" >> $GITHUB_OUTPUT
+            echo "✅ PR has $APPROVALS approval(s)."
+          else
+            echo "approval_status=fail" >> $GITHUB_OUTPUT
+            echo "❌ PR lacks required approvals."
+          fi
+
+      - name: Check CI Status
+        id: ci-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Wait for other CI checks to complete (except this one)
+          MAX_ATTEMPTS=30
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            # Fields available: name, state
+            CHECKS=$(gh pr checks $PR_NUMBER --json name,state)
+
+            # Identify checks that are not yet successful or neutral or skipped
+            # State can be: SUCCESS, FAILURE, PENDING, ERROR, SKIPPED, NEUTRAL
+            INCOMPLETE=$(echo "$CHECKS" | jq -r '.[] | select(.name != "Enforce Auto-Merge Policy" and (.state == "PENDING" or .state == "IN_PROGRESS")) | .name' | wc -l)
+
+            if [ "$INCOMPLETE" -eq 0 ]; then
+              # All other checks are completed. Now check for failures.
+              FAILED=$(echo "$CHECKS" | jq -r '.[] | select(.name != "Enforce Auto-Merge Policy" and .state != "SUCCESS" and .state != "NEUTRAL" and .state != "SKIPPED") | .name' | wc -l)
+              if [ "$FAILED" -eq 0 ]; then
+                echo "ci_status=pass" >> $GITHUB_OUTPUT
+                echo "✅ All other CI checks passed."
+                exit 0
+              else
+                echo "ci_status=fail" >> $GITHUB_OUTPUT
+                echo "❌ Some CI checks failed."
+                exit 0
+              fi
+            fi
+
+            echo "Waiting for other CI checks... (Attempt $ATTEMPT/$MAX_ATTEMPTS)"
+            sleep 60
+            ATTEMPT=$((ATTEMPT+1))
+          done
+
+          echo "ci_status=fail" >> $GITHUB_OUTPUT
+          echo "❌ Timed out waiting for other CI checks."
 
       - name: Handle Violations
         if: |
           steps.risk-check.outputs.risk_status == 'blocked' ||
           (steps.compliance-check.outputs.source_modified == 'true' &&
            (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
-          steps.observability-check.outputs.observability_pass == 'false'
+          steps.observability-check.outputs.observability_pass == 'false' ||
+          steps.approval-check.outputs.approval_status == 'fail' ||
+          steps.ci-check.outputs.ci_status == 'fail'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -139,6 +189,12 @@ jobs:
             if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
               REASON="$REASON\n- ❌ **Source code modified but no documentation updated.**"
             fi
+          fi
+          if [ "${{ steps.approval-check.outputs.approval_status }}" = "fail" ]; then
+            REASON="$REASON\n- ❌ **Missing required code owner approval.**"
+          fi
+          if [ "${{ steps.ci-check.outputs.ci_status }}" = "fail" ]; then
+            REASON="$REASON\n- ❌ **Other CI checks are pending or failed.**"
           fi
 
           gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, secrets, or infrastructure are automatically escalated."
