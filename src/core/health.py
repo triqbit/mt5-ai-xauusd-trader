@@ -8,6 +8,7 @@ License: MIT
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import platform
@@ -16,6 +17,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
+import psutil
 import redis
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -94,6 +96,8 @@ class HealthChecker:
         self.trade_logger = trade_logger
         self.model = model
         self.audit_logger = audit_logger
+        # Initialize psutil for non-blocking CPU checks
+        psutil.cpu_percent(interval=None)
 
     def _update_gauge(self, component: str, status: HealthStatus) -> None:
         """Update Prometheus health gauge for a component."""
@@ -107,9 +111,9 @@ class HealthChecker:
     def check_liveness(self) -> ComponentStatus:
         """
         Liveness probe: is the process running and responsive?
-        Basic check that doesn't depend on external systems.
+        Minimal check to indicate the application is not deadlocked.
         """
-        res = ComponentStatus(status=HealthStatus.HEALTHY, message="Application process is active")
+        res = ComponentStatus(status=HealthStatus.HEALTHY, message="Application heartbeat active")
         self._update_gauge("liveness", res.status)
         return res
 
@@ -117,6 +121,7 @@ class HealthChecker:
         """Report on the execution environment (OS, Python, Hardware)."""
         py_ver = platform.python_version()
         os_info = f"{platform.system()} {platform.release()}"
+        arch = platform.machine()
 
         hardware = "CPU"
         try:
@@ -129,9 +134,39 @@ class HealthChecker:
         except ImportError:
             hardware = "CPU (PyTorch not installed)"
 
-        msg = f"Python {py_ver} on {os_info} | Hardware: {hardware}"
+        msg = f"Python {py_ver} on {os_info} ({arch}) | Hardware: {hardware}"
         res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
         self._update_gauge("environment", res.status)
+        return res
+
+    def check_system_resources(
+        self, cpu_threshold: float = 90.0, mem_threshold: float = 90.0
+    ) -> ComponentStatus:
+        """
+        Monitor CPU and Memory usage.
+        Non-blocking check (interval=None) assumes previous initialization.
+        """
+        cpu_usage = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory()
+        mem_usage = mem.percent
+
+        status = HealthStatus.HEALTHY
+        messages = [f"CPU: {cpu_usage}%", f"MEM: {mem_usage}%"]
+        remedies = []
+
+        if cpu_usage > cpu_threshold:
+            status = HealthStatus.DEGRADED
+            remedies.append("Check for runaway processes or increase CPU allocation")
+        if mem_usage > mem_threshold:
+            status = HealthStatus.DEGRADED
+            remedies.append("Check for memory leaks or increase RAM allocation")
+
+        res = ComponentStatus(
+            status=status,
+            message=" | ".join(messages),
+            remedy="; ".join(remedies) if remedies else "N/A",
+        )
+        self._update_gauge("system_resources", res.status)
         return res
 
     def check_database(self) -> ComponentStatus:
@@ -140,7 +175,7 @@ class HealthChecker:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message="TradeLogger not initialized",
-                remedy="Ensure DB_URL is valid in .env",
+                remedy="Ensure DATABASE_URL is valid in .env and Database service is running",
             )
             self._update_gauge("database", res.status)
             return res
@@ -157,7 +192,7 @@ class HealthChecker:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message=f"Database unreachable: {e!s}",
-                remedy="Check database service and connection string",
+                remedy="Verify database service is running and connection string (DATABASE_URL) is correct",
             )
 
         self._update_gauge("database", res.status)
@@ -167,7 +202,9 @@ class HealthChecker:
         """Verify MT5/MetaAPI connection and terminal trading status."""
         if not self.connector:
             res = ComponentStatus(
-                status=HealthStatus.FAILED, message="MT5Connector not initialized"
+                status=HealthStatus.FAILED,
+                message="MT5Connector not initialized",
+                remedy="Initialization logic failed. Check application logs.",
             )
             self._update_gauge("mt5", res.status)
             return res
@@ -176,7 +213,7 @@ class HealthChecker:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message="MT5 connection not initialized",
-                remedy="Check credentials and network",
+                remedy="Check MT5 credentials, path, and server in .env. Ensure MT5 terminal is running.",
             )
             self._update_gauge("mt5", res.status)
             return res
@@ -186,7 +223,9 @@ class HealthChecker:
             info = self.connector.get_account_info()
             if not info:
                 res = ComponentStatus(
-                    status=HealthStatus.FAILED, message="MT5 failed to return account info"
+                    status=HealthStatus.FAILED,
+                    message="MT5 failed to return account info",
+                    remedy="Verify MT5 connection and credentials",
                 )
                 self._update_gauge("mt5", res.status)
                 return res
@@ -207,23 +246,23 @@ class HealthChecker:
 
             if not terminal_trade_allowed:
                 messages.append("Algo Trading is DISABLED in terminal")
-                remedies.append("Enable 'Algo Trading' button in MT5")
+                remedies.append("Enable 'Algo Trading' button in MT5 terminal")
                 overall_status = HealthStatus.DEGRADED
 
             if not account_trade_allowed:
                 messages.append("Trading is DISABLED for this account by broker")
-                remedies.append("Contact broker or check if account is read-only")
+                remedies.append("Contact broker or check if account is read-only or has limited permissions")
                 overall_status = HealthStatus.FAILED
 
             if not symbol_props:
                 similar = self.connector.find_symbols(symbol[:3]) if len(symbol) >= 3 else []
                 suggestion = f" (Did you mean: {', '.join(similar[:3])}?)" if similar else ""
                 messages.append(f"Symbol '{symbol}' not found on server{suggestion}")
-                remedies.append(f"Check SYMBOL in .env{suggestion}")
+                remedies.append(f"Check SYMBOL in .env is exactly as it appears in MT5 Market Watch{suggestion}")
                 overall_status = HealthStatus.FAILED
             elif not symbol_props.get("tradable", True):
                 messages.append(f"Symbol '{symbol}' is not tradable (Market closed)")
-                remedies.append("Wait for market open")
+                remedies.append("Wait for market open or use a symbol with active trading hours")
                 overall_status = HealthStatus.DEGRADED
 
             if not messages:
@@ -240,7 +279,11 @@ class HealthChecker:
 
         except Exception as e:
             logger.error("Health check - MT5 failure: %s", e)
-            res = ComponentStatus(status=HealthStatus.FAILED, message=f"MT5 API call failed: {e!s}")
+            res = ComponentStatus(
+                status=HealthStatus.FAILED,
+                message=f"MT5 API call failed: {e!s}",
+                remedy="Check MT5 terminal connectivity and network status",
+            )
 
         self._update_gauge("mt5", res.status)
         return res
@@ -271,7 +314,7 @@ class HealthChecker:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message="No models loaded in memory",
-                remedy="Ensure model weights exist in models/trained/",
+                remedy="Ensure model weight files exist in models/trained/ and ALGORITHM in .env is correct",
             )
         else:
             msg = f"Models loaded: {', '.join(loaded)}"
@@ -303,7 +346,7 @@ class HealthChecker:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message=f"Config invalid: {'; '.join(critical)}",
-                remedy="Review .env and validation output",
+                remedy="Review .env and ensure all required variables are set correctly",
             )
 
         self._update_gauge("config", res.status)
@@ -327,7 +370,7 @@ class HealthChecker:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message=f"Low disk: {free_mb:.1f}MB free",
-                remedy="Clear old logs or increase disk quota",
+                remedy="Clear old logs, increase disk quota, or check for large data files",
             )
         else:
             res = ComponentStatus(
@@ -364,13 +407,13 @@ class HealthChecker:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message="AuditLogger not initialized",
-                remedy="Check audit database connection",
+                remedy="Ensure database for audit log is accessible",
             )
         elif not self.audit_logger._initialized:
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message="AuditLogger not properly initialized",
-                remedy="Check audit database connection",
+                remedy="Check audit database connection and schema",
             )
         else:
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Audit trace active")
@@ -383,6 +426,7 @@ class HealthChecker:
         components = {
             "liveness": self.check_liveness(),
             "environment": self.check_environment(),
+            "system_resources": self.check_system_resources(),
             "database": self.check_database(),
             "mt5": self.check_mt5(),
             "models": self.check_models(),
@@ -411,6 +455,7 @@ class HealthChecker:
         """
         Critical Startup Gate: blocks application start if health is compromised.
         Aligned with Enterprise Release Standards.
+        Enforces a fail-fast policy for all critical dependencies.
         """
         report = self.get_full_report()
         if report.status == HealthStatus.FAILED:
@@ -425,6 +470,7 @@ class HealthChecker:
                         reason=msg,
                         metadata={"failed": failed},
                     )
+            # Raising RuntimeError effectively blocks the trading engine start in main.py
             raise RuntimeError(msg)
 
         if report.status == HealthStatus.DEGRADED:
@@ -474,13 +520,17 @@ def get_health_checker() -> HealthChecker:
 
 @router.get("/liveness", response_model=ComponentStatus)
 async def liveness():
-    """Liveness probe: process heartbeat."""
+    """Liveness probe: lightweight process heartbeat."""
     return get_health_checker().check_liveness()
 
 
 @router.get("/readiness", response_model=HealthReport)
 async def readiness():
-    """Readiness probe: check all dependencies."""
+    """
+    Readiness probe: check if the application is ready to handle trades.
+    Aggregates all dependency and resource checks.
+    Returns 503 Service Unavailable if critical checks fail.
+    """
     report = get_health_checker().get_full_report()
     if report.status == HealthStatus.FAILED:
         raise HTTPException(status_code=503, detail=jsonable_encoder(report))
@@ -489,12 +539,12 @@ async def readiness():
 
 @router.get("/full", response_model=HealthReport)
 async def full():
-    """Full enterprise health report."""
+    """Full enterprise health report for detailed diagnostics."""
     return get_health_checker().get_full_report()
 
 
 def create_health_app() -> FastAPI:
-    """Create the health monitoring micro-app."""
+    """Create the health monitoring micro-app with Prometheus integration."""
     app = FastAPI(title="MT5 Bot Health Monitoring", version=get_system_version())
     app.include_router(router)
     app.mount("/metrics", make_asgi_app())
