@@ -38,9 +38,10 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 - **Standardized Model Interface:** All AI models implement a unified `BaseModel` interface for seamless integration and ensemble voting.
 
 ### 🛡️ Institutional Risk Management
-- **Ray Dalio All-Weather Allocation:** Scenario-based risk parity across multi-currency pairs.
+- **Volatility-Aware Circuit Breakers:** Advanced protection that halts execution during extreme market volatility (ATR ratio > 3.0x), preventing losses during anomalies.
+- **Regime-Adaptive Safeguards:** Stricter confidence requirements dynamically applied during unstable market states (e.g., 80% confidence floor for News Shocks).
 - **9-Layer Execution Filter:** Cascade validation using ATR, Trend Angle, Momentum, EMA sequencing, Session time, Drawdown, Model Stability, Performance, and Confidence.
-- **Circuit Breakers:** Automated drawdown protection, per-session loss limits, and daily profit targets.
+- **Adaptive Position Sizing:** Multi-factor sizing engine that scales risk based on prediction certainty and market turbulence.
 
 ### ⚡ Production Infrastructure
 - **CI/CD Pipeline:** Fully automated GitHub Actions for linting, security audits (`pip-audit`), and unit testing.
