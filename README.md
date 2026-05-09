@@ -23,8 +23,8 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 
 - **[Architecture Quick-Start](./docs/ARCHITECTURE_QUICK.md):** 5-minute overview of system components, data flow, and maturity levels.
 - **[System Maturity Map](./docs/ARCHITECTURE_QUICK.md#🚦-system-maturity-map):** Transparent status of production vs. experimental subsystems.
-- **[Project Health Dashboard](./docs/status/EXECUTIVE_SUMMARY.md):** Real-time visibility into CI status, stability KPIs, and strategic risks.
-- **[Audit Evidence](./docs/audits/README.md):** Direct routing to ADRs, performance reports, and security scorecards.
+- **[Technical Health Dashboard](./docs/status/PROJECT_HEALTH.md):** Real-time visibility into technical debt, CI status, and process integrity.
+- **[Audit Evidence](./docs/audits/README.md):** Direct routing to verified walk-forward reports, ADRs, and security scorecards.
 
 ---
 
