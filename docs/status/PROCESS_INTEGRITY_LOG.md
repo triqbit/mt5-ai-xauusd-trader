@@ -305,3 +305,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **PR Purge:** Jules05 must urgently close the 409 stale PRs to reduce noise and force a total project re-synchronization.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - Ninth Consecutive Day of History Destruction).
+
+## 2026-05-09 17:20 GMT+4
+
+**Summary:** Tenth consecutive day of history destruction. PR #945 performs another total system swap under a documentation label, further eroding governance transparency.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The 'main' branch has been reset with a single monolithic graft commit ('36f3295') for the tenth consecutive day. This total loss of incremental history renders all standard Git-based audit and safety tools non-functional.
+- **Extreme Labeling Drift (PR #945):** Commit '36f3295' is titled "docs: improve developer onboarding and contribution experience (#945)", yet it replaces the entire repository (348 files, ~48,000 lines). This continues the dangerous pattern of masking system-wide logic swaps (trading, risk, models) under a documentation label.
+- **Critical PR Turbulence:** 423 open PRs now exist, many of which are fundamentally incompatible with the current single-commit baseline. This creates unmanageable noise and technical debt for contributors.
+- **Complete Review Bypass:** A 48,000-line change cannot be reviewed for safety or correctness in a single PR without incremental history. The current workflow bypasses the granular oversight necessary for an institutional-grade trading system.
+
+**PRs/Commits Involved:**
+- 'main' branch: Commit '36f3295' (replaces 'f6e7494' and all prior history).
+- PR #945: Used as the vehicle for the tenth system-wide swap.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #945 used).
+- [ ] CI must pass before merge (CI state for the total system swap is unverifiable via history).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the codebase, including high-risk trading and risk components, is being swapped daily with zero traceability).
+
+**Recommended Follow-ups:**
+- **URGENT — Human Intervention Required:** The autonomous workflow has completely diverged from Git-based governance. A human must intervene to restore a linear, traceable history and stop the use of history-resetting grafts.
+- **Audit:** Line-by-line validation of 'src/trading/' and 'src/core/risk_manager.py' against known trusted baselines is mandatory.
+- **PR Purge:** Jules05 must urgently close the 423 stale PRs to restore project coherence.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - Tenth Consecutive Day of History Destruction).
