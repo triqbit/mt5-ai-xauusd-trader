@@ -53,6 +53,7 @@ The following patterns trigger an automatic block and escalation:
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-09 | N/A | Policy Update | Jules05: Enhanced auto-merge policy with strict compliance and approval checks | [System Change] |
 | 2026-05-08 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (including docker-compose and ci.yml) | [System Change] |
 | 2026-05-07 | N/A | Policy Update | Jules05: Strict auto-merge enforcement implemented | [System Change] |
 | 2026-04-30 | #368 | Auto-Merged | Policy checks passed | [PR](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/368) |
