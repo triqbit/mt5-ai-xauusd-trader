@@ -1,6 +1,6 @@
 # Service Level Objectives (SLO) & Reliability Targets
 
-This document defines the formal, measurable reliability standards for the MT5 AI/ML Trading Bot. These targets represent the "Enterprise Quality" bar for production readiness, deployment safety, and operational excellence.
+This document defines the formal, measurable reliability standards for the MT5 AI/ML Trading Bot. These targets translate "Enterprise Quality" into specific, trackable objectives to ensure production trust, capital safety, and operational excellence.
 
 ## 1. Availability SLOs (System Uptime)
 
@@ -33,7 +33,7 @@ Inference and execution latency are measured via `src/core/profiler.py` and expo
 | **Model Inference** | < 10ms | < 50ms | < 100ms | `trading_block_duration_seconds{block_label="inference"}` |
 | **Risk Approval** | < 20ms | < 50ms | < 100ms | `trading_block_duration_seconds{block_label="risk_check"}` |
 | **End-to-End Latency** | < 100ms | < 500ms | < 1.5s | `trading_execution_latency_seconds` |
-| **Backtest Generation** | **< 5 min** | **< 8 min** | **< 12 min** | Local execution duration (Audit Log: `action="backtest_completed"`). |
+| **Backtest Generation** | **< 5 min** | **< 8 min** | **< 12 min** | Audit Log: `action="backtest_completed"` (metadata: `duration_seconds`). |
 
 ## 4. Operational Responsiveness (Alert Triage)
 
@@ -52,8 +52,8 @@ Defined in the [Disaster Recovery Plan](DISASTER_RECOVERY.md).
 
 | Metric | Target | Measurement Method |
 |--------|--------|--------------------|
-| **Recovery Time Objective (RTO)** | **15 mins** | Time from incident detection to `system_restored` event. |
-| **Recovery Point Objective (RPO)** | **1 hour** | Maximum data age in the most recent valid database backup. |
+| **Recovery Time Objective (RTO)** | **15 mins** | Time from incident detection to `system_restored` event in audit log. |
+| **Recovery Point Objective (RPO)** | **1 hour** | Maximum data age in the most recent valid database backup (`backup_verify.sh` logs). |
 
 ## 6. Error Budget Framework (30-Day Rolling Window)
 

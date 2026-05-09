@@ -15,6 +15,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -22,6 +23,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from src.core.audit_log import get_audit_logger
 from src.core.feature_engineering import FeatureEngineer
 from src.core.schemas import TradeSignal
 from src.trading.execution_filter import ExecutionFilter
@@ -107,12 +109,31 @@ class BacktestEngine:
         Executes a walk-forward backtest.
         Optimized via vectorized pre-calculations and future-scanning exit simulation.
         """
+        start_wall_time = time.perf_counter()
         logger.info(
             "Starting walk-forward backtest | train=%d test=%d step=%d",
             train_window,
             test_window,
             step_size,
         )
+
+        try:
+            audit = get_audit_logger()
+            audit.log(
+                actor="system",
+                action="backtest_started",
+                details=f"Symbol: {self.symbol}, Data points: {len(data)}",
+                metadata={
+                    "symbol": self.symbol,
+                    "train_window": train_window,
+                    "test_window": test_window,
+                    "step_size": step_size,
+                    "data_length": len(data),
+                },
+            )
+        except Exception:
+            # AuditLogger might not be initialized in all environments (e.g. simple unit tests)
+            logger.debug("AuditLogger not available - skipping backtest_started log")
 
         # 1. Pre-calculate all possible features for the entire dataset
         logger.info("Pre-calculating features for the entire dataset...")
@@ -288,7 +309,30 @@ class BacktestEngine:
 
         # 4. Finalization: Close any trailing trades
         self._close_all_trades(active_trades, close_vals[-1], time_vals[-1])
-        return self._calculate_performance()
+        report = self._calculate_performance()
+
+        duration = time.perf_counter() - start_wall_time
+        try:
+            audit = get_audit_logger()
+            audit.log(
+                actor="system",
+                action="backtest_completed",
+                details=f"Backtest completed in {duration:.2f}s | Trades: {report.total_trades}",
+                metadata={
+                    "symbol": self.symbol,
+                    "duration_seconds": duration,
+                    "total_trades": report.total_trades,
+                    "annualized_return": report.annualized_return,
+                    "sharpe_ratio": report.sharpe_ratio,
+                    "max_drawdown": report.max_drawdown,
+                    "period_start": str(report.start_date),
+                    "period_end": str(report.end_date),
+                },
+            )
+        except Exception:
+            logger.debug("AuditLogger not available - skipping backtest_completed log")
+
+        return report
 
     def _record_equity(
         self, timestamp: datetime, current_price: float, active_trades: list[dict[str, Any]]
