@@ -35,7 +35,20 @@ def verify_migrations():
         print("--- Step 3: Upgrading to head again ---")
         command.upgrade(alembic_cfg, "head")
 
-        print("--- Migration Reversibility Check PASSED ---")
+        # 4. Check for schema drift (models vs migrations)
+        print("--- Step 4: Checking for schema drift (alembic check) ---")
+        # alembic check was added in Alembic 1.9.0
+        try:
+            command.check(alembic_cfg)
+            print("--- Schema Drift Check PASSED ---")
+        except Exception as drift_error:
+            print("="*60)
+            print("  DEPLOYMENT BLOCKED: SCHEMA DRIFT DETECTED")
+            print("  (Models changed without corresponding migrations)")
+            print("="*60)
+            raise drift_error
+
+        print("--- Migration Reversibility & Drift Check PASSED ---")
         return True
 
     except Exception as e:
