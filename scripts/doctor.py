@@ -57,29 +57,43 @@ def check_python_version():
         )
 
 CORE_DEPENDENCIES = {
-    "numpy": "numpy",
-    "pandas": "pandas",
-    "pydantic": "pydantic",
-    "pydantic-settings": "pydantic_settings",
-    "sqlalchemy": "sqlalchemy",
-    "torch": "torch",
-    "talib": "talib",
-    "structlog": "structlog",
-    "rich": "rich",
-    "python-dotenv": "dotenv"
+    "numpy": ("numpy", "2.2.0"),
+    "pandas": ("pandas", "2.2.0"),
+    "pydantic": ("pydantic", "2.0.0"),
+    "pydantic-settings": ("pydantic_settings", "2.0.0"),
+    "sqlalchemy": ("sqlalchemy", "2.0.0"),
+    "torch": ("torch", "2.0.0"),
+    "talib": ("talib", "0.4.0"),
+    "structlog": ("structlog", "23.0.0"),
+    "rich": ("rich", "13.0.0"),
+    "python-dotenv": ("dotenv", "1.0.0")
 }
 
 def check_dependencies(dependencies=None):
+    from importlib.metadata import version as get_version
     deps = dependencies or CORE_DEPENDENCIES
     missing = []
-    for display_name, module_name in deps.items():
+    versions = []
+
+    for display_name, (module_name, min_version) in deps.items():
         try:
             __import__(module_name)
+            try:
+                # Some modules have different metadata names
+                meta_name = module_name.replace("_", "-")
+                if module_name == "dotenv": meta_name = "python-dotenv"
+                if module_name == "talib": meta_name = "TA-Lib"
+
+                actual_version = get_version(meta_name)
+                versions.append(f"{display_name} v{actual_version}")
+            except Exception:
+                versions.append(f"{display_name} v?")
         except ImportError:
             missing.append(display_name)
 
     if not missing:
-        return DiagnosticCheck("Dependencies", "OK", "All core libraries present")
+        msg = f"All core libraries present: {', '.join(versions[:3])}..."
+        return DiagnosticCheck("Dependencies", "OK", msg)
     else:
         return DiagnosticCheck(
             "Dependencies",
