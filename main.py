@@ -353,6 +353,14 @@ def run_live(
                     confidence = signal_obj.confidence
                     if monitor:
                         monitor.check_confidence_degradation(confidence)
+                        # Log model performance if available
+                        health = getattr(model, "get_health_metrics", lambda: None)()
+                        if health:
+                            monitor.log_model_performance(
+                                accuracy=health.get("accuracy", 0.0),
+                                drift_score=health.get("drift", 0.0),
+                                calibration_error=health.get("calibration", 0.0),
+                            )
 
                     # Log signal to audit trail
                     if audit_logger:
@@ -542,6 +550,7 @@ def run_live(
 
                 if risk_approved and direction != 0:
                     with profile("execution"):
+                        execution_start = time.perf_counter()
                         try:
                             ticket = connector.place_order(signal)
                         except MT5ExecutionError as e:
@@ -554,9 +563,18 @@ def run_live(
                                 )
                             ticket = None
 
+                        execution_latency_ms = (time.perf_counter() - execution_start) * 1000
+
                         if ticket:
                             risk.open_positions[cfg.symbol] = ticket
-                            log.info("Order placed", ticket=ticket)
+                            log.info("Order placed", ticket=ticket, latency_ms=execution_latency_ms)
+                            if monitor:
+                                # We don't have slippage here yet, so we pass 0.0
+                                monitor.log_execution_quality(
+                                    latency_ms=execution_latency_ms,
+                                    slippage_pips=0.0,
+                                    fill_rate=1.0,
+                                )
                             if trade_logger:
                                 trade_logger.log_trade(
                                     ticket=ticket,

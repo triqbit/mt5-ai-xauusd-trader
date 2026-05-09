@@ -5,14 +5,15 @@ Robust Circuit Breaker pattern for graceful failure and self-healing.
 """
 
 import functools
-import logging
 import time
 from enum import Enum
 from typing import Any, Callable, Optional, Type
 
+import structlog
+
 from src.core.exceptions import CircuitBreakerError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class CircuitState(Enum):
@@ -56,24 +57,30 @@ class CircuitBreaker:
             and (time.time() - self._last_failure_time) > self.recovery_timeout
         ):
             logger.info(
-                "Circuit Breaker [%s] transitioning OPEN -> HALF_OPEN due to timeout.",
-                self.name,
+                "circuit_breaker_transition",
+                name=self.name,
+                from_state=self._state.value,
+                to_state=CircuitState.HALF_OPEN.value,
+                reason="recovery_timeout_reached",
             )
             self._state = CircuitState.HALF_OPEN
         return self._state
 
-    def _handle_success(self):
+    def _handle_success(self) -> None:
         """Reset the breaker on success."""
         if self._state == CircuitState.HALF_OPEN:
             logger.info(
-                "Circuit Breaker [%s] transitioning HALF_OPEN -> CLOSED after successful test.",
-                self.name,
+                "circuit_breaker_transition",
+                name=self.name,
+                from_state=self._state.value,
+                to_state=CircuitState.CLOSED.value,
+                reason="test_success",
             )
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._last_failure_time = None
 
-    def _handle_failure(self, exception: Exception):
+    def _handle_failure(self, exception: Exception) -> None:
         """Record a failure and trip the breaker if threshold reached."""
         self._failure_count += 1
         self._last_failure_time = time.time()
@@ -81,10 +88,11 @@ class CircuitBreaker:
         if self._state == CircuitState.HALF_OPEN or self._failure_count >= self.failure_threshold:
             if self._state != CircuitState.OPEN:
                 logger.error(
-                    "Circuit Breaker [%s] TRIPPED! State -> OPEN. (Failures: %d, Error: %s)",
-                    self.name,
-                    self._failure_count,
-                    exception,
+                    "circuit_breaker_tripped",
+                    name=self.name,
+                    state=CircuitState.OPEN.value,
+                    failure_count=self._failure_count,
+                    error=str(exception),
                 )
             self._state = CircuitState.OPEN
 

@@ -11,7 +11,6 @@ License: MIT
 from __future__ import annotations
 
 import asyncio
-import logging
 import sys
 from contextlib import contextmanager
 from datetime import datetime
@@ -19,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 import nest_asyncio
 import pandas as pd
+import structlog
 
 try:
     import MetaTrader5 as mt5
@@ -49,7 +49,7 @@ from src.core.schemas import TradeSignal
 # Apply nest_asyncio to allow nested loops (MetaAPI SDK uses asyncio)
 nest_asyncio.apply()
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # MT5 constants (replicated so the module loads on Mac/Linux)
 ORDER_TYPE_BUY = 0
@@ -148,14 +148,17 @@ class MT5Connector:
     def _initialize_logic(self) -> bool:
         """Internal initialization logic wrapped by circuit breaker."""
         logger.info(
-            "Initializing MT5 connector | mode=%s | symbol=%s", self.cfg.mode, self.cfg.symbol
+            "mt5_connector_initialization_started",
+            mode=self.cfg.mode,
+            symbol=self.cfg.symbol,
+            mt5_server=self.cfg.mt5_server,
         )
         self.use_metaapi = False  # Reset state
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
             try:
-                logger.debug("Attempting native MT5 SDK initialization...")
+                logger.debug("native_mt5_sdk_initialization_attempt")
                 init_result = mt5.initialize(
                     path=self.cfg.mt5_path,
                     login=self.cfg.mt5_login,
@@ -164,9 +167,9 @@ class MT5Connector:
                 )
                 if init_result:
                     logger.info(
-                        "Native MT5 SDK initialized successfully | server=%s | login=%d",
-                        self.cfg.mt5_server,
-                        self.cfg.mt5_login,
+                        "native_mt5_sdk_initialization_success",
+                        server=self.cfg.mt5_server,
+                        login=self.cfg.mt5_login,
                     )
                     self.use_metaapi = False
                     self._is_initialized = True
@@ -174,19 +177,28 @@ class MT5Connector:
 
                 error_code, error_desc = mt5.last_error()
                 logger.warning(
-                    "Native mt5.initialize failed | error=%s | code=%d", error_desc, error_code
+                    "native_mt5_sdk_initialization_failed",
+                    error=error_desc,
+                    code=error_code,
+                    server=self.cfg.mt5_server,
                 )
             except Exception as e:
-                logger.exception("Native MT5 initialization encountered an unexpected error: %s", e)
+                logger.error(
+                    "native_mt5_sdk_initialization_exception",
+                    error=str(e),
+                    exc_info=True,
+                )
         else:
             logger.info(
-                "Native MetaTrader5 SDK not available on this platform (check OS or installation)."
+                "native_mt5_sdk_unavailable",
+                platform=sys.platform,
+                reason="SDK not imported or platform incompatible",
             )
 
         # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         metaapi_token = self.cfg.metaapi_token.get_secret_value() if self.cfg.metaapi_token else ""
         if METAAPI_AVAILABLE and metaapi_token and self.cfg.metaapi_account_id:
-            logger.info("Attempting MetaAPI cloud fallback...")
+            logger.info("metaapi_fallback_initialization_attempt")
             try:
                 self.metaapi = MetaApi(metaapi_token)
 
@@ -195,17 +207,17 @@ class MT5Connector:
                     if hasattr(account_id, "get_secret_value"):
                         account_id = account_id.get_secret_value()
 
-                    logger.debug("Fetching MetaAPI account | id=%s", account_id)
+                    logger.debug("metaapi_fetching_account", account_id=account_id)
                     self.metaapi_account = await self.metaapi.metatrader_account_api.get_account(
                         account_id
                     )
 
-                    logger.debug("Waiting for MetaAPI account connection...")
+                    logger.debug("metaapi_waiting_for_connection")
                     await self.metaapi_account.wait_connected()
 
                     self.metaapi_connection = self.metaapi_account.get_rpc_connection()
 
-                    logger.debug("Connecting RPC and waiting for synchronization...")
+                    logger.debug("metaapi_connecting_rpc_sync")
                     await self.metaapi_connection.connect()
                     await self.metaapi_connection.wait_synchronized()
 
@@ -214,10 +226,10 @@ class MT5Connector:
 
                 self.use_metaapi = True
                 self._is_initialized = True
-                logger.info("MetaAPI fallback configured and connected successfully.")
+                logger.info("metaapi_fallback_initialization_success")
                 return True
             except Exception as e:
-                logger.error("MetaAPI initialization failed | error=%s", e)
+                logger.error("metaapi_fallback_initialization_failed", error=str(e))
                 raise MT5ConnectionError(
                     f"MetaAPI initialization failed: {e}", details={"error_type": type(e).__name__}
                 ) from e
@@ -289,7 +301,7 @@ class MT5Connector:
     def _get_rates_logic(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Internal data retrieval logic wrapped by circuit breaker."""
         if not self._is_initialized:
-            logger.info("Connector not initialized. Attempting auto-initialization...")
+            logger.info("mt5_connector_auto_initialization")
             self.initialize()
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
@@ -302,7 +314,10 @@ class MT5Connector:
                     # If it's a connection-related error, trigger re-init for next retry
                     if err_code in [-1, 10001, 10002, 10003, 10004]:
                         logger.warning(
-                            "MT5 connection failure detected (code %d). Resetting...", err_code
+                            "mt5_data_connection_failure",
+                            error=err_desc,
+                            code=err_code,
+                            action="resetting_initialized_state",
                         )
                         self._is_initialized = False
 
@@ -506,11 +521,11 @@ class MT5Connector:
             self.initialize()
 
         logger.info(
-            "Placing order | symbol=%s | direction=%d | lots=%.2f | algo=%s",
-            signal.symbol,
-            signal.direction,
-            signal.lot_size,
-            signal.algorithm,
+            "order_placement_attempt",
+            symbol=signal.symbol,
+            direction=signal.direction,
+            lots=signal.lot_size,
+            algo=signal.algorithm,
         )
 
         order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
@@ -538,6 +553,12 @@ class MT5Connector:
             result = mt5.order_send(request)
             if result is None:
                 err_code, err_desc = mt5.last_error()
+                logger.error(
+                    "order_placement_failed_none",
+                    error=err_desc,
+                    code=err_code,
+                    symbol=signal.symbol,
+                )
                 raise MT5ExecutionError(
                     f"Order send failed (None result): {err_desc} (code: {err_code})"
                 )
@@ -547,11 +568,23 @@ class MT5Connector:
                 getattr(mt5, "TRADE_RETCODE_PLACED", 10008),
             ]:
                 error_msg = f"Order rejected: {result.comment} (code: {result.retcode})"
-                logger.error(error_msg)
+                logger.error(
+                    "order_placement_rejected",
+                    symbol=signal.symbol,
+                    comment=result.comment,
+                    retcode=result.retcode,
+                    deal=result.deal,
+                )
                 is_retriable = result.retcode not in NON_RETRIABLE_RETCODES
                 raise MT5ExecutionError(error_msg, is_retriable=is_retriable)
 
-            logger.info("Order executed successfully | ticket=%d", result.order)
+            logger.info(
+                "order_placement_success",
+                symbol=signal.symbol,
+                ticket=result.order,
+                deal=result.deal,
+                price=result.price,
+            )
             return int(result.order)
         else:
             action = "BUY" if signal.direction > 0 else "SELL"
@@ -567,9 +600,18 @@ class MT5Connector:
                     )
                 )
                 ticket = int(result["orderId"])
-                logger.info("MetaAPI order executed successfully | ticket=%d", ticket)
+                logger.info(
+                    "metaapi_order_placement_success",
+                    symbol=signal.symbol,
+                    ticket=ticket,
+                )
                 return ticket
             except Exception as e:
+                logger.error(
+                    "metaapi_order_placement_failed",
+                    symbol=signal.symbol,
+                    error=str(e),
+                )
                 raise MT5ExecutionError(f"MetaAPI order placement failed: {e}") from e
 
     def get_account_balance(self) -> float:
