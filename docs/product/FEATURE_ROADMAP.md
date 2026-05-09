@@ -1,55 +1,67 @@
-# Strategic Feature Roadmap - April 2026
+# 🗺️ Strategic Feature Roadmap - May 2026
 
-## High Priority (Next 2 Weeks)
+This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-performance ensemble bot to a truly institutional-grade "Glass Box" trading system.
 
-### 1. Explainable Regime-Aware Decision Cockpit
-- **Score:** 9.2/10
-- **Cost:** M
-- **Strategic Importance:** 9/10
-- **Dependency Readiness:** 🟢 High (Core data streams active)
-- **Operational Leverage:** High
-- **Why:** Solves the "Black Box" problem by visualizing *why* the ensemble model is taking a position, showing regime detection (Trending/Mean-Reverting), and consolidating health metrics into a single TUI/Dashboard.
+---
 
-### 2. Gold-Specific Macro Sensitivity Overlays
-- **Score:** 9.5/10
-- **Cost:** M
-- **Strategic Importance:** 10/10
-- **Dependency Readiness:** 🟡 Medium (Requires YFinance/FRED integration)
-- **Operational Leverage:** High
-- **Why:** Provides the primary market differentiation. Integrates Real Yields, DXY correlation, and Central Bank demand into the feature vector, giving the AI a unique "institutional" edge in XAUUSD trading.
+## 📊 Repo Maturity Assessment
 
-## Medium Priority (Weeks 3-4)
+| Category | Maturity | Gaps & Observations |
+| :--- | :--- | :--- |
+| **Product Capability** | 🟢 7/10 | Core execution and ensemble logic are solid. Key "Institutional" components (Regime/Capital Allocation) are built but not yet integrated into the live loop. |
+| **Usability** | 🔴 3/10 | Pure CLI interface. Operator has low visibility into *why* decisions are made in real-time. Documentation is excellent, but UI/UX for monitoring is missing. |
+| **Safety** | 🟢 8/10 | Strong risk gates, circuit breakers, and Enterprise Health Gate. Robust against hardware/connection failure. |
+| **Intelligence** | 🟡 5/10 | High theoretical intelligence (Ensemble, LSTM). Lacks real-time adaptation to macro events and correlation shifts. |
+| **Differentiation** | 🟡 6/10 | "Pre-trade Intelligence Briefing" is the "North Star" feature, but currently remains a design spec rather than a runtime reality. |
 
-### 3. High-Fidelity Backtesting & Walk-Forward Validation
-- **Score:** 8.0/10
-- **Cost:** L
-- **Strategic Importance:** 8/10
-- **Dependency Readiness:** 🟢 High
-- **Operational Leverage:** Medium
-- **Why:** Moves beyond simple backtests to robust walk-forward optimization, ensuring the model isn't overfitted to historical Gold price action.
+---
 
-### 4. Institutional News & Event Sentiment Filter
-- **Score:** 7.5/10
-- **Cost:** M
-- **Strategic Importance:** 7/10
-- **Dependency Readiness:** 🔴 Low (Requires News API integration)
-- **Operational Leverage:** Medium
-- **Why:** Prevents the bot from entering trades during high-impact economic releases (NFP, FOMC) unless specifically trained for event volatility.
+## 🚀 High Priority (Next 2 Weeks)
 
-## Future Consideration
+### 1. Institutional Intelligence Integration (The "Harmonization" Phase)
+*   **Rationale:** The system has advanced components (`RegimeDetector`, `CapitalAllocator`, `DynamicEnsemble`) sitting idle in `src/`. Integrating these into `main.py` immediately elevates the bot's sophistication.
+*   **Score:** 9.8/10
+*   **Strategic Importance:** 10 | **Cost:** S | **Dependency Readiness:** 🟢 High
+*   **Operational Leverage:** High | **End-User Value:** 9
+*   **Pain Solved:** Eliminates static risk-taking; allows the bot to scale down in ranging markets and scale up in trending ones.
 
-### 5. Multi-Arch Docker Deployment & Cloud Terraform
-- **Score:** 6.5/10
-- **Cost:** L
-- **Strategic Importance:** 6/10
-- **Dependency Readiness:** 🟢 High
-- **Operational Leverage:** Low
-- **Why:** Simplifies the "Day 1" operator experience and ensures consistent performance across ARM64 (Mac/Graviton) and AMD64 environments.
+### 2. Explainable Regime-Aware Decision Cockpit (TUI)
+*   **Rationale:** Uses `src/core/explainability.py` to provide a real-time, terminal-based dashboard (Rich-based) that shows exactly *why* a trade was taken, which model voted for it, and what the current regime context is.
+*   **Score:** 9.2/10
+*   **Strategic Importance:** 9 | **Cost:** M | **Dependency Readiness:** 🟢 High
+*   **Operational Leverage:** Medium | **End-User Value:** 10
+*   **Pain Solved:** Solves the "Black Box" anxiety. Allows operators to trust the bot by seeing its internal "thought process."
+
+---
+
+## 📈 Medium Priority (Weeks 3-4)
+
+### 3. XAUUSD Macro Sensitivity Overlays (FRED/YFinance)
+*   **Rationale:** Gold is driven by Real Yields, USD strength (DXY), and Geopolitics. This feature integrates these macro streams into the feature vector and risk filters.
+*   **Score:** 8.5/10
+*   **Strategic Importance:** 10 | **Cost:** M | **Dependency Readiness:** 🟡 Medium
+*   **Operational Leverage:** High | **End-User Value:** 8
+*   **Pain Solved:** Prevents "technical-only" mistakes during major macro shifts (e.g., sudden yield spikes).
+
+### 4. Advanced Walk-Forward Validation Lab
+*   **Rationale:** Moving from static backtests to a continuous walk-forward optimization framework in `src/research/stress_lab.py`.
+*   **Score:** 8.0/10
+*   **Strategic Importance:** 8 | **Cost:** L | **Dependency Readiness:** 🟢 High
+*   **Operational Leverage:** Medium | **End-User Value:** 7
+*   **Pain Solved:** Protects against model decay and overfitting to historical Gold price action.
+
+---
+
+## 🔭 Future Consideration
+
+### 5. Trade Narrative Memory (LLM-Enhanced Post-Mortem)
+*   **Rationale:** Use an LLM to analyze `trade_logger` data and "Pre-trade Briefings" to generate natural language post-mortems and self-correcting strategy notes.
+*   **Score:** 7.2/10
+*   **Strategic Importance:** 7 | **Cost:** M | **Dependency Readiness:** 🟡 Medium
+*   **Operational Leverage:** Low | **End-User Value:** 8
 
 ### 6. Dreamer V3 World Model Implementation
-- **Score:** 7.0/10
-- **Cost:** XL
-- **Strategic Importance:** 7/10
-- **Dependency Readiness:** 🟡 Medium (Architecture defined, implementation complex)
-- **Operational Leverage:** High (Long-term)
-- **Why:** Adds a predictive world model for planning, potentially increasing the Sharpe ratio by anticipating market shifts rather than just reacting.
+*   **Rationale:** Full transition from model-free RL (PPO) to model-based RL for predictive planning in XAUUSD.
+*   **Score:** 7.0/10
+*   **Strategic Importance:** 7 | **Cost:** XL | **Dependency Readiness:** 🔴 Low
+*   **Operational Leverage:** High (Long-term) | **End-User Value:** 6
