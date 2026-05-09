@@ -399,11 +399,11 @@ def test_detect_revenge_trading(miner):
     revenge = miner.detect_revenge_trading(trades)
     assert len(revenge) == 2
     # First revenge trade: id 2 after id 1 (10 mins, lot increase)
-    assert revenge[0]["trade_id"] == 2
-    assert revenge[0]["lot_increase"] is True
+    assert revenge[0].trade_id == 2
+    assert revenge[0].lot_increase is True
     # Second revenge trade: id 4 after id 3 (5 mins, no lot increase)
-    assert revenge[1]["trade_id"] == 4
-    assert revenge[1]["lot_increase"] is False
+    assert revenge[1].trade_id == 4
+    assert revenge[1].lot_increase is False
 
 
 def test_profitable_patterns_extended(miner):
