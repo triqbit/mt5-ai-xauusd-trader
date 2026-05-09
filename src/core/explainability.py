@@ -25,9 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 class FeatureContribution(BaseModel):
-    """Contribution from a specific feature cluster (e.g., Trend, Volatility, Liquidity)."""
+    """
+    Structured contribution from a specific feature cluster.
+    Provides both quantitative (score) and qualitative (impact, summary) attribution.
+    """
 
-    cluster_name: str = Field(..., description="Name of the feature cluster")
+    cluster_name: str = Field(..., description="Name of the feature cluster (e.g., Trend, Volatility)")
     contribution_score: float = Field(
         ..., description="Normalized contribution score (-1.0 to 1.0)"
     )
@@ -36,7 +39,10 @@ class FeatureContribution(BaseModel):
 
 
 class ModelAttribution(BaseModel):
-    """Breakdown of contributions from individual models within an ensemble."""
+    """
+    Detailed breakdown of an individual model's contribution to the ensemble decision.
+    Tracks alignment, confidence, and relative dominance within the group.
+    """
 
     model_name: str = Field(..., description="Name of the model (e.g., PPO, LSTM)")
     vote: SignalDirection = Field(..., description="The direction voted by this model")
@@ -46,7 +52,10 @@ class ModelAttribution(BaseModel):
 
 
 class RiskAssessment(BaseModel):
-    """Summary of risk management constraints and filters applied to the signal."""
+    """
+    Summary of institutional risk management constraints applied to the signal.
+    Captures rejection reasons, R:R quality, and Kelly-based sizing suggestions.
+    """
 
     passed: bool = Field(..., description="Whether the signal passed all risk filters")
     rejection_reasons: list[str] = Field(
@@ -61,7 +70,10 @@ class RiskAssessment(BaseModel):
 
 
 class RegimeContext(BaseModel):
-    """Market regime context at the time of signal generation."""
+    """
+    Institutional market regime context at the time of signal generation.
+    Decomposes the macro state into regime labels, volatility levels, and strategy favorability.
+    """
 
     regime_name: str = Field(
         "Unknown", description="Detected market regime (e.g., Trending, Ranging)"
@@ -77,9 +89,12 @@ class RegimeContext(BaseModel):
 
 
 class FilterResult(BaseModel):
-    """Result of a specific execution filter (e.g., Spread, Timing, Connectivity)."""
+    """
+    Institutional audit record for an individual execution filter.
+    Captures the pass/fail status along with observed values and their respective thresholds.
+    """
 
-    filter_name: str = Field(..., description="Name of the filter")
+    filter_name: str = Field(..., description="Name of the filter (e.g., Spread, Momentum)")
     passed: bool = Field(..., description="Whether the filter passed")
     value: Any = Field(None, description="Actual value observed")
     threshold: Any = Field(None, description="Threshold value for the filter")
@@ -87,7 +102,10 @@ class FilterResult(BaseModel):
 
 
 class ExecutionSummary(BaseModel):
-    """Summary of execution-level filters applied before signal generation."""
+    """
+    Unified summary of the institutional execution filter cascade.
+    Aggregates results from multiple technical and operational gates before signal release.
+    """
 
     passed: bool = Field(..., description="Whether all execution filters passed")
     filters: list[FilterResult] = Field(default_factory=list, description="Detailed filter results")
@@ -96,8 +114,9 @@ class ExecutionSummary(BaseModel):
 
 class SignalExplanation(BaseModel):
     """
-    Root explanation object for a trade signal.
-    Aggregates execution, model, feature, risk, and regime data into a structured format.
+    Institutional-grade root explanation object for a trade signal.
+    Aggregates execution, model, feature, risk, and regime data into a unified
+    structure suitable for real-time dashboards, post-trade analysis, and regulatory auditing.
     """
 
     signal_id: int | None = Field(None, description="Database ID of the signal")
@@ -131,15 +150,39 @@ class SignalExplanation(BaseModel):
 
 class SignalExplainer:
     """
-    Orchestrator for generating signal explanations.
-    Collects data from various system components and builds a SignalExplanation.
+    Institutional-grade orchestrator for generating trade signal explanations.
+    Collects data from ensemble models, risk managers, execution filters, and
+    regime detectors to produce a unified, auditable attribution object.
     """
 
     FEATURE_MAPPING = {
-        "Trend": ["slope", "ema", "returns", "ht_trendline", "adx"],
-        "Momentum": ["rsi", "mfi", "cci", "mom", "macd", "stoch", "willr", "ultosc"],
-        "Volatility": ["atr", "bb_", "keltner", "range", "ht_dcperiod", "ht_phasor"],
-        "Volume": ["vol", "obv", "vwap", "vpt", "vp_"],
+        "Momentum": [
+            "rsi",
+            "mfi",
+            "cci",
+            "mom",
+            "macd",
+            "stoch",
+            "willr",
+            "ultosc",
+            "returns",
+            "log_returns",
+            "dist_ema",
+            "dist_vwap",
+        ],
+        "Volatility": [
+            "atr",
+            "bb_",
+            "keltner",
+            "range",
+            "ht_dcperiod",
+            "ht_phasor",
+            "ht_sine",
+            "body_size",
+            "day_range",
+        ],
+        "Trend": ["slope", "ema", "adx", "ht_"],
+        "Volume": ["vol", "obv", "vwap", "vpt", "vp_", "rvol", "vol_sma_20"],
         "Patterns": ["pattern_"],
     }
 
