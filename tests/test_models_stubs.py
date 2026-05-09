@@ -92,3 +92,37 @@ def test_trading_env_skeleton():
     assert isinstance(terminated, bool)
     assert isinstance(truncated, bool)
     assert "action" in info
+
+def test_trading_env_hold_action():
+    """Test the HOLD action (0) in TradingEnv."""
+    df = np.zeros((100, 10))
+    # Close price at index 3. Set a trend to see equity changes.
+    df[:, 3] = np.arange(100) * 0.1
+    import pandas as pd
+    df_pd = pd.DataFrame(df)
+
+    env = TradingEnv(df=df_pd, window_size=10)
+    env.reset()
+
+    # 1. Open Long
+    env.step(1)
+    assert env.position == 1
+
+    # 2. Step with HOLD (action 0) should close the position in our implementation
+    obs, reward, terminated, truncated, info = env.step(0)
+    assert env.position == 0
+    assert info["position"] == 0
+
+def test_trading_env_render(caplog):
+    """Test the render method in TradingEnv."""
+    df = np.random.randn(100, 10)
+    import pandas as pd
+    df_pd = pd.DataFrame(df)
+
+    env = TradingEnv(df=df_pd, window_size=10)
+    env.reset()
+
+    with caplog.at_level("INFO"):
+        env.render()
+        assert "Step:" in caplog.text
+        assert "Balance:" in caplog.text

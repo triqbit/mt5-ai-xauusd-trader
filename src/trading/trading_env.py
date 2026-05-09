@@ -216,7 +216,7 @@ class TradingEnv(gym.Env):
         """
         Renders the current state of the environment for debugging.
         """
-        print(
+        self.logger.info(
             f"Step: {self.current_step} | Balance: {self.balance:.2f} | "
             f"Equity: {self.equity:.2f} | Position: {self.position}"
         )

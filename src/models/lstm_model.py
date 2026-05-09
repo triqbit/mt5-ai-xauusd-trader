@@ -166,7 +166,6 @@ class LSTMModel(BaseModel):
     Examples:
         >>> agent = LSTMModel(input_dim=140, use_attention=True)
         >>> signal = agent.predict(np.random.randn(20, 140))
-        >>> print(signal.direction)
     """
 
     def __init__(
@@ -272,11 +271,7 @@ class LSTMModel(BaseModel):
                 x = x.unsqueeze(0)
             elif x.dim() != 3:
                 self.logger.error(f"Expected 2D or 3D input, got {x.dim()}D with shape {x.shape}")
-                return Signal(
-                    direction=SignalDirection.HOLD,
-                    confidence=0.0,
-                    metadata={"error": f"Invalid input shape: {x.shape}"},
-                )
+                raise ValueError(f"Invalid input shape: {x.shape}")
 
             self.model.eval()
             with torch.no_grad():
@@ -297,6 +292,8 @@ class LSTMModel(BaseModel):
 
         except Exception as e:
             self.logger.exception(f"Error during LSTM prediction: {e}")
+            if isinstance(e, ValueError):
+                raise e
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,

@@ -133,11 +133,7 @@ class PPOAgent(BaseModel):
                 obs = np.expand_dims(obs, axis=0)
             elif obs.ndim > 3:
                 self.logger.error(f"Invalid observation shape: {obs.shape}. Expected up to 3 dims.")
-                return Signal(
-                    direction=SignalDirection.HOLD,
-                    confidence=0.0,
-                    metadata={"error": f"Invalid observation shape: {obs.shape}"},
-                )
+                raise ValueError(f"Invalid observation shape: {obs.shape}")
 
             # SB3 predict returns (action, states)
             # deterministic=True is used for production/inference consistency
@@ -192,6 +188,8 @@ class PPOAgent(BaseModel):
 
         except Exception as e:
             self.logger.exception(f"Error during PPO prediction: {e}")
+            if isinstance(e, ValueError):
+                raise e
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
