@@ -723,6 +723,12 @@ Usage Examples:
         help="Number of bars to slide the window per iteration",
     )
     p.add_argument(
+        "--initial-balance",
+        type=float,
+        default=10000.0,
+        help="Simulated starting capital for backtest environment",
+    )
+    p.add_argument(
         "--spread",
         type=float,
         default=0.0001,
@@ -805,7 +811,7 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
 
         engine = BacktestEngine(
             symbol=cfg.symbol,
-            initial_balance=10000.0,
+            initial_balance=args.initial_balance,
             spread=args.spread,
             commission_per_lot=args.commission,
             feature_engineer=feature_engineer,
@@ -1039,7 +1045,7 @@ def main() -> int:
     conf_color = (
         "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
     )
-    summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
+    summary.add_row("Min Confidence:  ", f"[{color}]{cfg.min_confidence:.1%}[/]")
 
     console.print(
         Panel(
@@ -1073,37 +1079,39 @@ def main() -> int:
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
     connector = MT5Connector(cfg)
-    with console.status("[bold green]Connecting to MT5 terminal..."):
-        try:
-            connector.connect()
-        except MT5ConnectionError as exc:
-            # Enhanced connection diagnostics
-            diag = Table.grid(expand=True)
-            diag.add_column(style="cyan", justify="right")
-            diag.add_column(style="white", justify="left")
-            diag.add_row("Broker Server:  ", cfg.mt5_server)
-            diag.add_row("Account Login:  ", str(cfg.mt5_login))
-            diag.add_row("Terminal Path:  ", cfg.mt5_path)
-            diag.add_row("OS Platform:    ", sys.platform)
-            diag.add_row(
-                "MetaAPI Config: ",
-                "Present" if cfg.metaapi_token and cfg.metaapi_account_id else "Missing",
-            )
-
-            console.print(
-                Panel(
-                    diag,
-                    title="[bold red]MT5 Connection Diagnostics[/]",
-                    subtitle="Please verify these settings in your .env file",
-                    border_style="red",
+    # Skip MT5 connection in backtest mode if it might block, but run_backtest needs it.
+    if cfg.mode != "backtest":
+        with console.status("[bold green]Connecting to MT5 terminal..."):
+            try:
+                connector.connect()
+            except MT5ConnectionError as exc:
+                # Enhanced connection diagnostics
+                diag = Table.grid(expand=True)
+                diag.add_column(style="cyan", justify="right")
+                diag.add_column(style="white", justify="left")
+                diag.add_row("Broker Server:  ", cfg.mt5_server)
+                diag.add_row("Account Login:  ", str(cfg.mt5_login))
+                diag.add_row("Terminal Path:  ", cfg.mt5_path)
+                diag.add_row("OS Platform:    ", sys.platform)
+                diag.add_row(
+                    "MetaAPI Config: ",
+                    "Present" if cfg.metaapi_token and cfg.metaapi_account_id else "Missing",
                 )
-            )
-            log.critical(
-                "FAILED TO CONNECT: The system could not establish a session with MetaTrader 5 or MetaAPI.",
-                error=str(exc),
-            )
-            return 1
-    balance = connector.get_account_balance()
+
+                console.print(
+                    Panel(
+                        diag,
+                        title="[bold red]MT5 Connection Diagnostics[/]",
+                        subtitle="Please verify these settings in your .env file",
+                        border_style="red",
+                    )
+                )
+                log.critical(
+                    "FAILED TO CONNECT: The system could not establish a session with MetaTrader 5 or MetaAPI.",
+                    error=str(exc),
+                )
+                return 1
+
     trade_logger = TradeLogger(
         db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
     )
@@ -1112,6 +1120,8 @@ def main() -> int:
     # Enterprise deployments use the FastAPI health app which includes /metrics.
     # However, we keep it for backward compatibility or individual component runs.
     monitor.start_metrics_server()
+    # balance might be 0 if not connected
+    balance = connector.get_account_balance() if connector._is_initialized else args.initial_balance
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
@@ -1166,33 +1176,34 @@ def main() -> int:
     health_checker = init_health_checker(
         cfg, connector, trade_logger, model, audit_logger=audit_logger
     )
-    with console.status("[bold blue]Running health checks..."):
-        try:
-            report = health_checker.startup_gate()
-        except RuntimeError as exc:
-            log.critical(str(exc))
-            # Fetch report directly to show failure state in table
-            report = health_checker.get_full_report()
+    if cfg.mode != "backtest":
+        with console.status("[bold blue]Running health checks..."):
+            try:
+                report = health_checker.startup_gate()
+            except RuntimeError as exc:
+                log.critical(str(exc))
+                # Fetch report directly to show failure state in table
+                report = health_checker.get_full_report()
 
-    table = Table(title="System Health", box=None)
-    table.add_column("Component", style="cyan")
-    table.add_column("Status", justify="center")
-    table.add_column("Message")
-    table.add_column("Suggested Remedy", style="green")
-    for name, comp in report.components.items():
-        color = (
-            "green"
-            if comp.status == HealthStatus.HEALTHY
-            else "yellow"
-            if comp.status == HealthStatus.DEGRADED
-            else "red"
-        )
-        table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy)
-    console.print(table)
+        table = Table(title="System Health", box=None)
+        table.add_column("Component", style="cyan")
+        table.add_column("Status", justify="center")
+        table.add_column("Message")
+        table.add_column("Suggested Remedy", style="green")
+        for name, comp in report.components.items():
+            color = (
+                "green"
+                if comp.status == HealthStatus.HEALTHY
+                else "yellow"
+                if comp.status == HealthStatus.DEGRADED
+                else "red"
+            )
+            table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy)
+        console.print(table)
 
-    if report.status == HealthStatus.FAILED:
-        log.critical("Startup HEALTH CHECK FAILED - Aborting.")
-        return 1
+        if report.status == HealthStatus.FAILED:
+            log.critical("Startup HEALTH CHECK FAILED - Aborting.")
+            return 1
 
     if args.check:
         log.info("Pre-flight check COMPLETE. System is healthy.")
@@ -1255,7 +1266,7 @@ def main() -> int:
                 audit_logger=audit_logger,
             )
         elif cfg.mode == "backtest":
-            connector.disconnect()  # Already connected in run_backtest bridge
+            # If not connected, run_backtest will attempt it
             return run_backtest(args, cfg, feature_engineer, execution_filter, model, console, log)
     finally:
         if audit_logger:
