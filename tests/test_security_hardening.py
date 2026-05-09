@@ -139,3 +139,55 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     permission_errors = [e for e in result.errors if e.field == "FILE_PERMISSION"]
     assert len(permission_errors) > 0
     assert "Insecure permissions" in permission_errors[0].message
+
+def test_safe_pytorch_loading():
+    """
+    Statically analyze the codebase to ensure all torch.load calls
+    include the weights_only=True argument for security.
+    """
+    import ast
+
+    root_dir = Path(__file__).resolve().parents[1]
+    violations = []
+
+    for path in root_dir.rglob("*.py"):
+        if ".git" in str(path) or "venv" in str(path) or "tests" in str(path):
+            continue
+
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                tree = ast.parse(f.read())
+            except SyntaxError:
+                continue
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    # Check for torch.load(...)
+                    is_torch_load = False
+                    if isinstance(node.func, ast.Attribute):
+                        if (isinstance(node.func.value, ast.Name) and
+                            node.func.value.id == "torch" and
+                            node.func.attr == "load"):
+                            is_torch_load = True
+                    elif isinstance(node.func, ast.Name) and node.func.id == "load":
+                        # Could be 'from torch import load'
+                        # For simplicity, we check if weights_only is present if it looks like a load call
+                        # but we prioritize torch.load
+                        pass
+
+                    if is_torch_load:
+                        has_weights_only = False
+                        for keyword in node.keywords:
+                            if keyword.arg == "weights_only":
+                                if (isinstance(keyword.value, ast.Constant) and
+                                    keyword.value.value is True):
+                                    has_weights_only = True
+                                elif (isinstance(keyword.value, ast.NameConstant) and
+                                      keyword.value.value is True):
+                                    # For older python versions
+                                    has_weights_only = True
+
+                        if not has_weights_only:
+                            violations.append(f"{path.relative_to(root_dir)}:{node.lineno}")
+
+    assert not violations, f"Unsafe torch.load calls found in: {violations}. Always use weights_only=True."
