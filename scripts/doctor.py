@@ -70,12 +70,23 @@ CORE_DEPENDENCIES = {
 }
 
 def check_dependencies(dependencies=None):
-    from importlib.metadata import version as get_version
+    try:
+        from importlib.metadata import version as get_version
+    except ImportError:
+        # Fallback for environments where importlib.metadata is problematic in mocks
+        def get_version(name): return "unknown"
+
     deps = dependencies or CORE_DEPENDENCIES
     missing = []
     versions = []
 
-    for display_name, (module_name, min_version) in deps.items():
+    for display_name, val in deps.items():
+        if isinstance(val, tuple):
+            module_name, min_version = val
+        else:
+            module_name = val
+            min_version = "0.0.0"
+
         try:
             __import__(module_name)
             try:

@@ -8,47 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Production-Ready AI Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces, probability extraction, automatic directory creation for persistence, and environment validation. Adheres to strict `BaseModel` interface.
-- **XAUUSD Environment Refinement:** Updated `TradingEnv` with institutional-grade spread/slippage parameters, documentation for reward shaping, and Gymnasium compatibility.
-- **Configuration Security Hardening:** Converted `redis_url` to `SecretStr` in `TradingConfig` to prevent credential leakage in logs and audit snapshots. Integrated deep redaction for sensitive connection strings.
-- **Monitoring & Alerting System:** Comprehensive real-time monitoring in `src/core/monitor.py` including equity curve tracking, Prometheus metrics export, and Telegram bot integration for critical alerts (circuit breakers, margin calls, liquidity crises) and daily performance summaries.
-- **Semantic TUI Visuals:** Enhanced the Decision Support System cockpit with semantic emojis (📈, 📉, ✅, ⚠️, 🛑) and panel icons for improved scannability and accessibility.
-- **Enterprise Core Scaffolding:** Refined `src/` package structure and core modules (`config.py`, `mt5_connector.py`, `risk_engine.py`, `ensemble.py`) to meet institutional enterprise standards with full type hints, docstrings, and unit tests.
-- **Institutional Backtesting Engine:** Implemented a high-performance, vectorized walk-forward backtesting engine in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission) and path-dependent metrics (MAE/MFE).
-- **Backtest Performance Optimization:** Refactored `BacktestEngine` to use O(1) incremental peak tracking for drawdown calculations, eliminating O(N^2) complexity in walk-forward simulations.
-- **Institutional Risk Notifications:** Integrated real-time alerts for circuit breaker triggers, margin calls, account balance mismatches, and liquidity (spread) crises into the primary trading loop.
-- **Automated Daily Performance Summaries:** Added logic to detect day changes and trigger automated Telegram summaries capturing daily P&L and trade counts.
-- **Model Health Monitoring:** Implemented confidence degradation warnings and drift detection alerts to ensure institutional model reliability during live execution.
-- **Vectorized Walk-Forward Backtester:** Implemented high-performance `BacktestEngine` in `src/trading/backtester.py` supporting realistic transaction costs (spread + commission), path-dependent metrics (MAE/MFE), and institutional performance reporting (Sharpe, CAGR, MDD).
-- **Enhanced RL Evaluation Suite:** Advanced institutional metrics including Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio. Improved robustness for regime sensitivity and agent interface integration (SB3, Signal objects).
-- **Vectorized Feature Engineering:** Optimized `FeatureEngineer` by refactoring internal methods to return dictionaries of NumPy arrays and using TA-Lib vectorization (`SMA`, `SUM`, `ROCP`), achieving ~20% overall speedup.
-- **Dependency Parity Guard:** Introduced `scripts/verify_dependencies.py` and `tests/test_verify_dependencies.py` to automate version synchronization checks across environment-specific requirements files.
-- **End-to-End Trace Correlation:** Implemented a unique `trace_id` (UUID) propagation system linking logs, audit trails, and database records (signals/trades) for every iteration of the trading loop.
-- **Institutional Walk-Forward Backtester:** Created a production-grade backtesting engine with strict normalization to prevent look-ahead bias, realistic transaction cost simulation, and institutional metrics (MAE/MFE, Sharpe, CAGR, MDD).
+- No added items in this section.
+
+## [1.1.0-rc7] - 2026-05-09
+
+### Added
+- **Institutional Strategy Benchmarking Framework:** Quantitative framework for comparing AI models against 12+ technical benchmarks.
+- **Enterprise Disaster Recovery Plan:** Automated hourly backup system for trade and audit databases with background integrity verification.
+- **Institutional Walk-Forward Optimization:** Rolling window hyperparameter optimization with robustness scoring and curve-fitting prevention.
+- **High-Fidelity Slippage Simulator:** Refined execution simulation utilizing realized slippage feedback loops.
+- **Production-Ready AI Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces and environment validation.
+- **XAUUSD Environment Refinement:** Updated `TradingEnv` with institutional-grade spread/slippage parameters and Gymnasium compatibility.
+- **Configuration Security Hardening:** Converted sensitive fields to `SecretStr` in `TradingConfig` to prevent credential leakage.
+- **Monitoring & Alerting System:** Comprehensive real-time monitoring including equity curve tracking and Telegram integration.
+- **Semantic TUI Visuals:** Enhanced Decision Support System cockpit with semantic emojis and panel icons.
+- **Enterprise Core Scaffolding:** Refined `src/` package structure and core modules to meet institutional enterprise standards.
+- **Institutional Backtesting Engine:** High-performance, vectorized walk-forward backtesting engine supporting realistic transaction costs.
+- **Enhanced RL Evaluation Suite:** Advanced institutional metrics including Tail Ratio and Common Sense Ratio.
+- **Vectorized Feature Engineering:** Optimized `FeatureEngineer` with TA-Lib vectorization, achieving ~20% speedup.
+- **Dependency Parity Guard:** Automated version synchronization checks across environment-specific requirements files.
+- **End-to-End Trace Correlation:** UUID propagation system linking logs, audit trails, and database records.
 
 ### Changed
-- **CI Dependency Pinning:** Pinned type stub dependencies (`types-redis`, `types-requests`, `types-python-dateutil`, `types-setuptools`, `types-PyYAML`) in `requirements-ci.txt` to stable versions for environment reproducibility and build stability.
-- **Dependency Harmonization:** Aligned core dependencies (`pandas==2.3.2`, `fastapi==0.136.1`, `starlette==0.49.1`) across all environments to resolve security vulnerabilities and satisfy `pandas-ta` requirements.
-- **Hardened Risk Validation:** Tightened startup configuration checks to treat `model_calibration_threshold` breaches (> 0.25) as critical failures, ensuring runtime alignment with `RISK_LIMITS.md`.
+- **CI Dependency Pinning:** Pinned type stub dependencies in `requirements-ci.txt` for environment reproducibility.
+- **Dependency Harmonization:** Aligned core dependencies across all environments to resolve security vulnerabilities.
+- **Black 26.3.1 Migration:** Upgraded code formatter to latest stable version for improved readability and toolchain hygiene.
 
 ### Fixed
-- **CI Pipeline Stabilization:** Resolved over 400 Ruff linting violations and standardized import sorting across the enterprise package.
-- **Package Architecture:** Populated missing `__init__.py` files to stabilize sub-package discovery and exported core interfaces.
-- **Dependency Security:** Harmonized and secured dependencies across all requirements files to resolve `pip-audit` vulnerabilities.
-- **Enterprise Health Monitoring:** Refined the `src/core/health.py` system with robust liveness/readiness probes, multi-layered dependency checks (Database, MT5, Redis, Models, Audit), and a mandatory startup gate.
-- **Deployment Validation Gates:** Implemented a robust pre-deployment validation workflow in `.github/workflows/pre-deploy-validation.yml` to prevent unsafe releases.
-- **Environment Safety Checks:** Enhanced `scripts/validate_env.py` and synchronized `.env.example` to ensure configuration completeness before deployment.
-- **Release Readiness Auditing:** Integrated `scripts/check_release_notes.py` to mandate descriptive changelog entries for all new releases.
+- **CI Pipeline Stabilization:** Resolved Ruff linting violations and standardized import sorting.
+- **Enterprise Health Monitoring:** Refined system with robust liveness/readiness probes and mandatory startup gate.
+- **Deployment Validation Gates:** Implemented robust pre-deployment validation workflow.
 
 ### Security
-- **Safe PyTorch Deserialization:** Enforced `weights_only=True` in all `torch.load` calls across the codebase (including `main.py` and `src/models/lstm_model.py`) to prevent arbitrary code execution (RCE) from untrusted model files.
-- **Security Regression Guard:** Introduced a static analysis test to ensure any future PyTorch model loading points adhere to the `weights_only` security standard.
-
-### Deprecated
-- No deprecated items in this section.
-
-### Removed
-- No removed items in this section.
+- **Safe PyTorch Deserialization:** Enforced `weights_only=True` in all `torch.load` calls to prevent RCE.
 
 ## [1.1.0-rc4] - 2026-05-05
 
