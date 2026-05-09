@@ -189,11 +189,13 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     assert risk_approved is True
 
     drawdown = (risk_manager.peak_equity - risk_manager.balance) / risk_manager.peak_equity
+    # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
+    fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=timezone.utc)
     filter_decision = execution_filter.validate(
         signal,
         df_features,
         current_drawdown=drawdown,
-        timestamp=datetime.now(timezone.utc)
+        timestamp=fixed_timestamp
     )
     assert filter_decision.is_approved is True
 

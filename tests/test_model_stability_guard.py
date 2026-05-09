@@ -26,6 +26,7 @@ def execution_filter(mock_config):
 
 @pytest.fixture
 def valid_signal():
+    # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED errors
     return TradeSignal(
         symbol="XAUUSD",
         direction=1,
@@ -35,7 +36,7 @@ def valid_signal():
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.7,
-        timestamp=datetime.now(UTC)
+        timestamp=datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
     )
 
 @pytest.fixture

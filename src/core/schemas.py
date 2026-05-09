@@ -20,32 +20,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from src.core.constants import SYMBOL_PATTERN, SignalDirection
 
 
-class ExecutionDecision(BaseModel):
-    """
-    Structured result of the execution filter cascade.
-    Enforces technical trust by ensuring every rejection has an explicit reason.
-    """
-
-    signal: "TradeSignal" = Field(..., description="The trade signal being evaluated")
-    is_approved: bool = Field(..., description="Final decision: True if passed all filters")
-    confidence_score: float = Field(
-        ..., ge=0.0, le=1.0, description="Confidence level of the signal"
-    )
-    blocked_by: str | None = Field(
-        None, description="The name of the filter that blocked execution, if any"
-    )
-    trace: dict[str, Any] = Field(
-        default_factory=dict, description="Detailed audit trace of all filter evaluations"
-    )
-
-    @model_validator(mode="after")
-    def validate_rejection_reason(self) -> "ExecutionDecision":
-        """Ensure blocked_by is populated if execution is not approved."""
-        if not self.is_approved and not self.blocked_by:
-            raise ValueError("A blocked decision must provide a 'blocked_by' reason.")
-        return self
-
-
 class TradeSignal(BaseModel):
     """
     Enterprise-grade validated trading signal schema.
@@ -135,4 +109,30 @@ class TradeSignal(BaseModel):
                 raise ValueError(
                     f"SELL Take Profit ({self.take_profit}) must be below Entry Price ({self.entry_price})"
                 )
+        return self
+
+
+class ExecutionDecision(BaseModel):
+    """
+    Structured result of the execution filter cascade.
+    Enforces technical trust by ensuring every rejection has an explicit reason.
+    """
+
+    signal: TradeSignal = Field(..., description="The trade signal being evaluated")
+    is_approved: bool = Field(..., description="Final decision: True if passed all filters")
+    confidence_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Confidence level of the signal"
+    )
+    blocked_by: str | None = Field(
+        None, description="The name of the filter that blocked execution, if any"
+    )
+    trace: dict[str, Any] = Field(
+        default_factory=dict, description="Detailed audit trace of all filter evaluations"
+    )
+
+    @model_validator(mode="after")
+    def validate_rejection_reason(self) -> "ExecutionDecision":
+        """Ensure blocked_by is populated if execution is not approved."""
+        if not self.is_approved and not self.blocked_by:
+            raise ValueError("A blocked decision must provide a 'blocked_by' reason.")
         return self

@@ -36,11 +36,20 @@ Detects default values or placeholder patterns (`YOUR_TOKEN`, `CHANGE_ME`, `YOUR
 - **MAX_LEVERAGE**: Strictly prohibited if greater than 20. Warning if > 10.
 - **MAX_POSITION_SIZE_PCT**: Strictly prohibited if greater than 20%. Warning if > 10%.
 - **MAX_DRAWDOWN**: Strictly prohibited if greater than 40%. Warning if > 30%.
-- **MODEL_DRIFT_THRESHOLD**: Warning if set greater than 0.4 (Recommended: 0.3).
-- **MODEL_ACCURACY_FLOOR**: Strictly prohibited if less than 0.45.
-- **MODEL_WIN_RATE_FLOOR**: Strictly prohibited if less than 0.40.
+- **MODEL_DRIFT_THRESHOLD**: Warning if set greater than 0.3.
+- **MODEL_ACCURACY_FLOOR**: Strictly prohibited if less than 0.50.
+- **MODEL_WIN_RATE_FLOOR**: Strictly prohibited if less than 0.45.
+- **MODEL_CALIBRATION_THRESHOLD**: Strictly prohibited if greater than 0.25.
 
-### 6. Incompatible Settings & Consistency
+### 6. Hierarchies & Operational Limits
+- **Daily Loss Hierarchy**: L1 < L2 < L3 < Max Daily Loss < Hard Stop.
+- **Spread Hierarchy**: Min < Alert < Reduce < Halt.
+- **Margin Hierarchy**: Alert < Halt < Liquidation (utilization percentages).
+- **Volatility Hierarchy**: High < Very High < Extreme thresholds.
+- **MAX_TRADES_PER_DAY**: Limited to 50 per institutional policy.
+- **MIN_LOT_SIZE**: Minimum 0.01 lot to prevent rounding errors.
+
+### 7. Incompatible Settings & Consistency
 - **LOG_LEVEL**: Warning if set to `DEBUG` in `live` mode.
 - **MAX_POSITIONS**: Limited to 5 in `live` mode for safety.
 - **MetaAPI Consistency**: `METAAPI_TOKEN` and `METAAPI_ACCOUNT_ID` must both be provided if either integration parameter is present.
