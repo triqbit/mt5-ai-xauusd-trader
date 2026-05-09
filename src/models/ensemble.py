@@ -24,6 +24,7 @@ try:
 except ImportError:
     torch = None  # type: ignore
 
+from src.core.audit_log import get_audit_logger
 from src.core.constants import SignalDirection
 from src.core.profiler import profile
 from src.models.base_model import BaseModel, Signal
@@ -137,15 +138,38 @@ class EnsembleModel(BaseModel):
         Record market outcome and update dynamic weights.
         This enables autonomous drift monitoring and adaptive rebalancing.
         """
+        old_weights = self.weights.copy()
         for name in self.ALGORITHMS:
             self.dynamic_ensemble.record_outcome(name, actual_direction)
 
         # Update weights based on the new history
         self.dynamic_ensemble.update_weights()
+        new_weights = self.weights
+        health = self.get_health_metrics()
+
+        # Audit the outcome and performance metrics
+        try:
+            audit = get_audit_logger()
+            audit.log_model_outcome(
+                actual_direction=actual_direction.value,
+                metrics=health,
+                context={"per_algo_weights": new_weights},
+            )
+
+            # Log weight rebalancing if they changed significantly
+            if old_weights != new_weights:
+                audit.log_config_change(
+                    old_config={"weights": old_weights},
+                    new_config={"weights": new_weights},
+                    reason="Ensemble weight rebalancing based on observed market outcome",
+                )
+        except (RuntimeError, ImportError):
+            pass
+
         logger.info(
             "Ensemble outcome observed | actual=%s | new_weights=%s",
             actual_direction.name,
-            self.weights,
+            new_weights,
         )
 
     def aggregate_signals(self, signals: Dict[str, Signal], symbol: str = "unknown") -> Signal:

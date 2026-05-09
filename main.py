@@ -308,14 +308,32 @@ def run_live(
                         log.warning("Connection lost. Attempting reconnection...")
                         if monitor:
                             monitor.alert_broker_connection_lost()
+                        if audit_logger:
+                            audit_logger.log_operator_action(
+                                operator="system",
+                                action="connection_lost",
+                                reason="Broker connection lost during trading loop",
+                            )
                         try:
                             connector.connect()
                             log.info("Reconnection successful.")
                             if monitor:
                                 monitor.alert_broker_connection_restored()
+                            if audit_logger:
+                                audit_logger.log_operator_action(
+                                    operator="system",
+                                    action="connection_restored",
+                                    reason="Broker connection restored successfully",
+                                )
                             continue
                         except MT5ConnectionError as reconnect_exc:
                             log.critical("Reconnection failed", error=str(reconnect_exc))
+                            if audit_logger:
+                                audit_logger.log_operator_action(
+                                    operator="system",
+                                    action="reconnection_failed",
+                                    reason=f"Failed to restore broker connection: {reconnect_exc!s}",
+                                )
                             time.sleep(poll_interval)
                             continue
 
@@ -603,7 +621,7 @@ def run_live(
                 log.info("Interrupted by user - shutting down")
                 if audit_logger:
                     audit_logger.log_operator_action(
-                        operator="user", action="shutdown", reason="KeyboardInterrupt"
+                        operator="user", action="shutdown_requested", reason="KeyboardInterrupt"
                     )
                 break
             except MT5ConnectionError as exc:
@@ -982,6 +1000,17 @@ def main() -> int:
         try:
             connector.connect()
         except MT5ConnectionError as exc:
+            if audit_logger:
+                audit_logger.log_operator_action(
+                    operator="system",
+                    action="connection_failure",
+                    reason=f"Failed to connect to MT5/MetaAPI: {exc!s}",
+                    metadata={
+                        "server": cfg.mt5_server,
+                        "login": cfg.mt5_login,
+                        "mode": cfg.mode,
+                    },
+                )
             # Enhanced connection diagnostics
             diag = Table.grid(expand=True)
             diag.add_column(style="cyan", justify="right")
@@ -1130,6 +1159,12 @@ def main() -> int:
     from src import __version__
 
     audit_logger.log_deployment(version=__version__, environment=cfg.mode)
+    audit_logger.log_release_event(
+        version=__version__,
+        event_type="deployed",
+        details=f"System started in {cfg.mode} mode with {cfg.algorithm} algorithm",
+        metadata={"mode": cfg.mode, "algo": cfg.algorithm, "symbol": cfg.symbol},
+    )
     audit_logger.log_operator_action(
         operator="system",
         action="trading_engine_started",

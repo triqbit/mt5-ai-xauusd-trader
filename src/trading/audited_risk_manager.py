@@ -33,20 +33,59 @@ class AuditedRiskManager(RiskManager):
         """
         Run the full 8-layer risk filter cascade.
         Returns True only if ALL layers pass.
-        Logs the full decision chain to the audit log.
+        Logs the full decision chain with metrics to the audit log.
         """
+        # Gather metrics for the audit trail
+        drawdown = (self.peak_equity - self.balance) / self.peak_equity
+        daily_loss_pct = (
+            abs(self.daily.realised_pnl) / self.daily.peak_equity if self.daily.peak_equity > 0 else 0.0
+        )
+        risk_val = abs(signal.entry_price - signal.stop_loss)
+        reward_val = abs(signal.take_profit - signal.entry_price)
+        rr_ratio = reward_val / risk_val if risk_val > 0 else 0.0
+
         decision_chain = {
-            "circuit_breaker": self._check_circuit_breaker(),
-            "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
-            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
-            "min_confidence": self._check_minimum_confidence(signal.confidence),
-            "risk_reward": self._check_risk_reward(signal),
-            "consecutive_losses": self._check_consecutive_losses(),
-            "model_health": self._check_model_health(model_health),
+            "circuit_breaker": {
+                "passed": self._check_circuit_breaker(),
+                "drawdown": float(drawdown),
+                "limit": 0.15,
+            },
+            "daily_loss": {
+                "passed": self._check_daily_loss(),
+                "loss_pct": float(daily_loss_pct),
+                "limit": float(self.cfg.max_daily_loss),
+            },
+            "max_positions": {
+                "passed": self._check_max_positions(),
+                "current": len(self.open_positions),
+                "limit": self.cfg.max_positions,
+            },
+            "symbol_allocation": {
+                "passed": self._check_symbol_allocation(signal.symbol),
+                "symbol": signal.symbol,
+            },
+            "min_confidence": {
+                "passed": self._check_minimum_confidence(signal.confidence),
+                "confidence": float(signal.confidence),
+                "threshold": 0.55,
+            },
+            "risk_reward": {
+                "passed": self._check_risk_reward(signal),
+                "ratio": float(rr_ratio),
+                "threshold": 1.5,
+            },
+            "consecutive_losses": {
+                "passed": self._check_consecutive_losses(),
+                "current": self.daily.consecutive_losses,
+                "limit": self.cfg.max_losing_streak,
+            },
+            "model_health": {
+                "passed": self._check_model_health(model_health),
+                "metrics": model_health,
+            },
         }
 
-        passed = all(decision_chain.values())
+        passed = all(d["passed"] for d in decision_chain.values())
 
         # Log to Audit Trail
         try:
@@ -58,28 +97,28 @@ class AuditedRiskManager(RiskManager):
                 passed=passed,
             )
 
-            # Log high-severity circuit breaker events specifically
-            if not decision_chain.get("circuit_breaker", True):
+            # Log high-severity events specifically
+            if not decision_chain["circuit_breaker"]["passed"]:
                 audit.log_operator_action(
                     operator="system",
                     action="circuit_breaker_triggered",
                     reason=f"Hard drawdown limit hit during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
+                    metadata={"symbol": signal.symbol, "drawdown": float(drawdown)},
                 )
 
-            if not decision_chain.get("daily_loss", True):
+            if not decision_chain["daily_loss"]["passed"]:
                 audit.log_operator_action(
                     operator="system",
                     action="daily_loss_limit_triggered",
                     reason=f"Daily loss limit reached during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
+                    metadata={"symbol": signal.symbol, "loss_pct": float(daily_loss_pct)},
                 )
 
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 
         if not passed:
-            rejection_reasons = [k for k, v in decision_chain.items() if not v]
+            rejection_reasons = [k for k, d in decision_chain.items() if not d["passed"]]
             reason_str = ", ".join(rejection_reasons)
             logger.warning(
                 "Signal REJECTED | %s %s | Failed: %s",
@@ -95,3 +134,28 @@ class AuditedRiskManager(RiskManager):
                     signal_id=signal_id,
                 )
         return passed
+
+    def reset_daily(self) -> None:
+        """
+        Reset daily stats and log a summary to the audit trail.
+        Ensures daily performance is attributable and traceable.
+        """
+        summary = {
+            "realised_pnl": float(self.daily.realised_pnl),
+            "trade_count": int(self.daily.trade_count),
+            "date": str(self.daily.date),
+        }
+
+        # Call parent to send monitor alerts and reset stats
+        super().reset_daily()
+
+        try:
+            audit = get_audit_logger()
+            audit.log(
+                actor="system",
+                action="daily_summary",
+                details=f"Daily summary: PnL={summary['realised_pnl']:.2f}, Trades={summary['trade_count']}",
+                metadata=summary,
+            )
+        except (RuntimeError, ImportError):
+            logger.debug("AuditLogger not available for daily summary logging")
