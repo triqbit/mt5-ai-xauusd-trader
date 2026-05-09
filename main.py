@@ -674,6 +674,7 @@ Usage Examples:
     )
     p.add_argument(
         "--algo",
+        dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
         help="Machine Learning algorithm architecture to use for signal generation.",
     )
@@ -732,7 +733,18 @@ Usage Examples:
         help="Perform comprehensive pre-flight health checks and exit",
     )
     p.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run the system diagnostic tool to verify environment and dependencies",
+    )
+    p.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Display the current sanitized configuration and exit",
+    )
+    p.add_argument(
         "--confirm-live",
+        dest="confirm_live_trading",
         action="store_true",
         help="Explicitly acknowledge and confirm LIVE trading execution",
     )
@@ -742,6 +754,18 @@ Usage Examples:
 def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, log):
     """Bridge for running the walk-forward backtesting engine."""
     from src.trading.backtester import BacktestEngine
+
+    def get_color(metric: str, value: float) -> str:
+        """Apply institutional color-coding based on EXCELLENCE_BLUEPRINT thresholds."""
+        if metric == "sharpe":
+            return "green" if value >= 2.0 else "yellow" if value >= 1.0 else "red"
+        if metric == "pf":
+            return "green" if value >= 2.0 else "yellow" if value >= 1.5 else "red"
+        if metric == "wr":
+            return "green" if value >= 0.55 else "yellow" if value >= 0.45 else "red"
+        if metric == "rf":
+            return "green" if value >= 3.0 else "yellow" if value >= 2.0 else "red"
+        return "white"
 
     start_date = datetime.strptime(args.start, "%Y-%m-%d")
     end_date = datetime.strptime(args.end, "%Y-%m-%d")
@@ -784,11 +808,18 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
         perf_table.add_column("Metric", style="cyan")
         perf_table.add_column("Value", justify="right")
 
+        # Color-coded metrics
+        s_color = get_color("sharpe", bt_report.sharpe_ratio)
+        pf_color = get_color("pf", bt_report.profit_factor)
+        wr_color = get_color("wr", bt_report.win_rate)
+        rf_color = get_color("rf", bt_report.recovery_factor)
+
         perf_table.add_row("Annualized Return", f"{bt_report.annualized_return:.2%}")
-        perf_table.add_row("Sharpe Ratio", f"{bt_report.sharpe_ratio:.2f}")
+        perf_table.add_row("Sharpe Ratio", f"[{s_color}]{bt_report.sharpe_ratio:.2f}[/]")
         perf_table.add_row("Max Drawdown", f"{bt_report.max_drawdown:.2%}")
-        perf_table.add_row("Profit Factor", f"{bt_report.profit_factor:.2f}")
-        perf_table.add_row("Win Rate", f"{bt_report.win_rate:.2%}")
+        perf_table.add_row("Profit Factor", f"[{pf_color}]{bt_report.profit_factor:.2f}[/]")
+        perf_table.add_row("Recovery Factor", f"[{rf_color}]{bt_report.recovery_factor:.2f}[/]")
+        perf_table.add_row("Win Rate", f"[{wr_color}]{bt_report.win_rate:.2%}[/]")
         perf_table.add_row("Total Trades", str(bt_report.total_trades))
         perf_table.add_row("MAE Avg", f"{bt_report.mae_avg:.2f}")
         perf_table.add_row("MFE Avg", f"{bt_report.mfe_avg:.2f}")
@@ -807,25 +838,26 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
 def main() -> int:
     args = parse_args()
 
-    # 1. Dynamic CLI Override Mapping: CLI Arg -> Environment Variable
-    # This ensures CLI > ENV > .env precedence.
-    cli_overrides = {
-        "mode": "MODE",
-        "algo": "ALGORITHM",
-        "symbol": "SYMBOL",
-        "timeframe": "TIMEFRAME",
-        "confirm_live": "CONFIRM_LIVE_TRADING",
-        "log_level": "LOG_LEVEL",
-    }
+    # 0. Immediate Diagnostic Handlers
+    if args.doctor:
+        try:
+            from scripts import doctor
 
+            doctor.main()
+            return 0
+        except Exception as e:
+            print(f"CRITICAL: Failed to run doctor script: {e}")
+            return 1
+
+    # 1. Dynamic CLI Override Mapping
     # Identify explicitly provided arguments to avoid defaults overriding ENV/.env.
     provided_dest = set()
     temp_p = argparse.ArgumentParser(add_help=False)
     temp_p.add_argument("--mode")
-    temp_p.add_argument("--algo")
+    temp_p.add_argument("--algo", dest="algorithm")
     temp_p.add_argument("--symbol")
     temp_p.add_argument("--timeframe")
-    temp_p.add_argument("--confirm-live", action="store_true")
+    temp_p.add_argument("--confirm-live", dest="confirm_live_trading", action="store_true")
     temp_p.add_argument("--log-level", dest="log_level")
 
     for action in temp_p._actions:
@@ -833,15 +865,16 @@ def main() -> int:
             if opt in sys.argv:
                 provided_dest.add(action.dest)
 
-    for arg_name, env_var in cli_overrides.items():
-        if arg_name in provided_dest:
-            val = getattr(args, arg_name, None)
-            if val is not None:
-                if isinstance(val, bool):
-                    if val:  # Only set if True for flags
-                        os.environ[env_var] = "YES" if arg_name == "confirm_live" else str(val)
-                else:
-                    os.environ[env_var] = str(val)
+    # Sync CLI overrides to environment variables for Pydantic to pick up
+    for dest in provided_dest:
+        val = getattr(args, dest, None)
+        if val is not None:
+            env_var = dest.upper()
+            if isinstance(val, bool):
+                if val:  # Only set if True for flags
+                    os.environ[env_var] = "YES" if dest == "confirm_live_trading" else "TRUE"
+            else:
+                os.environ[env_var] = str(val)
 
     # 2. Reset config cache before ANY component uses get_config()
     from src.core.config import get_config
@@ -875,6 +908,38 @@ def main() -> int:
     configure_logging(cfg.log_level)
     log, console = structlog.get_logger("main"), Console()
     get_masking_processor().update_secrets(cfg)
+
+    # 3.1 Handle --show-config
+    if args.show_config:
+        config_table = Table(title="[bold blue]Current System Configuration (Sanitized)[/]", box=None)
+        config_table.add_column("Parameter", style="cyan")
+        config_table.add_column("Value", style="white")
+
+        # Get sanitized dump
+        sanitized_cfg = cfg.model_dump(
+            mode="json",
+            exclude={
+                "mt5_password",
+                "metaapi_token",
+                "metaapi_account_id",
+                "database_url",
+                "redis_url",
+                "telegram_token",
+            },
+        )
+
+        for key, value in sorted(sanitized_cfg.items()):
+            config_table.add_row(key, str(value))
+
+        console.print(
+            Panel(
+                config_table,
+                title="[bold blue]System Config[/]",
+                border_style="blue",
+                expand=False,
+            )
+        )
+        return 0
 
     # Re-verify if it was a Pydantic validation error if we somehow got past get_config()
     # (Pydantic 2.0+ usually raises on instantiation)
