@@ -51,7 +51,7 @@ dash==2.18.2
 plotly==6.0.0
 
 # -- Configuration -------------------------------------------
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 pydantic==2.10.6
 pydantic-settings==2.7.1
 tomli==2.2.1
