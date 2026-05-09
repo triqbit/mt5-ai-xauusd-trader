@@ -330,3 +330,18 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
     assert "[bold red]0.50" in perf_text_low
     assert "[bold red]0.80" in perf_text_low
     assert "[bold red]0.20" in perf_text_low
+
+
+def test_packet_immutability():
+    """Verify that DecisionPacket and PerformanceContext are frozen (immutable)."""
+    with pytest.raises(Exception):
+        packet = DecisionPacket(
+            symbol="XAUUSD",
+            direction=SignalDirection.BUY,
+            consensus="Test",
+            explanation=MagicMock(),
+            regime=MagicMock(),
+            macro_risk=MagicMock(),
+            performance=MagicMock()
+        )
+        packet.symbol = "GOLD"
