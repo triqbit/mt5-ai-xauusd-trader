@@ -3,12 +3,12 @@
 # Reviewers are notified automatically when a PR touches their area.
 #
 # NOTE: Changes to "Sensitive Zones" (Trading, Models, Core) require
-# multi-signature approval from both the domain lead and the Release/Governance lead.
+# multi-signature approval from both the domain lead and the Release/Governance lead (@andonly1348).
 
-# Global Governance & Quality Oversight (Jules03, Jules06)
+# Global Governance & Quality Oversight
 * @andonly1348 @maintainer-quality
 
-# 🔴 SENSITIVE ZONE: Core Infrastructure & Configuration (Jules03, Jules06)
+# 🔴 SENSITIVE ZONE: Core Infrastructure & Configuration
 # Multi-signature required for any change affecting system-wide invariants.
 /src/core/ @andonly1348 @maintainer-quality
 /main.py @andonly1348 @maintainer-quality
@@ -16,31 +16,31 @@
 /alembic.ini @andonly1348
 /.env.example @andonly1348 @xnessom
 
-# 🔴 SENSITIVE ZONE: Trading & Risk Management (Jules01, Jules03)
+# 🔴 SENSITIVE ZONE: Trading & Risk Management
 # Highest sensitivity. Multi-signature mandatory for risk/execution logic.
 /src/trading/ @maintainer-trading @andonly1348
 /src/analytics/ @maintainer-trading
 /src/data/ @maintainer-trading @maintainer-models
 
-# 🔴 SENSITIVE ZONE: AI/ML Model Architectures & Research (Jules04, Jules03)
+# 🔴 SENSITIVE ZONE: AI/ML Model Architectures & Research
 # Multi-signature required for changes to model logic or research environment.
 /src/models/ @maintainer-models @andonly1348
 /src/research/ @maintainer-models
 /src/environment/ @maintainer-models
 
-# 🟡 UTILITY ZONE: Monitoring & Observability (Jules06)
+# 🟡 UTILITY ZONE: Monitoring & Observability
 /src/monitoring/ @maintainer-quality @andonly1348
 
 # 🟡 UTILITY ZONE: Utilities & Shared Helpers
 /src/utils/ @maintainer-quality @andonly1348
 
-# 🛡️ SECURITY & RELEASE: Reliability Enforcement (Jules02, Jules03)
+# 🛡️ SECURITY & RELEASE: Reliability Enforcement
 /.github/workflows/ @andonly1348 @xnessom
 /scripts/ @andonly1348 @xnessom
 /Dockerfile @andonly1348 @xnessom
 /requirements*.txt @xnessom
 
-# 📦 RELEASE: Database Migrations & Schemas (Jules03)
+# 📦 RELEASE: Database Migrations & Schemas
 /migrations/ @andonly1348
 
 # 📖 GOVERNANCE: Documentation & Policies
@@ -49,5 +49,5 @@
 /CHANGELOG.md @andonly1348
 /SECURITY.md @andonly1348 @xnessom
 
-# 🧪 QUALITY: Testing & Quality Assurance (Jules06)
+# 🧪 QUALITY: Testing & Quality Assurance
 /tests/ @maintainer-quality
