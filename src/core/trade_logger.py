@@ -92,7 +92,7 @@ class Trade(Base, AuditMixin):
     __tablename__ = "trades"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    ticket: Mapped[int] = mapped_column(unique=True, index=True)
+    ticket: Mapped[int | None] = mapped_column(Integer, unique=True, index=True, nullable=True)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     direction: Mapped[int] = mapped_column(nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
@@ -100,10 +100,12 @@ class Trade(Base, AuditMixin):
     lot_size: Mapped[float] = mapped_column(Float, nullable=False)
     pnl: Mapped[float] = mapped_column(Float, default=0.0)
     drawdown_impact: Mapped[float | None] = mapped_column(Float)  # impact on total drawdown
+    signal_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     status: Mapped[str] = mapped_column(
         String(20), default="OPEN", index=True
-    )  # OPEN, CLOSED, CANCELLED
+    )  # OPEN, CLOSED, CANCELLED, REJECTED
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
 
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"))
     signal: Mapped["ModelSignal"] = relationship("ModelSignal", back_populates="trade")
@@ -180,7 +182,7 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
     max_drawdown: Mapped[float | None] = mapped_column(Float)
@@ -225,16 +227,19 @@ class TradeLogger:
 
     def log_trade(
         self,
-        ticket: int,
+        ticket: int | None,
         symbol: str,
         direction: int,
         entry_price: float,
         lot_size: float,
         signal_id: int | None = None,
         status: str = "OPEN",
+        signal_source: str | None = None,
+        drawdown_impact: float = 0.0,
+        timestamp: datetime | None = None,
     ) -> int:
-        """Log a trade execution."""
-        # Invalidate cache if a new closed trade is logged (unlikely to be CLOSED immediately but for safety)
+        """Log a trade execution or rejection."""
+        # Invalidate cache if a new closed trade is logged
         if status == "CLOSED":
             self._perf_cache = None
 
@@ -250,8 +255,11 @@ class TradeLogger:
                 entry_price=entry_price,
                 lot_size=lot_size,
                 signal_id=signal_id,
+                signal_source=signal_source,
+                drawdown_impact=drawdown_impact,
                 trace_id=trace_id,
                 status=status,
+                timestamp=timestamp or datetime.now(UTC),
             )
             session.add(trade)
             session.commit()
@@ -288,7 +296,8 @@ class TradeLogger:
                         * trade.lot_size
                         * contract_size
                     )
-                trade.drawdown_impact = drawdown_impact
+                if drawdown_impact != 0.0 or trade.drawdown_impact is None:
+                    trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
                 session.commit()
 

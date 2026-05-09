@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enterprise Trade Logging System:** Implemented a comprehensive logging system in `src/core/trade_logger.py` using SQLAlchemy 2.0 and SQLite. Supports executed and rejected trades, captures `signal_source` and `drawdown_impact`, and provides vectorized performance reporting (Sharpe, Profit Factor, MDD).
 - **Production-Ready AI Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces, probability extraction, automatic directory creation for persistence, and environment validation. Adheres to strict `BaseModel` interface.
 - **XAUUSD Environment Refinement:** Updated `TradingEnv` with institutional-grade spread/slippage parameters, documentation for reward shaping, and Gymnasium compatibility.
 - **Configuration Security Hardening:** Converted `redis_url` to `SecretStr` in `TradingConfig` to prevent credential leakage in logs and audit snapshots. Integrated deep redaction for sensitive connection strings.
