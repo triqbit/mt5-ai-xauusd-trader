@@ -125,6 +125,7 @@ def _prepare_trade_signal(
     risk: RiskManager,
     allocator: CapitalAllocator,
     audit_logger: Optional[AuditLogger] = None,
+    market_data: Optional[pd.DataFrame] = None,
 ) -> TradeSignal:
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -163,6 +164,8 @@ def _prepare_trade_signal(
             win_rate=0.58,
             avg_win=4 * atr,
             avg_loss=2 * atr,
+            confidence=confidence,
+            market_data=market_data,
         )
         if approved_risk > 0
         else 0.0
@@ -395,6 +398,7 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
+                        market_data=df_raw,
                     )
                 lot_size = signal.lot_size
 
@@ -402,7 +406,13 @@ def run_live(
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
                     risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                        risk.approve(
+                            signal,
+                            signal_id=signal_id,
+                            model_health=health,
+                            market_data=df_raw,
+                            regime_info=regime_info,
+                        )
                         if direction != 0
                         else False
                     )

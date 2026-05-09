@@ -11,8 +11,11 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import pandas as pd
+
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
+from src.models.regime_detector import RegimeInfo
 from src.trading.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
@@ -29,9 +32,11 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        market_data: Optional[pd.DataFrame] = None,
+        regime_info: Optional[RegimeInfo] = None,
     ) -> bool:
         """
-        Run the full 8-layer risk filter cascade.
+        Run the full risk filter cascade.
         Returns True only if ALL layers pass.
         Logs the full decision chain to the audit log.
         """
@@ -44,6 +49,8 @@ class AuditedRiskManager(RiskManager):
             "risk_reward": self._check_risk_reward(signal),
             "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
+            "volatility_breaker": self._check_volatility_breaker(market_data),
+            "regime_safety": self._check_regime_safety(signal.confidence, regime_info),
         }
 
         passed = all(decision_chain.values())
