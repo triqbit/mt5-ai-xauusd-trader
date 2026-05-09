@@ -24,7 +24,14 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.config import get_config
-from src.core.trade_logger import ModelSignal, PerformanceMetric, RiskEvent, Trade
+from src.core.trade_logger import (
+    BlockedSignalAnalysis,
+    ExecutionQuality,
+    ModelSignal,
+    PerformanceMetric,
+    RiskEvent,
+    Trade,
+)
 
 # -- Setup Logging ---------------------------------------------------------
 logging.basicConfig(
@@ -212,11 +219,14 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False, archive_dir: Pa
     return count
 
 
-def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR) -> dict:
+def cleanup_database(
+    db_url: str, audit_db_url: str = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR
+) -> dict:
     """Purge old records from the database according to the retention policy."""
     engine = create_engine(db_url)
     # Ensure tables exist (especially for SQLite)
     from src.core.trade_logger import Base as TradeBase
+
     TradeBase.metadata.create_all(engine)
 
     Session = sessionmaker(bind=engine)
@@ -225,6 +235,8 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         "risk_events": 0,
         "performance_metrics": 0,
         "trades": 0,
+        "execution_qualities": 0,
+        "blocked_signal_analysis": 0,
         "audit_log": 0,
     }
 
@@ -238,14 +250,22 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         results["risk_events"] = len(risk_records)
 
         if risk_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_records)} risk events older than {risk_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(risk_records)} risk events older than {risk_cutoff.date()}"
+            )
             if not dry_run:
                 # Archiving risk events (Audit 2-year category, archived before purge)
                 if archive_records(risk_records, "risk_events", archive_dir):
                     # Also archive associated signals before deleting risk events
                     signal_ids = {r.signal_id for r in risk_records if r.signal_id}
                     if signal_ids:
-                        signals_to_archive = session.execute(select(ModelSignal).where(ModelSignal.id.in_(signal_ids))).scalars().all()
+                        signals_to_archive = (
+                            session.execute(
+                                select(ModelSignal).where(ModelSignal.id.in_(signal_ids))
+                            )
+                            .scalars()
+                            .all()
+                        )
                         archive_records(signals_to_archive, "linked_risk_signals", archive_dir)
 
                     # Bulk delete
@@ -254,40 +274,72 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
                 else:
                     logger.error("Skipping deletion of risk events due to archival failure.")
 
-        # 3. Cleanup Performance Metrics (older than 2 years)
+        # 2. Cleanup Performance Metrics (older than 2 years)
         perf_cutoff = now - timedelta(days=RETENTION_PERFORMANCE_METRICS)
         perf_query = select(PerformanceMetric).where(PerformanceMetric.created_at < perf_cutoff)
         perf_records = session.execute(perf_query).scalars().all()
         results["performance_metrics"] = len(perf_records)
 
         if perf_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_records)} performance metrics older than {perf_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(perf_records)} performance metrics older than {perf_cutoff.date()}"
+            )
             if not dry_run:
                 # Archiving performance metrics (Operational 2-year category, archived before purge)
                 if archive_records(perf_records, "performance_metrics", archive_dir):
                     ids_to_delete = [p.id for p in perf_records]
-                    session.execute(delete(PerformanceMetric).where(PerformanceMetric.id.in_(ids_to_delete)))
+                    session.execute(
+                        delete(PerformanceMetric).where(PerformanceMetric.id.in_(ids_to_delete))
+                    )
                 else:
                     logger.error("Skipping deletion of performance metrics due to archival failure.")
 
-        # 4. Cleanup Trades (older than 7 years)
+        # 3. Cleanup Trades (older than 7 years)
         trade_cutoff = now - timedelta(days=RETENTION_TRADES)
         trade_query = select(Trade).where(Trade.created_at < trade_cutoff)
         trade_records = session.execute(trade_query).scalars().all()
         results["trades"] = len(trade_records)
 
         if trade_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_records)} trade records older than {trade_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(trade_records)} trade records older than {trade_cutoff.date()}"
+            )
             if not dry_run:
                 # Mandatory archival for Compliance data
                 if archive_records(trade_records, "trades", archive_dir):
+                    ids_to_delete = [t.id for t in trade_records]
+
+                    # Also archive and delete associated execution quality records
+                    eq_records = (
+                        session.execute(
+                            select(ExecutionQuality).where(
+                                ExecutionQuality.trade_id.in_(ids_to_delete)
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    if eq_records:
+                        archive_records(eq_records, "execution_qualities", archive_dir)
+                        results["execution_qualities"] = len(eq_records)
+                        session.execute(
+                            delete(ExecutionQuality).where(
+                                ExecutionQuality.trade_id.in_(ids_to_delete)
+                            )
+                        )
+
                     # Also archive associated signals before deleting trades
                     signal_ids = {t.signal_id for t in trade_records if t.signal_id}
                     if signal_ids:
-                        signals_to_archive = session.execute(select(ModelSignal).where(ModelSignal.id.in_(signal_ids))).scalars().all()
+                        signals_to_archive = (
+                            session.execute(
+                                select(ModelSignal).where(ModelSignal.id.in_(signal_ids))
+                            )
+                            .scalars()
+                            .all()
+                        )
                         archive_records(signals_to_archive, "linked_signals", archive_dir)
 
-                    ids_to_delete = [t.id for t in trade_records]
                     session.execute(delete(Trade).where(Trade.id.in_(ids_to_delete)))
                 else:
                     logger.error("Skipping deletion of trades due to archival failure.")
@@ -298,8 +350,12 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
 
         # Subqueries for linked signals that are NOT being deleted
         # A signal is "kept" if it's linked to a Trade or RiskEvent that is NOT in the deletion list
-        kept_trade_signals = select(Trade.signal_id).where(Trade.signal_id.is_not(None), Trade.created_at >= trade_cutoff)
-        kept_risk_signals = select(RiskEvent.signal_id).where(RiskEvent.signal_id.is_not(None), RiskEvent.created_at >= risk_cutoff)
+        kept_trade_signals = select(Trade.signal_id).where(
+            Trade.signal_id.is_not(None), Trade.created_at >= trade_cutoff
+        )
+        kept_risk_signals = select(RiskEvent.signal_id).where(
+            RiskEvent.signal_id.is_not(None), RiskEvent.created_at >= risk_cutoff
+        )
 
         unlinked_signals_query = (
             select(ModelSignal)
@@ -312,10 +368,31 @@ def cleanup_database(db_url: str, audit_db_url: str = None, dry_run: bool = Fals
         results["model_signals"] = len(unlinked_records)
 
         if unlinked_records:
-            logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_records)} unlinked signals older than {signal_cutoff.date()}")
+            logger.info(
+                f"{'[DRY RUN] ' if dry_run else ''}Purging {len(unlinked_records)} unlinked signals older than {signal_cutoff.date()}"
+            )
             if not dry_run:
                 # No archival for unlinked signals as per policy (ephemeral)
                 ids_to_delete = [s.id for s in unlinked_records]
+
+                # Cleanup BlockedSignalAnalysis for these signals
+                bsa_records = (
+                    session.execute(
+                        select(BlockedSignalAnalysis).where(
+                            BlockedSignalAnalysis.signal_id.in_(ids_to_delete)
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                if bsa_records:
+                    results["blocked_signal_analysis"] = len(bsa_records)
+                    session.execute(
+                        delete(BlockedSignalAnalysis).where(
+                            BlockedSignalAnalysis.signal_id.in_(ids_to_delete)
+                        )
+                    )
+
                 session.execute(delete(ModelSignal).where(ModelSignal.id.in_(ids_to_delete)))
 
         if not dry_run:
@@ -371,17 +448,16 @@ def main():
     cfg = get_config()
 
     # Determine DB URLs mirroring main.py logic
-    if args.db_url:
-        db_url = args.db_url
-    else:
-        db_val = cfg.database_url.get_secret_value()
-        db_url = db_val if "sqlite" in db_val else "sqlite:///trades.db"
+    db_url = args.db_url or cfg.database_url.get_secret_value()
+    audit_db_url = args.audit_db_url or cfg.database_url.get_secret_value()
 
-    if args.audit_db_url:
-        audit_db_url = args.audit_db_url
-    else:
-        db_val = cfg.database_url.get_secret_value()
-        audit_db_url = db_val if "sqlite" in db_val else "sqlite:///audit.db"
+    # Fallback for SQLite if not fully specified in environment
+    if not args.db_url and "://" not in db_url:
+        db_url = f"sqlite:///{db_url}" if db_url.endswith(".db") else "sqlite:///trades.db"
+    if not args.audit_db_url and "://" not in audit_db_url:
+        audit_db_url = (
+            f"sqlite:///{audit_db_url}" if audit_db_url.endswith(".db") else "sqlite:///audit.db"
+        )
 
     logs_dir = Path(args.logs_dir) if args.logs_dir else cfg.logs_dir
     backtest_dir = Path(args.backtest_dir) if args.backtest_dir else Path(__file__).resolve().parents[1] / "backtest_results"
