@@ -250,21 +250,22 @@ def test_get_full_report(health_checker, mock_config):
         mock_conf.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
         with patch.object(HealthChecker, 'check_disk_space') as mock_disk:
             mock_disk.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+            with patch.object(HealthChecker, 'check_system_resources') as mock_sys:
+                mock_sys.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+                with patch.object(HealthChecker, 'check_redis') as mock_redis:
+                    mock_redis.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
+                    with patch.object(HealthChecker, 'check_audit_log') as mock_audit:
+                        mock_audit.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
 
-            with patch.object(HealthChecker, 'check_redis') as mock_redis:
-                mock_redis.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
-                with patch.object(HealthChecker, 'check_audit_log') as mock_audit:
-                    mock_audit.return_value = ComponentStatus(status=HealthStatus.HEALTHY, message="OK")
-
-                    report = health_checker.get_full_report()
-                    assert isinstance(report, HealthReport)
-                    assert report.status == HealthStatus.HEALTHY
-                    assert report.version == __version__
-                    assert report.environment == mock_config.mode
-                    assert "liveness" in report.components
-                    assert "database" in report.components
-                    assert "redis" in report.components
-                    assert "audit_log" in report.components
+                        report = health_checker.get_full_report()
+                        assert isinstance(report, HealthReport)
+                        assert report.status == HealthStatus.HEALTHY
+                        assert report.version == __version__
+                        assert report.environment == mock_config.mode
+                        assert "liveness" in report.components
+                        assert "database" in report.components
+                        assert "redis" in report.components
+                        assert "audit_log" in report.components
 
 # --- FastAPI Endpoint Tests ---
 
