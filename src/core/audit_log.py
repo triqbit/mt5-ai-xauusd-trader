@@ -144,6 +144,27 @@ class AuditLogger:
             },
         )
 
+    def log_model_outcome(
+        self,
+        actual_direction: int,
+        metrics: dict[str, float],
+        context: dict[str, Any] | None = None,
+    ) -> int:
+        """
+        Log the realized market outcome and resulting model performance metrics.
+        This provides traceability for drift monitoring and algorithm accuracy.
+        """
+        return self.log(
+            actor="model",
+            action="model_outcome",
+            details=f"Model outcome observed: {actual_direction}",
+            metadata={
+                "actual_direction": actual_direction,
+                "metrics": metrics,
+                "context": context,
+            },
+        )
+
     def log_risk_decision(
         self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool
     ) -> int:
@@ -201,9 +222,12 @@ class AuditLogger:
         if metadata:
             combined_metadata.update(metadata)
 
+        # Prefix action with operator_ if not already present, for consistency
+        log_action = f"operator_{action}" if not action.startswith("operator_") else action
+
         return self.log(
             actor=operator,
-            action=f"operator_{action}",
+            action=log_action,
             details=f"Operator action: {action}. Reason: {reason}",
             metadata=combined_metadata,
         )
@@ -215,6 +239,28 @@ class AuditLogger:
             action="deployment",
             details=f"Deployment {version} to {environment}: {status}",
             metadata={"version": version, "environment": environment, "status": status},
+        )
+
+    def log_release_event(
+        self,
+        version: str,
+        event_type: str,
+        details: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        """
+        Log a release deployment event (e.g., release_published, release_deployed).
+        Provides explicit traceability for the release lifecycle.
+        """
+        combined_metadata = {"version": version, "event_type": event_type}
+        if metadata:
+            combined_metadata.update(metadata)
+
+        return self.log(
+            actor="system",
+            action=f"release_{event_type}",
+            details=details or f"Release {version} event: {event_type}",
+            metadata=combined_metadata,
         )
 
     def log_trade_outcome(

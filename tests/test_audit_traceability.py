@@ -74,6 +74,17 @@ def test_log_deployment(audit_logger):
         assert entry.metadata_json["version"] == "1.1.0"
         assert entry.metadata_json["environment"] == "production"
 
+def test_log_release_event(audit_logger):
+    entry_id = audit_logger.log_release_event("2.0.0", "deployed", "Live node active", {"region": "us-east-1"})
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+        assert entry.action == "release_deployed"
+        assert entry.metadata_json["version"] == "2.0.0"
+        assert entry.metadata_json["event_type"] == "deployed"
+        assert entry.metadata_json["region"] == "us-east-1"
+        assert "Live node active" in entry.details
+
 def test_log_trade_outcome(audit_logger):
     metadata = {"entry": 2000.0, "exit": 2010.0}
     entry_id = audit_logger.log_trade_outcome(12345, "XAUUSD", 100.0, "market_close", metadata)
@@ -84,6 +95,18 @@ def test_log_trade_outcome(audit_logger):
         assert entry.metadata_json["ticket"] == 12345
         assert entry.metadata_json["pnl"] == 100.0
         assert entry.metadata_json["context"] == metadata
+
+def test_log_model_outcome(audit_logger):
+    metrics = {"accuracy": 0.85, "drift": 0.05}
+    context = {"per_algo_weights": {"ppo": 0.4, "dreamer": 0.3, "lstm": 0.3}}
+    entry_id = audit_logger.log_model_outcome(1, metrics, context)
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+        assert entry.action == "model_outcome"
+        assert entry.metadata_json["actual_direction"] == 1
+        assert entry.metadata_json["metrics"] == metrics
+        assert entry.metadata_json["context"] == context
 
 def test_log_config_change(audit_logger):
     old = {"MODE": "demo"}
