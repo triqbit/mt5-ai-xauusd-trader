@@ -1,5 +1,5 @@
 # Runbook 05: Failed Deployment Rollback
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 ## Overview
 Safe procedures for reverting a "bad" release. This covers reverting Docker images, rolling back database schema migrations (Alembic), and restoring environment configuration.
@@ -55,6 +55,10 @@ If the release failure was due to invalid environment variables:
   curl -f http://localhost:8000/health/liveness
   curl -f http://localhost:8000/health/readiness
   ```
+- Run the smoke test suite to ensure stability:
+  ```bash
+  python scripts/smoke_test.py
+  ```
 - Monitor the audit trail for "System Startup" events.
 
 ## Expected Outcomes
@@ -66,6 +70,7 @@ If the release failure was due to invalid environment variables:
 - `docker ps | grep xauusd_trader`
 - `docker exec -it xauusd_trader alembic current`
 - `python scripts/smoke_test.py`
+- `python scripts/verify_version_sync.py`
 - `curl -s http://localhost:8000/metrics | grep system_version`
 
 ## Escalation Path

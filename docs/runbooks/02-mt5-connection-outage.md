@@ -1,5 +1,5 @@
 # Runbook 02: MT5 Connection Outage
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 ## Overview
 Procedures for resolving connection failures between the trading bot and MetaTrader 5 (MT5) or the MetaAPI cloud gateway.
@@ -13,6 +13,7 @@ Procedures for resolving connection failures between the trading bot and MetaTra
   - `MetaAPI error: 401 Unauthorized` -> Token rotation needed.
   - `MetaAPI error: 503 Service Unavailable` -> Cloud outage.
 - Verify environment variables in `.env`: `MT5_LOGIN`, `MT5_SERVER`, `MT5_PASSWORD`, `METAAPI_TOKEN`, `METAAPI_ACCOUNT_ID`.
+- Run the environment validation gate: `python scripts/validate_env.py`
 
 ### 2. Recover Local MT5 (Windows Environment)
 - Ensure the MT5 Terminal application is running.
@@ -31,7 +32,7 @@ Procedures for resolving connection failures between the trading bot and MetaTra
   ```
 - Monitor logs to ensure the provisioning process completes:
   ```bash
-  docker logs xauusd_trader --tail 100 | grep "MT5"
+  docker logs xauusd_trader --tail 100 | grep -E "MT5|MetaAPI"
   ```
 
 ### 4. Connection Stability Check
@@ -44,6 +45,10 @@ Procedures for resolving connection failures between the trading bot and MetaTra
   ```bash
   curl -s http://localhost:8000/metrics | grep mt5_connection_status
   ```
+- Run a smoke test to verify all dependencies:
+  ```bash
+  python scripts/smoke_test.py
+  ```
 
 ## Expected Outcomes
 - `scripts/doctor.py` reports `PASSED` for all connectivity checks.
@@ -52,6 +57,8 @@ Procedures for resolving connection failures between the trading bot and MetaTra
 
 ## Verification Commands
 - `python scripts/doctor.py`
+- `python scripts/validate_env.py`
+- `python scripts/smoke_test.py`
 - `curl -i http://localhost:8000/health/readiness`
 - `docker logs xauusd_trader --tail 50`
 

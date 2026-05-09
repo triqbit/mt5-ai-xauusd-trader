@@ -1,12 +1,20 @@
 # Runbook 01: CI Failure Recovery
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 ## Overview
 Standardized procedures for recovering from failures in GitHub Actions workflows (CI, Release, Pre-Deployment Validation). These gates are mandatory "Quality Gates" and must pass before any merge to `main`.
 
 ## Step-by-Step Instructions
 
-### 1. Linting & Type Check Failures
+### 1. Automated Triage (Multi-PR Failure)
+If multiple PRs are failing or the repository state is turbulent, use the triage report tool:
+```bash
+export GITHUB_TOKEN="your_token"
+python scripts/generate_triage_report.py
+```
+- Review `docs/status/PR_TRIAGE_DAILY.md` for a high-level view of repository health and risk levels.
+
+### 2. Linting & Type Check Failures
 - **Symptoms:** `lint` or `type-check` jobs show red cross in PR.
 - **Actions:**
   1. Pull latest changes: `git pull origin <branch>`
@@ -15,7 +23,7 @@ Standardized procedures for recovering from failures in GitHub Actions workflows
   4. Fix all reported errors. Common issues include missing type hints or unused imports.
   5. Commit and push fixes.
 
-### 2. Test & Coverage Failures
+### 3. Test & Coverage Failures
 - **Symptoms:** `test` job fails; Coverage < 85%.
 - **Actions:**
   1. Execute local suite: `python -m pytest tests/`
@@ -25,7 +33,7 @@ Standardized procedures for recovering from failures in GitHub Actions workflows
   5. Add unit or integration tests to reach the 85% mandatory threshold.
   6. Ensure `tests/test_governance_vitals.py` passes if any governance files were moved.
 
-### 3. Security Scan Failures
+### 4. Security Scan Failures
 - **Symptoms:** `security-scan`, `gitleaks`, or `trivy` jobs fail.
 - **Actions:**
   1. **Gitleaks (Secret Detection):** Review the CI log to see which file triggered the alert. **IMMEDIATELY** revoke the leaked secret at the provider and rotate it. Use `git filter-repo` or similar if the secret must be scrubbed from history.
@@ -35,13 +43,14 @@ Standardized procedures for recovering from failures in GitHub Actions workflows
 ## Expected Outcomes
 - All GitHub Actions workflows return a "Success" status.
 - Code matches the repository's excellence standards (PEP8, Type Safety).
-- Production deployment gates (10-gate policy) are unlocked.
+- Production deployment gates (11-gate policy) are unlocked.
 
 ## Verification Commands
 - `ruff check .`
 - `mypy src/ main.py scripts/`
 - `pytest tests/ --cov=src --cov-fail-under=85`
 - `python scripts/verify_version_sync.py` (for release workflows)
+- `ls docs/status/PR_TRIAGE_DAILY.md`
 
 ## Escalation Path
 1. **P2/P3 Failures:** Core Maintainer (@maintainer-quality).

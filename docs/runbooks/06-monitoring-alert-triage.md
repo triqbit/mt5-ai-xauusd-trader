@@ -1,5 +1,5 @@
 # Runbook 06: Monitoring Alert Triage
-**Version:** 1.2 | **Last Updated:** 2026-05-08
+**Version:** 1.3 | **Last Updated:** 2024-05-22
 
 ## Overview
 Defined process for triaging alerts from Telegram and Prometheus/Grafana. This ensures that the most critical events (P0/P1) are addressed with priority to minimize capital risk.
@@ -45,6 +45,7 @@ Defined process for triaging alerts from Telegram and Prometheus/Grafana. This e
    ```bash
    curl -f http://localhost:8000/health/readiness
    python scripts/doctor.py
+   python scripts/smoke_test.py
    ```
 2. Post a brief "Resolved" message in the Telegram channel with the root cause (e.g., "Resolved: MetaAPI Cloud outage restored by provider").
 
@@ -56,6 +57,8 @@ Defined process for triaging alerts from Telegram and Prometheus/Grafana. This e
 
 ## Verification Commands
 - `python scripts/generate_incident_report.py`
+- `python scripts/doctor.py`
+- `python scripts/smoke_test.py`
 - `curl -s http://localhost:8000/health/readiness`
 - `curl -s http://localhost:8000/metrics | grep health_gauges`
 
