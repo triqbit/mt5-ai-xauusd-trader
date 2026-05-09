@@ -133,13 +133,16 @@ jobs:
           MAX_ATTEMPTS=30
           ATTEMPT=1
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            CHECKS=$(gh pr checks $PR_NUMBER --json name,state,conclusion)
-            # Filter out current check and check if any others are not completed
-            INCOMPLETE=$(echo "$CHECKS" | jq -r '.[] | select(.name != "Enforce Auto-Merge Policy" and .state != "COMPLETED") | .name' | wc -l)
+            # Fields available: name, state
+            CHECKS=$(gh pr checks $PR_NUMBER --json name,state)
+
+            # Identify checks that are not yet successful or neutral or skipped
+            # State can be: SUCCESS, FAILURE, PENDING, ERROR, SKIPPED, NEUTRAL
+            INCOMPLETE=$(echo "$CHECKS" | jq -r '.[] | select(.name != "Enforce Auto-Merge Policy" and (.state == "PENDING" or .state == "IN_PROGRESS")) | .name' | wc -l)
 
             if [ "$INCOMPLETE" -eq 0 ]; then
               # All other checks are completed. Now check for failures.
-              FAILED=$(echo "$CHECKS" | jq -r '.[] | select(.name != "Enforce Auto-Merge Policy" and .conclusion != "SUCCESS" and .conclusion != "NEUTRAL")' | wc -l)
+              FAILED=$(echo "$CHECKS" | jq -r '.[] | select(.name != "Enforce Auto-Merge Policy" and .state != "SUCCESS" and .state != "NEUTRAL" and .state != "SKIPPED") | .name' | wc -l)
               if [ "$FAILED" -eq 0 ]; then
                 echo "ci_status=pass" >> $GITHUB_OUTPUT
                 echo "✅ All other CI checks passed."
