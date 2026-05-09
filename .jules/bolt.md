@@ -17,3 +17,7 @@
 ## 2026-05-08 - [Incremental Peak Tracking for Drawdown]
 **Learning:** Calculating peak equity using `max()` on a growing list inside a loop creates an O(N^2) complexity bottleneck. For 50,000 bars, this results in significant slowdowns. Tracking the peak incrementally in O(1) reduces total complexity to O(N).
 **Action:** Always maintain running statistics (max, min, sum) for metrics used inside iterative loops instead of re-scanning historical lists.
+
+## 2026-05-10 - [Eliminating Redundant DataFrame Slicing in Backtest Loops]
+**Learning:** Repeatedly slicing a DataFrame using `.iloc[:idx]` inside a high-frequency loop (e.g., a backtester scanning 50,000+ bars) introduces significant overhead because Pandas creates a new (though often shallow) object and performs index alignment checks on every call. If technical indicators are already precomputed, passing `None` to validation methods can eliminate this $O(N^2)$ slicing pattern entirely.
+**Action:** When precomputing metrics for a loop, ensure the downstream consumers can accept `None` for the raw market data to avoid expensive and redundant slicing operations.

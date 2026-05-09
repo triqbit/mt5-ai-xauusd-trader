@@ -197,3 +197,27 @@ def test_full_cascade_blocked_by_drawdown(filter_engine, buy_signal, bullish_dat
     decision = filter_engine.validate(buy_signal, bullish_data, 0.15, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "DRAWDOWN_LIMIT"
+
+def test_validate_with_precomputed_metrics_only(filter_engine, buy_signal):
+    """Verifies optimization path: validate works with None market_data if metrics are provided."""
+    ts = datetime(2023, 10, 10, 10, 0, 0)
+    precomputed = {
+        "atr_volatility": {"current_atr": 1.0, "avg_atr": 1.0},
+        "trend_angle": {"slope": 1.0},
+        "ema_sequence": {"emas": {8: 104, 21: 103, 50: 102, 200: 101}},
+        "momentum": {"rsi": 60.0},
+    }
+
+    decision = filter_engine.validate(
+        buy_signal,
+        market_data=None,
+        current_drawdown=0.01,
+        timestamp=ts,
+        precomputed_metrics=precomputed
+    )
+
+    assert decision.is_approved is True
+    assert decision.trace["atr_volatility"]["passed"] is True
+    assert decision.trace["trend_angle"]["passed"] is True
+    assert decision.trace["ema_sequence"]["passed"] is True
+    assert decision.trace["momentum"]["passed"] is True
