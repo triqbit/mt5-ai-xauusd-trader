@@ -12,7 +12,7 @@ The `DecisionPacket` is a structured Pydantic model that serves as the single so
 - **Symbol & Direction:** The target asset and the intended trade direction (BUY/SELL/HOLD).
 - **Consensus Level:** A qualitative measure of agreement among the ensemble models (Unanimous, Strong Majority, Mixed, etc.).
 - **Decision Status:** Augmented status level (`EXECUTE`, `CAUTION`, `BLOCKED`) derived from overall decision quality.
-- **Decision Score:** A composite score (0-100) aggregating multiple intelligence dimensions.
+- **Decision Score:** A composite score (0-100) aggregating multiple intelligence dimensions. The score is strictly clamped between 0 and 100 for numerical stability.
 - **Sizing Multiplier:** A recommended scaling factor (0.0-1.0) for position sizing based on risk and confidence.
 - **Execution Status:** A final "Go/No-Go" flag determined by the combined state of all filters.
 - **Blocking Reasons:** A clear list of reasons if a trade is prevented from executing.
@@ -30,6 +30,7 @@ For human operators, the DSS generates a high-fidelity terminal dashboard using 
 - Color-coded status and direction.
 - **Institutional Metric Highlighting:** Sharpe Ratio, Profit Factor, and Recovery Factor are color-coded (Green/Yellow/Red) based on institutional health targets (e.g., Green for Sharpe >= 2.0).
 - Structured panels with descriptive icons for market and performance overviews.
+- **High Conviction Badge:** A `[HIGH CONVICTION] 💎` visual indicator for signals with a decision score of 90 or higher.
 - Detailed macro intelligence including active events and impact scores.
 - Full signal attribution details with model votes and feature impacts.
 
