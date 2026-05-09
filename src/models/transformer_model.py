@@ -20,7 +20,7 @@ from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
 
 
-class TimeSeriesTransformer(BaseModel, nn.Module if nn else object):
+class TimeSeriesTransformer(BaseModel):
     """
     Advanced Transformer model for price action forecasting.
     Input: [batch_size, seq_len, features]
@@ -35,35 +35,48 @@ class TimeSeriesTransformer(BaseModel, nn.Module if nn else object):
         num_layers: int = 4,
         dropout: float = 0.1,
     ):
-        BaseModel.__init__(self)
-        if nn:
-            nn.Module.__init__(self)
-        self.model_dim = model_dim
-        self.pos_encoder = PositionalEncoding(model_dim, dropout)
+        super().__init__()
+        if not nn:
+            self._module = None
+            return
 
-        # Transformer Encoder
-        encoder_layers = nn.TransformerEncoderLayer(
-            d_model=model_dim,
-            nhead=num_heads,
-            dim_feedforward=model_dim * 4,
-            dropout=dropout,
-            batch_first=True,
-        )
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
+        class TransformerModule(nn.Module):
+            def __init__(self, input_dim, model_dim, num_heads, num_layers, dropout):
+                super().__init__()
+                self.model_dim = model_dim
+                self.pos_encoder = PositionalEncoding(model_dim, dropout)
+                encoder_layers = nn.TransformerEncoderLayer(
+                    d_model=model_dim,
+                    nhead=num_heads,
+                    dim_feedforward=model_dim * 4,
+                    dropout=dropout,
+                    batch_first=True,
+                )
+                self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
+                self.input_projection = nn.Linear(input_dim, model_dim)
+                self.decoder = nn.Linear(model_dim, 3)
 
-        # Input and Output Projections
-        self.input_projection = nn.Linear(input_dim, model_dim)
-        self.decoder = nn.Linear(model_dim, 3)  # Output: [Hold, Buy, Sell] probabilities
+            def forward(self, src):
+                src = self.input_projection(src) * math.sqrt(self.model_dim)
+                src = self.pos_encoder(src)
+                output = self.transformer_encoder(src)
+                output = self.decoder(output[:, -1, :])
+                return torch.softmax(output, dim=-1)
+
+        self._module = TransformerModule(input_dim, model_dim, num_heads, num_layers, dropout)
 
     def forward(self, src: Any) -> Any:
-        # src shape: [batch_size, seq_len, input_dim]
-        src = self.input_projection(src) * math.sqrt(self.model_dim)
-        src = self.pos_encoder(src)
-        output = self.transformer_encoder(src)
+        if self._module:
+            return self._module(src)
+        raise RuntimeError("Torch not available")
 
-        # Use only the last time step for classification
-        output = self.decoder(output[:, -1, :])
-        return torch.softmax(output, dim=-1)
+    def eval(self) -> None:
+        if self._module:
+            self._module.eval()
+
+    def load_state_dict(self, state_dict: Any) -> None:
+        if self._module:
+            self._module.load_state_dict(state_dict)
 
     def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """
@@ -76,7 +89,7 @@ class TimeSeriesTransformer(BaseModel, nn.Module if nn else object):
         Returns:
             Signal: Consolidated signal.
         """
-        if not torch or not nn:
+        if not torch or not nn or not self._module:
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,

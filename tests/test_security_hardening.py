@@ -117,6 +117,15 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config.spread_halt_pips = 5.0
     config.max_single_direction_pct = 0.2
     config.max_total_notional_pct = 0.5
+    config.max_trades_per_day = 20
+    config.min_lot_size = 0.01
+    config.confirm_live_trading = "NO"
+    config.margin_alert_pct = 0.7
+    config.margin_halt_pct = 0.8
+    config.margin_liquidation_pct = 0.9
+    config.volatility_high_threshold = 1.5
+    config.volatility_very_high_threshold = 2.0
+    config.volatility_extreme_threshold = 3.0
 
     validator = ConfigValidator(config)
 

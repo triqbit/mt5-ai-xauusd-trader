@@ -243,6 +243,8 @@ class RiskScenarioBuilder:
     ) -> list[TradeSignal]:
         """Generates a sequence of signals likely to hit SL."""
         signals = []
+        # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
+        fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         for i in range(n_signals):
             price = start_price - (i * 10)
             signals.append(
@@ -255,6 +257,7 @@ class RiskScenarioBuilder:
                     lot_size=0.1,
                     algorithm="ensemble",
                     confidence=0.7,
+                    timestamp=fixed_timestamp,
                 )
             )
         return signals
@@ -265,6 +268,8 @@ class RiskScenarioBuilder:
         price: float = 2000.0,
     ) -> list[TradeSignal]:
         """Generates signals representing conflicting model votes."""
+        # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
+        fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         return [
             TradeSignal(
                 symbol=symbol,
@@ -275,6 +280,7 @@ class RiskScenarioBuilder:
                 lot_size=0.1,
                 algorithm="ppo",
                 confidence=0.9,
+                timestamp=fixed_timestamp,
             ),
             TradeSignal(
                 symbol=symbol,
@@ -285,6 +291,7 @@ class RiskScenarioBuilder:
                 lot_size=0.1,
                 algorithm="lstm",
                 confidence=0.8,
+                timestamp=fixed_timestamp,
             ),
         ]
 
@@ -296,6 +303,8 @@ class RiskScenarioBuilder:
     ) -> list[TradeSignal]:
         """Generates signals that, if lost, would breach the daily loss limit."""
         signals = []
+        # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
+        fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         for _ in range(n_losses):
             signals.append(
                 TradeSignal(
@@ -307,6 +316,7 @@ class RiskScenarioBuilder:
                     lot_size=1.0,  # Large lot to amplify PnL impact
                     algorithm="ensemble",
                     confidence=0.8,
+                    timestamp=fixed_timestamp,
                 )
             )
         return signals
@@ -317,6 +327,8 @@ class RiskScenarioBuilder:
         price: float = 2000.0,
     ) -> list[TradeSignal]:
         """Generates signals for testing the 15% peak-to-valley circuit breaker."""
+        # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
+        fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         # A single very large losing trade or multiple trades
         return [
             TradeSignal(
@@ -328,6 +340,7 @@ class RiskScenarioBuilder:
                 lot_size=2.0,
                 algorithm="ensemble",
                 confidence=0.9,
+                timestamp=fixed_timestamp,
             )
         ]
 
@@ -346,6 +359,9 @@ class ExecutionScenarioBuilder:
         df = self.gen.generate(
             n_steps=300, regime="trending", trend_strength=0.0002, volatility=0.0005
         )
+        # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
+        fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
+
         # Ensure enough data for indicators
         signal = TradeSignal(
             symbol=symbol,
@@ -356,6 +372,7 @@ class ExecutionScenarioBuilder:
             lot_size=0.1,
             algorithm="ensemble",
             confidence=0.8,
+            timestamp=fixed_timestamp,
         )
         return signal, df
 
@@ -397,6 +414,8 @@ class ExecutionScenarioBuilder:
     def confidence_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
         """Signal with confidence below threshold (0.4)."""
         signal, df = self.passing_buy(symbol)
+        # Ensure open market time
+        signal.timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         signal.confidence = 0.4
         return signal, df
 
@@ -404,6 +423,8 @@ class ExecutionScenarioBuilder:
         """A sequence of oscillating signals (BUY, SELL, BUY, SELL, ...)."""
         signals = []
         base_price = 2300.0
+        # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
+        fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
         for i in range(10):
             direction = 1 if i % 2 == 0 else -1
             signals.append(
@@ -417,6 +438,7 @@ class ExecutionScenarioBuilder:
                     lot_size=0.1,
                     algorithm="ensemble",
                     confidence=0.7,  # Lower confidence to avoid RSI-like failures, but above 0.6
+                    timestamp=fixed_timestamp,
                 )
             )
         return signals
