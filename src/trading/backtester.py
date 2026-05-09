@@ -301,10 +301,10 @@ class BacktestEngine:
                             }
 
                             # Validate signal through 10-layer filter
-                            # Note: Slicing features up to abs_idx+1 prevents look-ahead bias
+                            # Optimization: market_data=None because we use precomputed_metrics
                             decision = self.ef.validate(
                                 signal,
-                                df_features.iloc[: abs_idx + 1],
+                                market_data=None,
                                 current_drawdown=current_drawdown,
                                 timestamp=bar_time,
                                 precomputed_metrics=precomputed,

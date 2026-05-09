@@ -56,8 +56,8 @@ class ExecutionFilter:
     def validate(
         self,
         signal: TradeSignal,
-        market_data: pd.DataFrame,
-        current_drawdown: float,
+        market_data: pd.DataFrame | None = None,
+        current_drawdown: float = 0.0,
         timestamp: datetime | None = None,
         precomputed_metrics: dict[str, Any] | None = None,
         model_health: dict[str, Any] | None = None,
@@ -70,7 +70,7 @@ class ExecutionFilter:
 
         Args:
             signal: The signal to validate.
-            market_data: DataFrame with OHLCV and technical indicators.
+            market_data: Optional DataFrame with OHLCV and technical indicators.
             current_drawdown: Current account drawdown (0.0 to 1.0).
             timestamp: Evaluation time.
             precomputed_metrics: Optional dictionary containing pre-calculated metrics.
@@ -227,7 +227,7 @@ class ExecutionFilter:
 
     def _check_atr_volatility_with_metrics(
         self,
-        df: pd.DataFrame,
+        df: pd.DataFrame | None,
         threshold: float = 3.0,
         precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
@@ -236,6 +236,8 @@ class ExecutionFilter:
             current_atr = precomputed.get("current_atr", 0.0)
             avg_atr = precomputed.get("avg_atr", 1.0)
         else:
+            if df is None:
+                return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
             if "base_M5_atr" in df.columns:
                 atr = df["base_M5_atr"]
             elif "atr" in df.columns:
@@ -265,7 +267,7 @@ class ExecutionFilter:
 
     def _check_trend_angle_with_metrics(
         self,
-        df: pd.DataFrame,
+        df: pd.DataFrame | None,
         direction: int,
         window: int = 20,
         precomputed: dict[str, Any] | None = None,
@@ -274,6 +276,8 @@ class ExecutionFilter:
         if precomputed:
             slope = precomputed.get("slope", 0.0)
         else:
+            if df is None:
+                return True, {"slope": 0.0, "reason": "No data"}
             ema_col = "base_M5_ema_21"
             if ema_col in df.columns:
                 ema_series = df[ema_col]
@@ -296,7 +300,7 @@ class ExecutionFilter:
 
     def _check_ema_sequence_with_metrics(
         self,
-        df: pd.DataFrame,
+        df: pd.DataFrame | None,
         direction: int,
         precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
@@ -304,6 +308,8 @@ class ExecutionFilter:
         if precomputed:
             emas = precomputed.get("emas", {})
         else:
+            if df is None:
+                return True, {"emas": {}, "direction": direction}
             periods = [8, 21, 50, 200]
             emas = {}
             for p in periods:
@@ -329,7 +335,7 @@ class ExecutionFilter:
 
     def _check_momentum_with_metrics(
         self,
-        df: pd.DataFrame,
+        df: pd.DataFrame | None,
         direction: int,
         precomputed: dict[str, Any] | None = None,
     ) -> tuple[bool, dict[str, Any]]:
@@ -337,6 +343,8 @@ class ExecutionFilter:
         if precomputed:
             rsi = precomputed.get("rsi", 0.0)
         else:
+            if df is None:
+                return True, {"rsi": 50.0}
             col = "base_M5_rsi"
             if col in df.columns:
                 rsi = float(df[col].iloc[-1])
