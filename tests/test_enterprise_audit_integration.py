@@ -126,8 +126,8 @@ def test_enterprise_audit_flow_double_rejection(mock_cfg, audit_logger):
             select(AuditEntry).where(AuditEntry.action == "risk_decision")
         ).scalar_one()
         assert risk_entry.metadata_json["passed"] is False
-        assert risk_entry.metadata_json["decision_chain"]["risk_reward"] is False
-        assert risk_entry.metadata_json["decision_chain"]["circuit_breaker"] is True
+        assert risk_entry.metadata_json["decision_chain"]["risk_reward"]["passed"] is False
+        assert risk_entry.metadata_json["decision_chain"]["circuit_breaker"]["passed"] is True
 
 def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
     """
@@ -193,4 +193,4 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
             select(AuditEntry).where(AuditEntry.action == "risk_decision")
         ).scalar_one()
         assert risk_entry.metadata_json["passed"] is False
-        assert risk_entry.metadata_json["decision_chain"]["risk_reward"] is False
+        assert risk_entry.metadata_json["decision_chain"]["risk_reward"]["passed"] is False

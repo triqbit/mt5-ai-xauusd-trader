@@ -121,7 +121,7 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     ]
     mock_explanation.risk_assessment.risk_reward_ratio = 3.0
     mock_regime.confidence = 1.0
-    mock_macro_risk.risk_multiplier = 1.0
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
 
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     assert packet.decision_score == 100.0  # (1.0*40) + (1.0*30) + (20 + 10)
@@ -135,7 +135,7 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     ]
     mock_regime.confidence = 0.5
     mock_explanation.risk_assessment.risk_reward_ratio = 1.0  # (1/3)*20 = 6.66
-    mock_macro_risk.risk_multiplier = 0.5  # 0.5*10 = 5
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.5})  # 0.5*10 = 5
 
     # Consensus score: 0.5 * 40 = 20
     # Regime score: 0.5 * 30 = 15
@@ -161,7 +161,7 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     ]
     mock_regime.confidence = 1.0
     mock_explanation.risk_assessment.risk_reward_ratio = 3.0
-    mock_macro_risk.risk_multiplier = 0.25  # Severe reduction but not blocked
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.25})  # Severe reduction but not blocked
 
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     # Score: 40 (Consensus) + 30 (Regime) + 20 (R:R) + 2.5 (Macro Safety) = 92.5
@@ -213,8 +213,7 @@ def test_consensus_logic():
 
 def test_assemble_packet_blocked_by_macro(mock_explanation, mock_regime, mock_macro_risk):
     dss = DecisionSupportSystem()
-    mock_macro_risk.is_blocked = True
-    mock_macro_risk.reason = "Blocked by FOMC"
+    mock_macro_risk = mock_macro_risk.model_copy(update={"is_blocked": True, "reason": "Blocked by FOMC"})
 
     packet = dss.assemble_packet(
         symbol="XAUUSD",

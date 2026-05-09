@@ -102,7 +102,11 @@ def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
         ]
         for layer in expected_layers:
             assert layer in decision_chain
-            assert decision_chain[layer] is True
+            # In the audited manager, each layer is now a dict with metrics
+            if isinstance(decision_chain[layer], dict):
+                assert decision_chain[layer]["passed"] is True
+            else:
+                assert decision_chain[layer] is True
 
 def test_monitor_calibration_alert(mock_config):
     """Verify that Monitor alerts on high calibration error."""

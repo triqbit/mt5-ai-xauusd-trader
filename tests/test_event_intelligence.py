@@ -63,7 +63,8 @@ def test_risk_status_blocking(now):
 
     assert status.is_blocked is True
     assert "CPI Data" in status.reason
-    assert status.risk_multiplier == 0.5
+    # If blocked, risk_multiplier must be 0.0 per RiskStatus validator
+    assert status.risk_multiplier == 0.0
 
 def test_risk_status_critical_blocking(now):
     events = [
@@ -97,8 +98,8 @@ def test_risk_status_cooldown(now):
 
     status = intel.get_risk_status(now)
     assert status.is_blocked is True
-    # NFP is a major event, so it gets a stricter multiplier (0.25)
-    assert status.risk_multiplier == 0.25
+    # NFP is a major event, but since it is blocked, multiplier must be 0.0
+    assert status.risk_multiplier == 0.0
     assert len(status.active_events) == 1
     assert status.active_events[0].name == "Past NFP"
 
@@ -154,7 +155,7 @@ def test_fallback_behavior_with_cache(now):
 
     assert status.is_blocked is True
     assert "Cached Event" in status.reason
-    assert status.risk_multiplier == 0.5
+    assert status.risk_multiplier == 0.0
 
 def test_ongoing_event(now):
     events = [
@@ -171,7 +172,7 @@ def test_ongoing_event(now):
 
     status = intel.get_risk_status(now)
     assert status.is_blocked is True
-    assert status.risk_multiplier == 0.5
+    assert status.risk_multiplier == 0.0
     assert any(e.name == "Geopolitical Crisis" for e in status.active_events)
 
 def test_json_provider(tmp_path, now):
@@ -296,11 +297,11 @@ def test_macro_event_properties(now):
         name="Test",
         category=EventCategory.OTHER,
         impact=EventImpact.HIGH,
-        timestamp=now
+        timestamp=now,
+        end_timestamp=now + timedelta(hours=1)
     )
     assert event.is_high_impact is True
 
-    event.end_timestamp = now + timedelta(hours=1)
     assert event.is_ongoing(now + timedelta(minutes=30)) is True
     assert event.is_ongoing(now - timedelta(minutes=1)) is False
 

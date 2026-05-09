@@ -45,47 +45,59 @@ class AuditedRiskManager(RiskManager):
         rr_ratio = reward_val / risk_val if risk_val > 0 else 0.0
 
         decision_chain = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+            "consecutive_losses": self._check_consecutive_losses(),
+            "model_health": self._check_model_health(model_health),
+        }
+
+        # Detailed metrics for audit logging
+        audit_decision_chain = {
             "circuit_breaker": {
-                "passed": self._check_circuit_breaker(),
+                "passed": decision_chain["circuit_breaker"],
                 "drawdown": float(drawdown),
                 "limit": 0.15,
             },
             "daily_loss": {
-                "passed": self._check_daily_loss(),
+                "passed": decision_chain["daily_loss"],
                 "loss_pct": float(daily_loss_pct),
                 "limit": float(self.cfg.max_daily_loss),
             },
             "max_positions": {
-                "passed": self._check_max_positions(),
+                "passed": decision_chain["max_positions"],
                 "current": len(self.open_positions),
                 "limit": self.cfg.max_positions,
             },
             "symbol_allocation": {
-                "passed": self._check_symbol_allocation(signal.symbol),
+                "passed": decision_chain["symbol_allocation"],
                 "symbol": signal.symbol,
             },
             "min_confidence": {
-                "passed": self._check_minimum_confidence(signal.confidence),
+                "passed": decision_chain["min_confidence"],
                 "confidence": float(signal.confidence),
                 "threshold": 0.55,
             },
             "risk_reward": {
-                "passed": self._check_risk_reward(signal),
+                "passed": decision_chain["risk_reward"],
                 "ratio": float(rr_ratio),
                 "threshold": 1.5,
             },
             "consecutive_losses": {
-                "passed": self._check_consecutive_losses(),
+                "passed": decision_chain["consecutive_losses"],
                 "current": self.daily.consecutive_losses,
                 "limit": self.cfg.max_losing_streak,
             },
             "model_health": {
-                "passed": self._check_model_health(model_health),
+                "passed": decision_chain["model_health"],
                 "metrics": model_health,
             },
         }
 
-        passed = all(d["passed"] for d in decision_chain.values())
+        passed = all(decision_chain.values())
 
         # Log to Audit Trail
         try:
@@ -93,12 +105,12 @@ class AuditedRiskManager(RiskManager):
             audit.log_risk_decision(
                 symbol=signal.symbol,
                 direction=signal.direction,
-                decision_chain=decision_chain,
+                decision_chain=audit_decision_chain,
                 passed=passed,
             )
 
             # Log high-severity events specifically
-            if not decision_chain["circuit_breaker"]["passed"]:
+            if not decision_chain["circuit_breaker"]:
                 audit.log_operator_action(
                     operator="system",
                     action="circuit_breaker_triggered",
@@ -106,7 +118,7 @@ class AuditedRiskManager(RiskManager):
                     metadata={"symbol": signal.symbol, "drawdown": float(drawdown)},
                 )
 
-            if not decision_chain["daily_loss"]["passed"]:
+            if not decision_chain["daily_loss"]:
                 audit.log_operator_action(
                     operator="system",
                     action="daily_loss_limit_triggered",
@@ -118,7 +130,7 @@ class AuditedRiskManager(RiskManager):
             logger.debug("AuditLogger not available for risk decision logging")
 
         if not passed:
-            rejection_reasons = [k for k, d in decision_chain.items() if not d["passed"]]
+            rejection_reasons = [k for k, v in decision_chain.items() if not v]
             reason_str = ", ".join(rejection_reasons)
             logger.warning(
                 "Signal REJECTED | %s %s | Failed: %s",

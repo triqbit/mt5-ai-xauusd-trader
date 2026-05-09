@@ -145,7 +145,8 @@ def test_stricter_major_event_multipliers(now):
     provider.get_upcoming_events.return_value = [event_generic]
     intel_generic = EventIntelligence([provider])
     status_generic = intel_generic.get_risk_status(now)
-    assert status_generic.risk_multiplier == 0.5
+    # Generic HIGH impact blocks at 30m, now is 5m pre-event -> blocked, so 0.0
+    assert status_generic.risk_multiplier == 0.0
 
     # Major HIGH impact
     event_major = MacroEvent(
@@ -158,7 +159,8 @@ def test_stricter_major_event_multipliers(now):
     provider_major.get_upcoming_events.return_value = [event_major]
     intel_major = EventIntelligence([provider_major])
     status_major = intel_major.get_risk_status(now)
-    assert status_major.risk_multiplier == 0.25
+    # FOMC blocks at 60m pre-event -> now is 5m pre-event -> blocked, so 0.0
+    assert status_major.risk_multiplier == 0.0
 
 @patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
 def test_metaapi_provider_unsupported_impact(mock_init_session, now):

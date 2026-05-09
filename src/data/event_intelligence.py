@@ -539,7 +539,12 @@ class EventIntelligence:
                         event_mult, 0.0 if event.impact == EventImpact.CRITICAL else 0.25
                     )
 
-                min_multiplier = min(min_multiplier, event_mult)
+            # Technical trust: if is_event_blocking is True, the multiplier MUST be 0.0
+            # for this event to satisfy RiskStatus validation in event_models.py
+            if is_event_blocking:
+                event_mult = 0.0
+
+            min_multiplier = min(min_multiplier, event_mult)
 
         reason = None
         if is_blocked:
