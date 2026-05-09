@@ -6,6 +6,7 @@ This directory serves as the central repository for all technical audits, perfor
 
 | Report | Description | Status |
 | :--- | :--- | :--- |
+| [**walkforward_verification_report.md**](./walkforward_verification_report.md) | Institutional Walk-Forward Optimization and strategy robustness report. | ✅ Verified |
 | **ALIGNMENT_REPORT.md** | Strategy-to-code alignment and agent coordination audit. | ⏳ Upcoming |
 | **PERFORMANCE_COMPLEXITY_REPORT.md** | Runtime efficiency and computational complexity analysis. | ⏳ Upcoming |
 | **ENTERPRISE_EVIDENCE_SCORECARD.md** | Compliance with institutional engineering standards. | ⏳ Upcoming |

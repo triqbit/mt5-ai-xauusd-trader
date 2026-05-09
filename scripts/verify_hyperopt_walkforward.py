@@ -104,7 +104,7 @@ def run_verification():
     reporter = ResearchReporter()
 
     # Save results
-    report_path = "walkforward_verification_report.md"
+    report_path = "docs/audits/walkforward_verification_report.md"
     reporter.save_markdown(report, report_path)
     logger.info(f"Report saved to {report_path}")
 
