@@ -72,13 +72,18 @@ class TradingConfig(BaseSettings):
 
     # ── Risk Parameters (per RISK_LIMITS.md) ──────────────────────────────────
     max_positions: int = Field(
-        default=5, ge=1, le=10, description="Maximum number of concurrent open positions permitted"
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum number of concurrent open positions permitted",
+        validation_alias="MAX_POSITIONS",
     )
     risk_per_trade: float = Field(
         default=0.01,
         ge=0.001,
         le=0.02,
         description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)",
+        validation_alias="RISK_PER_TRADE",
     )
     max_position_size_pct: float = Field(
         default=0.10, description="Max Position Size: 10% of account equity per trade"
@@ -95,6 +100,10 @@ class TradingConfig(BaseSettings):
     )
     margin_liquidation_pct: float = Field(default=0.90, description="Automatic close at 90% margin")
     max_drawdown: float = Field(default=0.30, description="Max Equity Drawdown (30%)")
+    drawdown_lvl1: float = Field(default=0.10, description="Level 1 Alert: 10% drawdown")
+    drawdown_lvl2: float = Field(default=0.15, description="Level 2: 15% drawdown -> 75% size")
+    drawdown_lvl3: float = Field(default=0.20, description="Level 3: 20% drawdown -> 50% size")
+    drawdown_lvl4: float = Field(default=0.25, description="Level 4: 25% drawdown -> Halt entries")
 
     # Daily Limits (Cascading)
     max_daily_loss: float = Field(
@@ -151,10 +160,12 @@ class TradingConfig(BaseSettings):
     database_url: SecretStr = Field(
         default="postgresql://trader:password@localhost:5432/mt5_trades",
         description="SQLAlchemy-compatible connection string for the primary database",
+        validation_alias="DATABASE_URL",
     )
     redis_url: SecretStr = Field(
         default="redis://localhost:6379/0",
         description="Connection URL for the Redis instance used for caching/queuing",
+        validation_alias="REDIS_URL",
     )
 
     # ── Monitoring ──────────────────────────────────────────────────────────
@@ -168,10 +179,14 @@ class TradingConfig(BaseSettings):
         default="INFO", description="Granularity of application logs (DEBUG, INFO, WARNING, ERROR)"
     )
     telegram_token: SecretStr = Field(
-        default="", description="Access token for the Telegram Bot API for real-time alerts"
+        default="",
+        description="Access token for the Telegram Bot API for real-time alerts",
+        validation_alias="TELEGRAM_TOKEN",
     )
     telegram_chat_id: str = Field(
-        default="", description="Telegram Chat ID or Group ID where alerts will be sent"
+        default="",
+        description="Telegram Chat ID or Group ID where alerts will be sent",
+        validation_alias="TELEGRAM_CHAT_ID",
     )
     confirm_live_trading: str = Field(
         default="",
