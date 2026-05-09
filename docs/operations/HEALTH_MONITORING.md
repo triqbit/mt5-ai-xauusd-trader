@@ -44,3 +44,11 @@ The system exports health status for all components as Gauges:
 ## 6. Audit Trail Integration
 
 All health gate transitions (Success, Warning, Failure) are recorded in the `audit_log` table for compliance and incident post-mortems.
+
+## 7. Structured Observability
+
+To ensure high-fidelity failure attribution and trace correlation, critical path components use structured logging via `structlog`:
+
+- **Circuit Breaker**: Transitions between `CLOSED`, `OPEN`, and `HALF_OPEN` states are logged with full context (name, failure counts, and errors).
+- **MT5 Connector**: All connection attempts, data retrieval failures, and order execution events are logged with structured fields (server, login, error codes, tickets).
+- **Trace Correlation**: Every log entry generated during a trading cycle iteration includes a unique `trace_id` for end-to-end debugging.
