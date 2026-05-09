@@ -11,7 +11,15 @@ from sqlalchemy.pool import StaticPool
 
 from scripts.data_cleanup import cleanup_backtests, cleanup_database, cleanup_logs
 from src.core.audit_log import AuditEntry, Base as AuditBase
-from src.core.trade_logger import Base, ModelSignal, PerformanceMetric, RiskEvent, Trade
+from src.core.trade_logger import (
+    Base,
+    BlockedSignalAnalysis,
+    ExecutionQuality,
+    ModelSignal,
+    PerformanceMetric,
+    RiskEvent,
+    Trade,
+)
 
 
 class TestDataCleanup(unittest.TestCase):
@@ -126,11 +134,40 @@ class TestDataCleanup(unittest.TestCase):
 
             # 7. Old Trade (older than 7 years, should be purged)
             very_old_trade = Trade(
-                ticket=999, symbol="XAUUSD", direction=1, entry_price=1000.0,
-                lot_size=0.1, created_at=now - timedelta(days=3000)
+                ticket=999,
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=1000.0,
+                lot_size=0.1,
+                created_at=now - timedelta(days=3000),
+            )
+            session.add(very_old_trade)
+            session.flush()
+
+            # 8. Execution Quality for very old trade (should be purged)
+            old_eq = ExecutionQuality(
+                trade_id=very_old_trade.id,
+                slippage_pips=0.5,
+                execution_latency_ms=25.0,
+                fill_quality_score=0.9,
+                edge_capture=0.1,
+                timing_efficiency=0.8,
+                alpha_decay_pips=0.0,
+                execution_cost_pips=0.2,
+                created_at=now - timedelta(days=3000),
             )
 
-            # 8. Audit Log entries
+            # 9. Blocked Signal Analysis for old unlinked signal (should be purged)
+            old_bsa = BlockedSignalAnalysis(
+                signal_id=old_unlinked.id,
+                opportunity_cost_pnl=50.0,
+                max_favorable_excursion=10.0,
+                max_adverse_excursion=2.0,
+                would_have_won=True,
+                created_at=now - timedelta(days=100),
+            )
+
+            # 10. Audit Log entries
             old_audit = AuditEntry(
                 actor="system", action="config_change", created_at=now - timedelta(days=3000)
             )
@@ -138,13 +175,15 @@ class TestDataCleanup(unittest.TestCase):
                 actor="system", action="startup", created_at=now - timedelta(days=10)
             )
 
-            session.add_all([trade, old_risk, new_risk, old_perf, very_old_trade, old_audit, new_audit])
+            session.add_all([trade, old_risk, new_risk, old_perf, old_eq, old_bsa, old_audit, new_audit])
             session.commit()
 
             # Capture IDs while session is still open
             new_unlinked_id = new_unlinked.id
             old_linked_id = old_linked.id
             old_unlinked_id = old_unlinked.id
+            old_eq_id = old_eq.id
+            old_bsa_id = old_bsa.id
 
         # Run cleanup on the in-memory DB
         # We need to monkeypatch create_engine or pass the engine
@@ -157,10 +196,12 @@ class TestDataCleanup(unittest.TestCase):
         finally:
             scripts.data_cleanup.create_engine = original_create_engine
 
-        self.assertEqual(results["model_signals"], 1) # only old_unlinked
-        self.assertEqual(results["risk_events"], 1)    # only old_risk
+        self.assertEqual(results["model_signals"], 1)  # only old_unlinked
+        self.assertEqual(results["risk_events"], 1)  # only old_risk
         self.assertEqual(results["performance_metrics"], 1)
-        self.assertEqual(results["trades"], 1) # very_old_trade
+        self.assertEqual(results["trades"], 1)  # very_old_trade
+        self.assertEqual(results["execution_qualities"], 1)
+        self.assertEqual(results["blocked_signal_analysis"], 1)
         self.assertEqual(results["audit_log"], 1)
 
         with self.Session() as session:
@@ -173,6 +214,12 @@ class TestDataCleanup(unittest.TestCase):
             trades = session.execute(select(Trade)).scalars().all()
             self.assertEqual(len(trades), 1)
             self.assertEqual(trades[0].ticket, 123)
+
+            eqs = session.execute(select(ExecutionQuality)).scalars().all()
+            self.assertEqual(len(eqs), 0)
+
+            bsas = session.execute(select(BlockedSignalAnalysis)).scalars().all()
+            self.assertEqual(len(bsas), 0)
 
             audit_entries = session.execute(select(AuditEntry)).scalars().all()
             self.assertEqual(len(audit_entries), 1)

@@ -8,10 +8,12 @@ This policy defines the retention periods and disposal procedures for operationa
 | Data Category | Data Type | Retention Period | Disposal Method | Reason |
 |---------------|-----------|------------------|-----------------|--------|
 | **Compliance** | Trade Records (`trades` table) | 7 Years | Archival + Purge | Regulatory Requirement |
+| **Compliance** | Execution Quality (`execution_qualities`) | 7 Years | Archival + Purge | Execution Analytics |
 | **Audit** | Audit Log (`audit_log` table) | 7 Years | Archival + Purge | Enterprise Traceability |
-| **Audit** | Risk Events (`risk_events` table) | 2 Years | Purge | Operational Auditing |
+| **Audit** | Risk Events (`risk_events` table) | 2 Years | Archival + Purge | Operational Auditing |
 | **Audit** | Linked Model Signals | 7 Years | Archival + Purge | Trade Traceability |
 | **Operational** | Unlinked Model Signals | 90 Days | Purge | Performance Tuning |
+| **Operational** | Blocked Signal Analysis | 90 Days | Purge | Opportunity Cost |
 | **Operational** | Performance Metrics | 2 Years | Archival + Purge | Trend Analysis |
 | **Diagnostics** | Application Logs (`logs/*.log`) | 90 Days | Deletion | Troubleshooting |
 | **Research** | Backtest Results | 1 Year | Archival + Deletion | Optimization |
@@ -21,6 +23,7 @@ This policy defines the retention periods and disposal procedures for operationa
 ### 3.1 Audit-Critical Data (Preserve)
 The following data must be preserved for the full 7-year compliance window:
 - **Trade Records**: All fields in the `trades` table, including tickets, symbols, prices, and PnL.
+- **Execution Quality**: High-precision execution analytics linked to each trade record.
 - **Audit Log**: System actions, configuration changes, and operator events in the `audit_log` table.
 - **Linked Signals**: Any `model_signals` record referenced by a `trade` record via `signal_id` OR a `risk_event` record via `signal_id`.
 
@@ -28,6 +31,8 @@ The following data must be preserved for the full 7-year compliance window:
 To maintain referential integrity and auditability:
 - A `model_signals` record is considered "Linked" if it is associated with at least one `trade` or `risk_event`.
 - Linked signals inherit the maximum retention period of their associated records (e.g., 7 years if linked to a trade).
+- `ExecutionQuality` records are linked to `Trade` and inherit its 7-year retention.
+- `BlockedSignalAnalysis` records are linked to `ModelSignal` and inherit the signal's retention (typically 90 days unless linked to a risk event).
 - When a parent record (Trade/RiskEvent) is purged, the cleanup script must verify if the associated signal is still required by another active record before deletion.
 
 ### 3.3 Ephemeral Data (Rotate/Purge)
@@ -60,6 +65,6 @@ The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a
 The primary mechanism for enforcement is the `scripts/data_cleanup.py` tool. It uses the `database_url` and `logs_dir` from the system configuration to target the correct data stores.
 
 ---
-**Version**: 1.3.1
-**Effective Date**: 2026-05-24
+**Version**: 1.4.0
+**Effective Date**: 2024-05-22
 **Owner**: Release Reliability & Governance (Jules03)
