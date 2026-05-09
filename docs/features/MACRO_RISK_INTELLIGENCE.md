@@ -4,12 +4,12 @@
 The `EventIntelligence` module (located in `src/data/event_intelligence.py`) provides institutional-grade macroeconomic event awareness for the XAUUSD trading system. It ingests, normalizes, and analyzes high-impact events to manage trading risk.
 
 ## Key Features
-- **Sophisticated Event Modeling:** Uses `MacroEvent` Pydantic models to represent economic releases, rate decisions, and geopolitical windows.
+- **Sophisticated Event Modeling:** Uses `MacroEvent` Pydantic models to represent economic releases, rate decisions, and geopolitical windows. Ingests richer data including `actual`, `forecast`, and `previous` values for enhanced signal attribution.
 - **Duration-Based Events:** Supports ongoing events (e.g., FOMC press conferences) via `end_timestamp`.
 - **Category-Specific Windows:** Implements specialized risk windows for major events (FOMC, NFP, RATES), providing wider pre-event and post-event (cooldown) coverage.
 - **Risk Multipliers:** Calculates a `risk_multiplier` to reduce position sizes during elevated risk periods.
 - **Execution Blocking:** Automatically identifies when trading should be strictly prohibited due to critical events.
-- **Enterprise-Grade Resilience:** Features an internal caching mechanism and robust fallback logic that maintains "elevated risk awareness" even if external data providers fail.
+- **Enterprise-Grade Resilience:** Features an internal caching mechanism and robust fallback logic that maintains "elevated risk awareness" even if external data providers fail. The system implements a "merge-and-prune" cache strategy, ensuring that new data from one provider doesn't overwrite still-relevant data from others.
 - **Advanced Categorization:** Utilizes keyword-based intelligence to identify geopolitical risks (e.g., "TENSION") and key USD macro drivers (e.g., "TREASURY") beyond standard economic calendar classifications.
 - **Timezone Safety:** Standardizes all event processing on timezone-aware UTC datetimes to prevent synchronization bugs.
 

@@ -235,6 +235,9 @@ class MetaAPIEventProvider(BaseEventProvider):
                         category=category,
                         impact=impact,
                         timestamp=ts,
+                        actual=item.get("actual"),
+                        forecast=item.get("forecast"),
+                        previous=item.get("previous"),
                     )
                 )
             return macro_events
@@ -251,16 +254,23 @@ class MetaAPIEventProvider(BaseEventProvider):
     def _guess_category(self, name: str) -> EventCategory:
         """Guesses the event category based on the event name."""
         name_upper = name.upper()
-        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE"]):
+        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI"]):
             return EventCategory.CPI
         if any(
             kw in name_upper
-            for kw in ["NON-FARM PAYROLL", "NFP", "UNEMPLOYMENT", "EMPLOYMENT", "JOBLESS"]
+            for kw in [
+                "NON-FARM PAYROLL",
+                "NFP",
+                "UNEMPLOYMENT",
+                "EMPLOYMENT",
+                "JOBLESS",
+                "JOBLESS CLAIMS",
+            ]
         ):
             return EventCategory.NFP
         if any(
             kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT"]
-        ):
+        ) and "PHILLY FED" not in name_upper:
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
@@ -268,7 +278,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                 kw in name_upper
                 for kw in ["DECISION", "STATEMENT", "MINUTES", "PRESS CONFERENCE", "TARGET"]
             )
-        ) or "FUNDS RATE" in name_upper:
+        ) or any(kw in name_upper for kw in ["FUNDS RATE", "MONETARY POLICY"]):
             return EventCategory.RATES
         if any(
             kw in name_upper
@@ -301,6 +311,10 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "HOUSING STARTS",
                 "MANUFACTURING",
                 "CENTRAL BANK",
+                "TRADE BALANCE",
+                "FACTORY ORDERS",
+                "EMPIRE STATE",
+                "PHILLY FED",
             ]
         ):
             return EventCategory.USD_MACRO
@@ -346,6 +360,7 @@ class EventIntelligence:
     def refresh(self, current_time: datetime | None = None) -> None:
         """
         Force a refresh of event data from all providers.
+        Merges newly fetched events into the cache instead of overwriting.
         """
         now = current_time or datetime.now(UTC)
         if now.tzinfo is None:
@@ -353,26 +368,38 @@ class EventIntelligence:
 
         max_pre = max(self.pre_event_minutes.values())
         max_post = max(self.post_event_minutes.values())
+
+        # Major event minimum windows
+        max_pre = max(max_pre, 120)
+        max_post = max(max_post, 180)
+
         start_lookback = now - timedelta(minutes=max_post + 1440)
         end_lookahead = now + timedelta(minutes=max_pre + 1440)
 
-        events: list[MacroEvent] = []
+        new_events: list[MacroEvent] = []
         any_success = False
         for provider in self.providers:
             try:
                 provider_events = provider.get_upcoming_events(start_lookback, end_lookahead)
-                events.extend(provider_events)
-                any_success = True
+                if provider_events is not None:
+                    new_events.extend(provider_events)
+                    any_success = True
             except Exception as e:
                 logger.error(f"Provider {provider.__class__.__name__} failed during refresh: {e}")
 
         if any_success:
-            unique_events = {}
-            for e in events:
-                key = (e.name, e.timestamp)
-                if key not in unique_events:
-                    unique_events[key] = e
-            self._cached_events = list(unique_events.values())
+            # Use a dictionary for merging to preserve uniqueness and prevent data loss
+            # from temporarily failing providers.
+            unique_events = {(e.name, e.timestamp): e for e in self._cached_events}
+            for e in new_events:
+                unique_events[(e.name, e.timestamp)] = e
+
+            # Filter out stale events from cache to keep it performant
+            stale_threshold = now - timedelta(days=2)
+            self._cached_events = [
+                e for e in unique_events.values()
+                if (e.end_timestamp or e.timestamp) >= stale_threshold
+            ]
             self._last_successful_fetch = now
 
     def get_risk_status(self, current_time: datetime | None = None) -> RiskStatus:
@@ -391,48 +418,22 @@ class EventIntelligence:
             or not self._cached_events
         )
 
+        if needs_refresh:
+            self.refresh(now)
+
+        # Re-verify if fetch failed completely and we have no cache
+        all_fetch_failed = self._last_successful_fetch is None or (
+            needs_refresh and (now - self._last_successful_fetch) > timedelta(seconds=1)
+        )
+
         # Look ahead and behind based on max windows
         max_pre = max(self.pre_event_minutes.values())
         max_post = max(self.post_event_minutes.values())
-
-        # Also consider major event minimum windows (120m pre, 180m post)
         max_pre = max(max_pre, 120)
         max_post = max(max_post, 180)
 
-        # Extend windows for long-duration events
-        start_lookback = now - timedelta(minutes=max_post + 1440)  # +1 day for long events
+        start_lookback = now - timedelta(minutes=max_post + 1440)
         end_lookahead = now + timedelta(minutes=max_pre + 1440)
-
-        all_fetch_failed = False
-        if needs_refresh:
-            events: list[MacroEvent] = []
-            any_success = False
-
-            for provider in self.providers:
-                try:
-                    provider_events = provider.get_upcoming_events(start_lookback, end_lookahead)
-                    if provider_events is not None:
-                        events.extend(provider_events)
-                        any_success = True
-                except Exception as e:
-                    logger.error(
-                        f"Provider {provider.__class__.__name__} failed to fetch events: {e}"
-                    )
-
-            if any_success:
-                # De-duplicate events by name and timestamp
-                unique_events = {}
-                for e in events:
-                    key = (e.name, e.timestamp)
-                    if key not in unique_events:
-                        unique_events[key] = e
-                self._cached_events = list(unique_events.values())
-                self._last_successful_fetch = now
-            else:
-                all_fetch_failed = True
-                logger.warning(
-                    "All providers failed or no events found during refresh. Using cache."
-                )
 
         # Always filter the cache for the current relevant window
         events = [
