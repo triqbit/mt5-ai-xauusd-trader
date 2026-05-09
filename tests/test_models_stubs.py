@@ -22,6 +22,48 @@ def test_ppo_agent_stub():
     assert signal.confidence == 0.0
     assert "error" in signal.metadata
 
+def test_ppo_agent_train_missing_env():
+    """Test PPOAgent.train() raises RuntimeError when env is missing."""
+    agent = PPOAgent()
+    # Mocking model to be non-None but env to be None
+    from unittest.mock import MagicMock
+    agent.model = MagicMock()
+    agent.model.get_env.return_value = None
+
+    with pytest.raises(RuntimeError, match="No environment set"):
+        agent.train(total_timesteps=100)
+
+def test_agent_save_directory_creation(tmp_path):
+    """Test that save() automatically creates parent directories for all agents."""
+    save_dir = tmp_path / "deep" / "nested" / "path"
+
+    # 1. PPOAgent
+    ppo_agent = PPOAgent()
+    from unittest.mock import MagicMock
+    ppo_agent.model = MagicMock()
+    ppo_path = save_dir / "ppo_model.zip"
+    ppo_agent.save(ppo_path)
+    assert save_dir.exists()
+    ppo_agent.model.save.assert_called_once()
+
+    # 2. LSTMModel
+    lstm_agent = LSTMModel(input_dim=10)
+    if lstm_agent.model is not None:
+        lstm_path = save_dir / "lstm_model.pt"
+        # We need to mock torch.save to avoid actual file write errors
+        import torch
+        from unittest.mock import patch
+        with patch("torch.save") as mock_save:
+            lstm_agent.save(lstm_path)
+            assert save_dir.exists()
+            mock_save.assert_called_once()
+
+    # 3. DreamerAgent
+    dreamer_agent = DreamerAgent()
+    dreamer_path = save_dir / "dreamer_model.pt"
+    dreamer_agent.save(dreamer_path)
+    assert save_dir.exists()
+
 def test_lstm_model_stub():
     """Test LSTMModel initialization and prediction behavior."""
     agent = LSTMModel(input_dim=10)
