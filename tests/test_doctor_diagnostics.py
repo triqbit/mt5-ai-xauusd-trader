@@ -25,19 +25,29 @@ def test_check_python_version():
 
 def test_check_dependencies_success():
     """Verify dependency check passes when all modules exist."""
-    with patch("builtins.__import__", return_value=None):
-        res = doctor.check_dependencies(dependencies={"Test": "test_mod"})
+    original_import = __import__
+
+    def side_effect(name, *args, **kwargs):
+        if name == "test_mod":
+            return MagicMock()
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=side_effect):
+        res = doctor.check_dependencies(dependencies={"Test": ("test_mod", "1.0.0")})
         assert res.status == "OK"
+
 
 def test_check_dependencies_failure():
     """Verify dependency check fails when modules are missing."""
+    original_import = __import__
+
     def side_effect(name, *args, **kwargs):
         if name == "non_existent_module":
             raise ImportError(f"No module named '{name}'")
-        return None
+        return original_import(name, *args, **kwargs)
 
     with patch("builtins.__import__", side_effect=side_effect):
-        res = doctor.check_dependencies(dependencies={"Display": "non_existent_module"})
+        res = doctor.check_dependencies(dependencies={"Display": ("non_existent_module", "1.0.0")})
         assert res.status == "FAILED"
         assert "Display" in res.message
 

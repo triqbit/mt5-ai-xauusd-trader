@@ -283,9 +283,11 @@ class CapitalAllocator:
         # Sort requests by strategy performance multiplier (descending)
         sorted_requests = sorted(
             requests,
-            key=lambda r: self.strategies.get(r.strategy_id).performance_multiplier
-            if r.strategy_id in self.strategies
-            else 0.0,
+            key=lambda r: (
+                self.strategies.get(r.strategy_id).performance_multiplier
+                if r.strategy_id in self.strategies
+                else 0.0
+            ),
             reverse=True,
         )
 

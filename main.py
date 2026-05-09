@@ -929,7 +929,9 @@ def main() -> int:
 
     # 3.1 Handle --show-config
     if args.show_config:
-        config_table = Table(title="[bold blue]Current System Configuration (Sanitized)[/]", box=None)
+        config_table = Table(
+            title="[bold blue]Current System Configuration (Sanitized)[/]", box=None
+        )
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="white")
 
@@ -1154,7 +1156,9 @@ def main() -> int:
         # Standard input_dim is 140 for the current feature engineer
         model = TimeSeriesTransformer(input_dim=140)
         if torch and transformer_path.exists():
-            model.load_state_dict(torch.load(transformer_path, map_location="cpu", weights_only=True))
+            model.load_state_dict(
+                torch.load(transformer_path, map_location="cpu", weights_only=True)
+            )
     else:
         # This branch should rarely be hit if Literal choices are enforced by Pydantic
         log.warning(

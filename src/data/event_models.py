@@ -103,7 +103,11 @@ class MacroEvent(BaseModel):
                 ets = ets.replace(tzinfo=UTC)
             data["end_timestamp"] = ets
 
-        if data.get("end_timestamp") and data.get("timestamp") and data["end_timestamp"] <= data["timestamp"]:
+        if (
+            data.get("end_timestamp")
+            and data.get("timestamp")
+            and data["end_timestamp"] <= data["timestamp"]
+        ):
             raise ValueError(
                 f"end_timestamp ({data['end_timestamp']}) must be after timestamp ({data['timestamp']})"
             )

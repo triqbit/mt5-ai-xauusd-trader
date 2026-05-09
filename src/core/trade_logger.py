@@ -125,7 +125,9 @@ class BlockedSignalAnalysis(Base, AuditMixin):
     __tablename__ = "blocked_signal_analysis"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    signal_id: Mapped[int] = mapped_column(ForeignKey("model_signals.id"), nullable=False, unique=True)
+    signal_id: Mapped[int] = mapped_column(
+        ForeignKey("model_signals.id"), nullable=False, unique=True
+    )
 
     opportunity_cost_pnl: Mapped[float] = mapped_column(Float, nullable=False)
     max_favorable_excursion: Mapped[float] = mapped_column(Float, nullable=False)
