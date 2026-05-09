@@ -63,3 +63,6 @@ for session in report.session_analysis:
     if session.is_overtrading:
         print(f"Overtrading detected in {session.session_name}")
 ```
+
+## Analytical Motifs
+The JournalMiner detects early-warning motifs that frequently precede drawdowns, allowing for proactive strategy damping.
