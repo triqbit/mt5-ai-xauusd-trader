@@ -130,6 +130,9 @@ class TradingConfig(BaseSettings):
     spread_alert_pips: float = Field(default=1.0, description="Alert if spread >1.0 pip")
     spread_reduce_pips: float = Field(default=1.5, description="Reduce if spread >1.5 pips")
     spread_halt_pips: float = Field(default=2.0, description="Halt if spread >2.0 pips")
+    execution_latency_threshold: float = Field(
+        default=1.0, description="Max allowed execution latency in seconds before alerting"
+    )
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
