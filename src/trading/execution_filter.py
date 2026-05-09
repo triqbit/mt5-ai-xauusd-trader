@@ -29,17 +29,18 @@ logger = logging.getLogger(__name__)
 class ExecutionFilter:
     """
     Implements a 10-layer validation cascade for trading signals.
-    Layers:
-        1. ATR Volatility Threshold
-        2. Trend Angle Confirmation
-        3. EMA Sequence Check
-        4. Momentum Filter
-        5. Session/Time Filter
-        6. Drawdown Circuit Breaker
-        7. Model Stability (Drift/Accuracy)
-        8. Performance Floor (Win Rate)
-        9. Confidence Threshold
-        10. Signal Consistency (Flicker Guard)
+    Primary layers as per README.md and documentation:
+        1. ATR Volatility Threshold (ATR_VOLATILITY)
+        2. Trend Angle Confirmation (TREND_ANGLE)
+        3. EMA Sequence Check (EMA_SEQUENCE)
+        4. Momentum Filter (MOMENTUM)
+        5. Session/Time Filter (SESSION_CLOSED)
+        6. Drawdown Circuit Breaker (DRAWDOWN_LIMIT)
+    Additional enterprise layers:
+        7. Model Stability Guard (MODEL_STABILITY)
+        8. Performance Floor (PERFORMANCE_FLOOR)
+        9. Confidence Threshold (CONFIDENCE_THRESHOLD)
+        10. Signal Consistency (SIGNAL_CONSISTENCY)
     """
 
     def __init__(
@@ -48,9 +49,17 @@ class ExecutionFilter:
         rsi_period: int = 14,
         config: TradingConfig | None = None,
     ):
+        """
+        Initialize the execution filter.
+
+        Args:
+            max_drawdown: Drawdown threshold for the circuit breaker (default 0.12).
+            rsi_period: Period for RSI momentum calculation.
+            config: Optional TradingConfig for overrides.
+        """
+        self.cfg = config
         self.max_drawdown = max_drawdown
         self.rsi_period = rsi_period
-        self.cfg = config
         self._signal_history: dict[str, deque[int]] = {}
 
     def validate(
@@ -65,7 +74,7 @@ class ExecutionFilter:
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 10-layer filter cascade.
+        Run the full filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -75,7 +84,7 @@ class ExecutionFilter:
             timestamp: Evaluation time.
             precomputed_metrics: Optional dictionary containing pre-calculated metrics.
             model_health: Optional model health metrics.
-            trade_logger: Optional trade logger for win rate check.
+            trade_logger: Optional trade logger for performance check.
         """
         if timestamp is None:
             timestamp = signal.timestamp or datetime.now(UTC)
@@ -84,8 +93,9 @@ class ExecutionFilter:
         metrics = precomputed_metrics or {}
 
         # Layer 1: ATR Volatility
+        atr_threshold = self.cfg.volatility_extreme_threshold if self.cfg else 3.0
         atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(
-            market_data, precomputed=metrics.get("atr_volatility")
+            market_data, threshold=atr_threshold, precomputed=metrics.get("atr_volatility")
         )
         trace["atr_volatility"] = {
             "passed": bool(atr_passed),
@@ -164,17 +174,24 @@ class ExecutionFilter:
         if trade_logger:
             perf = trade_logger.read_performance_report()
             win_rate = perf.get("win_rate", 1.0)
+            total_trades = perf.get("total_trades", 0)
             win_rate_floor = self.cfg.model_win_rate_floor if self.cfg else 0.45
-            perf_passed = win_rate >= win_rate_floor
+            # Apply performance floor only after a minimum number of trades
+            if total_trades >= 20:
+                perf_passed = win_rate >= win_rate_floor
+            else:
+                perf_passed = True
+
             perf_trace = {
                 "passed": bool(perf_passed),
                 "win_rate": win_rate,
                 "win_rate_floor": win_rate_floor,
+                "total_trades": total_trades,
             }
         trace["performance_floor"] = perf_trace
 
         # Layer 9: Confidence Threshold
-        min_confidence = self.cfg.min_confidence if self.cfg else 0.6
+        min_confidence = self.cfg.min_confidence if self.cfg else 0.55
         confidence_passed = signal.confidence >= min_confidence
         trace["confidence_threshold"] = {
             "passed": bool(confidence_passed),
@@ -221,10 +238,6 @@ class ExecutionFilter:
             trace=trace,
         )
 
-    def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
-        passed, _ = self._check_atr_volatility_with_metrics(df, threshold)
-        return bool(passed)
-
     def _check_atr_volatility_with_metrics(
         self,
         df: pd.DataFrame,
@@ -236,10 +249,9 @@ class ExecutionFilter:
             current_atr = precomputed.get("current_atr", 0.0)
             avg_atr = precomputed.get("avg_atr", 1.0)
         else:
-            if "base_M5_atr" in df.columns:
-                atr = df["base_M5_atr"]
-            elif "atr" in df.columns:
-                atr = df["atr"]
+            atr_col = "base_M5_atr" if "base_M5_atr" in df.columns else "atr"
+            if atr_col in df.columns:
+                atr_series = df[atr_col]
             else:
                 if len(df) < 15:
                     return True, {"current_atr": 0.0, "avg_atr": 0.0, "ratio": 0.0}
@@ -248,9 +260,10 @@ class ExecutionFilter:
                     [high - low, (high - close.shift(1)).abs(), (low - close.shift(1)).abs()],
                     axis=1,
                 ).max(axis=1)
-                atr = tr.rolling(window=14).mean()
-            current_atr = float(atr.iloc[-1])
-            avg_atr = float(atr.rolling(window=100).mean().iloc[-1])
+                atr_series = tr.rolling(window=14).mean()
+
+            current_atr = float(atr_series.iloc[-1])
+            avg_atr = float(atr_series.rolling(window=100).mean().iloc[-1])
 
         if np.isnan(current_atr) or np.isnan(avg_atr) or avg_atr == 0:
             return True, {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": 0.0}
@@ -258,10 +271,6 @@ class ExecutionFilter:
         ratio = current_atr / avg_atr
         passed = ratio <= threshold
         return bool(passed), {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": ratio}
-
-    def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
-        passed, _ = self._check_trend_angle_with_metrics(df, direction, window)
-        return bool(passed)
 
     def _check_trend_angle_with_metrics(
         self,
@@ -281,6 +290,7 @@ class ExecutionFilter:
                 ema_series = df["close"].iloc[-(window + 50) :].ewm(span=21, adjust=False).mean()
             else:
                 return True, {"slope": 0.0, "reason": "No data"}
+
             target_ema = ema_series.iloc[-window:]
             if len(target_ema) < window:
                 return True, {"slope": 0.0, "reason": "Insufficient data"}
@@ -289,10 +299,6 @@ class ExecutionFilter:
 
         passed = (direction > 0 and slope > 0) or (direction < 0 and slope < 0)
         return bool(passed), {"slope": float(slope), "direction": direction}
-
-    def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
-        passed, _ = self._check_ema_sequence_with_metrics(df, direction)
-        return bool(passed)
 
     def _check_ema_sequence_with_metrics(
         self,
@@ -323,10 +329,6 @@ class ExecutionFilter:
             passed = False
         return bool(passed), {"emas": emas, "direction": direction}
 
-    def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
-        passed, _ = self._check_momentum_with_metrics(df, direction)
-        return bool(passed)
-
     def _check_momentum_with_metrics(
         self,
         df: pd.DataFrame,
@@ -345,7 +347,8 @@ class ExecutionFilter:
                 gain = (delta.where(delta > 0, 0)).rolling(window=self.rsi_period).mean()
                 loss = (-delta.where(delta < 0, 0)).rolling(window=self.rsi_period).mean()
                 rs = gain / (loss + 1e-8)
-                rsi = float(100 - (100 / (1 + rs)).iloc[-1])
+                rsi_series = 100 - (100 / (1 + rs))
+                rsi = float(rsi_series.iloc[-1])
 
         if np.isnan(rsi):
             return True, {"rsi": 50.0}
@@ -355,33 +358,38 @@ class ExecutionFilter:
     def _check_session_time(self, timestamp: datetime) -> bool:
         """Blocks outside institutional hours (Sun 17:00 - Fri 16:00 GMT)."""
         wd, hr = timestamp.weekday(), timestamp.hour
-        if wd == 5:
+        if wd == 5:  # Saturday
             return False
-        if wd == 6:
+        if wd == 6:  # Sunday
             return hr >= 17
-        if wd == 4:
+        if wd == 4:  # Friday
             return hr < 16
         return True
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
+        """Blocks if current drawdown exceeds threshold."""
         return current_drawdown < self.max_drawdown
 
     def _check_signal_consistency_with_metrics(
         self, symbol: str, direction: int
     ) -> tuple[bool, dict[str, Any]]:
+        """Prevents rapid signal flipping (flicker guard)."""
         window = self.cfg.signal_flicker_window if self.cfg else 6
         max_changes = self.cfg.max_signal_changes if self.cfg else 3
         if symbol not in self._signal_history:
             self._signal_history[symbol] = deque(maxlen=window)
         history = self._signal_history[symbol]
         history.append(int(direction))
+
         if len(history) < 2:
             return True, {"changes": 0, "window": window, "max_changes": max_changes}
+
         changes = 0
         h_list = list(history)
         for i in range(1, len(h_list)):
             if h_list[i] != h_list[i - 1]:
                 changes += 1
+
         passed = changes <= max_changes
         return bool(passed), {
             "changes": changes,

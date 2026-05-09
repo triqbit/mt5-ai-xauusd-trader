@@ -470,7 +470,9 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.calibration_analysis:
-            self.console.print(f"\n[bold cyan]{section_idx}. Confidence Calibration & Reliability[/]")
+            self.console.print(
+                f"\n[bold cyan]{section_idx}. Confidence Calibration & Reliability[/]"
+            )
             section_idx += 1
             self.console.print(
                 f"ECE: [bold]{report.calibration_analysis.ece:.4f}[/] | "
@@ -483,11 +485,11 @@ class ResearchReporter:
             table.add_column("Avg Confidence")
             table.add_column("Samples")
             for b in report.calibration_analysis.buckets:
-                table.add_row(
-                    b.range, f"{b.accuracy:.1%}", f"{b.confidence:.1%}", str(b.samples)
-                )
+                table.add_row(b.range, f"{b.accuracy:.1%}", f"{b.confidence:.1%}", str(b.samples))
             self.console.print(table)
-            self.console.print(f"[dim]Insight: {report.calibration_analysis.reliability_insight}[/]")
+            self.console.print(
+                f"[dim]Insight: {report.calibration_analysis.reliability_insight}[/]"
+            )
 
         if report.execution_quality:
             self.console.print(f"\n[bold blue]{section_idx}. Execution Quality & Alpha Decay[/]")

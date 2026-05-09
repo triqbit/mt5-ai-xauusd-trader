@@ -258,10 +258,7 @@ class RegimeDetector:
 
         # Transition score heuristic
         transition_score = (
-            abs(atr_ratio - 1.0) * 0.3
-            + abs(er - 0.5) * 0.3
-            + abs(vc) * 0.2
-            + min(vov / 3.0, 0.2)
+            abs(atr_ratio - 1.0) * 0.3 + abs(er - 0.5) * 0.3 + abs(vc) * 0.2 + min(vov / 3.0, 0.2)
         )
         return label, confidence, transition_score
 
