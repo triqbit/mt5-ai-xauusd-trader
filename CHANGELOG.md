@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- No added items in this section.
+- **6-Layer Execution Filter Cascade:** Implemented a streamlined validation system for trading signals (ATR, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown).
+- **Structured Execution Decisions:** Introduced a typed `ExecutionDecision` dataclass for granular audit tracing and clear rejection reasons.
+- **Enhanced Filter Unit Tests:** Added 27 comprehensive tests covering edge cases for all 6 validation layers.
 
 ## [1.1.0-rc7] - 2026-05-09
 
