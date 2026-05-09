@@ -58,6 +58,7 @@ class RareEventResult(BaseModel):
     peak_impact_pct: float
     realized_volatility: float
     recovery_attained: float
+    description: str = ""
 
     def to_report_summary(self) -> Any:
         """Convert to RareEventSummary for ResearchReporter."""
@@ -68,6 +69,7 @@ class RareEventResult(BaseModel):
             peak_impact_pct=self.peak_impact_pct,
             realized_volatility=self.realized_volatility,
             recovery_attained=self.recovery_attained,
+            description=self.description,
         )
 
 
@@ -258,7 +260,8 @@ class RareEventSimulator:
         # Peak impact is the max percentage deviation from the price before the crash
         event_prices = df["close"].iloc[start_idx : start_idx + crash_duration + recovery_duration]
         start_price = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
-        peak_impact = float((event_prices / start_price - 1).min())
+        deviations = (event_prices / start_price - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
 
         result = RareEventResult(
             event_type=RareEventType.FLASH_CRASH,
@@ -268,6 +271,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=float(recovered_total_pct / abs(impact)) if impact != 0 else 0,
+            description=f"Flash crash of {peak_impact:.2%} with {config.recovery_factor:.0%} recovery.",
         )
 
         return df, result
@@ -316,7 +320,8 @@ class RareEventSimulator:
 
         event_prices = df["close"].iloc[start_idx : start_idx + duration]
         start_price = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
-        peak_impact = float(np.max(np.abs(event_prices / start_price - 1)))
+        deviations = (event_prices / start_price - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
 
         result = RareEventResult(
             event_type=RareEventType.LIQUIDITY_VACUUM,
@@ -326,6 +331,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=1.0,
+            description=f"Liquidity vacuum with extreme spreads and {peak_impact:.2%} peak deviation.",
         )
 
         return df, result
@@ -367,6 +373,7 @@ class RareEventSimulator:
             peak_impact_pct=gap_magnitude_pct,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
+            description=f"Discontinuous gold gap of {gap_magnitude_pct:.2%}.",
         )
         return df, result
 
@@ -410,6 +417,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
+            description=f"Violent trend reversal of {peak_impact:.2%}.",
         )
         return df, result
 
@@ -444,7 +452,8 @@ class RareEventSimulator:
         start_price = (
             df["close"].iloc[dislocation_idx - 1] if dislocation_idx > 0 else df["close"].iloc[0]
         )
-        peak_impact = float((event_prices / start_price - 1).min())
+        deviations = (event_prices / start_price - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
 
         result = RareEventResult(
             event_type=RareEventType.DISLOCATION,
@@ -454,6 +463,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
+            description=f"Regime dislocation with {peak_impact:.2%} impact and sustained volatility.",
         )
         return df, result
 
@@ -495,7 +505,8 @@ class RareEventSimulator:
         start_idx = shock_indices[0]
         event_prices = df["close"].iloc[start_idx:]
         start_price = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
-        peak_impact = float(np.max(np.abs(event_prices / start_price - 1)))
+        deviations = (event_prices / start_price - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
 
         result = RareEventResult(
             event_type=RareEventType.VOL_CLUSTER,
@@ -505,6 +516,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
+            description=f"Abnormal volatility cluster with {peak_impact:.2%} peak deviation.",
         )
         return df, result
 
@@ -522,6 +534,37 @@ class RareEventSimulator:
             )
             suite[event_type.value] = self.generate_scenario(config)
         return suite
+
+    def generate_report_section(
+        self, suite_results: dict[str, tuple[pd.DataFrame, RareEventResult]]
+    ) -> Any:
+        """
+        Convert a suite of results into a RareEventSection for ResearchReporter.
+
+        Args:
+            suite_results: Dictionary of scenario names to (DataFrame, Result) tuples.
+
+        Returns:
+            RareEventSection: Pydantic model for reporting.
+        """
+        from src.research.reporting import RareEventSection
+
+        summaries = [res.to_report_summary() for _, res in suite_results.values()]
+
+        # Generate automated insights
+        critical_events = [s for s in summaries if abs(s.peak_impact_pct) > 0.05]
+        insight_msg = (
+            f"Evaluated {len(summaries)} rare event scenarios. "
+            f"Detected {len(critical_events)} high-impact events (>5% deviation). "
+        )
+
+        if critical_events:
+            most_severe = min(summaries, key=lambda s: s.peak_impact_pct)
+            insight_msg += f"Most severe impact was {most_severe.event_type} at {most_severe.peak_impact_pct:.2%}."
+        else:
+            insight_msg += "All events remained within manageable risk bounds."
+
+        return RareEventSection(scenarios=summaries, insights=insight_msg)
 
     def _simulate_news_shock(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """
@@ -557,7 +600,8 @@ class RareEventSimulator:
 
         event_prices = df["close"].iloc[shock_idx : shock_idx + shock_duration]
         start_price_val = df["close"].iloc[shock_idx - 1] if shock_idx > 0 else df["close"].iloc[0]
-        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
+        deviations = (event_prices / start_price_val - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
 
         result = RareEventResult(
             event_type=RareEventType.NEWS_SHOCK,
@@ -567,6 +611,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
+            description=f"News-driven directional shock of {peak_impact:.2%}.",
         )
         return df, result
 
@@ -579,51 +624,46 @@ class RareEventSimulator:
         vols = np.zeros(n)
         drifts = np.zeros(n)
 
-        # Divide into 4 sessions
-        session_size = n // 4
-        regimes = [
-            {"vol": config.base_volatility, "drift": config.drift},
-            {
-                "vol": config.base_volatility * 3.0 * config.event_magnitude,
-                "drift": config.drift - 0.001 * config.event_magnitude,
-            },
-            {
-                "vol": config.base_volatility * 1.5 * config.event_magnitude,
-                "drift": config.drift + 0.0005 * config.event_magnitude,
-            },
-            {
-                "vol": config.base_volatility * 5.0 * config.event_magnitude,
-                "drift": config.drift - 0.002 * config.event_magnitude,
-            },
-        ]
+        # Dynamically determine session boundaries and regime parameters
+        num_sessions = self.rng.integers(3, 6)
+        session_boundaries = np.sort(self.rng.choice(range(10, n - 10), num_sessions - 1, replace=False))
+        session_boundaries = np.concatenate(([0], session_boundaries, [n]))
 
-        for i in range(4):
-            start = i * session_size
-            end = (i + 1) * session_size if i < 3 else n
-            vols[start:end] = regimes[i]["vol"]
-            drifts[start:end] = regimes[i]["drift"]
-            returns[start:end] = self._generate_t_returns(
-                end - start, drifts[start:end].mean(), vols[start:end].mean()
-            )
+        for i in range(num_sessions):
+            start, end = int(session_boundaries[i]), int(session_boundaries[i + 1])
+
+            # Randomize regime characteristics
+            vol_mult = self.rng.uniform(1.0, 5.0) * config.event_magnitude
+            drift_shift = self.rng.uniform(-0.002, 0.002) * config.event_magnitude
+
+            vol = config.base_volatility * vol_mult
+            drift = config.drift + drift_shift
+
+            vols[start:end] = vol
+            drifts[start:end] = drift
+            returns[start:end] = self._generate_t_returns(end - start, drift, vol)
 
         df = self._generate_base_ohlc(
             config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
         )
 
         # Max percentage deviation from the very beginning of the multi-session event
-        event_prices = df["close"].iloc[session_size:]
+        first_session_end = int(session_boundaries[1])
+        event_prices = df["close"].iloc[first_session_end:]
         start_price_val = (
-            df["close"].iloc[session_size - 1] if session_size > 0 else df["close"].iloc[0]
+            df["close"].iloc[first_session_end - 1] if first_session_end > 0 else df["close"].iloc[0]
         )
-        peak_impact = float(np.max(np.abs(event_prices / start_price_val - 1)))
+        deviations = (event_prices / start_price_val - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
 
         result = RareEventResult(
             event_type=RareEventType.MULTI_SESSION_DISLOCATION,
             config=config,
-            start_index=session_size,
+            start_index=first_session_end,
             end_index=n - 1,
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
+            description=f"Multi-session regime dislocation ({num_sessions} sessions) with {peak_impact:.2%} peak deviation.",
         )
         return df, result

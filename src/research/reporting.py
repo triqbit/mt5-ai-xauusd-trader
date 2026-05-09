@@ -173,6 +173,7 @@ class RareEventSummary(BaseModel):
     peak_impact_pct: float
     realized_volatility: float
     recovery_attained: float
+    description: str = ""
 
 
 class RareEventSection(BaseModel):
