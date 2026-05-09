@@ -52,3 +52,10 @@ class ConfigurationError(TradingError):
 
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(message, details=details, is_retriable=False)
+
+
+class CircuitBreakerError(TradingError):
+    """Raised when an operation is blocked by an open circuit breaker."""
+
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
+        super().__init__(message, details=details, is_retriable=False)
