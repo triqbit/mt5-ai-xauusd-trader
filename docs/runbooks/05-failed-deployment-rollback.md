@@ -1,5 +1,5 @@
 # Runbook 05: Failed Deployment Rollback
-**Version:** 1.3 | **Last Updated:** 2024-05-22
+**Version:** 1.4.0 | **Last Updated:** 2024-06-01
 
 ## Overview
 Safe procedures for reverting a "bad" release. This covers reverting Docker images, rolling back database schema migrations (Alembic), and restoring environment configuration.
@@ -27,14 +27,19 @@ Identify the last known stable version (e.g., `v1.1.0-rc3`) from the deployment 
 
 ### 3. Downgrade Database Schema (If Necessary)
 If the failed release included database migrations (Alembic), you must downgrade the schema to match the code version.
-1. **Identify current and target revisions:**
+1. **Verify Migration Reversibility:**
+   Run the migration verification script in a safe environment if possible:
+   ```bash
+   python scripts/verify_migrations.py
+   ```
+2. **Identify current and target revisions:**
    ```bash
    # See current revision
    docker exec -it xauusd_trader alembic current
    # See history to find the previous revision ID
    docker exec -it xauusd_trader alembic history
    ```
-2. **Execute downgrade:**
+3. **Execute downgrade:**
    ```bash
    docker exec -it xauusd_trader alembic downgrade <previous_revision_id>
    ```
@@ -66,14 +71,15 @@ If the release failure was due to invalid environment variables:
 - High-severity (P0/P1) alerts triggered by the failed deployment are resolved.
 - Database schema consistency is maintained.
 
+## Escalation Path
+1. **Rollback Execution Help:** Release Engineer (Jules03).
+2. **Data/Migration Issues:** Lead Developer (@maintainer-quality).
+3. **Incident Post-Mortem:** Engineering Lead.
+
 ## Verification Commands
 - `docker ps | grep xauusd_trader`
 - `docker exec -it xauusd_trader alembic current`
 - `python scripts/smoke_test.py`
 - `python scripts/verify_version_sync.py`
+- `python scripts/verify_migrations.py`
 - `curl -s http://localhost:8000/metrics | grep system_version`
-
-## Escalation Path
-1. **Rollback Execution Help:** Release Engineer (Jules03).
-2. **Data/Migration Issues:** Lead Developer (@maintainer-quality).
-3. **Incident Post-Mortem:** Engineering Lead.

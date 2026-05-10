@@ -1,5 +1,5 @@
 # Runbook 02: MT5 Connection Outage
-**Version:** 1.3 | **Last Updated:** 2024-05-22
+**Version:** 1.4.0 | **Last Updated:** 2024-06-01
 
 ## Overview
 Procedures for resolving connection failures between the trading bot and MetaTrader 5 (MT5) or the MetaAPI cloud gateway.
@@ -26,6 +26,13 @@ Procedures for resolving connection failures between the trading bot and MetaTra
 ### 3. Recover MetaAPI (Cloud Gateway)
 - Verify `METAAPI_TOKEN` and `METAAPI_ACCOUNT_ID` are valid in the MetaAPI Dashboard.
 - Check MetaAPI status: `https://status.metaapi.cloud/`.
+- **Failover Diagnostics:**
+  - If local MT5 is persistently down, consider switching to MetaAPI cloud execution by updating `.env`:
+    ```env
+    USE_METAAPI=True
+    METAAPI_TOKEN=your_token
+    METAAPI_ACCOUNT_ID=your_id
+    ```
 - If using Docker, restart the container to force a reconnection:
   ```bash
   docker restart xauusd_trader
@@ -55,14 +62,15 @@ Procedures for resolving connection failures between the trading bot and MetaTra
 - Application logs show active price updates for `XAUUSD`.
 - The readiness probe `/health/readiness` returns a `200 OK` status.
 
+## Escalation Path
+1. **Trading Connectivity:** Trading Ops (@maintainer-trading).
+2. **Platform Stability:** Release Reliability Engineer (Jules03).
+3. **Broker Issues:** Contact Broker Support via the Client Portal.
+
 ## Verification Commands
 - `python scripts/doctor.py`
 - `python scripts/validate_env.py`
 - `python scripts/smoke_test.py`
 - `curl -i http://localhost:8000/health/readiness`
+- `curl -s http://localhost:8000/metrics | grep mt5_connection_status`
 - `docker logs xauusd_trader --tail 50`
-
-## Escalation Path
-1. **Trading Connectivity:** Trading Ops (@maintainer-trading).
-2. **Platform Stability:** Release Reliability Engineer (Jules03).
-3. **Broker Issues:** Contact Broker Support via the Client Portal.
