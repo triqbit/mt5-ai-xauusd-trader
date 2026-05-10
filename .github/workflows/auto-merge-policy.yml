@@ -23,8 +23,9 @@ jobs:
       has_tests: ${{ steps.compliance-check.outputs.has_tests }}
       has_docs: ${{ steps.compliance-check.outputs.has_docs }}
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
-      coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
       observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
+      approvals_pass: ${{ steps.approval-check.outputs.approvals_pass }}
+      mergeable_pass: ${{ steps.mergeable-check.outputs.mergeable_pass }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -38,18 +39,18 @@ jobs:
       - name: Check for High-Risk Files
         id: risk-check
         run: |
-          # Patterns that strictly block and escalate as per Jules05 mandate
+          # Patterns that strictly block and escalate (using regex matching)
           HIGH_RISK_PATTERNS=(
-            "src/trading/executor.py"      # Live trading execution logic
-            "src/core/risk_engine.py"      # Risk parameters
-            "src/trading/risk_engine.py"   # Risk parameters
-            "src/trading/risk_manager.py"  # Risk parameters
-            "config/secrets.*"             # Credentials and secrets
-            ".github/workflows/deploy.*"   # Deployment workflows
-            ".github/workflows/ci.yml"     # CI/CD workflows
-            "Dockerfile"                   # Infrastructure control
-            "docker-compose.yml"           # Infrastructure control
-            "migrations/.*"                # Database migrations
+            "^src/trading/executor.py"      # Live trading execution logic
+            "^src/core/risk_engine.py"      # Risk parameters
+            "^src/trading/risk_engine.py"   # Risk parameters
+            "^src/trading/risk_manager.py"  # Risk parameters
+            "^config/secrets.*"             # Credentials and secrets
+            "^\.github/workflows/deploy.*"  # Deployment workflows
+            "^\.github/workflows/ci.yml"    # CI/CD workflows affecting quality gates
+            "^Dockerfile"                   # Infrastructure control
+            "^docker-compose.yml"           # Infrastructure control
+            "^migrations/"                  # Database migrations
           )
 
           TOUCHED_HIGH_RISK=false
@@ -106,20 +107,44 @@ jobs:
             echo "observability_pass=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check Coverage
-        id: coverage-check
+      - name: Check Approvals and Mergeability
+        id: approval-check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Verify coverage threshold (assuming 80% is enforced in ci.yml)
-          echo "coverage_pass=true" >> $GITHUB_OUTPUT
+          # Check for code owner approval via reviewDecision
+          # reviewDecision is 'APPROVED' if all branch protection and code owner rules are satisfied.
+          DECISION=$(gh pr view $PR_NUMBER --json reviewDecision -q '.reviewDecision')
+
+          if [ "$DECISION" = "APPROVED" ]; then
+            echo "approvals_pass=true" >> $GITHUB_OUTPUT
+            echo "✅ Required approvals (including Code Owners) present."
+          else
+            echo "approvals_pass=false" >> $GITHUB_OUTPUT
+            echo "❌ Required approvals missing or changes requested. (Decision: $DECISION)"
+          fi
+
+          # Check for merge conflicts
+          MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable -q '.mergeable')
+          if [ "$MERGEABLE" = "MERGEABLE" ]; then
+            echo "mergeable_pass=true" >> $GITHUB_OUTPUT
+            echo "✅ No merge conflicts."
+          else
+            echo "mergeable_pass=false" >> $GITHUB_OUTPUT
+            echo "❌ Merge conflicts detected."
+          fi
 
       - name: Handle Violations
         if: |
-          steps.risk-check.outputs.risk_status == 'blocked' ||
-          (steps.compliance-check.outputs.source_modified == 'true' &&
-           (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
-          steps.observability-check.outputs.observability_pass == 'false'
+          always() && (
+            steps.risk-check.outputs.risk_status == 'blocked' ||
+            (steps.compliance-check.outputs.source_modified == 'true' &&
+             (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
+            steps.observability-check.outputs.observability_pass == 'false' ||
+            steps.approval-check.outputs.approvals_pass == 'false' ||
+            steps.approval-check.outputs.mergeable_pass == 'false'
+          )
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -140,6 +165,12 @@ jobs:
               REASON="$REASON\n- ❌ **Source code modified but no documentation updated.**"
             fi
           fi
+          if [ "${{ steps.approval-check.outputs.approvals_pass }}" = "false" ]; then
+            REASON="$REASON\n- ❌ **Missing required approvals from Code Owners.**"
+          fi
+          if [ "${{ steps.approval-check.outputs.mergeable_pass }}" = "false" ]; then
+            REASON="$REASON\n- ❌ **Merge conflicts detected.**"
+          fi
 
           gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, secrets, or infrastructure are automatically escalated."
           gh pr merge $PR_NUMBER --disable-auto || true
@@ -157,4 +188,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled."
+          # Final check: Ensure no checks have FAILED.
+          # The 'gh pr merge --auto' command will handle the actual wait for success.
+          FAILURES=$(gh pr view $PR_NUMBER --json statusCheckRollup -q '.statusCheckRollup[] | select(.conclusion == "FAILURE" or .state == "FAILURE") | .name // .context')
+
+          if [ -n "$FAILURES" ]; then
+            echo "❌ Cannot enable auto-merge. The following checks have FAILED:"
+            echo "$FAILURES"
+            exit 1
+          fi
+
+          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled yet."

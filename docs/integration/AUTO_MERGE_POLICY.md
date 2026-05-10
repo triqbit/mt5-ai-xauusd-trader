@@ -19,7 +19,7 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 
 Automatically **BLOCK** and **ESCALATE** if any of these are true:
 
-- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py` or files interacting with MT5 order placement.
+- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py` (or files interacting with order placement).
 - 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py`, `src/trading/risk_engine.py`, or `src/trading/risk_manager.py`.
 - 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*` or credential handling.
 - 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
@@ -47,12 +47,13 @@ The following patterns trigger an automatic block and escalation:
 2. **Notification:** A comment is posted explaining the policy violation.
 3. **Review:** A Lead Engineer or Product Owner must perform a deep-dive review.
 4. **Validation:** Manual verification in a staging environment is mandatory.
-5. **Approval:** Two senior approvals are required for any change labeled `escalated-risk`.
+5. **Approval:** Two senior approvals (including one from `@andonly1348`) are required for any change labeled `escalated-risk`.
 
 ## Audit Log of Auto-Merge Decisions
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-09 | N/A | Policy Update | 🤖 Jules05: Strict auto-merge enforcement & coverage threshold sync | [System Change] |
 | 2026-05-08 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (including docker-compose and ci.yml) | [System Change] |
 | 2026-05-07 | N/A | Policy Update | Jules05: Strict auto-merge enforcement implemented | [System Change] |
 | 2026-04-30 | #368 | Auto-Merged | Policy checks passed | [PR](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/368) |

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sqlalchemy import select
+from src.core.database import get_engine
 
 # Standardize mocks for use across all tests and imports
 mock_torch = MagicMock()
@@ -42,6 +43,7 @@ def reset_audit_logger():
     """Reset the AuditLogger singleton before each test."""
     AuditLogger._instance = None
     AuditLogger._initialized = False
+    get_engine.cache_clear()
 
 @pytest.fixture
 def audit_logger():
