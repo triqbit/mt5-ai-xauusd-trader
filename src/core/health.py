@@ -217,6 +217,16 @@ class HealthChecker:
             self._update_gauge("mt5", res.status)
             return res
 
+        # Check Circuit Breaker state (Self-healing monitoring)
+        if self.connector.circuit_state == "OPEN":
+            res = ComponentStatus(
+                status=HealthStatus.DEGRADED,
+                message="MT5 circuit breaker is OPEN (failing requests blocked)",
+                remedy="Check network stability or broker API status. System will auto-recover in HALF_OPEN state.",
+            )
+            self._update_gauge("mt5", res.status)
+            return res
+
         try:
             # 1. Account Info Check
             info = self.connector.get_account_info()
@@ -297,7 +307,7 @@ class HealthChecker:
             return res
 
         loaded = []
-        # Check EnsembleModel components (Standard attributes)
+        # 1. Check EnsembleModel components (Standard attributes)
         if getattr(self.model, "ppo_agent", None) is not None:
             loaded.append("PPO")
         if getattr(self.model, "lstm_model", None) is not None:
@@ -305,8 +315,14 @@ class HealthChecker:
         if getattr(self.model, "dreamer_agent", None) is not None:
             loaded.append("Dreamer")
 
-        # Check for individual model wrapper
-        if not loaded and getattr(self.model, "model", None) is not None:
+        # 2. Check for Transformer component
+        if getattr(self.model, "transformer_model", None) is not None or self.model.__class__.__name__ == "TimeSeriesTransformer":
+            loaded.append("Transformer")
+
+        # 3. Check for individual model wrapper/direct instance
+        if not loaded and (
+            getattr(self.model, "model", None) is not None or hasattr(self.model, "predict")
+        ):
             loaded.append(self.model.__class__.__name__)
 
         if not loaded:

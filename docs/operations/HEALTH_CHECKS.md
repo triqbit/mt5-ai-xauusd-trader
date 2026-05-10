@@ -15,7 +15,7 @@ The `HealthChecker` performs deep diagnostics across several dimensions:
 -   **Dependency Health**:
     -   **Database**: Validates reachability of the primary trade database.
     -   **MT5/MetaAPI**: Verifies connection status, account permissions, and symbol tradability.
-    -   **Models**: Ensures required AI model weights (PPO, LSTM, etc.) are loaded in memory.
+    -   **Models**: Ensures required AI model weights (PPO, LSTM, Transformer, etc.) are loaded in memory.
     -   **Audit Log**: Verifies initialization of the enterprise audit trail.
 -   **System Resources**:
     -   **CPU Usage**: Monitors CPU utilization with non-blocking checks.
