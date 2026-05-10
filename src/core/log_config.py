@@ -5,7 +5,7 @@ src/core/log_config.py
 
 from __future__ import annotations
 
-import re
+import contextlib
 from typing import Any
 
 from src.core.config import TradingConfig
@@ -48,10 +48,8 @@ class SecretMaskingProcessor:
                 secret_val = val.get_secret_value()
             elif "Secret" in str(type(val)):
                 # Defensive check for other secret-like types that might not have get_secret_value
-                try:
+                with contextlib.suppress(AttributeError, TypeError):
                     secret_val = val.get_secret_value()
-                except (AttributeError, TypeError):
-                    pass
 
             if secret_val is not None:
                 if isinstance(secret_val, bytes):

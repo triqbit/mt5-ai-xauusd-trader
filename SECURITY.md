@@ -129,7 +129,7 @@ written justification before the deadline passes.
 
 | Category | Specific Examples |
 |---|---|
-| **Credential Exposure** | MT5 password/token in logs, `.env` leakage, SecretStr bypass |
+| **Credential Exposure** | MT5 password/token in logs, `.env` leakage, SecretStr bypass, dynamic discovery gaps, URL credential leaks |
 | **Trade Execution** | RiskManager approval bypass, signal injection, order tampering |
 | **Database Layer** | SQL injection in TradeLogger, Alembic migration tampering, constraint bypass |
 | **Model Integrity** | Unsafe deserialization of PPO/LSTM/Dreamer weights, model poisoning |
