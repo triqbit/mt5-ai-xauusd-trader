@@ -32,7 +32,7 @@ We use a role-based governance model where specific leads oversee different doma
   - `docs/`: Documentation-only improvements
   - `refactor/`: Code reorganization without functional changes
 - **Conventional Commits:** All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`, `security:`). This enables automated changelog generation and versioning.
-- **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](../ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
+- **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
 
 ### 3. Pull Request Lifecycle
 1.  **Draft PR:** Open a Draft PR early to get feedback on architectural direction.
@@ -91,6 +91,7 @@ If you discover a security vulnerability, please **do NOT open a public issue**.
 - [Release Playbook](./RELEASE_PLAYBOOK.md)
 - [SLO Targets](./SLO_TARGETS.md)
 - [Architecture Quick-Start](./ARCHITECTURE_QUICK.md)
+- [Enterprise Standards](./ENTERPRISE_STANDARDS.md)
 
 ---
 *By contributing, you agree that your contributions will be licensed under the project's MIT License.*
