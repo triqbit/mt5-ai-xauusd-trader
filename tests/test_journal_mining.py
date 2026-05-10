@@ -478,3 +478,134 @@ def test_report_includes_revenge_trading_risk(miner):
     revenge_risk = next((r for r in section.behavioral_risks if r.type == "Revenge Trading"), None)
     assert revenge_risk is not None
     assert "TILT" in revenge_risk.description
+
+
+def test_run_mining_with_days_filtering(miner):
+    with miner.Session() as session:
+        from src.core.trade_logger import ModelSignal, Trade
+
+        now = datetime.now(timezone.utc)
+        # Old signal and trade (10 days ago)
+        sig_old = ModelSignal(
+            algorithm="old_algo",
+            created_at=now - pd.Timedelta(days=10),
+            volatility=0.1,
+            confidence=0.8,
+            direction=1,
+            symbol="XAUUSD",
+            entry_price=2000.0,
+        )
+        session.add(sig_old)
+        session.commit()
+
+        trd_old = Trade(
+            ticket=1,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            lot_size=0.1,
+            pnl=100.0,
+            status="CLOSED",
+            signal_id=sig_old.id,
+            created_at=now - pd.Timedelta(days=10),
+        )
+        session.add(trd_old)
+
+        # New signal and trade (today)
+        sig_new = ModelSignal(
+            algorithm="new_algo",
+            created_at=now,
+            volatility=0.1,
+            confidence=0.8,
+            direction=1,
+            symbol="XAUUSD",
+            entry_price=2000.0,
+        )
+        session.add(sig_new)
+        session.commit()
+
+        trd_new = Trade(
+            ticket=2,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            lot_size=0.1,
+            pnl=100.0,
+            status="CLOSED",
+            signal_id=sig_new.id,
+            created_at=now,
+        )
+        session.add(trd_new)
+        session.commit()
+
+    # Mining for last 5 days
+    report = miner.run_mining(days=5)
+    # Check profitable concentrations which uses trades_df
+    new_algo_patterns = [
+        p for p in report.profitable_concentrations if p.value == "new_algo"
+    ]
+    old_algo_patterns = [
+        p for p in report.profitable_concentrations if p.value == "old_algo"
+    ]
+
+    assert len(new_algo_patterns) > 0
+    assert len(old_algo_patterns) == 0
+
+
+def test_combination_motifs_pnl_calculation(miner):
+    now = datetime.now(timezone.utc)
+
+    # 2 clusters with different losses
+    trades = pd.DataFrame(
+        [
+            {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
+            {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
+            {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
+            {"id": 9, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3)},
+            # Total loss: -30
+            {"id": 4, "pnl": -20, "created_at": now + pd.Timedelta(hours=1), "signal_id": 4},
+            {"id": 5, "pnl": -20, "created_at": now + pd.Timedelta(hours=1, minutes=1), "signal_id": 5},
+            {"id": 6, "pnl": -20, "created_at": now + pd.Timedelta(hours=1, minutes=2), "signal_id": 6},
+            {"id": 10, "pnl": 10, "created_at": now + pd.Timedelta(hours=1, minutes=3)},
+            # Total loss: -60
+        ]
+    )
+
+    # Signal combinations before each cluster
+    signals = pd.DataFrame(
+        [
+            {
+                "id": 100,
+                "algorithm": "A",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": now - pd.Timedelta(minutes=5),
+            },
+            {
+                "id": 101,
+                "algorithm": "B",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": now - pd.Timedelta(minutes=4),
+            },
+            {
+                "id": 200,
+                "algorithm": "A",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": now + pd.Timedelta(hours=1) - pd.Timedelta(minutes=5),
+            },
+            {
+                "id": 201,
+                "algorithm": "B",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": now + pd.Timedelta(hours=1) - pd.Timedelta(minutes=4),
+            },
+        ]
+    )
+
+    motifs = miner.find_combination_motifs(signals, trades)
+    assert len(motifs) == 1
+    # Avg PnL should be (-30 + -60) / 2 = -45.0
+    assert motifs[0].avg_pnl_after == -45.0

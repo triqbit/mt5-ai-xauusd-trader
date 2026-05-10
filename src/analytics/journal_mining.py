@@ -269,7 +269,15 @@ class JournalMiner:
         return active
 
     def get_session_stats(self, trades_df: pd.DataFrame) -> list[SessionAnalysis]:
-        """Detect overtrading and performance per session."""
+        """
+        Detect overtrading and performance per trading session.
+
+        Args:
+            trades_df: DataFrame of executed trades with pnl and created_at.
+
+        Returns:
+            List of SessionAnalysis for each session (Sydney, Tokyo, London, New York).
+        """
         if trades_df.empty:
             return []
 
@@ -320,7 +328,15 @@ class JournalMiner:
         return results
 
     def analyze_volatility_patterns(self, signals_df: pd.DataFrame) -> list[VolatilityPattern]:
-        """Analyze false positives under specific volatility conditions."""
+        """
+        Analyze false positives (executed losing trades) under specific volatility conditions.
+
+        Args:
+            signals_df: DataFrame of model signals, joined with trade pnl if executed.
+
+        Returns:
+            List of VolatilityPattern summaries.
+        """
         if signals_df.empty or "volatility" not in signals_df.columns:
             return []
 
@@ -345,12 +361,15 @@ class JournalMiner:
             group = df[df["bucket"] == bucket]
             signal_count = len(group)
 
-            # A false positive is a signal that was executed but had negative PnL or
-            # we can just use the PnL from the joined Trade table if available.
-            # Here we assume signals_df is already joined with trades.
+            # A false positive is defined here as an EXECUTED signal that resulted in a loss.
             if "pnl" in group.columns:
-                false_positives = len(group[group["pnl"] < 0])
-                fp_rate = false_positives / signal_count if signal_count > 0 else 0.0
+                executed = group.dropna(subset=["pnl"])
+                executed_count = len(executed)
+                if executed_count > 0:
+                    false_positives = len(executed[executed["pnl"] < 0])
+                    fp_rate = false_positives / executed_count
+                else:
+                    fp_rate = 0.0
             else:
                 fp_rate = 0.0
 
@@ -420,7 +439,15 @@ class JournalMiner:
         return revenge_trades
 
     def detect_drawdown_clusters(self, trades_df: pd.DataFrame) -> list[DrawdownCluster]:
-        """Detect clusters of 3+ consecutive losing trades."""
+        """
+        Detect clusters of 3+ consecutive losing trades.
+
+        Args:
+            trades_df: DataFrame of executed trades with pnl and created_at.
+
+        Returns:
+            List of DrawdownCluster objects.
+        """
         if trades_df.empty:
             return []
 
@@ -431,7 +458,11 @@ class JournalMiner:
         else:
             df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_convert(UTC)
 
-        trades = df.sort_values("created_at").to_dict("records")
+        # Use id as tie-breaker for deterministic sorting
+        sort_cols = ["created_at"]
+        if "id" in df.columns:
+            sort_cols.append("id")
+        trades = df.sort_values(sort_cols).to_dict("records")
 
         clusters = []
         current_cluster = []
@@ -466,7 +497,15 @@ class JournalMiner:
         return clusters
 
     def find_profitable_patterns(self, trades_df: pd.DataFrame) -> list[PatternConcentration]:
-        """Find concentrations of profitable patterns by symbol, algorithm, hour, and day."""
+        """
+        Find concentrations of profitable patterns by symbol, algorithm, hour, and day.
+
+        Args:
+            trades_df: DataFrame of executed trades.
+
+        Returns:
+            Sorted list of PatternConcentration objects, highest profit factor first.
+        """
         if trades_df.empty:
             return []
 
@@ -679,9 +718,19 @@ class JournalMiner:
         self,
         risk_events_df: pd.DataFrame,
         signals_df: pd.DataFrame,
-        trades_df: pd.DataFrame = None,
+        trades_df: pd.DataFrame | None = None,
     ) -> list[BlockReasonSummary]:
-        """Summarize recurring risk block reasons with weak state correlation."""
+        """
+        Summarize recurring risk block reasons with weak state correlation.
+
+        Args:
+            risk_events_df: DataFrame of risk events.
+            signals_df: DataFrame of signals.
+            trades_df: Optional DataFrame of trades for correlation analysis.
+
+        Returns:
+            List of BlockReasonSummary objects.
+        """
         if risk_events_df.empty:
             return []
 
@@ -787,7 +836,7 @@ class JournalMiner:
         return self.find_frequent_motifs(pre_df)
 
     def find_frequent_motifs(
-        self, signals_df: pd.DataFrame, trades_df: pd.DataFrame = None
+        self, signals_df: pd.DataFrame, trades_df: pd.DataFrame | None = None
     ) -> list[SignalMotif]:
         """
         Find recurring motifs in signals, especially focusing on losing combinations.
@@ -994,6 +1043,8 @@ class JournalMiner:
             return []
 
         combinations = []
+        pattern_pnls: dict[tuple[Any, ...], list[float]] = {}
+
         for cluster in clusters:
             # Ensure cluster start_time is timezone-aware and UTC
             cluster_start = cluster.start_time
@@ -1010,8 +1061,13 @@ class JournalMiner:
 
             if len(pre_cluster) >= 2:
                 # Create a pattern string: sorted list of algo:direction
-                pattern = sorted(
-                    [f"{row['algorithm']}:{row['direction']}" for _, row in pre_cluster.iterrows()]
+                pattern = tuple(
+                    sorted(
+                        [
+                            f"{row['algorithm']}:{row['direction']}"
+                            for _, row in pre_cluster.iterrows()
+                        ]
+                    )
                 )
 
                 # Determine dominant session and volatility if consistent
@@ -1030,7 +1086,11 @@ class JournalMiner:
                 vol_buckets = pre_cluster["vol_bucket"].unique()
                 dom_vol = vol_buckets[0] if len(vol_buckets) == 1 else "Mixed"
 
-                combinations.append((tuple(pattern), dom_session, dom_vol))
+                key = (pattern, dom_session, dom_vol)
+                combinations.append(key)
+                if key not in pattern_pnls:
+                    pattern_pnls[key] = []
+                pattern_pnls[key].append(cluster.total_loss)
 
         if not combinations:
             return []
@@ -1040,12 +1100,15 @@ class JournalMiner:
 
         for (pattern_tuple, sess, vol), count in counts.items():
             if count >= 2:
+                pnls = pattern_pnls.get((pattern_tuple, sess, vol), [])
+                avg_pnl = sum(pnls) / len(pnls) if pnls else 0.0
+
                 # Heuristic: these combinations precede clusters, so they are toxic by definition
                 results.append(
                     CombinationMotif(
                         patterns=list(pattern_tuple),
                         frequency=count,
-                        avg_pnl_after=0.0,  # Could be calculated if needed
+                        avg_pnl_after=avg_pnl,
                         is_toxic=True,
                         session=sess,
                         volatility_bucket=vol,
@@ -1054,13 +1117,31 @@ class JournalMiner:
 
         return sorted(results, key=lambda x: x.frequency, reverse=True)
 
-    def run_mining(self) -> JournalReport:
-        """Execute full mining suite and return typed report."""
+    def run_mining(self, days: int | None = None) -> JournalReport:
+        """
+        Execute full mining suite and return typed report.
+
+        Args:
+            days: Optional lookback period in days to filter data.
+
+        Returns:
+            Populated JournalReport.
+        """
         with self.Session() as session:
             # Fetch data
-            trades_raw = session.query(Trade).filter(Trade.is_deleted.is_(False)).all()
-            signals_raw = session.query(ModelSignal).filter(ModelSignal.is_deleted.is_(False)).all()
-            risk_raw = session.query(RiskEvent).filter(RiskEvent.is_deleted.is_(False)).all()
+            query_trades = session.query(Trade).filter(Trade.is_deleted.is_(False))
+            query_signals = session.query(ModelSignal).filter(ModelSignal.is_deleted.is_(False))
+            query_risk = session.query(RiskEvent).filter(RiskEvent.is_deleted.is_(False))
+
+            if days:
+                cutoff = datetime.now(UTC) - pd.Timedelta(days=days)
+                query_trades = query_trades.filter(Trade.created_at >= cutoff)
+                query_signals = query_signals.filter(ModelSignal.created_at >= cutoff)
+                query_risk = query_risk.filter(RiskEvent.created_at >= cutoff)
+
+            trades_raw = query_trades.all()
+            signals_raw = query_signals.all()
+            risk_raw = query_risk.all()
 
             # Analyze durations
             durations = self.analyze_trade_durations(trades_raw)
