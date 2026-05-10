@@ -441,15 +441,6 @@ def run_live(
                                 cfg.symbol,
                                 filter_decision.blocked_by,
                             )
-                            if audit_logger:
-                                audit_logger.log_blocked_trade(
-                                    symbol=cfg.symbol,
-                                    reason=f"Execution filter blocked: {filter_decision.blocked_by}",
-                                    context={
-                                        "direction": signal.direction,
-                                        "trace": filter_decision.trace,
-                                    },
-                                )
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)

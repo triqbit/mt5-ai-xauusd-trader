@@ -87,20 +87,6 @@ class AuditedRiskManager(RiskManager):
                 signal.direction,
                 reason_str,
             )
-
-            # Explicitly log blocked trade to audit trail
-            try:
-                audit = get_audit_logger()
-                audit.log_blocked_trade(
-                    symbol=signal.symbol,
-                    reason=f"Risk filters failed: {reason_str}",
-                    context={
-                        "direction": signal.direction,
-                        "decision_chain": decision_chain,
-                    },
-                )
-            except (RuntimeError, ImportError):
-                pass
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
