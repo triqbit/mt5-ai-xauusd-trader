@@ -47,7 +47,7 @@ The following patterns trigger an automatic block and escalation:
 2. **Notification:** A comment is posted explaining the policy violation.
 3. **Review:** A Lead Engineer or Product Owner must perform a deep-dive review.
 4. **Validation:** Manual verification in a staging environment is mandatory.
-5. **Approval:** Two senior approvals (including one from `@andonly1348`) are required for any change labeled `escalated-risk`.
+5. **Approval:** Two senior approvals (including one from the Release/Governance Lead) are required for any change labeled `escalated-risk`.
 
 ## Audit Log of Auto-Merge Decisions
 

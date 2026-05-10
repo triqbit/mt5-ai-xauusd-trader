@@ -174,7 +174,8 @@ jobs:
 
           gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, secrets, or infrastructure are automatically escalated."
           gh pr merge $PR_NUMBER --disable-auto || true
-          exit 1
+          # We exit 0 because 'blocking' auto-merge is a valid policy outcome, not a workflow failure.
+          exit 0
 
   enable-auto-merge:
     name: Enable Auto-Merge
