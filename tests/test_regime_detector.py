@@ -241,5 +241,47 @@ class TestRegimeDetector(unittest.TestCase):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
+    def test_nan_handling_in_features(self):
+        """Verify robust feature extraction under incomplete data."""
+        data = pd.DataFrame({
+            'close': [1000.0] * 50,
+            'high': [1000.1] * 50,
+            'low': [999.9] * 50
+        })
+        # Inject NaNs
+        data.iloc[10:20, 0] = np.nan
+
+        features = self.detector._extract_features(data)
+        self.assertFalse(features.isnull().values.any())
+        # Check specific fills
+        self.assertEqual(features['efficiency_ratio'].iloc[0], 0.5)
+        self.assertEqual(features['atr_ratio'].iloc[0], 1.0)
+
+    def test_regime_info_raw_features(self):
+        """Ensure transparency data is correctly populated in the output object."""
+        np.random.seed(42)
+        data = pd.DataFrame({
+            'close': 2000.0 + np.random.randn(50) * 0.1,
+            'high': 2000.2 + np.random.randn(50) * 0.1,
+            'low': 1999.8 + np.random.randn(50) * 0.1
+        })
+        info = self.detector.detect(data)
+        self.assertIsInstance(info.raw_features, dict)
+        self.assertIn('atr_ratio', info.raw_features)
+        self.assertIn('angle', info.raw_features)
+        self.assertGreater(len(info.raw_features), 5)
+
+    def test_edge_case_flat_data(self):
+        """Ensure stability when price data is static."""
+        data = pd.DataFrame({
+            'close': [2000.0] * 100,
+            'high': [2000.0] * 100,
+            'low': [2000.0] * 100
+        })
+        info = self.detector.detect(data)
+        self.assertEqual(info.label, MarketRegime.RANGING)
+        self.assertEqual(info.confidence, 0.5) # 1.0 - er(0.5)
+        self.assertEqual(info.volatility_index, 1.0) # filled value
+
 if __name__ == '__main__':
     unittest.main()
