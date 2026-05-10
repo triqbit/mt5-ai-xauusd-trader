@@ -9,15 +9,18 @@ License: MIT
 from __future__ import annotations
 
 import contextlib
-import logging
+import json
 from enum import Enum
-from typing import Any
+from pathlib import Path
+from typing import Any, Generator
 
+import structlog
 from pydantic import BaseModel, Field
 
 from src.core.audit_log import get_audit_logger
+from src.core.config import TradingConfig
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class RejectionCode(str, Enum):
@@ -102,18 +105,33 @@ class CapitalAllocator:
         self.current_allocations: dict[str, float] = {}  # strategy_id -> current allocated amount
         self.rejection_history: dict[str, int] = {code.value: 0 for code in RejectionCode}
 
+    @staticmethod
+    def from_config(config: TradingConfig, total_budget: float) -> CapitalAllocator:
+        """
+        Factory method to initialize CapitalAllocator from TradingConfig.
+        """
+        return CapitalAllocator(
+            total_budget=total_budget,
+            max_symbol_risk=config.allocator_max_symbol_risk,
+            max_family_risk=config.allocator_max_family_risk,
+            max_total_heat=config.allocator_max_total_heat,
+            performance_step=config.allocator_performance_step,
+            decay_rate=config.allocator_decay_rate,
+            soft_limit_buffer=config.allocator_soft_limit_buffer,
+        )
+
     def add_strategy(self, config: StrategyConfig) -> None:
         """Register a new strategy for capital allocation."""
         self.strategies[config.strategy_id] = config
         if config.strategy_id not in self.current_allocations:
             self.current_allocations[config.strategy_id] = 0.0
-        logger.info("Strategy %s registered for symbol %s", config.strategy_id, config.symbol)
+        logger.info("strategy_registered", strategy_id=config.strategy_id, symbol=config.symbol)
 
     def update_budget(self, new_budget: float) -> None:
         """Dynamically update the total budget."""
         old_budget = self.total_budget
         self.total_budget = max(0.0, new_budget)
-        logger.info("Total budget updated from %.2f to %.2f", old_budget, self.total_budget)
+        logger.info("budget_updated", old_budget=old_budget, new_budget=self.total_budget)
 
     def update_allocation(self, strategy_id: str, amount: float) -> None:
         """Update the currently used capital for a strategy."""
@@ -124,7 +142,104 @@ class CapitalAllocator:
         """Explicitly release all allocated capital for a strategy."""
         if strategy_id in self.current_allocations:
             self.current_allocations[strategy_id] = 0.0
-            logger.debug("Allocation released for strategy %s", strategy_id)
+            logger.debug("allocation_released", strategy_id=strategy_id)
+
+    @contextlib.contextmanager
+    def _temporary_allocation(self, strategy_id: str, amount: float) -> Generator[None, None, None]:
+        """Temporarily set an allocation for scoring purposes, then restore."""
+        old_amt = self.current_allocations.get(strategy_id, 0.0)
+        self.current_allocations[strategy_id] = amount
+        try:
+            yield
+        finally:
+            self.current_allocations[strategy_id] = old_amt
+
+    def route_allocation(
+        self, symbol: str, risk_pct: float, allow_scaling: bool = False
+    ) -> AllocationResult | None:
+        """
+        Diversification-aware routing.
+        Selects the optimal strategy for a symbol by calculating which one
+        would result in the best portfolio diversification score.
+        """
+        eligible_strategies = [
+            sid for sid, config in self.strategies.items() if config.symbol == symbol
+        ]
+        if not eligible_strategies:
+            logger.warning("no_strategies_for_symbol", symbol=symbol)
+            return None
+
+        best_score = -1.0
+        best_result = None
+
+        for sid in eligible_strategies:
+            # Simulate allocation
+            res = self.request_allocation(sid, risk_pct, allow_scaling=allow_scaling)
+            if not res.is_allowed:
+                continue
+
+            with self._temporary_allocation(sid, res.allocated_amount):
+                score = self.get_diversification_score()
+
+            if score > best_score:
+                best_score = score
+                best_result = res
+
+        if best_result:
+            logger.info(
+                "allocation_routed",
+                symbol=symbol,
+                strategy_id=best_result.strategy_id,
+                diversification_score=best_score,
+            )
+        else:
+            logger.warning("no_eligible_strategy", symbol=symbol)
+
+        return best_result
+
+    def save_state(self, filepath: str | Path) -> None:
+        """
+        Persist strategy performance multipliers and historical PnL to a JSON file.
+        Useful for maintaining state across system restarts.
+        """
+        state = {
+            sid: {
+                "performance_multiplier": config.performance_multiplier,
+                "historical_pnl": config.historical_pnl,
+                "consecutive_losses": config.consecutive_losses,
+            }
+            for sid, config in self.strategies.items()
+        }
+        with open(filepath, "w") as f:
+            json.dump(state, f, indent=4)
+        logger.info("state_saved", filepath=str(filepath))
+
+    def load_state(self, filepath: str | Path) -> None:
+        """
+        Load strategy performance multipliers and historical PnL from a JSON file.
+        Only updates strategies that are already registered.
+        """
+        path = Path(filepath)
+        if not path.exists():
+            logger.warning("state_file_not_found", filepath=str(filepath))
+            return
+
+        with open(path) as f:
+            state = json.load(f)
+
+        for sid, data in state.items():
+            if sid in self.strategies:
+                config = self.strategies[sid]
+                config.performance_multiplier = data.get(
+                    "performance_multiplier", config.performance_multiplier
+                )
+                config.historical_pnl = data.get("historical_pnl", config.historical_pnl)
+                config.consecutive_losses = data.get(
+                    "consecutive_losses", config.consecutive_losses
+                )
+                logger.debug("state_restored", strategy_id=sid)
+
+        logger.info("state_loaded", filepath=str(filepath))
 
     def update_strategy_performance(self, strategy_id: str, pnl: float) -> None:
         """
@@ -153,9 +268,9 @@ class CapitalAllocator:
             # Cooling-off mechanism: Floor multiplier if too many losses
             if config.consecutive_losses >= config.max_consecutive_losses:
                 logger.warning(
-                    "Strategy %s hit max consecutive losses (%d). Applying cooling-off floor.",
-                    strategy_id,
-                    config.consecutive_losses,
+                    "cooling_off_triggered",
+                    strategy_id=strategy_id,
+                    consecutive_losses=config.consecutive_losses,
                 )
                 config.performance_multiplier = min(config.performance_multiplier, 0.1)
 
@@ -171,11 +286,11 @@ class CapitalAllocator:
                 )
 
         logger.debug(
-            "Strategy %s multiplier updated to %.2f | PnL: %.2f | Consecutive Losses: %d",
-            strategy_id,
-            config.performance_multiplier,
-            pnl,
-            config.consecutive_losses,
+            "performance_updated",
+            strategy_id=strategy_id,
+            multiplier=config.performance_multiplier,
+            pnl=pnl,
+            consecutive_losses=config.consecutive_losses,
         )
 
     def decay_performance_multipliers(self) -> None:
@@ -314,7 +429,7 @@ class CapitalAllocator:
         """
         if self.total_budget <= 0:
             self._record_rejection(RejectionCode.NO_BUDGET)
-            return AllocationResult(
+            res = AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
                 allocated_risk_pct=0.0,
@@ -323,10 +438,12 @@ class CapitalAllocator:
                 rejection_reason="Total budget is zero or negative",
                 rejection_code=RejectionCode.NO_BUDGET,
             )
+            self._log_and_audit(res)
+            return res
 
         if strategy_id not in self.strategies:
             self._record_rejection(RejectionCode.STRATEGY_NOT_FOUND)
-            return AllocationResult(
+            res = AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
                 allocated_risk_pct=0.0,
@@ -335,6 +452,8 @@ class CapitalAllocator:
                 rejection_reason="Strategy not registered",
                 rejection_code=RejectionCode.STRATEGY_NOT_FOUND,
             )
+            self._log_and_audit(res)
+            return res
 
         config = self.strategies[strategy_id]
         was_capped = False
@@ -351,10 +470,10 @@ class CapitalAllocator:
         # Ensure we don't exceed the absolute capital limit for this strategy.
         if target_amount > config.capital_cap:
             logger.debug(
-                "Strategy %s target amount %.2f exceeds cap %.2f",
-                strategy_id,
-                target_amount,
-                config.capital_cap,
+                "strategy_cap_exceeded",
+                strategy_id=strategy_id,
+                target_amount=target_amount,
+                cap=config.capital_cap,
             )
             target_amount = config.capital_cap
             target_risk_pct = target_amount / self.total_budget
@@ -362,7 +481,7 @@ class CapitalAllocator:
 
             if target_amount <= 0:
                 self._record_rejection(RejectionCode.CAPITAL_CAP_REACHED)
-                return AllocationResult(
+                res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
                     allocated_risk_pct=0.0,
@@ -371,6 +490,8 @@ class CapitalAllocator:
                     rejection_reason="Strategy capital cap reached or zero",
                     rejection_code=RejectionCode.CAPITAL_CAP_REACHED,
                 )
+                self._log_and_audit(res)
+                return res
 
         # 3. Diversification Guard: Linear scaling as limits are approached
         # This scales down the requested risk before hard limits are hit.
@@ -406,11 +527,12 @@ class CapitalAllocator:
             target_risk_pct *= overall_soft_scale
             was_scaled = True
             logger.debug(
-                "Diversification Guard applied scaling: %.2f (Heat: %.2f, Symbol: %.2f, Family: %.2f)",
-                overall_soft_scale,
-                heat_scale,
-                symbol_scale,
-                family_scale,
+                "diversification_guard_active",
+                strategy_id=strategy_id,
+                scale=overall_soft_scale,
+                heat_scale=heat_scale,
+                symbol_scale=symbol_scale,
+                family_scale=family_scale,
             )
 
         # 4. Hard Safety Limits: Final check of scaled amount against absolute limits
@@ -422,7 +544,7 @@ class CapitalAllocator:
                 was_capped = True
             else:
                 self._record_rejection(RejectionCode.TOTAL_HEAT_LIMIT)
-                return AllocationResult(
+                res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
                     allocated_risk_pct=0.0,
@@ -431,6 +553,8 @@ class CapitalAllocator:
                     rejection_reason=f"Total heat limit reached: {current_total_heat:.2f}",
                     rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
                 )
+                self._log_and_audit(res)
+                return res
 
         if symbol_heat + target_risk_pct > self.max_symbol_risk:
             if allow_scaling:
@@ -438,7 +562,7 @@ class CapitalAllocator:
                 was_capped = True
             else:
                 self._record_rejection(RejectionCode.SYMBOL_CONCENTRATION_LIMIT)
-                return AllocationResult(
+                res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
                     allocated_risk_pct=0.0,
@@ -447,6 +571,8 @@ class CapitalAllocator:
                     rejection_reason=f"Symbol concentration limit reached for {config.symbol}",
                     rejection_code=RejectionCode.SYMBOL_CONCENTRATION_LIMIT,
                 )
+                self._log_and_audit(res)
+                return res
 
         if family_heat + target_risk_pct > self.max_family_risk:
             if allow_scaling:
@@ -454,7 +580,7 @@ class CapitalAllocator:
                 was_capped = True
             else:
                 self._record_rejection(RejectionCode.FAMILY_CONCENTRATION_LIMIT)
-                return AllocationResult(
+                res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
                     allocated_risk_pct=0.0,
@@ -463,13 +589,15 @@ class CapitalAllocator:
                     rejection_reason=f"Family concentration limit reached for {config.model_family}",
                     rejection_code=RejectionCode.FAMILY_CONCENTRATION_LIMIT,
                 )
+                self._log_and_audit(res)
+                return res
 
         # Final check if scaling reduced it to zero
         if target_risk_pct <= 0:
             # We already checked RejectionCode.CAPITAL_CAP_REACHED in step 2.
             # If scaling brought it to 0, it means we're at some heat limit or scaling was zero.
             self._record_rejection(RejectionCode.SCALED_TO_ZERO)
-            return AllocationResult(
+            res = AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
                 allocated_risk_pct=0.0,
@@ -478,10 +606,12 @@ class CapitalAllocator:
                 rejection_reason="Scaling or safety limits reduced allocation to zero",
                 rejection_code=RejectionCode.SCALED_TO_ZERO,
             )
+            self._log_and_audit(res)
+            return res
 
         target_amount = self.total_budget * target_risk_pct
 
-        return AllocationResult(
+        res = AllocationResult(
             strategy_id=strategy_id,
             allocated_amount=target_amount,
             allocated_risk_pct=target_risk_pct,
@@ -490,6 +620,39 @@ class CapitalAllocator:
             was_capped=was_capped,
             was_scaled=was_scaled,
         )
+        self._log_and_audit(res)
+        return res
+
+    def _log_and_audit(self, result: AllocationResult) -> None:
+        """Helper to log and audit an allocation result."""
+        if result.is_allowed:
+            logger.info(
+                "allocation_allowed",
+                strategy_id=result.strategy_id,
+                amount=result.allocated_amount,
+                risk=result.allocated_risk_pct,
+            )
+        else:
+            logger.warning(
+                "allocation_rejected",
+                strategy_id=result.strategy_id,
+                reason=result.rejection_reason,
+                code=result.rejection_code,
+            )
+
+        with contextlib.suppress(RuntimeError, ImportError):
+            get_audit_logger().log_allocation_decision(
+                strategy_id=result.strategy_id,
+                requested_risk=result.requested_risk_pct,
+                allocated_amount=result.allocated_amount,
+                is_allowed=result.is_allowed,
+                rejection_code=result.rejection_code.value if result.rejection_code else None,
+                metadata={
+                    "was_capped": result.was_capped,
+                    "was_scaled": result.was_scaled,
+                    "rejection_reason": result.rejection_reason,
+                },
+            )
 
 
 __all__ = [

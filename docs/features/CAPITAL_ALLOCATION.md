@@ -16,6 +16,9 @@ The `CapitalAllocator` is an institutional-grade capital management system desig
 - **Cooling-Off Periods**: Automatically enforces a cooling-off period (capping risk multipliers at 0.1) when a strategy hits a configurable consecutive loss threshold, preventing "tilt" and protecting capital during drawdown.
 - **Programmatic Rejection Codes**: Returns specific `RejectionCode` values (e.g., `TOTAL_HEAT_LIMIT`, `SYMBOL_CONCENTRATION_LIMIT`) and maintains a `rejection_history` for audit and reporting.
 - **Dynamic Risk Adaptation**: Automatically updates strategy multipliers based on PnL outcomes and decays them back to baseline (1.0) over time.
+- **State Persistence**: Performance multipliers and historical metrics are persisted to JSON for continuity across system restarts.
+- **Institutional Audit Trail**: Integrated with the system `AuditLogger` to record every decision with granular rejection codes.
+- **Institutional Observability**: Utilizes `structlog` for structured, machine-readable execution traces and decision audits.
 
 ## Configuration
 
@@ -47,9 +50,11 @@ Each strategy is registered using a `StrategyConfig` model:
 
 ```python
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+from src.core.config import get_config
 
-# Initialize allocator
-allocator = CapitalAllocator(total_budget=100000.0)
+# Initialize allocator from system configuration
+cfg = get_config()
+allocator = CapitalAllocator.from_config(cfg, total_budget=100000.0)
 
 # Register a strategy
 gold_ppo_config = StrategyConfig(
