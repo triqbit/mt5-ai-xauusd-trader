@@ -422,7 +422,7 @@ class FeatureEngineer:
             if self.mins is None:
                 self.mins = np.nanmin(vals, axis=0)
                 self.maxs = np.nanmax(vals, axis=0)
-            denom = (self.maxs - self.mins)
+            denom = self.maxs - self.mins
             denom[denom == 0] = 1.0
             norm_vals = (vals - self.mins) / denom
             return pd.DataFrame(norm_vals, index=df.index, columns=df.columns)

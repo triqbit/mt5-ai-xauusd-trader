@@ -30,7 +30,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install quality tools
-        run: pip install ruff==0.4.3 mypy==1.10.0
+        run: pip install ruff==0.9.6 mypy==1.15.0
       - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
       - name: Ruff format (apply formatting)
@@ -39,6 +39,8 @@ jobs:
         run: ruff format --check src/ main.py
       - name: Import sort check (isort via ruff I-rules)
         run: ruff check --select I src/ main.py
+      - name: Institutional __all__ sorting check (RUF022)
+        run: ruff check --select RUF022 src/
 
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan

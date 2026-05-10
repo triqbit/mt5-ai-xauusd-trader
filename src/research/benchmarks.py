@@ -142,9 +142,7 @@ class RiskFilteredBaseline:
 class MACDStrategy:
     """Moving Average Convergence Divergence baseline."""
 
-    def __init__(
-        self, fast_window: int = 12, slow_window: int = 26, signal_window: int = 9
-    ):
+    def __init__(self, fast_window: int = 12, slow_window: int = 26, signal_window: int = 9):
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.signal_window = signal_window

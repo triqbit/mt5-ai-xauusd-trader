@@ -2,4 +2,6 @@
 
 from .gym_env import TradingEnv
 
-__all__ = ["TradingEnv"]
+__all__ = [
+    "TradingEnv",
+]

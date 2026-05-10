@@ -2,4 +2,6 @@
 
 from src.core.monitor import Monitor
 
-__all__ = ["Monitor"]
+__all__ = [
+    "Monitor",
+]
