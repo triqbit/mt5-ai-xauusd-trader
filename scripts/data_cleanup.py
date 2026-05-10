@@ -256,7 +256,7 @@ def cleanup_database(
             if not dry_run:
                 # Archiving risk events (Audit 2-year category, archived before purge)
                 if archive_records(risk_records, "risk_events", archive_dir):
-                    # Also archive associated signals before deleting risk events
+                    # Also archive associated signals and analysis before deleting risk events
                     signal_ids = {r.signal_id for r in risk_records if r.signal_id}
                     if signal_ids:
                         signals_to_archive = (
@@ -267,6 +267,18 @@ def cleanup_database(
                             .all()
                         )
                         archive_records(signals_to_archive, "linked_risk_signals", archive_dir)
+
+                        bsa_to_archive = (
+                            session.execute(
+                                select(BlockedSignalAnalysis).where(
+                                    BlockedSignalAnalysis.signal_id.in_(signal_ids)
+                                )
+                            )
+                            .scalars()
+                            .all()
+                        )
+                        if bsa_to_archive:
+                            archive_records(bsa_to_archive, "linked_risk_bsa", archive_dir)
 
                     # Bulk delete
                     ids_to_delete = [r.id for r in risk_records]
@@ -328,7 +340,7 @@ def cleanup_database(
                             )
                         )
 
-                    # Also archive associated signals before deleting trades
+                    # Also archive associated signals and analysis before deleting trades
                     signal_ids = {t.signal_id for t in trade_records if t.signal_id}
                     if signal_ids:
                         signals_to_archive = (
@@ -339,6 +351,18 @@ def cleanup_database(
                             .all()
                         )
                         archive_records(signals_to_archive, "linked_signals", archive_dir)
+
+                        bsa_to_archive = (
+                            session.execute(
+                                select(BlockedSignalAnalysis).where(
+                                    BlockedSignalAnalysis.signal_id.in_(signal_ids)
+                                )
+                            )
+                            .scalars()
+                            .all()
+                        )
+                        if bsa_to_archive:
+                            archive_records(bsa_to_archive, "linked_bsa", archive_dir)
 
                     session.execute(delete(Trade).where(Trade.id.in_(ids_to_delete)))
                 else:
