@@ -567,7 +567,7 @@ class RareEventSimulator:
             suite[event_type.value] = self.generate_scenario(config)
         return suite
 
-    def generate_report_section(
+    def to_report_section(
         self, suite_results: dict[str, tuple[pd.DataFrame, RareEventResult]]
     ) -> Any:
         """
