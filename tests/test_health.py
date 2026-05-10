@@ -123,6 +123,12 @@ def test_check_mt5_api_error(health_checker, mock_connector):
     assert status.status == HealthStatus.FAILED
     assert "API call failed" in status.message
 
+def test_check_mt5_circuit_breaker_open(health_checker, mock_connector):
+    mock_connector.circuit_state = "OPEN"
+    status = health_checker.check_mt5()
+    assert status.status == HealthStatus.DEGRADED
+    assert "circuit breaker is OPEN" in status.message
+
 def test_check_mt5_metaapi_success(health_checker, mock_connector):
     mock_connector.use_metaapi = True
     status = health_checker.check_mt5()
@@ -148,9 +154,23 @@ def test_check_models_failed(health_checker, mock_model):
     mock_model.ppo_agent = None
     mock_model.lstm_model = None
     mock_model.dreamer_agent = None
+    mock_model.transformer_model = None
+    mock_model.__class__.__name__ = "Mock"
     mock_model.model = None  # Individual wrapper check
+    # MagicMock has all attributes by default, so we must explicitly delete predict
+    if hasattr(mock_model, "predict"):
+        del mock_model.predict
     status = health_checker.check_models()
     assert status.status == HealthStatus.FAILED
+
+def test_check_models_transformer(health_checker, mock_model):
+    mock_model.ppo_agent = None
+    mock_model.lstm_model = None
+    mock_model.dreamer_agent = None
+    mock_model.transformer_model = MagicMock()
+    status = health_checker.check_models()
+    assert status.status == HealthStatus.HEALTHY
+    assert "Transformer" in status.message
 
 def test_check_models_individual_wrapper(health_checker, mock_model):
     mock_model.ppo_agent = None
