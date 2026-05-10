@@ -62,7 +62,7 @@ pytest-cov==6.0.0
 hypothesis==6.125.2
 
 # ── DevOps / CI ─────────────────────────────────────────────
-optuna==4.2.1
+optuna==4.8.0
 pre-commit==4.1.0
 black==25.1.0
 ruff==0.9.6

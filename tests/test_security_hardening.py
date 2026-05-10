@@ -99,6 +99,10 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config.max_leverage = 10
     config.max_position_size_pct = 0.1
     config.max_drawdown = 0.3
+    config.max_slippage_pips = 1.0
+    config.max_losing_streak = 3
+    config.signal_flicker_window = 6
+    config.max_signal_changes = 3
     config.model_drift_threshold = 0.3
     config.model_accuracy_floor = 0.5
     config.model_win_rate_floor = 0.45
