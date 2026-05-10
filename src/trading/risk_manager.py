@@ -387,9 +387,10 @@ class RiskManager:
             elif p_type == 1 or p_type == "SELL":
                 net_lots -= vol
 
-        net_lots += self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
-        price_estimate = 2300.0  # Gold estimate fallback
-        # This is very rough, but standardizes the check
+        # Use signal lot size for exposure impact estimate
+        net_lots += signal.lot_size if signal.direction > 0 else -signal.lot_size
+        price_estimate = signal.entry_price or 2300.0  # Entry price or fallback
+        # Gold-specific notional: price * multiplier (100) * lots
         notional = abs(net_lots) * price_estimate * 100
         exposure_pct = notional / self.balance if self.balance > 0 else 1.0
 
@@ -398,9 +399,9 @@ class RiskManager:
     def _check_total_notional(
         self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
     ) -> bool:
-        """Layer 4: Total notional < 100% equity."""
-        total_lots = sum(pos.get("volume", pos.get("lot_size", 0.0)) for pos in open_positions) + self.cfg.min_lot_size
-        price = market_data["close"].iloc[-1] if not market_data.empty else 2300.0
+        """Layer 4: Total notional < 100% equity (10x notional/equity typical cap)."""
+        total_lots = sum(pos.get("volume", pos.get("lot_size", 0.0)) for pos in open_positions) + signal.lot_size
+        price = market_data["close"].iloc[-1] if not market_data.empty else (signal.entry_price or 2300.0)
         total_notional = total_lots * price * 100
         return total_notional < (self.balance * self.cfg.max_total_notional_pct)
 

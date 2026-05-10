@@ -116,10 +116,10 @@
 - **Owner**: Jules05
 
 ### 3. Immutable Schema Conflict (TradeSignal)
-- **Conflict**: `TradeSignal` was frozen (immutable), which prevented the risk engine from adjusting the `lot_size` based on ATR volatility scaling before execution.
+- Conflict: `TradeSignal` was frozen (immutable), which prevented the risk engine from adjusting the `lot_size` based on ATR volatility scaling before execution.
 - **Agents**: Jules01, Jules02
 - **Impact**: Medium. Blocked dynamic lot sizing adjustments.
-- **Resolution**: Set `frozen=False` in `TradeSignal` model config to allow authorized mutations by the risk engine.
+- Resolution: Maintained `frozen=True` to preserve audit integrity. Updated `main.py` to use `.model_copy(update={"lot_size": ...})` for authorized risk-based sizing adjustments before execution.
 - **Owner**: Jules05
 
 ### 4. Terminology Drift (SignalDirection vs ModelAction)
