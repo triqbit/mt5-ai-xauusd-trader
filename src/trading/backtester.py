@@ -318,7 +318,12 @@ class BacktestEngine:
                                 if decision.is_approved:
                                     # Vectorized Exit Simulation: Scan future bars for SL/TP hit
                                     self._open_and_simulate_trade(
-                                        active_trades, signal, abs_idx, high_vals, low_vals, time_vals
+                                        active_trades,
+                                        signal,
+                                        abs_idx,
+                                        high_vals,
+                                        low_vals,
+                                        time_vals,
                                     )
 
                     # 4. Record equity at the end of each bar

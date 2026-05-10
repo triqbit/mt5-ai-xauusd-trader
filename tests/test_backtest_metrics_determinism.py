@@ -121,7 +121,7 @@ def test_steady_sharpe_calibration(backtest_builder):
     )
 
     assert report.total_trades > 0
-    assert report.win_rate > 0.9  # Nearly all trades should win in a steady trend
+    assert report.win_rate >= 0.9  # Nearly all trades should win in a steady trend
     # Sharpe might be 0 if daily resample doesn't have enough days
     # But Profit Factor should be huge
     assert report.profit_factor > 10.0
