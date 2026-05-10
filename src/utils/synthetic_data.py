@@ -420,9 +420,9 @@ class ExecutionScenarioBuilder:
         return signal, df, sat
 
     def drawdown_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, float]:
-        """Signal with excessive drawdown (e.g., 0.15)."""
+        """Signal with excessive drawdown (e.g., 0.40)."""
         signal, df = self.passing_buy(symbol)
-        return signal, df, 0.15
+        return signal, df, 0.40
 
     def confidence_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
         """Signal with confidence below threshold (0.4)."""
@@ -466,7 +466,7 @@ class ExecutionScenarioBuilder:
         # We define a simple dummy class to avoid importing MagicMock at the top level of src
         class DummyLogger:
             def read_performance_report(self):
-                return {"win_rate": 0.3}
+                return {"win_rate": 0.3, "total_trades": 50}
 
         return signal, df, DummyLogger()
 

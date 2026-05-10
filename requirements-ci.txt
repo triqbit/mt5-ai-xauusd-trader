@@ -23,9 +23,9 @@ pydantic-settings==2.7.1
 starlette==0.49.1
 
 # -- Testing -------------------------------------------------------
-optuna==4.8.0
-pytest==9.0.3
-pytest-asyncio==1.3.0
+optuna==4.2.1
+pytest==8.3.4
+pytest-asyncio==0.24.0
 pytest-cov==6.0.0
 pytest-mock==3.14.0
 python-telegram-bot==21.10
