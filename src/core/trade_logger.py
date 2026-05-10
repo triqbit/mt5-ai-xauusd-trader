@@ -22,12 +22,13 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
+    func,
     select,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from src.core.audit_log import get_audit_logger
+from src.core.database import get_engine, get_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -167,9 +168,9 @@ class RiskEvent(Base, AuditMixin):
     __tablename__ = "risk_events"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text)
-    symbol: Mapped[str | None] = mapped_column(String(20))
+    symbol: Mapped[str | None] = mapped_column(String(20), index=True)
 
     signal_id: Mapped[int | None] = mapped_column(ForeignKey("model_signals.id"), nullable=True)
 
@@ -180,22 +181,27 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
     max_drawdown: Mapped[float | None] = mapped_column(Float)
     total_trades: Mapped[int | None] = mapped_column(Integer)
     win_rate: Mapped[float | None] = mapped_column(Float)
 
+    __table_args__ = (
+        CheckConstraint("win_rate >= 0 AND win_rate <= 1", name="check_performance_win_rate_range"),
+        CheckConstraint("profit_factor >= 0", name="check_performance_profit_factor_non_negative"),
+    )
+
 
 class TradeLogger:
     """Enterprise trade logging interface."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
-        self.engine = create_engine(db_url)
+        self.engine = get_engine(db_url)
         # Create tables if they don't exist
         Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
+        self.Session = get_session_factory(self.engine)
         # Caching performance report to avoid O(N) DB queries on every signal
         self._perf_cache: dict[str, float] | None = None
 
@@ -269,11 +275,9 @@ class TradeLogger:
         self._perf_cache = None
 
         with self.Session() as session:
-            trade = (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
-            )
+            trade = session.execute(
+                select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+            ).scalar_one_or_none()
             if trade:
                 trade.exit_price = exit_price
                 if pnl is not None:
@@ -314,11 +318,9 @@ class TradeLogger:
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:
-            return (
-                session.query(Trade)
-                .filter(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-                .first()
-            )
+            return session.execute(
+                select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+            ).scalar_one_or_none()
 
     def log_risk_event(
         self,
@@ -351,26 +353,43 @@ class TradeLogger:
             return self._perf_cache
 
         with self.Session() as session:
-            # Optimized: only fetch pnl column for active closed trades
-            pnls = np.array(
-                session.execute(
-                    select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
-                )
-                .scalars()
-                .all()
-            )
+            # 1. Database-level aggregation for basic metrics
+            # Optimized: use func.sum and func.count to reduce application-side processing
+            stats = session.execute(
+                select(
+                    func.count(Trade.id).label("total"),
+                    func.sum(Trade.pnl).filter(Trade.pnl > 0).label("gross_profit"),
+                    func.sum(Trade.pnl).filter(Trade.pnl < 0).label("gross_loss"),
+                    func.count(Trade.id).filter(Trade.pnl > 0).label("wins"),
+                ).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+            ).one()
 
-            if len(pnls) == 0:
+            total_trades = stats.total or 0
+            if total_trades == 0:
                 return {
                     "sharpe_ratio": 0.0,
                     "profit_factor": 0.0,
                     "max_drawdown": 0.0,
+                    "win_rate": 0.0,
+                    "total_trades": 0,
                 }
 
-            # Profit Factor
-            gross_profit = np.sum(pnls[pnls > 0])
-            gross_loss = abs(np.sum(pnls[pnls < 0]))
+            gross_profit = float(stats.gross_profit or 0.0)
+            gross_loss = abs(float(stats.gross_loss or 0.0))
             profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+            win_rate = float(stats.wins or 0) / total_trades
+
+            # 2. Sharpe Ratio and Max Drawdown require the full P&L sequence
+            # Still fetch only the necessary column
+            pnls = np.array(
+                session.execute(
+                    select(Trade.pnl)
+                    .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    .order_by(Trade.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
 
             # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
             if len(pnls) > 1:
@@ -386,13 +405,12 @@ class TradeLogger:
             drawdown = peak - equity_curve
             max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
 
-            win_rate = float(np.sum(pnls > 0) / len(pnls))
             metrics = {
                 "sharpe_ratio": float(sharpe),
                 "profit_factor": float(profit_factor),
                 "max_drawdown": float(max_dd),
-                "win_rate": win_rate,
-                "total_trades": len(pnls),
+                "win_rate": float(win_rate),
+                "total_trades": int(total_trades),
             }
 
             # Update cache

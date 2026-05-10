@@ -17,10 +17,10 @@ from sqlalchemy import (
     DateTime,
     String,
     Text,
-    create_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from src.core.database import get_engine, get_session_factory
 from src.core.log_config import get_masking_processor
 
 logger = logging.getLogger(__name__)
@@ -76,9 +76,9 @@ class AuditLogger:
         if not db_url:
             raise ValueError("AuditLogger must be initialized with a db_url")
 
-        self.engine = create_engine(db_url)
+        self.engine = get_engine(db_url)
         Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
+        self.Session = get_session_factory(self.engine)
         self._initialized = True
         logger.info("AuditLogger initialized with database: %s", db_url)
 
