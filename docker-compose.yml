@@ -13,8 +13,8 @@ services:
       - "8050:8050"  # Dash dashboard
     volumes:
       - ./.env:/app/.env:ro
-      - ./logs:/app/logs
-      - ./models:/app/models:ro
+      - ./logs:/app/logs:rw
+      - ./models:/app/models:rw
     environment:
       - MODE=${MODE:-demo}
       - ALGO=${ALGO:-ensemble}

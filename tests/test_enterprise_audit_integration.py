@@ -33,6 +33,7 @@ with patch.dict("sys.modules", {
     from src.core.audit_log import AuditEntry, AuditLogger
     from src.core.config import get_config
     from src.core.constants import SignalDirection
+    from src.core.database import get_engine
     from src.trading.audited_risk_manager import AuditedRiskManager
     from src.trading.execution_filter import ExecutionFilter
     from src.trading.risk_manager import TradeSignal
@@ -42,6 +43,7 @@ def reset_audit_logger():
     """Reset the AuditLogger singleton before each test."""
     AuditLogger._instance = None
     AuditLogger._initialized = False
+    get_engine.cache_clear()
 
 @pytest.fixture
 def audit_logger():

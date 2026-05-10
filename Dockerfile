@@ -1,6 +1,6 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
-# Dockerfile (Python 3.11 slim, multi-stage build)
+# Dockerfile (Python 3.12 slim, multi-stage build)
 # Supporting linux/amd64 and linux/arm64
 # ============================================================
 
@@ -28,14 +28,14 @@ RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6
 COPY requirements-docker.txt .
 
 # Architecture-specific adjustments for PyTorch
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
+RUN if [ "$TARGETARCH" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then \
         # ARM64 (Apple Silicon / AWS Graviton): PyPI provides valid CPU wheels
         sed -i '/--extra-index-url/d' requirements-docker.txt && \
         sed -i 's/+cpu//g' requirements-docker.txt; \
     else \
         # AMD64: Explicitly use the CPU-optimized wheels from PyTorch's dedicated index
-        sed -i 's/torch==2.3.1/torch==2.3.1+cpu/g' requirements-docker.txt && \
-        sed -i 's/torchvision==0.18.1/torchvision==0.18.1+cpu/g' requirements-docker.txt; \
+        sed -i 's/torch==2.5.1/torch==2.5.1+cpu/g' requirements-docker.txt && \
+        sed -i 's/torchvision==0.20.1/torchvision==0.20.1+cpu/g' requirements-docker.txt; \
     fi
 
 # Initialize virtual environment for isolation
@@ -78,10 +78,10 @@ COPY alembic.ini .
 # Setup non-root user for production security
 RUN useradd -m -u 1000 trader
 
-# Create log directory and ensure correct ownership
-RUN mkdir -p /app/logs && \
+# Create necessary directories and ensure correct ownership
+RUN mkdir -p /app/logs /app/models && \
     chown -R trader:trader /app && \
-    chmod 755 /app/logs
+    chmod 755 /app/logs /app/models
 
 USER trader
 

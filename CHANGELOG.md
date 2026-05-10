@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- feat: refactor Dockerfile into a robust multi-stage build supporting linux/amd64 and linux/arm64.
+- feat: add optimized .dockerignore to reduce build context and image size.
+- feat: enhance docker-compose.yml with persistent volume mounts for logs and models for local development.
 - feat: refine institutional feature engineering and unit tests.
 - feat: implement 6-layer execution filter cascade strictly following README.md.
 - fix: resolve starlette and fastapi version conflicts in requirements files.
