@@ -315,11 +315,16 @@ class Monitor:
             fill_rate=fill_rate,
         )
 
-        if latency_seconds > self.cfg.execution_latency_threshold:
+        threshold = (
+            self.cfg.execution_latency_threshold
+            if hasattr(self.cfg, "execution_latency_threshold")
+            else 0.5
+        )
+        if latency_seconds > threshold:
             msg = (
                 f"🚨 CRITICAL: High Execution Latency!\n"
                 f"Latency: {latency_ms:.2f}ms\n"
-                f"Threshold: {self.cfg.execution_latency_threshold * 1000:.2f}ms"
+                f"Threshold: {threshold * 1000:.2f}ms"
             )
             self.send_message(msg)
             logger.error("high_execution_latency_alert", latency_ms=latency_ms)

@@ -9,6 +9,8 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 ### 1.1 CPU Profiling
 - **Tool**: cProfile, py-spy for runtime profiling
 - **Instrumentation**: High-resolution `profile` context manager in `src/core/profiler.py`
+    - **DEBUG Level**: All performance metrics are logged at DEBUG level by default to minimize I/O overhead.
+    - **Slow Threshold**: Supports an optional `slow_threshold_ms` parameter. If duration exceeds this threshold, the event is escalated to INFO level for visibility of latency hotspots.
 - **Granular Blocks**:
     - `compute_features_total`: Entire feature engineering pipeline.
     - `fe_base_technical`, `fe_candle_patterns`, `fe_price_action`, `fe_volume`: Specific base-timeframe feature blocks.
