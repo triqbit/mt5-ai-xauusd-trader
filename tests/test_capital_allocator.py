@@ -4,6 +4,9 @@ Unit tests for the CapitalAllocator system.
 
 import pytest
 
+from unittest.mock import MagicMock, patch
+
+from src.core.config import TradingConfig
 from src.trading.capital_allocator import (
     AllocationRequest,
     CapitalAllocator,
@@ -589,3 +592,94 @@ def test_request_allocation_no_budget(allocator):
     assert result.is_allowed is False
     assert result.rejection_code == RejectionCode.NO_BUDGET
     assert result.rejection_reason == "Total budget is zero or negative"
+
+
+def test_save_load_state(allocator, tmp_path):
+    """Test state persistence."""
+    state_file = tmp_path / "allocator_state.json"
+    s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=50000.0)
+    allocator.add_strategy(s1)
+
+    # Change some state
+    allocator.update_strategy_performance("s1", 100.0)  # multiplier becomes 1.1
+    allocator.update_strategy_performance("s1", -50.0)  # multiplier becomes 1.0, losses = 1
+    allocator.strategies["s1"].historical_pnl = 50.0
+
+    allocator.save_state(state_file)
+    assert state_file.exists()
+
+    # Create new allocator and load state
+    new_allocator = CapitalAllocator(total_budget=100000.0)
+    new_allocator.add_strategy(
+        StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=50000.0)
+    )
+
+    new_allocator.load_state(state_file)
+
+    assert new_allocator.strategies["s1"].performance_multiplier == 1.0
+    assert new_allocator.strategies["s1"].historical_pnl == 50.0
+    assert new_allocator.strategies["s1"].consecutive_losses == 1
+
+
+def test_route_allocation(allocator):
+    """Test diversification-aware routing."""
+    # S1 is on XAUUSD
+    s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=50000.0)
+    # S2 is also on XAUUSD
+    s2 = StrategyConfig(strategy_id="s2", symbol="XAUUSD", model_family="LSTM", capital_cap=50000.0)
+    # S3 is on EURUSD
+    s3 = StrategyConfig(strategy_id="s3", symbol="EURUSD", model_family="RL", capital_cap=50000.0)
+
+    allocator.add_strategy(s1)
+    allocator.add_strategy(s2)
+    allocator.add_strategy(s3)
+
+    # Allocate some capital to S3 (EURUSD) to create an initial state
+    allocator.update_allocation("s3", 10000.0)
+
+    # Now route for XAUUSD.
+    # Since both s1 and s2 are empty and on the same symbol, the diversification impact should be similar
+    # but route_allocation will pick the one that gives the best score.
+    # Here they should be equal, so it picks the first one it finds.
+    result = allocator.route_allocation("XAUUSD", 0.01)
+    assert result is not None
+    assert result.strategy_id in ["s1", "s2"]
+
+
+def test_from_config():
+    """Test initialization from TradingConfig."""
+    mock_config = MagicMock(spec=TradingConfig)
+    mock_config.allocator_max_symbol_risk = 0.5
+    mock_config.allocator_max_family_risk = 0.6
+    mock_config.allocator_max_total_heat = 0.8
+    mock_config.allocator_performance_step = 0.02
+    mock_config.allocator_decay_rate = 0.005
+    mock_config.allocator_soft_limit_buffer = 0.15
+
+    allocator = CapitalAllocator.from_config(mock_config, total_budget=200000.0)
+
+    assert allocator.total_budget == 200000.0
+    assert allocator.max_symbol_risk == 0.5
+    assert allocator.max_family_risk == 0.6
+    assert allocator.max_total_heat == 0.8
+    assert allocator.performance_step == 0.02
+    assert allocator.decay_rate == 0.005
+    assert allocator.soft_limit_buffer == 0.15
+
+
+@patch("src.trading.capital_allocator.get_audit_logger")
+def test_audit_logging(mock_get_audit_logger, allocator):
+    """Verify that allocation decisions are audited."""
+    mock_audit = MagicMock()
+    mock_get_audit_logger.return_value = mock_audit
+
+    s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=50000.0)
+    allocator.add_strategy(s1)
+
+    allocator.request_allocation("s1", 0.01)
+
+    assert mock_audit.log_allocation_decision.called
+    args, kwargs = mock_audit.log_allocation_decision.call_args
+    assert kwargs["strategy_id"] == "s1"
+    assert kwargs["requested_risk"] == 0.01
+    assert kwargs["is_allowed"] is True
