@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- feat: 🔁 Added deterministic schema drift check to migration verification pipeline.
+- feat: 🚀 Optimized migration verification CI by mocking `talib`, removing heavy C library build step.
+- feat: 🗄️ Added missing Alembic migration (62d8808c59c4) to sync database schema with SQLAlchemy models.
+- feat: 🛠️ Streamlined CI quality checks and harmonized Ruff version to 0.9.6 for deterministic linting.
 - feat: Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
 - fix: Refined validation scripts with explicit remediation messages.
 - docs: Integrated PREPROD_CHECKLIST.md validation into release gates.
