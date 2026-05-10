@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from src.core.schemas import ExecutionDecision
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -21,21 +23,6 @@ from scipy import stats
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
-
-
-@dataclass
-class ExecutionDecision:
-    """Result of the 6-layer execution filter cascade."""
-
-    signal: TradeSignal
-    confidence_score: float
-    blocked_by: str | None
-    trace: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def is_approved(self) -> bool:
-        """Returns True if the signal passed all 6 layers."""
-        return self.blocked_by is None
 
 logger = logging.getLogger(__name__)
 
