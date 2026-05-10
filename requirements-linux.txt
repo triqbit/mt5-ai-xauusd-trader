@@ -37,14 +37,14 @@ alembic==1.14.1
 redis==5.2.1
 
 # ── Monitoring & Logging ────────────────────────────────────
-starlette>=0.40.0,<0.46.0
+starlette>=1.0.0
 prometheus-client==0.21.1
 structlog==25.1.0
 rich==13.9.4
 tqdm==4.67.1
 
 # ── Dashboard / API ─────────────────────────────────────────
-fastapi==0.115.8
+fastapi==0.136.1
 uvicorn[standard]==0.34.0
 dash==2.18.2
 plotly==6.0.0

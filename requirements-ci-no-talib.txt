@@ -19,7 +19,7 @@ redis==5.2.1
 # -- Pydantic / settings -------------------------------------------
 pydantic==2.10.6
 pydantic-settings==2.7.1
-starlette>=0.40.0,<0.46.0
+starlette>=1.0.0
 
 # -- Testing -------------------------------------------------------
 optuna==4.8.0
@@ -28,7 +28,7 @@ pytest-asyncio==1.3.0
 pytest-cov==6.0.0
 pytest-mock==3.14.0
 python-telegram-bot==21.10
-fastapi==0.115.8
+fastapi==0.136.1
 requests==2.32.3
 httpx==0.28.1
 structlog==25.1.0
