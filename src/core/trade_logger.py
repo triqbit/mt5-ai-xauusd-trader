@@ -126,7 +126,9 @@ class BlockedSignalAnalysis(Base, AuditMixin):
     __tablename__ = "blocked_signal_analysis"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    signal_id: Mapped[int] = mapped_column(ForeignKey("model_signals.id"), nullable=False, unique=True)
+    signal_id: Mapped[int] = mapped_column(
+        ForeignKey("model_signals.id"), nullable=False, unique=True
+    )
 
     opportunity_cost_pnl: Mapped[float] = mapped_column(Float, nullable=False)
     max_favorable_excursion: Mapped[float] = mapped_column(Float, nullable=False)
@@ -181,7 +183,9 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), index=True
+    )
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
     max_drawdown: Mapped[float | None] = mapped_column(Float)
