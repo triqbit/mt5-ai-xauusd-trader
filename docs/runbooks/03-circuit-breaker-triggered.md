@@ -1,5 +1,5 @@
 # Runbook 03: Circuit Breaker Triggered
-**Version:** 1.3 | **Last Updated:** 2024-05-22
+**Version:** 1.4.0 | **Last Updated:** 2024-06-01
 
 ## Overview
 Critical response procedure for when the automated `RiskManager` circuit breaker halts trading due to safety breaches (e.g., 15% equity drawdown, extreme spread, or model calibration failure).
@@ -56,12 +56,12 @@ Critical response procedure for when the automated `RiskManager` circuit breaker
 - A detailed incident report is generated and archived.
 - Circuit breaker state is cleared only after formal root cause analysis and stakeholder approval.
 
-## Verification Commands
-- `python scripts/generate_incident_report.py`
-- `sqlite3 trades.db "SELECT event_type, reason, created_at FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"`
-- `curl -s http://localhost:8000/metrics | grep circuit_breaker`
-
 ## Escalation Path
 1. **Risk Breach/Limits:** Risk Lead (@maintainer-trading).
 2. **Model Performance/Drift:** ML Lead (@maintainer-models).
 3. **P0 Financial Incident:** Business Owner (@andonly1348).
+
+## Verification Commands
+- `python scripts/generate_incident_report.py`
+- `sqlite3 trades.db "SELECT event_type, reason, created_at FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"`
+- `curl -s http://localhost:8000/metrics | grep circuit_breaker`
