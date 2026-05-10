@@ -407,11 +407,25 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    risk_decision = None
+                    risk_approved = False
+
+                    if direction != 0:
+                        # Fetch open positions for Layer 4 checks
+                        current_positions = connector.get_positions(cfg.symbol)
+                        risk_decision = risk.approve(
+                            signal,
+                            market_data=df_raw,
+                            open_positions=current_positions,
+                            model_health=health,
+                            signal_id=signal_id
+                        )
+                        risk_approved = risk_decision.is_approved
+
+                        # Apply adjusted lot size if approved
+                        if risk_approved and risk_decision.adjusted_lot_size > 0:
+                            signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
+                            lot_size = signal.lot_size
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -455,14 +469,13 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": [risk_decision.reason] if risk_decision and not risk_approved else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason if risk_decision else "No risk evaluation",
+                            "trace": risk_decision.trace if risk_decision else {},
                         }
 
                         regime_data = {
