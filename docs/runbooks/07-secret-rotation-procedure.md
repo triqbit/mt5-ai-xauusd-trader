@@ -1,5 +1,5 @@
 # Runbook 07: Secret Rotation Procedure
-**Version:** 1.3 | **Last Updated:** 2024-05-22
+**Version:** 1.4.0 | **Last Updated:** 2024-06-01
 
 ## Overview
 Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Telegram Bot Token) safely to maintain system security and compliance.
@@ -59,14 +59,14 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
 - No "Invalid Credentials", "401 Unauthorized", or "Authentication Failed" errors appear in logs.
 - Connectivity to Broker, Cloud Gateway, and Alerting channels is successfully re-established.
 
+## Escalation Path
+1. **Security/Token Issues:** Security Lead (@xnessom).
+2. **Access Blocked After Rotation:** Release Reliability Engineer (Jules03).
+3. **Broker Portal Lockout:** Contact Broker Support.
+
 ## Verification Commands
 - `python scripts/validate_env.py`
 - `python scripts/doctor.py`
 - `python scripts/smoke_test.py`
 - `curl -i http://localhost:8000/health/readiness`
 - `docker logs xauusd_trader --tail 50`
-
-## Escalation Path
-1. **Security/Token Issues:** Security Lead (@xnessom).
-2. **Access Blocked After Rotation:** Release Reliability Engineer (Jules03).
-3. **Broker Portal Lockout:** Contact Broker Support.

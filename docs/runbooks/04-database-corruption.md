@@ -1,5 +1,5 @@
 # Runbook 04: Database Corruption Recovery
-**Version:** 1.3 | **Last Updated:** 2024-05-22
+**Version:** 1.4.0 | **Last Updated:** 2024-06-01
 
 ## Overview
 Procedures for recovering from SQLite corruption in `trades.db` or `audit.db`. This runbook leverages the built-in backup and verification framework defined in `docs/DISASTER_RECOVERY.md`.
@@ -66,14 +66,14 @@ bash scripts/backup_verify.sh
 - The bot starts without `SQLAlchemy` or `DatabaseError` exceptions.
 - Recent trade and audit data is preserved (Recovery Point Objective < 1 hour).
 
+## Escalation Path
+1. **DB Connection Failures:** DevOps Lead (@maintainer-quality).
+2. **Significant Data Loss:** Release Reliability Engineer (Jules03).
+3. **Data Integrity Audit:** Compliance Officer.
+
 ## Verification Commands
 - `sqlite3 trades.db "PRAGMA integrity_check;"`
 - `sqlite3 audit.db "PRAGMA integrity_check;"`
 - `bash scripts/backup_verify.sh`
 - `python scripts/doctor.py`
 - `curl -s http://localhost:8000/health/readiness`
-
-## Escalation Path
-1. **DB Connection Failures:** DevOps Lead (@maintainer-quality).
-2. **Significant Data Loss:** Release Reliability Engineer (Jules03).
-3. **Data Integrity Audit:** Compliance Officer.

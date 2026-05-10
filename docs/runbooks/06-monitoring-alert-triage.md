@@ -1,5 +1,5 @@
 # Runbook 06: Monitoring Alert Triage
-**Version:** 1.3 | **Last Updated:** 2024-05-22
+**Version:** 1.4.0 | **Last Updated:** 2024-06-01
 
 ## Overview
 Defined process for triaging alerts from Telegram and Prometheus/Grafana. This ensures that the most critical events (P0/P1) are addressed with priority to minimize capital risk.
@@ -50,10 +50,16 @@ Defined process for triaging alerts from Telegram and Prometheus/Grafana. This e
 2. Post a brief "Resolved" message in the Telegram channel with the root cause (e.g., "Resolved: MetaAPI Cloud outage restored by provider").
 
 ## Expected Outcomes
-- Response targets (TTO) are consistently met.
+- Response targets (TTO) are consistently met per `docs/SLO_TARGETS.md`.
 - Root causes are identified using standardized scripts and tools.
 - Correct specialized runbooks are engaged based on alert symptoms.
-- No P0/P1 alert remains unacknowledged for more than 15 minutes.
+- No P0 alert remains unacknowledged for more than 5 minutes.
+- No P1 alert remains unacknowledged for more than 15 minutes.
+
+## Escalation Path
+1. **P0 Financial/Capital Incident:** Business Owner (@andonly1348).
+2. **P1 Service Outage:** Release Reliability Engineer (Jules03).
+3. **P2/P3 Operational:** Primary On-Call Engineer.
 
 ## Verification Commands
 - `python scripts/generate_incident_report.py`
@@ -61,8 +67,3 @@ Defined process for triaging alerts from Telegram and Prometheus/Grafana. This e
 - `python scripts/smoke_test.py`
 - `curl -s http://localhost:8000/health/readiness`
 - `curl -s http://localhost:8000/metrics | grep health_gauges`
-
-## Escalation Path
-1. **P0 Financial/Capital Incident:** Business Owner (@andonly1348).
-2. **P1 Service Outage:** Release Reliability Engineer (Jules03).
-3. **P2/P3 Operational:** Primary On-Call Engineer.
