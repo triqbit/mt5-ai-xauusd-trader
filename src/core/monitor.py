@@ -78,6 +78,13 @@ DATA_FRESHNESS_GAUGE = Gauge(
     "trading_data_freshness_seconds", "Age of latest data point in seconds"
 )
 
+# 6. Internal Rejection Metrics
+INTERNAL_REJECTION_COUNTER = Counter(
+    "trading_internal_rejections_total",
+    "Total count of signals blocked by internal gates",
+    ["component", "reason"],
+)
+
 
 class Monitor:
     """
@@ -405,6 +412,18 @@ class Monitor:
             msg = f"⚠️ WARNING: Data Stale!\nLast Data Point: {age / 60:.1f} minutes ago."
             self.send_message(msg)
             logger.warning("stale_data_alert", age_seconds=age)
+
+    def record_internal_rejection(self, component: str, reason: str) -> None:
+        """
+        Record a signal rejection by an internal gate (RiskManager, ExecutionFilter, etc.)
+        Increments Prometheus counter and logs structured event.
+        """
+        INTERNAL_REJECTION_COUNTER.labels(component=component, reason=reason).inc()
+        logger.info(
+            "internal_signal_rejection",
+            component=component,
+            reason=reason,
+        )
 
     def alert_inference_timeout(self, latency_ms: float, threshold_ms: float) -> None:
         """Send warning for model inference timeout."""

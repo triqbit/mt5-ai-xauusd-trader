@@ -17,17 +17,18 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, Optional
+
+import structlog
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Ray Dalio All-Weather allocation weights
 ALLOCATION_WEIGHTS: Dict[str, float] = {
@@ -107,11 +108,13 @@ class RiskManager:
         passed = rejection_reason == ""
         if not passed:
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
+                "signal_rejected",
+                symbol=signal.symbol,
+                direction=signal.direction,
+                reason=rejection_reason,
             )
+            if self.monitor:
+                self.monitor.record_internal_rejection("risk_manager", rejection_reason)
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
@@ -176,9 +179,9 @@ class RiskManager:
     def _check_consecutive_losses(self) -> bool:
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
             logger.warning(
-                "Losing streak limit hit: %d (Limit: %d)",
-                self.daily.consecutive_losses,
-                self.cfg.max_losing_streak,
+                "losing_streak_limit_hit",
+                consecutive_losses=self.daily.consecutive_losses,
+                limit=self.cfg.max_losing_streak,
             )
             return False
         return True
@@ -193,19 +196,19 @@ class RiskManager:
 
         if drift > self.cfg.model_drift_threshold:
             logger.warning(
-                "Model drift too high: %.2f > %.2f", drift, self.cfg.model_drift_threshold
+                "model_drift_too_high", drift=drift, threshold=self.cfg.model_drift_threshold
             )
             return False
         if accuracy < self.cfg.model_accuracy_floor:
             logger.warning(
-                "Model accuracy too low: %.2f < %.2f", accuracy, self.cfg.model_accuracy_floor
+                "model_accuracy_too_low", accuracy=accuracy, floor=self.cfg.model_accuracy_floor
             )
             return False
         if calibration > self.cfg.model_calibration_threshold:
             logger.warning(
-                "Model calibration error too high: %.2f > %.2f",
-                calibration,
-                self.cfg.model_calibration_threshold,
+                "model_calibration_error_too_high",
+                calibration=calibration,
+                threshold=self.cfg.model_calibration_threshold,
             )
             return False
 
@@ -215,8 +218,8 @@ class RiskManager:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
         if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
             logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
-                drawdown * 100,
+                "circuit_breaker_triggered",
+                drawdown_pct=drawdown * 100,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
@@ -233,7 +236,7 @@ class RiskManager:
             return True
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
         if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
+            logger.warning("daily_loss_limit_hit", loss_pct=loss_pct * 100)
             return False
         return True
 
@@ -246,7 +249,7 @@ class RiskManager:
     def _check_symbol_allocation(self, symbol: str) -> bool:
         """Block trading on symbols not in the All-Weather portfolio."""
         if symbol not in ALLOCATION_WEIGHTS:
-            logger.warning("Symbol %s not in approved portfolio", symbol)
+            logger.warning("symbol_not_in_approved_portfolio", symbol=symbol)
             return False
         return True
 

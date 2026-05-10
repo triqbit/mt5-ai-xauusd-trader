@@ -8,7 +8,6 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -16,10 +15,12 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
+import structlog
 from scipy import stats
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
+    from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
 
 
@@ -37,7 +38,8 @@ class ExecutionDecision:
         """Returns True if the signal passed all 6 layers."""
         return self.blocked_by is None
 
-logger = logging.getLogger(__name__)
+
+logger = structlog.get_logger(__name__)
 
 
 class ExecutionFilter:
@@ -57,12 +59,14 @@ class ExecutionFilter:
         max_drawdown: float = 0.12,
         rsi_period: int = 14,
         config: TradingConfig | None = None,
+        monitor: Monitor | None = None,
     ):
         self.cfg = config
         self.max_drawdown = (
             config.max_drawdown if config and hasattr(config, "max_drawdown") else max_drawdown
         )
         self.rsi_period = rsi_period
+        self.monitor = monitor
         self._signal_history: dict[str, deque[int]] = {}
 
     def validate(
@@ -202,6 +206,9 @@ class ExecutionFilter:
             if layer_key in trace and not trace[layer_key]["passed"]:
                 blocked_by = reason
                 break
+
+        if blocked_by and self.monitor:
+            self.monitor.record_internal_rejection("execution_filter", blocked_by)
 
         return ExecutionDecision(
             signal=signal,
