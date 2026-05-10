@@ -155,7 +155,7 @@ class TestMonitor(unittest.TestCase):
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            self.monitor.log_system_error("MT5", "Connection failed")
+            self.monitor.log_system_error("MT5", "Connection failed", trace_id="test-trace-uuid")
 
             mock_labels.assert_called_once_with(component="MT5")
             mock_counter.inc.assert_called_once()
@@ -164,6 +164,7 @@ class TestMonitor(unittest.TestCase):
             self.assertIn("SYSTEM ERROR", msg)
             self.assertIn("MT5", msg)
             self.assertIn("Connection failed", msg)
+            self.assertIn("test-trace-uuid", msg)
 
     def test_update_performance_metrics(self):
         with patch.object(WIN_RATE_GAUGE, "set") as mock_win_set, patch.object(
@@ -314,13 +315,18 @@ class TestMonitor(unittest.TestCase):
             mock_hist = MagicMock()
             mock_labels.return_value = mock_hist
 
-            with self.monitor.track_block_duration("test_block"):
+            with self.monitor.track_block_duration("test_block", trace_id="trace-123"):
                 time.sleep(0.1)
 
             mock_labels.assert_called_once_with(block_label="test_block")
             mock_hist.observe.assert_called_once()
             duration = mock_hist.observe.call_args[0][0]
             self.assertGreaterEqual(duration, 0.1)
+
+    def test_generate_trace_id(self):
+        trace_id = self.monitor.generate_trace_id()
+        self.assertIsInstance(trace_id, str)
+        self.assertEqual(len(trace_id), 36)  # UUID4 length
 
     def test_alert_liquidity_crisis(self):
         self.monitor.bot = MagicMock()
