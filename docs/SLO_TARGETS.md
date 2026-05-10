@@ -8,9 +8,9 @@ Uptime is defined as the percentage of time the system is operational and capabl
 
 | Metric | Target | Measurement Method |
 |--------|--------|--------------------|
-| **System Uptime (Live Mode)** | **99.5%** | `/health/readiness` probe success rate (Prometheus: `up{job="mt5-bot"}`). |
+| **System Uptime (Live Mode)** | **99.5%** | `/health/readiness` probe success rate (Prometheus: `system_component_health{component="liveness"}`). |
 | **API Availability** | 99.9% | Percentage of 2xx/3xx responses from health/metrics endpoints. |
-| **MT5 Connectivity** | 99.0% | `MT5Connector.is_initialized` status during market hours. |
+| **MT5 Connectivity** | 99.0% | Prometheus: `system_component_health{component="mt5"}` status during market hours. |
 
 **Acceptable Downtime:** ~3.6 hours per 30-day rolling window during market hours.
 
@@ -52,7 +52,7 @@ Defined in the [Disaster Recovery Plan](DISASTER_RECOVERY.md).
 
 | Metric | Target | Measurement Method |
 |--------|--------|--------------------|
-| **Recovery Time Objective (RTO)** | **15 mins** | Time from incident detection to `system_restored` event in audit log. |
+| **Recovery Time Objective (RTO)** | **15 mins** | Time from incident detection to `system_restored` event in audit log (logged via `AuditLogger.log_system_restored`). |
 | **Recovery Point Objective (RPO)** | **1 hour** | Maximum data age in the most recent valid database backup (`backup_verify.sh` logs). |
 
 ## 6. Error Budget Framework (30-Day Rolling Window)
