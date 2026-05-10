@@ -216,7 +216,10 @@ class RegimeDetector:
             if self.transition_matrix is not None and self._last_regime != MarketRegime.UNKNOWN:
                 from_regime = self._last_regime.value
                 to_regime = label.value
-                if from_regime in self.transition_matrix.index and to_regime in self.transition_matrix.columns:
+                if (
+                    from_regime in self.transition_matrix.index
+                    and to_regime in self.transition_matrix.columns
+                ):
                     prob = self.transition_matrix.loc[from_regime, to_regime]
                     transition_score = (transition_score + (1.0 - prob)) / 2.0
         else:
@@ -238,7 +241,7 @@ class RegimeDetector:
                 previous=str(self._last_regime),
                 current=str(label),
                 confidence=regime_info.confidence,
-                transition_score=regime_info.transition_score
+                transition_score=regime_info.transition_score,
             )
             self._last_regime = label
 
@@ -285,10 +288,7 @@ class RegimeDetector:
 
         # Transition score heuristic
         transition_score = (
-            abs(atr_ratio - 1.0) * 0.3
-            + abs(er - 0.5) * 0.3
-            + abs(vc) * 0.2
-            + min(vov / 3.0, 0.2)
+            abs(atr_ratio - 1.0) * 0.3 + abs(er - 0.5) * 0.3 + abs(vc) * 0.2 + min(vov / 3.0, 0.2)
         )
         return label, confidence, transition_score
 
@@ -620,8 +620,7 @@ class RegimeDetector:
         probs = self._gmm.predict_proba(X)
         cluster_indices = np.argmax(probs, axis=1)
         regimes = [
-            self._cluster_to_regime.get(idx, MarketRegime.RANGING).value
-            for idx in cluster_indices
+            self._cluster_to_regime.get(idx, MarketRegime.RANGING).value for idx in cluster_indices
         ]
 
         regime_series = pd.Series(regimes)

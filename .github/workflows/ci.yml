@@ -8,7 +8,7 @@ on:
 
 # ===========================================================
 # Self-enforcing CI:
-# quality  -> ruff lint, ruff format check, import sort check
+# quality  -> ruff lint, ruff format check
 # security -> pip-audit vulnerability scan
 # test     -> pytest with coverage
 # docker   -> build image (main branch only)
@@ -17,7 +17,7 @@ on:
 jobs:
 
   # -----------------------------------------------------------
-  # JOB 1: Code Quality - lint + format + imports
+  # JOB 1: Code Quality - lint + format
   # -----------------------------------------------------------
   quality:
     name: Code Quality
@@ -30,15 +30,11 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install quality tools
-        run: pip install ruff==0.4.3 mypy==1.10.0
-      - name: Ruff lint (auto-fixable violations fail the build)
+        run: pip install ruff==0.9.6 mypy==1.10.0
+      - name: Ruff check (includes isort and lint)
         run: ruff check src/ main.py
-      - name: Ruff format (apply formatting)
-        run: ruff format src/ main.py
       - name: Ruff format check (formatting enforced)
         run: ruff format --check src/ main.py
-      - name: Import sort check (isort via ruff I-rules)
-        run: ruff check --select I src/ main.py
 
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan

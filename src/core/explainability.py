@@ -30,7 +30,9 @@ class FeatureContribution(BaseModel):
     Provides both quantitative (score) and qualitative (impact, summary) attribution.
     """
 
-    cluster_name: str = Field(..., description="Name of the feature cluster (e.g., Trend, Volatility)")
+    cluster_name: str = Field(
+        ..., description="Name of the feature cluster (e.g., Trend, Volatility)"
+    )
     contribution_score: float = Field(
         ..., description="Normalized contribution score (-1.0 to 1.0)"
     )
