@@ -316,17 +316,14 @@ class HealthChecker:
             loaded.append("Dreamer")
 
         # 2. Check for Transformer component
-        if getattr(self.model, "transformer_model", None) is not None:
-            loaded.append("Transformer")
-        elif self.model.__class__.__name__ == "TimeSeriesTransformer":
+        if getattr(self.model, "transformer_model", None) is not None or self.model.__class__.__name__ == "TimeSeriesTransformer":
             loaded.append("Transformer")
 
         # 3. Check for individual model wrapper/direct instance
-        if not loaded:
-            if getattr(self.model, "model", None) is not None:
-                loaded.append(self.model.__class__.__name__)
-            elif hasattr(self.model, "predict"):
-                loaded.append(self.model.__class__.__name__)
+        if not loaded and (
+            getattr(self.model, "model", None) is not None or hasattr(self.model, "predict")
+        ):
+            loaded.append(self.model.__class__.__name__)
 
         if not loaded:
             res = ComponentStatus(
