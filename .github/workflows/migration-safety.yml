@@ -6,7 +6,7 @@ on:
 
 jobs:
   verify:
-    name: Migration Reversibility
+    name: Migration Reversibility & Drift
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -17,24 +17,11 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install TA-Lib C library from source
+      - name: Install dependencies (No TA-Lib)
         run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y build-essential wget
-          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
-          tar -xzf ta-lib-0.6.4-src.tar.gz
-          cd ta-lib-0.6.4
-          ./configure --prefix=/usr
-          make -j2
-          sudo make install
-          cd ..
-          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
-          sudo ldconfig
+          pip install -r requirements-ci-no-talib.txt
 
-      - name: Install dependencies
+      - name: Run Migration Reversibility & Drift Check
         run: |
-          pip install -r requirements-ci.txt
-
-      - name: Run Migration Reversibility Check
-        run: python scripts/verify_migrations.py
+          export PYTHONPATH=$PYTHONPATH:.
+          python scripts/verify_migrations.py
