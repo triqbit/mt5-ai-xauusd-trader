@@ -331,5 +331,40 @@ Generic bots use lagging indicators (RSI, Moving Averages) that only react after
 
 ---
 
+## 10. Institutional Mobile Command & Control (Telegram Interactive Gatekeeper)
+
+### What it is and why it matters
+The **Institutional Mobile Command & Control** is an interactive, secure, and mobile-accessible extension of the Decision Cockpit, delivered via a Telegram bot interface. It provides real-time signal notifications with actionable "Approve" or "Reject" buttons, enabling human-in-the-loop oversight without requiring 24/7 terminal monitoring.
+
+In institutional environments, certain signals (e.g., those occurring during high-impact news or at extreme position sizes) may require a final human "sanity check." This feature transforms the bot from a passive automated script into a collaborative trading partner that can be managed securely from anywhere.
+
+### How it differentiates from generic trading bots
+Generic bots either trade fully blindly or send simple "Price Hit" alerts. The MT5 AI Trader's Mobile Command Center provides a high-fidelity briefing (consensus, regime, risk) directly in the chat, allowing the operator to make an informed decision and execute it with a single tap. It includes security features like IP-whitelisting for the bot server and authenticated session management.
+
+### Architecture Outline
+1.  **Telegram Bot Gateway**: A dedicated service in `src/interface/telegram_gateway.py` using the `python-telegram-bot` library to handle asynchronous polling or webhooks.
+2.  **Interactive Signal Payload**: A message-formatting engine that serializes the `TradeBriefing` into a readable mobile format, including inline keyboard buttons for `APPROVE`, `REJECT (1/2 SIZE)`, and `REJECT (CANCEL)`.
+3.  **Human-in-the-Loop Interlock**: A stateful gate in the `main.py` trading loop that pauses execution for signals flagged as "Require Approval" until a response is received from the Telegram gateway.
+4.  **Telemetry Push**: Periodic "Heartbeat" messages containing the current PnL, open risk, and operating mode to ensure the operator always has situational awareness.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Real-time signal delivery to Telegram with < 2s latency from signal generation. |
+| **Functional** | Interactive buttons to approve or reject trades directly from the chat. |
+| **Technical** | Support for `TELEGRAM_ADMIN_IDS` whitelist to prevent unauthorized access. |
+| **Operational** | Ability to trigger the "Emergency Kill Switch" via a specialized mobile command. |
+| **Release Readiness** | Integration tests must verify that "Require Approval" trades do not execute until sanctioned. |
+
+### Implementation Lane
+*   **Jules02 (Observability & CLI)**: Lead on Telegram bot integration, message formatting, and TUI parity.
+*   **Jules03 (Release Reliability)**: Lead on secure command execution and "Emergency Stop" mobile hooks.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires a valid Telegram Bot Token and the `python-telegram-bot` library.
+*   **Constraints**: Must handle network-induced latency gracefully; if the operator does not respond within a configurable `APPROVAL_TIMEOUT`, the trade should be automatically rejected for safety.
+
+---
+
 ## Future Differentiators (Candidates)
 - **Sentiment-Driven Order Routing** (Analyzing retail vs. institutional positioning)
