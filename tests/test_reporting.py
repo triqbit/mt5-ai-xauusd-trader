@@ -3,9 +3,7 @@ Tests for the research reporting system.
 """
 
 import os
-
 import pytest
-
 from src.research.reporting import (
     AllocationEntry,
     AllocationSection,
@@ -21,7 +19,6 @@ from src.research.reporting import (
     TradePatternSection,
     SignalMotif,
 )
-
 
 @pytest.fixture
 def sample_report():
@@ -143,6 +140,47 @@ def test_rare_event_reporting():
     assert "flash_crash" in html
     assert 'href="#rare-events"' in html
     assert 'role="progressbar"' not in html # No stress tests here
+
+def test_calibration_reporting():
+    """Verify that CalibrationResult integrates with the reporting system."""
+    from src.models.calibration import CalibrationResult, ConfidenceBucket
+
+    buckets = [
+        ConfidenceBucket(range_start=0.5, range_end=0.6, avg_confidence=0.55, accuracy=0.52, sample_count=10, deviation=0.03),
+        ConfidenceBucket(range_start=0.9, range_end=1.0, avg_confidence=0.95, accuracy=0.92, sample_count=5, deviation=0.03)
+    ]
+    cal_res = CalibrationResult(
+        brier_score=0.05,
+        reliability=0.02,
+        resolution=0.1,
+        uncertainty=0.15,
+        ece=0.04,
+        mce=0.08,
+        buckets=buckets,
+        optimal_threshold=0.65,
+        status="VERIFIED"
+    )
+
+    report = ResearchReport(
+        title="Calibration Audit",
+        executive_summary="Testing calibration.",
+        calibration_analysis=cal_res.to_report_section(),
+        conclusion="Calibrated."
+    )
+
+    reporter = ResearchReporter()
+    md = reporter.generate_markdown(report)
+    html = reporter.generate_html(report)
+
+    assert "Confidence Calibration & Reliability" in md
+    assert "0.04" in md  # ECE
+    assert "0.5-0.6" in md
+    assert "92.0%" in md
+
+    assert "Confidence Calibration & Reliability" in html
+    assert "VERIFIED" in html
+    assert "0.04" in html
+    assert "0.65" in html
 
 def test_html_dynamic_elements(sample_report):
     """Verify TOC, dynamic numbering and progress bars in HTML."""
