@@ -9,7 +9,7 @@ from src.core.explainability import (
 )
 from src.core.schemas import TradeSignal
 from src.models.regime_detector import MarketRegime, RegimeInfo
-from src.core.schemas import ExecutionDecision
+from src.trading.execution_filter import ExecutionDecision
 
 
 def test_signal_explanation_pydantic_validation():

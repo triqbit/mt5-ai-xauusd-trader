@@ -13,7 +13,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from src.core.constants import ModelAction, SignalDirection
 
@@ -28,15 +28,11 @@ class FeatureContribution(BaseModel):
     """
     Structured contribution from a specific feature cluster.
     Provides both quantitative (score) and qualitative (impact, summary) attribution.
-
-    Enforces technical trust via immutability and strict range validation.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     cluster_name: str = Field(..., description="Name of the feature cluster (e.g., Trend, Volatility)")
     contribution_score: float = Field(
-        ..., ge=-1.0, le=1.0, description="Normalized contribution score (-1.0 to 1.0)"
+        ..., description="Normalized contribution score (-1.0 to 1.0)"
     )
     impact_level: str = Field(..., description="Qualitative impact (Low, Medium, High)")
     summary: str = Field(..., description="Human-readable description of the contribution")
@@ -46,18 +42,12 @@ class ModelAttribution(BaseModel):
     """
     Detailed breakdown of an individual model's contribution to the ensemble decision.
     Tracks alignment, confidence, and relative dominance within the group.
-
-    Enforces technical trust via immutability and strict range validation.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     model_name: str = Field(..., description="Name of the model (e.g., PPO, LSTM)")
     vote: SignalDirection = Field(..., description="The direction voted by this model")
-    confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="Model's internal confidence score"
-    )
-    weight: float = Field(..., ge=0.0, le=1.0, description="Weight of this model in the ensemble")
+    confidence: float = Field(..., description="Model's internal confidence score")
+    weight: float = Field(..., description="Weight of this model in the ensemble")
     is_dominant: bool = Field(False, description="Whether this model drove the final decision")
 
 
@@ -65,19 +55,15 @@ class RiskAssessment(BaseModel):
     """
     Summary of institutional risk management constraints applied to the signal.
     Captures rejection reasons, R:R quality, and Kelly-based sizing suggestions.
-
-    Enforces technical trust via immutability and strict range validation.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     passed: bool = Field(..., description="Whether the signal passed all risk filters")
     rejection_reasons: list[str] = Field(
         default_factory=list, description="Reasons for rejection if any"
     )
-    risk_reward_ratio: float = Field(0.0, ge=0.0, description="Calculated R:R for the trade")
-    drawdown_impact_pct: float = Field(0.0, ge=0.0, description="Estimated impact on total drawdown")
-    kelly_fraction: float = Field(0.0, ge=0.0, le=1.0, description="Kelly Criterion suggested sizing")
+    risk_reward_ratio: float = Field(0.0, description="Calculated R:R for the trade")
+    drawdown_impact_pct: float = Field(0.0, description="Estimated impact on total drawdown")
+    kelly_fraction: float = Field(0.0, description="Kelly Criterion suggested sizing")
     summary: str = Field(
         "No risk data provided", description="Human-readable risk assessment summary"
     )
@@ -87,16 +73,12 @@ class RegimeContext(BaseModel):
     """
     Institutional market regime context at the time of signal generation.
     Decomposes the macro state into regime labels, volatility levels, and strategy favorability.
-
-    Enforces technical trust via immutability and strict range validation.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     regime_name: str = Field(
         "Unknown", description="Detected market regime (e.g., Trending, Ranging)"
     )
-    confidence: float = Field(0.0, ge=0.0, le=1.0, description="Regime detection confidence")
+    confidence: float = Field(0.0, description="Regime detection confidence")
     volatility_state: str = Field(
         "Normal", description="Current volatility level (Low, Normal, High, Extreme)"
     )
@@ -110,11 +92,7 @@ class FilterResult(BaseModel):
     """
     Institutional audit record for an individual execution filter.
     Captures the pass/fail status along with observed values and their respective thresholds.
-
-    Enforces technical trust via immutability.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     filter_name: str = Field(..., description="Name of the filter (e.g., Spread, Momentum)")
     passed: bool = Field(..., description="Whether the filter passed")
@@ -127,11 +105,7 @@ class ExecutionSummary(BaseModel):
     """
     Unified summary of the institutional execution filter cascade.
     Aggregates results from multiple technical and operational gates before signal release.
-
-    Enforces technical trust via immutability.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     passed: bool = Field(..., description="Whether all execution filters passed")
     filters: list[FilterResult] = Field(default_factory=list, description="Detailed filter results")
@@ -143,11 +117,7 @@ class SignalExplanation(BaseModel):
     Institutional-grade root explanation object for a trade signal.
     Aggregates execution, model, feature, risk, and regime data into a unified
     structure suitable for real-time dashboards, post-trade analysis, and regulatory auditing.
-
-    Enforces technical trust via immutability and strict range validation.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True, use_enum_values=False)
 
     signal_id: int | None = Field(None, description="Database ID of the signal")
     timestamp: datetime = Field(
@@ -156,9 +126,7 @@ class SignalExplanation(BaseModel):
     )
     symbol: str = Field(..., description="Trading symbol (e.g., XAUUSD)")
     direction: SignalDirection = Field(..., description="Final ensemble signal direction")
-    total_confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="Aggregated ensemble confidence score"
-    )
+    total_confidence: float = Field(..., description="Aggregated ensemble confidence score")
 
     # Components
     execution_summary: ExecutionSummary = Field(..., description="Execution-level filter breakdown")
@@ -176,6 +144,8 @@ class SignalExplanation(BaseModel):
     machine_attribution: dict[str, Any] = Field(
         ..., description="Key-value pairs for automated post-trade analysis"
     )
+
+    model_config = {"use_enum_values": False}
 
 
 class SignalExplainer:
@@ -336,12 +306,10 @@ class SignalExplainer:
                 )
             )
 
-        # Finalize dominant models (requires creating new instances as models are frozen)
-        if dominant_models:
-            attributions = [
-                attr.model_copy(update={"is_dominant": True}) if attr.model_name in dominant_models else attr
-                for attr in attributions
-            ]
+        # Finalize dominant models
+        for attr in attributions:
+            if attr.model_name in dominant_models:
+                attr.is_dominant = True
 
         # 3. Risk Assessment
         risk_assessment = RiskAssessment(

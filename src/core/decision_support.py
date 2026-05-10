@@ -39,26 +39,26 @@ class PerformanceContext(BaseModel):
     Recent performance metrics for the current strategy/account.
     Enables the operator to understand the strategy's current state.
 
-    Enforces technical trust via immutability and strict range validation.
+    This model is immutable (frozen) and forbids extra fields.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     sharpe_ratio: float = Field(
-        0.0, ge=-10.0, le=10.0, description="Risk-adjusted return (Sharpe Ratio). Target > 2.0 per standards."
+        0.0, description="Risk-adjusted return (Sharpe Ratio). Target > 2.0 per standards."
     )
     profit_factor: float = Field(
-        0.0, ge=0.0, description="Gross Profit / Gross Loss. Target > 2.0 per standards."
+        0.0, description="Gross Profit / Gross Loss. Target > 2.0 per standards."
     )
     recovery_factor: float = Field(
-        0.0, ge=0.0, description="Net Profit / Max Drawdown. Target > 2.0 per standards."
+        0.0, description="Net Profit / Max Drawdown. Target > 2.0 per standards."
     )
     win_rate: float = Field(
         0.0, ge=0.0, le=1.0, description="Percentage of winning trades (0.0 to 1.0)."
     )
-    win_loss_ratio: float = Field(0.0, ge=0.0, description="Average Win / Average Loss.")
+    win_loss_ratio: float = Field(0.0, description="Average Win / Average Loss.")
     max_drawdown: float = Field(
-        0.0, ge=0.0, le=1.0, description="Maximum observed equity drawdown from peak to trough."
+        0.0, description="Maximum observed equity drawdown from peak to trough."
     )
     total_trades: int = Field(0, ge=0, description="Count of trades analyzed in this window.")
 
@@ -68,7 +68,7 @@ class DecisionPacket(BaseModel):
     Unified packet for operator review before trade execution.
     Aggregates all critical dimensions of a trading decision for institutional trust.
 
-    Enforces technical trust via immutability and deterministic state validation.
+    This model is immutable (frozen) and forbids extra fields.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
