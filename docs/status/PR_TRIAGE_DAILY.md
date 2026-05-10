@@ -1,22 +1,23 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-05-10 13:17:28 UTC
+**Date:** 2026-05-10 14:08:25 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (434)
+- High number of open PRs (435)
 
 ---
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Address Turbulence:** High number of open PRs (434)
-2. **Core Progress:** Review Medium Risk PR #976 (Implement Full Audit Trail for Compliance and Debugging)
+1. **Address Turbulence:** High number of open PRs (435)
+2. **Core Progress:** Review Medium Risk PR #994 (feat: implement institutional journal mining intelligence)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|-----------|------------|-------------|
+| [994](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/994) | feat: implement institutional journal mining intelligence | saysgrok | `feat/journal-mining-intelligence-10575820448845383664` | pending | Medium Risk | New |
 | [989](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/989) | Resolve all CI failures and harmonize dependencies | triqbit | `fix-ci-failures-and-imports-final-14474084974891750530` | pending | High Risk | New |
 | [985](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/985) | feat: 📡 Jules02: Observability improvement — Structured rejection tracking | xnessom | `jules02/observability-rejection-tracking-8766634053177925619` | pending | High Risk | New |
 | [984](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/984) | feat: 🔁 Jules02: CI quality gate improvement — deterministic migration drift check | xnessom | `jules02-ci-migration-drift-check-1842948954929956371` | pending | High Risk | New |
@@ -36,7 +37,7 @@
 | [917](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/917) | feat: 🗄️ Jules02: Database reliability improvement — Centralize database management and session handling | xnessom | `jules02/centralize-db-3625103350412574808` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [912](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/912) | 🛡️ Jules02: Risk control and drift monitoring — Volatility-aware and regime-adaptive safeguards | xnessom | `jules02-risk-hardening-volatility-regime-980568004115244000` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [908](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/908) | Implement Comprehensive Enterprise Audit Trail | andonly1348 | `feature/enterprise-audit-trail-6497387635214808056` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [895](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/895) | Scaffold Enterprise Core and Institutional Trading Logic | triqbit | `scaffold-enterprise-core-1581668055466054132` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [895](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/895) | Scaffold Enterprise Core and Institutional Trading Logic | triqbit | `scaffold-enterprise-core-1581668055466054132` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [890](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/890) | docs: 📊 jules05: daily progress report 2026-05-08 | yxynoty | `docs/daily-progress-report-2026-05-08-10155964672664604761` | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [889](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/889) | 🧹 Jules05: Technical debt cleanup — architectural harmonization and quality | yxynoty | `jules05/debt-cleanup-harmonization-11281418275541400240` | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [883](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/883) | 🔧 Jules05: Resolve cross-agent risk and sizing conflicts | yxynoty | `jules05-resolve-risk-conflicts-12857142660277910343` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
@@ -455,13 +456,14 @@
 ## 🛡️ Risk Classification Summary
 
 - **High Risk (New):** 5 PRs
-- **Medium Risk (New):** 3 PRs
+- **Medium Risk (New):** 4 PRs
 - **Safe Surface (New):** 0 PRs
 - **Triage Required (New):** 0 PRs
 - **Stale (Total):** 426 PRs
 
 ## ✨ Good Candidates for Review Today
 
+- **PR #994**: feat: implement institutional journal mining intelligence (saysgrok) [CI: pending] - *Medium Risk*
 - **PR #976**: Implement Full Audit Trail for Compliance and Debugging (andonly1348) [CI: pending] - *Medium Risk*
 - **PR #975**: fix: 🛠️ Jules02: Resilience improvement — Hardening MT5 data paths (xnessom) [CI: pending] - *Medium Risk*
 - **PR #965**: Robust Startup Configuration Validation Layer (andonly1348) [CI: pending] - *Medium Risk*
