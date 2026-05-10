@@ -617,94 +617,172 @@ class MT5Connector:
                 raise MT5ExecutionError(f"MetaAPI order placement failed: {e}") from e
 
     def get_account_balance(self) -> float:
-        """Retrieve current account balance."""
+        """
+        Retrieve current account balance.
+        Propagates MT5DataError if account info retrieval fails.
+        """
         info = self.get_account_info()
-        # MT5 standard field is 'balance', MetaAPI is 'balance'
-        return float(info.get("balance", 0.0))
+        # Hard access to 'balance' to ensure we don't return a misleading 0.0 on partial failures
+        return float(info["balance"])
 
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_account_info(self) -> Dict[str, Any]:
-        """Retrieve account information."""
-        if not self._is_initialized:
-            return {}
-        if not self.use_metaapi:
-            acc = mt5.account_info()
-            return acc._asdict() if acc else {}
-        else:
-            return self._run_async(self.metaapi_connection.get_account_information())
+        """Retrieve account information with retry and circuit breaker."""
+        return self.breaker(self._get_account_info_logic)()
 
+    def _get_account_info_logic(self) -> Dict[str, Any]:
+        """Internal account info retrieval logic wrapped by circuit breaker."""
+        if not self._is_initialized:
+            self.initialize()
+
+        try:
+            if not self.use_metaapi:
+                acc = mt5.account_info()
+                if acc is None:
+                    err_code, err_desc = mt5.last_error()
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
+                        self._is_initialized = False
+                    raise MT5DataError(f"Failed to get account info: {err_desc} (code: {err_code})")
+                return acc._asdict()
+            else:
+                return self._run_async(self.metaapi_connection.get_account_information())
+        except Exception as e:
+            if isinstance(e, (MT5DataError, MT5ConnectionError)):
+                raise
+            logger.exception("unexpected_error_in_get_account_info", error=str(e))
+            self._is_initialized = False
+            raise MT5DataError(f"Unexpected account info retrieval error: {e}") from e
+
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Retrieve open positions."""
-        if not self._is_initialized:
-            return []
-        if not self.use_metaapi:
-            positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
-            return [p._asdict() for p in positions] if positions else []
-        else:
-            return self._run_async(self.metaapi_connection.get_positions())
+        """Retrieve open positions with retry and circuit breaker."""
+        return self.breaker(self._get_positions_logic)(symbol)
 
+    def _get_positions_logic(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Internal positions retrieval logic wrapped by circuit breaker."""
+        if not self._is_initialized:
+            self.initialize()
+
+        try:
+            if not self.use_metaapi:
+                positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
+                if positions is None:
+                    err_code, err_desc = mt5.last_error()
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
+                        self._is_initialized = False
+                    raise MT5DataError(f"Failed to get positions: {err_desc} (code: {err_code})")
+                return [p._asdict() for p in positions]
+            else:
+                return self._run_async(self.metaapi_connection.get_positions())
+        except Exception as e:
+            if isinstance(e, (MT5DataError, MT5ConnectionError)):
+                raise
+            logger.exception("unexpected_error_in_get_positions", error=str(e))
+            self._is_initialized = False
+            raise MT5DataError(f"Unexpected positions retrieval error: {e}") from e
+
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_terminal_status(self) -> Dict[str, Any]:
-        """
-        Retrieve terminal status (e.g., algo trading enabled).
-        Ensures a consistent 'algo_trading' key is present.
-        """
-        if not self._is_initialized:
-            return {"algo_trading": False}
-        if not self.use_metaapi:
-            info = mt5.terminal_info()
-            if not info:
-                return {"algo_trading": False}
-            data = info._asdict()
-            # Map 'trade_allowed' (terminal-wide algo trading button) to 'algo_trading' for clarity
-            if "trade_allowed" in data:
-                data["algo_trading"] = data["trade_allowed"]
-            return data
-        else:
-            # MetaAPI doesn't have a direct equivalent for terminal 'algo_trading' button
-            # but we assume it's true if we can connect and synchronize.
-            return {"algo_trading": True}
+        """Retrieve terminal status with retry and circuit breaker."""
+        return self.breaker(self._get_terminal_status_logic)()
 
-    def get_symbol_properties(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Retrieve symbol properties."""
+    def _get_terminal_status_logic(self) -> Dict[str, Any]:
+        """Internal terminal status logic wrapped by circuit breaker."""
         if not self._is_initialized:
-            return None
-        if not self.use_metaapi:
-            info = mt5.symbol_info(symbol)
-            if not info:
-                return None
-            return {
-                "name": info.name,
-                "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
-                "spread": info.spread,
-                "digits": info.digits,
-                "point": info.point,
-                "trade_contract_size": info.trade_contract_size,
-            }
-        else:
-            try:
+            self.initialize()
+
+        try:
+            if not self.use_metaapi:
+                info = mt5.terminal_info()
+                if info is None:
+                    err_code, err_desc = mt5.last_error()
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
+                        self._is_initialized = False
+                    raise MT5DataError(f"Failed to get terminal info: {err_desc} (code: {err_code})")
+                data = info._asdict()
+                if "trade_allowed" in data:
+                    data["algo_trading"] = data["trade_allowed"]
+                return data
+            else:
+                return {"algo_trading": True}
+        except Exception as e:
+            if isinstance(e, (MT5DataError, MT5ConnectionError)):
+                raise
+            logger.exception("unexpected_error_in_get_terminal_status", error=str(e))
+            self._is_initialized = False
+            raise MT5DataError(f"Unexpected terminal status retrieval error: {e}") from e
+
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
+    def get_symbol_properties(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Retrieve symbol properties with retry and circuit breaker."""
+        return self.breaker(self._get_symbol_properties_logic)(symbol)
+
+    def _get_symbol_properties_logic(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Internal symbol properties logic wrapped by circuit breaker."""
+        if not self._is_initialized:
+            self.initialize()
+
+        try:
+            if not self.use_metaapi:
+                info = mt5.symbol_info(symbol)
+                if info is None:
+                    err_code, err_desc = mt5.last_error()
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
+                        self._is_initialized = False
+                    raise MT5DataError(f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})")
+                return {
+                    "name": info.name,
+                    "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
+                    "spread": info.spread,
+                    "digits": info.digits,
+                    "point": info.point,
+                    "trade_contract_size": info.trade_contract_size,
+                }
+            else:
                 spec = self._run_async(self.metaapi_connection.get_symbol_specification(symbol))
                 return {
                     "name": spec["symbol"],
-                    "tradable": True,  # MetaAPI symbols are usually tradable if found
-                    "spread": 0,  # Not directly in spec
+                    "tradable": True,
+                    "spread": 0,
                     "digits": spec["digits"],
                     "point": spec.get("point"),
                     "pip_size": spec.get("pipSize"),
                     "trade_contract_size": spec.get("contractSize"),
                 }
-            except Exception:
-                return None
+        except Exception as e:
+            if isinstance(e, (MT5DataError, MT5ConnectionError)):
+                raise
+            logger.exception("unexpected_error_in_get_symbol_properties", symbol=symbol, error=str(e))
+            self._is_initialized = False
+            raise MT5DataError(f"Unexpected symbol properties retrieval error: {e}") from e
 
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def find_symbols(self, pattern: str) -> List[str]:
-        """Find symbols matching a pattern."""
+        """Find symbols matching a pattern with retry and circuit breaker."""
+        return self.breaker(self._find_symbols_logic)(pattern)
+
+    def _find_symbols_logic(self, pattern: str) -> List[str]:
+        """Internal find symbols logic wrapped by circuit breaker."""
         if not self._is_initialized:
-            return []
-        if not self.use_metaapi:
-            symbols = mt5.symbols_get(pattern)
-            return [s.name for s in symbols] if symbols else []
-        else:
-            # For MetaAPI, we'd need to fetch all and filter, which is slow.
-            # Return empty or a simple guess.
-            return [pattern.upper()]
+            self.initialize()
+
+        try:
+            if not self.use_metaapi:
+                symbols = mt5.symbols_get(pattern)
+                if symbols is None:
+                    err_code, err_desc = mt5.last_error()
+                    if err_code in [-1, 10001, 10002, 10003, 10004]:
+                        self._is_initialized = False
+                    raise MT5DataError(f"Failed to find symbols: {err_desc} (code: {err_code})")
+                return [s.name for s in symbols]
+            else:
+                return [pattern.upper()]
+        except Exception as e:
+            if isinstance(e, (MT5DataError, MT5ConnectionError)):
+                raise
+            logger.exception("unexpected_error_in_find_symbols", pattern=pattern, error=str(e))
+            self._is_initialized = False
+            raise MT5DataError(f"Unexpected find symbols error: {e}") from e
 
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]
