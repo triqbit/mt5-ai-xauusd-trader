@@ -33,14 +33,19 @@ class SecretMaskingProcessor:
         if config:
             self.update_secrets(config)
 
-    def update_secrets(self, config: TradingConfig) -> None:
+    def update_secrets(self, config: Any) -> None:
         """
         Extract all SecretStr/SecretBytes values from the config.
         Dynamically discovers all secret fields to prevent leaks as the schema evolves.
         """
+        if not hasattr(config, "model_fields"):
+            return
+
         # Use the class's model_fields to avoid Pydantic instance attribute warnings
-        for field_name in config.__class__.model_fields:
-            val = getattr(config, field_name)
+        for field_name in config.model_fields:
+            val = getattr(config, field_name, None)
+            if val is None:
+                continue
 
             # Extract the raw value if it's a Pydantic Secret type
             secret_val = None

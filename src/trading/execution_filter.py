@@ -72,10 +72,12 @@ class ExecutionFilter:
         current_drawdown: float = 0.0,
         timestamp: datetime | None = None,
         precomputed_metrics: dict[str, Any] | None = None,
+        model_health: dict[str, Any] | None = None,
+        trade_logger: Any | None = None,
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 6-layer filter cascade.
+        Run the full 10-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -84,6 +86,8 @@ class ExecutionFilter:
             current_drawdown: Current account drawdown (0.0 to 1.0).
             timestamp: Evaluation time.
             precomputed_metrics: Optional dictionary containing pre-calculated metrics.
+            model_health: Optional dictionary with model health metrics (drift, accuracy).
+            trade_logger: Optional TradeLogger for historical win rate checks.
         """
         if timestamp is None:
             timestamp = signal.timestamp or datetime.now(UTC)
@@ -148,6 +152,36 @@ class ExecutionFilter:
             "max_drawdown": self.max_drawdown,
         }
 
+        # Layer 7: Model Stability (Health)
+        stability_passed, stability_metrics = self._check_model_stability(model_health)
+        trace["model_stability"] = {
+            "passed": bool(stability_passed),
+            **stability_metrics,
+        }
+
+        # Layer 8: Historical Win Rate
+        win_rate_passed, win_rate_metrics = self._check_historical_win_rate(trade_logger)
+        trace["performance_floor"] = {
+            "passed": bool(win_rate_passed),
+            **win_rate_metrics,
+        }
+
+        # Layer 9: Minimum Confidence
+        confidence_passed, confidence_metrics = self._check_minimum_confidence(signal.confidence)
+        trace["confidence_threshold"] = {
+            "passed": bool(confidence_passed),
+            **confidence_metrics,
+        }
+
+        # Layer 10: Signal Consistency (Flicker)
+        consistency_passed, consistency_metrics = self._check_signal_consistency_with_metrics(
+            signal.symbol, signal.direction
+        )
+        trace["signal_consistency"] = {
+            "passed": bool(consistency_passed),
+            **consistency_metrics,
+        }
+
         # Determine final approval and blocked_by reason
         blocked_by = None
         failure_order = [
@@ -157,6 +191,10 @@ class ExecutionFilter:
             ("momentum", "MOMENTUM"),
             ("session_time", "SESSION_CLOSED"),
             ("drawdown_limit", "DRAWDOWN_LIMIT"),
+            ("model_stability", "MODEL_STABILITY"),
+            ("performance_floor", "PERFORMANCE_FLOOR"),
+            ("confidence_threshold", "CONFIDENCE_THRESHOLD"),
+            ("signal_consistency", "SIGNAL_FLICKER"),
         ]
         for layer_key, reason in failure_order:
             if not trace[layer_key]["passed"]:
@@ -169,6 +207,54 @@ class ExecutionFilter:
             blocked_by=blocked_by,
             trace=trace,
         )
+
+    def _check_model_stability(self, health: dict[str, Any] | None) -> tuple[bool, dict[str, Any]]:
+        """Checks model health against configured thresholds."""
+        if health is None or not self.cfg:
+            return True, {"drift": 0.0, "accuracy": 1.0}
+
+        drift = float(health.get("drift", 0.0))
+        accuracy = float(health.get("accuracy", 1.0))
+        drift_threshold = getattr(self.cfg, "model_drift_threshold", 0.3)
+        accuracy_floor = getattr(self.cfg, "model_accuracy_floor", 0.5)
+
+        passed = drift <= drift_threshold and accuracy >= accuracy_floor
+        return bool(passed), {
+            "drift": drift,
+            "accuracy": accuracy,
+            "drift_threshold": drift_threshold,
+            "accuracy_floor": accuracy_floor,
+        }
+
+    def _check_historical_win_rate(self, trade_logger: Any | None) -> tuple[bool, dict[str, Any]]:
+        """Checks historical win rate from trade logs."""
+        if trade_logger is None or not self.cfg:
+            return True, {"win_rate": 1.0, "total_trades": 0}
+
+        perf = trade_logger.read_performance_report()
+        win_rate = float(perf.get("win_rate", 1.0))
+        total_trades = int(perf.get("total_trades", 0))
+        win_rate_floor = getattr(self.cfg, "model_win_rate_floor", 0.45)
+
+        # Only enforce if we have enough statistical data
+        if total_trades < 10:
+            return True, {"win_rate": win_rate, "total_trades": total_trades}
+
+        passed = win_rate >= win_rate_floor
+        return bool(passed), {
+            "win_rate": win_rate,
+            "total_trades": total_trades,
+            "win_rate_floor": win_rate_floor,
+        }
+
+    def _check_minimum_confidence(self, confidence: float) -> tuple[bool, dict[str, Any]]:
+        """Enforces minimum confidence threshold."""
+        if not self.cfg:
+            return True, {"confidence": confidence, "threshold": 0.55}
+
+        threshold = getattr(self.cfg, "min_confidence", 0.55)
+        passed = confidence >= threshold
+        return bool(passed), {"confidence": confidence, "threshold": threshold}
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
         passed, _ = self._check_atr_volatility_with_metrics(df, threshold)
