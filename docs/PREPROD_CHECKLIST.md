@@ -6,7 +6,7 @@ This document defines the formal gate checklist that must pass before any produc
 
 ## Mandatory Gates
 
-- [ ] **All CI checks passing** (lint, tests, coverage ≥80%, security scan clean)
+- [ ] **All CI checks passing** (lint, tests, coverage ≥85%, security scan clean)
 - [ ] **Environment configuration validated**
 - [ ] **Backtest results reviewed and acceptable**
 - [ ] **Health checks passing in staging environment**

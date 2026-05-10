@@ -25,6 +25,7 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
     - **Capital Allocation Reporting** verification.
     - **Backtest Audit Traceability** verification.
     - **Journal Mining & Pattern Detection** verification.
+    - **Model Explainability & UI** verification.
     - **Consolidated Research Audit Report** generation (`research_audit_report.md`).
 
 3.  **Build & Runtime Verification Stage:**
