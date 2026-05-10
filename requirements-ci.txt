@@ -18,8 +18,8 @@ alembic==1.14.1
 redis==5.2.1
 
 # -- Pydantic / settings -------------------------------------------
-pydantic==2.10.6
-pydantic-settings==2.7.1
+pydantic==2.13.4
+pydantic-settings==2.14.1
 starlette==0.52.1
 
 # -- Testing -------------------------------------------------------
@@ -32,12 +32,12 @@ python-telegram-bot==21.10
 fastapi==0.136.1
 requests==2.33.1
 httpx==0.28.1
-structlog==25.1.0
+structlog==25.5.0
 rich==13.9.4
 gymnasium==1.0.0
 jinja2==3.1.6
 prometheus-client==0.21.1
-psutil==6.1.1
+psutil==7.2.2
 nest-asyncio==1.6.0
 types-redis==4.6.0.20241004
 types-requests==2.32.0.20241016
