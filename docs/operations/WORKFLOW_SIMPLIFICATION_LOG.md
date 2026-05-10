@@ -74,6 +74,20 @@ This log identifies every point where the current repository workflow depends on
 **Risk level:** Low
 **Estimated time saved:** 20 minutes per day
 
+### Friction: Model Retraining (Drift Response)
+**Current state:** Manual detection of model drift followed by manual execution of retraining scripts. No deterministic criteria for when to retrain or how to validate the new model before promotion.
+**Proposed automation:** `Branch promotion logic`. Implement an automated "Retraining Pipeline" triggered by `Monitor` drift alerts. New models must pass a standardized `BacktestEngine` suite and a "Golden Baseline" comparison before being staged for production.
+**Implementation owner:** Jules04
+**Risk level:** Medium
+**Estimated time saved:** 120 minutes per retraining cycle
+
+### Friction: Feature Health & Pipeline Failures (Silent Decay)
+**Current state:** Feature engineering failures or data pipeline gaps (e.g., missing OHLCV bars) are often detected only through log inspection or when the model generates anomalous signals. Response is manual debugging.
+**Proposed automation:** `Acceptance contracts`. Implement "Feature Health Probes" in the `HealthChecker` that verify the statistical distribution of input features in real-time. If features deviate from training distributions, the `RiskManager` automatically shifts to a "Reduced Exposure" mode.
+**Implementation owner:** Jules01
+**Risk level:** Medium
+**Estimated time saved:** 45 minutes per incident
+
 ### Friction: PR Triage and Backlog Management (Deterministic Merging)
 **Current state:** 400+ PRs in backlog. Manual triage is impossible due to history-grafting turbulence. Determining which PRs are "safe" is a repetitive manual task.
 **Proposed automation:** `Merge gates that replace manual review`. Use `scripts/generate_triage_report.py` to auto-label PRs as `safe-surface`, `core-logic`, or `high-risk`. Jules05 will auto-approve and merge `safe-surface` PRs that pass all CI gates without human intervention.
