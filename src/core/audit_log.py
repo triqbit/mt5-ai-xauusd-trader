@@ -144,6 +144,23 @@ class AuditLogger:
             },
         )
 
+    def log_model_outcome(
+        self,
+        actual_direction: int,
+        metrics: dict[str, Any] | None = None,
+        details: str | None = None,
+    ) -> int:
+        """Log the realized outcome of model predictions for drift tracking."""
+        return self.log(
+            actor="model",
+            action="outcome_observed",
+            details=details or f"Market outcome observed: {actual_direction}",
+            metadata={
+                "actual_direction": actual_direction,
+                "metrics": metrics,
+            },
+        )
+
     def log_risk_decision(
         self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool
     ) -> int:

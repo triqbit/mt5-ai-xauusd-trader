@@ -24,6 +24,7 @@ try:
 except ImportError:
     torch = None  # type: ignore
 
+from src.core.audit_log import get_audit_logger
 from src.core.constants import SignalDirection
 from src.core.profiler import profile
 from src.models.base_model import BaseModel, Signal
@@ -137,16 +138,42 @@ class EnsembleModel(BaseModel):
         Record market outcome and update dynamic weights.
         This enables autonomous drift monitoring and adaptive rebalancing.
         """
+        old_weights = self.weights.copy()
         for name in self.ALGORITHMS:
             self.dynamic_ensemble.record_outcome(name, actual_direction)
 
         # Update weights based on the new history
         self.dynamic_ensemble.update_weights()
+        new_weights = self.weights
+
         logger.info(
             "Ensemble outcome observed | actual=%s | new_weights=%s",
             actual_direction.name,
-            self.weights,
+            new_weights,
         )
+
+        # Enterprise Audit Trail Integration
+        try:
+            audit = get_audit_logger()
+            health = self.get_health_metrics()
+
+            # 1. Log realized outcome and ensemble health
+            audit.log_model_outcome(
+                actual_direction=actual_direction.value,
+                metrics=health,
+                details=f"Ensemble outcome observed: {actual_direction.name}",
+            )
+
+            # 2. Log weight rebalancing as a configuration change
+            if old_weights != new_weights:
+                audit.log_config_change(
+                    old_config={"weights": old_weights},
+                    new_config={"weights": new_weights},
+                    reason="Ensemble dynamic weight rebalancing",
+                )
+        except (RuntimeError, ImportError):
+            # Fallback for environments where AuditLogger is not initialized
+            logger.debug("AuditLogger not available for ensemble outcome logging")
 
     def aggregate_signals(self, signals: Dict[str, Signal], symbol: str = "unknown") -> Signal:
         """

@@ -124,3 +124,14 @@ def test_log_system_restored(audit_logger):
     assert entry.action == "system_restored"
     assert entry.details == details
     assert entry.metadata_json["incident_id"] == incident_id
+
+def test_log_model_outcome(audit_logger):
+    """Test logging a model outcome event."""
+    metrics = {"accuracy": 0.85, "drift": 0.05}
+    entry_id = audit_logger.log_model_outcome(actual_direction=1, metrics=metrics)
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+        assert entry.action == "outcome_observed"
+        assert entry.metadata_json["actual_direction"] == 1
+        assert entry.metadata_json["metrics"] == metrics
