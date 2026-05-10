@@ -57,16 +57,17 @@ def check_python_version():
         )
 
 CORE_DEPENDENCIES = {
-    "numpy": ("numpy", "2.2.0"),
-    "pandas": ("pandas", "2.2.0"),
-    "pydantic": ("pydantic", "2.0.0"),
-    "pydantic-settings": ("pydantic_settings", "2.0.0"),
-    "sqlalchemy": ("sqlalchemy", "2.0.0"),
-    "torch": ("torch", "2.0.0"),
-    "talib": ("talib", "0.4.0"),
-    "structlog": ("structlog", "23.0.0"),
-    "rich": ("rich", "13.0.0"),
-    "python-dotenv": ("dotenv", "1.0.0")
+    "numpy": ("numpy", "2.2.3"),
+    "pandas": ("pandas", "2.2.3"),
+    "pydantic": ("pydantic", "2.10.6"),
+    "pydantic-settings": ("pydantic_settings", "2.7.1"),
+    "sqlalchemy": ("sqlalchemy", "2.0.38"),
+    "torch": ("torch", "2.5.1"),
+    "fastapi": ("fastapi", "0.115.8"),
+    "talib": ("talib", "0.6.4"),
+    "structlog": ("structlog", "25.1.0"),
+    "rich": ("rich", "13.9.4"),
+    "python-dotenv": ("dotenv", "1.2.2")
 }
 
 def check_dependencies(dependencies=None):
