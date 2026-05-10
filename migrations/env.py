@@ -1,4 +1,6 @@
 from logging.config import fileConfig
+import sys
+import os
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -16,9 +18,31 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-import sys
-import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Mock problematic modules to allow migrations to run without full dependency suite
+from unittest.mock import MagicMock
+mock_modules = [
+    'talib',
+    'MetaTrader5',
+    'gymnasium',
+    'stable_baselines3',
+    'plotly',
+    'yfinance',
+    'dash',
+    'optuna',
+    'pandas_ta',
+    'mplfinance',
+    'transformers',
+    'timm',
+    'einops',
+    'metaapi_cloud_sdk',
+    'aiohttp'
+]
+
+for mod_name in mock_modules:
+    if mod_name not in sys.modules:
+        sys.modules[mod_name] = MagicMock()
 
 from src.core.trade_logger import Base
 target_metadata = Base.metadata
