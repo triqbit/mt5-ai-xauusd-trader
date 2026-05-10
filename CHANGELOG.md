@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-
+- feat: Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
+- fix: Refined validation scripts with explicit remediation messages.
+- docs: Integrated PREPROD_CHECKLIST.md validation into release gates.
 ### Added
 - **Comprehensive Monitoring System:** Implemented full monitoring and alerting system in `src/core/monitor.py` including equity curve tracking, Prometheus metrics, and granular Telegram alerts.
 - **Institutional Feature Engineering:** Implemented a scalable pipeline for 140+ technical indicators with multi-timeframe support (M1-D1) and no look-ahead bias in `src/core/feature_engineering.py`.

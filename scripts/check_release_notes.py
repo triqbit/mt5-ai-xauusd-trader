@@ -43,12 +43,13 @@ def check_release_notes():
                  break
 
     if not has_content:
-        print("="*60)
+        print("=" * 60)
         print("  DEPLOYMENT BLOCKED: RELEASE NOTES EMPTY")
-        print("="*60)
+        print("=" * 60)
         print("Error: [Unreleased] section in CHANGELOG.md exists but has no descriptive content.")
         print("REMEDIATION: Add details about your changes under the [Unreleased] section.")
-        print("="*60)
+        print("Follow Conventional Commits format (e.g., - feat: describe feature).")
+        print("=" * 60)
         return False
 
     print("SUCCESS: [Unreleased] section has content. Release notes validation passed.")

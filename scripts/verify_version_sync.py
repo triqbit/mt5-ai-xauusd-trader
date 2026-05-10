@@ -82,10 +82,14 @@ def main():
     unique_versions = set(authoritative.values())
 
     if len(unique_versions) > 1:
-        print("❌ DEPLOYMENT BLOCKED: Version mismatch detected!")
+        print("=" * 60)
+        print("❌ DEPLOYMENT BLOCKED: VERSION MISMATCH DETECTED")
+        print("=" * 60)
         for file, version in authoritative.items():
             print(f"  - {file}: {version}")
-        print("\nRemediation: Ensure all shared version markers share the same semantic version.")
+        print("\nREMEDIATION: Ensure all shared version markers share the same semantic version.")
+        print("Update pyproject.toml and src/__init__.py to match the target release.")
+        print("=" * 60)
         sys.exit(1)
 
     print("✅ SUCCESS: All version markers are synchronized.")

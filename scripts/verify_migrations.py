@@ -39,13 +39,15 @@ def verify_migrations():
         return True
 
     except Exception as e:
-        print("="*60)
+        print("=" * 60)
         print("  DEPLOYMENT BLOCKED: MIGRATION VERIFICATION FAILED")
-        print("="*60)
+        print("=" * 60)
         print(f"Error during migration verification: {e}")
+        print("\nREMEDIATION: Check for SQL syntax errors, broken references, or")
+        print("non-reversible operations (missing downgrade logic) in migrations/versions/.")
         import traceback
         traceback.print_exc()
-        print("="*60)
+        print("=" * 60)
         return False
 
     finally:
