@@ -68,7 +68,7 @@ class ConfigValidator:
             )
 
         mt5_server = self.config.mt5_server.upper() if self.config.mt5_server else ""
-        if self.config.mode == "live" and "DEMO" in mt5_server:
+        if self.config.is_live and "DEMO" in mt5_server:
             self.errors.append(
                 ValidationError(
                     "MT5_SERVER",
@@ -92,12 +92,11 @@ class ConfigValidator:
                 )
             )
         elif " " in self.config.mt5_server:
-            is_critical = self.config.mode == "live"
             self.errors.append(
                 ValidationError(
                     "MT5_SERVER",
                     "MT5 server name contains spaces.",
-                    is_critical,
+                    self.config.is_live,
                     "Remove spaces from MT5_SERVER (e.g., Use IC-Markets-Demo instead of IC Markets Demo).",
                 )
             )
@@ -115,6 +114,15 @@ class ConfigValidator:
                     "MT5 password is missing or using placeholder.",
                     True,
                     "Set MT5_PASSWORD in your .env file.",
+                )
+            )
+        elif len(mt5_password) < 5:
+            self.errors.append(
+                ValidationError(
+                    "MT5_PASSWORD",
+                    "MT5 password is too short (minimum 5 characters).",
+                    True,
+                    "Provide a valid MT5 password in .env.",
                 )
             )
 
@@ -166,7 +174,7 @@ class ConfigValidator:
 
     def _check_live_mode_confirmation(self) -> None:
         """Enforce explicit confirmation for LIVE trading."""
-        if self.config.mode == "live" and self.config.confirm_live_trading.upper() != "YES":
+        if self.config.is_live and self.config.confirm_live_trading.upper() != "YES":
             self.errors.append(
                 ValidationError(
                     "MODE",
@@ -195,6 +203,7 @@ class ConfigValidator:
             "EXAMPLE_TOKEN",
             "DUMMY",
             "FAKE",
+            "TOKEN_HERE",
         ]
 
         # Check database URL
@@ -304,29 +313,20 @@ class ConfigValidator:
                 ValidationError(
                     "RISK_PER_TRADE",
                     f"Risk per trade {self.config.risk_per_trade*100}% exceeds policy limit of 1%.",
-                    False,  # Non-critical warning
-                    "Consider reducing RISK_PER_TRADE to 0.01 (1%) for better risk parity.",
+                    self.config.is_live,  # Critical in LIVE
+                    "Set RISK_PER_TRADE to 0.01 (1%) or less for production safety.",
                 )
             )
 
         # 2. Daily loss limits (RISK_LIMITS.md 2.1)
         # Level 4 (Emergency Stop) is 5%.
-        if self.config.max_daily_loss > 0.06:
+        if self.config.max_daily_loss > 0.05:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 6%.",
+                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% safety limit.",
                     True,
-                    "Reduce MAX_DAILY_LOSS to 0.06 or less.",
-                )
-            )
-        elif self.config.max_daily_loss > 0.05:
-            self.errors.append(
-                ValidationError(
-                    "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% limit.",
-                    False,
-                    "Set MAX_DAILY_LOSS to 0.05 for compliance with enterprise standards.",
+                    "Reduce MAX_DAILY_LOSS to 0.05 or less.",
                 )
             )
 
@@ -352,23 +352,23 @@ class ConfigValidator:
                 )
 
         # 2.2 Weekly/Monthly Loss Limits (RISK_LIMITS.md 3.1, 3.2)
-        if self.config.max_weekly_loss > 0.15:
+        if self.config.max_weekly_loss > 0.10:
             self.errors.append(
                 ValidationError(
                     "MAX_WEEKLY_LOSS",
-                    f"Max weekly loss {self.config.max_weekly_loss*100}% exceeds 15% safety limit.",
+                    f"Max weekly loss {self.config.max_weekly_loss*100}% exceeds 10% safety limit.",
                     True,
-                    "Reduce MAX_WEEKLY_LOSS to 0.15 or less.",
+                    "Reduce MAX_WEEKLY_LOSS to 0.10 or less.",
                 )
             )
 
-        if self.config.max_monthly_loss > 0.25:
+        if self.config.max_monthly_loss > 0.15:
             self.errors.append(
                 ValidationError(
                     "MAX_MONTHLY_LOSS",
-                    f"Max monthly loss {self.config.max_monthly_loss*100}% exceeds 25% safety limit.",
+                    f"Max monthly loss {self.config.max_monthly_loss*100}% exceeds 15% safety limit.",
                     True,
-                    "Reduce MAX_MONTHLY_LOSS to 0.25 or less.",
+                    "Reduce MAX_MONTHLY_LOSS to 0.15 or less.",
                 )
             )
 
@@ -436,8 +436,8 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
-                    f"Maximum positions {self.config.max_positions} exceeds limit of 5.",
-                    False,
+                    f"Maximum positions {self.config.max_positions} exceeds policy limit of 5.",
+                    self.config.is_live,
                     "Reduce MAX_POSITIONS to 5 or less for production safety.",
                 )
             )
@@ -449,7 +449,7 @@ class ConfigValidator:
                     "MAX_LEVERAGE",
                     f"Max leverage {self.config.max_leverage} is too high.",
                     True,
-                    "Reduce MAX_LEVERAGE to 20 or less (Policy is 10:1).",
+                    "Reduce MAX_LEVERAGE to 20 or less.",
                 )
             )
         elif self.config.max_leverage > 10:
@@ -457,7 +457,7 @@ class ConfigValidator:
                 ValidationError(
                     "MAX_LEVERAGE",
                     f"Max leverage {self.config.max_leverage} exceeds policy limit of 10.",
-                    False,
+                    self.config.is_live,
                     "Set MAX_LEVERAGE to 10 for enterprise compliance.",
                 )
             )
@@ -476,7 +476,7 @@ class ConfigValidator:
                 ValidationError(
                     "MAX_POSITION_SIZE_PCT",
                     f"Max position size {self.config.max_position_size_pct*100}% exceeds 10% limit.",
-                    False,
+                    self.config.is_live,
                     "Set MAX_POSITION_SIZE_PCT to 0.10 for compliance.",
                 )
             )
@@ -496,7 +496,7 @@ class ConfigValidator:
                 ValidationError(
                     "MAX_DRAWDOWN",
                     f"Max drawdown {self.config.max_drawdown*100}% exceeds 30% policy limit.",
-                    False,
+                    self.config.is_live,
                     "Set MAX_DRAWDOWN to 0.30 for enterprise standards.",
                 )
             )
@@ -533,8 +533,6 @@ class ConfigValidator:
             )
 
         # 8. Calibration Threshold (RISK_LIMITS.md 4.2)
-        # Release-readiness gate: Prevents deployment of overconfident/poorly calibrated models.
-        # High ECE (Expected Calibration Error) indicates the model's confidence doesn't match its accuracy.
         if self.config.model_calibration_threshold > 0.25:
             self.errors.append(
                 ValidationError(
@@ -542,6 +540,28 @@ class ConfigValidator:
                     f"Model calibration threshold {self.config.model_calibration_threshold} exceeds 0.25 limit.",
                     True,
                     "Set MODEL_CALIBRATION_THRESHOLD to 0.25 or lower for enterprise compliance.",
+                )
+            )
+
+        # 9. Slippage (RISK_LIMITS.md 7.1)
+        if self.config.max_slippage_pips > 1.0:
+            self.errors.append(
+                ValidationError(
+                    "MAX_SLIPPAGE_PIPS",
+                    f"Max slippage {self.config.max_slippage_pips} pips exceeds policy limit of 1.0.",
+                    self.config.is_live,
+                    "Reduce MAX_SLIPPAGE_PIPS to 1.0 or less.",
+                )
+            )
+
+        # 10. Losing Streak (RISK_LIMITS.md 2.3)
+        if self.config.max_losing_streak > 3:
+            self.errors.append(
+                ValidationError(
+                    "MAX_LOSING_STREAK",
+                    f"Max losing streak {self.config.max_losing_streak} exceeds limit of 3.",
+                    self.config.is_live,
+                    "Set MAX_LOSING_STREAK to 3 for production safety.",
                 )
             )
 
@@ -561,7 +581,7 @@ class ConfigValidator:
                 ValidationError(
                     "MAX_SINGLE_DIRECTION_PCT",
                     f"Max single direction exposure {self.config.max_single_direction_pct*100}% exceeds 30% policy.",
-                    False,
+                    self.config.is_live,
                     "Set MAX_SINGLE_DIRECTION_PCT to 0.30 for compliance.",
                 )
             )
@@ -580,23 +600,23 @@ class ConfigValidator:
                 ValidationError(
                     "MAX_TOTAL_NOTIONAL_PCT",
                     f"Max total notional {self.config.max_total_notional_pct*100}% exceeds 100% equity.",
-                    False,
+                    self.config.is_live,
                     "Set MAX_TOTAL_NOTIONAL_PCT to 1.00 for enterprise safety.",
                 )
             )
 
-        # Max Trades Per Day validation (Plan requirement)
-        if self.config.max_trades_per_day > 50:
+        # Max Trades Per Day validation (RISK_LIMITS.md 2.3)
+        if self.config.max_trades_per_day > 20:
             self.errors.append(
                 ValidationError(
                     "MAX_TRADES_PER_DAY",
-                    f"Max trades per day ({self.config.max_trades_per_day}) exceeds institutional limit of 50.",
-                    True,
-                    "Reduce MAX_TRADES_PER_DAY to 50 or less.",
+                    f"Max trades per day ({self.config.max_trades_per_day}) exceeds institutional limit of 20.",
+                    self.config.is_live,
+                    "Reduce MAX_TRADES_PER_DAY to 20 or less.",
                 )
             )
 
-        # Min Lot Size validation (Plan requirement)
+        # Min Lot Size validation (RISK_LIMITS.md 1.1)
         if self.config.min_lot_size < 0.01:
             self.errors.append(
                 ValidationError(
@@ -609,8 +629,8 @@ class ConfigValidator:
 
     def _check_margin_and_volatility_limits(self) -> None:
         """Verify margin and volatility hierarchy levels (RISK_LIMITS.md 1.2, 5.1)."""
-        # 1. Margin Hierarchy (Note: These are utilization percentages, not MT5 Margin Level %)
-        # As risk increases, utilization grows: Alert (70%) < Halt (80%) < Liquidation (90%)
+        # 1. Margin Hierarchy
+        # Alert (70%) < Halt (80%) < Liquidation (90%)
         margin_levels = [
             ("MARGIN_ALERT_PCT", self.config.margin_alert_pct),
             ("MARGIN_HALT_PCT", self.config.margin_halt_pct),
@@ -627,6 +647,16 @@ class ConfigValidator:
                         "Correct the margin limit hierarchy in .env.",
                     )
                 )
+
+        if self.config.margin_halt_pct > 0.80:
+            self.errors.append(
+                ValidationError(
+                    "MARGIN_HALT_PCT",
+                    f"Margin halt percentage {self.config.margin_halt_pct*100}% exceeds 80% safety limit.",
+                    True,
+                    "Reduce MARGIN_HALT_PCT to 0.80 or less.",
+                )
+            )
 
         # 2. Volatility Hierarchy
         vol_levels = [
@@ -650,36 +680,26 @@ class ConfigValidator:
         """Detect incompatible configuration combinations."""
         # 0. Database Choice
         if (
-            self.config.mode == "live"
+            self.config.is_live
             and "sqlite" in self.config.database_url.get_secret_value().lower()
         ):
             self.errors.append(
                 ValidationError(
                     "DATABASE_URL",
                     "SQLite is used in LIVE mode.",
-                    False,  # Warning
-                    "Consider using a production-grade database like PostgreSQL for live trading.",
+                    True,
+                    "Use a production-grade database like PostgreSQL for live trading. SQLite is only for demo/backtest.",
                 )
             )
 
         # 1. LIVE mode restrictions
-        if self.config.mode == "live" and self.config.log_level == "DEBUG":
+        if self.config.is_live and self.config.log_level == "DEBUG":
             self.errors.append(
                 ValidationError(
                     "LOG_LEVEL",
                     "DEBUG logging in LIVE mode is discouraged.",
                     False,
                     "Set LOG_LEVEL=INFO for live trading to avoid performance issues.",
-                )
-            )
-
-        if self.config.mode == "live" and self.config.max_positions > 5:
-            self.errors.append(
-                ValidationError(
-                    "MAX_POSITIONS",
-                    "Max positions > 5 is prohibited in LIVE mode.",
-                    True,
-                    "Set MAX_POSITIONS to 5 or less for live mode.",
                 )
             )
 
@@ -767,10 +787,9 @@ class ConfigValidator:
                         ValidationError(
                             "FILE_PERMISSION",
                             f"Insecure permissions for {path.name}: {current_mode}",
-                            False,  # Warning for now to avoid breaking existing setups
+                            False,  # Warning
                             f"Run 'chmod 600 {path.name}' to restrict access.",
                         )
                     )
             except Exception:
-                # Log but don't fail if we can't check permissions
                 pass
