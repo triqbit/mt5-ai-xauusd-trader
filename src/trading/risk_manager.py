@@ -128,20 +128,36 @@ class RiskManager:
         avg_win: float,
         avg_loss: float,
         pip_value: float = 1.0,
+        model_health: Optional[dict] = None,
     ) -> float:
         """
-        Fractional Kelly Criterion position sizing.
+        Fractional Kelly Criterion position sizing with health-aware scaling.
         Returns lot size capped at max risk per trade.
         """
+        # Use real-time accuracy if health data is provided
+        effective_win_rate = (
+            model_health.get("accuracy", win_rate) if model_health else win_rate
+        )
+
         if avg_loss == 0:
             return 0.01  # minimum lot
-        kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
+
+        kelly_fraction = (
+            effective_win_rate * avg_win - (1 - effective_win_rate) * avg_loss
+        ) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+
+        # Apply health-aware defensive multiplier
+        health_multiplier = self._get_health_multiplier(model_health)
+
+        risk_capital = self.balance * self.cfg.risk_per_trade * health_multiplier
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
+
         logger.debug(
-            "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
+            "Kelly sizing | win_rate=%.3f health_mult=%.2f kelly=%.3f risk_cap=%.2f lots=%.2f",
+            effective_win_rate,
+            health_multiplier,
             kelly_fraction,
             risk_capital,
             lot_size,
@@ -173,6 +189,46 @@ class RiskManager:
         logger.info("Daily stats reset")
 
     # -- Private filter layers ----------------------------------------------
+    def _get_health_multiplier(self, health: Optional[dict]) -> float:
+        """
+        Calculates a defensive risk multiplier based on model health.
+
+        Logic (per RISK_LIMITS.md):
+        - Win Rate Floor: If accuracy < 0.45, reduce position size to 25% (Multiplier=0.25).
+        - Drift Penalty: If drift > 50% of threshold (0.15), reduce size by up to 20%.
+        """
+        if not health:
+            return 1.0
+
+        accuracy = float(health.get("accuracy", 1.0))
+        drift = float(health.get("drift", 0.0))
+
+        # 1. Win Rate Floor (RISK_LIMITS.md 4.2)
+        if accuracy < 0.45:
+            logger.warning(
+                "Defensive scaling: Accuracy %.2f below 0.45. Multiplier=0.25", accuracy
+            )
+            return 0.25
+
+        # 2. Drift Penalty (RISK_LIMITS.md 4.2)
+        # Threshold for drift is usually 0.3. 50% of it is 0.15.
+        drift_trigger = self.cfg.model_drift_threshold * 0.5
+        drift_limit = self.cfg.model_drift_threshold
+
+        multiplier = 1.0
+        if drift > drift_trigger:
+            # Scale linearly from 0% penalty (at trigger) to 20% penalty (at limit)
+            # This is a conservative interpretation of "Confidence Penalty" for sizing.
+            excess = (drift - drift_trigger) / (drift_limit - drift_trigger)
+            multiplier = 1.0 - (0.20 * min(1.0, excess))
+            logger.warning(
+                "Defensive scaling: Drift %.2f active. Multiplier=%.2f",
+                drift,
+                multiplier,
+            )
+
+        return multiplier
+
     def _check_consecutive_losses(self) -> bool:
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
             logger.warning(

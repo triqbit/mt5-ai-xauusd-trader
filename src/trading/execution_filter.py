@@ -148,6 +148,14 @@ class ExecutionFilter:
             "max_drawdown": self.max_drawdown,
         }
 
+        # Layer 7: Model Stability (Drift & Accuracy)
+        model_health = kwargs.get("model_health")
+        stability_passed, stability_trace = self._check_model_stability(model_health)
+        trace["model_stability"] = {
+            "passed": bool(stability_passed),
+            **stability_trace,
+        }
+
         # Determine final approval and blocked_by reason
         blocked_by = None
         failure_order = [
@@ -157,6 +165,7 @@ class ExecutionFilter:
             ("momentum", "MOMENTUM"),
             ("session_time", "SESSION_CLOSED"),
             ("drawdown_limit", "DRAWDOWN_LIMIT"),
+            ("model_stability", "MODEL_STABILITY"),
         ]
         for layer_key, reason in failure_order:
             if not trace[layer_key]["passed"]:
@@ -329,6 +338,33 @@ class ExecutionFilter:
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
         return current_drawdown < self.max_drawdown
+
+    def _check_model_stability(self, health: dict | None) -> tuple[bool, dict[str, Any]]:
+        """
+        Final safety gate for model health before execution.
+        Blocks if drift exceeds threshold or accuracy falls below floor.
+        """
+        if not health:
+            return True, {"reason": "No health data"}
+
+        drift = float(health.get("drift", 0.0))
+        accuracy = float(health.get("accuracy", 1.0))
+
+        drift_threshold = (
+            self.cfg.model_drift_threshold if self.cfg else 0.3
+        )
+        accuracy_floor = (
+            self.cfg.model_accuracy_floor if self.cfg else 0.5
+        )
+
+        passed = (drift <= drift_threshold) and (accuracy >= accuracy_floor)
+
+        return bool(passed), {
+            "drift": drift,
+            "accuracy": accuracy,
+            "drift_threshold": drift_threshold,
+            "accuracy_floor": accuracy_floor,
+        }
 
     def _check_signal_consistency_with_metrics(
         self, symbol: str, direction: int
