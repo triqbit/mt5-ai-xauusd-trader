@@ -113,6 +113,14 @@ class TradingConfig(BaseSettings):
     max_weekly_loss: float = Field(default=0.10, description="Max Weekly Loss: 10% of account")
     max_monthly_loss: float = Field(default=0.15, description="Max Monthly Loss: 15% of account")
 
+    # Capital Allocation
+    allocator_max_total_heat: float = Field(default=0.70, description="Max 70% of budget committed")
+    allocator_max_symbol_risk: float = Field(default=0.40, description="Max 40% per symbol")
+    allocator_max_family_risk: float = Field(default=0.40, description="Max 40% per model family")
+    allocator_performance_step: float = Field(default=0.05, description="Adjustment step for performance")
+    allocator_decay_rate: float = Field(default=0.001, description="Rate at which multiplier returns to 1.0")
+    allocator_soft_limit_buffer: float = Field(default=0.10, description="Buffer for diversification guard")
+
     # Volatility Thresholds
     volatility_high_threshold: float = Field(
         default=1.5, description="High Volatility (>1.5x normal)"

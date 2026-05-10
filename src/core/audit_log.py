@@ -160,6 +160,40 @@ class AuditLogger:
             },
         )
 
+    def log_allocation_decision(
+        self,
+        strategy_id: str,
+        requested_risk: float,
+        allocated_amount: float,
+        is_allowed: bool,
+        rejection_code: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        """Log a capital allocation decision."""
+        details = (
+            f"Allocation for {strategy_id}: {'ALLOWED' if is_allowed else 'REJECTED'}. "
+            f"Amt: {allocated_amount:.2f} (Risk: {requested_risk:.2%})"
+        )
+        if rejection_code:
+            details += f" | Code: {rejection_code}"
+
+        combined_metadata = {
+            "strategy_id": strategy_id,
+            "requested_risk": requested_risk,
+            "allocated_amount": allocated_amount,
+            "is_allowed": is_allowed,
+            "rejection_code": rejection_code,
+        }
+        if metadata:
+            combined_metadata.update(metadata)
+
+        return self.log(
+            actor="capital_allocator",
+            action="allocation_decision",
+            details=details,
+            metadata=combined_metadata,
+        )
+
     def log_execution_decision(
         self,
         symbol: str,
