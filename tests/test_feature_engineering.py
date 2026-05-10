@@ -86,7 +86,10 @@ def test_stateful_normalization(synthetic_ohlcv):
 
     # Check if stats are loaded
     assert fe2.means is not None
-    assert fe2.means["base_M1_rsi"] == fe1.means["base_M1_rsi"]
+
+    # Access via index since fe2.means is now a numpy array
+    rsi_idx = fe2.feature_columns.index("base_M1_rsi")
+    assert np.isclose(fe2.means[rsi_idx], fe1.means[rsi_idx])
 
     # Compute with loaded stats
     features2 = fe2.compute_features(test_df)
