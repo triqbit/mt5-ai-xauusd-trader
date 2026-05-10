@@ -57,6 +57,9 @@ regime_info = detector.detect(ohlcv_df)
 print(f"Current Regime: {regime_info.label}")
 print(f"Confidence: {regime_info.confidence}")
 print(f"Transition Score: {regime_info.transition_score}")
+
+# Raw features for explainability
+print(f"Efficiency Ratio: {regime_info.raw_features['efficiency_ratio']}")
 ```
 
 ### Historical Labeling (for Backtesting)
