@@ -46,7 +46,10 @@ def reset_audit_logger():
 @pytest.fixture
 def audit_logger():
     """Provide a fresh in-memory AuditLogger."""
-    return AuditLogger(db_url="sqlite:///:memory:")
+    import uuid
+    # Use a unique identifier to ensure each test gets a fresh in-memory database
+    # This bypasses the engine cache in src.core.database.get_engine
+    return AuditLogger(db_url=f"sqlite:///memdb_{uuid.uuid4()}")
 
 @pytest.fixture
 def mock_cfg():
