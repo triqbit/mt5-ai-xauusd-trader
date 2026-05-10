@@ -30,7 +30,7 @@ pytest-cov==6.0.0
 pytest-mock==3.14.0
 python-telegram-bot==21.10
 fastapi==0.115.8
-requests==2.32.3
+requests==2.33.0
 httpx==0.28.1
 structlog==25.1.0
 rich==13.9.4
