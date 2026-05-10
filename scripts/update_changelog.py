@@ -45,7 +45,7 @@ def categorize_commits(commits, labels=None):
         "feat": "Added",
         "fix": "Fixed",
         "security": "Security",
-        "perf": "Added",
+        "perf": "Changed",
         "refactor": "Changed",
         "docs": "Changed",
         "style": "Changed",
@@ -67,8 +67,8 @@ def categorize_commits(commits, labels=None):
             "refactor": "Changed",
             "deprecated": "Deprecated",
             "removal": "Removed",
-            "release:major": "Added",
-            "release:minor": "Added",
+            "release:major": "Changed",
+            "release:minor": "Changed",
             "release:patch": "Fixed",
         }
         for label in labels:
