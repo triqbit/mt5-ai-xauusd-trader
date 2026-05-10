@@ -509,13 +509,12 @@ class SignalExplainer:
                     if cont.impact_level == "Medium"
                     else "dim"
                 )
-                score_color = (
-                    "green"
-                    if cont.contribution_score > 0
-                    else "red"
-                    if cont.contribution_score < 0
-                    else "white"
+                # Confluence-aware coloring: Green if the contribution aligns with the signal direction
+                is_confluent = (
+                    (explanation.direction == SignalDirection.BUY and cont.contribution_score > 0) or
+                    (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
                 )
+                score_color = "green" if is_confluent else "red" if cont.contribution_score != 0 else "white"
                 feature_table.add_row(
                     cont.cluster_name,
                     f"[{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
@@ -630,13 +629,12 @@ class SignalExplainer:
                     if cont.impact_level == "Medium"
                     else "dim"
                 )
-                score_color = (
-                    "green"
-                    if cont.contribution_score > 0
-                    else "red"
-                    if cont.contribution_score < 0
-                    else "white"
+                # Confluence-aware coloring: Green if the contribution aligns with the signal direction
+                is_confluent = (
+                    (explanation.direction == SignalDirection.BUY and cont.contribution_score > 0) or
+                    (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
                 )
+                score_color = "green" if is_confluent else "red" if cont.contribution_score != 0 else "white"
                 feature_table.add_row(
                     cont.cluster_name,
                     f"[{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
