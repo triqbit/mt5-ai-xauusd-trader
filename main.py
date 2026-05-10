@@ -1112,11 +1112,12 @@ def main() -> int:
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
+        monitor=monitor,
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
     regime_detector = RegimeDetector()
     # Use balance for allocator; if balance is 0, CapitalAllocator will handle it (or fail validation)
-    allocator = CapitalAllocator(total_budget=balance)
+    allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
 
     # Register default strategy in allocator

@@ -52,3 +52,4 @@ To ensure high-fidelity failure attribution and trace correlation, critical path
 - **Circuit Breaker**: Transitions between `CLOSED`, `OPEN`, and `HALF_OPEN` states are logged with full context (name, failure counts, and errors).
 - **MT5 Connector**: All connection attempts, data retrieval failures, and order execution events are logged with structured fields (server, login, error codes, tickets).
 - **Trace Correlation**: Every log entry generated during a trading cycle iteration includes a unique `trace_id` for end-to-end debugging.
+- **Decision Funnel**: Rejections across the technical filter cascade, risk management engine, and capital allocator are tracked via the `trading_internal_rejections_total` metric, providing immediate visibility into "no-trade" decisions.

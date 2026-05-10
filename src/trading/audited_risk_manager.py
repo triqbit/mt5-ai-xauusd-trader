@@ -8,14 +8,15 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from typing import Optional
+
+import structlog
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
 from src.trading.risk_manager import RiskManager
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class AuditedRiskManager(RiskManager):
@@ -82,11 +83,13 @@ class AuditedRiskManager(RiskManager):
             rejection_reasons = [k for k, v in decision_chain.items() if not v]
             reason_str = ", ".join(rejection_reasons)
             logger.warning(
-                "Signal REJECTED | %s %s | Failed: %s",
-                signal.symbol,
-                signal.direction,
-                reason_str,
+                "signal_rejected",
+                symbol=signal.symbol,
+                direction=signal.direction,
+                failed_filters=rejection_reasons,
             )
+            if self.monitor:
+                self.monitor.record_internal_rejection("risk_manager", reason_str)
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",

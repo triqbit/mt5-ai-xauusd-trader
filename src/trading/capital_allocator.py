@@ -9,15 +9,16 @@ License: MIT
 from __future__ import annotations
 
 import contextlib
-import logging
 from enum import Enum
 from typing import Any
 
+import structlog
 from pydantic import BaseModel, Field
 
 from src.core.audit_log import get_audit_logger
+from src.core.monitor import Monitor
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class RejectionCode(str, Enum):
@@ -89,6 +90,7 @@ class CapitalAllocator:
         performance_step: float = 0.05,  # Adjustment step for performance multiplier
         decay_rate: float = 0.001,  # Rate at which multiplier returns to 1.0
         soft_limit_buffer: float = 0.1,  # Buffer for diversification guard
+        monitor: Monitor | None = None,
     ):
         self.total_budget = total_budget
         self.max_symbol_risk = max_symbol_risk
@@ -97,6 +99,7 @@ class CapitalAllocator:
         self.performance_step = performance_step
         self.decay_rate = decay_rate
         self.soft_limit_buffer = soft_limit_buffer
+        self.monitor = monitor
 
         self.strategies: dict[str, StrategyConfig] = {}
         self.current_allocations: dict[str, float] = {}  # strategy_id -> current allocated amount
@@ -273,6 +276,8 @@ class CapitalAllocator:
     def _record_rejection(self, code: RejectionCode) -> None:
         """Increment the counter for a specific rejection reason."""
         self.rejection_history[code.value] += 1
+        if self.monitor:
+            self.monitor.record_internal_rejection("capital_allocator", code.value)
 
     def allocate_batch(self, requests: list[AllocationRequest]) -> list[AllocationResult]:
         """
