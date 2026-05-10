@@ -379,3 +379,36 @@ def test_packet_immutability():
             performance=MagicMock()
         )
         packet.symbol = "GOLD"
+
+
+def test_decision_packet_field_completeness(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that DecisionPacket contains all required fields for institutional review."""
+    dss = DecisionSupportSystem()
+    packet = dss.assemble_packet(
+        symbol="XAUUSD",
+        explanation=mock_explanation,
+        regime_info=mock_regime,
+        macro_risk=mock_macro_risk,
+        performance_metrics={"sharpe_ratio": 2.0}
+    )
+
+    # Required summary fields
+    assert hasattr(packet, "symbol")
+    assert hasattr(packet, "direction")
+    assert hasattr(packet, "consensus")
+    assert hasattr(packet, "status_level")
+    assert hasattr(packet, "decision_score")
+    assert hasattr(packet, "sizing_multiplier")
+    assert hasattr(packet, "is_executable")
+    assert hasattr(packet, "blocking_reasons")
+
+    # Required payload components
+    assert hasattr(packet, "explanation")
+    assert hasattr(packet, "regime")
+    assert hasattr(packet, "macro_risk")
+    assert hasattr(packet, "performance")
+
+    # Verify nested types
+    assert isinstance(packet.performance, PerformanceContext)
+    assert isinstance(packet.performance.sharpe_ratio, float)
+    assert packet.performance.sharpe_ratio == 2.0
