@@ -125,6 +125,7 @@ def _prepare_trade_signal(
     risk: RiskManager,
     allocator: CapitalAllocator,
     audit_logger: Optional[AuditLogger] = None,
+    model_health: Optional[dict] = None,
 ) -> TradeSignal:
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -157,12 +158,16 @@ def _prepare_trade_signal(
         approved_risk = alloc_result.allocated_risk_pct
 
     # 3. Lot Sizing
+    # Use real-time win rate from model health if available, otherwise baseline 0.58
+    accuracy = model_health.get("accuracy", 0.58) if model_health else 0.58
+
     lot_size = (
         risk.size_position(
             cfg.symbol,
-            win_rate=0.58,
+            win_rate=accuracy,
             avg_win=4 * atr,
             avg_loss=2 * atr,
+            model_health=model_health,
         )
         if approved_risk > 0
         else 0.0
@@ -391,6 +396,9 @@ def run_live(
                 price = tick["ask"] if direction == 1 else tick["bid"]
                 atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
+                # 4.1 Retrieve health metrics before preparation for dynamic sizing
+                health = getattr(model, "get_health_metrics", lambda: None)()
+
                 with profile("signal_preparation"):
                     signal = _prepare_trade_signal(
                         cfg=cfg,
@@ -401,12 +409,12 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
+                        model_health=health,
                     )
                 lot_size = signal.lot_size
 
                 # 6. Risk approval gate
                 with profile("risk_check"):
-                    health = getattr(model, "get_health_metrics", lambda: None)()
                     risk_approved = (
                         risk.approve(signal, signal_id=signal_id, model_health=health)
                         if direction != 0
