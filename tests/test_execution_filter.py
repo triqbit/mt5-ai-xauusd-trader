@@ -278,3 +278,20 @@ def test_validate_with_precomputed_metrics_only(filter_engine, buy_signal):
     assert decision.trace["trend_angle"]["passed"] is True
     assert decision.trace["ema_sequence"]["passed"] is True
     assert decision.trace["momentum"]["passed"] is True
+
+
+def test_extra_layers_removed(filter_engine, buy_signal, bullish_data):
+    """Verifies that layers 7-10 are no longer in the trace."""
+    ts = datetime(2023, 10, 10, 10, 0, 0)
+    decision = filter_engine.validate(
+        buy_signal,
+        bullish_data,
+        0.05,
+        timestamp=ts,
+        model_health={"drift": 0.5, "accuracy": 0.1},  # Should be ignored
+    )
+    assert decision.is_approved is True
+    assert "model_stability" not in decision.trace
+    assert "performance_guard" not in decision.trace
+    assert "confidence_threshold" not in decision.trace
+    assert "signal_consistency" not in decision.trace
