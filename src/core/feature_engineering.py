@@ -27,6 +27,12 @@ class FeatureEngineer:
     Supports stateful normalization for production inference.
     """
 
+    # Pre-cache TA-Lib pattern functions to avoid redundant lookups
+    _PATTERN_FUNCS = {
+        name.lower(): getattr(talib, name)
+        for name in talib.get_function_groups()["Pattern Recognition"]
+    }
+
     def __init__(
         self,
         base_timeframe: str = "M5",
@@ -70,9 +76,8 @@ class FeatureEngineer:
             if df.empty:
                 return pd.DataFrame()
 
-            # Ensure column names are lowercase
-            df = df.copy()
-            df.columns = [col.lower() for col in df.columns]
+            # Optimization: rename is faster than copy + manual column loop
+            df = df.rename(columns=str.lower)
 
             # 1. Base Timeframe Features
             all_features = {}
@@ -107,7 +112,7 @@ class FeatureEngineer:
             else:
                 full_df = pd.concat([df, base_features_df], axis=1)
 
-            # Optimization: Filter by base and MTF columns
+            # Optimization: Consolidate dropna passes while maintaining observability
             base_cols = [
                 c
                 for c in full_df.columns
@@ -115,22 +120,13 @@ class FeatureEngineer:
             ]
             mtf_cols = [c for c in full_df.columns if c.startswith("mtf_")]
 
-            # First, drop rows where base features are NaN
             if base_cols:
                 full_df = full_df.dropna(subset=base_cols)
 
             if not full_df.empty and mtf_cols:
                 if full_df[mtf_cols].isna().all().all():
-                    logger.warning(
-                        "MTF features are entirely NaN due to insufficient data history."
-                    )
-                    temp_df = full_df.dropna(subset=mtf_cols)
-                    if temp_df.empty:
-                        logger.error("Insufficient data for MTF features.")
-                    else:
-                        full_df = temp_df
-                else:
-                    full_df = full_df.dropna(subset=mtf_cols)
+                    logger.warning("MTF features are entirely NaN. Check data history.")
+                full_df = full_df.dropna(subset=mtf_cols)
 
             if full_df.empty:
                 logger.error("Feature engineering resulted in an empty DataFrame.")
@@ -145,12 +141,21 @@ class FeatureEngineer:
             else:
                 features_only = full_df
 
-            features_only = features_only.dropna()
+            # Optimization: Cast to float32 early to speed up normalization and reduce memory.
+            # Most ML models prefer float32 and it fits the 500MB memory goal.
+            features_only = features_only.astype(np.float32, copy=False)
+
+            # Ensure consistent column ordering for safe NumPy-based normalization
+            if not self.feature_columns:
+                self.feature_columns = features_only.columns.tolist()
+            else:
+                # Reindex to match the columns we have stats for
+                features_only = features_only.reindex(columns=self.feature_columns).fillna(0.0)
 
             if self.normalize:
-                features_only = self._normalize_features(features_only)
+                with profile_context("fe_normalization"):
+                    features_only = self._normalize_features(features_only)
 
-            self.feature_columns = features_only.columns.tolist()
             return features_only
 
     def _get_technical_indicators(self, df: pd.DataFrame, prefix: str) -> dict[str, np.ndarray]:
@@ -165,10 +170,11 @@ class FeatureEngineer:
             Dictionary containing computed technical indicators.
         """
         indicators = {}
-        close = df["close"].values.astype(np.float64)
-        high = df["high"].values.astype(np.float64)
-        low = df["low"].values.astype(np.float64)
-        volume = df["tick_volume"].values.astype(np.float64)
+        # Optimization: use copy=False to avoid redundant allocations if data is already float64
+        close = df["close"].values.astype(np.float64, copy=False)
+        high = df["high"].values.astype(np.float64, copy=False)
+        low = df["low"].values.astype(np.float64, copy=False)
+        volume = df["tick_volume"].values.astype(np.float64, copy=False)
 
         # Momentum
         indicators[f"{prefix}_rsi"] = talib.RSI(close, timeperiod=14)
@@ -251,19 +257,16 @@ class FeatureEngineer:
         Returns:
             Dictionary of candle patterns.
         """
-        op = df["open"].values.astype(np.float64)
-        hi = df["high"].values.astype(np.float64)
-        lo = df["low"].values.astype(np.float64)
-        cl = df["close"].values.astype(np.float64)
+        op = df["open"].values.astype(np.float64, copy=False)
+        hi = df["high"].values.astype(np.float64, copy=False)
+        lo = df["low"].values.astype(np.float64, copy=False)
+        cl = df["close"].values.astype(np.float64, copy=False)
 
         patterns = {}
-        pattern_list = talib.get_function_groups()["Pattern Recognition"]
         col_prefix = f"{prefix}_" if prefix else "pattern_"
 
-        for pattern in pattern_list:
-            patterns[f"{col_prefix}{pattern.lower()}"] = getattr(talib, pattern)(
-                op, hi, lo, cl
-            ).astype(np.float64)
+        for name, func in self._PATTERN_FUNCS.items():
+            patterns[f"{col_prefix}{name}"] = func(op, hi, lo, cl).astype(np.float64)
 
         return patterns
 
@@ -278,10 +281,10 @@ class FeatureEngineer:
             Dictionary containing custom price action features.
         """
         pa = {}
-        close = df["close"].values.astype(np.float64)
-        high = df["high"].values.astype(np.float64)
-        low = df["low"].values.astype(np.float64)
-        open_ = df["open"].values.astype(np.float64)
+        close = df["close"].values.astype(np.float64, copy=False)
+        high = df["high"].values.astype(np.float64, copy=False)
+        low = df["low"].values.astype(np.float64, copy=False)
+        open_ = df["open"].values.astype(np.float64, copy=False)
 
         pa["returns_1"] = talib.ROCP(close, timeperiod=1)
         pa["returns_5"] = talib.ROCP(close, timeperiod=5)
@@ -310,10 +313,10 @@ class FeatureEngineer:
             Dictionary containing volume-based features.
         """
         vol = {}
-        close = df["close"].values.astype(np.float64)
-        high = df["high"].values.astype(np.float64)
-        low = df["low"].values.astype(np.float64)
-        volume = df["tick_volume"].values.astype(np.float64)
+        close = df["close"].values.astype(np.float64, copy=False)
+        high = df["high"].values.astype(np.float64, copy=False)
+        low = df["low"].values.astype(np.float64, copy=False)
+        volume = df["tick_volume"].values.astype(np.float64, copy=False)
 
         vol_sma_20 = talib.SMA(volume, timeperiod=20)
         vol["vol_sma_20"] = volume / (vol_sma_20 + 1e-8)
@@ -404,19 +407,25 @@ class FeatureEngineer:
         return combined_mtf
 
     def _normalize_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normalize features using stored or newly computed stats."""
+        """Normalize features using stored or newly computed stats (NumPy optimized)."""
+        vals = df.values
         if self.method == "zscore":
             if self.means is None:
-                self.means = df.mean()
-                self.stds = df.std().replace(0, 1.0).fillna(1.0)
-            return (df - self.means) / self.stds
+                # Use numpy for faster mean/std on clean data
+                self.means = np.nanmean(vals, axis=0)
+                self.stds = np.nanstd(vals, axis=0)
+                self.stds[self.stds == 0] = 1.0
+            norm_vals = (vals - self.means) / (self.stds + 1e-8)
+            return pd.DataFrame(norm_vals, index=df.index, columns=df.columns)
 
         if self.method == "minmax":
             if self.mins is None:
-                self.mins = df.min()
-                self.maxs = df.max()
-            denom = (self.maxs - self.mins).replace(0, 1.0).fillna(1.0)
-            return (df - self.mins) / denom
+                self.mins = np.nanmin(vals, axis=0)
+                self.maxs = np.nanmax(vals, axis=0)
+            denom = (self.maxs - self.mins)
+            denom[denom == 0] = 1.0
+            norm_vals = (vals - self.mins) / denom
+            return pd.DataFrame(norm_vals, index=df.index, columns=df.columns)
 
         return df
 
@@ -429,10 +438,18 @@ class FeatureEngineer:
         """
         return {
             "method": self.method,
-            "means": self.means.to_dict() if self.means is not None else None,
-            "stds": self.stds.to_dict() if self.stds is not None else None,
-            "mins": self.mins.to_dict() if self.mins is not None else None,
-            "maxs": self.maxs.to_dict() if self.maxs is not None else None,
+            "means": dict(zip(self.feature_columns, self.means.tolist(), strict=False))
+            if self.means is not None
+            else None,
+            "stds": dict(zip(self.feature_columns, self.stds.tolist(), strict=False))
+            if self.stds is not None
+            else None,
+            "mins": dict(zip(self.feature_columns, self.mins.tolist(), strict=False))
+            if self.mins is not None
+            else None,
+            "maxs": dict(zip(self.feature_columns, self.maxs.tolist(), strict=False))
+            if self.maxs is not None
+            else None,
             "columns": self.feature_columns,
         }
 
@@ -444,15 +461,21 @@ class FeatureEngineer:
             stats: Dictionary of normalization stats.
         """
         self.method = stats.get("method", self.method)
+        cols = stats.get("columns", [])
+        self.feature_columns = cols
+
         if stats.get("means"):
-            self.means = pd.Series(stats["means"])
+            means_dict = stats["means"]
+            self.means = np.array([means_dict.get(c, 0.0) for c in cols])
         if stats.get("stds"):
-            self.stds = pd.Series(stats["stds"])
+            stds_dict = stats["stds"]
+            self.stds = np.array([stds_dict.get(c, 1.0) for c in cols])
         if stats.get("mins"):
-            self.mins = pd.Series(stats["mins"])
+            mins_dict = stats["mins"]
+            self.mins = np.array([mins_dict.get(c, 0.0) for c in cols])
         if stats.get("maxs"):
-            self.maxs = pd.Series(stats["maxs"])
-        self.feature_columns = stats.get("columns", [])
+            maxs_dict = stats["maxs"]
+            self.maxs = np.array([maxs_dict.get(c, 1.0) for c in cols])
 
     def get_feature_count(self) -> int:
         """Return the number of engineered features."""
