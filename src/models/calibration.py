@@ -9,6 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import numpy as np
 from pydantic import BaseModel
@@ -41,6 +42,37 @@ class CalibrationResult(BaseModel):
     buckets: list[ConfidenceBucket]
     optimal_threshold: float = 0.5
     status: str = "PROVISIONAL"
+
+    def to_report_section(self) -> Any:
+        """Convert result to CalibrationSection for ResearchReporter."""
+        from src.research.reporting import CalibrationBucket as ReportingBucket, CalibrationSection
+
+        reporting_buckets = []
+        for b in self.buckets:
+            reporting_buckets.append(
+                ReportingBucket(
+                    range=f"{b.range_start:.1f}-{b.range_end:.1f}",
+                    accuracy=b.accuracy,
+                    confidence=b.avg_confidence,
+                    samples=b.sample_count,
+                )
+            )
+
+        reliability_msg = "Model shows good alignment between confidence and accuracy."
+        if self.ece > 0.25:
+            reliability_msg = "Critical calibration error; confidence scores unreliable."
+        elif self.ece > 0.15:
+            reliability_msg = "Model is overconfident; calibration suggested."
+
+        return CalibrationSection(
+            brier_score=self.brier_score,
+            ece=self.ece,
+            mce=self.mce,
+            status=self.status,
+            optimal_threshold=self.optimal_threshold,
+            buckets=reporting_buckets,
+            reliability_insight=reliability_msg,
+        )
 
 
 class CalibrationEngine:

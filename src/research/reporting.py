@@ -277,6 +277,46 @@ class ResearchReporter:
         with open(filepath, "w") as f:
             f.write(content)
 
+    def _get_color_for_metric(self, value: str | float, metric_type: str) -> str:
+        """Get Rich color code based on institutional thresholds."""
+        try:
+            # Handle percentage strings or raw numbers
+            if isinstance(value, str):
+                cleaned = value.replace("%", "").replace("$", "").replace(",", "")
+                val = float(cleaned)
+                if "%" in value:
+                    val /= 100.0
+            else:
+                val = float(value)
+        except (ValueError, TypeError):
+            return "white"
+
+        if metric_type == "sharpe":
+            if val >= 2.0:
+                return "green"
+            if val >= 1.0:
+                return "yellow"
+            return "red"
+        if metric_type == "pf":
+            if val >= 2.0:
+                return "green"
+            if val >= 1.5:
+                return "yellow"
+            return "red"
+        if metric_type == "recovery":
+            if val >= 3.0:
+                return "green"
+            if val >= 2.0:
+                return "yellow"
+            return "red"
+        if metric_type == "win_rate":
+            if val >= 0.55:
+                return "green"
+            if val >= 0.45:
+                return "yellow"
+            return "red"
+        return "white"
+
     def format_for_terminal(self, report: ResearchReport) -> None:
         """Print a scannable version of the report to the terminal."""
         status_color = "green" if report.overall_status == "VERIFIED" else "yellow"
@@ -316,12 +356,15 @@ class ResearchReporter:
             table.add_column("Recov")
             table.add_column("PF")
             table.add_column("Outcome")
+
+            # Baseline row
+            b = report.stress_tests.baseline
             table.add_row(
                 "Baseline",
-                report.stress_tests.baseline.total_return,
-                report.stress_tests.baseline.max_drawdown,
-                report.stress_tests.baseline.recovery_factor,
-                report.stress_tests.baseline.profit_factor,
+                b.total_return,
+                b.max_drawdown,
+                f"[{self._get_color_for_metric(b.recovery_factor, 'recovery')}]{b.recovery_factor}[/]",
+                f"[{self._get_color_for_metric(b.profit_factor, 'pf')}]{b.profit_factor}[/]",
                 "N/A",
             )
             for s in report.stress_tests.scenarios:
@@ -329,8 +372,8 @@ class ResearchReporter:
                     s.name,
                     s.total_return,
                     s.max_drawdown,
-                    s.recovery_factor,
-                    s.profit_factor,
+                    f"[{self._get_color_for_metric(s.recovery_factor, 'recovery')}]{s.recovery_factor}[/]",
+                    f"[{self._get_color_for_metric(s.profit_factor, 'pf')}]{s.profit_factor}[/]",
                     s.outcome,
                 )
             self.console.print(table)
@@ -360,10 +403,19 @@ class ResearchReporter:
             table = Table(box=None)
             table.add_column("Attribute")
             table.add_column("Value")
+            table.add_column("WR")
             table.add_column("PF")
             table.add_column("Trades")
             for c in report.trade_patterns.concentrations:
-                table.add_row(c.attribute, c.value, f"{c.profit_factor:.2f}", str(c.total_trades))
+                wr_color = self._get_color_for_metric(c.win_rate, "win_rate")
+                pf_color = self._get_color_for_metric(c.profit_factor, "pf")
+                table.add_row(
+                    c.attribute,
+                    c.value,
+                    f"[{wr_color}]{c.win_rate:.1%}[/]",
+                    f"[{pf_color}]{c.profit_factor:.2f}[/]",
+                    str(c.total_trades),
+                )
             self.console.print(table)
 
             if report.trade_patterns.motifs:
@@ -375,11 +427,12 @@ class ResearchReporter:
                 m_table.add_column("WR")
                 for m in report.trade_patterns.motifs:
                     if m.win_rate < 0.5:
+                        wr_color = self._get_color_for_metric(m.win_rate, 'win_rate')
                         m_table.add_row(
                             m.algorithm,
                             m.volatility_bucket,
                             m.confidence_bucket,
-                            f"{m.win_rate:.1%}",
+                            f"[{wr_color}]{m.win_rate:.1%}[/]",
                         )
                 self.console.print(m_table)
 
@@ -424,11 +477,11 @@ class ResearchReporter:
                 table.add_row(
                     b.name,
                     b.total_return,
-                    b.sharpe,
+                    f"[{self._get_color_for_metric(b.sharpe, 'sharpe')}]{b.sharpe}[/]",
                     b.max_drawdown,
-                    b.profit_factor,
+                    f"[{self._get_color_for_metric(b.profit_factor, 'pf')}]{b.profit_factor}[/]",
                     b.sqn,
-                    b.recovery_factor,
+                    f"[{self._get_color_for_metric(b.recovery_factor, 'recovery')}]{b.recovery_factor}[/]",
                     b.p_value,
                 )
             self.console.print(table)
@@ -448,9 +501,9 @@ class ResearchReporter:
             for m in report.rl_evaluation.metrics:
                 table.add_row(
                     m.agent_name,
-                    f"{m.sharpe:.2f}",
+                    f"[{self._get_color_for_metric(m.sharpe, 'sharpe')}]{m.sharpe:.2f}[/]",
                     f"{m.sortino:.2f}",
-                    f"{m.profit_factor:.2f}",
+                    f"[{self._get_color_for_metric(m.profit_factor, 'pf')}]{m.profit_factor:.2f}[/]",
                     f"{m.max_dd:.2%}",
                     f"{m.var_95:.2%}",
                     f"{m.sqn:.2f}",
