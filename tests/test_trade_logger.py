@@ -43,9 +43,34 @@ def test_log_trade(logger):
         direction=1,
         entry_price=2000.0,
         lot_size=0.1,
-        signal_id=signal_id
+        signal_id=signal_id,
+        signal_source="ensemble_v1"
     )
     assert trade_id > 0
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade
+        trade = session.get(Trade, trade_id)
+        assert trade.ticket == 12345
+        assert trade.signal_source == "ensemble_v1"
+        assert trade.timestamp is not None
+
+def test_log_rejected_trade(logger):
+    trade_id = logger.log_trade(
+        ticket=None,
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2000.0,
+        lot_size=0.1,
+        status="REJECTED",
+        signal_source="risk_engine"
+    )
+    assert trade_id > 0
+    with logger.Session() as session:
+        from src.core.trade_logger import Trade
+        trade = session.get(Trade, trade_id)
+        assert trade.ticket is None
+        assert trade.status == "REJECTED"
+        assert trade.signal_source == "risk_engine"
 
 def test_performance_report(logger):
     # Log some closed trades
