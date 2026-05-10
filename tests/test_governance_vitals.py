@@ -13,6 +13,8 @@ def test_governance_files_exist():
         "docs/CONTRIBUTING.md",
         "docs/PREPROD_CHECKLIST.md",
         "docs/ENTERPRISE_STANDARDS.md",
+        "docs/LICENSE_COMPLIANCE.md",
+        "docs/DEPENDENCY_LICENSES.md",
         "SECURITY.md",
     ]
 

@@ -20,7 +20,6 @@ timm==1.0.14
 einops==0.8.0
 
 # ── Technical Analysis ──────────────────────────────────────
-TA-Lib==0.6.4
 # pandas-ta==0.4.71b0
 mplfinance==0.12.10b0
 
@@ -31,8 +30,6 @@ aiohttp==3.13.4
 httpx==0.28.1
 
 # ── MetaTrader 5 ────────────────────────────────────────────
-MetaTrader5==5.0.5735; sys_platform == 'win32'
-metaapi-cloud-sdk==29.1.1; sys_platform == 'win32'
 
 # ── Database ────────────────────────────────────────────────
 psycopg2-binary==2.9.10
