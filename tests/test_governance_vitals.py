@@ -12,6 +12,7 @@ def test_governance_files_exist():
         ".github/ISSUE_TEMPLATE/security_report.yml",
         "docs/CONTRIBUTING.md",
         "docs/PREPROD_CHECKLIST.md",
+        "docs/ENTERPRISE_STANDARDS.md",
         "SECURITY.md",
     ]
 
