@@ -19,7 +19,19 @@ Located in `src/utils/synthetic_data.py`, the `ScenarioGenerator` provides deter
 - **mean_reversion**: Oscillating price process with high z-score and low efficiency ratio.
 - **low_volatility_drift**: Small constant trend with minimal noise and low ATR.
 - **news_shock**: Extreme spike at the end to trigger news-like volatility checks.
+- **noisy**: Ranging data with frequent extreme outliers (spikes).
+- **missing_data**: Data with random NaN "holes" in OHLCV columns to test pipeline robustness.
 - **malformed**: Data with intentional errors (NaNs, negative prices, High < Low) to test pipeline resilience.
+
+## BacktestScenarioBuilder
+
+Located in `src/utils/synthetic_data.py`, the `BacktestScenarioBuilder` provides deterministic price sequences designed to verify the mathematical correctness of the `BacktestEngine`.
+
+### Key Methods
+
+- **drawdown_recovery(n_steps, start_price)**: Creates a 10% drawdown followed by a 20% gain. Used to verify `max_drawdown` and `recovery_factor` calculations.
+- **wick_traps(n_steps, start_price)**: Creates bars where both SL and TP levels are touched. Verifies the conservative "SL-first" exit policy.
+- **steady_sharpe(n_steps, start_price)**: Near-perfect linear trend with minimal noise to produce high Sharpe and Profit Factor for baseline testing.
 
 ## ExecutionScenarioBuilder
 
