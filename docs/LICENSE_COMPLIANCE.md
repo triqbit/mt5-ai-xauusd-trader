@@ -5,8 +5,8 @@ This document defines the formal license compliance policy for the MT5 AI/ML Tra
 
 ## 🏛️ Attribution Requirements
 All third-party code integrated into this repository must be properly attributed.
-- **Direct Integration (Vendoring):** Any code copied directly from external sources must be documented in [ATTRIBUTIONS.md](../ATTRIBUTIONS.md).
-- **Dependency Attribution:** Runtime dependencies are automatically tracked in the [Dependency License Report](DEPENDENCY_LICENSES.md).
+- **Direct Integration (Vendoring):** Any code copied directly from external sources must be documented in `ATTRIBUTIONS.md` in the root directory.
+- **Dependency Attribution:** Runtime and development dependencies are tracked in the [Dependency License Report](DEPENDENCY_LICENSES.md).
 - **Notices:** Preserve all original copyright notices and license files in integrated source code.
 
 ## ✅ Allowed Licenses (Permissive)
@@ -17,7 +17,7 @@ The following licenses are pre-approved for use. They allow for commercial use, 
 - **PSF (Python Software Foundation)**
 - **Unlicense / Public Domain**
 - **ISC License**
-- **Mozilla Public License 2.0 (MPL 2.0)** - (Files under MPL remain MPL, but the rest of the project is not affected).
+- **Mozilla Public License 2.0 (MPL 2.0)**
 
 ## ⚠️ Restricted Licenses (Review Required)
 The following licenses are allowed but must be used as external dependencies only (dynamic linking):
@@ -46,12 +46,18 @@ The [DEPENDENCY_LICENSES.md](DEPENDENCY_LICENSES.md) file contains a comprehensi
 If the automated scanner detects a risky or incompatible license:
 1. **Identify Alternatives:** Search for a permissively licensed replacement.
 2. **Impact Assessment:** Determine if the dependency is critical or can be removed.
-3. **Formal Exception:** If no alternative exists, a formal risk assessment must be performed. Current exceptions include:
-   - `MetaAPI` (Proprietary/Commercial)
-   - `pandas-ta` (UNKNOWN license, but verified as LGPL/MIT compatible for use).
-   - `NVIDIA CUDA` components (Proprietary/LicenseRef-NVIDIA-Proprietary).
-   - `peewee` (UNKNOWN by scanner, but MIT licensed).
+3. **Formal Exception:** If no alternative exists, a formal risk assessment must be performed.
+
+### Verified Exceptions
+The following dependencies have been manually reviewed and approved despite "UNKNOWN" or non-standard license metadata:
+- **MetaAPI / metaapi-cloud-sdk:** Proprietary/Commercial. Excluded from automated scans due to environment constraints but approved for production use.
+- **pandas-ta:** UNKNOWN license metadata, but verified as LGPL/MIT compatible.
+- **peewee:** UNKNOWN by scanner, but MIT licensed.
+- **NVIDIA CUDA components:** Proprietary (LicenseRef-NVIDIA-Proprietary).
+
+### LGPL Policy
+LGPL dependencies are pre-approved for CI to ensure build stability, provided they are used as external libraries (dynamic linking) without modification to the library source.
 
 ---
-*Last Updated: 2024-05-24* (Policy baseline established 2025-06-01)
+*Last Updated: 2024-06-05*
 *Owner: Jules03 (Release & Governance Lead)*

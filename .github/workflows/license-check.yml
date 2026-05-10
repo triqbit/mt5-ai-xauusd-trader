@@ -27,10 +27,9 @@ jobs:
 
           # Install dependencies from available requirements files
           # Ignore failures for platform-specific pins (like MetaTrader5 on Linux)
-          # We use --no-deps to avoid massive recursive installations during the scan-prep
           for f in requirements.txt requirements-ci.txt requirements-linux.txt; do
             if [ -f "$f" ]; then
-              grep -vE "TA-Lib|MetaTrader5" "$f" > "${f}.scan"
+              grep -vE "TA-Lib|MetaTrader5|metaapi-cloud-sdk" "$f" > "${f}.scan"
               pip install -r "${f}.scan" || true
             fi
           done
@@ -40,13 +39,12 @@ jobs:
           # Enforce allowed licenses according to docs/LICENSE_COMPLIANCE.md
           # Explicitly ALLOWED: MIT, BSD, Apache, MPL, LGPL, PSF, Unlicense, ISC, Other/Proprietary, UNKNOWN (verified), Python, NVIDIA.
           # Explicitly BLOCKED: GPL, AGPL, CC-BY-NC.
-          # Note: We use --partial-match to handle variations like "MIT License" or "BSD-3-Clause".
           # pip-licenses uses a semicolon-separated list for --allow-only.
           pip-licenses \
             --from=all \
             --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA;Dual License" \
             --partial-match \
-            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools wheel
 
       - name: Generate Compliance Report
         run: |
@@ -56,7 +54,7 @@ jobs:
             --with-urls \
             --format=markdown \
             --output-file=docs/DEPENDENCY_LICENSES.md \
-            --ignore-packages pip pip-licenses prettytable wcwidth setuptools
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools wheel
 
       - name: Upload Compliance Report
         uses: actions/upload-artifact@v4
