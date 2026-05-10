@@ -28,9 +28,11 @@ The DSS summarizes the following dimensions:
 For human operators, the DSS generates a high-fidelity terminal dashboard using the `rich` library. This dashboard provides:
 - Semantic icons and emojis (📈/📉, ✅/⚠️/🛑, 💎/💪) for rapid scannability and accessibility.
 - Color-coded status and direction.
-- **Institutional Metric Highlighting:** Sharpe Ratio, Profit Factor, and Recovery Factor are color-coded (Green/Yellow/Red) based on institutional health targets (e.g., Green for Sharpe >= 2.0).
+- **Institutional Metric Highlighting:** Sharpe Ratio, Profit Factor, Recovery Factor, Win Rate, and Win/Loss Ratio are color-coded (Green/Yellow/Red) based on institutional health targets (e.g., Green for Win Rate >= 55%).
 - Structured panels with descriptive icons for market and performance overviews.
 - **High Conviction Badge:** A `[HIGH CONVICTION] 💎` visual indicator for signals with a decision score of 90 or higher.
+- **Conviction Meter:** A visual progress bar showing the decision score conviction at a glance.
+- **Execution Blocked Panel:** A dedicated, high-visibility warning panel for blocked trades to ensure critical rejection reasons are not missed.
 - Detailed macro intelligence including active events and impact scores.
 - Full signal attribution details with model votes and feature impacts.
 

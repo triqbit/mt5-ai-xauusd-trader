@@ -300,6 +300,7 @@ class DecisionSupportSystem:
             from rich import box
             from rich.console import Console, Group
             from rich.panel import Panel
+            from rich.progress_bar import ProgressBar
             from rich.table import Table
             from rich.text import Text
 
@@ -345,10 +346,18 @@ class DecisionSupportSystem:
             header_content.append("  |  CONSENSUS: ", style="bold")
             header_content.append(packet.consensus.upper(), style="bold cyan")
 
+            blocking_panel = None
             if packet.blocking_reasons:
-                header_content.append("\n\nBLOCKING REASONS:\n", style="bold red")
+                blocking_content = Text()
                 for reason in packet.blocking_reasons:
-                    header_content.append(f" 🚫 {reason}\n", style="red")
+                    blocking_content.append(f" 🚫 {reason}\n", style="bold red")
+
+                blocking_panel = Panel(
+                    blocking_content,
+                    title="[bold red]Execution Blocked[/bold red]",
+                    border_style="red",
+                    box=box.HEAVY,
+                )
 
             header = Panel(
                 header_content,
@@ -366,14 +375,33 @@ class DecisionSupportSystem:
                 if packet.decision_score >= 50
                 else "red"
             )
-            score_content = Text()
-            score_content.append("Decision Score: ", style="bold")
-            score_content.append(f"{packet.decision_score:.1f}/100", style=f"bold {score_color}")
-            score_content.append("  |  Sizing Recommendation: ", style="bold")
-            score_content.append(f"{packet.sizing_multiplier:.1%}", style="bold cyan")
+            score_content = Table.grid(expand=True)
+            score_content.add_column(ratio=2)
+            score_content.add_column(ratio=3)
+
+            score_text = Text()
+            score_text.append("Decision Score: ", style="bold")
+            score_text.append(f"{packet.decision_score:.1f}/100", style=f"bold {score_color}")
+            score_text.append("\nSizing Rec:     ", style="bold")
+            score_text.append(f"{packet.sizing_multiplier:.1%}", style="bold cyan")
 
             if packet.decision_score >= 90.0 and packet.is_executable:
-                score_content.append("  |  [HIGH CONVICTION] 💎", style="bold green")
+                score_text.append("\n[HIGH CONVICTION] 💎", style="bold green")
+
+            # Conviction Meter
+            meter = ProgressBar(
+                total=100,
+                completed=packet.decision_score,
+                width=40,
+                pulse=False,
+                style="dim",
+                complete_style=score_color
+            )
+
+            score_content.add_row(
+                score_text,
+                Panel(Group(Text("Conviction Meter", style="dim center"), meter), box=box.SIMPLE)
+            )
 
             augmentation_panel = Panel(
                 score_content, title="🎯 Augmentation Metrics", border_style="blue"
@@ -394,24 +422,26 @@ class DecisionSupportSystem:
             regime_panel = Panel(regime_content, title="🌐 Market Regime", border_style="cyan")
 
             # Right Column: Performance with Color-Coded Metrics
-            def get_metric_color(val: float) -> str:
-                if val >= 2.0:
+            def get_color(val: float, green_thr: float, yellow_thr: float) -> str:
+                if val >= green_thr:
                     return "green"
-                if val >= 1.0:
+                if val >= yellow_thr:
                     return "yellow"
                 return "red"
 
-            sharpe_color = get_metric_color(packet.performance.sharpe_ratio)
-            pf_color = get_metric_color(packet.performance.profit_factor)
-            rf_color = get_metric_color(packet.performance.recovery_factor)
+            sharpe_color = get_color(packet.performance.sharpe_ratio, 2.0, 1.0)
+            pf_color = get_color(packet.performance.profit_factor, 2.0, 1.5)
+            rf_color = get_color(packet.performance.recovery_factor, 3.0, 2.0)
+            wr_color = get_color(packet.performance.win_rate, 0.55, 0.45)
+            wl_color = get_color(packet.performance.win_loss_ratio, 2.0, 1.2)
 
             perf_content = (
-                f"Sharpe: [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
+                f"Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
                 f"Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
                 f"Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
-                f"Win Rate: [bold]{packet.performance.win_rate:.1%}[/bold]\n"
-                f"W/L Ratio: [bold]{packet.performance.win_loss_ratio:.2f}[/bold]\n"
-                f"Total Trades: {packet.performance.total_trades}"
+                f"Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]\n"
+                f"W/L Ratio:     [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
+                f"Total Trades:  {packet.performance.total_trades}"
             )
             perf_panel = Panel(perf_content, title="📊 Recent Performance", border_style="magenta")
 
@@ -450,15 +480,20 @@ class DecisionSupportSystem:
             )
 
             # Assemble everything into a single group for output
-            dashboard = Group(
-                header,
+            components = [header]
+            if blocking_panel:
+                components.append(blocking_panel)
+
+            components.extend([
                 augmentation_panel,
                 overview_table,
                 macro_panel,
                 attribution_summary,
                 Text("\n[bold]DETAILED ATTRIBUTION BREAKDOWN[/bold]\n"),
                 self.explainer.get_renderable(packet.explanation),
-            )
+            ])
+
+            dashboard = Group(*components)
 
             # Print to console if provided
             if console:
