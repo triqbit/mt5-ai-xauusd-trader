@@ -121,8 +121,6 @@ class RareEventSimulator:
         if config.seed is not None:
             self.rng = np.random.default_rng(config.seed)
 
-        self._current_config = config
-
         if config.event_type == RareEventType.FLASH_CRASH:
             return self._simulate_flash_crash(config)
         if config.event_type == RareEventType.LIQUIDITY_VACUUM:
@@ -150,12 +148,13 @@ class RareEventSimulator:
         gaps: np.ndarray | None = None,
         spread_multiplier: float = 1.0,
         vols: np.ndarray | None = None,
+        bars_per_day: int = 288,
+        start_date: str = "2024-01-01",
     ) -> pd.DataFrame:
         """
         Helper to convert a returns series into a valid OHLCV DataFrame.
         Ensures price continuity: open[i] = close[i-1] unless gap requested.
         """
-        config_ref = getattr(self, "_current_config", None)
         n = len(returns)
         if vols is None:
             vols = np.full(n, base_vol)
@@ -191,27 +190,28 @@ class RareEventSimulator:
         vol_factor = 1.0 + (np.abs(returns) / (vols + 1e-9)) * 0.5
         adj_volume = np.clip(base_volume * vol_factor, 1, 10000).astype(int)
 
+        # Generate ticks and volumes
+        tick_volumes = self.rng.poisson(adj_volume).astype(np.int64)
+        real_volumes = self.rng.poisson(adj_volume * 10).astype(np.int64)
+
         df = pd.DataFrame(
             {
-                "open": opens,
-                "high": highs,
-                "low": lows,
-                "close": closes,
-                "tick_volume": self.rng.poisson(adj_volume),
-                "real_volume": self.rng.poisson(adj_volume * 10),
-                "spread": spreads,
+                "open": opens.astype(np.float32),
+                "high": highs.astype(np.float32),
+                "low": lows.astype(np.float32),
+                "close": closes.astype(np.float32),
+                "tick_volume": tick_volumes,
+                "real_volume": real_volumes,
+                "spread": spreads.astype(np.float32),
             }
         )
 
         # Add a timestamp index. Use freq relative to bars_per_day if possible.
         total_seconds = 24 * 60 * 60
-        seconds_per_bar = 300
-        start_date = "2024-01-01"
-        if config_ref:
-            seconds_per_bar = total_seconds // config_ref.bars_per_day
-            start_date = config_ref.start_date
+        seconds_per_bar = max(1, total_seconds // bars_per_day)
 
         df.index = pd.date_range(start=start_date, periods=n, freq=f"{seconds_per_bar}s")
+        df.index.name = "time"
 
         return df
 
@@ -250,7 +250,13 @@ class RareEventSimulator:
                 vols[idx] *= 1.8 * config.event_magnitude
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         # Volume Surge during crash
@@ -300,7 +306,13 @@ class RareEventSimulator:
                 vols[idx] *= 4.0 * config.event_magnitude
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         vacuum_mask = (np.arange(n) >= start_idx) & (np.arange(n) < start_idx + duration)
@@ -363,6 +375,8 @@ class RareEventSimulator:
             config.base_volume,
             gaps=gaps,
             vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         result = RareEventResult(
@@ -401,7 +415,13 @@ class RareEventSimulator:
                 vols[idx] *= 2.0 * config.event_magnitude
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         # Peak impact is the reversal magnitude from the peak reached during the trend
@@ -445,7 +465,13 @@ class RareEventSimulator:
             vols[dislocation_idx + 1 :] = new_vol
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         event_prices = df["close"].iloc[dislocation_idx:]
@@ -498,7 +524,13 @@ class RareEventSimulator:
         # Generate base returns then scale noise by the volatility cluster
         returns = config.drift + self._generate_t_returns(n, 0.0, 1.0) * vols
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         # For Vol Cluster, peak impact is the max absolute price deviation from start
@@ -595,7 +627,13 @@ class RareEventSimulator:
                 returns[idx] = self._generate_t_returns(1, config.drift, vols[idx], df=2.5)[0]
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         event_prices = df["close"].iloc[shock_idx : shock_idx + shock_duration]
@@ -644,7 +682,13 @@ class RareEventSimulator:
             returns[start:end] = self._generate_t_returns(end - start, drift, vol)
 
         df = self._generate_base_ohlc(
-            config.start_price, returns, config.base_volatility, config.base_volume, vols=vols
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
         )
 
         # Max percentage deviation from the very beginning of the multi-session event
