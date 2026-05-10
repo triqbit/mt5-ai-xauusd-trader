@@ -14,7 +14,7 @@ services:
     volumes:
       - ./.env:/app/.env:ro
       - ./logs:/app/logs
-      - ./models:/app/models:ro
+      - ./models:/app/models
     environment:
       - MODE=${MODE:-demo}
       - ALGO=${ALGO:-ensemble}
