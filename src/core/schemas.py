@@ -33,7 +33,7 @@ class TradeSignal(BaseModel):
     the injection of untrusted or malformed data into the trading pipeline.
     """
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     symbol: str = Field(
         ...,

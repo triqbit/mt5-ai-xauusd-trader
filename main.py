@@ -407,11 +407,23 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                    current_positions = connector.get_positions()
+                    risk_decision = (
+                        risk.approve(
+                            signal,
+                            signal_id=signal_id,
+                            model_health=health,
+                            market_data=df_raw,
+                            open_positions=current_positions,
+                        )
                         if direction != 0
-                        else False
+                        else None
                     )
+
+                    risk_approved = risk_decision.is_approved if risk_decision else False
+                    if risk_approved and risk_decision:
+                        # Update signal with adjusted lot size from institutional risk engine
+                        signal.lot_size = risk_decision.adjusted_lot_size
 
                 # 7. Execution Filter Cascade
                 filter_decision = None

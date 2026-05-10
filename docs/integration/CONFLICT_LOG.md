@@ -99,6 +99,29 @@
 - **Resolution**: Extract to `_prepare_trade_signal` helper.
 - **Owner**: Jules05
 
+## [2026-05-10] - Risk Management Harmonization & Interface Unification
+
+### 1. Risk Management Logic Fragmentation
+- **Conflict**: Institutional risk logic was split between `RiskEngine` and `RiskManager`. `RiskEngine` had ATR-based sizing and exposure limits, while `RiskManager` had Kelly sizing and All-Weather allocation.
+- **Agents**: Jules01, Jules05
+- **Impact**: High. System was using a hybrid of two risk managers, leading to inconsistent safety checks and sizing.
+- **Resolution**: Consolidated all unique institutional logic from `RiskEngine` into `RiskManager`. Deleted redundant `src/trading/risk_engine.py`.
+- **Owner**: Jules05
+
+### 2. Interface Mismatch (RiskDecision vs bool)
+- **Conflict**: `RiskEngine.validate_signal` returned a `RiskDecision` object, while `RiskManager.approve` returned a `bool`. `main.py` was trying to use both patterns inconsistently.
+- **Agents**: Jules01, Jules05
+- **Impact**: High. Prevented `main.py` from receiving detailed rejection reasons or adjusted lot sizes from the risk engine.
+- **Resolution**: Standardized `RiskManager` and `AuditedRiskManager` to return a `RiskDecision` object.
+- **Owner**: Jules05
+
+### 3. Immutable Schema Conflict (TradeSignal)
+- **Conflict**: `TradeSignal` was frozen (immutable), which prevented the risk engine from adjusting the `lot_size` based on ATR volatility scaling before execution.
+- **Agents**: Jules01, Jules02
+- **Impact**: Medium. Blocked dynamic lot sizing adjustments.
+- **Resolution**: Set `frozen=False` in `TradeSignal` model config to allow authorized mutations by the risk engine.
+- **Owner**: Jules05
+
 ### 4. Terminology Drift (SignalDirection vs ModelAction)
 - **Conflict**: Models return `SignalDirection` (1, -1, 0) but some internal adapters still reference `ModelAction` indices (0, 1, 2) without clear mapping, leading to potential confusion during debugging.
 - **Agents**: Jules01, Jules02

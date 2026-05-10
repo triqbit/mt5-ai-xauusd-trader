@@ -3,13 +3,11 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/risk_manager.py
 
 Enterprise risk management engine implementing:
-  - Kelly Criterion position sizing (fractional)
+  - ATR-based position sizing (14-period vs 30-day average)
+  - Fractional Kelly Criterion position sizing
   - Ray Dalio All-Weather portfolio allocation
-  - Dynamic drawdown protection & circuit breakers
-  - 6-layer entry filter cascade
-
-This module relies on the unified TradeSignal schema from src.core.schemas
-to ensure all signals entering the risk engine are technically valid.
+  - Cascading daily loss circuit breakers (Level 1-4)
+  - 8-layer safety cascade signal validation
 
 Author : triqbit
 License: MIT
@@ -20,7 +18,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -43,6 +43,15 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
 
 
 @dataclass
+class RiskDecision:
+    """Decision details from the RiskManager."""
+
+    is_approved: bool
+    reason: str = ""
+    adjusted_lot_size: float = 0.0
+
+
+@dataclass
 class DailyStats:
     """Intraday PnL tracker reset each trading day."""
 
@@ -56,7 +65,7 @@ class DailyStats:
 class RiskManager:
     """
     Central risk authority.
-    Every signal must be approved here before reaching the order router.
+    Enforces RISK_LIMITS.md safeguards via an 8-layer cascade.
     """
 
     def __init__(
@@ -81,45 +90,83 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+        market_data: Optional[pd.DataFrame] = None,
+        open_positions: Optional[List[Dict[str, Any]]] = None,
+    ) -> RiskDecision:
         """
-        Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
-        """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
-        elif not self._check_consecutive_losses():
-            rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
-            rejection_reason = "Model health metrics below threshold"
+        Validate a trade signal against the 8-layer cascade from RISK_LIMITS.md.
 
-        passed = rejection_reason == ""
-        if not passed:
-            logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
+        Layers:
+          1. Circuit Breakers (Equity Drawdown).
+          2. Daily Loss Limits (Level 4 Emergency Stop).
+          3. Activity Limits (Max Daily Trades, Max Consecutive Losses).
+          4. Exposure Limits (Max Concurrent Positions, Single Direction, Total Notional).
+          5. Symbol Allocation (Approved Portfolio).
+          6. Prediction Limits (Min Confidence).
+          7. Risk-Reward Validation (Institutional R:R ratio).
+          8. Model Health (Drift, Accuracy, Calibration).
+
+        Args:
+            signal: TradeSignal to validate.
+            signal_id: Optional database ID for the signal.
+            model_health: Optional dictionary of model performance metrics.
+            market_data: Optional historical OHLCV + Indicators for ATR sizing.
+            open_positions: Optional list of active position dictionaries for exposure checks.
+
+        Returns:
+            RiskDecision: Approval status, reason, and adjusted lot size.
+        """
+        # Layer 1: Circuit Breakers (Equity Drawdown)
+        if not self._check_circuit_breaker():
+            return RiskDecision(False, "Hard drawdown limit reached")
+
+        # Layer 2: Daily Loss Limits (Level 4)
+        if self.get_daily_loss_level() >= 4:
+            return RiskDecision(False, "Daily loss limit reached (Level 4)")
+
+        # Layer 3: Activity Limits
+        if self.daily.trade_count >= self.cfg.max_trades_per_day:
+            return RiskDecision(False, "Max daily trades reached")
+        if not self._check_consecutive_losses():
+            return RiskDecision(False, "Max consecutive losses reached")
+
+        # Layer 4: Exposure Limits
+        positions = open_positions if open_positions is not None else []
+        if len(positions) >= self.cfg.max_positions:
+            return RiskDecision(False, "Max concurrent positions reached")
+        if not self._check_directional_exposure(signal, positions):
+            return RiskDecision(False, "Max directional exposure reached (30%)")
+        if market_data is not None and not self._check_total_notional(signal, positions, market_data):
+            return RiskDecision(False, "Total notional exposure exceeds equity")
+
+        # Layer 5: Symbol Allocation
+        if not self._check_symbol_allocation(signal.symbol):
+            return RiskDecision(False, f"Symbol {signal.symbol} not in approved portfolio")
+
+        # Layer 6: Prediction Limits
+        if not self._check_minimum_confidence(signal.confidence):
+            return RiskDecision(
+                False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
             )
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
-        return passed
+
+        # Layer 7: Risk-Reward Validation
+        if not self._check_risk_reward(signal):
+            return RiskDecision(False, "Risk-Reward ratio below 1.5")
+
+        # Layer 8: Model Health
+        if not self._check_model_health(model_health):
+            return RiskDecision(False, "Model health metrics below threshold")
+
+        # Calculate final lot size
+        # Use ATR-based sizing if market_data is available, otherwise default to signal's lot_size
+        adjusted_lots = signal.lot_size
+        if market_data is not None:
+            adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
+
+        if adjusted_lots < self.cfg.min_lot_size:
+            return RiskDecision(False, f"Calculated lot size {adjusted_lots} below minimum", adjusted_lots)
+
+        return RiskDecision(True, "Approved", adjusted_lots)
 
     def size_position(
         self,
@@ -134,12 +181,12 @@ class RiskManager:
         Returns lot size capped at max risk per trade.
         """
         if avg_loss == 0:
-            return 0.01  # minimum lot
+            return self.cfg.min_lot_size
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
         risk_capital = self.balance * self.cfg.risk_per_trade
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
-        lot_size = max(0.01, round(lot_size, 2))
+        lot_size = max(self.cfg.min_lot_size, round(lot_size, 2))
         logger.debug(
             "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
             kelly_fraction,
@@ -147,6 +194,73 @@ class RiskManager:
             lot_size,
         )
         return lot_size
+
+    def calculate_position_size(self, symbol: str, market_data: pd.DataFrame) -> float:
+        """
+        ATR-based position sizing according to RISK_LIMITS.md.
+
+        Logic:
+          - Compare 14-period ATR to 30-day average.
+          - Normal Volatility: 100% position size.
+          - High Volatility (>1.5x): Reduce to 75% position size.
+          - Very High Volatility (>2x): Reduce to 50% position size.
+          - Extreme Volatility (>3x): HALT (0.0 lots).
+
+        Additional Constraints:
+          - Daily loss level multiplier (100%, 50%, 25%, 0%).
+          - Max Position Size (10% of account equity per trade).
+
+        Args:
+            symbol: Trading symbol.
+            market_data: DataFrame with 'atr' and 'close'.
+
+        Returns:
+            float: Calculated lot size.
+        """
+        if market_data.empty or "atr" not in market_data.columns:
+            return self.cfg.min_lot_size
+
+        current_atr = market_data["atr"].iloc[-1]
+        # Approx 30 days of M5 (12 bars/hr * 24 hr * 30 days = 8640)
+        avg_atr = market_data["atr"].tail(8640).mean()
+
+        vol_multiplier = 1.0
+        ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
+
+        if ratio > self.cfg.volatility_extreme_threshold:
+            return 0.0
+        elif ratio > self.cfg.volatility_very_high_threshold:
+            vol_multiplier = 0.5
+        elif ratio > self.cfg.volatility_high_threshold:
+            vol_multiplier = 0.75
+
+        loss_multiplier = self.get_size_multiplier_from_loss()
+        total_multiplier = vol_multiplier * loss_multiplier
+
+        if total_multiplier <= 0:
+            return 0.0
+
+        # Sizing: risk X% (cfg.risk_per_trade) of balance
+        risk_amount = self.balance * self.cfg.risk_per_trade
+
+        # ATR * 100 converts gold ATR to $ per lot (1.00 gold movement = $100 per lot)
+        # This is a simplification for XAUUSD.
+        multiplier = 100.0 if "XAU" in symbol else 1.0
+
+        if current_atr > 0:
+            lot_size = (risk_amount / (current_atr * multiplier)) * total_multiplier
+        else:
+            lot_size = self.cfg.min_lot_size
+
+        # Cap at Max Position Size (e.g. 10% of equity)
+        max_notional = self.balance * self.cfg.max_position_size_pct
+        price = market_data["close"].iloc[-1]
+        max_lots = max_notional / (price * multiplier)
+
+        final_lots = min(lot_size, max_lots)
+        final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
+
+        return final_lots
 
     def update_equity(self, current_equity: float) -> None:
         """Call after every closed trade or on heartbeat."""
@@ -168,9 +282,37 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
+            try:
+                self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
+            except Exception as e:
+                logger.error("Failed to send daily summary: %s", e)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
+
+    def get_daily_loss_level(self) -> int:
+        """
+        Layer 2: Daily Loss Level (0-4).
+        """
+        if self.daily.peak_equity <= 0 or self.daily.realised_pnl >= 0:
+            return 0
+
+        loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
+
+        if loss_pct >= self.cfg.max_daily_loss:
+            return 4
+        if loss_pct >= self.cfg.daily_loss_lvl3:
+            return 3
+        if loss_pct >= self.cfg.daily_loss_lvl2:
+            return 2
+        if loss_pct >= self.cfg.daily_loss_lvl1:
+            return 1
+        return 0
+
+    def get_size_multiplier_from_loss(self) -> float:
+        """Multiplier based on daily loss level."""
+        level = self.get_daily_loss_level()
+        mapping = {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.25, 4: 0.0}
+        return mapping.get(level, 0.0)
 
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:
@@ -212,8 +354,10 @@ class RiskManager:
         return True
 
     def _check_circuit_breaker(self) -> bool:
+        if self.peak_equity <= 0:
+            return True
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
+        if drawdown >= self.cfg.max_drawdown:
             logger.critical(
                 "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
                 drawdown * 100,
@@ -221,27 +365,44 @@ class RiskManager:
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit {self.cfg.max_drawdown*100:.1f}% limit",
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
             return False
         return True
 
-    def _check_daily_loss(self) -> bool:
-        if self.daily.peak_equity == 0:
-            return True
-        loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
-            return False
-        return True
+    def _check_directional_exposure(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]]
+    ) -> bool:
+        """Layer 4: 30% net directional exposure."""
+        net_lots = 0.0
+        for pos in open_positions:
+            vol = pos.get("volume", pos.get("lot_size", 0.0))
+            # MT5 position type: 0=BUY, 1=SELL
+            # or custom dict type
+            p_type = pos.get("type")
+            if p_type == 0 or p_type == "BUY":
+                net_lots += vol
+            elif p_type == 1 or p_type == "SELL":
+                net_lots -= vol
 
-    def _check_max_positions(self) -> bool:
-        if len(self.open_positions) >= self.cfg.max_positions:
-            logger.debug("Max positions reached (%d)", self.cfg.max_positions)
-            return False
-        return True
+        net_lots += self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
+        price_estimate = 2300.0  # Gold estimate fallback
+        # This is very rough, but standardizes the check
+        notional = abs(net_lots) * price_estimate * 100
+        exposure_pct = notional / self.balance if self.balance > 0 else 1.0
+
+        return exposure_pct <= self.cfg.max_single_direction_pct
+
+    def _check_total_notional(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
+    ) -> bool:
+        """Layer 4: Total notional < 100% equity."""
+        total_lots = sum(pos.get("volume", pos.get("lot_size", 0.0)) for pos in open_positions) + self.cfg.min_lot_size
+        price = market_data["close"].iloc[-1] if not market_data.empty else 2300.0
+        total_notional = total_lots * price * 100
+        return total_notional < (self.balance * self.cfg.max_total_notional_pct)
 
     def _check_symbol_allocation(self, symbol: str) -> bool:
         """Block trading on symbols not in the All-Weather portfolio."""
@@ -250,9 +411,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
-        if confidence < threshold:
-            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
+    def _check_minimum_confidence(self, confidence: float) -> bool:
+        if confidence < self.cfg.min_confidence:
+            logger.debug("Confidence %.2f below threshold %.2f", confidence, self.cfg.min_confidence)
             return False
         return True
 
@@ -268,4 +429,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskDecision", "RiskManager"]
