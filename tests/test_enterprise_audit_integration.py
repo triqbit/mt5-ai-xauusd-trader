@@ -47,9 +47,12 @@ def reset_audit_logger():
 def audit_logger():
     """Provide a fresh in-memory AuditLogger."""
     import uuid
-    # Use a unique identifier to ensure each test gets a fresh in-memory database
-    # This bypasses the engine cache in src.core.database.get_engine
-    return AuditLogger(db_url=f"sqlite:///memdb_{uuid.uuid4()}")
+    # Use a unique identifier to ensure each test gets a fresh in-memory database.
+    # We use sqlite:///:memory: but since we clear the engine cache in reset_audit_logger,
+    # it should be fresh anyway. However, for extreme isolation, we use a unique name.
+    # Note: sqlite:///name (without :memory:) creates a file.
+    # We want a truly in-memory DB that is isolated.
+    return AuditLogger(db_url=f"sqlite:///:memory:?cache=shared&name={uuid.uuid4()}")
 
 @pytest.fixture
 def mock_cfg():
