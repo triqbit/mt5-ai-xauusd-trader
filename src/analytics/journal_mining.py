@@ -346,7 +346,7 @@ class JournalMiner:
 
         # Create buckets for volatility
         try:
-            df["bucket"] = pd.qcut(
+            df["vol_bucket"] = pd.qcut(
                 df["volatility"],
                 q=4,
                 labels=["Low", "Normal", "High", "Extreme"],
@@ -354,11 +354,11 @@ class JournalMiner:
             )
         except ValueError:
             # Fallback if not enough data for qcut
-            df["bucket"] = "Standard"
+            df["vol_bucket"] = "Standard"
 
         results = []
-        for bucket in df["bucket"].unique():
-            group = df[df["bucket"] == bucket]
+        for bucket in df["vol_bucket"].unique():
+            group = df[df["vol_bucket"] == bucket]
             signal_count = len(group)
 
             # A false positive is defined here as an EXECUTED signal that resulted in a loss.

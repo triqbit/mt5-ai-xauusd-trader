@@ -20,27 +20,30 @@ Analyzes AI signal reliability under different market conditions by binning hist
 
 This helps identify "Toxic Motifs"—recurring attribute combinations (e.g., "PPO + Long + High Volatility + Low Confidence") that show significantly lower win rates.
 
-### 3. Drawdown Cluster Detection
-Automatically identifies sequences of 3 or more consecutive losing trades. This is used to diagnose "streakiness" and identify if the system is failing to adapt to rapid regime transitions.
+### 3. Volatility-Linked False Positives
+Refined analysis of false positives based specifically on **executed trades**. The system calculates the `false_positive_rate` for each volatility bucket by examining only those signals that actually triggered market execution but resulted in a loss. This provides a more accurate failure metric for strategy calibration than simple signal-to-outcome mapping.
 
-### 4. Profitable Pattern Concentrations
+### 4. Drawdown Cluster Detection
+Automatically identifies sequences of 3 or more consecutive losing trades. The system utilizes deterministic sorting with a primary key tie-breaker (`id`) to ensure consistent cluster identification when multiple trades occur at the same timestamp. This is used to diagnose "streakiness" and identify if the system is failing to adapt to rapid regime transitions.
+
+### 5. Profitable Pattern Concentrations
 Aggregates performance by:
 - **Symbol**: Asset-level performance (e.g., XAUUSD vs others).
 - **Algorithm**: Which AI model family is currently dominant.
 - **Hour of Day**: Identifying specific intraday windows of high edge.
 - **Day of Week**: Detecting cyclical edges or "Friday volatility" effects.
 
-### 5. Trade Duration Analysis
+### 6. Trade Duration Analysis
 Calculates average win vs loss holding times in minutes. This reveals behavioral biases such as "cutting winners short and letting losers run," which is critical for XAUUSD risk management where volatility can quickly turn a small loss into a major drawdown.
 
-### 6. Early Warning & Toxic Motif Tracking
+### 7. Early Warning & Toxic Motif Tracking
 Detects advanced behavioral risks:
 - **Toxic Motifs**: Recurring attribute combinations that show significantly lower win rates or high frequency within drawdown clusters. Motifs are ranked using a toxic score: `(1.0 - win_rate) * log1p(frequency)`, prioritizing high-confidence failures.
 - **Pre-Drawdown Motifs**: Identification of signal combinations that frequently occur shortly before (default 6 hours) a drawdown cluster begins.
-- **Combination Motifs**: Recurring sets of multiple signals (e.g., Ensemble BUY + PPO SELL) within a short window (60m) that frequently precede drawdown clusters.
+- **Combination Motifs**: Recurring sets of multiple signals (e.g., Ensemble BUY + PPO SELL) within a short window (60m) that frequently precede drawdown clusters. Toxicity is quantified by calculating the actual `avg_pnl_after` (average loss) incurred during the subsequent drawdown cluster.
 - **Strategy Fragility**: High correlation between risk blocks and "weak states" (defined as the 24-hour window *preceding* a drawdown cluster).
 
-### 7. Risk Block Analysis
+### 8. Risk Block Analysis
 Summarizes recurring reasons why the `RiskManager` rejected AI signals (e.g., `MAX_DRAWDOWN`, `SPREAD_TOO_WIDE`). This reveals the "opportunity cost" of the current risk parameters.
 
 
@@ -49,6 +52,7 @@ Summarizes recurring reasons why the `RiskManager` rejected AI signals (e.g., `M
 - **Location**: `src/analytics/journal_mining.py`
 - **Output**: Typed `JournalReport` (Pydantic model)
 - **Engine**: SQLAlchemy for data retrieval and Pandas for statistical analysis.
+- **Time-Bounded Analysis**: Supports a `days` lookback parameter in `run_mining()` to filter trades, signals, and risk events for specific performance auditing periods.
 
 ## Usage
 
