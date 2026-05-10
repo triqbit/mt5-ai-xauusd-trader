@@ -621,9 +621,8 @@ class ExecutionAnalyzer:
                     .filter(ExecutionQuality.trade_id == trade.id)
                     .first()
                 )
-                if not existing:
-                    if self.analyze_trade(trade.id, persist=persist):
-                        count += 1
+                if not existing and self.analyze_trade(trade.id, persist=persist):
+                    count += 1
         return count
 
     def generate_summary_report(self, days: int = 7, persist: bool = False) -> ExecutionSummary:
