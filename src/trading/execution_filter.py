@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/execution_filter.py
-6-layer entry filter cascade to vet signals before execution.
+10-layer entry filter cascade to vet signals before execution.
 Author : triqbit
 License: MIT
 """
@@ -75,7 +75,7 @@ class ExecutionFilter:
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the 6-layer execution filter cascade.
+        Run the full 9-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -90,6 +90,8 @@ class ExecutionFilter:
 
         trace: dict[str, Any] = {}
         metrics = precomputed_metrics or {}
+        model_health = kwargs.get("model_health")
+        trade_logger = kwargs.get("trade_logger")
 
         # Layer 1: ATR Volatility
         atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(
@@ -148,6 +150,40 @@ class ExecutionFilter:
             "max_drawdown": self.max_drawdown,
         }
 
+        # Layer 7: Model Stability
+        if model_health:
+            stability_passed, stability_metrics = self._check_model_stability_with_metrics(
+                model_health
+            )
+            trace["model_stability"] = {
+                "passed": bool(stability_passed),
+                **stability_metrics,
+            }
+
+        # Layer 8: Performance Guard
+        if trade_logger:
+            perf_passed, perf_metrics = self._check_performance_guard_with_metrics(trade_logger)
+            trace["performance_guard"] = {
+                "passed": bool(perf_passed),
+                **perf_metrics,
+            }
+
+        # Layer 9: Confidence Threshold
+        conf_passed, conf_metrics = self._check_confidence_threshold_with_metrics(signal)
+        trace["confidence_threshold"] = {
+            "passed": bool(conf_passed),
+            **conf_metrics,
+        }
+
+        # Layer 10: Signal Consistency
+        cons_passed, cons_metrics = self._check_signal_consistency_with_metrics(
+            signal.symbol, signal.direction
+        )
+        trace["signal_consistency"] = {
+            "passed": bool(cons_passed),
+            **cons_metrics,
+        }
+
         # Determine final approval and blocked_by reason
         blocked_by = None
         failure_order = [
@@ -157,6 +193,10 @@ class ExecutionFilter:
             ("momentum", "MOMENTUM"),
             ("session_time", "SESSION_CLOSED"),
             ("drawdown_limit", "DRAWDOWN_LIMIT"),
+            ("model_stability", "MODEL_STABILITY"),
+            ("performance_guard", "PERFORMANCE_FLOOR"),
+            ("confidence_threshold", "CONFIDENCE_THRESHOLD"),
+            ("signal_consistency", "SIGNAL_FLICKER"),
         ]
         for layer_key, reason in failure_order:
             if layer_key in trace and not trace[layer_key]["passed"]:
@@ -330,3 +370,72 @@ class ExecutionFilter:
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
         return current_drawdown < self.max_drawdown
 
+    def _check_model_stability_with_metrics(
+        self, model_health: dict[str, float]
+    ) -> tuple[bool, dict[str, Any]]:
+        """Blocks if drift is too high or accuracy is too low."""
+        drift_threshold = (
+            self.cfg.model_drift_threshold if self.cfg and hasattr(self.cfg, "model_drift_threshold") else 0.3
+        )
+        accuracy_floor = (
+            self.cfg.model_accuracy_floor if self.cfg and hasattr(self.cfg, "model_accuracy_floor") else 0.45
+        )
+
+        drift = model_health.get("drift", 0.0)
+        accuracy = model_health.get("accuracy", 1.0)
+
+        passed = drift <= drift_threshold and accuracy >= accuracy_floor
+        return bool(passed), {
+            "drift": drift,
+            "drift_threshold": drift_threshold,
+            "accuracy": accuracy,
+            "accuracy_floor": accuracy_floor,
+        }
+
+    def _check_performance_guard_with_metrics(self, trade_logger: Any) -> tuple[bool, dict[str, Any]]:
+        """Blocks if historical win rate is dangerously low."""
+        report = trade_logger.read_performance_report()
+        win_rate = report.get("win_rate", 1.0)
+        total_trades = report.get("total_trades", 0)
+
+        # Only apply guard after a statistically significant number of trades
+        if total_trades < 20:
+            return True, {"win_rate": win_rate, "total_trades": total_trades, "status": "insufficient_data"}
+
+        floor = 0.45
+        passed = win_rate >= floor
+        return bool(passed), {"win_rate": win_rate, "floor": floor, "total_trades": total_trades}
+
+    def _check_confidence_threshold_with_metrics(
+        self, signal: TradeSignal
+    ) -> tuple[bool, dict[str, Any]]:
+        """Blocks if signal confidence is below minimum threshold."""
+        threshold = (
+            self.cfg.min_confidence if self.cfg and hasattr(self.cfg, "min_confidence") else 0.55
+        )
+        passed = signal.confidence >= threshold
+        return bool(passed), {"confidence": signal.confidence, "threshold": threshold}
+
+    def _check_signal_consistency_with_metrics(
+        self, symbol: str, direction: int
+    ) -> tuple[bool, dict[str, Any]]:
+        window = self.cfg.signal_flicker_window if self.cfg else 6
+        max_changes = self.cfg.max_signal_changes if self.cfg else 3
+        if symbol not in self._signal_history:
+            self._signal_history[symbol] = deque(maxlen=window)
+        history = self._signal_history[symbol]
+        history.append(int(direction))
+        if len(history) < 2:
+            return True, {"changes": 0, "window": window, "max_changes": max_changes}
+        changes = 0
+        h_list = list(history)
+        for i in range(1, len(h_list)):
+            if h_list[i] != h_list[i - 1]:
+                changes += 1
+        passed = changes <= max_changes
+        return bool(passed), {
+            "changes": changes,
+            "window": window,
+            "max_changes": max_changes,
+            "history": h_list,
+        }
