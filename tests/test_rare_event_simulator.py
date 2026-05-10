@@ -26,8 +26,23 @@ def test_simulator_basic_structure(simulator):
     assert isinstance(df, pd.DataFrame)
     assert isinstance(result, RareEventResult)
     assert len(df) == 200
-    assert all(col in df.columns for col in ["open", "high", "low", "close", "tick_volume", "real_volume", "spread"])
+
+    # Verify standard columns
+    expected_cols = ["open", "high", "low", "close", "tick_volume", "real_volume", "spread"]
+    assert all(col in df.columns for col in expected_cols)
     assert not df.isnull().values.any()
+
+    # Verify strict dtypes for pipeline compatibility
+    assert df["open"].dtype == np.float32
+    assert df["high"].dtype == np.float32
+    assert df["low"].dtype == np.float32
+    assert df["close"].dtype == np.float32
+    assert df["spread"].dtype == np.float32
+    assert df["tick_volume"].dtype == np.int64
+    assert df["real_volume"].dtype == np.int64
+
+    # Verify named index
+    assert df.index.name == "time"
 
 
 def test_ohlc_consistency(simulator):

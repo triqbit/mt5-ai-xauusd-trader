@@ -9,7 +9,7 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 ## Key Features
 
 - **Plausible Scenarios**: Generates flash crashes, liquidity vacuums, gold gaps, and more.
-- **Pipeline Compatible**: Produces DataFrames with `open`, `high`, `low`, `close`, `tick_volume`, `real_volume`, and `spread` columns, fully compatible with the `FeatureEngineer`.
+- **Pipeline Compatible**: Produces DataFrames with standardized lowercase columns (`open`, `high`, `low`, `close`, `tick_volume`, `real_volume`, `spread`). Uses strict `float32` for prices and `int64` for volumes to match `FeatureEngineer` expectations.
 - **Configurable**: Supports adjusting magnitude, duration, recovery factor, and frequency (bars per day).
 - **Reproducible**: Uses `numpy` random generators with optional seeds for deterministic scenario generation.
 

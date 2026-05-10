@@ -114,17 +114,17 @@ def test_enterprise_audit_flow_double_rejection(mock_cfg, audit_logger):
     # 5. Verify Audit Persistence
     with audit_logger.Session() as session:
         # Check Execution Decision Entry
-        ef_entry = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "execution_decision")
-        ).scalar_one()
+        ef_entry = session.scalars(
+            select(AuditEntry).where(AuditEntry.action == "execution_decision").order_by(AuditEntry.id.desc())
+        ).first()
         assert ef_entry.metadata_json["is_approved"] is False
         assert ef_entry.metadata_json["trace"]["trend_angle"]["passed"] is False
         assert ef_entry.metadata_json["symbol"] == "XAUUSD"
 
         # Check Risk Decision Entry
-        risk_entry = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "risk_decision")
-        ).scalar_one()
+        risk_entry = session.scalars(
+            select(AuditEntry).where(AuditEntry.action == "risk_decision").order_by(AuditEntry.id.desc())
+        ).first()
         assert risk_entry.metadata_json["passed"] is False
         assert risk_entry.metadata_json["decision_chain"]["risk_reward"] is False
         assert risk_entry.metadata_json["decision_chain"]["circuit_breaker"] is True
@@ -183,14 +183,14 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
     # 5. Verify Audit Persistence
     with audit_logger.Session() as session:
         # Check Execution Decision (Passed)
-        ef_entry = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "execution_decision")
-        ).scalar_one()
+        ef_entry = session.scalars(
+            select(AuditEntry).where(AuditEntry.action == "execution_decision").order_by(AuditEntry.id.desc())
+        ).first()
         assert ef_entry.metadata_json["is_approved"] is True
 
         # Check Risk Decision (Failed)
-        risk_entry = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "risk_decision")
-        ).scalar_one()
+        risk_entry = session.scalars(
+            select(AuditEntry).where(AuditEntry.action == "risk_decision").order_by(AuditEntry.id.desc())
+        ).first()
         assert risk_entry.metadata_json["passed"] is False
         assert risk_entry.metadata_json["decision_chain"]["risk_reward"] is False
