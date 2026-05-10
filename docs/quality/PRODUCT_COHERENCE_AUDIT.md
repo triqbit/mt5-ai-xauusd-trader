@@ -3,16 +3,17 @@
 ## 1. Executive Summary
 This audit evaluates the MT5 AI XAUUSD Trader for architectural coherence, naming consistency, and institutional polish. While the system demonstrates high technical maturity, several areas of "fragmentation debt" have been identified that could reduce operator trust and increase maintenance overhead.
 
-**Status Update (May 8, 2026):** Remediation in progress by Jules05 to resolve fragmentation debt in CLI, logging, and model output standardization.
+**Status Update (May 11, 2026):** Remediation finalized by Jules05. Risk management has been unified, and core schemas have been consolidated to eliminate fragmentation debt.
 
 ## 2. Findings
 
 ### A. Naming & Type Consistency
 - **Duplicate Enums:** `SignalDirection` is defined in both `src/core/schemas.py` and `src/core/constants.py`. (RESOLVED)
-- **Mapping Layers:** Multiple layers of mapping exist between `ModelAction` (0,1,2) and `SignalDirection` (1,-1,0). (HARMOMIZING)
-- **Terminology Drift:** Standardizing on "Signal" for raw model outputs and "Decision" for risk-filtered outputs. (IN PROGRESS)
+- **Mapping Layers:** Multiple layers of mapping exist between `ModelAction` (0,1,2) and `SignalDirection` (1,-1,0). (RESOLVED via ModelAction.to_direction())
+- **Terminology Drift:** Standardizing on "Signal" for raw model outputs and "Decision" for risk-filtered outputs. (RESOLVED: RiskDecision and ExecutionDecision formalized)
 
 ### B. Module Boundaries
+- **Risk Logic Fragmentation:** Logic was split between `RiskEngine` and `RiskManager`. (RESOLVED: Unified into `RiskManager`)
 - **Core Package bloat:** `src/core` contains diverse logic. Evaluation for future domain separation (e.g., moving FeatureEngineer to `src/data`) is ongoing.
 - **Circular Risk:** Centralizing enums in `constants.py` has reduced circular dependency risks between `schemas` and other modules.
 
