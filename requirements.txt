@@ -9,8 +9,8 @@ torch==2.5.1
 torchvision==0.20.1
 stable-baselines3==2.4.0
 gymnasium==1.0.0
-numpy==1.26.4
-scipy==1.12.0
+numpy==2.2.3
+scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
 

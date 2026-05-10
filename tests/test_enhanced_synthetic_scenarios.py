@@ -22,7 +22,8 @@ def config(monkeypatch):
         model_accuracy_floor=0.6,
         min_confidence=0.6,
         max_signal_changes=3,
-        signal_flicker_window=6
+        signal_flicker_window=6,
+        max_drawdown=0.10
     )
 
 @pytest.fixture
@@ -78,6 +79,7 @@ def test_signal_flicker_violation(filter_svc, execution_builder):
     final_sig = signals[-1]
     decision = filter_svc.validate(final_sig, df, current_drawdown=0.0)
     assert decision.trace["signal_consistency"]["passed"] is False
+    assert decision.blocked_by == "SIGNAL_FLICKER"
 
 def test_performance_violation(filter_svc, execution_builder):
     signal, df, mock_logger = execution_builder.performance_violation()
