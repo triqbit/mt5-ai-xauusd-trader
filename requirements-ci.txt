@@ -20,7 +20,7 @@ redis==5.2.1
 # -- Pydantic / settings -------------------------------------------
 pydantic==2.10.6
 pydantic-settings==2.7.1
-starlette==0.45.0
+starlette==0.52.1
 
 # -- Testing -------------------------------------------------------
 optuna==4.8.0
