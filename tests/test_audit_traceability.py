@@ -108,3 +108,19 @@ def test_log_operator_action_refined(audit_logger):
         assert entry.metadata_json["action_type"] == "emergency_halt"
         assert entry.metadata_json["reason"] == "System anomaly"
         assert entry.metadata_json["extra"] == "data"
+
+
+def test_log_system_restored(audit_logger):
+    """Test logging a system restoration event."""
+    incident_id = "INC-123"
+    details = "Manual DB restore completed"
+    entry_id = audit_logger.log_system_restored(incident_id=incident_id, details=details)
+
+    with audit_logger.Session() as session:
+        entry = session.get(AuditEntry, entry_id)
+
+    assert entry is not None
+    assert entry.actor == "system"
+    assert entry.action == "system_restored"
+    assert entry.details == details
+    assert entry.metadata_json["incident_id"] == incident_id
