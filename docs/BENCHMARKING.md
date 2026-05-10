@@ -12,6 +12,7 @@ The following rule-based baselines are available in `src/research/benchmarks.py`
 
 - **Buy and Hold**: Passive long baseline.
 - **Sell and Hold**: Passive short baseline.
+- **Buy and Hold**: Consistently maintains a long position (BUY signal).
 - **EMA Crossover**: Simple trend-following using fast and slow Exponential Moving Averages.
 - **Momentum (ROC)**: Momentum-based strategy using Rate of Change with a configurable noise-filtering threshold.
 - **Volatility Breakout**: Bollinger Band breakout strategy.
@@ -44,11 +45,15 @@ The `BenchmarkEvaluator` calculates high-fidelity metrics beyond simple returns:
 
 ## Statistical Comparison
 
-The framework uses a **Paired T-Test** (`scipy.stats.ttest_rel`) to compare the return distributions of a strategy against a baseline (typically the Random Baseline).
+The framework uses a dual statistical approach to compare return distributions of a strategy against a baseline:
+
+1.  **Paired T-Test** (`scipy.stats.ttest_rel`): Standard parametric test for comparing means.
+2.  **Wilcoxon Signed-Rank Test** (`scipy.stats.wilcoxon`): Non-parametric alternative that is more robust to non-normal return distributions common in finance.
 
 - **Outperformance**: Absolute difference in total returns.
-- **P-Value**: Indicates if the outperformance is statistically significant (p < 0.05).
-- **Significant**: Boolean flag indicating if the strategy reliably beats the baseline.
+- **P-Value**: Parametric significance from T-test.
+- **Wilcoxon P-Value**: Non-parametric significance.
+- **Significant**: Boolean flag indicating if outperformance is significant (p < 0.05) in *either* test.
 
 ## Model Adapters
 
