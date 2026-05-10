@@ -16,6 +16,7 @@ HAS_TORCH = importlib.util.find_spec("torch") is not None
 from src.models.base_model import Signal
 from src.research.benchmarks import (
     BenchmarkEvaluator,
+    BuyAndHoldStrategy,
     DreamerAdapter,
     EMACrossoverStrategy,
     EnsembleAdapter,
@@ -55,6 +56,13 @@ def test_ema_crossover_signals(sample_data):
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
+
+
+def test_buy_and_hold_signals(sample_data):
+    strategy = BuyAndHoldStrategy()
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(signals == 1.0)
 
 
 def test_momentum_signals(sample_data):
@@ -138,6 +146,7 @@ def test_comparison_logic(sample_data):
     comp = evaluator.compare_to_baseline(s1.name, s2.name)
     assert "Outperformance" in comp
     assert "Sharpe Improvement" in comp
+    assert "Wilcoxon P-Value" in comp
 
 
 def test_to_report_section(sample_data):

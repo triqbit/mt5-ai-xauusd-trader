@@ -112,6 +112,18 @@ class NaiveDirectionalStrategy:
         return signals
 
 
+class BuyAndHoldStrategy:
+    """Simple Buy and Hold baseline."""
+
+    @property
+    def name(self) -> str:
+        return "Buy_and_Hold"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """Always return BUY signal."""
+        return np.ones(len(df))
+
+
 class RiskFilteredBaseline:
     """EMA Crossover strategy with a simple volatility filter."""
 
@@ -432,6 +444,15 @@ class BenchmarkEvaluator:
         # Paired t-test on return distributions for identical market conditions
         t_stat, p_value = stats.ttest_rel(s_final, b_final)
 
+        # Wilcoxon signed-rank test (non-parametric)
+        wilcoxon_p = 1.0
+        try:
+            # Only run if there is variance in differences
+            if not np.array_equal(s_final, b_final):
+                _, wilcoxon_p = stats.wilcoxon(s_final, b_final)
+        except Exception:
+            wilcoxon_p = 1.0
+
         # Simple relative performance
         outperformance = s_metrics["Total Return"] - b_metrics["Total Return"]
         sharpe_diff = s_metrics["Sharpe Ratio"] - b_metrics["Sharpe Ratio"]
@@ -442,7 +463,10 @@ class BenchmarkEvaluator:
             "Relative Return": outperformance / (abs(b_metrics["Total Return"]) + 1e-9),
             "T-Statistic": float(t_stat),
             "P-Value": float(p_value),
-            "Significant": bool(p_value < 0.05) if not np.isnan(p_value) else False,
+            "Wilcoxon P-Value": float(wilcoxon_p),
+            "Significant": bool(p_value < 0.05 or wilcoxon_p < 0.05)
+            if not np.isnan(p_value)
+            else False,
         }
 
     def to_report_section(self, baseline_name: str) -> Any:
@@ -472,10 +496,18 @@ class BenchmarkEvaluator:
             )
 
         # Statistical summary
-        significant_count = len([c for c in comparisons if float(c.p_value) < 0.05])
+        significant_count = 0
+        for name in self.results:
+            if name.endswith("_returns") or name == baseline_name:
+                continue
+            comp = self.compare_to_baseline(name, baseline_name)
+            if comp.get("Significant", False):
+                significant_count += 1
+
         summary = (
             f"Compared {len(comparisons)} strategies against {baseline_name}. "
-            f"{significant_count} strategies showed statistically significant outperformance."
+            f"{significant_count} strategies showed statistically significant outperformance "
+            f"(p < 0.05 via T-test or Wilcoxon signed-rank test)."
         )
 
         return BenchmarkSection(comparisons=comparisons, statistical_summary=summary)
