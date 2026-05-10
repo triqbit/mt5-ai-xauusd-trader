@@ -239,6 +239,13 @@ def run_live(
         current_date = datetime.now(timezone.utc).date()
         if current_date > last_reset_date:
             log.info("Day change detected, resetting daily stats")
+            if monitor:
+                # Calculate daily stats before reset
+                perf = trade_logger.read_performance_report() if trade_logger else {}
+                daily_pnl = perf.get("daily_pnl", 0.0)
+                daily_trades = perf.get("daily_trades", 0)
+                monitor.send_daily_summary(daily_pnl, daily_trades)
+
             risk.reset_daily()
             last_reset_date = current_date
 
