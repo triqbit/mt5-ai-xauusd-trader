@@ -18,6 +18,7 @@ def config(monkeypatch):
     monkeypatch.setenv("MT5_PASSWORD", "fake_password")
     monkeypatch.setenv("MT5_SERVER", "fake_server")
     return TradingConfig(
+        max_drawdown=0.10,
         model_drift_threshold=0.2,
         model_accuracy_floor=0.6,
         min_confidence=0.6,

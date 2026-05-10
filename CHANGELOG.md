@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- feat: Refactored Dockerfile to a proper multi-stage build system supporting linux/amd64 and linux/arm64.
+- feat: Enhanced ExecutionFilter cascade from 6 to 10 validation layers, adding Confidence Threshold, Model Stability, Performance Floor, and Signal Consistency checks.
+- fix: Harmonized dependencies across all requirements files (Optuna 4.2.1, Pytest 8.3.4, Pytest-Asyncio 0.25.3).
+- fix: Resolved TypeError in ExecutionDecision instantiation and Monitor test regressions.
 - feat: Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
 - fix: Refined validation scripts with explicit remediation messages.
 - docs: Integrated PREPROD_CHECKLIST.md validation into release gates.

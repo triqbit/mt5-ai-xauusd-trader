@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class ExecutionDecision:
-    """Result of the 6-layer execution filter cascade."""
+    """Result of the execution filter cascade."""
 
     signal: TradeSignal
     confidence_score: float
@@ -34,7 +34,7 @@ class ExecutionDecision:
 
     @property
     def is_approved(self) -> bool:
-        """Returns True if the signal passed all 6 layers."""
+        """Returns True if the signal passed all validation layers."""
         return self.blocked_by is None
 
 logger = logging.getLogger(__name__)
@@ -59,9 +59,7 @@ class ExecutionFilter:
         config: TradingConfig | None = None,
     ):
         self.cfg = config
-        self.max_drawdown = (
-            config.max_drawdown if config and hasattr(config, "max_drawdown") else max_drawdown
-        )
+        self._default_max_drawdown = max_drawdown
         self.rsi_period = rsi_period
         self._signal_history: dict[str, deque[int]] = {}
 
@@ -75,7 +73,7 @@ class ExecutionFilter:
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 6-layer filter cascade.
+        Run the multi-layer validation cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -84,6 +82,7 @@ class ExecutionFilter:
             current_drawdown: Current account drawdown (0.0 to 1.0).
             timestamp: Evaluation time.
             precomputed_metrics: Optional dictionary containing pre-calculated metrics.
+            kwargs: Extra context like 'model_health' and 'trade_logger'.
         """
         if timestamp is None:
             timestamp = signal.timestamp or datetime.now(UTC)
@@ -141,11 +140,89 @@ class ExecutionFilter:
         }
 
         # Layer 6: Drawdown
-        drawdown_passed = self._check_drawdown_limit(current_drawdown)
+        max_dd = self.max_drawdown
+        if self.cfg and hasattr(self.cfg, "max_drawdown"):
+            max_dd = self.cfg.max_drawdown
+
+        drawdown_passed = current_drawdown < max_dd
         trace["drawdown_limit"] = {
             "passed": bool(drawdown_passed),
-            "current_drawdown": current_drawdown,
-            "max_drawdown": self.max_drawdown,
+            "current_drawdown": float(current_drawdown),
+            "max_drawdown": float(max_dd),
+        }
+
+        # Layer 7: Confidence Threshold
+        min_conf = (
+            self.cfg.min_confidence
+            if self.cfg and hasattr(self.cfg, "min_confidence")
+            else 0.6
+        )
+        conf_passed = signal.confidence >= min_conf
+        trace["confidence_threshold"] = {
+            "passed": bool(conf_passed),
+            "confidence": float(signal.confidence),
+            "threshold": float(min_conf),
+        }
+
+        # Layer 8: Model Stability (Drift/Accuracy)
+        model_health = kwargs.get("model_health")
+        drift_threshold = (
+            self.cfg.model_drift_threshold
+            if self.cfg and hasattr(self.cfg, "model_drift_threshold")
+            else 0.3
+        )
+        accuracy_floor = (
+            self.cfg.model_accuracy_floor
+            if self.cfg and hasattr(self.cfg, "model_accuracy_floor")
+            else 0.5
+        )
+        ms_passed = True
+        ms_trace = {"passed": True}
+        if model_health:
+            drift = model_health.get("drift", 0.0)
+            accuracy = model_health.get("accuracy", 1.0)
+            if drift > drift_threshold or accuracy < accuracy_floor:
+                ms_passed = False
+            ms_trace = {
+                "passed": ms_passed,
+                "drift": float(drift),
+                "drift_threshold": float(drift_threshold),
+                "accuracy": float(accuracy),
+                "accuracy_floor": float(accuracy_floor),
+            }
+        trace["model_stability"] = ms_trace
+
+        # Layer 9: Performance Floor
+        trade_logger = kwargs.get("trade_logger")
+        win_rate_floor = (
+            self.cfg.model_win_rate_floor
+            if self.cfg and hasattr(self.cfg, "model_win_rate_floor")
+            else 0.45
+        )
+        pf_passed = True
+        pf_trace = {"passed": True}
+        if trade_logger:
+            report = trade_logger.read_performance_report()
+            win_rate = report.get("win_rate", 1.0)
+            total_trades = report.get("total_trades", 0)
+            # If total_trades is not reported (missing from dict), assume it meets the minimum for safety checks
+            if win_rate < win_rate_floor and (total_trades >= 10 or total_trades == 0):
+                pf_passed = False
+            pf_trace = {
+                "passed": pf_passed,
+                "win_rate": float(win_rate),
+                "win_rate_floor": float(win_rate_floor),
+                "total_trades": int(total_trades),
+            }
+        trace["performance_floor"] = pf_trace
+
+        # Layer 10: Signal Consistency (Flicker Guard)
+        sc_passed, sc_metrics = self._check_signal_consistency_with_metrics(
+            signal.symbol, signal.direction
+        )
+        trace["signal_consistency"] = {
+            "passed": bool(sc_passed),
+            **sc_metrics,
         }
 
         # Determine final approval and blocked_by reason
@@ -157,6 +234,10 @@ class ExecutionFilter:
             ("momentum", "MOMENTUM"),
             ("session_time", "SESSION_CLOSED"),
             ("drawdown_limit", "DRAWDOWN_LIMIT"),
+            ("confidence_threshold", "CONFIDENCE_THRESHOLD"),
+            ("model_stability", "MODEL_STABILITY"),
+            ("performance_floor", "PERFORMANCE_FLOOR"),
+            ("signal_consistency", "SIGNAL_CONSISTENCY"),
         ]
         for layer_key, reason in failure_order:
             if not trace[layer_key]["passed"]:
@@ -327,8 +408,16 @@ class ExecutionFilter:
             return hr < 16
         return True
 
+    @property
+    def max_drawdown(self) -> float:
+        """Retrieves the effective max drawdown from config or default."""
+        if self.cfg and hasattr(self.cfg, "max_drawdown"):
+            return float(self.cfg.max_drawdown)
+        return float(self._default_max_drawdown)
+
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
-        return current_drawdown < self.max_drawdown
+        """Checks if current drawdown is within allowed limit."""
+        return float(current_drawdown) < self.max_drawdown
 
     def _check_signal_consistency_with_metrics(
         self, symbol: str, direction: int

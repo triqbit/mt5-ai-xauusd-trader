@@ -1,6 +1,6 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - Enterprise Edition
-# Dockerfile (Python 3.11 slim, multi-stage build)
+# Dockerfile (Python 3.12 slim, multi-stage build)
 # Supporting linux/amd64 and linux/arm64
 # ============================================================
 
@@ -14,12 +14,11 @@ WORKDIR /app
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ make \
+    gcc g++ make wget ca-certificates \
     libpq-dev \
-    wget ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Build TA-Lib from source
+# Build TA-Lib C library from source
 RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz && \
     tar xf ta-lib-0.6.4-src.tar.gz && \
     cd ta-lib-0.6.4 && ./configure --prefix=/usr && make -j$(nproc) && make install
@@ -27,18 +26,17 @@ RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6
 # Prepare requirements
 COPY requirements-docker.txt .
 
-# Architecture-specific adjustments for PyTorch
+# Architecture-specific adjustments for PyTorch (CPU-only for Docker)
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        # ARM64 (Apple Silicon / AWS Graviton): PyPI provides valid CPU wheels
-        sed -i '/--extra-index-url/d' requirements-docker.txt && \
-        sed -i 's/+cpu//g' requirements-docker.txt; \
+        # ARM64: Standard PyPI wheels are fine, remove extra index
+        sed -i '/--extra-index-url/d' requirements-docker.txt; \
     else \
-        # AMD64: Explicitly use the CPU-optimized wheels from PyTorch's dedicated index
-        sed -i 's/torch==2.3.1/torch==2.3.1+cpu/g' requirements-docker.txt && \
-        sed -i 's/torchvision==0.18.1/torchvision==0.18.1+cpu/g' requirements-docker.txt; \
+        # AMD64: Use CPU-optimized wheels from PyTorch index
+        sed -i 's/torch==2.5.1/torch==2.5.1+cpu/g' requirements-docker.txt && \
+        sed -i 's/torchvision==0.20.1/torchvision==0.20.1+cpu/g' requirements-docker.txt; \
     fi
 
-# Initialize virtual environment for isolation
+# Create virtual environment for isolation
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -56,32 +54,28 @@ WORKDIR /app
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
     ca-certificates \
+    libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy TA-Lib shared libraries and headers from builder
+# Copy TA-Lib shared libraries from builder
 COPY --from=builder /usr/lib/libta_lib* /usr/lib/
-COPY --from=builder /usr/include/ta-lib /usr/include/ta-lib
 RUN ldconfig
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application source and assets
+# Copy application source and configuration
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY main.py .
 COPY alembic.ini .
 
 # Setup non-root user for production security
-RUN useradd -m -u 1000 trader
-
-# Create log directory and ensure correct ownership
-RUN mkdir -p /app/logs && \
-    chown -R trader:trader /app && \
-    chmod 755 /app/logs
+RUN useradd -m -u 1000 trader && \
+    mkdir -p /app/logs /app/models && \
+    chown -R trader:trader /app
 
 USER trader
 
