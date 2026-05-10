@@ -1,51 +1,39 @@
 # Execution Quality Analytics
 
-The `ExecutionAnalyzer` module provides institutional-grade analytics to measure execution efficiency and trade quality. It helps distinguish between alpha quality (model performance) and execution quality (the cost of getting in and out of the market).
+The Execution Quality Analytics module provides institutional-grade metrics to evaluate the efficiency of trade execution and distinguish alpha quality from execution drag.
 
-## Features
+## Overview
 
-- **Execution Slippage**: Measures the difference between the signal's entry price and the actual fill price.
-- **Fill Quality Score**: A heuristic score (0.0 to 1.0) that penalizes high slippage and latency.
-- **Opportunity Cost Analysis**: Evaluates signals rejected by the Risk Manager by calculating their potential PnL, Maximum Favorable Excursion (MFE), and Maximum Adverse Excursion (MAE).
-- **Timing Efficiency**: Measures how close the entry price was to the optimal price within the entry candle.
-- **Edge Capture**: Compares realized profit against the theoretical potential of the signal.
-- **Post-Entry Drift (Markouts)**: Tracks price movement at multiple horizons (1m, 5m, 15m, 30m, 60m) after entry to distinguish alpha from execution quality.
-- **Execution Cost Tracking**: Introduced `execution_cost_pips` which includes both slippage and half of the prevailing spread.
-- **Improved Fill Quality Score**: Uses a spread-relative sigmoid model to penalize slippage more fairly across different volatility regimes.
-- **Alpha Decay Tracking**: Measures price movement between signal generation and actual execution to quantify information loss.
-- **Spread-Aware Metrics**: Tracks spread at execution and calculates slippage-to-spread ratios.
-- **Dynamic Instrument Property Detection**: Automatically detects pip sizes and contract sizes for diverse asset classes (FX, Gold, Indices) via the `MT5Connector`.
-- **Standardized UTC Temporal Logic**: Ensures consistent timezone handling for robust cross-instrument analytics.
+High-quality signals (alpha) can be eroded by poor execution mechanics. This module isolates broker-induced slippage from market-driven alpha decay, providing a clear picture of whether performance issues stem from the strategy or the execution environment.
 
-## Implementation Details
+## Key Metrics
 
-The system correlates records from three database tables:
-1. `ModelSignal`: The theoretical intent.
-2. `Trade`: The actual execution.
-3. `RiskEvent`: Logs of rejected signals.
+### 1. Alpha Decay
+Measures the price movement between the time a signal is generated and the time the trade is actually executed. This represents the portion of slippage caused by the market moving against the position before the broker could fill it.
 
-### Key Metrics
+### 2. Broker Slippage
+Calculated as `Total Slippage - Alpha Decay`. This isolates the execution drag attributable to the broker's liquidity and mechanics, such as wide spreads or slow fills.
 
-| Metric | Description |
-|--------|-------------|
-| Slippage (Pips) | `(Actual Price - Signal Price) * Direction / PipSize` |
-| Latency (ms) | `Execution Time - Signal Time` |
-| Edge Capture | `(Realized PnL - 0.5 * Spread) / Theoretical PnL` |
-| Drift | Price movement N minutes after entry in the direction of the trade. |
-| Alpha Decay | Price movement between signal and execution. |
-| Slippage/Spread Ratio | Slippage relative to the prevailing spread. |
+### 3. Fill Quality Score
+A sigmoid-based score (0.0 to 1.0) that penalizes large slippage relative to the prevailing spread. It also factors in execution latency.
+
+### 4. Edge Capture
+Measures the percentage of the theoretical signal edge (distance from entry to take-profit) that was actually captured, adjusted for the cost of the half-spread.
+
+### 5. Markouts (Post-Entry Drift)
+Tracks price movement at fixed horizons (1m, 5m, 15m, 30m, 60m) after trade entry. This helps identify if entries are being "picked off" (negative drift) or if they are timed well.
+
+### 6. Blocked Signal Quality (Opportunity Cost)
+Analyzes signals rejected by risk management to determine if they would have hit their Take-Profit or Stop-Loss first. This measures the opportunity cost of being too risk-averse.
 
 ## Usage
+
+Metrics are automatically calculated and persisted to the `execution_qualities` database table. Aggregate summaries can be generated via the `ExecutionAnalyzer.generate_summary_report()` method, which integrates with the research reporting system.
 
 ```python
 from src.analytics.execution_quality import ExecutionAnalyzer
 
-analyzer = ExecutionAnalyzer(db_url="sqlite:///trades.db", connector=mt5_connector)
-
-# Analyze a specific trade
-quality = analyzer.analyze_trade(trade_id=123)
-
-# Generate a weekly summary report
+analyzer = ExecutionAnalyzer()
 summary = analyzer.generate_summary_report(days=7)
-print(summary.model_dump_json(indent=2))
+print(f"Execution Efficiency: {summary.execution_efficiency_score:.2%}")
 ```

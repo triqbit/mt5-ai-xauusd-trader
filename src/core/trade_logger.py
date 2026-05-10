@@ -153,6 +153,8 @@ class ExecutionQuality(Base, AuditMixin):
     timing_efficiency: Mapped[float] = mapped_column(Float, nullable=False)
     alpha_decay_pips: Mapped[float] = mapped_column(Float, nullable=False)
     execution_cost_pips: Mapped[float] = mapped_column(Float, nullable=False)
+    broker_slippage_pips: Mapped[float] = mapped_column(Float, nullable=True)
+    effective_spread_pips: Mapped[float] = mapped_column(Float, nullable=True)
     session: Mapped[str | None] = mapped_column(String(20))
 
     # Detailed markouts (stored as JSON string for simplicity in SQLite)
