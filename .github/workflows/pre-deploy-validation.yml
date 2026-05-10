@@ -30,51 +30,53 @@ jobs:
 
       - name: Install Validation Tools
         run: |
-          pip install ruff==0.15.12 mypy==1.10.0 pip-audit==2.7.3 pip-licenses
+          # Align versions with ci.yml and requirements-ci.txt where possible
+          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses==4.4.0
 
       - name: Gate 1.1: Ruff Lint & Format Check
         run: |
           echo "Running Ruff checks..."
-          ruff check src/ main.py scripts/ tests/ || { echo "::error::Ruff linting failed. Please fix violations."; exit 1; }
-          ruff format --check src/ main.py scripts/ tests/ || { echo "::error::Ruff formatting failed. Run 'ruff format .'"; exit 1; }
+          ruff check src/ main.py scripts/ tests/ || { echo "::error title=Ruff Lint Failure::Ruff linting failed. Please fix violations."; exit 1; }
+          ruff format --check src/ main.py scripts/ tests/ || { echo "::error title=Ruff Format Failure::Ruff formatting failed. Run 'ruff format .'"; exit 1; }
 
       - name: Gate 1.2: Mypy Type Check
         run: |
           echo "Running Mypy static analysis..."
-          mypy src/ main.py scripts/ --ignore-missing-imports || { echo "::error::Mypy type checks failed."; exit 1; }
+          mypy src/ main.py scripts/ --ignore-missing-imports || { echo "::error title=Mypy Failure::Mypy type checks failed."; exit 1; }
 
       - name: Gate 2: Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
 
       - name: Gate 3: Validate Environment Config Template
         run: |
           echo "Verifying .env.example matches src/core/config.py..."
-          python scripts/validate_env.py || { echo "::error::Environment template validation failed. Sync .env.example with src/core/config.py"; exit 1; }
+          python scripts/validate_env.py || { echo "::error title=Config Template Failure::Environment template validation failed. Sync .env.example with src/core/config.py"; exit 1; }
 
       - name: Gate 4: Validate Release Notes
         run: |
           echo "Checking CHANGELOG.md for [Unreleased] content..."
-          python scripts/check_release_notes.py || { echo "::error::Release notes validation failed. Add your changes to the [Unreleased] section in CHANGELOG.md"; exit 1; }
+          python scripts/check_release_notes.py || { echo "::error title=Release Notes Failure::Release notes validation failed. Add your changes to the [Unreleased] section in CHANGELOG.md"; exit 1; }
 
       - name: Gate 4.1: Verify Version Synchronization
         run: |
           echo "Verifying version consistency across metadata..."
-          python scripts/verify_version_sync.py || { echo "::error::Version synchronization failed. Ensure pyproject.toml, src/__init__.py, and CHANGELOG.md are aligned."; exit 1; }
+          python scripts/verify_version_sync.py || { echo "::error title=Version Sync Failure::Version synchronization failed. Ensure pyproject.toml, src/__init__.py, and CHANGELOG.md are aligned."; exit 1; }
 
       - name: Gate 4.5: Automated Pre-Prod Checklist Verification
         run: |
           echo "Verifying docs/PREPROD_CHECKLIST.md has no uncompleted items..."
           CHECKLIST="docs/PREPROD_CHECKLIST.md"
           if [ ! -f "$CHECKLIST" ]; then
-            echo "::error::PREPROD_CHECKLIST.md missing!"
+            echo "::error title=Checklist Missing::PREPROD_CHECKLIST.md missing!"
             exit 1
           fi
 
           # Fail if there are any unchecked boxes [ ]
           if grep -q "\[ \]" "$CHECKLIST"; then
-            echo "::error::Uncompleted items found in PREPROD_CHECKLIST.md. Deployment blocked."
+            echo "::error title=Checklist Incomplete::Uncompleted items found in PREPROD_CHECKLIST.md. Deployment blocked."
             grep -n "\[ \]" "$CHECKLIST"
             exit 1
           fi
@@ -83,13 +85,13 @@ jobs:
       - name: Gate 5: Dependency Security Audit
         run: |
           echo "Scanning dependencies for vulnerabilities (CI & Prod)..."
-          pip-audit --requirement requirements-ci.txt || { echo "::error::Security vulnerabilities found in CI requirements."; exit 1; }
-          pip-audit --requirement requirements.txt || { echo "::error::Security vulnerabilities found in production requirements."; exit 1; }
+          pip-audit --requirement requirements-ci.txt || { echo "::error title=Security Audit Failure::Security vulnerabilities found in CI requirements."; exit 1; }
+          pip-audit --requirement requirements.txt || { echo "::error title=Security Audit Failure::Security vulnerabilities found in production requirements."; exit 1; }
 
       - name: Gate 5.1: Verify Dependency Harmonization
         run: |
           echo "Verifying overlapping dependencies are harmonized..."
-          python scripts/verify_dependencies.py || { echo "::error::Dependency mismatch detected across requirements files. Harmonize versions."; exit 1; }
+          python scripts/verify_dependencies.py || { echo "::error title=Dependency Harmonization Failure::Dependency mismatch detected across requirements files. Harmonize versions."; exit 1; }
 
       - name: Gate 6: License Compliance Check
         run: |
@@ -101,10 +103,11 @@ jobs:
           ls requirements.txt requirements-ci.txt requirements-linux.txt requirements-scan.txt 2>/dev/null | xargs -r cat | grep -vE "TA-Lib|MetaTrader5" | sort | uniq > requirements-all-scan.txt
           pip install -r requirements-all-scan.txt
 
+          # Filter for approved licenses based on docs/LICENSE_COMPLIANCE.md
           pip-licenses \
             --allow-only "MIT;BSD;Apache;MPL;LGPL;PSF;Unlicense;ISC;Other/Proprietary;UNKNOWN;Python;NVIDIA" \
             --partial-match \
-            --ignore-packages pip pip-licenses prettytable wcwidth setuptools || { echo "::error::License compliance check failed. Prohibited licenses detected."; exit 1; }
+            --ignore-packages pip pip-licenses prettytable wcwidth setuptools || { echo "::error title=License Compliance Failure::Prohibited licenses detected. Check docs/LICENSE_COMPLIANCE.md"; exit 1; }
 
   # -----------------------------------------------------------
   # STAGE 2: Functional - Migrations, Tests & Coverage
@@ -153,12 +156,12 @@ jobs:
       - name: Gate 7: Database Migration Reversibility Check
         run: |
           echo "Verifying database migrations (up/down/up cycle)..."
-          python scripts/verify_migrations.py || { echo "::error::Migration reversibility check failed. Verify your Alembic scripts."; exit 1; }
+          python scripts/verify_migrations.py || { echo "::error title=Migration Failure::Migration reversibility check failed. Verify your Alembic scripts."; exit 1; }
 
       - name: Gate 8: Run Tests with Coverage Gate (85%)
         run: |
           echo "Running unit and integration tests..."
-          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85 || { echo "::error::Tests failed or coverage below 85% gate."; exit 1; }
+          pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=85 || { echo "::error title=Test/Coverage Failure::Tests failed or coverage below 85% gate."; exit 1; }
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"
