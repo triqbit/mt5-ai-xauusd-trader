@@ -10,9 +10,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.trading.execution_filter import ExecutionFilter
-from src.core.schemas import TradeSignal
 from src.core.config import TradingConfig
+from src.core.schemas import TradeSignal
+from src.trading.execution_filter import ExecutionFilter
 
 
 @pytest.fixture
