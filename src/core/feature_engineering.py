@@ -438,16 +438,16 @@ class FeatureEngineer:
         """
         return {
             "method": self.method,
-            "means": dict(zip(self.feature_columns, self.means.tolist()))
+            "means": dict(zip(self.feature_columns, self.means.tolist(), strict=False))
             if self.means is not None
             else None,
-            "stds": dict(zip(self.feature_columns, self.stds.tolist()))
+            "stds": dict(zip(self.feature_columns, self.stds.tolist(), strict=False))
             if self.stds is not None
             else None,
-            "mins": dict(zip(self.feature_columns, self.mins.tolist()))
+            "mins": dict(zip(self.feature_columns, self.mins.tolist(), strict=False))
             if self.mins is not None
             else None,
-            "maxs": dict(zip(self.feature_columns, self.maxs.tolist()))
+            "maxs": dict(zip(self.feature_columns, self.maxs.tolist(), strict=False))
             if self.maxs is not None
             else None,
             "columns": self.feature_columns,
