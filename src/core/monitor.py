@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import uuid
 from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -183,6 +184,9 @@ class Monitor:
 
         async def _send():
             try:
+                # Using 'async with self.bot' is NOT required for telegram.Bot itself,
+                # but we MUST ensure we're not using a closed bot session.
+                # python-telegram-bot v20+ requires an active event loop for the internal HTTP client.
                 await self.bot.send_message(chat_id=self.cfg.telegram_chat_id, text=text)
                 logger.info("telegram_message_sent")
             except Exception as e:
@@ -192,9 +196,13 @@ class Monitor:
             try:
                 loop = asyncio.get_running_loop()
                 # We are inside a running event loop, schedule task
-                task = loop.create_task(_send())
-                self._background_tasks.add(task)
-                task.add_done_callback(self._background_tasks.discard)
+                if loop.is_running():
+                    task = loop.create_task(_send())
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
+                else:
+                    # Loop exists but is not running, fallback to asyncio.run
+                    asyncio.run(_send())
             except RuntimeError:
                 # No event loop is running, use asyncio.run (blocking)
                 asyncio.run(_send())
@@ -241,12 +249,19 @@ class Monitor:
         """Increment the total trade counter."""
         TRADE_COUNTER.inc()
 
-    def log_system_error(self, component: str, error_message: str) -> None:
+    def log_system_error(
+        self, component: str, error_message: str, trace_id: str | None = None
+    ) -> None:
         """Log system errors to Prometheus and send a Telegram alert."""
         SYSTEM_ERROR_COUNTER.labels(component=component).inc()
         msg = f"❌ SYSTEM ERROR: {component}\nError: {error_message}"
+        if trace_id:
+            msg += f"\nTrace ID: {trace_id}"
+
         self.send_message(msg)
-        logger.error("system_error_logged", component=component, error=error_message)
+        logger.error(
+            "system_error_logged", component=component, error=error_message, trace_id=trace_id
+        )
 
     def update_performance_metrics(self, win_rate: float, sharpe_ratio: float) -> None:
         """Update Sharpe Ratio and Win Rate Prometheus metrics."""
@@ -431,15 +446,27 @@ class Monitor:
         logger.error("model_training_failed_alert", error=error)
 
     @contextmanager
-    def track_block_duration(self, label: str) -> Generator[None, None, None]:
+    def track_block_duration(
+        self, label: str, trace_id: str | None = None
+    ) -> Generator[None, None, None]:
         """Context manager to track the duration of a code block."""
         start_time = time.perf_counter()
+        # Set trace_id in context if provided
+        if trace_id:
+            structlog.contextvars.bind_contextvars(trace_id=trace_id)
+
         try:
             yield
         finally:
             duration = time.perf_counter() - start_time
             TRADING_BLOCK_DURATION.labels(block_label=label).observe(duration)
             logger.debug("block_duration_tracked", label=label, duration=duration)
+            if trace_id:
+                structlog.contextvars.unbind_contextvars("trace_id")
+
+    def generate_trace_id(self) -> str:
+        """Generate a unique trace ID for end-to-end correlation."""
+        return str(uuid.uuid4())
 
     def get_equity_curve(self) -> list[dict[str, Any]]:
         """Return the tracked equity curve history."""
