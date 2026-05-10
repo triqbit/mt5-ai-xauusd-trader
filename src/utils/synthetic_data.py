@@ -42,6 +42,8 @@ class ScenarioGenerator:
             "mean_reversion",
             "low_volatility_drift",
             "news_shock",
+            "noisy",
+            "missing_data",
         ] = "ranging",
         start_price: float = 2300.0,
         trend_strength: float = 0.001,
@@ -79,6 +81,10 @@ class ScenarioGenerator:
             return self._generate_low_volatility_drift(n_steps, start_price)
         if regime == "news_shock":
             return self._generate_news_shock(n_steps, start_price)
+        if regime == "noisy":
+            return self._generate_noisy(n_steps, start_price, volatility)
+        if regime == "missing_data":
+            return self._generate_missing_data(n_steps, start_price, volatility)
         raise ValueError(f"Unknown regime: {regime}")
 
     def _generate_base(self, n_steps: int, start_price: float, returns: np.ndarray) -> pd.DataFrame:
@@ -236,6 +242,79 @@ class ScenarioGenerator:
         df.loc[3, "tick_volume"] = 0
 
         return df
+
+    def _generate_noisy(self, n_steps: int, start_price: float, volatility: float) -> pd.DataFrame:
+        """Ranging data with frequent extreme outliers (spikes)."""
+        returns = self.rng.normal(0, volatility, n_steps)
+        # 5% of bars are extreme spikes
+        spikes = self.rng.choice([0, 1, -1], size=n_steps, p=[0.95, 0.025, 0.025])
+        returns += spikes * volatility * 20
+        return self._generate_base(n_steps, start_price, returns)
+
+    def _generate_missing_data(
+        self, n_steps: int, start_price: float, volatility: float
+    ) -> pd.DataFrame:
+        """Data with random NaN holes."""
+        df = self._generate_ranging(n_steps, start_price, volatility)
+        # 5% missing values per column
+        for col in ["open", "high", "low", "close", "tick_volume"]:
+            mask = self.rng.choice([True, False], size=n_steps, p=[0.05, 0.95])
+            df.loc[mask, col] = np.nan
+        return df
+
+
+class BacktestScenarioBuilder:
+    """
+    Generates deterministic price sequences designed to verify backtest metrics.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def drawdown_recovery(
+        self, n_steps: int = 200, start_price: float = 10000.0
+    ) -> pd.DataFrame:
+        """
+        Creates a 10% drawdown followed by a 20% gain.
+        Useful for verifying Max Drawdown and Recovery Factor.
+        """
+        mid = n_steps // 2
+        quarter = mid // 2
+
+        # Start flat
+        returns = np.zeros(n_steps)
+        # Drop 10% over 'quarter' steps
+        returns[quarter:mid] = np.log(0.9) / (mid - quarter)
+        # Gain 20% from that low over 'mid' steps
+        returns[mid:] = np.log(1.2) / (n_steps - mid)
+
+        return self.gen._generate_base(n_steps, start_price, returns)
+
+    def wick_traps(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Creates bars where both SL and TP levels are touched.
+        Verifies conservative SL-first exit policy in backtester.
+        """
+        df = self.gen.generate(n_steps, regime="ranging", start_price=start_price)
+        # Inject wick traps: massive high and massive low on the same bar
+        trap_indices = [10, 30, 50]
+        for idx in trap_indices:
+            real_idx = df.index[idx]
+            close = df.loc[real_idx, "close"]
+            df.loc[real_idx, "high"] = close + 100.0
+            df.loc[real_idx, "low"] = close - 100.0
+
+        return df
+
+    def steady_sharpe(self, n_steps: int = 500, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Near-perfect linear trend with minimal noise.
+        Should produce high Sharpe and Profit Factor.
+        """
+        returns = np.full(n_steps, 0.0001)  # Steady 0.01% gain per bar
+        # Add tiny amount of noise
+        returns += self.gen.rng.normal(0, 0.00001, n_steps)
+        return self.gen._generate_base(n_steps, start_price, returns)
 
 
 class RiskScenarioBuilder:

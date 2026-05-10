@@ -93,3 +93,25 @@ def test_regime_shift_regime():
     first_half_vol = df["close"].iloc[:50].pct_change().std()
     second_half_vol = df["close"].iloc[50:].pct_change().std()
     assert second_half_vol > first_half_vol * 2
+
+
+def test_noisy_regime():
+    gen = ScenarioGenerator(seed=42)
+    vol = 0.001
+    df = gen.generate(n_steps=200, regime="noisy", volatility=vol)
+    # Check for extreme spikes (returns > 10 * vol)
+    returns = df["close"].pct_change().dropna()
+    spikes = returns[returns.abs() > vol * 10]
+    assert not spikes.empty
+
+
+def test_missing_data_regime():
+    gen = ScenarioGenerator(seed=42)
+    df = gen.generate(n_steps=100, regime="missing_data")
+    # Check that we have NaNs in at least one expected column
+    has_nans = False
+    for col in ["open", "high", "low", "close", "tick_volume"]:
+        if df[col].isna().any():
+            has_nans = True
+            break
+    assert has_nans
