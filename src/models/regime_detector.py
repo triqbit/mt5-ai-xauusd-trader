@@ -24,24 +24,42 @@ logger = structlog.get_logger(__name__)
 
 
 class MarketRegime(str, Enum):
-    """XAUUSD Market Regimes."""
+    """
+    XAUUSD Market Regimes with institutional definitions.
+    """
 
     TRENDING = "trending"
+    """Persistent directional movement with high efficiency and clear slope."""
+
     RANGING = "ranging"
+    """Mean-reverting behavior within a stable volatility corridor; default state."""
+
     VOLATILE_BREAKOUT = "volatile_breakout"
+    """High-momentum expansion accompanied by a significant volatility spike."""
+
     LOW_VOLATILITY_DRIFT = "low_volatility_drift"
+    """Quiet directional movement with minimal retracements and suppressed volatility."""
+
     NEWS_SHOCK = "news_shock"
+    """Extreme, non-linear price dislocation often linked to macro-economic events."""
+
     MEAN_REVERSION = "mean_reversion"
+    """Overextended price state indicating a high probability of a corrective snap-back."""
+
     UNKNOWN = "unknown"
+    """Insufficient data or indeterminate market state."""
 
 
 class RegimeInfo(BaseModel):
-    """Structured regime detection output."""
+    """Structured regime detection output with transparency for signal attribution."""
 
     label: MarketRegime = Field(..., description="Detected regime label")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence")
     transition_score: float = Field(..., description="Likelihood of a regime transition")
     volatility_index: float = Field(..., description="Normalized volatility metric")
+    raw_features: dict[str, float] = Field(
+        default_factory=dict, description="Underlying statistical features used for detection"
+    )
 
 
 class RegimeDetector:
@@ -64,10 +82,12 @@ class RegimeDetector:
     def _calculate_efficiency_ratio(self, prices: np.ndarray) -> float:
         """Kaufman Efficiency Ratio: net change / sum of absolute changes."""
         if len(prices) < 2:
-            return 0.0
+            return 0.5
         net_change = abs(prices[-1] - prices[0])
         abs_changes = np.abs(np.diff(prices))
         sum_abs_changes = np.sum(abs_changes)
+        if sum_abs_changes < 1e-9:
+            return 0.5
         return float(net_change / (sum_abs_changes + 1e-9))
 
     def _calculate_slope(self, prices: np.ndarray) -> float:
@@ -154,6 +174,7 @@ class RegimeDetector:
                 confidence=0.0,
                 transition_score=0.0,
                 volatility_index=0.0,
+                raw_features={},
             )
 
         lookback = self.long_window + 1
@@ -172,7 +193,10 @@ class RegimeDetector:
 
         atr_short = np.mean(tr[-self.window :])
         atr_long = np.mean(tr[-self.long_window :])
-        atr_ratio = atr_short / (atr_long + 1e-9)
+        if atr_long < 1e-9:
+            atr_ratio = 1.0
+        else:
+            atr_ratio = float(atr_short / (atr_long + 1e-9))
 
         # 2. Efficiency Ratio
         er = self._calculate_efficiency_ratio(close[-self.window :])
@@ -184,7 +208,7 @@ class RegimeDetector:
         # 4. Z-Score
         ma = np.mean(close[-self.window :])
         std = np.std(close[-self.window :]) + 1e-9
-        z_score = (close[-1] - ma) / std
+        z_score = float((close[-1] - ma) / std)
 
         # 5. Volatility Clustering & Vol-of-Vol
         returns = np.diff(close) / (close[:-1] + 1e-9)
@@ -195,12 +219,24 @@ class RegimeDetector:
         kurt = self._calculate_kurtosis(returns[-self.window :])
         skew = self._calculate_skewness(returns[-self.window :])
 
+        # Raw features for explainability
+        raw_features = {
+            "atr_ratio": atr_ratio,
+            "efficiency_ratio": er,
+            "slope": slope,
+            "z_score": z_score,
+            "kurtosis": kurt,
+            "skewness": skew,
+            "vol_of_vol": vov,
+            "vol_clustering": vc,
+            "angle": angle,
+        }
+
         if self._gmm is not None:
             # Clustering-based detection
             X = np.array([[atr_ratio, er, slope, z_score, kurt, skew, vov, vc]])
             # Ensure no NaNs in input
-            if np.isnan(X).any():
-                X = np.nan_to_num(X)
+            X = np.nan_to_num(X, nan=0.0)
 
             probs = self._gmm.predict_proba(X)[0]
             cluster_idx = int(np.argmax(probs))
@@ -230,6 +266,7 @@ class RegimeDetector:
             confidence=float(np.clip(confidence, 0.0, 1.0)),
             transition_score=float(np.clip(transition_score, 0.0, 1.0)),
             volatility_index=float(atr_ratio),
+            raw_features=raw_features,
         )
 
         if label != self._last_regime:
@@ -398,7 +435,7 @@ class RegimeDetector:
             # Use GMM for vectorized labeling
             X = features.values
             # Handle NaNs in features
-            X = np.nan_to_num(X)
+            X = np.nan_to_num(X, nan=0.0)
 
             probs = self._gmm.predict_proba(X)
             cluster_indices = np.argmax(probs, axis=1)
@@ -487,18 +524,18 @@ class RegimeDetector:
         ).fillna(high - low)
         atr_short = tr.rolling(window=self.window).mean()
         atr_long = tr.rolling(window=self.long_window).mean()
-        atr_ratio = atr_short / (atr_long + 1e-9)
+        atr_ratio = (atr_short / (atr_long + 1e-9)).fillna(1.0)
 
         # 2. Efficiency Ratio
         net_change = (close - close.shift(self.window - 1)).abs()
         abs_changes = (close - close.shift(1)).abs().rolling(window=self.window - 1).sum()
-        er = net_change / (abs_changes + 1e-9)
+        er = (net_change / (abs_changes + 1e-9)).fillna(0.5)
 
         # 3. Returns and derived stats
         returns = close.pct_change().fillna(0)
         # Fast vectorized higher-order moments
-        kurt = returns.rolling(window=self.window).kurt().fillna(0)
-        skew = returns.rolling(window=self.window).skew().fillna(0)
+        kurt = returns.rolling(window=self.window).kurt().fillna(0.0)
+        skew = returns.rolling(window=self.window).skew().fillna(0.0)
 
         # 4. Slope and Z-Score
         # Vectorized linear regression slope: (n*sum(xy) - sum(x)*sum(y)) / (n*sum(x^2) - (sum(x))^2)
@@ -512,23 +549,24 @@ class RegimeDetector:
         sum_relative_iy = s_iy - start_indices * s_y
         slope_num = n * sum_relative_iy - s_x * s_y
         slope_den = n * s_x2 - s_x**2
-        slope = (slope_num / (slope_den + 1e-9)) / (close.shift(n - 1) + 1e-9)
+        slope = ((slope_num / (slope_den + 1e-9)) / (close.shift(n - 1) + 1e-9)).fillna(0.0)
 
         ma = close.rolling(window=self.window).mean()
         std = close.rolling(window=self.window).std()
-        z_score = (close - ma) / (std + 1e-9)
+        z_score = ((close - ma) / (std + 1e-9)).fillna(0.0)
 
         # 5. Vol-of-vol and Vol Clustering
         # Vol-of-vol: std(rolling_vol) / mean(rolling_vol)
         vov_window = max(2, self.window // 2)
         rolling_vol = returns.rolling(window=vov_window).std()
-        vov = rolling_vol.rolling(window=self.window).std() / (
-            rolling_vol.rolling(window=self.window).mean() + 1e-9
-        )
+        vov = (
+            rolling_vol.rolling(window=self.window).std()
+            / (rolling_vol.rolling(window=self.window).mean() + 1e-9)
+        ).fillna(1.0)
 
         # Volatility Clustering: Correlation of absolute returns with lagged absolute returns
         abs_rets = returns.abs()
-        vc = abs_rets.rolling(window=self.window).corr(abs_rets.shift(1))
+        vc = abs_rets.rolling(window=self.window).corr(abs_rets.shift(1)).fillna(0.0)
 
         features = pd.DataFrame(
             {
@@ -541,7 +579,7 @@ class RegimeDetector:
                 "vol_of_vol": vov,
                 "vol_clustering": vc,
             }
-        ).fillna(0)
+        )
 
         return features
 
@@ -561,7 +599,7 @@ class RegimeDetector:
 
         # Skip the burn-in period and handle NaNs
         X = features.iloc[self.long_window :].values
-        X = np.nan_to_num(X)
+        X = np.nan_to_num(X, nan=0.0)
 
         self._gmm = GaussianMixture(
             n_components=n_clusters, covariance_type="full", random_state=42, n_init=5
@@ -616,7 +654,7 @@ class RegimeDetector:
             return
 
         X = features.values
-        X = np.nan_to_num(X)
+        X = np.nan_to_num(X, nan=0.0)
         probs = self._gmm.predict_proba(X)
         cluster_indices = np.argmax(probs, axis=1)
         regimes = [
@@ -637,15 +675,16 @@ class RegimeDetector:
             atr_ratio, er, slope, z_score, _kurt, _skew, vov, _vc = center
             angle = self._calculate_angle(slope)
 
-            if atr_ratio > 1.8 and er > 0.6 and vov > 1.2:
+            # Thresholds synchronized with _apply_regime_logic
+            if atr_ratio > 2.0 and er > 0.7 and vov > 1.2:
                 self._cluster_to_regime[i] = MarketRegime.NEWS_SHOCK
-            elif atr_ratio > 1.2 and er > 0.4:
+            elif atr_ratio > 1.25 and er > 0.5:
                 self._cluster_to_regime[i] = MarketRegime.VOLATILE_BREAKOUT
-            elif er > 0.35 and abs(angle) > 10.0:
+            elif er > 0.4 and abs(angle) > 15.0:
                 self._cluster_to_regime[i] = MarketRegime.TRENDING
-            elif abs(z_score) > 1.5 and er < 0.3:
+            elif abs(z_score) > 1.8 and er < 0.35:
                 self._cluster_to_regime[i] = MarketRegime.MEAN_REVERSION
-            elif atr_ratio < 1.0 and abs(angle) > 3.0 and vov < 1.2:
+            elif atr_ratio < 1.1 and abs(angle) > 2.0 and vov < 1.3:
                 self._cluster_to_regime[i] = MarketRegime.LOW_VOLATILITY_DRIFT
             else:
                 self._cluster_to_regime[i] = MarketRegime.RANGING
