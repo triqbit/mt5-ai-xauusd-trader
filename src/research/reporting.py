@@ -427,11 +427,12 @@ class ResearchReporter:
                 m_table.add_column("WR")
                 for m in report.trade_patterns.motifs:
                     if m.win_rate < 0.5:
+                        wr_color = self._get_color_for_metric(m.win_rate, 'win_rate')
                         m_table.add_row(
                             m.algorithm,
                             m.volatility_bucket,
                             m.confidence_bucket,
-                            f"[{self._get_color_for_metric(m.win_rate, "win_rate")}]{m.win_rate:.1%}[/]",
+                            f"[{wr_color}]{m.win_rate:.1%}[/]",
                         )
                 self.console.print(m_table)
 

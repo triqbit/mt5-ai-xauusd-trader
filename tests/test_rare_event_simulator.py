@@ -188,7 +188,7 @@ def test_reporting_integration(simulator):
     from src.research.reporting import RareEventSection, RareEventSummary
 
     suite = simulator.generate_suite(n_steps=200)
-    section = simulator.to_report_section(suite)
+    section = simulator.generate_report_section(suite)
 
     assert isinstance(section, RareEventSection)
     assert len(section.scenarios) == len(RareEventType)

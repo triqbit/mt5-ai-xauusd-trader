@@ -161,7 +161,7 @@ class TestRegimeDetector(unittest.TestCase):
             'returns': np.random.randn(200) * 0.001
         })
 
-        summary = self.detector.to_report_section(data)
+        summary = self.detector.generate_summary(data)
         from src.research.reporting import RegimeSection
         self.assertIsInstance(summary, RegimeSection)
         self.assertTrue(len(summary.regimes) > 0)

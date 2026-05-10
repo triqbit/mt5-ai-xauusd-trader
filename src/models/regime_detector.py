@@ -329,7 +329,7 @@ class RegimeDetector:
         )
         return label, confidence, transition_score
 
-    def to_report_section(self, df: pd.DataFrame) -> Any:
+    def generate_summary(self, df: pd.DataFrame) -> Any:
         """
         Analyze a historical DataFrame and generate a RegimeSection for ResearchReporter.
         """
