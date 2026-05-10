@@ -13,7 +13,7 @@ from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 logger = logging.getLogger(__name__)
 

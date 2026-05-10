@@ -87,22 +87,23 @@ WHERE market_data.id = trades.market_data_id;
 
 ### 2.3 Connection Management
 ```python
-# Good: Connection pooling
-from sqlalchemy import create_engine
+# Best Practice: Use centralized engine factory
+from src.core.database import get_engine, get_session_factory
 
-engine = create_engine(
-    'postgresql://user:password@localhost/trading_db',
-    poolclass=QueuePool,
-    pool_size=20,
-    max_overflow=40,
-    pool_pre_ping=True,  # Verify connections are alive
-    pool_recycle=3600,   # Recycle connections every hour
-    echo=False
-)
+# Centralized management ensures consistent pooling and resilience
+engine = get_engine(database_url)
+SessionFactory = get_session_factory(engine)
 
-# All database operations use this engine
-connection = engine.connect()
+# Use with context manager
+with SessionFactory() as session:
+    # database operations
+    ...
 ```
+
+The system uses `src/core/database.py` to manage SQLAlchemy engines. It automatically configures:
+- `StaticPool` for in-memory SQLite (shares same DB across connections).
+- `NullPool` for file-based SQLite (prevents "database is locked" errors).
+- `QueuePool` for PostgreSQL with `pool_pre_ping=True` and `pool_recycle=3600`.
 
 ### 2.4 Transaction Handling
 ```python
