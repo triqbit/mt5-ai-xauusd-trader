@@ -10,19 +10,19 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
-
-from src.core.schemas import ExecutionDecision
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
+from src.core.schemas import ExecutionDecision
+
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
+
 
 logger = logging.getLogger(__name__)
 
