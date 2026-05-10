@@ -41,7 +41,7 @@ alembic==1.14.1
 redis==5.2.1
 
 # ── Monitoring & Logging ────────────────────────────────────
-starlette==0.52.1
+starlette==0.45.0
 prometheus-client==0.21.1
 structlog==25.1.0
 rich==13.9.4
