@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 class ExecutionFilter:
     """
-    Implements a 6-layer validation cascade for trading signals.
+    Implements a 10-layer validation cascade for trading signals.
     Layers:
         1. ATR Volatility Threshold
         2. Trend Angle Confirmation
@@ -50,6 +50,10 @@ class ExecutionFilter:
         4. Momentum Filter
         5. Session/Time Filter
         6. Drawdown Circuit Breaker
+        7. Model Stability Guard
+        8. Performance Floor
+        9. Confidence Threshold
+        10. Signal Flicker Guard
     """
 
     def __init__(
@@ -148,6 +152,38 @@ class ExecutionFilter:
             "max_drawdown": self.max_drawdown,
         }
 
+        # Layer 7: Model Stability
+        model_health = kwargs.get("model_health")
+        stability_passed, stability_metrics = self._check_model_stability_with_metrics(model_health)
+        trace["model_stability"] = {
+            "passed": bool(stability_passed),
+            **stability_metrics,
+        }
+
+        # Layer 8: Performance Floor
+        trade_logger = kwargs.get("trade_logger")
+        perf_passed, perf_metrics = self._check_performance_floor_with_metrics(trade_logger)
+        trace["performance_floor"] = {
+            "passed": bool(perf_passed),
+            **perf_metrics,
+        }
+
+        # Layer 9: Confidence Threshold
+        conf_passed, conf_metrics = self._check_confidence_threshold_with_metrics(signal.confidence)
+        trace["confidence_threshold"] = {
+            "passed": bool(conf_passed),
+            **conf_metrics,
+        }
+
+        # Layer 10: Signal Flicker Guard
+        flicker_passed, flicker_metrics = self._check_signal_consistency_with_metrics(
+            signal.symbol, signal.direction
+        )
+        trace["signal_flicker"] = {
+            "passed": bool(flicker_passed),
+            **flicker_metrics,
+        }
+
         # Determine final approval and blocked_by reason
         blocked_by = None
         failure_order = [
@@ -157,6 +193,10 @@ class ExecutionFilter:
             ("momentum", "MOMENTUM"),
             ("session_time", "SESSION_CLOSED"),
             ("drawdown_limit", "DRAWDOWN_LIMIT"),
+            ("model_stability", "MODEL_UNSTABLE"),
+            ("performance_floor", "PERFORMANCE_FLOOR_HIT"),
+            ("confidence_threshold", "CONFIDENCE_TOO_LOW"),
+            ("signal_flicker", "SIGNAL_FLICKER"),
         ]
         for layer_key, reason in failure_order:
             if not trace[layer_key]["passed"]:
@@ -329,6 +369,47 @@ class ExecutionFilter:
 
     def _check_drawdown_limit(self, current_drawdown: float) -> bool:
         return current_drawdown < self.max_drawdown
+
+    def _check_model_stability_with_metrics(
+        self, model_health: dict[str, float] | None
+    ) -> tuple[bool, dict[str, Any]]:
+        """Blocks if model drift is too high or accuracy is too low."""
+        if not model_health:
+            return True, {"message": "No model health data available"}
+
+        drift = model_health.get("drift", 0.0)
+        acc = model_health.get("accuracy", 1.0)
+
+        drift_threshold = self.cfg.model_drift_threshold if self.cfg else 0.3
+        acc_floor = self.cfg.model_accuracy_floor if self.cfg else 0.45
+
+        passed = drift <= drift_threshold and acc >= acc_floor
+        return bool(passed), {
+            "drift": drift,
+            "drift_threshold": drift_threshold,
+            "accuracy": acc,
+            "accuracy_floor": acc_floor,
+        }
+
+    def _check_performance_floor_with_metrics(
+        self, trade_logger: Any | None
+    ) -> tuple[bool, dict[str, Any]]:
+        """Blocks if recent strategy win rate falls below floor."""
+        if not trade_logger:
+            return True, {"message": "TradeLogger not available"}
+
+        perf = trade_logger.read_performance_report()
+        win_rate = perf.get("win_rate", 1.0)
+        wr_floor = self.cfg.model_win_rate_floor if self.cfg else 0.40
+
+        passed = win_rate >= wr_floor
+        return bool(passed), {"win_rate": win_rate, "win_rate_floor": wr_floor}
+
+    def _check_confidence_threshold_with_metrics(self, confidence: float) -> tuple[bool, dict[str, Any]]:
+        """Institutional confidence gate."""
+        min_conf = self.cfg.min_confidence if self.cfg else 0.55
+        passed = confidence >= min_conf
+        return bool(passed), {"confidence": confidence, "min_confidence": min_conf}
 
     def _check_signal_consistency_with_metrics(
         self, symbol: str, direction: int
