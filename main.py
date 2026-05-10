@@ -423,7 +423,8 @@ def run_live(
                     risk_approved = risk_decision.is_approved if risk_decision else False
                     if risk_approved and risk_decision:
                         # Update signal with adjusted lot size from institutional risk engine
-                        signal.lot_size = risk_decision.adjusted_lot_size
+                        # Use model_copy(update=...) as TradeSignal is frozen
+                        signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
