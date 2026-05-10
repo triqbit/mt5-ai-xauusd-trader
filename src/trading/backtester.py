@@ -142,7 +142,10 @@ class BacktestEngine:
         # Ensure we get raw features for proper walk-forward normalization
         original_norm = self.fe.normalize
         self.fe.normalize = False
-        df_features = self.fe.compute_features(data, drop_ohlcv=False)
+        from src.core.profiler import profile as profile_context
+
+        with profile_context("bt_feature_engineering_total"):
+            df_features = self.fe.compute_features(data, drop_ohlcv=False)
         self.fe.normalize = original_norm
 
         if df_features.empty:
@@ -160,55 +163,56 @@ class BacktestEngine:
         # 2. Pre-calculate metrics for the ExecutionFilter to avoid O(N) in loop
         logger.info("Pre-calculating execution filter metrics...")
 
-        # Calculate ATR for SL/TP and Volatility filter
-        high_low = data["high"] - data["low"]
-        high_close = (data["high"] - data["close"].shift(1)).abs()
-        low_close = (data["low"] - data["close"].shift(1)).abs()
-        tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        data["atr"] = tr.rolling(14).mean()
+        with profile_context("bt_ef_precomputation_total"):
+            # Calculate ATR for SL/TP and Volatility filter
+            high_low = data["high"] - data["low"]
+            high_close = (data["high"] - data["close"].shift(1)).abs()
+            low_close = (data["low"] - data["close"].shift(1)).abs()
+            tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            data["atr"] = tr.rolling(14).mean()
 
-        prefix = f"base_{self.fe.base_timeframe}"
-        atr_series = data["atr"]
-        avg_atr_series = atr_series.rolling(window=100).mean()
-        atr_current_vals = atr_series.values
-        atr_avg_vals = avg_atr_series.values
+            prefix = f"base_{self.fe.base_timeframe}"
+            atr_series = data["atr"]
+            avg_atr_series = atr_series.rolling(window=100).mean()
+            atr_current_vals = atr_series.values
+            atr_avg_vals = avg_atr_series.values
 
-        # Trend Angle (EMA21 Slope) via vectorized convolution
-        ema21_col = f"{prefix}_ema_21"
-        if ema21_col in df_features.columns:
-            ema21_series = df_features[ema21_col]
-        else:
-            ema21_series = data["close"].ewm(span=21, adjust=False).mean()
-
-        ema21_vals = ema21_series.values
-        window = 20
-        x = np.arange(window)
-        weights = (x - np.mean(x)) / (np.var(x) * window + 1e-8)
-        # Vectorized rolling slope (O(N) vs O(N*W))
-        if n >= window:
-            conv = np.convolve(ema21_vals, weights[::-1], mode="valid")
-            slopes = np.concatenate([np.zeros(window - 1), conv])
-        else:
-            slopes = np.zeros(n)
-
-        # Pre-extract EMAs for Layer 3 check
-        ema_vals = {}
-        for p in [8, 21, 50, 200]:
-            col = f"{prefix}_ema_{p}"
-            if col in df_features.columns:
-                ema_vals[p] = df_features[col].values
+            # Trend Angle (EMA21 Slope) via vectorized convolution
+            ema21_col = f"{prefix}_ema_21"
+            if ema21_col in df_features.columns:
+                ema21_series = df_features[ema21_col]
             else:
-                ema_vals[p] = data["close"].ewm(span=p, adjust=False).mean().values
+                ema21_series = data["close"].ewm(span=21, adjust=False).mean()
 
-        # Pre-calculate RSI for Layer 4 check
-        rsi_col = f"{prefix}_rsi"
-        if rsi_col in df_features.columns:
-            rsi_vals = df_features[rsi_col].values
-        else:
-            delta = data["close"].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rsi_vals = (100 - (100 / (1 + (gain / (loss + 1e-8))))).values
+            ema21_vals = ema21_series.values
+            window = 20
+            x = np.arange(window)
+            weights = (x - np.mean(x)) / (np.var(x) * window + 1e-8)
+            # Vectorized rolling slope (O(N) vs O(N*W))
+            if n >= window:
+                conv = np.convolve(ema21_vals, weights[::-1], mode="valid")
+                slopes = np.concatenate([np.zeros(window - 1), conv])
+            else:
+                slopes = np.zeros(n)
+
+            # Pre-extract EMAs for Layer 3 check
+            ema_vals = {}
+            for p in [8, 21, 50, 200]:
+                col = f"{prefix}_ema_{p}"
+                if col in df_features.columns:
+                    ema_vals[p] = df_features[col].values
+                else:
+                    ema_vals[p] = data["close"].ewm(span=p, adjust=False).mean().values
+
+            # Pre-calculate RSI for Layer 4 check
+            rsi_col = f"{prefix}_rsi"
+            if rsi_col in df_features.columns:
+                rsi_vals = df_features[rsi_col].values
+            else:
+                delta = data["close"].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rsi_vals = (100 - (100 / (1 + (gain / (loss + 1e-8))))).values
 
         # 3. Main Walk-Forward Loop
         start = 0
@@ -227,100 +231,101 @@ class BacktestEngine:
         feature_cols = [c for c in df_features.columns if c not in cols_to_exclude]
         feature_vals = df_features[feature_cols].values
 
-        while start + train_window + test_window <= n:
-            test_start_idx = start + train_window
+        with profile_context("bt_walk_forward_loop_total"):
+            while start + train_window + test_window <= n:
+                test_start_idx = start + train_window
 
-            # Institutional Walk-Forward: Compute normalization stats from train window ONLY
-            # to strictly prevent look-ahead bias in the test window.
-            train_slice = feature_vals[start:test_start_idx]
-            train_mean = np.nanmean(train_slice, axis=0)
-            train_std = np.nanstd(train_slice, axis=0)
-            train_std[train_std == 0] = 1.0  # Avoid division by zero
+                # Institutional Walk-Forward: Compute normalization stats from train window ONLY
+                # to strictly prevent look-ahead bias in the test window.
+                train_slice = feature_vals[start:test_start_idx]
+                train_mean = np.nanmean(train_slice, axis=0)
+                train_std = np.nanstd(train_slice, axis=0)
+                train_std[train_std == 0] = 1.0  # Avoid division by zero
 
-            for i in range(test_window):
-                abs_idx = test_start_idx + i
+                for i in range(test_window):
+                    abs_idx = test_start_idx + i
 
-                # Prevent double-processing bars due to step overlap
-                if abs_idx <= last_processed_idx or abs_idx >= n:
-                    continue
+                    # Prevent double-processing bars due to step overlap
+                    if abs_idx <= last_processed_idx or abs_idx >= n:
+                        continue
 
-                bar_time = time_vals[abs_idx]
-                current_price = close_vals[abs_idx]
+                    bar_time = time_vals[abs_idx]
+                    current_price = close_vals[abs_idx]
 
-                # 1. Update active trades: Check if any simulated exit is reached
-                self._update_active_trades(active_trades, abs_idx)
+                    # 1. Update active trades: Check if any simulated exit is reached
+                    self._update_active_trades(active_trades, abs_idx)
 
-                # 2. Evaluation Logic: If slot available, check for new signals
-                if len(active_trades) < self.max_positions:
-                    # Apply train-window normalization to the current observation
-                    obs_raw = feature_vals[abs_idx]
-                    obs = (obs_raw - train_mean) / (train_std + 1e-8)
+                    # 2. Evaluation Logic: If slot available, check for new signals
+                    if len(active_trades) < self.max_positions:
+                        # Apply train-window normalization to the current observation
+                        obs_raw = feature_vals[abs_idx]
+                        obs = (obs_raw - train_mean) / (train_std + 1e-8)
 
-                    try:
-                        # Standard Signal object or fallback to raw int
-                        signal_obj = model.predict(obs)
-                        direction = int(signal_obj.direction)
-                        confidence = float(signal_obj.confidence)
-                    except Exception:
-                        direction, confidence = 0, 0.0
+                        try:
+                            # Standard Signal object or fallback to raw int
+                            signal_obj = model.predict(obs)
+                            direction = int(signal_obj.direction)
+                            confidence = float(signal_obj.confidence)
+                        except Exception:
+                            direction, confidence = 0, 0.0
 
-                    if direction != 0:
-                        atr = atr_vals[abs_idx]
-                        if not np.isnan(atr) and atr > 0:
-                            # 3. Prepare Signal and Validate with Filter Cascade
-                            signal = TradeSignal(
-                                symbol=self.symbol,
-                                direction=direction,
-                                entry_price=current_price,
-                                stop_loss=current_price - (direction * 2 * atr),
-                                take_profit=current_price + (direction * 4 * atr),
-                                lot_size=0.1,  # Base lot for backtest
-                                algorithm="backtest",
-                                confidence=confidence,
-                                timestamp=bar_time,
-                            )
-
-                            # Dynamic Drawdown for Layer 6 (O(1) lookup)
-                            current_drawdown = 0.0
-                            if self.equity_curve:
-                                peak = self.max_equity
-                                current_equity = self.equity_curve[-1][1]
-                                current_drawdown = (peak - current_equity) / (peak + 1e-8)
-
-                            # Pack precomputed metrics for speed
-                            precomputed = {
-                                "atr_volatility": {
-                                    "current_atr": atr_current_vals[abs_idx],
-                                    "avg_atr": atr_avg_vals[abs_idx],
-                                },
-                                "trend_angle": {"slope": slopes[abs_idx]},
-                                "ema_sequence": {
-                                    "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
-                                },
-                                "momentum": {"rsi": rsi_vals[abs_idx]},
-                            }
-
-                            # Validate signal through 10-layer filter
-                            # Optimization: market_data=None because we use precomputed_metrics
-                            decision = self.ef.validate(
-                                signal,
-                                market_data=None,
-                                current_drawdown=current_drawdown,
-                                timestamp=bar_time,
-                                precomputed_metrics=precomputed,
-                            )
-
-                            if decision.is_approved:
-                                # Vectorized Exit Simulation: Scan future bars for SL/TP hit
-                                self._open_and_simulate_trade(
-                                    active_trades, signal, abs_idx, high_vals, low_vals, time_vals
+                        if direction != 0:
+                            atr = atr_vals[abs_idx]
+                            if not np.isnan(atr) and atr > 0:
+                                # 3. Prepare Signal and Validate with Filter Cascade
+                                signal = TradeSignal(
+                                    symbol=self.symbol,
+                                    direction=direction,
+                                    entry_price=current_price,
+                                    stop_loss=current_price - (direction * 2 * atr),
+                                    take_profit=current_price + (direction * 4 * atr),
+                                    lot_size=0.1,  # Base lot for backtest
+                                    algorithm="backtest",
+                                    confidence=confidence,
+                                    timestamp=bar_time,
                                 )
 
-                # 4. Record equity at the end of each bar
-                self._record_equity(bar_time, current_price, active_trades)
-                last_processed_idx = abs_idx
+                                # Dynamic Drawdown for Layer 6 (O(1) lookup)
+                                current_drawdown = 0.0
+                                if self.equity_curve:
+                                    peak = self.max_equity
+                                    current_equity = self.equity_curve[-1][1]
+                                    current_drawdown = (peak - current_equity) / (peak + 1e-8)
 
-            start += step_size
+                                # Pack precomputed metrics for speed
+                                precomputed = {
+                                    "atr_volatility": {
+                                        "current_atr": atr_current_vals[abs_idx],
+                                        "avg_atr": atr_avg_vals[abs_idx],
+                                    },
+                                    "trend_angle": {"slope": slopes[abs_idx]},
+                                    "ema_sequence": {
+                                        "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
+                                    },
+                                    "momentum": {"rsi": rsi_vals[abs_idx]},
+                                }
+
+                                # Validate signal through 10-layer filter
+                                # Optimization: market_data=None because we use precomputed_metrics
+                                decision = self.ef.validate(
+                                    signal,
+                                    market_data=None,
+                                    current_drawdown=current_drawdown,
+                                    timestamp=bar_time,
+                                    precomputed_metrics=precomputed,
+                                )
+
+                                if decision.is_approved:
+                                    # Vectorized Exit Simulation: Scan future bars for SL/TP hit
+                                    self._open_and_simulate_trade(
+                                        active_trades, signal, abs_idx, high_vals, low_vals, time_vals
+                                    )
+
+                    # 4. Record equity at the end of each bar
+                    self._record_equity(bar_time, current_price, active_trades)
+                    last_processed_idx = abs_idx
+
+                start += step_size
 
         # 4. Finalization: Close any trailing trades
         self._close_all_trades(active_trades, close_vals[-1], time_vals[-1])

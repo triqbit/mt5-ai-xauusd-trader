@@ -39,8 +39,11 @@ class SecretMaskingProcessor:
         Dynamically discovers all secret fields to prevent leaks as the schema evolves.
         """
         # Use the class's model_fields to avoid Pydantic instance attribute warnings
+        if not hasattr(config.__class__, "model_fields"):
+            return
+
         for field_name in config.__class__.model_fields:
-            val = getattr(config, field_name)
+            val = getattr(config, field_name, None)
 
             # Extract the raw value if it's a Pydantic Secret type
             secret_val = None

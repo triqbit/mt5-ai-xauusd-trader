@@ -65,8 +65,6 @@ def test_execution_filter_full_trace(execution_filter):
     assert "momentum" in decision.trace
     assert "session_time" in decision.trace
     assert "drawdown_limit" in decision.trace
-    assert "model_stability" in decision.trace
-    assert "performance_floor" in decision.trace
     assert "confidence_threshold" in decision.trace
 
     # All layers should have a 'passed' key

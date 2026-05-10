@@ -65,6 +65,7 @@ class TestStructuredObservability(unittest.TestCase):
         mock_cfg.model_accuracy_floor = 0.5
         mock_cfg.model_drift_threshold = 0.3
         mock_cfg.model_calibration_threshold = 0.2
+        mock_cfg.execution_latency_threshold = 0.5
         monitor = Monitor(mock_cfg)
 
         # These methods exist in src/core/monitor.py

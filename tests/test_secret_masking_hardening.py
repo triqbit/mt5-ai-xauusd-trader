@@ -8,7 +8,8 @@ def test_dynamic_secret_discovery():
     """Verify that all SecretStr fields are automatically discovered and masked."""
     # Create a config with various secrets
     config = TradingConfig(
-        mt5_password=SecretStr("super_secret_mt5"),
+        MT5_PASSWORD=SecretStr("super_secret_mt5"),
+        MT5_SERVER="test_server",
         redis_url=SecretStr("redis://:redis_pass_123@localhost:6379/0"),
         database_url=SecretStr("postgresql://user:db_pass_456@localhost:5432/db"),
         telegram_token=SecretStr("bot123:tele_secret_789")
