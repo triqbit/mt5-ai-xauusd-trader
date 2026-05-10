@@ -90,7 +90,7 @@ emergency-stop:
 
 daily-summary:
 	@echo "Generating Daily Operator Summary..."
-	$(PYTHON_EXEC) generate_triage_report.py
+	$(PYTHON_EXEC) scripts/generate_triage_report.py
 
 analytics:
 	@echo "Running Post-Trade Signal Attribution Analysis..."
