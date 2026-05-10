@@ -34,32 +34,47 @@ class SecretMaskingProcessor:
             self.update_secrets(config)
 
     def update_secrets(self, config: TradingConfig) -> None:
-        """Extract all SecretStr values from the config."""
-        # Use the class's model_fields to avoid Pydantic 2.11+ instance attribute warning
-        for field_name, field_info in config.__class__.model_fields.items():
-            # Check if SecretStr is in the type annotation
-            annotation_str = str(field_info.annotation)
-            if "SecretStr" in annotation_str:
-                val = getattr(config, field_name)
-                if hasattr(val, "get_secret_value"):
-                    secret_val = val.get_secret_value()
-                    if secret_val and len(secret_val) > 3:
-                        self.secrets.add(secret_val)
-                elif isinstance(val, str) and val and len(val) > 3:
-                    self.secrets.add(val)
+        """
+        Extract all SecretStr/SecretBytes values from the config.
+        Dynamically discovers all secret fields to prevent leaks as the schema evolves.
+        """
+        # Use the class's model_fields to avoid Pydantic instance attribute warnings
+        for field_name in config.__class__.model_fields:
+            val = getattr(config, field_name)
 
-        # Also specifically check database_url for embedded passwords
-        db_url = (
-            config.database_url.get_secret_value()
-            if hasattr(config.database_url, "get_secret_value")
-            else str(config.database_url)
-        )
-        if db_url and "@" in db_url:
-            # Mask the password part of the URL specifically
-            # postgresql://user:password@host:port/db
-            match = re.search(r"://([^:]+):([^@]+)@", db_url)
-            if match:
-                self.secrets.add(match.group(2))
+            # Extract the raw value if it's a Pydantic Secret type
+            secret_val = None
+            if hasattr(val, "get_secret_value"):
+                secret_val = val.get_secret_value()
+            elif "Secret" in str(type(val)):
+                # Defensive check for other secret-like types that might not have get_secret_value
+                try:
+                    secret_val = val.get_secret_value()
+                except (AttributeError, TypeError):
+                    pass
+
+            if secret_val is not None:
+                if isinstance(secret_val, bytes):
+                    secret_val = secret_val.decode("utf-8", errors="replace")
+
+                if isinstance(secret_val, str) and len(secret_val) > 3:
+                    self.secrets.add(secret_val)
+
+        # Generic URL credential extraction: protocol://user:password@host
+        # This protects embedded passwords in DATABASE_URL, REDIS_URL, etc.
+        for secret in list(self.secrets):
+            if isinstance(secret, str) and "://" in secret and "@" in secret:
+                try:
+                    # Extract auth part (user:password) between :// and @
+                    # Using rsplit for @ to handle cases where @ might be in password (escaped)
+                    auth_part = secret.split("://", 1)[1].rsplit("@", 1)[0]
+                    if ":" in auth_part:
+                        # Password is the part after the LAST colon in the auth section
+                        password = auth_part.rsplit(":", 1)[1]
+                        if password and len(password) > 3:
+                            self.secrets.add(password)
+                except (IndexError, ValueError):
+                    continue
 
     def redact_any(self, data: Any) -> Any:
         """
