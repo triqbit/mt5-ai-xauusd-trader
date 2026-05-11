@@ -109,12 +109,13 @@ class DreamerAgent(BaseModel):
         # with every step to maintain the latent representation (RSSM).
         self.logger.debug("DreamerAgent.observe called (placeholder).")
 
-    def imagine(self, horizon: int = 15) -> Any:
+    def imagine(self, horizon: int = 15, **kwargs: Any) -> Any:
         """
         Simulates future trajectories in the latent space.
 
         Args:
             horizon: Number of steps to look ahead.
+            **kwargs: Additional parameters for imagination.
 
         Returns:
             Simulated trajectory data (placeholder).
@@ -122,12 +123,13 @@ class DreamerAgent(BaseModel):
         self.logger.debug(f"DreamerAgent.imagine called with horizon {horizon} (placeholder).")
         return None
 
-    def train(self, replay_buffer: Any) -> None:
+    def train(self, replay_buffer: Any, **kwargs: Any) -> None:
         """
         Trains the world model, actor, and critic from replay buffer data.
 
         Args:
             replay_buffer: Buffer containing past experience transitions.
+            **kwargs: Hyperparameters for training.
         """
         self.logger.debug("DreamerAgent.train called (placeholder).")
 
