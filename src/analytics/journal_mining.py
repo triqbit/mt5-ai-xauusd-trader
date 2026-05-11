@@ -779,11 +779,11 @@ class JournalMiner:
             group = blocked_df[blocked_df["rejection_reason"] == reason]
             total = len(group)
             # Correct block: signal would have lost (would_have_won=False)
-            correct = len(group[group["would_have_won"] == False])
+            correct = len(group[~group["would_have_won"]])
             # Incorrect block: signal would have won (would_have_won=True)
-            incorrect = len(group[group["would_have_won"] == True])
+            incorrect = len(group[group["would_have_won"]])
             accuracy = correct / total if total > 0 else 0.0
-            opp_cost = group[group["would_have_won"] == True]["opportunity_cost_pnl"].sum()
+            opp_cost = group[group["would_have_won"]]["opportunity_cost_pnl"].sum()
 
             results.append(
                 RejectionQuality(

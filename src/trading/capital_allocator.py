@@ -176,8 +176,8 @@ class CapitalAllocator:
         best_result = None
 
         for sid in eligible_strategies:
-            # Simulate allocation
-            res = self.request_allocation(sid, risk_pct, allow_scaling=allow_scaling)
+            # Simulate allocation silently to avoid audit pollution
+            res = self.request_allocation(sid, risk_pct, allow_scaling=allow_scaling, silent=True)
             if not res.is_allowed:
                 continue
 
@@ -344,24 +344,56 @@ class CapitalAllocator:
 
     def get_diversification_score(self) -> float:
         """
-        Calculate portfolio diversification score using normalized HHI.
+        Calculate portfolio diversification score using multi-factor normalized HHI.
         Ranges from 0.0 (maximum concentration) to 1.0 (perfectly diversified).
+
+        Factors:
+        - Strategy-level HHI (40%): Diversification across specific models.
+        - Symbol-level HHI (30%): Diversification across assets.
+        - Family-level HHI (30%): Diversification across model architectures.
+
+        Normalization uses the number of registered strategies as the baseline
+        degrees of freedom.
         """
         total_allocated = sum(self.current_allocations.values())
-        if total_allocated <= 0 or len(self.strategies) <= 1:
+        n_strategies = len(self.strategies)
+
+        if total_allocated <= 0 or n_strategies <= 1:
             return 1.0
 
-        # Calculate Herfindahl-Hirschman Index (HHI)
-        # HHI = sum(s_i^2) where s_i is the share of each strategy in the portfolio
-        hhi = sum((amt / total_allocated) ** 2 for amt in self.current_allocations.values())
+        def _calculate_score(shares: list[float]) -> float:
+            """Calculate 1.0 - normalized HHI using n_strategies as the baseline."""
+            hhi = sum(s**2 for s in shares)
+            # normalized_hhi ranges from 0 (perfectly diversified) to 1 (concentrated)
+            # We use n_strategies as the baseline because it represents the total
+            # units of risk/decisions the system can make.
+            normalized_hhi = (hhi - 1 / n_strategies) / (1 - 1 / n_strategies)
+            return max(0.0, min(1.0, 1.0 - normalized_hhi))
 
-        # Normalize HHI to [0, 1] range: (HHI - 1/n) / (1 - 1/n)
-        # where n is the number of strategies.
-        n = len(self.strategies)
-        normalized_hhi = (hhi - 1 / n) / (1 - 1 / n) if n > 1 else 1.0
+        # 1. Strategy-level HHI
+        strategy_shares = [amt / total_allocated for amt in self.current_allocations.values() if amt > 0]
+        strategy_score = _calculate_score(strategy_shares)
 
-        # Return 1 - normalized_hhi so that higher is better
-        return max(0.0, min(1.0, 1.0 - normalized_hhi))
+        # 2. Symbol-level HHI
+        symbol_totals: dict[str, float] = {}
+        for sid, amt in self.current_allocations.items():
+            if amt > 0:
+                sym = self.strategies[sid].symbol
+                symbol_totals[sym] = symbol_totals.get(sym, 0.0) + amt
+        symbol_shares = [amt / total_allocated for amt in symbol_totals.values()]
+        symbol_score = _calculate_score(symbol_shares)
+
+        # 3. Family-level HHI
+        family_totals: dict[str, float] = {}
+        for sid, amt in self.current_allocations.items():
+            if amt > 0:
+                fam = self.strategies[sid].model_family
+                family_totals[fam] = family_totals.get(fam, 0.0) + amt
+        family_shares = [amt / total_allocated for amt in family_totals.values()]
+        family_score = _calculate_score(family_shares)
+
+        # Weighted Ensemble of Scores
+        return (strategy_score * 0.4) + (symbol_score * 0.3) + (family_score * 0.3)
 
     def to_report_section(self, rejection_history: dict[str, int] | None = None) -> Any:
         """Convert current state to AllocationSection for ResearchReporter."""
@@ -421,7 +453,7 @@ class CapitalAllocator:
         return results
 
     def request_allocation(
-        self, strategy_id: str, risk_pct: float, allow_scaling: bool = False
+        self, strategy_id: str, risk_pct: float, allow_scaling: bool = False, silent: bool = False
     ) -> AllocationResult:
         """
         Evaluate if a strategy can be allocated the requested risk.
@@ -429,9 +461,16 @@ class CapitalAllocator:
 
         If allow_scaling is True, instead of rejecting due to heat limits,
         it will return the maximum possible allocation that fits within limits.
+
+        Args:
+            strategy_id: ID of the strategy requesting capital.
+            risk_pct: Requested risk as a percentage of total budget.
+            allow_scaling: If True, partial allocations are allowed.
+            silent: If True, audit logging and metric recording are skipped (useful for simulations).
         """
         if self.total_budget <= 0:
-            self._record_rejection(RejectionCode.NO_BUDGET)
+            if not silent:
+                self._record_rejection(RejectionCode.NO_BUDGET)
             res = AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
@@ -441,11 +480,12 @@ class CapitalAllocator:
                 rejection_reason="Total budget is zero or negative",
                 rejection_code=RejectionCode.NO_BUDGET,
             )
-            self._log_and_audit(res)
+            self._log_and_audit(res, silent=silent)
             return res
 
         if strategy_id not in self.strategies:
-            self._record_rejection(RejectionCode.STRATEGY_NOT_FOUND)
+            if not silent:
+                self._record_rejection(RejectionCode.STRATEGY_NOT_FOUND)
             res = AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
@@ -455,7 +495,7 @@ class CapitalAllocator:
                 rejection_reason="Strategy not registered",
                 rejection_code=RejectionCode.STRATEGY_NOT_FOUND,
             )
-            self._log_and_audit(res)
+            self._log_and_audit(res, silent=silent)
             return res
 
         config = self.strategies[strategy_id]
@@ -483,7 +523,8 @@ class CapitalAllocator:
             was_capped = True
 
             if target_amount <= 0:
-                self._record_rejection(RejectionCode.CAPITAL_CAP_REACHED)
+                if not silent:
+                    self._record_rejection(RejectionCode.CAPITAL_CAP_REACHED)
                 res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
@@ -493,7 +534,7 @@ class CapitalAllocator:
                     rejection_reason="Strategy capital cap reached or zero",
                     rejection_code=RejectionCode.CAPITAL_CAP_REACHED,
                 )
-                self._log_and_audit(res)
+                self._log_and_audit(res, silent=silent)
                 return res
 
         # 3. Diversification Guard: Linear scaling as limits are approached
@@ -546,7 +587,8 @@ class CapitalAllocator:
                 target_risk_pct = max(0.0, self.max_total_heat - current_total_heat)
                 was_capped = True
             else:
-                self._record_rejection(RejectionCode.TOTAL_HEAT_LIMIT)
+                if not silent:
+                    self._record_rejection(RejectionCode.TOTAL_HEAT_LIMIT)
                 res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
@@ -556,7 +598,7 @@ class CapitalAllocator:
                     rejection_reason=f"Total heat limit reached: {current_total_heat:.2f}",
                     rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
                 )
-                self._log_and_audit(res)
+                self._log_and_audit(res, silent=silent)
                 return res
 
         if symbol_heat + target_risk_pct > self.max_symbol_risk:
@@ -564,7 +606,8 @@ class CapitalAllocator:
                 target_risk_pct = max(0.0, self.max_symbol_risk - symbol_heat)
                 was_capped = True
             else:
-                self._record_rejection(RejectionCode.SYMBOL_CONCENTRATION_LIMIT)
+                if not silent:
+                    self._record_rejection(RejectionCode.SYMBOL_CONCENTRATION_LIMIT)
                 res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
@@ -574,7 +617,7 @@ class CapitalAllocator:
                     rejection_reason=f"Symbol concentration limit reached for {config.symbol}",
                     rejection_code=RejectionCode.SYMBOL_CONCENTRATION_LIMIT,
                 )
-                self._log_and_audit(res)
+                self._log_and_audit(res, silent=silent)
                 return res
 
         if family_heat + target_risk_pct > self.max_family_risk:
@@ -582,7 +625,8 @@ class CapitalAllocator:
                 target_risk_pct = max(0.0, self.max_family_risk - family_heat)
                 was_capped = True
             else:
-                self._record_rejection(RejectionCode.FAMILY_CONCENTRATION_LIMIT)
+                if not silent:
+                    self._record_rejection(RejectionCode.FAMILY_CONCENTRATION_LIMIT)
                 res = AllocationResult(
                     strategy_id=strategy_id,
                     allocated_amount=0.0,
@@ -592,14 +636,15 @@ class CapitalAllocator:
                     rejection_reason=f"Family concentration limit reached for {config.model_family}",
                     rejection_code=RejectionCode.FAMILY_CONCENTRATION_LIMIT,
                 )
-                self._log_and_audit(res)
+                self._log_and_audit(res, silent=silent)
                 return res
 
         # Final check if scaling reduced it to zero
         if target_risk_pct <= 0:
             # We already checked RejectionCode.CAPITAL_CAP_REACHED in step 2.
             # If scaling brought it to 0, it means we're at some heat limit or scaling was zero.
-            self._record_rejection(RejectionCode.SCALED_TO_ZERO)
+            if not silent:
+                self._record_rejection(RejectionCode.SCALED_TO_ZERO)
             res = AllocationResult(
                 strategy_id=strategy_id,
                 allocated_amount=0.0,
@@ -609,7 +654,7 @@ class CapitalAllocator:
                 rejection_reason="Scaling or safety limits reduced allocation to zero",
                 rejection_code=RejectionCode.SCALED_TO_ZERO,
             )
-            self._log_and_audit(res)
+            self._log_and_audit(res, silent=silent)
             return res
 
         target_amount = self.total_budget * target_risk_pct
@@ -623,11 +668,14 @@ class CapitalAllocator:
             was_capped=was_capped,
             was_scaled=was_scaled,
         )
-        self._log_and_audit(res)
+        self._log_and_audit(res, silent=silent)
         return res
 
-    def _log_and_audit(self, result: AllocationResult) -> None:
+    def _log_and_audit(self, result: AllocationResult, silent: bool = False) -> None:
         """Helper to log and audit an allocation result."""
+        if silent:
+            return
+
         if result.is_allowed:
             logger.info(
                 "allocation_allowed",
