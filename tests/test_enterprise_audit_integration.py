@@ -108,8 +108,8 @@ def test_enterprise_audit_flow_double_rejection(mock_cfg, audit_logger):
     # Force rejection by mocking one of the risk layers
     with patch.object(risk_manager, "_check_risk_reward", return_value=False):
         # AuditedRiskManager.approve calls audit_logger.log_risk_decision internally
-        risk_approved = risk_manager.approve(signal)
-        assert risk_approved is False
+        decision = risk_manager.approve(signal, market_data=df, open_positions=[])
+        assert decision.is_approved is False
 
     # 5. Verify Audit Persistence
     with audit_logger.Session() as session:
@@ -126,8 +126,8 @@ def test_enterprise_audit_flow_double_rejection(mock_cfg, audit_logger):
             select(AuditEntry).where(AuditEntry.action == "risk_decision").order_by(AuditEntry.id.desc())
         ).first()
         assert risk_entry.metadata_json["passed"] is False
-        assert risk_entry.metadata_json["decision_chain"]["risk_reward"] is False
-        assert risk_entry.metadata_json["decision_chain"]["circuit_breaker"] is True
+        assert risk_entry.metadata_json["decision_chain"]["layer7_risk_reward"] is False
+        assert risk_entry.metadata_json["decision_chain"]["layer1_drawdown"] is True
 
 def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
     """
@@ -177,8 +177,8 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
     # 4. Audited Risk Manager Validation (Should FAIL)
     risk_manager = AuditedRiskManager(mock_cfg, account_balance=10000.0)
     with patch.object(risk_manager, "_check_risk_reward", return_value=False):
-        risk_approved = risk_manager.approve(signal)
-        assert risk_approved is False
+        decision = risk_manager.approve(signal, market_data=df, open_positions=[])
+        assert decision.is_approved is False
 
     # 5. Verify Audit Persistence
     with audit_logger.Session() as session:
@@ -193,4 +193,4 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
             select(AuditEntry).where(AuditEntry.action == "risk_decision").order_by(AuditEntry.id.desc())
         ).first()
         assert risk_entry.metadata_json["passed"] is False
-        assert risk_entry.metadata_json["decision_chain"]["risk_reward"] is False
+        assert risk_entry.metadata_json["decision_chain"]["layer7_risk_reward"] is False

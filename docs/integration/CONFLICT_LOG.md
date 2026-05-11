@@ -105,3 +105,26 @@
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
 - **Owner**: Jules05
+
+## [2026-05-12] - Risk Management Harmonization & Interface Standardization
+
+### 1. Risk Management Fragmentation (RiskEngine vs RiskManager)
+- **Conflict**: Institutional risk logic was split between `RiskEngine` (Jules01/triqbit) and `RiskManager` (Jules02/xnessom), leading to redundant checks and potential decision drift.
+- **Agents**: Jules01, Jules02
+- **Impact**: High. Fragmented logic increases maintenance debt and risks inconsistent signal validation.
+- **Resolution**: Consolidated all institutional logic (ATR sizing, 8-layer cascade, exposure caps) into `RiskManager`. Deleted `src/trading/risk_engine.py`.
+- **Owner**: Jules05
+
+### 2. Interface Mismatch (Boolean vs RiskDecision)
+- **Conflict**: `risk.approve()` returned a simple boolean, losing rich audit data and preventing the risk engine from dynamically adjusting lot sizes.
+- **Agents**: Jules01, Jules02, Jules05
+- **Impact**: Medium. Restricts auditability and adaptive execution.
+- **Resolution**: Refactored `RiskManager.approve()` and `AuditedRiskManager.approve()` to return a standardized `RiskDecision` object containing the 8-layer trace and `adjusted_lot_size`.
+- **Owner**: Jules05
+
+### 3. Schema Redundancy (DailyStats)
+- **Conflict**: Multiple definitions of `DailyStats` existed in risk modules.
+- **Agents**: Jules01, Jules02
+- **Impact**: Low (Technical Debt).
+- **Resolution**: Centralized `DailyStats` and `RiskDecision` in `src/core/schemas.py` as Pydantic models.
+- **Owner**: Jules05
