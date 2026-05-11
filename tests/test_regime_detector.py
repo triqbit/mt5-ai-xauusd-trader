@@ -152,7 +152,7 @@ class TestRegimeDetector(unittest.TestCase):
         for idx in [80, 100, 140]:
             self.assertEqual(df_vec['regime'].iloc[idx], df_iter['regime'].iloc[idx], f"Mismatch at index {idx}")
 
-    def test_generate_summary(self):
+    def test_run_analysis_and_report(self):
         np.random.seed(42)
         data = pd.DataFrame({
             'close': 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
@@ -161,11 +161,51 @@ class TestRegimeDetector(unittest.TestCase):
             'returns': np.random.randn(200) * 0.001
         })
 
-        summary = self.detector.generate_summary(data)
+        report = self.detector.run_analysis(data)
+        from src.models.regime_detector import RegimeAnalysisReport
+        self.assertIsInstance(report, RegimeAnalysisReport)
+        self.assertTrue(len(report.counts_pct) > 0)
+        self.assertTrue(len(report.avg_durations) > 0)
+        self.assertIsNotNone(report.transitions)
+
+        # Verify conversion to report section
+        section = report.to_report_section()
         from src.research.reporting import RegimeSection
-        self.assertIsInstance(summary, RegimeSection)
-        self.assertTrue(len(summary.regimes) > 0)
-        self.assertIn("Stability", summary.transition_insights)
+        self.assertIsInstance(section, RegimeSection)
+        self.assertTrue(len(section.regimes) > 0)
+        self.assertIn("Stability", section.transition_insights)
+
+    def test_regime_info_transition_probabilities(self):
+        """Verify that transition_probabilities are populated in RegimeInfo."""
+        np.random.seed(42)
+        data = pd.DataFrame({
+            'close': 2000.0 + np.random.randn(50) * 0.1,
+            'high': 2000.2 + np.random.randn(50) * 0.1,
+            'low': 1999.8 + np.random.randn(50) * 0.1
+        })
+
+        # 1. Heuristic mode
+        info_h = self.detector.detect(data)
+        self.assertIsInstance(info_h.transition_probabilities, dict)
+        self.assertIn(info_h.label.value, info_h.transition_probabilities)
+        self.assertEqual(info_h.transition_probabilities[info_h.label.value], info_h.confidence)
+
+        # 2. GMM mode
+        # Generate some diverse data to fit GMM
+        ranging = 2000.0 + np.random.randn(100) * 0.1
+        trending = np.linspace(2000, 2050, 100)
+        fit_data = pd.DataFrame({
+            'close': np.concatenate([ranging, trending]),
+            'high': np.concatenate([ranging + 0.1, trending + 0.1]),
+            'low': np.concatenate([ranging - 0.1, trending - 0.1])
+        })
+        self.detector.fit(fit_data, n_clusters=2)
+
+        info_gmm = self.detector.detect(data)
+        self.assertIsInstance(info_gmm.transition_probabilities, dict)
+        self.assertGreater(len(info_gmm.transition_probabilities), 0)
+        # Sum of probabilities should be approx 1.0
+        self.assertAlmostEqual(sum(info_gmm.transition_probabilities.values()), 1.0, places=5)
 
     def test_performance_benchmarking(self):
         import time
