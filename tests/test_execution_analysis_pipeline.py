@@ -89,7 +89,6 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
     cfg.model_accuracy_floor = 0.45
 
     risk_manager = AuditedRiskManager(cfg, account_balance=10000.0, logger_db=trade_logger)
-    execution_filter = ExecutionFilter(max_drawdown=0.15, config=cfg)
 
     # --- SCENARIO 1: Rejected Signal ---
     signal_time = datetime.now(timezone.utc) - timedelta(hours=1)

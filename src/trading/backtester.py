@@ -258,14 +258,16 @@ class BacktestEngine:
                     # 2. Evaluation Logic: If slot available, check for new signals
                     if len(active_trades) < self.max_positions:
                         # Apply train-window normalization to the current observation
-                        obs_raw = feature_vals[abs_idx]
-                        obs = (obs_raw - train_mean) / (train_std + 1e-8)
+                        with profile_context("bt_observation_normalization"):
+                            obs_raw = feature_vals[abs_idx]
+                            obs = (obs_raw - train_mean) / (train_std + 1e-8)
 
                         try:
                             # Standard Signal object or fallback to raw int
-                            signal_obj = model.predict(obs)
-                            direction = int(signal_obj.direction)
-                            confidence = float(signal_obj.confidence)
+                            with profile_context("bt_model_predict"):
+                                signal_obj = model.predict(obs)
+                                direction = int(signal_obj.direction)
+                                confidence = float(signal_obj.confidence)
                         except Exception:
                             direction, confidence = 0, 0.0
 
