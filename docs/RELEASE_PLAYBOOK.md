@@ -13,6 +13,7 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
     - Dependency security audits (`pip-audit`).
     - License compliance verification (`pip-licenses`).
     - Full test suite execution with a mandatory **85% code coverage gate**.
+    - **Atlas Governance Audit (Gate 4.8)**: Verifies synchronization between `RISK_LIMITS.md` and `src/core/config.py`, and ensures runbook integrity.
     - Configuration and environment template validation (`scripts/validate_env.py`).
     - Database migration reversibility checks (`scripts/verify_migrations.py`).
     - **Automated Pre-Prod Checklist Verification**: Ensures `docs/PREPROD_CHECKLIST.md` contains no unchecked items `[ ]`.
@@ -36,7 +37,7 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
 4.  **Release Stage:**
     - Automated version bumping and `CHANGELOG.md` finalization.
     - Git tagging.
-    - Artifact packaging with SHA256 integrity checksums.
+    - Artifact packaging with SHA256 integrity checksums via `scripts/package_release.sh`.
     - Creation of a GitHub Release with version-specific notes, integrity verification, and quick-rollback links.
 
 ---
@@ -50,7 +51,7 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
 4.  Select the **Branch** (usually `main`).
 5.  Fill in the parameters:
     - **Version**: Enter the target semantic version (e.g., `1.2.3`).
-        - *Note*: If left empty, the system will use `mathieudutour/github-tag-action` to calculate the next version based on [Conventional Commits](VERSIONING_POLICY.md).
+        - *Note*: If left empty, the system will calculate the next version based on [Conventional Commits](VERSIONING_POLICY.md).
     - **Prerelease**: Toggle this if creating a Release Candidate (`-rc.N`) or beta build.
     - **Dry Run**: Toggle this to execute all validation, test, and build steps *without* creating a Git tag, pushing code changes, or publishing a GitHub Release. Use this for final verification before a real push.
 6.  Click **Run workflow** button to start the process.
@@ -144,6 +145,7 @@ In case of catastrophic trading behavior, risk limit breaches, or circuit breake
 ## 7. Troubleshooting Release Failures
 
 - **Validation Gate Failure**: Check CI logs for the specific gate (e.g., Ruff, Mypy, Pytest). Fix the issues in the source branch and re-run.
+- **Atlas Audit Failure**: Verify synchronization between `RISK_LIMITS.md` and `src/core/config.py`.
 - **Trivy Security Failure**: Update the base image or vulnerable library in `requirements.txt`.
 - **Smoke Test Failure**: Review container logs using `docker logs <container_id>`. Common issues include missing environment variables or database connection timeouts.
 - **Checksum Mismatch**: Ensure no manual changes were made to the `releases/vX.Y.Z/` directory after `package_release.sh` finished.

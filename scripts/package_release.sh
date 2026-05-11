@@ -50,6 +50,9 @@ echo "Executing Mandatory Validation Gates..."
 # Gate 1: Version Sync
 python3 scripts/verify_version_sync.py
 
+# Gate 1.1: Atlas Governance Audit
+python3 scripts/atlas_audit.py
+
 # Gate 2: Environment Template Integrity
 python3 scripts/validate_env.py
 
