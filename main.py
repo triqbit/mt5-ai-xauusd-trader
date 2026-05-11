@@ -22,6 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+HAS_DEPENDENCIES = True
+BOOTSTRAP_ERROR = None
+
 try:
     import pandas as pd
     import structlog
@@ -29,58 +32,17 @@ try:
     from rich.panel import Panel
     from rich.table import Table
 except ImportError as e:
-    import platform
-
-    print("=" * 70)
-    print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
-    print("=" * 70)
-    print(f"Details: {e}")
-    print(f"Platform: {platform.system()} {platform.release()}")
-    print(f"Python:   {sys.version.split()[0]}")
-    print("\nREMEDIATION STEPS:")
-    print("1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics.")
-    print("2. Run 'pip install -r requirements.txt' to install all required libraries.")
-    if platform.system() == "Linux":
-        print("3. On Linux, if TA-Lib is missing, ensure the C-library is installed:")
-        print("   'sudo apt-get install libta-lib0' or equivalent.")
-    print("-" * 70)
-    sys.exit(1)
+    HAS_DEPENDENCIES = False
+    BOOTSTRAP_ERROR = e
+    # Use fallback if rich is not available
+    Console = None
+    Panel = None
+    Table = None
 
 try:
     import torch
 except ImportError:
     torch = None
-
-from src.core import profile
-from src.core.audit_log import AuditLogger
-from src.core.config_validator import ConfigValidator
-from src.core.constants import SignalDirection
-from src.core.decision_support import DecisionSupportSystem
-from src.core.exceptions import (
-    CircuitBreakerError,
-    MT5ConnectionError,
-    MT5DataError,
-    MT5ExecutionError,
-)
-from src.core.explainability import SignalExplainer
-from src.core.feature_engineering import FeatureEngineer
-from src.core.health import HealthStatus, init_health_checker
-from src.core.log_config import get_masking_processor
-from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
-from src.core.trade_logger import TradeLogger
-from src.data.event_intelligence import RiskStatus
-from src.models.base_model import BaseModel
-from src.models.ensemble import EnsembleModel
-from src.models.lstm_model import LSTMModel
-from src.models.ppo_agent import PPOAgent
-from src.models.regime_detector import RegimeDetector
-from src.models.transformer_model import TimeSeriesTransformer
-from src.trading.audited_risk_manager import AuditedRiskManager
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.trading.execution_filter import ExecutionFilter
-from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_manager import RiskManager
 
 # -- Logging setup ---------------------------------------------------------
 
@@ -89,6 +51,8 @@ def configure_logging(level: str = "INFO") -> None:
     import logging
 
     import structlog.contextvars
+
+    from src.core.log_config import get_masking_processor
 
     structlog.configure(
         processors=[
@@ -122,14 +86,17 @@ def _prepare_trade_signal(
     confidence: float,
     price: float,
     atr: float,
-    risk: RiskManager,
-    allocator: CapitalAllocator,
-    audit_logger: Optional[AuditLogger] = None,
-) -> TradeSignal:
+    risk: "RiskManager",
+    allocator: "CapitalAllocator",
+    audit_logger: Optional["AuditLogger"] = None,
+) -> "TradeSignal":
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
     based on institutional risk and capital allocation.
     """
+    from src.core.constants import SignalDirection
+    from src.core.schemas import TradeSignal
+
     log = structlog.get_logger("main.risk")
 
     # 1. SL/TP Calculation
@@ -182,20 +149,29 @@ def _prepare_trade_signal(
 
 def run_live(
     cfg,
-    connector: MT5Connector,
-    risk: RiskManager,
-    model: BaseModel,
-    execution_filter: ExecutionFilter,
-    feature_engineer: FeatureEngineer,
-    regime_detector: RegimeDetector,
-    allocator: CapitalAllocator,
-    dss: DecisionSupportSystem,
-    trade_logger: Optional[TradeLogger] = None,
-    monitor: Optional[Monitor] = None,
-    console: Optional[Console] = None,
-    audit_logger: Optional[AuditLogger] = None,
+    connector: "MT5Connector",
+    risk: "RiskManager",
+    model: "BaseModel",
+    execution_filter: "ExecutionFilter",
+    feature_engineer: "FeatureEngineer",
+    regime_detector: "RegimeDetector",
+    allocator: "CapitalAllocator",
+    dss: "DecisionSupportSystem",
+    trade_logger: Optional["TradeLogger"] = None,
+    monitor: Optional["Monitor"] = None,
+    console: Optional["Console"] = None,
+    audit_logger: Optional["AuditLogger"] = None,
 ) -> None:
     import structlog.contextvars
+    from src.core import profile
+    from src.core.constants import SignalDirection
+    from src.core.exceptions import (
+        CircuitBreakerError,
+        MT5ConnectionError,
+        MT5DataError,
+    )
+    from src.core.explainability import SignalExplainer
+    from src.data.event_intelligence import RiskStatus
 
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
@@ -548,6 +524,8 @@ def run_live(
 
                 if risk_approved and direction != 0:
                     with profile("execution"):
+                        from src.core.exceptions import MT5ExecutionError
+
                         execution_start = time.perf_counter()
                         try:
                             ticket = connector.place_order(signal)
@@ -655,11 +633,16 @@ def run_live(
 
 def get_system_version() -> str:
     """Retrieve application version from src package."""
+    # Attempt to read version from src/__init__.py directly to avoid import dependencies
     try:
-        from src import __version__
-
-        return __version__
-    except ImportError:
+        init_path = Path(__file__).resolve().parent / "src" / "__init__.py"
+        if init_path.exists():
+            with open(init_path, "r") as f:
+                for line in f:
+                    if "__version__" in line and "=" in line:
+                        return line.split("=")[1].strip().strip("'\"")
+        return "unknown"
+    except Exception:
         return "unknown"
 
 
@@ -767,7 +750,15 @@ Usage Examples:
     return p.parse_args()
 
 
-def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, log):
+def run_backtest(
+    args,
+    cfg,
+    feature_engineer: "FeatureEngineer",
+    execution_filter: "ExecutionFilter",
+    model: "BaseModel",
+    console: "Console",
+    log: "BoundLogger",
+):
     """Bridge for running the walk-forward backtesting engine."""
     from src.trading.backtester import BacktestEngine
 
@@ -782,6 +773,8 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
         if metric == "rf":
             return "green" if value >= 3.0 else "yellow" if value >= 2.0 else "red"
         return "white"
+
+    from src.trading.mt5_connector import MT5Connector
 
     start_date = datetime.strptime(args.start, "%Y-%m-%d")
     end_date = datetime.strptime(args.end, "%Y-%m-%d")
@@ -852,6 +845,51 @@ def run_backtest(args, cfg, feature_engineer, execution_filter, model, console, 
 
 
 def main() -> int:
+    # 0. Identify diagnostic commands that can proceed without full setup
+    diagnostic_flags = ["--help", "-h", "--version", "--doctor"]
+    is_diagnostic = any(arg in sys.argv for arg in diagnostic_flags)
+
+    # 1. Guided Setup: Detect missing .env and offer to initialize it
+    env_file = Path(".env")
+    example_file = Path(".env.example")
+    if not is_diagnostic and not env_file.exists() and example_file.exists():
+        # Check if we are in an interactive terminal
+        if sys.stdin.isatty():
+            print("\n[!] Configuration file (.env) is missing.")
+            try:
+                choice = (
+                    input("Would you like to initialize it from .env.example? [Y/n]: ")
+                    .strip()
+                    .lower()
+                )
+                if choice in ["", "y", "yes"]:
+                    import shutil
+
+                    shutil.copy(".env.example", ".env")
+                    print("✅ Created .env from template. Please edit it with your credentials.\n")
+            except (KeyboardInterrupt, EOFError):
+                print("\nSetup skipped.")
+
+    # 2. Handle missing dependencies gracefully for diagnostic flags
+    if not HAS_DEPENDENCIES:
+        if not is_diagnostic:
+            import platform
+
+            print("=" * 70)
+            print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
+            print("=" * 70)
+            print(f"Details: {BOOTSTRAP_ERROR}")
+            print(f"Platform: {platform.system()} {platform.release()}")
+            print(f"Python:   {sys.version.split()[0]}")
+            print("\nREMEDIATION STEPS:")
+            print("1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics.")
+            print("2. Run 'pip install -r requirements.txt' to install all required libraries.")
+            if platform.system() == "Linux":
+                print("3. On Linux, if TA-Lib is missing, ensure the C-library is installed:")
+                print("   'sudo apt-get install libta-lib0' or equivalent.")
+            print("-" * 70)
+            return 1
+
     args = parse_args()
 
     # 0. Immediate Diagnostic Handlers
@@ -902,24 +940,40 @@ def main() -> int:
         cfg = get_config()
     except Exception as exc:
         # Preliminary check for missing required variables before logging is even ready
-        console = Console()
-        if "validation error" in str(exc).lower():
-            console.print(
-                Panel(
-                    "[bold red]Configuration Error:[/]\n\n"
-                    "One or more required environment variables are missing.\n"
-                    "Please ensure you have a [bold].env[/] file in the project root.\n\n"
-                    "Quick Fix:\n"
-                    "1. Copy [cyan].env.example[/] to [cyan].env[/]\n"
-                    "2. Fill in your [bold]MT5_PASSWORD[/] and [bold]MT5_SERVER[/]\n\n"
-                    f"[dim]Technical details: {exc}[/]",
-                    title="[bold red]Bootstrap Failure[/]",
-                    border_style="red",
+        if Console and Panel:
+            console = Console()
+            if "validation error" in str(exc).lower():
+                console.print(
+                    Panel(
+                        "[bold red]Configuration Error:[/]\n\n"
+                        "One or more required environment variables are missing.\n"
+                        "Please ensure you have a [bold].env[/] file in the project root.\n\n"
+                        "Quick Fix:\n"
+                        "1. Copy [cyan].env.example[/] to [cyan].env[/]\n"
+                        "2. Fill in your [bold]MT5_PASSWORD[/] and [bold]MT5_SERVER[/]\n\n"
+                        f"[dim]Technical details: {exc}[/]",
+                        title="[bold red]Bootstrap Failure[/]",
+                        border_style="red",
+                    )
                 )
-            )
+            else:
+                print(f"CRITICAL: Failed to load configuration: {exc}")
         else:
-            print(f"CRITICAL: Failed to load configuration: {exc}")
+            # Fallback to plain print if rich is not available
+            print("=" * 70)
+            print("CRITICAL: BOOTSTRAP FAILURE - CONFIGURATION ERROR")
+            print("=" * 70)
+            if "validation error" in str(exc).lower():
+                print("One or more required environment variables are missing.")
+                print("Please ensure you have a .env file in the project root.")
+                print("\nQUICK FIX:")
+                print("1. Copy .env.example to .env")
+                print("2. Fill in your MT5_PASSWORD and MT5_SERVER")
+            print(f"\nTechnical details: {exc}")
+            print("-" * 70)
         return 1
+
+    from src.core.log_config import get_masking_processor
 
     configure_logging(cfg.log_level)
     log, console = structlog.get_logger("main"), Console()
@@ -961,6 +1015,8 @@ def main() -> int:
     # Actually, we already handled it above.
 
     # Validate configuration
+    from src.core.config_validator import ConfigValidator
+
     validator = ConfigValidator(cfg)
     result = validator.validate()
 
@@ -1049,6 +1105,8 @@ def main() -> int:
 
     # Initialise components
     # 1. Audit Logger (Mandatory for enterprise traceability)
+    from src.core.audit_log import AuditLogger
+
     database_url = cfg.database_url.get_secret_value()
     audit_db_url = database_url if "sqlite" in database_url else "sqlite:///audit.db"
     audit_logger = AuditLogger(db_url=audit_db_url)
@@ -1067,6 +1125,9 @@ def main() -> int:
         )
     )
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
+
+    from src.core.exceptions import MT5ConnectionError
+    from src.trading.mt5_connector import MT5Connector
 
     connector = MT5Connector(cfg)
     with console.status("[bold green]Connecting to MT5 terminal..."):
@@ -1099,6 +1160,20 @@ def main() -> int:
                 error=str(exc),
             )
             return 1
+    from src.core.decision_support import DecisionSupportSystem
+    from src.core.feature_engineering import FeatureEngineer
+    from src.core.health import HealthStatus, init_health_checker
+    from src.core.monitor import Monitor
+    from src.core.trade_logger import TradeLogger
+    from src.models.ensemble import EnsembleModel
+    from src.models.lstm_model import LSTMModel
+    from src.models.ppo_agent import PPOAgent
+    from src.models.regime_detector import RegimeDetector
+    from src.models.transformer_model import TimeSeriesTransformer
+    from src.trading.audited_risk_manager import AuditedRiskManager
+    from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+    from src.trading.execution_filter import ExecutionFilter
+
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(
         db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
@@ -1150,7 +1225,9 @@ def main() -> int:
         # Standard input_dim is 140 for the current feature engineer
         model = TimeSeriesTransformer(input_dim=140)
         if torch and transformer_path.exists():
-            model.load_state_dict(torch.load(transformer_path, map_location="cpu", weights_only=True))
+            model.load_state_dict(
+                torch.load(transformer_path, map_location="cpu", weights_only=True)
+            )
     else:
         # This branch should rarely be hit if Literal choices are enforced by Pydantic
         log.warning(
