@@ -409,13 +409,16 @@ class BacktestEngine:
             )
             return
 
-        # Vectorized hit detection
+        # Vectorized hit detection (accounting for spread)
+        # Assuming OHLC data is based on BID prices
         if direction == 1:  # BUY
+            # BUY exits at BID
             sl_hit = future_low <= sl
             tp_hit = future_high >= tp
         else:  # SELL
-            sl_hit = future_high >= sl
-            tp_hit = future_low <= tp
+            # SELL exits at ASK = BID + spread
+            sl_hit = (future_high + self.spread) >= sl
+            tp_hit = (future_low + self.spread) <= tp
 
         hits = sl_hit | tp_hit
 

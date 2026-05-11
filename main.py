@@ -1009,6 +1009,8 @@ def main() -> int:
     # Configuration Group
     summary.add_row("[bold underline]Configuration[/]", "")
     summary.add_row("Mode:  ", f"[bold]{cfg.mode.upper()}[/]")
+    if cfg.mode == "backtest":
+        summary.add_row("Period:  ", f"{args.start} to {args.end}")
     summary.add_row("Symbol:  ", f"[bold]{cfg.symbol}[/]")
     summary.add_row("Timeframe:  ", cfg.timeframe)
     summary.add_row("Algorithm:  ", cfg.algorithm)
