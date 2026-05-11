@@ -35,7 +35,7 @@ rich==13.9.4
 gymnasium==1.0.0
 jinja2==3.1.6
 prometheus-client==0.21.1
-psutil==6.1.1
+psutil==7.2.2
 nest-asyncio==1.6.0
 types-redis==4.6.0.20241004
 types-requests==2.32.0.20241016
