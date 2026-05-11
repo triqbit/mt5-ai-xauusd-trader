@@ -58,6 +58,9 @@ print(f"Current Regime: {regime_info.label}")
 print(f"Confidence: {regime_info.confidence}")
 print(f"Transition Score: {regime_info.transition_score}")
 
+# Granular transition distribution
+print(f"Probabilities: {regime_info.transition_probabilities}")
+
 # Raw features for explainability
 print(f"Efficiency Ratio: {regime_info.raw_features['efficiency_ratio']}")
 ```
@@ -67,6 +70,18 @@ print(f"Efficiency Ratio: {regime_info.raw_features['efficiency_ratio']}")
 ```python
 # Highly optimized vectorized labeling
 df_with_regimes = detector.label_history(historical_df, use_vectorized=True)
+```
+
+### Institutional Research Reporting
+
+Generate comprehensive regime analysis reports directly from historical data:
+
+```python
+# Run historical analysis
+analysis_report = detector.run_analysis(historical_df)
+
+# Convert to reporting section for ResearchReporter
+report_section = analysis_report.to_report_section()
 ```
 
 ## Implementation Details
