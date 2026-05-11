@@ -192,3 +192,49 @@ def test_trading_env_column_mapping():
     # index 2 of Close is 1.2
     obs, reward, terminated, truncated, info = env.step(1)
     assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage
+
+
+def test_trading_env_transaction_penalty():
+    """Test that taking an action incurs a small reward penalty."""
+    import pandas as pd
+
+    df = pd.DataFrame(np.zeros((100, 5)), columns=["open", "high", "low", "close", "volume"])
+    env = TradingEnv(df=df, window_size=10, spread=0.20, slippage=0.05)
+    env.reset()
+
+    # Step with action 1 (BUY)
+    _, reward, _, _, _ = env.step(1)
+
+    # Penalty is (spread + slippage) * 0.0001 = 0.25 * 0.0001 = 0.000025
+    # Since prices are 0, log return is 0 (or undefined/0 in implementation)
+    # The penalty should make the reward negative.
+    assert reward < 0
+
+
+def test_ppo_agent_reshaping():
+    """Test PPOAgent robust observation reshaping."""
+    agent = PPOAgent()
+    # Mock model and observation space
+    from unittest.mock import MagicMock
+
+    agent.model = MagicMock()
+    agent.model.observation_space.shape = (20, 140)
+    agent.model.predict.return_value = (np.array([0]), None)
+
+    # 1. Test 1D input (features only)
+    features_1d = np.zeros(140)
+    agent.predict(features_1d)
+    # Should be reshaped to (1, 20, 140) if it guesses correctly or (1, 1, 140)
+    # Based on implementation: if obs.shape[0] == expected_shape[1] (140 == 140) -> (1, 1, 140)
+    # Wait, the implementation says:
+    # if obs.shape[0] == expected_shape[1]: obs = obs.reshape(1, 1, -1)
+    # else: obs = obs.reshape(1, *expected_shape)
+    # So for features_1d (140), it becomes (1, 1, 140).
+    called_obs = agent.model.predict.call_args[0][0]
+    assert called_obs.shape == (1, 1, 140)
+
+    # 2. Test 2D input (window, features)
+    features_2d = np.zeros((20, 140))
+    agent.predict(features_2d)
+    called_obs = agent.model.predict.call_args[0][0]
+    assert called_obs.shape == (1, 20, 140)

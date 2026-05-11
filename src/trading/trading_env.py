@@ -44,6 +44,8 @@ class TradingEnv(gym.Env):
         window_size: int = 20,
         initial_balance: float = 10000.0,
         column_mapping: dict[str, int] | None = None,
+        spread: float = 0.20,
+        slippage: float = 0.05,
     ) -> None:
         """
         Initializes the trading environment.
@@ -54,12 +56,16 @@ class TradingEnv(gym.Env):
             window_size: Number of past time steps to include in the observation.
             initial_balance: Starting account balance.
             column_mapping: Optional mapping of column names to indices.
+            spread: Trading spread for XAUUSD (default: 0.20 USD).
+            slippage: Expected slippage per trade (default: 0.05 USD).
         """
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.df = df
         self.window_size = window_size
         self.initial_balance = initial_balance
+        self.spread = spread
+        self.slippage = slippage
 
         # Default column mapping if none provided
         self.column_mapping = column_mapping or {
@@ -134,12 +140,6 @@ class TradingEnv(gym.Env):
         """
         self.current_step += 1
 
-        # XAUUSD specific parameters (configurable in production)
-        # For Gold (XAUUSD), 1 point is typically 0.01 USD.
-        # institutional spread is often 15-30 points (0.15 - 0.30 USD).
-        spread = 0.20  # 20 points spread for Gold
-        slippage = 0.05
-
         reward = 0.0
         if self._data is not None and self.current_step < len(self._data):
             close_idx = self.column_mapping.get("close", 3)
@@ -160,35 +160,48 @@ class TradingEnv(gym.Env):
             # Handle actions (0=HOLD, 1=BUY, 2=SELL)
             if action == 1:  # LONG
                 if self.position == -1:  # Close short
-                    realized_pnl = self.entry_price - current_price - (spread + slippage)
+                    realized_pnl = (
+                        self.entry_price - current_price - (self.spread + self.slippage)
+                    )
                     self.balance += realized_pnl
                     self.position = 0
 
                 if self.position == 0:  # Open long
                     self.position = 1
-                    self.entry_price = current_price + (spread + slippage)
-                    self.equity -= spread + slippage  # Immediate cost
+                    self.entry_price = current_price + (self.spread + self.slippage)
+                    self.equity -= self.spread + self.slippage  # Immediate cost
 
             elif action == 2:  # SHORT
                 if self.position == 1:  # Close long
-                    realized_pnl = current_price - self.entry_price - (spread + slippage)
+                    realized_pnl = (
+                        current_price - self.entry_price - (self.spread + self.slippage)
+                    )
                     self.balance += realized_pnl
                     self.position = 0
 
                 if self.position == 0:  # Open short
                     self.position = -1
-                    self.entry_price = current_price - (spread + slippage)
-                    self.equity -= spread + slippage  # Immediate cost
+                    self.entry_price = current_price - (self.spread + self.slippage)
+                    self.equity -= self.spread + self.slippage  # Immediate cost
 
             elif action == 0:  # HOLD / CLOSE
                 # Implementation choice: 0 closes all positions
                 if self.position != 0:
                     if self.position == 1:
-                        realized_pnl = current_price - self.entry_price - (spread + slippage)
+                        realized_pnl = (
+                            current_price - self.entry_price - (self.spread + self.slippage)
+                        )
                     else:
-                        realized_pnl = self.entry_price - current_price - (spread + slippage)
+                        realized_pnl = (
+                            self.entry_price - current_price - (self.spread + self.slippage)
+                        )
                     self.balance += realized_pnl
                     self.position = 0
+
+            # Apply transaction cost penalty to reward if an action was taken
+            # to prevent excessive switching/churn.
+            if action != 0:
+                reward -= (self.spread + self.slippage) * 0.0001  # Scaled penalty
 
         terminated = False
         if self._data is not None and self.current_step >= len(self._data) - 1:
@@ -235,6 +248,12 @@ class TradingEnv(gym.Env):
             f"Step: {self.current_step} | Balance: {self.balance:.2f} | "
             f"Equity: {self.equity:.2f} | Position: {self.position}"
         )
+
+    def close(self) -> None:
+        """
+        Performs any necessary cleanup when the environment is closed.
+        """
+        self.logger.debug("Closing TradingEnv.")
 
 
 __all__ = ["TradingEnv"]
