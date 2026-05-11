@@ -9,7 +9,7 @@ torch==2.5.1
 torchvision==0.20.1
 stable-baselines3==2.8.0
 gymnasium==1.0.0
-numpy==2.2.6
+numpy==1.26.4
 scipy==1.15.2
 scikit-learn==1.6.1
 pandas==2.2.3
@@ -21,7 +21,6 @@ einops==0.8.0
 
 # ── Technical Analysis ──────────────────────────────────────
 TA-Lib==0.6.4
-pandas-ta==0.4.71b0
 mplfinance==0.12.10b0
 
 # ── Data Acquisition ────────────────────────────────────────
@@ -37,14 +36,14 @@ alembic==1.14.1
 redis==5.2.1
 
 # ── Monitoring & Logging ────────────────────────────────────
-starlette==0.47.2
+starlette==1.0.0
 prometheus-client==0.21.1
 structlog==25.1.0
 rich==13.9.4
 tqdm==4.67.1
 
 # ── Dashboard / API ─────────────────────────────────────────
-fastapi==0.115.8
+fastapi==0.136.1
 uvicorn[standard]==0.34.0
 dash==2.18.2
 plotly==6.0.0
