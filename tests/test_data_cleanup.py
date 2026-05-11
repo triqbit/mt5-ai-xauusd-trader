@@ -9,7 +9,12 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from scripts.data_cleanup import cleanup_backtests, cleanup_database, cleanup_logs
+from scripts.data_cleanup import (
+    cleanup_archives,
+    cleanup_backtests,
+    cleanup_database,
+    cleanup_logs,
+)
 from src.core.audit_log import AuditEntry, Base as AuditBase
 from src.core.trade_logger import (
     Base,
@@ -49,6 +54,9 @@ class TestDataCleanup(unittest.TestCase):
         backtest_dir = Path(self.test_dir) / "backtests"
         backtest_dir.mkdir()
 
+        archive_dir = Path(self.test_dir) / "archives"
+        archive_dir.mkdir()
+
         old_subdir = backtest_dir / "old_run"
         old_subdir.mkdir()
 
@@ -64,12 +72,14 @@ class TestDataCleanup(unittest.TestCase):
         os.utime(old_subdir, (old_time, old_time))
 
         # Run cleanup
-        count = cleanup_backtests(backtest_dir, dry_run=False)
+        count = cleanup_backtests(backtest_dir, dry_run=False, archive_dir=archive_dir)
 
         self.assertEqual(count, 1)
         self.assertFalse(old_file.exists())
-        self.assertFalse(old_subdir.exists()) # Should be removed as empty
+        self.assertFalse(old_subdir.exists())  # Should be removed as empty
         self.assertTrue(new_file.exists())
+        # Verify research archive exists
+        self.assertTrue((archive_dir / "research").exists())
 
     def test_log_cleanup(self):
         # Create some log files
@@ -89,6 +99,26 @@ class TestDataCleanup(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertFalse(old_log.exists())
         self.assertTrue(new_log.exists())
+
+    def test_archive_cleanup(self):
+        archive_dir = Path(self.test_dir) / "archives"
+        research_dir = archive_dir / "research"
+        research_dir.mkdir(parents=True)
+
+        old_archive = research_dir / "old_archive.tar.gz"
+        old_archive.touch()
+
+        new_archive = research_dir / "new_archive.tar.gz"
+        new_archive.touch()
+
+        # Set old time (RETENTION_ARCHIVE_RESEARCH is 365 days)
+        old_time = (datetime.now() - timedelta(days=400)).timestamp()
+        os.utime(old_archive, (old_time, old_time))
+
+        count = cleanup_archives(archive_dir, dry_run=False)
+        self.assertEqual(count, 1)
+        self.assertFalse(old_archive.exists())
+        self.assertTrue(new_archive.exists())
 
     def test_database_cleanup(self):
         now = datetime.now(timezone.utc)
@@ -188,11 +218,14 @@ class TestDataCleanup(unittest.TestCase):
         # Run cleanup on the in-memory DB
         # We need to monkeypatch create_engine or pass the engine
         import scripts.data_cleanup
+
         original_create_engine = scripts.data_cleanup.create_engine
         scripts.data_cleanup.create_engine = lambda url: self.engine
 
+        archive_dir = Path(self.test_dir) / "archives"
+
         try:
-            results = cleanup_database("dummy_url", dry_run=False)
+            results = cleanup_database("dummy_url", dry_run=False, archive_dir=archive_dir)
         finally:
             scripts.data_cleanup.create_engine = original_create_engine
 
