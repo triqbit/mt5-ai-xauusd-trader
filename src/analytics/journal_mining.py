@@ -77,6 +77,28 @@ class BlockReasonSummary(BaseModel):
     count: int
     impacted_algorithms: list[str]
     weak_state_correlation: float = 0.0
+    correct_rejection_rate: float = 0.0
+    profit_opportunity_cost: float = 0.0
+
+
+class RejectionQuality(BaseModel):
+    """Effectiveness of signal rejections."""
+
+    reason: str
+    total_blocked: int
+    correct_blocks: int  # avoided losses (would_have_won=False)
+    incorrect_blocks: int  # missed profits (would_have_won=True)
+    accuracy: float
+    profit_opportunity_cost: float
+
+
+class OverconfidenceEvent(BaseModel):
+    """Details of potential overconfidence (aggressive sizing after wins)."""
+
+    trade_id: int
+    consecutive_wins: int
+    lot_increase_pct: float
+    pnl: float
 
 
 class SignalMotif(BaseModel):
@@ -111,6 +133,8 @@ class JournalReport(BaseModel):
     drawdown_clusters: list[DrawdownCluster]
     profitable_concentrations: list[PatternConcentration]
     risk_block_summary: list[BlockReasonSummary]
+    rejection_quality: list[RejectionQuality] = Field(default_factory=list)
+    overconfidence_events: list[OverconfidenceEvent] = Field(default_factory=list)
     recurring_motifs: list[SignalMotif] = Field(default_factory=list)
     pre_drawdown_motifs: list[SignalMotif] = Field(default_factory=list)
     combination_motifs: list[CombinationMotif] = Field(default_factory=list)
@@ -211,6 +235,26 @@ class JournalReport(BaseModel):
                 BehavioralRisk(
                     type="Revenge Trading",
                     description=description,
+                )
+            )
+
+        # Overconfidence Risks
+        if self.overconfidence_events:
+            risks.append(
+                BehavioralRisk(
+                    type="Overconfidence",
+                    description=f"Detected {len(self.overconfidence_events)} instances of aggressive sizing after wins (GREED).",
+                )
+            )
+
+        # Rejection Quality Risks
+        poor_rejections = [r for r in self.rejection_quality if r.accuracy < 0.4 and r.total_blocked >= 3]
+        if poor_rejections:
+            r = poor_rejections[0]
+            risks.append(
+                BehavioralRisk(
+                    type="Poor Rejection Quality",
+                    description=f"Risk block '{r.reason}' has low accuracy ({r.accuracy:.1%}) and missed {r.profit_opportunity_cost:.2f} in profit.",
                 )
             )
 
@@ -324,7 +368,7 @@ class JournalMiner:
         if signals_df.empty or "volatility" not in signals_df.columns:
             return []
 
-        df = signals_df.dropna(subset=["volatility"])
+        df = signals_df.dropna(subset=["volatility"]).copy()
         if df.empty:
             return []
 
@@ -366,6 +410,54 @@ class JournalMiner:
             )
 
         return results
+
+    def detect_overconfidence(
+        self, trades_df: pd.DataFrame, consecutive_wins_threshold: int = 3
+    ) -> list[OverconfidenceEvent]:
+        """
+        Detect potential 'overconfidence' or greed.
+        Defined as lot size increases following a sequence of consecutive wins.
+
+        Args:
+            trades_df: DataFrame of executed trades.
+            consecutive_wins_threshold: Number of wins before checking for lot increase.
+
+        Returns:
+            List of OverconfidenceEvent objects.
+        """
+        if trades_df.empty or len(trades_df) < consecutive_wins_threshold + 1:
+            return []
+
+        df = trades_df.sort_values("created_at").copy()
+        events = []
+        consecutive_wins = 0
+
+        for i in range(len(df)):
+            trade = df.iloc[i]
+
+            if i > 0 and consecutive_wins >= consecutive_wins_threshold:
+                prev_trade = df.iloc[i - 1]
+                if (
+                    "lot_size" in trade
+                    and "lot_size" in prev_trade
+                    and trade["lot_size"] > prev_trade["lot_size"]
+                ):
+                    lot_inc = (trade["lot_size"] - prev_trade["lot_size"]) / prev_trade["lot_size"]
+                    events.append(
+                        OverconfidenceEvent(
+                            trade_id=int(trade["id"]),
+                            consecutive_wins=consecutive_wins,
+                            lot_increase_pct=float(lot_inc),
+                            pnl=float(trade["pnl"]),
+                        )
+                    )
+
+            if trade["pnl"] > 0:
+                consecutive_wins += 1
+            else:
+                consecutive_wins = 0
+
+        return events
 
     def detect_revenge_trading(
         self, trades_df: pd.DataFrame, window_minutes: int = 30
@@ -675,13 +767,44 @@ class JournalMiner:
 
         return sorted(results, key=lambda x: x.profit_factor, reverse=True)
 
+    def analyze_rejection_quality(self, blocked_df: pd.DataFrame) -> list[RejectionQuality]:
+        """Analyze the effectiveness of signal rejections based on opportunity cost."""
+        if blocked_df.empty:
+            return []
+
+        results = []
+        for reason in blocked_df["rejection_reason"].unique():
+            if pd.isna(reason):
+                continue
+            group = blocked_df[blocked_df["rejection_reason"] == reason]
+            total = len(group)
+            # Correct block: signal would have lost (would_have_won=False)
+            correct = len(group[group["would_have_won"] == False])
+            # Incorrect block: signal would have won (would_have_won=True)
+            incorrect = len(group[group["would_have_won"] == True])
+            accuracy = correct / total if total > 0 else 0.0
+            opp_cost = group[group["would_have_won"] == True]["opportunity_cost_pnl"].sum()
+
+            results.append(
+                RejectionQuality(
+                    reason=str(reason),
+                    total_blocked=total,
+                    correct_blocks=correct,
+                    incorrect_blocks=incorrect,
+                    accuracy=accuracy,
+                    profit_opportunity_cost=float(opp_cost),
+                )
+            )
+        return results
+
     def analyze_risk_blocks(
         self,
         risk_events_df: pd.DataFrame,
         signals_df: pd.DataFrame,
         trades_df: pd.DataFrame = None,
+        blocked_df: pd.DataFrame = None,
     ) -> list[BlockReasonSummary]:
-        """Summarize recurring risk block reasons with weak state correlation."""
+        """Summarize recurring risk block reasons with weak state correlation and efficiency."""
         if risk_events_df.empty:
             return []
 
@@ -692,6 +815,13 @@ class JournalMiner:
         correlations = {}
         if trades_df is not None and not trades_df.empty:
             correlations = self.analyze_strategy_state_correlation(risk_events_df, trades_df)
+
+        # Rejection quality metrics
+        rejection_metrics = {}
+        if blocked_df is not None and not blocked_df.empty:
+            qualities = self.analyze_rejection_quality(blocked_df)
+            for q in qualities:
+                rejection_metrics[q.reason] = (q.accuracy, q.profit_opportunity_cost)
 
         for reason, count in counts.items():
             # Find algorithms impacted by this reason if signal_id is present
@@ -705,12 +835,15 @@ class JournalMiner:
                 relevant_signals = signals_df[signals_df["id"].isin(event_signals)]
                 impacted_algos = list(relevant_signals["algorithm"].unique())
 
+            metrics = rejection_metrics.get(reason, (0.0, 0.0))
             results.append(
                 BlockReasonSummary(
                     reason=str(reason),
                     count=int(count),
                     impacted_algorithms=impacted_algos,
                     weak_state_correlation=correlations.get(reason, 0.0),
+                    correct_rejection_rate=metrics[0],
+                    profit_opportunity_cost=metrics[1],
                 )
             )
 
@@ -1056,11 +1189,18 @@ class JournalMiner:
 
     def run_mining(self) -> JournalReport:
         """Execute full mining suite and return typed report."""
+        from src.core.trade_logger import BlockedSignalAnalysis
+
         with self.Session() as session:
             # Fetch data
             trades_raw = session.query(Trade).filter(Trade.is_deleted.is_(False)).all()
             signals_raw = session.query(ModelSignal).filter(ModelSignal.is_deleted.is_(False)).all()
             risk_raw = session.query(RiskEvent).filter(RiskEvent.is_deleted.is_(False)).all()
+            blocked_raw = (
+                session.query(BlockedSignalAnalysis)
+                .filter(BlockedSignalAnalysis.is_deleted.is_(False))
+                .all()
+            )
 
             # Analyze durations
             durations = self.analyze_trade_durations(trades_raw)
@@ -1109,6 +1249,17 @@ class JournalMiner:
                 ]
             )
 
+            blocked_df = pd.DataFrame(
+                [
+                    {
+                        "rejection_reason": b.rejection_reason,
+                        "would_have_won": b.would_have_won,
+                        "opportunity_cost_pnl": b.opportunity_cost_pnl,
+                    }
+                    for b in blocked_raw
+                ]
+            )
+
             # Ensure sessions are available for pattern concentration
             if not trades_df.empty:
                 trades_df["sessions"] = trades_df["created_at"].apply(self._get_session)
@@ -1118,7 +1269,11 @@ class JournalMiner:
                 volatility_patterns=self.analyze_volatility_patterns(signals_df),
                 drawdown_clusters=self.detect_drawdown_clusters(trades_df),
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
-                risk_block_summary=self.analyze_risk_blocks(risk_df, signals_df, trades_df),
+                risk_block_summary=self.analyze_risk_blocks(
+                    risk_df, signals_df, trades_df, blocked_df
+                ),
+                rejection_quality=self.analyze_rejection_quality(blocked_df),
+                overconfidence_events=self.detect_overconfidence(trades_df),
                 recurring_motifs=self.find_frequent_motifs(signals_df, trades_df),
                 pre_drawdown_motifs=self.detect_pre_drawdown_motifs(signals_df, trades_df),
                 combination_motifs=self.find_combination_motifs(signals_df, trades_df),
