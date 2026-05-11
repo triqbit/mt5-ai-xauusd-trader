@@ -168,3 +168,27 @@ def test_trading_env_render(caplog):
         env.render()
         assert "Step:" in caplog.text
         assert "Balance:" in caplog.text
+
+def test_trading_env_column_mapping():
+    """Test TradingEnv with custom column mapping."""
+    # Data with non-standard column order
+    data = {
+        "High": [1.1, 1.2, 1.3],
+        "Low": [0.9, 1.0, 1.1],
+        "Close": [1.0, 1.1, 1.2],
+        "Open": [1.0, 1.1, 1.2],
+        "Volume": [100, 200, 300]
+    }
+    import pandas as pd
+    df = pd.DataFrame(data)
+
+    # Map Close to index 2
+    mapping = {"open": 3, "high": 0, "low": 1, "close": 2, "volume": 4}
+    env = TradingEnv(df=df, window_size=1, column_mapping=mapping)
+    env.reset()
+
+    # Step should use index 2 for price
+    # current_step starts at 1. step(1) increments to 2.
+    # index 2 of Close is 1.2
+    obs, reward, terminated, truncated, info = env.step(1)
+    assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage

@@ -7,7 +7,6 @@ Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 from __future__ import annotations
 
 import logging
-import contextlib
 from pathlib import Path
 from typing import Any
 

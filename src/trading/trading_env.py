@@ -53,7 +53,7 @@ class TradingEnv(gym.Env):
                 Required columns: 'Open', 'High', 'Low', 'Close', 'Volume' (at minimum).
             window_size: Number of past time steps to include in the observation.
             initial_balance: Starting account balance.
-            column_mapping: Mapping of column names to indices.
+            column_mapping: Optional mapping of column names to indices.
         """
         super().__init__()
         self.logger = logging.getLogger(__name__)
@@ -91,7 +91,6 @@ class TradingEnv(gym.Env):
         self.entry_price = 0.0
         self.current_step = window_size
 
-        # Reset environment during initialization
         self.reset()
 
     def reset(

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- feat: implement production-ready stubs for PPO, LSTM, and Dreamer agents.
+- feat: optimize PPOAgent with module-level imports and robust confidence extraction.
+- feat: enhance LSTMModel with training stubs and detailed architecture documentation.
+- feat: update DreamerAgent with extensible method signatures for ensemble compatibility.
+- feat: implement configurable column mapping in TradingEnv for flexible data handling.
 - feat: ⚙️ Jules02: Performance and runtime analysis — optimize feature engineering and backtest profiling.
 - feat: refine institutional feature engineering and unit tests.
 - feat: implement 6-layer execution filter cascade strictly following README.md.
