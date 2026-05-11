@@ -132,19 +132,26 @@ class EnsembleModel(BaseModel):
             "calibration": total_cal,
         }
 
-    def observe_outcome(self, actual_direction: SignalDirection) -> None:
+    def observe_outcome(
+        self, actual_direction: SignalDirection, regime_info: Optional[RegimeInfo] = None
+    ) -> None:
         """
         Record market outcome and update dynamic weights.
         This enables autonomous drift monitoring and adaptive rebalancing.
+
+        Args:
+            actual_direction: The realized market direction.
+            regime_info: Optional current market regime context.
         """
         for name in self.ALGORITHMS:
             self.dynamic_ensemble.record_outcome(name, actual_direction)
 
-        # Update weights based on the new history
-        self.dynamic_ensemble.update_weights()
+        # Update weights based on the new history and current market context
+        self.dynamic_ensemble.update_weights(regime_info=regime_info)
         logger.info(
-            "Ensemble outcome observed | actual=%s | new_weights=%s",
+            "Ensemble outcome observed | actual=%s | regime=%s | new_weights=%s",
             actual_direction.name,
+            regime_info.label.value if regime_info else "unknown",
             self.weights,
         )
 

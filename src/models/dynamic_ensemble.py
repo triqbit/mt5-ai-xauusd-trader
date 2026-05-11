@@ -150,8 +150,9 @@ class DynamicEnsemble:
             accuracy_gain = 1.0 if is_correct else 0.0
 
         # Calibration: how close was confidence to the binary outcome?
-        # A well-calibrated model has confidence ~ win rate.
-        cal_error = abs(prediction["confidence"] - (1.0 if is_correct else 0.0))
+        # Using Brier Score component (squared error) for institutional rigor.
+        outcome_val = 1.0 if is_correct else 0.0
+        cal_error = float((prediction["confidence"] - outcome_val) ** 2)
 
         self._history[model_name].append(
             {
@@ -183,14 +184,16 @@ class DynamicEnsemble:
         cal = sum(h["calibration_error"] for h in history) / len(history)
 
         # 3. Drift Detection (Recent 20% vs Full Window)
+        # Uses a sensitivity ratio to detect performance degradation early.
         drift = 0.0
         if len(history) >= 10:
             recent_split = max(1, len(history) // 5)
             recent_acc = (
                 sum(h["accuracy_gain"] for h in list(history)[-recent_split:]) / recent_split
             )
-            # Drift is high if recent performance is significantly lower than window average
-            drift = float(np.clip((acc - recent_acc) * 2.0, 0.0, 1.0))
+            # Drift score: high if recent performance is significantly lower than window average.
+            # Sensitivity ratio of 2.0 ensures early detection of degradation.
+            drift = float(np.clip((acc - recent_acc) / (acc + 1e-9) * 2.0, 0.0, 1.0))
 
         return {
             "accuracy": float(acc),
