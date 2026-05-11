@@ -620,39 +620,80 @@ class MT5Connector:
         """Retrieve current account balance."""
         info = self.get_account_info()
         # MT5 standard field is 'balance', MetaAPI is 'balance'
-        return float(info.get("balance", 0.0))
+        # Hardened to use direct key access so exceptions in get_account_info propagate
+        # and we don't accidentally return 0.0 on hidden failure.
+        return float(info["balance"])
 
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account information."""
+        return self.breaker(self._get_account_info_logic)()
+
+    def _get_account_info_logic(self) -> Dict[str, Any]:
+        """Internal account information retrieval logic."""
         if not self._is_initialized:
-            return {}
+            self.initialize()
+
         if not self.use_metaapi:
             acc = mt5.account_info()
-            return acc._asdict() if acc else {}
+            if acc is None:
+                err_code, err_desc = mt5.last_error()
+                if err_code in [-1, 10001, 10002, 10003, 10004]:
+                    self._is_initialized = False
+                raise MT5DataError(f"Failed to get account info: {err_desc} (code: {err_code})")
+            return acc._asdict()
         else:
-            return self._run_async(self.metaapi_connection.get_account_information())
+            try:
+                return self._run_async(self.metaapi_connection.get_account_information())
+            except Exception as e:
+                self._is_initialized = False
+                raise MT5DataError(f"MetaAPI get_account_information failed: {e}") from e
 
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_positions(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve open positions."""
+        return self.breaker(self._get_positions_logic)(symbol)
+
+    def _get_positions_logic(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Internal positions retrieval logic."""
         if not self._is_initialized:
-            return []
+            self.initialize()
+
         if not self.use_metaapi:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
-            return [p._asdict() for p in positions] if positions else []
+            if positions is None:
+                err_code, err_desc = mt5.last_error()
+                if err_code in [-1, 10001, 10002, 10003, 10004]:
+                    self._is_initialized = False
+                raise MT5DataError(f"Failed to get positions: {err_desc} (code: {err_code})")
+            return [p._asdict() for p in positions]
         else:
-            return self._run_async(self.metaapi_connection.get_positions())
+            try:
+                return self._run_async(self.metaapi_connection.get_positions())
+            except Exception as e:
+                self._is_initialized = False
+                raise MT5DataError(f"MetaAPI get_positions failed: {e}") from e
 
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_terminal_status(self) -> Dict[str, Any]:
         """
         Retrieve terminal status (e.g., algo trading enabled).
         Ensures a consistent 'algo_trading' key is present.
         """
+        return self.breaker(self._get_terminal_status_logic)()
+
+    def _get_terminal_status_logic(self) -> Dict[str, Any]:
+        """Internal terminal status retrieval logic."""
         if not self._is_initialized:
-            return {"algo_trading": False}
+            self.initialize()
+
         if not self.use_metaapi:
             info = mt5.terminal_info()
             if not info:
-                return {"algo_trading": False}
+                err_code, err_desc = mt5.last_error()
+                if err_code in [-1, 10001, 10002, 10003, 10004]:
+                    self._is_initialized = False
+                raise MT5DataError(f"Failed to get terminal status: {err_desc} (code: {err_code})")
             data = info._asdict()
             # Map 'trade_allowed' (terminal-wide algo trading button) to 'algo_trading' for clarity
             if "trade_allowed" in data:
@@ -663,14 +704,23 @@ class MT5Connector:
             # but we assume it's true if we can connect and synchronize.
             return {"algo_trading": True}
 
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_symbol_properties(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Retrieve symbol properties."""
+        return self.breaker(self._get_symbol_properties_logic)(symbol)
+
+    def _get_symbol_properties_logic(self, symbol: str) -> Dict[str, Any]:
+        """Internal symbol properties retrieval logic."""
         if not self._is_initialized:
-            return None
+            self.initialize()
+
         if not self.use_metaapi:
             info = mt5.symbol_info(symbol)
             if not info:
-                return None
+                err_code, err_desc = mt5.last_error()
+                if err_code in [-1, 10001, 10002, 10003, 10004]:
+                    self._is_initialized = False
+                raise MT5DataError(f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})")
             return {
                 "name": info.name,
                 "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
@@ -684,23 +734,35 @@ class MT5Connector:
                 spec = self._run_async(self.metaapi_connection.get_symbol_specification(symbol))
                 return {
                     "name": spec["symbol"],
-                    "tradable": True,  # MetaAPI symbols are usually tradable if found
-                    "spread": 0,  # Not directly in spec
+                    "tradable": True,
+                    "spread": 0,
                     "digits": spec["digits"],
                     "point": spec.get("point"),
                     "pip_size": spec.get("pipSize"),
                     "trade_contract_size": spec.get("contractSize"),
                 }
-            except Exception:
-                return None
+            except Exception as e:
+                self._is_initialized = False
+                raise MT5DataError(f"MetaAPI get_symbol_specification failed for {symbol}: {e}") from e
 
+    @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def find_symbols(self, pattern: str) -> List[str]:
         """Find symbols matching a pattern."""
+        return self.breaker(self._find_symbols_logic)(pattern)
+
+    def _find_symbols_logic(self, pattern: str) -> List[str]:
+        """Internal symbols discovery logic."""
         if not self._is_initialized:
-            return []
+            self.initialize()
+
         if not self.use_metaapi:
             symbols = mt5.symbols_get(pattern)
-            return [s.name for s in symbols] if symbols else []
+            if symbols is None:
+                err_code, err_desc = mt5.last_error()
+                if err_code in [-1, 10001, 10002, 10003, 10004]:
+                    self._is_initialized = False
+                raise MT5DataError(f"Failed to find symbols with pattern {pattern}: {err_desc} (code: {err_code})")
+            return [s.name for s in symbols]
         else:
             # For MetaAPI, we'd need to fetch all and filter, which is slow.
             # Return empty or a simple guess.
