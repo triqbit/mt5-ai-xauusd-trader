@@ -65,6 +65,55 @@ class MarketRegime(str, Enum):
     """Insufficient data or indeterminate market state."""
 
 
+class RegimeAnalysisReport(BaseModel):
+    """
+    Comprehensive historical market regime analysis report.
+    """
+
+    timestamp: str = Field(..., description="Time of report generation")
+    counts_pct: dict[str, float] = Field(..., description="Percentage frequency of each regime")
+    avg_durations: dict[str, float] = Field(..., description="Average duration of each regime in bars")
+    transitions: pd.DataFrame = Field(..., description="Regime transition matrix")
+    summary_text: str = Field(..., description="Narrative summary of the analysis")
+    regime_list: list[Any] = Field(default_factory=list, description="Detailed list of regime metrics")
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def to_report_section(self) -> Any:
+        """
+        Convert report to RegimeSection for ResearchReporter.
+        """
+        from src.research.reporting import RegimeSection
+
+        # Stability is the mean of all average durations
+        stability = sum(self.avg_durations.values()) / len(self.avg_durations) if self.avg_durations else 0.0
+
+        # Transition insights
+        top_transitions = []
+        for reg in self.transitions.index:
+            if reg == MarketRegime.UNKNOWN.value:
+                continue
+            # Get most likely transition that is NOT to itself
+            other_regs = self.transitions.columns[self.transitions.columns != reg]
+            if not other_regs.empty:
+                valid_targets = [t for t in other_regs if t != MarketRegime.UNKNOWN.value]
+                if valid_targets:
+                    target = self.transitions.loc[reg, valid_targets].idxmax()
+                    prob = self.transitions.loc[reg, target]
+                    if prob > 0.05:
+                        top_transitions.append(f"{reg} -> {target} ({prob:.1%})")
+
+        transition_txt = " | ".join(top_transitions[:3])
+        if not transition_txt:
+            transition_txt = "No significant transitions detected."
+
+        return RegimeSection(
+            summary=self.summary_text,
+            regimes=self.regime_list,
+            transition_insights=f"Stability: {stability:.1f} bars. Common paths: {transition_txt}",
+        )
+
+
 class RegimeInfo(BaseModel):
     """
     Structured regime detection output with transparency for signal attribution.
@@ -81,6 +130,9 @@ class RegimeInfo(BaseModel):
         ..., ge=0.0, le=1.0, description="Likelihood of a regime transition"
     )
     volatility_index: float = Field(..., description="Normalized volatility metric")
+    transition_probabilities: dict[str, float] = Field(
+        default_factory=dict, description="Full distribution of probabilities for potential next regimes"
+    )
     raw_features: dict[str, float] = Field(
         default_factory=dict, description="Underlying statistical features used for detection"
     )
@@ -256,6 +308,7 @@ class RegimeDetector:
             "angle": angle,
         }
 
+        transition_probabilities = {}
         if self._gmm is not None:
             # Clustering-based detection
             X = np.array([[atr_ratio, er, slope, z_score, kurt, skew, vov, vc]])
@@ -266,6 +319,11 @@ class RegimeDetector:
             cluster_idx = int(np.argmax(probs))
             label = self._cluster_to_regime.get(cluster_idx, MarketRegime.RANGING)
             confidence = float(probs[cluster_idx])
+
+            # Map all cluster probabilities to regime labels
+            for idx, prob in enumerate(probs):
+                regime_label = self._cluster_to_regime.get(idx, MarketRegime.RANGING).value
+                transition_probabilities[regime_label] = transition_probabilities.get(regime_label, 0.0) + float(prob)
 
             # Transition score based on entropy of cluster probabilities
             # Max entropy for 6 clusters is ln(6) approx 1.79
@@ -284,12 +342,14 @@ class RegimeDetector:
             label, confidence, transition_score = self._apply_regime_logic(
                 atr_ratio, er, slope, z_score, vc, angle, vov
             )
+            transition_probabilities = {label.value: confidence, MarketRegime.UNKNOWN.value: 1.0 - confidence}
 
         regime_info = RegimeInfo(
             label=label,
             confidence=float(np.clip(confidence, 0.0, 1.0)),
             transition_score=float(np.clip(transition_score, 0.0, 1.0)),
             volatility_index=float(atr_ratio),
+            transition_probabilities=transition_probabilities,
             raw_features=raw_features,
         )
 
@@ -353,11 +413,13 @@ class RegimeDetector:
         )
         return label, confidence, transition_score
 
-    def generate_summary(self, df: pd.DataFrame) -> Any:
+    def run_analysis(self, df: pd.DataFrame) -> RegimeAnalysisReport:
         """
-        Analyze a historical DataFrame and generate a RegimeSection for ResearchReporter.
+        Analyze a historical DataFrame and generate a RegimeAnalysisReport.
         """
-        from src.research.reporting import RegimeSection, RegimeSummary
+        from datetime import UTC, datetime
+
+        from src.research.reporting import RegimeSummary
 
         if "regime" not in df.columns:
             df = self.label_history(df)
@@ -398,30 +460,20 @@ class RegimeDetector:
                 )
             )
 
-        # Transition insights
-        top_transitions = []
-        for reg in transitions.index:
-            if reg == MarketRegime.UNKNOWN.value:
-                continue
-            # Get most likely transition that is NOT to itself
-            other_regs = transitions.columns[transitions.columns != reg]
-            if not other_regs.empty:
-                valid_targets = [t for t in other_regs if t != MarketRegime.UNKNOWN.value]
-                if valid_targets:
-                    target = transitions.loc[reg, valid_targets].idxmax()
-                    prob = transitions.loc[reg, target]
-                    if prob > 0.05:
-                        top_transitions.append(f"{reg} -> {target} ({prob:.1%})")
-
-        transition_txt = " | ".join(top_transitions[:3])
-        if not transition_txt:
-            transition_txt = "No significant transitions detected."
-
-        return RegimeSection(
-            summary=f"Detected {len(counts)} distinct market regimes.",
-            regimes=regime_list,
-            transition_insights=f"Stability: {avg_durations.mean():.1f} bars. Common paths: {transition_txt}",
+        return RegimeAnalysisReport(
+            timestamp=datetime.now(UTC).isoformat(),
+            counts_pct=counts.to_dict(),
+            avg_durations=avg_durations.to_dict(),
+            transitions=transitions,
+            summary_text=f"Detected {len(counts)} distinct market regimes.",
+            regime_list=regime_list,
         )
+
+    def generate_summary(self, df: pd.DataFrame) -> Any:
+        """
+        Legacy method for backward compatibility. Use run_analysis instead.
+        """
+        return self.run_analysis(df).to_report_section()
 
     def label_history(self, data: pd.DataFrame, use_vectorized: bool = True) -> pd.DataFrame:
         """
@@ -556,7 +608,7 @@ class RegimeDetector:
         er = (net_change / (abs_changes + 1e-9)).fillna(0.5)
 
         # 3. Returns and derived stats
-        returns = close.pct_change().fillna(0)
+        returns = close.pct_change(fill_method=None).fillna(0)
         # Fast vectorized higher-order moments
         kurt = returns.rolling(window=self.window).kurt().fillna(0.0)
         skew = returns.rolling(window=self.window).skew().fillna(0.0)
