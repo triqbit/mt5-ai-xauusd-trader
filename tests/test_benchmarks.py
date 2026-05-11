@@ -2,9 +2,8 @@
 Unit tests for the benchmarking framework.
 """
 
-from unittest.mock import MagicMock
-
 import importlib.util
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
@@ -322,7 +321,7 @@ def test_regime_aware_adapter(sample_data):
     adapter.predict(sample_data)
 
     # Verify that the first call to mock_agent.predict received regime_info
-    args, kwargs = mock_agent.predict.call_args_list[0]
+    _args, kwargs = mock_agent.predict.call_args_list[0]
     regime_info = kwargs.get("regime_info")
     assert regime_info is not None
     assert regime_info.label == MarketRegime.TRENDING

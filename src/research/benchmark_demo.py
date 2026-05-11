@@ -15,25 +15,19 @@ from src.research.benchmarks import (
     BenchmarkEvaluator,
     EMACrossoverStrategy,
     MomentumStrategy,
-    VolatilityBreakoutStrategy,
     RiskFilteredBaseline,
-    MACDStrategy,
-    MeanReversionStrategy,
-    RandomStrategy,
-    BuyAndHoldStrategy,
-    NaiveDirectionalStrategy,
-    BenchmarkStrategy
+    VolatilityBreakoutStrategy,
 )
-from src.research.rare_event_simulator import RareEventSimulator, RareEventConfig, RareEventType
-from src.research.reporting import ResearchReporter, ResearchOrchestrator
-from src.models.base_model import Signal
-from src.core.constants import SignalDirection
+from src.research.rare_event_simulator import RareEventConfig, RareEventSimulator, RareEventType
+from src.research.reporting import ResearchOrchestrator, ResearchReporter
+
 
 class MockAdvancedStrategy:
     """
     A mock 'sophisticated' strategy that uses a simple regime-aware filter
     to outperform basic baselines on synthetic data.
     """
+
     def __init__(self, name: str = "Advanced_Ensemble_Mock"):
         self._name = name
 
@@ -67,6 +61,7 @@ class MockAdvancedStrategy:
         rs = gain / (loss + 1e-9)
         return 100 - (100 / (1 + rs))
 
+
 def main():
     console = Console()
     console.print(Panel("[bold green]XAUUSD Strategy Benchmarking Demonstration[/]"))
@@ -79,7 +74,7 @@ def main():
         n_steps=1000,
         start_price=2000.0,
         base_volatility=0.001,
-        event_magnitude=1.2
+        event_magnitude=1.2,
     )
     df, _ = simulator.generate_scenario(config)
 
@@ -92,19 +87,19 @@ def main():
         MomentumStrategy(14, 0.001),
         VolatilityBreakoutStrategy(20, 2.0),
         RiskFilteredBaseline(9, 21, 0.01),
-        MockAdvancedStrategy()
+        MockAdvancedStrategy(),
     ]
 
     # 4. Run Evaluation
     console.print(f"[yellow]Evaluating {len(strategies)} strategies over {len(df)} bars...[/]")
-    summary = evaluator.evaluate_all(strategies)
+    evaluator.evaluate_all(strategies)
 
     # 5. Generate Report using ResearchReporter
     orchestrator = ResearchOrchestrator(
         title="Strategy Benchmark Report",
         executive_summary="Comparative analysis of baseline strategies against a mock advanced strategy on synthetic XAUUSD data.",
         conclusion="The mock advanced strategy demonstrates superior risk-adjusted returns compared to simple trend-following baselines.",
-        overall_status="VERIFIED"
+        overall_status="VERIFIED",
     )
 
     # Use the first baseline (EMA) for comparison
@@ -126,6 +121,7 @@ def main():
             console.print(f"  {key}: {val:.6f}")
         else:
             console.print(f"  {key}: {val}")
+
 
 if __name__ == "__main__":
     main()
