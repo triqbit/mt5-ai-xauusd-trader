@@ -75,10 +75,9 @@ class AuditedRiskManager(RiskManager):
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 
-        if not decision.is_approved:
-            if self.monitor:
-                rejection_reasons = [k for k, v in decision.trace.items() if not v]
-                for reason in rejection_reasons:
-                    self.monitor.record_internal_rejection("risk_manager", reason.upper())
+        if not decision.is_approved and self.monitor:
+            rejection_reasons = [k for k, v in decision.trace.items() if not v]
+            for reason in rejection_reasons:
+                self.monitor.record_internal_rejection("risk_manager", reason.upper())
 
         return decision
