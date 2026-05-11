@@ -96,6 +96,19 @@ class TradingConfig(BaseSettings):
     margin_liquidation_pct: float = Field(default=0.90, description="Automatic close at 90% margin")
     max_drawdown: float = Field(default=0.30, description="Max Equity Drawdown (30%)")
 
+    # Macro Risk Settings
+    enable_macro_guard: bool = Field(
+        default=True, description="Enable automatic execution blocking during high-impact events"
+    )
+    macro_pre_event_minutes: dict[int, int] = Field(
+        default_factory=lambda: {1: 5, 2: 15, 3: 60, 4: 120},
+        description="Minutes before an event to begin risk reduction/blocking, indexed by Impact Level",
+    )
+    macro_post_event_minutes: dict[int, int] = Field(
+        default_factory=lambda: {1: 5, 2: 30, 3: 120, 4: 240},
+        description="Minutes after an event to maintain risk reduction/blocking, indexed by Impact Level",
+    )
+
     # Daily Limits (Cascading)
     max_daily_loss: float = Field(
         default=0.05, ge=0.01, le=0.06, description="Emergency Stop Level 4: 5% loss"

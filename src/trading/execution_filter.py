@@ -50,6 +50,11 @@ class ExecutionFilter:
         4. Momentum Filter
         5. Session/Time Filter
         6. Drawdown Circuit Breaker
+        7. Model Stability
+        8. Performance Guard
+        9. Confidence Threshold
+        10. Signal Consistency
+        11. Macro Risk Gate
     """
 
     def __init__(
@@ -57,7 +62,9 @@ class ExecutionFilter:
         max_drawdown: float = 0.12,
         rsi_period: int = 14,
         config: TradingConfig | None = None,
+        event_intelligence: Any | None = None,
     ):
+        self.event_intelligence = event_intelligence
         self.cfg = config
         self.max_drawdown = (
             config.max_drawdown if config and hasattr(config, "max_drawdown") else max_drawdown
@@ -184,6 +191,13 @@ class ExecutionFilter:
             **cons_metrics,
         }
 
+        # Layer 11: Macro Risk Gate
+        macro_passed, macro_metrics = self._check_macro_risk_with_metrics(timestamp)
+        trace["macro_event"] = {
+            "passed": bool(macro_passed),
+            **macro_metrics,
+        }
+
         # Determine final approval and blocked_by reason
         blocked_by = None
         failure_order = [
@@ -197,6 +211,7 @@ class ExecutionFilter:
             ("performance_guard", "PERFORMANCE_FLOOR"),
             ("confidence_threshold", "CONFIDENCE_THRESHOLD"),
             ("signal_consistency", "SIGNAL_FLICKER"),
+            ("macro_event", "MACRO_EVENT"),
         ]
         for layer_key, reason in failure_order:
             if layer_key in trace and not trace[layer_key]["passed"]:
@@ -438,4 +453,25 @@ class ExecutionFilter:
             "window": window,
             "max_changes": max_changes,
             "history": h_list,
+        }
+
+    def _check_macro_risk_with_metrics(
+        self, timestamp: datetime | None = None
+    ) -> tuple[bool, dict[str, Any]]:
+        """Blocks if Macro Intelligence indicates an execution block."""
+        if not self.event_intelligence:
+            return True, {"status": "no_intelligence"}
+
+        # Check if guard is enabled in config
+        if self.cfg and not getattr(self.cfg, "enable_macro_guard", True):
+            return True, {"status": "guard_disabled"}
+
+        risk_status = self.event_intelligence.get_risk_status(timestamp)
+        passed = not risk_status.is_blocked
+
+        return bool(passed), {
+            "is_blocked": risk_status.is_blocked,
+            "reason": risk_status.reason,
+            "risk_multiplier": risk_status.risk_multiplier,
+            "active_events": [e.name for e in risk_status.active_events],
         }

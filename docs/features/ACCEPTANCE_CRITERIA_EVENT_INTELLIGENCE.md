@@ -9,7 +9,7 @@
 - **Edge Cases:**
     - Handle provider connectivity failures by falling back to cached event data.
     - Handle long-duration events (multi-hour or multi-day) correctly.
-    - Stricter blocking for major events (FOMC, NFP, Interest Rates) regardless of default impact score.
+    - Stricter blocking for major events (FOMC, NFP, Interest Rates, and **CPI**) regardless of default impact score.
 - **Inputs/Outputs:**
     - **Inputs:** Current timestamp, event window settings (pre/post minutes per impact).
     - **Outputs:** `RiskStatus` object (is_blocked, risk_multiplier, active_events, reason).
