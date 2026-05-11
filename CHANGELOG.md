@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- feat: implement institutional-grade walk-forward backtesting engine.
 - feat: refine institutional feature engineering and unit tests.
 - feat: implement 6-layer execution filter cascade strictly following README.md.
 - fix: resolve starlette and fastapi version conflicts in requirements files.
