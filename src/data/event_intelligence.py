@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import structlog
 
@@ -293,6 +294,8 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "MISSILE",
                 "STRIKE",
                 "SAFE HAVEN",
+                "TERROR",
+                "ATTACK",
             ]
         ):
             return EventCategory.GEOPOLITICAL
@@ -315,6 +318,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "FACTORY ORDERS",
                 "EMPIRE STATE",
                 "PHILLY FED",
+                "OPEC",
             ]
         ):
             return EventCategory.USD_MACRO
@@ -336,26 +340,40 @@ class EventIntelligence:
         post_event_minutes: dict[EventImpact, int] | None = None,
         refresh_interval_minutes: int = 5,
         fail_safe_blocked: bool = False,
+        config: Any | None = None,
     ):
         self.providers = providers
         self._cached_events: list[MacroEvent] = []
         self._last_successful_fetch: datetime | None = None
         self.refresh_interval = timedelta(minutes=refresh_interval_minutes)
         self.fail_safe_blocked = fail_safe_blocked
+        self.config = config
 
         # Default risk windows (minutes)
-        self.pre_event_minutes = pre_event_minutes or {
-            EventImpact.LOW: 5,
-            EventImpact.MEDIUM: 15,
-            EventImpact.HIGH: 60,
-            EventImpact.CRITICAL: 120,
-        }
-        self.post_event_minutes = post_event_minutes or {
-            EventImpact.LOW: 5,
-            EventImpact.MEDIUM: 30,
-            EventImpact.HIGH: 120,
-            EventImpact.CRITICAL: 240,
-        }
+        if config and hasattr(config, "macro_pre_event_minutes"):
+            # Map dict[int, int] to dict[EventImpact, int]
+            self.pre_event_minutes = {
+                EventImpact(k): v for k, v in config.macro_pre_event_minutes.items()
+            }
+        else:
+            self.pre_event_minutes = pre_event_minutes or {
+                EventImpact.LOW: 5,
+                EventImpact.MEDIUM: 15,
+                EventImpact.HIGH: 60,
+                EventImpact.CRITICAL: 120,
+            }
+
+        if config and hasattr(config, "macro_post_event_minutes"):
+            self.post_event_minutes = {
+                EventImpact(k): v for k, v in config.macro_post_event_minutes.items()
+            }
+        else:
+            self.post_event_minutes = post_event_minutes or {
+                EventImpact.LOW: 5,
+                EventImpact.MEDIUM: 30,
+                EventImpact.HIGH: 120,
+                EventImpact.CRITICAL: 240,
+            }
 
     def refresh(self, current_time: datetime | None = None) -> None:
         """
@@ -462,7 +480,12 @@ class EventIntelligence:
             post_window = self.post_event_minutes.get(event.impact, 0)
 
             # Adjust windows based on category
-            if event.category in [EventCategory.FOMC, EventCategory.NFP, EventCategory.RATES]:
+            if event.category in [
+                EventCategory.FOMC,
+                EventCategory.NFP,
+                EventCategory.RATES,
+                EventCategory.CPI,
+            ]:
                 pre_window = max(pre_window, 120)  # At least 2 hours for major events
                 post_window = max(post_window, 180)  # At least 3 hours for major events
 
@@ -488,6 +511,7 @@ class EventIntelligence:
                             EventCategory.FOMC,
                             EventCategory.NFP,
                             EventCategory.RATES,
+                            EventCategory.CPI,
                         ]
                         and (event.timestamp - now) <= timedelta(minutes=60)
                     )
@@ -511,6 +535,7 @@ class EventIntelligence:
                         EventCategory.FOMC,
                         EventCategory.NFP,
                         EventCategory.RATES,
+                        EventCategory.CPI,
                     ]
                     and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
                 ):
@@ -533,7 +558,13 @@ class EventIntelligence:
 
                 # Stricter multiplier for major events
                 if (
-                    event.category in [EventCategory.FOMC, EventCategory.NFP, EventCategory.RATES]
+                    event.category
+                    in [
+                        EventCategory.FOMC,
+                        EventCategory.NFP,
+                        EventCategory.RATES,
+                        EventCategory.CPI,
+                    ]
                     and event.impact >= EventImpact.HIGH
                 ):
                     event_mult = min(
