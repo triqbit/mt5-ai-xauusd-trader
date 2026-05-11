@@ -39,6 +39,7 @@ class DreamerAgent(BaseModel):
         config: dict[str, Any] | None = None,
         model_path: str | Path | None = None,
         device: str = "cpu",
+        **kwargs: Any,
     ) -> None:
         """
         Initializes the DreamerAgent placeholder.
@@ -47,9 +48,10 @@ class DreamerAgent(BaseModel):
             config: Optional configuration dictionary.
             model_path: Optional path to model weights.
             device: Device for inference.
+            **kwargs: Additional parameters for flexible propagation.
         """
         self.logger = logging.getLogger(__name__)
-        self.config = config or {}
+        self.config = {**(config or {}), **kwargs}
         self.state: Any | None = None
         self.logger.info("DreamerAgent initialized in placeholder mode.")
 
