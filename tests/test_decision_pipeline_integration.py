@@ -129,8 +129,8 @@ def test_decision_pipeline_full_confluence(
         confidence=signal_obj.confidence
     )
 
-    risk_approved = risk_manager.approve(signal)
-    assert risk_approved is True
+    risk_approved = risk_manager.approve(signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), [])
+    assert risk_approved.is_approved is True
 
     # 4. Execution Filter
     # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
@@ -208,8 +208,8 @@ def test_decision_pipeline_risk_rejection(
 
     # Force RiskManager to reject by mocking the R:R check
     with patch.object(risk_manager, "_check_risk_reward", return_value=False):
-        risk_approved = risk_manager.approve(signal)
-        assert risk_approved is False
+        risk_approved = risk_manager.approve(signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), [])
+        assert risk_approved.is_approved is False
 
     explanation = explainer.explain(
         symbol=signal.symbol,
