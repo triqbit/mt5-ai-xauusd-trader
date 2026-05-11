@@ -43,7 +43,8 @@ def generate_full_audit():
             "regimes but shows sensitivity to extreme news shocks. Capital allocation is well-diversified, "
             "and execution quality remains within institutional standards."
         ),
-        conclusion="The strategy is suitable for deployment in production with a 'Verified' status, provided macro guardrails are active.",
+        conclusion="The strategy is suitable for deployment in production with a 'Verified' status, "
+        "provided macro guardrails are active.",
         overall_status="VERIFIED",
         recommendations=[
             "Reduce risk multiplier during high-impact news windows.",
@@ -69,7 +70,8 @@ def generate_full_audit():
                 profitability="Low",
             ),
         ],
-        transition_insights="Stability: 28.5 bars. Common paths: trending -> ranging (15.5%) | ranging -> news_shock (8.2%)",
+        transition_insights="Stability: 28.5 bars. Common paths: trending -> ranging (15.5%) | "
+        "ranging -> news_shock (8.2%)",
     )
     orchestrator.add_section(regime_section)
 
@@ -223,7 +225,7 @@ def generate_full_audit():
                 profit_factor="1.25",
             ),
         ],
-        statistical_summary="Compared 2 strategies against Ensemble. 2 strategies showed statistically significant outperformance.",
+        statistical_summary="Compared 2 strategies against Ensemble. 2 showed outperformance.",
     )
     orchestrator.add_section(bench_section)
 

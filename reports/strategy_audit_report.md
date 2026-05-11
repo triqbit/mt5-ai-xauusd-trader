@@ -2,7 +2,7 @@
 
 ---
 **Report Metadata**
-- **Date:** 2026-05-11 15:29:16.993055+00:00
+- **Date:** 2026-05-11 15:59:29.187710+00:00
 - **Author:** Jules Research
 - **Status:** VERIFIED
 - **Scope:** Research and Strategy Audit
@@ -181,7 +181,7 @@ Significant shifts in: atr_ratio (+0.45), z_score (-0.32), vol_of_vol (+0.18)
 
 
 **Statistical Significance:**
-Compared 2 strategies against Ensemble. 2 strategies showed statistically significant outperformance.
+Compared 2 strategies against Ensemble. 2 showed outperformance.
 
 
 
