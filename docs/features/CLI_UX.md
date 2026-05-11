@@ -22,3 +22,8 @@ Upon startup, a structured table is displayed showing the health status of all c
 - [green]HEALTHY[/]: Component is operating normally.
 - [yellow]DEGRADED[/]: Component is operational but has warnings.
 - [red]FAILED[/]: Critical failure that prevents startup.
+
+### 3. Institutional Decision Support Dashboard
+Enhanced terminal output for trade signal evaluation, featuring:
+- **Intuitive Iconography**: At-a-glance scannability using market-standard emojis for regime and performance metrics.
+- **High Conviction Visuals**: Prominent "💎 [HIGH CONVICTION]" badges in the header for signals with a Decision Score ≥ 90.

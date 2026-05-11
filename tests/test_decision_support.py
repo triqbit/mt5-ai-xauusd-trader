@@ -419,3 +419,43 @@ def test_decision_packet_field_completeness(mock_explanation, mock_regime, mock_
     assert isinstance(packet.performance, PerformanceContext)
     assert isinstance(packet.performance.sharpe_ratio, float)
     assert packet.performance.sharpe_ratio == 2.0
+
+
+def test_dashboard_iconography_and_badges(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that icons and high-conviction badges are present in the operator output."""
+    dss = DecisionSupportSystem()
+
+    # Setup for High Conviction
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
+    ]
+    mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+
+    # Use model_copy as these models are frozen
+    mock_regime_high = mock_regime.model_copy(update={"confidence": 1.0})
+    mock_macro_risk_high = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
+
+    packet = dss.assemble_packet(
+        symbol="XAUUSD",
+        explanation=mock_explanation,
+        regime_info=mock_regime_high,
+        macro_risk=mock_macro_risk_high,
+        performance_metrics={"sharpe_ratio": 2.5}
+    )
+
+    assert packet.decision_score >= 90.0
+    assert packet.is_executable is True
+
+    output = dss.format_for_operator(packet)
+
+    # Verify Icons
+    assert "🏷️ Label" in output
+    assert "🎯 Confidence" in output
+    assert "🌪️ Volatility" in output
+    assert "📈 Sharpe Ratio" in output
+    assert "💰 Profit Factor" in output
+    assert "🛡️ Recov. Factor" in output
+
+    # Verify High Conviction Badge in title or metrics
+    assert "[HIGH CONVICTION]" in output
+    assert "💎" in output
