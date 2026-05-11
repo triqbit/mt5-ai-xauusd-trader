@@ -47,6 +47,7 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 - **Startup Configuration Validation:** Mandatory safety gate that blocks execution if production configuration is invalid, incomplete, or contains insecure placeholders.
 - **Dockerized Deployment:** Multi-stage builds for lightweight, cross-platform cloud deployment.
 - **Hybrid Connector:** Native MT5 SDK support with MetaAPI cloud failover.
+- **Enterprise Health Monitoring:** Integrated Liveness and Readiness probes via FastAPI, with automated checks for MT5 connectivity, database health, model integrity, and disk space.
 
 ---
 
