@@ -10,7 +10,7 @@ torchvision==0.20.1
 stable-baselines3==2.8.0
 gymnasium==1.0.0
 numpy==1.26.4
-scipy==1.15.2
+scipy==1.15.3
 scikit-learn==1.6.1
 pandas==2.2.3
 
@@ -74,7 +74,7 @@ mypy==1.15.0
 # ── Utilities ───────────────────────────────────────────────
 python-dateutil==2.9.0.post0
 nest-asyncio==1.6.0
-pytz==2025.1
+pytz==2026.2
 click==8.1.8
 tabulate==0.9.0
 joblib==1.4.2
