@@ -256,19 +256,8 @@ def run_live(
                             continue
 
                         # 1.1 Record market outcome for drift tracking
+                        # Move this AFTER regime detection in step 2 to allow context-aware weighting.
                         current_price = tick["bid"]  # Use bid as reference for mid-market
-                        if last_price is not None and hasattr(model, "observe_outcome"):
-                            # Determine actual direction since last prediction
-                            actual_dir = SignalDirection.HOLD
-                            noise_thresh = getattr(cfg, "outcome_noise_threshold", 0.0001)
-                            if current_price > last_price * (1 + noise_thresh):
-                                actual_dir = SignalDirection.BUY
-                            elif current_price < last_price * (1 - noise_thresh):
-                                actual_dir = SignalDirection.SELL
-
-                            model.observe_outcome(actual_dir)
-
-                        last_price = current_price
 
                         if monitor and not df_raw.empty:
                             # Monitor data freshness using latest bar timestamp
@@ -336,6 +325,21 @@ def run_live(
                     regime_info = regime_detector.detect(df_raw)
 
                     volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
+
+                    # 2.1 Record market outcome for drift tracking (with regime context)
+                    if last_price is not None and hasattr(model, "observe_outcome"):
+                        # Determine actual direction since last prediction
+                        actual_dir = SignalDirection.HOLD
+                        noise_thresh = getattr(cfg, "outcome_noise_threshold", 0.0001)
+                        if current_price > last_price * (1 + noise_thresh):
+                            actual_dir = SignalDirection.BUY
+                        elif current_price < last_price * (1 - noise_thresh):
+                            actual_dir = SignalDirection.SELL
+
+                        # Pass current regime info to allow intelligent weight adaptation
+                        model.observe_outcome(actual_dir, regime_info=regime_info)
+
+                    last_price = current_price
 
                 # 3. Model Signal Generation
                 with profile("inference"):

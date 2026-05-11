@@ -334,7 +334,8 @@ class TestDynamicEnsemble(unittest.TestCase):
         self.assertEqual(len(history), 1)
         self.assertTrue(history[0]["correct"])
         self.assertEqual(history[0]["accuracy_gain"], 1.0)
-        self.assertAlmostEqual(history[0]["calibration_error"], 0.2)  # abs(0.8 - 1.0)
+        # Using Brier component: (0.8 - 1.0)**2 = 0.04
+        self.assertAlmostEqual(history[0]["calibration_error"], 0.04)
 
     def test_calculate_metrics(self):
         """Verify calculate_metrics returns expected values."""
