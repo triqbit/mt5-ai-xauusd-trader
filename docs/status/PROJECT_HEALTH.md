@@ -8,7 +8,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 95% | RC v1.1.0-rc5 verified and stable. |
 | **Lint Debt** | 🟡 342 Issues | Primarily un-sorted imports and unused variables in tests. |
-| **Process Integrity** | 🔴 RED | Persistent history grafting on `main` (9 consecutive days). |
+| **Process Integrity** | 🔴 RED | Persistent history grafting on `main` (12 consecutive days). |
 | **Evidence Maturity** | 🟡 Emerging | 1 verified audit; 5 upcoming enterprise scorecards. |
 
 ---
