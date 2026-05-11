@@ -42,24 +42,22 @@ class SecretMaskingProcessor:
         if not hasattr(config.__class__, "model_fields"):
             return
 
-        for field_name in config.__class__.model_fields:
-            val = getattr(config, field_name, None)
-
-            # Extract the raw value if it's a Pydantic Secret type
-            secret_val = None
-            if hasattr(val, "get_secret_value"):
-                secret_val = val.get_secret_value()
-            elif "Secret" in str(type(val)):
-                # Defensive check for other secret-like types that might not have get_secret_value
-                with contextlib.suppress(AttributeError, TypeError):
+        for field_name, info in config.__class__.model_fields.items():
+            if "Secret" in str(info.annotation):
+                val = getattr(config, field_name, None)
+                secret_val = None
+                if hasattr(val, "get_secret_value"):
                     secret_val = val.get_secret_value()
+                elif "Secret" in str(type(val)):
+                    with contextlib.suppress(AttributeError, TypeError):
+                        secret_val = val.get_secret_value()
 
-            if secret_val is not None:
-                if isinstance(secret_val, bytes):
-                    secret_val = secret_val.decode("utf-8", errors="replace")
+                if secret_val is not None:
+                    if isinstance(secret_val, bytes):
+                        secret_val = secret_val.decode("utf-8", errors="replace")
 
-                if isinstance(secret_val, str) and len(secret_val) > 3:
-                    self.secrets.add(secret_val)
+                    if isinstance(secret_val, str) and len(secret_val) > 3:
+                        self.secrets.add(secret_val)
 
         # Generic URL credential extraction: protocol://user:password@host
         # This protects embedded passwords in DATABASE_URL, REDIS_URL, etc.
