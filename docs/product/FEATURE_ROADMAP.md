@@ -64,5 +64,12 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-perfo
   - *Operational Leverage:* Low (Long-term alpha refinement)
   - *End-user/Operator Value:* Automates the qualitative "Why?" analysis for every trade.
 
+- **Institutional Gold Flow & Physical Demand Proxies** — Score: 7.2/10 | Cost: M | Why: Track physical gold market dynamics (ETF flows, SGE premiums) to detect divergences between paper and physical markets.
+  - *Strategic Importance:* 7/10
+  - *Implementation Cost:* M
+  - *Dependency Readiness:* 🟢 High
+  - *Operational Leverage:* Medium
+  - *End-user/Operator Value:* Provides a "Physical Floor" analysis to filter out speculative traps.
+
 ---
 *Roadmap curated by Jules05 — Autonomous Product Steward.*
