@@ -478,3 +478,129 @@ def test_report_includes_revenge_trading_risk(miner):
     revenge_risk = next((r for r in section.behavioral_risks if r.type == "Revenge Trading"), None)
     assert revenge_risk is not None
     assert "TILT" in revenge_risk.description
+
+
+def test_analyze_rejection_quality(miner):
+    blocked_df = pd.DataFrame(
+        [
+            {"rejection_reason": "SPREAD", "would_have_won": False, "opportunity_cost_pnl": 0.0},
+            {"rejection_reason": "SPREAD", "would_have_won": True, "opportunity_cost_pnl": 50.0},
+            {"rejection_reason": "MAX_DD", "would_have_won": False, "opportunity_cost_pnl": 0.0},
+        ]
+    )
+
+    qualities = miner.analyze_rejection_quality(blocked_df)
+    assert len(qualities) == 2
+
+    spread = next(q for q in qualities if q.reason == "SPREAD")
+    assert spread.total_blocked == 2
+    assert spread.correct_blocks == 1
+    assert spread.incorrect_blocks == 1
+    assert spread.accuracy == 0.5
+    assert spread.profit_opportunity_cost == 50.0
+
+
+def test_detect_overconfidence(miner):
+    now = datetime.now(timezone.utc)
+    # 3 consecutive wins followed by a lot increase
+    trades = pd.DataFrame(
+        [
+            {"id": 1, "pnl": 10.0, "lot_size": 0.1, "created_at": now},
+            {"id": 2, "pnl": 20.0, "lot_size": 0.1, "created_at": now + pd.Timedelta(minutes=5)},
+            {"id": 3, "pnl": 15.0, "lot_size": 0.1, "created_at": now + pd.Timedelta(minutes=10)},
+            {"id": 4, "pnl": -5.0, "lot_size": 0.2, "created_at": now + pd.Timedelta(minutes=15)},
+        ]
+    )
+
+    overconfidence = miner.detect_overconfidence(trades, consecutive_wins_threshold=3)
+    assert len(overconfidence) == 1
+    assert overconfidence[0].trade_id == 4
+    assert overconfidence[0].consecutive_wins == 3
+    assert overconfidence[0].lot_increase_pct == 1.0
+
+
+def test_run_mining_enhanced(miner):
+    from src.core.trade_logger import BlockedSignalAnalysis, ModelSignal, Trade
+
+    with miner.Session() as session:
+        sig = ModelSignal(
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            algorithm="ppo",
+            confidence=0.8,
+            volatility=0.1,
+        )
+        session.add(sig)
+        session.commit()
+
+        # Closed trade for overconfidence detection (need 4 trades)
+        for i in range(4):
+            t = Trade(
+                ticket=1000 + i,
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=2000.0,
+                lot_size=0.1 if i < 3 else 0.2,
+                pnl=10.0 if i < 3 else -5.0,
+                status="CLOSED",
+                signal_id=sig.id,
+            )
+            t.created_at = datetime.now(timezone.utc) + pd.Timedelta(minutes=i)
+            session.add(t)
+
+        # Blocked signal for rejection quality
+        sig2 = ModelSignal(
+            symbol="XAUUSD", direction=-1, entry_price=2000.0, algorithm="ppo", confidence=0.8
+        )
+        session.add(sig2)
+        session.commit()
+
+        blocked = BlockedSignalAnalysis(
+            signal_id=sig2.id,
+            opportunity_cost_pnl=100.0,
+            max_favorable_excursion=110.0,
+            max_adverse_excursion=10.0,
+            would_have_won=True,
+            rejection_reason="RISK_LIMIT",
+        )
+        session.add(blocked)
+        session.commit()
+
+    report = miner.run_mining()
+    assert len(report.rejection_quality) == 1
+    assert report.rejection_quality[0].reason == "RISK_LIMIT"
+    assert report.rejection_quality[0].profit_opportunity_cost == 100.0
+    assert len(report.overconfidence_events) == 1
+    assert report.overconfidence_events[0].consecutive_wins == 3
+
+
+def test_to_report_section_enhanced_risks(miner):
+    from src.analytics.journal_mining import JournalReport, OverconfidenceEvent, RejectionQuality
+
+    report = JournalReport(
+        session_analysis=[],
+        volatility_patterns=[],
+        drawdown_clusters=[],
+        profitable_concentrations=[],
+        risk_block_summary=[],
+        overconfidence_events=[
+            OverconfidenceEvent(trade_id=4, consecutive_wins=3, lot_increase_pct=1.0, pnl=-5.0)
+        ],
+        rejection_quality=[
+            RejectionQuality(
+                reason="DUMMY",
+                total_blocked=5,
+                correct_blocks=1,
+                incorrect_blocks=4,
+                accuracy=0.2,
+                profit_opportunity_cost=500.0,
+            )
+        ],
+    )
+
+    section = report.to_report_section()
+    risk_types = [r.type for r in section.behavioral_risks]
+    assert "Overconfidence" in risk_types
+    assert "Poor Rejection Quality" in risk_types
+    assert "missed 500.00" in section.behavioral_risks[1].description
