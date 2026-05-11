@@ -385,9 +385,13 @@ class DecisionSupportSystem:
                     box=box.HEAVY,
                 )
 
+            title_text = "💠 [bold]Institutional Decision Support[/bold]"
+            if packet.decision_score >= 90.0 and packet.is_executable:
+                title_text += " [bold green]💎 [HIGH CONVICTION][/bold green]"
+
             header = Panel(
                 header_content,
-                title="💠 [bold]Institutional Decision Support[/bold]",
+                title=title_text,
                 subtitle=packet.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 border_style=status_color,
                 box=box.DOUBLE,
@@ -440,10 +444,10 @@ class DecisionSupportSystem:
 
             # Left Column: Regime
             regime_content = (
-                f"Label: [bold cyan]{packet.regime.label.value.upper()}[/bold cyan]\n"
-                f"Confidence: [bold]{packet.regime.confidence:.1%}[/bold]\n"
-                f"Volatility: [bold]{packet.regime.volatility_index:.2f}[/bold]\n"
-                f"Transition: {packet.regime.transition_score:.2f}"
+                f"🏷️ Label: [bold cyan]{packet.regime.label.value.upper()}[/bold cyan]\n"
+                f"🎯 Confidence: [bold]{packet.regime.confidence:.1%}[/bold]\n"
+                f"🌪️ Volatility: [bold]{packet.regime.volatility_index:.2f}[/bold]\n"
+                f"🔄 Transition: {packet.regime.transition_score:.2f}"
             )
             regime_panel = Panel(regime_content, title="🌐 Market Regime", border_style="cyan")
 
@@ -462,12 +466,12 @@ class DecisionSupportSystem:
             wl_color = get_color(packet.performance.win_loss_ratio, 2.0, 1.2)
 
             perf_content = (
-                f"Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
-                f"Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
-                f"Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
-                f"Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]\n"
-                f"W/L Ratio:     [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
-                f"Total Trades:  {packet.performance.total_trades}"
+                f"📈 Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
+                f"💰 Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
+                f"🛡️ Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
+                f"🎯 Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]\n"
+                f"⚖️ W/L Ratio:     [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
+                f"🔢 Total Trades:  {packet.performance.total_trades}"
             )
             perf_panel = Panel(perf_content, title="📊 Recent Performance", border_style="magenta")
 

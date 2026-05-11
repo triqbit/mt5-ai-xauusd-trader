@@ -6,30 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- feat: implement institutional-grade feature engineering pipeline with 140+ features and multi-timeframe analysis.
-- fix: resolve undefined name `batch_idx` in LSTMModel training loop.
-- feat: implement production-ready stubs for PPO, LSTM, and Dreamer agents.
-- feat: optimize PPOAgent with robust observation reshaping and strict Signal return typing.
-- feat: enhance LSTMModel with functional training loop stubs and multi-architecture support.
-- feat: update DreamerAgent with flexible parameter propagation via `**kwargs` for ensemble compatibility.
-- feat: implement configurable transaction cost penalties and cleanup logic in TradingEnv.
-- feat: ⚙️ Jules02: Performance and runtime analysis — optimize feature engineering and backtest profiling.
-- feat: refine institutional feature engineering and unit tests.
-- feat: implement 6-layer execution filter cascade strictly following README.md.
-- fix: resolve starlette and fastapi version conflicts in requirements files.
-- fix: resolve security vulnerabilities in starlette dependency (upgrade to 0.52.1).
-- perf: Optimized `FeatureEngineer` technical analysis pipeline, achieving ~17% reduction in latency.
-- feat: Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
-- fix: Refined validation scripts with explicit remediation messages.
-- docs: Integrated PREPROD_CHECKLIST.md validation into release gates.
+
+## [1.1.0-rc8] - 2026-05-11
+
 ### Added
+- **Decision Support Dashboard Enhancements:** Added institutional-grade iconography, dynamic conviction badges, and high-conviction labeling to the DSS cockpit for improved operator clarity.
+- **Dependency Version Harmonization:** Standardized `FastAPI` and `Starlette` versions across all requirement files to resolve security vulnerabilities and environment-specific conflicts.
 - **Comprehensive Monitoring System:** Implemented full monitoring and alerting system in `src/core/monitor.py` including equity curve tracking, Prometheus metrics, and granular Telegram alerts.
 - **Institutional Feature Engineering:** Implemented a scalable pipeline for 140+ technical indicators with multi-timeframe support (M1-D1) and no look-ahead bias in `src/core/feature_engineering.py`.
 - **Stateful Feature Normalization:** Added production-ready Z-score and Min-Max normalization with persistence support for consistent inference.
 - **6-Layer Execution Filter Cascade:** Implemented a streamlined validation system for trading signals (ATR, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown).
 - **Structured Execution Decisions:** Introduced a typed `ExecutionDecision` dataclass for granular audit tracing and clear rejection reasons.
 - **Enhanced Filter Unit Tests:** Added 27 comprehensive tests covering edge cases for all 6 validation layers.
-- Implement monitoring system and Telegram alerting (#962)
+- **Production-Ready AI Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces and environment validation.
+
+### Changed
+- **PPOAgent Optimization:** Optimized agent with robust observation reshaping and strict Signal return typing.
+- **DreamerAgent Flexibility:** Updated agent with flexible parameter propagation via `**kwargs` for ensemble compatibility.
+- **TradingEnv Refinement:** Implemented configurable transaction cost penalties and cleanup logic.
+
+### Fixed
+- **LSTMModel Training Fix:** Resolved undefined name `batch_idx` in the training loop.
+- **Dependency Security Patches:** Resolved security vulnerabilities in `pytz` (2026.2), `scipy` (1.15.3), and `starlette` (1.0.0).
+
+### Performance
+- **Feature Engineering Latency:** Optimized `FeatureEngineer` technical analysis pipeline, achieving ~17% reduction in latency.
 
 * feat: implement comprehensive monitoring and alerting system
 
