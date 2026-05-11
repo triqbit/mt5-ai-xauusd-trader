@@ -2,17 +2,14 @@
 Unit tests for the benchmarking framework.
 """
 
-from unittest.mock import MagicMock
-
 import importlib.util
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from src.core.constants import SignalDirection
-
-HAS_TORCH = importlib.util.find_spec("torch") is not None
 from src.models.base_model import Signal
 from src.research.benchmarks import (
     BenchmarkEvaluator,
@@ -31,6 +28,8 @@ from src.research.benchmarks import (
     TransformerAdapter,
     VolatilityBreakoutStrategy,
 )
+
+HAS_TORCH = importlib.util.find_spec("torch") is not None
 
 
 @pytest.fixture
@@ -268,3 +267,89 @@ def test_random_strategy_signals(sample_data):
     s3 = RandomStrategy(seed=43)
     signals3 = s3.predict(sample_data)
     assert not np.array_equal(signals, signals3)
+
+
+def test_comparison_identical_strategies(sample_data):
+    """Test statistical comparison of identical strategies."""
+    evaluator = BenchmarkEvaluator(sample_data)
+    s1 = EMACrossoverStrategy(5, 10)
+    evaluator.evaluate_all([s1])
+
+    # Manually add duplicate results with different name
+    evaluator.results["EMA_Duplicate"] = evaluator.results[s1.name]
+    evaluator.results["EMA_Duplicate_returns"] = evaluator.results[s1.name + "_returns"]
+
+    comp = evaluator.compare_to_baseline(s1.name, "EMA_Duplicate")
+    assert comp["Outperformance"] == 0.0
+    assert comp["Sharpe Improvement"] == 0.0
+    assert not comp["Significant"]
+
+
+def test_comparison_no_trades(sample_data):
+    """Test comparison when one strategy has no trades."""
+    evaluator = BenchmarkEvaluator(sample_data)
+
+    # Mock strategy with no signals
+    class NoTradeStrategy:
+        @property
+        def name(self):
+            return "No_Trade"
+
+        def predict(self, df):
+            return np.zeros(len(df))
+
+    s1 = EMACrossoverStrategy(5, 10)
+    s2 = NoTradeStrategy()
+    evaluator.evaluate_all([s1, s2])
+
+    comp = evaluator.compare_to_baseline(s1.name, s2.name)
+    assert "error" not in comp
+    assert comp["Outperformance"] == evaluator.results[s1.name]["Total Return"]
+
+
+def test_regime_aware_adapter(sample_data):
+    """Test that adapters correctly extract and pass regime info."""
+    from src.models.regime_detector import MarketRegime
+
+    # Add regime columns to sample data
+    sample_data["regime"] = MarketRegime.TRENDING.value
+    sample_data["regime_confidence"] = 0.95
+    sample_data["regime_transition_score"] = 0.1
+    sample_data["volatility_index"] = 1.2
+
+    mock_agent = MagicMock()
+    mock_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.9)
+
+    adapter = PPOAdapter(mock_agent)
+    adapter.predict(sample_data)
+
+    # Verify that the first call to mock_agent.predict received regime_info
+    _args, kwargs = mock_agent.predict.call_args_list[0]
+    regime_info = kwargs.get("regime_info")
+    assert regime_info is not None
+    assert regime_info.label == MarketRegime.TRENDING
+    assert regime_info.confidence == 0.95
+
+
+def test_comparison_very_few_trades(sample_data):
+    """Test comparison when strategies have very few trades."""
+    evaluator = BenchmarkEvaluator(sample_data)
+
+    # Strategy with only 1 trade
+    class FewTradeStrategy:
+        @property
+        def name(self):
+            return "Few_Trade"
+
+        def predict(self, df):
+            signals = np.zeros(len(df))
+            signals[10] = 1
+            signals[11] = 0
+            return signals
+
+    s1 = EMACrossoverStrategy(5, 10)
+    s2 = FewTradeStrategy()
+    evaluator.evaluate_all([s1, s2])
+
+    comp = evaluator.compare_to_baseline(s1.name, s2.name)
+    assert "error" not in comp
