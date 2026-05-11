@@ -34,6 +34,14 @@
 - **Monitoring:**
     - Alert on high rejection rates (>10% of total signals over a 1-hour window) to detect potential misconfiguration or market regime shifts.
 
+## Implementation Details (Jules02)
+- **Metric**: `trading_internal_rejections_total` (Prometheus Counter).
+- **Labels**: `component` (risk_manager, execution_filter, capital_allocator), `reason` (standardized uppercase strings).
+- **Instrumentation**:
+    - `RiskManager`/`AuditedRiskManager`: `CIRCUIT_BREAKER`, `DAILY_LOSS`, `MAX_POSITIONS`, `SYMBOL_ALLOCATION`, `MIN_CONFIDENCE`, `RISK_REWARD`, `CONSECUTIVE_LOSSES`, `MODEL_HEALTH`.
+    - `ExecutionFilter`: `ATR_VOLATILITY`, `TREND_ANGLE`, `EMA_SEQUENCE`, `MOMENTUM`, `SESSION_CLOSED`, `DRAWDOWN_LIMIT`, `MODEL_STABILITY`, `PERFORMANCE_FLOOR`, `CONFIDENCE_THRESHOLD`, `SIGNAL_FLICKER`, `MACRO_EVENT`.
+    - `CapitalAllocator`: `STRATEGY_NOT_FOUND`, `TOTAL_HEAT_LIMIT`, `SYMBOL_CONCENTRATION_LIMIT`, `FAMILY_CONCENTRATION_LIMIT`, `CAPITAL_CAP_REACHED`, `SCALED_TO_ZERO`, `NO_BUDGET`.
+
 ## Release Readiness
 - **Deployment:** Can be deployed independently as an observability enhancement.
 - **Backward Compatibility:** Must be compatible with historical `TradeLogger` records for retrospective analysis.

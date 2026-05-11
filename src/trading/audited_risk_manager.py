@@ -87,6 +87,9 @@ class AuditedRiskManager(RiskManager):
                 signal.direction,
                 reason_str,
             )
+            if self.monitor:
+                for reason in rejection_reasons:
+                    self.monitor.record_internal_rejection("risk_manager", reason.upper())
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",

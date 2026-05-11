@@ -63,9 +63,11 @@ class ExecutionFilter:
         rsi_period: int = 14,
         config: TradingConfig | None = None,
         event_intelligence: Any | None = None,
+        monitor: Any | None = None,
     ):
         self.event_intelligence = event_intelligence
         self.cfg = config
+        self.monitor = monitor
         self.max_drawdown = (
             config.max_drawdown if config and hasattr(config, "max_drawdown") else max_drawdown
         )
@@ -217,6 +219,9 @@ class ExecutionFilter:
             if layer_key in trace and not trace[layer_key]["passed"]:
                 blocked_by = reason
                 break
+
+        if blocked_by and self.monitor:
+            self.monitor.record_internal_rejection("execution_filter", blocked_by)
 
         return ExecutionDecision(
             signal=signal,

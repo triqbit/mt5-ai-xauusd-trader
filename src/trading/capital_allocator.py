@@ -92,6 +92,7 @@ class CapitalAllocator:
         performance_step: float = 0.05,  # Adjustment step for performance multiplier
         decay_rate: float = 0.001,  # Rate at which multiplier returns to 1.0
         soft_limit_buffer: float = 0.1,  # Buffer for diversification guard
+        monitor: Any | None = None,
     ):
         self.total_budget = total_budget
         self.max_symbol_risk = max_symbol_risk
@@ -100,13 +101,14 @@ class CapitalAllocator:
         self.performance_step = performance_step
         self.decay_rate = decay_rate
         self.soft_limit_buffer = soft_limit_buffer
+        self.monitor = monitor
 
         self.strategies: dict[str, StrategyConfig] = {}
         self.current_allocations: dict[str, float] = {}  # strategy_id -> current allocated amount
         self.rejection_history: dict[str, int] = {code.value: 0 for code in RejectionCode}
 
     @staticmethod
-    def from_config(config: TradingConfig, total_budget: float) -> CapitalAllocator:
+    def from_config(config: TradingConfig, total_budget: float, monitor: Any | None = None) -> CapitalAllocator:
         """
         Factory method to initialize CapitalAllocator from TradingConfig.
         """
@@ -118,6 +120,7 @@ class CapitalAllocator:
             performance_step=config.allocator_performance_step,
             decay_rate=config.allocator_decay_rate,
             soft_limit_buffer=config.allocator_soft_limit_buffer,
+            monitor=monitor,
         )
 
     def add_strategy(self, config: StrategyConfig) -> None:
@@ -639,6 +642,8 @@ class CapitalAllocator:
                 reason=result.rejection_reason,
                 code=result.rejection_code,
             )
+            if self.monitor and result.rejection_code:
+                self.monitor.record_internal_rejection("capital_allocator", result.rejection_code.value)
 
         with contextlib.suppress(RuntimeError, ImportError):
             get_audit_logger().log_allocation_decision(

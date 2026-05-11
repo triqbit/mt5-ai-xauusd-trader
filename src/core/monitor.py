@@ -50,6 +50,11 @@ FILL_RATE_GAUGE = Gauge("trading_fill_rate", "Percentage of orders filled at int
 REJECTED_ORDER_COUNTER = Counter(
     "trading_orders_rejected_total", "Total number of rejected orders", ["reason"]
 )
+INTERNAL_REJECTION_COUNTER = Counter(
+    "trading_internal_rejections_total",
+    "Total number of internal signal rejections",
+    ["component", "reason"],
+)
 PARTIAL_FILL_COUNTER = Counter("trading_partial_fills_total", "Total number of partial fills")
 
 # 3. System Health Metrics
@@ -333,6 +338,11 @@ class Monitor:
         """Record a rejected order."""
         REJECTED_ORDER_COUNTER.labels(reason=reason).inc()
         logger.warning("order_rejected", reason=reason)
+
+    def record_internal_rejection(self, component: str, reason: str) -> None:
+        """Record an internal signal rejection from a specific component."""
+        INTERNAL_REJECTION_COUNTER.labels(component=component, reason=reason).inc()
+        logger.info("internal_rejection_recorded", component=component, reason=reason)
 
     def record_partial_fill(self) -> None:
         """Record a partial fill."""
