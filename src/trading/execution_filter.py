@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/execution_filter.py
-10-layer entry filter cascade to vet signals before execution.
+Institutional entry filter cascade to vet signals before execution.
 Author : triqbit
 License: MIT
 """
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class ExecutionDecision:
-    """Result of the 6-layer execution filter cascade."""
+    """Result of the execution filter cascade."""
 
     signal: TradeSignal
     confidence_score: float
@@ -34,22 +34,24 @@ class ExecutionDecision:
 
     @property
     def is_approved(self) -> bool:
-        """Returns True if the signal passed all 6 layers."""
+        """Returns True if the signal passed all layers."""
         return self.blocked_by is None
+
 
 logger = logging.getLogger(__name__)
 
 
 class ExecutionFilter:
     """
-    Implements a 6-layer validation cascade for trading signals.
-    Layers:
+    Implements a strict validation cascade for trading signals.
+    The primary 6 layers are:
         1. ATR Volatility Threshold
         2. Trend Angle Confirmation
         3. EMA Sequence Check
         4. Momentum Filter
         5. Session/Time Filter
         6. Drawdown Circuit Breaker
+    Extended layers for institutional trust:
         7. Model Stability
         8. Performance Guard
         9. Confidence Threshold
@@ -65,9 +67,9 @@ class ExecutionFilter:
         event_intelligence: Any | None = None,
         monitor: Any | None = None,
     ):
-        self.event_intelligence = event_intelligence
         self.cfg = config
         self.monitor = monitor
+        self.event_intelligence = event_intelligence
         self.max_drawdown = (
             config.max_drawdown if config and hasattr(config, "max_drawdown") else max_drawdown
         )
@@ -84,8 +86,8 @@ class ExecutionFilter:
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 9-layer filter cascade.
-        Evaluates all layers without short-circuiting to capture a full audit trace.
+        Run the full filter cascade.
+        Evaluates all layers to capture a full audit trace.
 
         Args:
             signal: The signal to validate.
@@ -106,43 +108,25 @@ class ExecutionFilter:
         atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(
             market_data, precomputed=metrics.get("atr_volatility")
         )
-        trace["atr_volatility"] = {
-            "passed": bool(atr_passed),
-            **atr_metrics,
-        }
+        trace["atr_volatility"] = {"passed": bool(atr_passed), **atr_metrics}
 
         # Layer 2: Trend Angle
         trend_passed, trend_metrics = self._check_trend_angle_with_metrics(
-            market_data,
-            signal.direction,
-            precomputed=metrics.get("trend_angle"),
+            market_data, signal.direction, precomputed=metrics.get("trend_angle")
         )
-        trace["trend_angle"] = {
-            "passed": bool(trend_passed),
-            **trend_metrics,
-        }
+        trace["trend_angle"] = {"passed": bool(trend_passed), **trend_metrics}
 
         # Layer 3: EMA Sequence
         ema_passed, ema_metrics = self._check_ema_sequence_with_metrics(
-            market_data,
-            signal.direction,
-            precomputed=metrics.get("ema_sequence"),
+            market_data, signal.direction, precomputed=metrics.get("ema_sequence")
         )
-        trace["ema_sequence"] = {
-            "passed": bool(ema_passed),
-            **ema_metrics,
-        }
+        trace["ema_sequence"] = {"passed": bool(ema_passed), **ema_metrics}
 
         # Layer 4: Momentum (RSI)
         momentum_passed, momentum_metrics = self._check_momentum_with_metrics(
-            market_data,
-            signal.direction,
-            precomputed=metrics.get("momentum"),
+            market_data, signal.direction, precomputed=metrics.get("momentum")
         )
-        trace["momentum"] = {
-            "passed": bool(momentum_passed),
-            **momentum_metrics,
-        }
+        trace["momentum"] = {"passed": bool(momentum_passed), **momentum_metrics}
 
         # Layer 5: Session/Time
         session_passed = self._check_session_time(timestamp)
@@ -159,46 +143,29 @@ class ExecutionFilter:
             "max_drawdown": self.max_drawdown,
         }
 
+        # --- Extended Layers (7-11) ---
+
         # Layer 7: Model Stability
-        if model_health:
-            stability_passed, stability_metrics = self._check_model_stability_with_metrics(
-                model_health
-            )
-            trace["model_stability"] = {
-                "passed": bool(stability_passed),
-                **stability_metrics,
-            }
+        stab_passed, stab_metrics = self._check_model_stability_with_metrics(model_health)
+        trace["model_stability"] = {"passed": bool(stab_passed), **stab_metrics}
 
         # Layer 8: Performance Guard
-        if trade_logger:
-            perf_passed, perf_metrics = self._check_performance_guard_with_metrics(trade_logger)
-            trace["performance_guard"] = {
-                "passed": bool(perf_passed),
-                **perf_metrics,
-            }
+        perf_passed, perf_metrics = self._check_performance_guard_with_metrics(trade_logger)
+        trace["performance_guard"] = {"passed": bool(perf_passed), **perf_metrics}
 
         # Layer 9: Confidence Threshold
         conf_passed, conf_metrics = self._check_confidence_threshold_with_metrics(signal)
-        trace["confidence_threshold"] = {
-            "passed": bool(conf_passed),
-            **conf_metrics,
-        }
+        trace["confidence_threshold"] = {"passed": bool(conf_passed), **conf_metrics}
 
         # Layer 10: Signal Consistency
         cons_passed, cons_metrics = self._check_signal_consistency_with_metrics(
             signal.symbol, signal.direction
         )
-        trace["signal_consistency"] = {
-            "passed": bool(cons_passed),
-            **cons_metrics,
-        }
+        trace["signal_consistency"] = {"passed": bool(cons_passed), **cons_metrics}
 
         # Layer 11: Macro Risk Gate
         macro_passed, macro_metrics = self._check_macro_risk_with_metrics(timestamp)
-        trace["macro_event"] = {
-            "passed": bool(macro_passed),
-            **macro_metrics,
-        }
+        trace["macro_event"] = {"passed": bool(macro_passed), **macro_metrics}
 
         # Determine final approval and blocked_by reason
         blocked_by = None
@@ -230,10 +197,6 @@ class ExecutionFilter:
             trace=trace,
         )
 
-    def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
-        passed, _ = self._check_atr_volatility_with_metrics(df, threshold)
-        return bool(passed)
-
     def _check_atr_volatility_with_metrics(
         self,
         df: pd.DataFrame | None,
@@ -242,11 +205,7 @@ class ExecutionFilter:
     ) -> tuple[bool, dict[str, Any]]:
         """Blocks if current ATR is > threshold * average ATR."""
         if threshold is None:
-            threshold = (
-                self.cfg.volatility_extreme_threshold
-                if self.cfg and hasattr(self.cfg, "volatility_extreme_threshold")
-                else 3.0
-            )
+            threshold = getattr(self.cfg, "volatility_extreme_threshold", 3.0)
 
         if precomputed:
             current_atr = precomputed.get("current_atr", 0.0)
@@ -277,10 +236,6 @@ class ExecutionFilter:
         passed = ratio <= threshold
         return bool(passed), {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": ratio}
 
-    def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
-        passed, _ = self._check_trend_angle_with_metrics(df, direction, window)
-        return bool(passed)
-
     def _check_trend_angle_with_metrics(
         self,
         df: pd.DataFrame | None,
@@ -309,10 +264,6 @@ class ExecutionFilter:
 
         passed = (direction > 0 and slope > 0) or (direction < 0 and slope < 0)
         return bool(passed), {"slope": float(slope), "direction": direction}
-
-    def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
-        passed, _ = self._check_ema_sequence_with_metrics(df, direction)
-        return bool(passed)
 
     def _check_ema_sequence_with_metrics(
         self,
@@ -344,10 +295,6 @@ class ExecutionFilter:
         else:
             passed = False
         return bool(passed), {"emas": emas, "direction": direction}
-
-    def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
-        passed, _ = self._check_momentum_with_metrics(df, direction)
-        return bool(passed)
 
     def _check_momentum_with_metrics(
         self,
@@ -391,19 +338,14 @@ class ExecutionFilter:
         return current_drawdown < self.max_drawdown
 
     def _check_model_stability_with_metrics(
-        self, model_health: dict[str, float]
+        self, health: dict[str, float] | None
     ) -> tuple[bool, dict[str, Any]]:
-        """Blocks if drift is too high or accuracy is too low."""
-        drift_threshold = (
-            self.cfg.model_drift_threshold if self.cfg and hasattr(self.cfg, "model_drift_threshold") else 0.3
-        )
-        accuracy_floor = (
-            self.cfg.model_accuracy_floor if self.cfg and hasattr(self.cfg, "model_accuracy_floor") else 0.45
-        )
-
-        drift = model_health.get("drift", 0.0)
-        accuracy = model_health.get("accuracy", 1.0)
-
+        if not health:
+            return True, {"status": "no_health_data"}
+        drift_threshold = getattr(self.cfg, "model_drift_threshold", 0.3)
+        accuracy_floor = getattr(self.cfg, "model_accuracy_floor", 0.45)
+        drift = health.get("drift", 0.0)
+        accuracy = health.get("accuracy", 1.0)
         passed = drift <= drift_threshold and accuracy >= accuracy_floor
         return bool(passed), {
             "drift": drift,
@@ -412,68 +354,45 @@ class ExecutionFilter:
             "accuracy_floor": accuracy_floor,
         }
 
-    def _check_performance_guard_with_metrics(self, trade_logger: Any) -> tuple[bool, dict[str, Any]]:
-        """Blocks if historical win rate is dangerously low."""
+    def _check_performance_guard_with_metrics(self, trade_logger: Any | None) -> tuple[bool, dict[str, Any]]:
+        if not trade_logger:
+            return True, {"status": "no_logger"}
         report = trade_logger.read_performance_report()
         win_rate = report.get("win_rate", 1.0)
         total_trades = report.get("total_trades", 0)
-
-        # Only apply guard after a statistically significant number of trades
         if total_trades < 20:
             return True, {"win_rate": win_rate, "total_trades": total_trades, "status": "insufficient_data"}
-
-        floor = 0.45
+        floor = getattr(self.cfg, "model_win_rate_floor", 0.45)
         passed = win_rate >= floor
-        return bool(passed), {"win_rate": win_rate, "floor": floor, "total_trades": total_trades}
+        return bool(passed), {"win_rate": win_rate, "total_trades": total_trades, "floor": floor}
 
-    def _check_confidence_threshold_with_metrics(
-        self, signal: TradeSignal
-    ) -> tuple[bool, dict[str, Any]]:
-        """Blocks if signal confidence is below minimum threshold."""
-        threshold = (
-            self.cfg.min_confidence if self.cfg and hasattr(self.cfg, "min_confidence") else 0.55
-        )
+    def _check_confidence_threshold_with_metrics(self, signal: TradeSignal) -> tuple[bool, dict[str, Any]]:
+        threshold = getattr(self.cfg, "min_confidence", 0.55)
         passed = signal.confidence >= threshold
         return bool(passed), {"confidence": signal.confidence, "threshold": threshold}
 
-    def _check_signal_consistency_with_metrics(
-        self, symbol: str, direction: int
-    ) -> tuple[bool, dict[str, Any]]:
-        window = self.cfg.signal_flicker_window if self.cfg else 6
-        max_changes = self.cfg.max_signal_changes if self.cfg else 3
+    def _check_signal_consistency_with_metrics(self, symbol: str, direction: int) -> tuple[bool, dict[str, Any]]:
+        window = getattr(self.cfg, "signal_flicker_window", 6)
+        max_changes = getattr(self.cfg, "max_signal_changes", 3)
         if symbol not in self._signal_history:
             self._signal_history[symbol] = deque(maxlen=window)
         history = self._signal_history[symbol]
         history.append(int(direction))
         if len(history) < 2:
             return True, {"changes": 0, "window": window, "max_changes": max_changes}
-        changes = 0
-        h_list = list(history)
-        for i in range(1, len(h_list)):
-            if h_list[i] != h_list[i - 1]:
-                changes += 1
+        changes = sum(1 for i in range(1, len(history)) if history[i] != history[i - 1])
         passed = changes <= max_changes
-        return bool(passed), {
-            "changes": changes,
-            "window": window,
-            "max_changes": max_changes,
-            "history": h_list,
-        }
+        return bool(passed), {"changes": changes, "window": window, "max_changes": max_changes}
 
     def _check_macro_risk_with_metrics(
         self, timestamp: datetime | None = None
     ) -> tuple[bool, dict[str, Any]]:
-        """Blocks if Macro Intelligence indicates an execution block."""
         if not self.event_intelligence:
             return True, {"status": "no_intelligence"}
-
-        # Check if guard is enabled in config
         if self.cfg and not getattr(self.cfg, "enable_macro_guard", True):
             return True, {"status": "guard_disabled"}
-
         risk_status = self.event_intelligence.get_risk_status(timestamp)
         passed = not risk_status.is_blocked
-
         return bool(passed), {
             "is_blocked": risk_status.is_blocked,
             "reason": risk_status.reason,

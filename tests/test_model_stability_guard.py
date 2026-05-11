@@ -18,6 +18,7 @@ def mock_config():
     config.model_win_rate_floor = 0.45
     config.signal_flicker_window = 6
     config.max_signal_changes = 3
+    config.volatility_extreme_threshold = 3.0
     return config
 
 @pytest.fixture
@@ -72,7 +73,6 @@ def test_filter_with_low_accuracy(execution_filter, valid_signal, mock_market_da
 def test_filter_with_healthy_model(execution_filter, valid_signal, mock_market_data):
     health = {"drift": 0.1, "accuracy": 0.7}
     decision = execution_filter.validate(valid_signal, mock_market_data, 0.05, model_health=health)
-    # Adjust mock data to ensure earlier layers pass
     assert decision.is_approved is True
 
 def test_filter_with_model_stability_in_trace(execution_filter, valid_signal, mock_market_data):

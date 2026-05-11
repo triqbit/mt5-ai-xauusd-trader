@@ -18,6 +18,7 @@ class MockConfig:
         self.logs_dir = "logs"
         self.signal_flicker_window = 6
         self.max_signal_changes = 3
+        self.volatility_extreme_threshold = 3.0
 
 @pytest.fixture
 def execution_filter():
