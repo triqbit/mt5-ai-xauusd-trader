@@ -62,8 +62,8 @@ Defined process for triaging alerts from Telegram and Prometheus/Grafana. This e
 3. **P2/P3 Operational:** Primary On-Call Engineer.
 
 ## Verification Commands
-- `python scripts/generate_incident_report.py`
-- `python scripts/doctor.py`
-- `python scripts/smoke_test.py`
-- `curl -s http://localhost:8000/health/readiness`
-- `curl -s http://localhost:8000/metrics | grep health_gauges`
+```bash
+python scripts/generate_incident_report.py
+python scripts/doctor.py
+python scripts/smoke_test.py
+```

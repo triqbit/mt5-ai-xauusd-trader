@@ -84,8 +84,9 @@ bash scripts/backup_verify.sh
 3. **Data Integrity Audit:** Compliance Officer.
 
 ## Verification Commands
-- `sqlite3 trades.db "PRAGMA integrity_check;"`
-- `sqlite3 audit.db "PRAGMA integrity_check;"`
-- `bash scripts/backup_verify.sh`
-- `python scripts/doctor.py`
-- `curl -s http://localhost:8000/health/readiness`
+```bash
+sqlite3 trades.db "PRAGMA integrity_check;"
+sqlite3 audit.db "PRAGMA integrity_check;"
+bash scripts/backup_verify.sh
+python scripts/doctor.py
+```

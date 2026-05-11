@@ -73,8 +73,8 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
 3. **Broker Portal Lockout:** Contact Broker Support.
 
 ## Verification Commands
-- `python scripts/validate_env.py`
-- `python scripts/doctor.py`
-- `python scripts/smoke_test.py`
-- `curl -i http://localhost:8000/health/readiness`
-- `docker logs xauusd_trader --tail 50`
+```bash
+python scripts/validate_env.py
+python scripts/doctor.py
+python scripts/smoke_test.py
+```

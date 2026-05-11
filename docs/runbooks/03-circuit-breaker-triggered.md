@@ -2,75 +2,49 @@
 **Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
-Critical response procedure for when the automated `RiskManager` circuit breaker halts trading due to safety breaches (e.g., 15% equity drawdown, extreme spread, or model calibration failure).
+Procedures for responding to automatic trading halts caused by risk limit breaches or system instability.
 
 ## Step-by-Step Instructions
 
-### 1. Emergency Containment
-- **IMMEDIATE ACTION:** Verify the bot has stopped placing new orders.
-- Stop the container to prevent any automated activity during triage:
-  ```bash
-  docker stop xauusd_trader
-  ```
-- **Manual Intervention:** Open the MT5 Terminal or Mobile App and manually close or hedge any remaining open positions that pose a risk to capital.
-- **Audit Manual Action:** Record the manual intervention in the audit trail (if the database is accessible):
-  ```bash
-  # Example: Logging manual position closure
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'manual_position_closure', 'Manually closed all XAUUSD positions due to circuit breaker', datetime('now'));"
-  ```
+### 1. Identify the Trigger
+Review the Telegram alert or audit log to determine why the circuit breaker tripped:
+```bash
+# Check audit log for circuit_breaker_triggered event
+sqlite3 audit.db "SELECT * FROM audit_log WHERE action='circuit_breaker_triggered' ORDER BY created_at DESC LIMIT 1;"
+```
+Triggers include:
+- `MAX_DRAWDOWN` (30%)
+- `MAX_DAILY_LOSS` (5%)
+- `MT5_CONNECTION_LOST` (>300s)
+- `MODEL_ACCURACY_CRITICAL` (<50%)
 
-### 2. Incident Analysis & Triage
-- Generate an automated incident report to understand the breach:
-  ```bash
-  export DATABASE_URL="sqlite:///trades.db"
-  export AUDIT_DATABASE_URL="sqlite:///audit.db"
-  python scripts/generate_incident_report.py
-  ```
-- Review the `risk_events` table for specific breach details:
-  ```bash
-  sqlite3 trades.db "SELECT * FROM risk_events ORDER BY created_at DESC LIMIT 5;"
-  ```
-- Check `audit_log` for the `risk_decision` that preceded the halt:
-  ```bash
-  sqlite3 audit.db "SELECT * FROM audit_log WHERE action LIKE '%risk%' ORDER BY created_at DESC LIMIT 10;"
-  ```
-- **Common Trigger Causes:**
-  - **Equity Drawdown:** Cumulative losses exceeded the daily/weekly/monthly threshold defined in `docs/SLO_TARGETS.md` or `src/core/config.py`.
-  - **Spread Alert:** Market liquidity vanished, triggering a safety halt.
-  - **Model Drift:** Model accuracy dropped below 0.50 or calibration error exceeded 0.25.
+### 2. Capital Preservation
+1. **Verify Open Positions:** Check if any positions are still open.
+2. **Force Close (If Necessary):** If the bot failed to close positions during the halt, close them manually via the MT5 mobile app or desktop terminal.
 
-### 3. Resolution & Root Cause
-- Address the underlying cause identified in Step 2.
-- If it was a market-wide "Flash Crash", wait for volatility to stabilize.
-- If it was a model failure, involve the ML Lead (@maintainer-models).
-- **DO NOT** restart the bot until a clear root cause is identified and documented.
+### 3. Investigation
+1. Run the system doctor: `python scripts/doctor.py`.
+2. Review the `DecisionSupportSystem` cockpit for recent signal quality.
+3. If the trigger was `MAX_DRAWDOWN`, perform a post-mortem on recent trades.
 
-### 4. System Reset
-- Once authorized to resume, restart the bot:
-  ```bash
-  docker start xauusd_trader
-  ```
-- **Log Resolution:** Ensure the resolution is recorded:
-  ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'incident_resolved', 'Root cause identified and addressed. System resumed.', datetime('now'));"
-  ```
-- Monitor the `logs/` directory and the Prometheus `/metrics` endpoint closely for the first 5 trades.
-- Verify the `circuit_breaker_status` metric is reset to `0.0` (Healthy):
-  ```bash
-  curl -s http://localhost:8000/metrics | grep circuit_breaker
-  ```
+### 4. Reset & Resume
+1. Fix the underlying issue (e.g., restore internet, retrain model).
+2. **Manual Reset:** Circuit breakers typically reset at 00:00 UTC. To override and resume earlier:
+   ```bash
+   # Caution: Only perform if the risk is understood and mitigated
+   docker restart xauusd_trader
+   ```
 
 ## Expected Outcomes
-- All open risk is neutralized immediately.
-- A detailed incident report is generated and archived.
-- Circuit breaker state is cleared only after formal root cause analysis and stakeholder approval.
+- Trading is successfully halted to prevent further loss.
+- Audit trail captures the trigger reason and state.
+- Normal operation is restored only after operator verification.
 
 ## Escalation Path
-1. **Risk Breach/Limits:** Risk Lead (@maintainer-trading).
-2. **Model Performance/Drift:** ML Lead (@maintainer-models).
-3. **P0 Financial Incident:** Business Owner (@andonly1348).
+1. **Large Scale Drawdown:** Risk Lead (@andonly1348).
+2. **Rogue Bot Behavior:** Jules03 (Governance).
 
 ## Verification Commands
-- `python scripts/generate_incident_report.py`
-- `sqlite3 trades.db "SELECT event_type, reason, created_at FROM risk_events WHERE event_type='CIRCUIT_BREAKER' ORDER BY created_at DESC LIMIT 1;"`
-- `curl -s http://localhost:8000/metrics | grep circuit_breaker`
+```bash
+curl -s http://localhost:8000/health/readiness
+```
