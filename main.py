@@ -394,16 +394,26 @@ def run_live(
                         allocator=allocator,
                         audit_logger=audit_logger,
                     )
-                lot_size = signal.lot_size
 
                 # 6. Risk approval gate
-                with profile("risk_check"):
-                    health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                risk_decision = None
+                risk_approved = False
+                if direction != 0:
+                    with profile("risk_check"):
+                        health = getattr(model, "get_health_metrics", lambda: None)()
+                        current_positions = connector.get_positions(cfg.symbol)
+                        risk_decision = risk.approve(
+                            signal,
+                            market_data=df_raw,
+                            open_positions=current_positions,
+                            signal_id=signal_id,
+                            model_health=health,
+                        )
+                        risk_approved = risk_decision.is_approved
+
+                        # Apply adjusted lot size from institutional sizing
+                        if risk_approved:
+                            signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -433,6 +443,7 @@ def run_live(
                                 cfg.symbol,
                                 filter_decision.blocked_by,
                             )
+                            # Update decision for support system
                             risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
@@ -447,14 +458,12 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": [risk_decision.reason] if risk_decision and not risk_decision.is_approved else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason if risk_decision else "Risk gate rejected",
                         }
 
                         regime_data = {
@@ -685,13 +694,13 @@ Usage Examples:
     p.add_argument(
         "--mode",
         choices=["demo", "live", "backtest"],
-        help="Execution mode: 'demo' for paper trading, 'live' for real execution, or 'backtest' for historical simulation.",
+        help="System execution environment: 'demo' for paper trading, 'live' for institutional execution, or 'backtest' for historical strategy validation.",
     )
     p.add_argument(
         "--algo",
         dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
-        help="Machine Learning algorithm architecture to use for signal generation.",
+        help="Quantitative model architecture selection for signal generation and market analysis.",
     )
     p.add_argument(
         "--start", help="Historical start date for backtest (YYYY-MM-DD)", default="2017-01-01"
@@ -761,7 +770,7 @@ Usage Examples:
         "--confirm-live",
         dest="confirm_live_trading",
         action="store_true",
-        help="Explicitly acknowledge and confirm LIVE trading execution",
+        help="Institutional authorization: Explicitly acknowledge and confirm LIVE capital deployment",
     )
     return p.parse_args()
 
