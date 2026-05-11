@@ -1,18 +1,18 @@
-# 🗺️ Strategic Feature Roadmap - May 10, 2026
+# 🗺️ Strategic Feature Roadmap - May 13, 2026
 
-This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-performance ensemble bot to a truly autonomous institutional-grade "Glass Box" trading system. It reflects the latest maturity assessment and identifies high-value opportunities to eliminate operational friction and "Macro Blindness."
+This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-performance ensemble bot to a truly autonomous institutional-grade "Glass Box" trading system. It reflects the latest maturity assessment following the Jules01-04 lifecycle harmonization.
 
 ---
 
-## 📊 Repo Maturity Assessment (May 10, 2026)
+## 📊 Repo Maturity Assessment (May 13, 2026)
 
 | Category | Maturity | Gaps & Observations |
 | :--- | :--- | :--- |
-| **Product Capability** | 🟢 7.5/10 | **Status:** Unified `RiskManager` architecture provides a solid institutional foundation. **Gap:** Missing high-fidelity slippage feedback loop and real-time capital preservation modes. |
-| **Usability** | 🟢 7/10 | **Status:** Decision Cockpit TUI is highly functional for local operators. **Gap:** Still terminal-bound; lacks remote/mobile interactivity for signal approval and status monitoring. |
-| **Safety** | 🟢 8.5/10 | **Status:** Circuit breakers and audited risk logging are industry-leading. **Gap:** `make emergency-stop` remains a stub; needs automated "Flatten & Fence" implementation. |
-| **Intelligence** | 🟡 6.5/10 | **Status:** Regime detection is vectorized and integrated. **Gap:** "Macro Blind" to US Real Yields and DXY in the live execution loop; missing temporal model confidence heatmaps. |
-| **Market Differentiation** | 🟢 8/10 | **Status:** "Glass Box" transparency sets us apart. **Gap:** Gold-specific macro overlays and LLM-enhanced trade narratives are not yet active. |
+| **Product Capability** | 🟢 8.0/10 | **Status:** `RiskManager` and `CapitalAllocator` are fully harmonized. **Gap:** Execution feedback loop for real-time slippage adjustment is missing. |
+| **Usability** | 🟢 7.2/10 | **Status:** Decision Cockpit TUI is robust. **Gap:** Remote/mobile interactivity is currently restricted to passive logging. |
+| **Safety** | 🟢 8.8/10 | **Status:** 8-layer cascading risk filter is integrated and verified. **Gap:** Automated "Flatten & Fence" (Emergency Kill Switch) remains a verified stub. |
+| **Intelligence** | 🟡 6.8/10 | **Status:** Regime stability scoring is architected. **Gap:** System is still "Macro Blind" to real-time US Treasury and DXY shifts. |
+| **Market Differentiation** | 🟢 8.2/10 | **Status:** "Glass Box" transparency is structurally enforced. **Gap:** Gold-specific macro overlays and liquidity heatmaps are not yet active. |
 
 ---
 
@@ -25,44 +25,58 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-perfo
   - *Operational Leverage:* Massive (Reduces drawdown by avoiding "yield-trap" breakouts)
   - *End-user/Operator Value:* Solves the primary pain of "Technical-only" blindness during Fed pivots.
 
-- **Production-Grade Emergency Kill Switch** — Score: 9.5/10 | Cost: S | Why: Currently a stub (`make emergency-stop`). Implementing "Flatten & Fence" (close all, cancel all, lock accounts) is critical for institutional safety and rapid incident response.
-  - *Strategic Importance:* 9/10
+- **Production-Grade Emergency Kill Switch** — Score: 9.5/10 | Cost: S | Why: Currently a verified stub (`make emergency-stop`). Implementing "Flatten & Fence" (close all, cancel all, lock accounts) is critical for institutional safety.
+  - *Strategic Importance:* 9.5/10
   - *Implementation Cost:* S
-  - *Dependency Readiness:* 🟢 High (API hooks available in MT5/MetaAPI)
+  - *Dependency Readiness:* 🟢 High (MT5/MetaAPI hooks verified)
   - *Operational Leverage:* High (Foundational for capital preservation)
-  - *End-user/Operator Value:* Peace of mind during catastrophic market events or system failures.
+  - *End-user/Operator Value:* Instant recovery from catastrophic market events or system failures.
 
-- **Telegram Interactive Command Center** — Score: 9.0/10 | Cost: M | Why: Port the Decision Cockpit to Telegram with "Approve/Reject" buttons. Transforms the bot into a mobile-accessible command center.
-  - *Strategic Importance:* 9/10
+- **Adaptive Capital-Preservation Operating Modes** — Score: 9.0/10 | Cost: M | Why: Dynamic postures (Defensive, Balanced, Aggressive) that adjust sizing and filters globally.
+  - *Strategic Importance:* 9.0/10
   - *Implementation Cost:* M
-  - *Dependency Readiness:* 🟡 Medium
-  - *Operational Leverage:* High (Increases operator mobility and response time)
-  - *End-user/Operator Value:* Eliminates the need for 24/7 terminal monitoring.
+  - *Dependency Readiness:* 🟢 High (RiskManager architecture supports dynamic overrides)
+  - *Operational Leverage:* High (Automates risk-off during high-uncertainty regimes)
+  - *End-user/Operator Value:* Eliminates manual parameter tweaking during news events.
 
 ## Medium Priority (Weeks 3-4)
 
-- **Institutional What-If Execution Simulator** — Score: 8.5/10 | Cost: M | Why: Pre-execution sensitivity analysis (slippage, flash crash) allows operators to visualize potential outcomes before committing capital.
-  - *Strategic Importance:* 8/10
+- **Telegram Interactive Command Center** — Score: 9.0/10 | Cost: M | Why: Port the Decision Cockpit to Telegram with "Approve/Reject" buttons for human-in-the-loop oversight.
+  - *Strategic Importance:* 9.0/10
   - *Implementation Cost:* M
-  - *Dependency Readiness:* 🟡 Medium
-  - *Operational Leverage:* Medium
-  - *End-user/Operator Value:* Transforms "guesswork" into rehearsed execution; increases trust in high-lot-size signals.
+  - *Dependency Readiness:* 🟡 Medium (Requires bot gateway implementation)
+  - *Operational Leverage:* High (Increases mobility and response time)
+  - *End-user/Operator Value:* Eliminates the need for 24/7 terminal monitoring; provides remote safety controls.
 
-- **Adaptive Position Sizing (Regime Stability)** — Score: 8.2/10 | Cost: M | Why: Scale lot sizes based on the persistence and confidence of the market regime. Leans in during stable trends and steps back during fragile transitions.
-  - *Strategic Importance:* 8/10
+- **Institutional Liquidity & Order Flow Heatmap** — Score: 8.5/10 | Cost: L | Why: Use DOM data to detect institutional liquidity pools and avoid "Liquidity Gaps."
+  - *Strategic Importance:* 8.5/10
+  - *Implementation Cost:* L
+  - *Dependency Readiness:* 🟡 Medium (Requires MT5 Level 2 data streaming)
+  - *Operational Leverage:* High (Leading indicator for reversals)
+  - *End-user/Operator Value:* Provides visibility into "Smart Money" positioning vs. retail traps.
+
+- **Adaptive Position Sizing (Regime Stability)** — Score: 8.2/10 | Cost: M | Why: Scale lot sizes based on the persistence and confidence of the market regime.
+  - *Strategic Importance:* 8.0/10
   - *Implementation Cost:* M
   - *Dependency Readiness:* 🟢 High (`RegimeDetector` stability scores exist)
-  - *Operational Leverage:* High (Optimizes capital efficiency across market cycles)
-  - *End-user/Operator Value:* Automates the "risk-down" phase during regime exhaustion.
+  - *Operational Leverage:* High (Optimizes capital efficiency across cycles)
+  - *End-user/Operator Value:* Automatically "leans in" during stable trends and "steps back" during fragile transitions.
 
 ## Future Consideration
 
-- **Trade Narrative Memory (LLM-Enhanced)** — Score: 7.5/10 | Cost: L | Why: Use an LLM to synthesize trade data into natural language post-mortems. Automates qualitative alpha discovery and trade journaling.
-  - *Strategic Importance:* 7/10
+- **Institutional What-If Execution Simulator** — Score: 8.0/10 | Cost: M | Why: Pre-execution sensitivity analysis for slippage and flash crashes.
+  - *Strategic Importance:* 8.0/10
+  - *Implementation Cost:* M
+  - *Dependency Readiness:* 🟡 Medium (Requires rare-event simulator integration)
+  - *Operational Leverage:* Medium (Improves trust in high-lot signals)
+  - *End-user/Operator Value:* Rehearses trade outcomes before committing capital.
+
+- **Trade Narrative Memory (LLM-Enhanced)** — Score: 7.5/10 | Cost: L | Why: Qualitative "Why?" analysis for every trade using LLM synthesis.
+  - *Strategic Importance:* 7.0/10
   - *Implementation Cost:* L
-  - *Dependency Readiness:* 🟡 Medium
+  - *Dependency Readiness:* 🟡 Medium (Requires LLM API integration)
   - *Operational Leverage:* Low (Long-term alpha refinement)
-  - *End-user/Operator Value:* Automates the qualitative "Why?" analysis for every trade.
+  - *End-user/Operator Value:* Automates qualitative trade journaling and alpha discovery.
 
 ---
 *Roadmap curated by Jules05 — Autonomous Product Steward.*
