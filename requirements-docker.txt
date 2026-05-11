@@ -37,7 +37,7 @@ redis==5.2.1
 
 # -- Monitoring & Logging ------------------------------------
 prometheus-client==0.21.1
-structlog==25.1.0
+structlog==25.5.0
 rich==13.9.4
 tqdm==4.67.1
 
@@ -50,7 +50,7 @@ plotly==6.0.0
 
 # -- Configuration -------------------------------------------
 python-dotenv==1.2.2
-pydantic==2.10.6
+pydantic==2.13.4
 pydantic-settings==2.7.1
 tomli==2.2.1
 
