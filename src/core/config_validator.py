@@ -583,7 +583,7 @@ class ConfigValidator:
 
     def _check_allocator_settings(self) -> None:
         """Verify capital allocator settings."""
-        if self.config.allocator_max_total_heat > 1.0 or self.config.allocator_max_total_heat <= 0:
+        if self.config.allocator_max_total_heat > 1.0 or self.config.allocator_max_total_heat < 0.01:
             self.errors.append(
                 ValidationError(
                     "ALLOCATOR_MAX_TOTAL_HEAT",
@@ -593,7 +593,7 @@ class ConfigValidator:
                 )
             )
 
-        if self.config.allocator_max_symbol_risk > 1.0 or self.config.allocator_max_symbol_risk <= 0:
+        if self.config.allocator_max_symbol_risk > 1.0 or self.config.allocator_max_symbol_risk < 0.01:
             self.errors.append(
                 ValidationError(
                     "ALLOCATOR_MAX_SYMBOL_RISK",
