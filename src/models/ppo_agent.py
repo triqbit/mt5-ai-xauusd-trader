@@ -125,13 +125,24 @@ class PPOAgent(BaseModel):
             )
 
         try:
-            # Explicit shape validation
-            obs = features
+            # Explicit shape validation and reshaping for production robustness
+            obs = features.astype(np.float32)
+            expected_shape = None
+            if self.model is not None and hasattr(self.model, "observation_space"):
+                expected_shape = self.model.observation_space.shape
+
             if obs.ndim == 1:
-                # Add batch and window dimensions if only features provided
-                obs = np.expand_dims(np.expand_dims(obs, axis=0), axis=0)
+                # If only a single feature vector is provided, reshape to (1, 1, features)
+                # or (1, window_size, features) if possible.
+                if expected_shape and len(expected_shape) == 2:
+                    if obs.shape[0] == expected_shape[1]:
+                        obs = obs.reshape(1, 1, -1)
+                    else:
+                        obs = obs.reshape(1, *expected_shape)
+                else:
+                    obs = obs.reshape(1, 1, -1)
             elif obs.ndim == 2:
-                # Add batch dimension if window x features provided
+                # (window, features) -> (1, window, features)
                 obs = np.expand_dims(obs, axis=0)
             elif obs.ndim > 3:
                 self.logger.error(f"Invalid observation shape: {obs.shape}. Expected up to 3 dims.")

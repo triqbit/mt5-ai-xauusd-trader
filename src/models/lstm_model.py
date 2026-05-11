@@ -337,17 +337,44 @@ class LSTMModel(BaseModel):
         """
         Trains the LSTM model using the provided data.
 
-        In a production implementation, this would involve a training loop with
-        backpropagation, loss calculation, and optimization.
+        Implements a production-ready training loop stub with loss tracking
+        and optimization.
 
         Args:
-            data: Training data (e.g., DataLoader or feature/target tensors).
-            **kwargs: Hyperparameters (learning_rate, epochs, batch_size, etc.).
+            data: Training data (e.g., torch DataLoader).
+            **kwargs: Hyperparameters:
+                learning_rate: Optimizer step size (default 1e-3).
+                epochs: Number of training passes (default 10).
         """
-        self.logger.info("LSTMModel.train called (placeholder).")
         if self.model is None or not torch:
             self.logger.error("Cannot train: Model not initialized or PyTorch missing.")
             return
+
+        lr = kwargs.get("learning_rate", 1e-3)
+        epochs = kwargs.get("epochs", 10)
+
+        self.logger.info(f"Starting LSTM training (stub): epochs={epochs}, lr={lr}")
+
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+        # Using CrossEntropyLoss as the model performs 3-class classification
+        # (HOLD, BUY, SELL) rather than direct price regression.
+        criterion = torch.nn.CrossEntropyLoss()
+
+        self.model.train()
+        if data is not None:
+            self.logger.info("Executing LSTM training loop...")
+            for epoch in range(epochs):
+                running_loss = 0.0
+                for batch_idx, (features, targets) in enumerate(data):
+                    optimizer.zero_grad()
+                    outputs = self.model(features.to(self.device))
+                    loss = criterion(outputs, targets.to(self.device))
+                    loss.backward()
+                    optimizer.step()
+                    running_loss += loss.item()
+                self.logger.debug(f"Epoch {epoch+1}/{epochs} - Loss: {running_loss/(batch_idx+1):.4f}")
+
+        self.logger.info("LSTM training complete.")
 
     def save(self, path: str | Path) -> None:
         """
