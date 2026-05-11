@@ -1,8 +1,24 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/core/explainability.py
+
 Trade signal explainability and attribution system.
-Provides structured breakdowns of why a signal was generated or rejected.
+Provides institutional-grade structured breakdowns of why a signal was generated,
+including ensemble voting, feature impacts, and execution filter results.
+
+Usage:
+    explainer = SignalExplainer()
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.85,
+        ...
+    )
+    print(explainer.format_for_terminal(explanation))
+
+All attribution models in this module are immutable (frozen) and enforce strict
+validation to ensure technical trust and a reliable audit trail.
+
 Author : triqbit
 License: MIT
 """
@@ -13,7 +29,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.core.constants import ModelAction, SignalDirection
 
@@ -28,11 +44,19 @@ class FeatureContribution(BaseModel):
     """
     Structured contribution from a specific feature cluster.
     Provides both quantitative (score) and qualitative (impact, summary) attribution.
+
+    This model is immutable (frozen) and forbids extra fields to ensure
+    consistent and auditable feature impact reporting.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     cluster_name: str = Field(..., description="Name of the feature cluster (e.g., Trend, Volatility)")
     contribution_score: float = Field(
-        ..., description="Normalized contribution score (-1.0 to 1.0)"
+        ...,
+        ge=-1.0,
+        le=1.0,
+        description="Normalized contribution score (-1.0 to 1.0).",
     )
     impact_level: str = Field(..., description="Qualitative impact (Low, Medium, High)")
     summary: str = Field(..., description="Human-readable description of the contribution")
@@ -42,12 +66,21 @@ class ModelAttribution(BaseModel):
     """
     Detailed breakdown of an individual model's contribution to the ensemble decision.
     Tracks alignment, confidence, and relative dominance within the group.
+
+    This model is immutable (frozen) and forbids extra fields to maintain
+    traceability of the ensemble's internal voting mechanics.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     model_name: str = Field(..., description="Name of the model (e.g., PPO, LSTM)")
     vote: SignalDirection = Field(..., description="The direction voted by this model")
-    confidence: float = Field(..., description="Model's internal confidence score")
-    weight: float = Field(..., description="Weight of this model in the ensemble")
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Model's internal confidence score (0.0 to 1.0)."
+    )
+    weight: float = Field(
+        ..., ge=0.0, le=1.0, description="Weight of this model in the ensemble (0.0 to 1.0)."
+    )
     is_dominant: bool = Field(False, description="Whether this model drove the final decision")
 
 
@@ -55,7 +88,12 @@ class RiskAssessment(BaseModel):
     """
     Summary of institutional risk management constraints applied to the signal.
     Captures rejection reasons, R:R quality, and Kelly-based sizing suggestions.
+
+    This model is immutable (frozen) and forbids extra fields to ensure
+    risk assessments are not modified after generation.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     passed: bool = Field(..., description="Whether the signal passed all risk filters")
     rejection_reasons: list[str] = Field(
@@ -73,12 +111,19 @@ class RegimeContext(BaseModel):
     """
     Institutional market regime context at the time of signal generation.
     Decomposes the macro state into regime labels, volatility levels, and strategy favorability.
+
+    This model is immutable (frozen) and forbids extra fields to preserve
+    the market state snapshot at the time of execution.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     regime_name: str = Field(
         "Unknown", description="Detected market regime (e.g., Trending, Ranging)"
     )
-    confidence: float = Field(0.0, description="Regime detection confidence")
+    confidence: float = Field(
+        0.0, ge=0.0, le=1.0, description="Regime detection confidence (0.0 to 1.0)."
+    )
     volatility_state: str = Field(
         "Normal", description="Current volatility level (Low, Normal, High, Extreme)"
     )
@@ -92,7 +137,11 @@ class FilterResult(BaseModel):
     """
     Institutional audit record for an individual execution filter.
     Captures the pass/fail status along with observed values and their respective thresholds.
+
+    This model is immutable (frozen) and forbids extra fields for technical trust.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     filter_name: str = Field(..., description="Name of the filter (e.g., Spread, Momentum)")
     passed: bool = Field(..., description="Whether the filter passed")
@@ -105,7 +154,12 @@ class ExecutionSummary(BaseModel):
     """
     Unified summary of the institutional execution filter cascade.
     Aggregates results from multiple technical and operational gates before signal release.
+
+    This model is immutable (frozen) and forbids extra fields to ensure
+    execution filter results remain consistent across the pipeline.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     passed: bool = Field(..., description="Whether all execution filters passed")
     filters: list[FilterResult] = Field(default_factory=list, description="Detailed filter results")
@@ -117,7 +171,12 @@ class SignalExplanation(BaseModel):
     Institutional-grade root explanation object for a trade signal.
     Aggregates execution, model, feature, risk, and regime data into a unified
     structure suitable for real-time dashboards, post-trade analysis, and regulatory auditing.
+
+    This model is immutable (frozen) and forbids extra fields to ensure that once an
+    explanation is generated, it cannot be altered by downstream components.
     """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, use_enum_values=False)
 
     signal_id: int | None = Field(None, description="Database ID of the signal")
     timestamp: datetime = Field(
@@ -126,7 +185,12 @@ class SignalExplanation(BaseModel):
     )
     symbol: str = Field(..., description="Trading symbol (e.g., XAUUSD)")
     direction: SignalDirection = Field(..., description="Final ensemble signal direction")
-    total_confidence: float = Field(..., description="Aggregated ensemble confidence score")
+    total_confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Aggregated ensemble confidence score (0.0 to 1.0).",
+    )
 
     # Components
     execution_summary: ExecutionSummary = Field(..., description="Execution-level filter breakdown")
@@ -144,8 +208,6 @@ class SignalExplanation(BaseModel):
     machine_attribution: dict[str, Any] = Field(
         ..., description="Key-value pairs for automated post-trade analysis"
     )
-
-    model_config = {"use_enum_values": False}
 
 
 class SignalExplainer:
@@ -297,19 +359,21 @@ class SignalExplainer:
                 dominant_models.append(name)
 
             attributions.append(
-                ModelAttribution(
-                    model_name=name,
-                    vote=vote_dir,
-                    confidence=model_conf,
-                    weight=weight,
-                    is_dominant=False,  # Set in second pass
-                )
+                {
+                    "model_name": name,
+                    "vote": vote_dir,
+                    "confidence": model_conf,
+                    "weight": weight,
+                    "is_dominant": False,  # Set in second pass
+                }
             )
 
-        # Finalize dominant models
-        for attr in attributions:
-            if attr.model_name in dominant_models:
-                attr.is_dominant = True
+        # Finalize dominant models and convert to objects
+        final_attributions = []
+        for attr_dict in attributions:
+            if attr_dict["model_name"] in dominant_models:
+                attr_dict["is_dominant"] = True
+            final_attributions.append(ModelAttribution(**attr_dict))
 
         # 3. Risk Assessment
         risk_assessment = RiskAssessment(
@@ -427,7 +491,7 @@ class SignalExplainer:
             direction=SignalDirection(direction),
             total_confidence=confidence,
             execution_summary=execution_summary,
-            model_attributions=attributions,
+            model_attributions=final_attributions,
             feature_contributions=contributions,
             risk_assessment=risk_assessment,
             regime_context=regime_context,
