@@ -30,6 +30,7 @@ from src.models.base_model import BaseModel, Signal
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
+    from src.models.regime_detector import RegimeInfo
 from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMModel
