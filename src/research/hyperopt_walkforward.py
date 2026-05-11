@@ -229,6 +229,7 @@ class WalkForwardOptimizer:
 
         Measures how much performance (Sharpe Ratio) changes when parameters are shifted
         by a small amount. Uses only training data to prevent look-ahead bias.
+        Utilizes scale-invariant CV and includes a fragility safeguard.
 
         Args:
             params: Base parameters.
@@ -236,67 +237,79 @@ class WalkForwardOptimizer:
             perturbation_pct: Percentage to perturb parameters (default 5%).
 
         Returns:
-            float: Standard deviation of Sharpe ratios under perturbation.
+            float: Coefficient of Variation (CV) of Sharpe ratios under perturbation.
         """
         perturbations = []
-        base_sharpe = self._evaluate_strategy(data, params).get("Sharpe Ratio", 0.0)
-        perturbations.append(base_sharpe)
+        try:
+            base_metrics = self._evaluate_strategy(data, params)
+            base_sharpe = base_metrics.get("Sharpe Ratio", 0.0)
+            if np.isnan(base_sharpe):
+                return 10.0  # Fragility safeguard
+            perturbations.append(base_sharpe)
 
-        for key, value in params.items():
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                original_val = value
-                is_int = isinstance(original_val, int)
+            for key, value in params.items():
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    original_val = value
+                    is_int = isinstance(original_val, int)
 
-                # Small perturbation (e.g. 5%)
-                # Ensure a minimum delta for small or zero values
-                if is_int:
-                    delta = max(1, int(round(abs(original_val) * perturbation_pct)))
-                else:
-                    # For floats, use a small epsilon if value is 0
-                    delta = max(1e-4, abs(original_val) * perturbation_pct)
-
-                for direction in [-1, 1]:
-                    perturbed_params = params.copy()
-                    new_val = original_val + (direction * delta)
-
+                    # Small perturbation (e.g. 5%)
+                    # Ensure a minimum delta for small or zero values
                     if is_int:
-                        new_val = int(round(new_val))
+                        delta = max(1, int(round(abs(original_val) * perturbation_pct)))
+                    else:
+                        # For floats, use a small epsilon if value is 0
+                        delta = max(1e-4, abs(original_val) * perturbation_pct)
 
-                    # Skip if no actual change
-                    if new_val == original_val:
-                        continue
+                    for direction in [-1, 1]:
+                        perturbed_params = params.copy()
+                        new_val = original_val + (direction * delta)
 
-                    perturbed_params[key] = new_val
+                        if is_int:
+                            new_val = int(round(new_val))
 
-                    try:
-                        p_metrics = self._evaluate_strategy(data, perturbed_params)
-                        p_sharpe = p_metrics.get("Sharpe Ratio", 0.0)
-                        if not np.isnan(p_sharpe):
-                            perturbations.append(float(p_sharpe))
-                    except Exception as e:
-                        logger.debug("Perturbation failed for %s=%s: %s", key, new_val, e)
-                        continue
+                        # Skip if no actual change
+                        if new_val == original_val:
+                            continue
+
+                        perturbed_params[key] = new_val
+
+                        try:
+                            p_metrics = self._evaluate_strategy(data, perturbed_params)
+                            p_sharpe = p_metrics.get("Sharpe Ratio", 0.0)
+                            if not np.isnan(p_sharpe):
+                                perturbations.append(float(p_sharpe))
+                        except Exception as e:
+                            logger.debug("Perturbation failed for %s=%s: %s", key, new_val, e)
+                            continue
+        except Exception as e:
+            logger.warning("Stability calculation failed: %s", e)
+            return 10.0  # Fragility safeguard
 
         if len(perturbations) < 2:
             return 0.0
 
-        # Penalty is the standard deviation of Sharpe ratios under perturbation
-        # Normalized by base Sharpe to handle scale difference? No, absolute SD is fine
-        # as it represents the 'volatility' of the result in parameter space.
-        return float(np.std(perturbations))
+        mean_sharpe = np.mean(perturbations)
+        std_sharpe = np.std(perturbations)
+
+        # Scale-invariant CV penalty
+        # High CV indicates high sensitivity to parameter changes (instability)
+        cv = std_sharpe / (abs(mean_sharpe) + 1e-9)
+        return float(np.clip(cv, 0.0, 10.0))
 
     def _calculate_regime_consistency(
         self, data: pd.DataFrame, strategy_params: dict[str, Any]
     ) -> float:
         """
         Measures how consistent performance (Sharpe Ratio) is across different detected regimes.
+        Uses frequency-weighting to ensure that the performance consistency across market
+        environments is not skewed by regimes with few observations.
 
         Args:
             data: Data containing 'regime' column (typically the training/IS window).
             strategy_params: Strategy parameters.
 
         Returns:
-            float: Consistency score (1 - Coefficient of Variation), clipped at [0, 1].
+            float: Frequency-weighted consistency score (1 - CV), clipped at [0, 1].
         """
         strategy = self.strategy_factory(**strategy_params)
         evaluator = BenchmarkEvaluator(
@@ -311,21 +324,29 @@ class WalkForwardOptimizer:
         temp_df = pd.DataFrame({"returns": returns, "regime": data["regime"]})
 
         def calc_sharpe(x):
+            if len(x) < 5:  # Minimum observations for a valid regime-specific Sharpe
+                return None
             std = x.std()
             if std < 1e-9:
                 return 0.0
             return float(x.mean() / std * np.sqrt(self.config.bars_per_year))
 
-        regime_sharpes = temp_df.groupby("regime")["returns"].apply(calc_sharpe)
+        regime_stats = temp_df.groupby("regime")["returns"].agg([calc_sharpe, "count"])
+        # Filter out regimes with None Sharpe
+        valid_stats = regime_stats.dropna(subset=["calc_sharpe"])
 
-        if len(regime_sharpes) < 2:
-            return 1.0  # Not enough regimes to judge
+        if len(valid_stats) < 2:
+            return 1.0  # Not enough valid regimes to judge consistency
 
-        # Return 1 - CV of Sharpe ratios across regimes (higher is more consistent)
-        mean_sharpe = np.mean(regime_sharpes)
-        std_sharpe = np.std(regime_sharpes)
+        # Frequency-weighted Mean and Std
+        weights = valid_stats["count"] / valid_stats["count"].sum()
+        weighted_mean = np.average(valid_stats["calc_sharpe"], weights=weights)
+        weighted_std = np.sqrt(
+            np.average((valid_stats["calc_sharpe"] - weighted_mean) ** 2, weights=weights)
+        )
 
-        cv = std_sharpe / (abs(mean_sharpe) + 1e-9)
+        # Return 1 - weighted CV of Sharpe ratios across regimes (higher is more consistent)
+        cv = weighted_std / (abs(weighted_mean) + 1e-9)
         return float(np.clip(1.0 - cv, 0.0, 1.0))
 
     def run_optimization(self) -> WalkForwardResult:
