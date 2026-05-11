@@ -32,9 +32,28 @@ def get_system_version() -> str:
         # Add root to sys.path to allow importing src
         sys.path.append(str(Path(__file__).resolve().parents[1]))
         from src import __version__
+
         return __version__
     except Exception:
         return "1.0.0 (fallback)"
+
+
+def parse_version(v_str: str) -> tuple[int, ...]:
+    """Convert version string to tuple of integers for robust comparison."""
+    try:
+        # Handle versions like '0.136.1', '2.5.1+cpu', '2.14.1.post0'
+        # Strip non-numeric parts from each segment
+        parts = []
+        for segment in v_str.split("."):
+            clean_segment = "".join(filter(str.isdigit, segment))
+            if clean_segment:
+                parts.append(int(clean_segment))
+            else:
+                parts.append(0)
+        return tuple(parts)
+    except Exception:
+        return (0,)
+
 
 class DiagnosticCheck:
     def __init__(self, name, status, message, remedy="N/A"):
@@ -57,17 +76,17 @@ def check_python_version():
         )
 
 CORE_DEPENDENCIES = {
-    "numpy": ("numpy", "2.2.3"),
+    "numpy": ("numpy", "1.26.4"),
     "pandas": ("pandas", "2.2.3"),
-    "pydantic": ("pydantic", "2.10.6"),
-    "pydantic-settings": ("pydantic_settings", "2.7.1"),
+    "pydantic": ("pydantic", "2.13.4"),
+    "pydantic-settings": ("pydantic_settings", "2.14.1"),
     "sqlalchemy": ("sqlalchemy", "2.0.38"),
     "torch": ("torch", "2.5.1"),
-    "fastapi": ("fastapi", "0.115.8"),
+    "fastapi": ("fastapi", "0.136.1"),
     "talib": ("talib", "0.6.4"),
-    "structlog": ("structlog", "25.1.0"),
+    "structlog": ("structlog", "25.5.0"),
     "rich": ("rich", "13.9.4"),
-    "python-dotenv": ("dotenv", "1.2.2")
+    "python-dotenv": ("dotenv", "1.2.2"),
 }
 
 def check_dependencies(dependencies=None):
@@ -75,10 +94,12 @@ def check_dependencies(dependencies=None):
         from importlib.metadata import version as get_version
     except ImportError:
         # Fallback for environments where importlib.metadata is problematic in mocks
-        def get_version(name): return "unknown"
+        def get_version(name):
+            return "unknown"
 
     deps = dependencies or CORE_DEPENDENCIES
     missing = []
+    outdated = []
     versions = []
 
     for display_name, val in deps.items():
@@ -93,26 +114,89 @@ def check_dependencies(dependencies=None):
             try:
                 # Some modules have different metadata names
                 meta_name = module_name.replace("_", "-")
-                if module_name == "dotenv": meta_name = "python-dotenv"
-                if module_name == "talib": meta_name = "TA-Lib"
+                if module_name == "dotenv":
+                    meta_name = "python-dotenv"
+                if module_name == "talib":
+                    meta_name = "TA-Lib"
 
                 actual_version = get_version(meta_name)
+
+                if actual_version != "unknown":
+                    if parse_version(actual_version) < parse_version(min_version):
+                        outdated.append(f"{display_name} (found {actual_version}, need {min_version})")
+
                 versions.append(f"{display_name} v{actual_version}")
             except Exception:
                 versions.append(f"{display_name} v?")
         except ImportError:
             missing.append(display_name)
 
-    if not missing:
-        msg = f"All core libraries present: {', '.join(versions[:3])}..."
-        return DiagnosticCheck("Dependencies", "OK", msg)
-    else:
+    if missing:
         return DiagnosticCheck(
             "Dependencies",
             "FAILED",
             f"Missing: {', '.join(missing)}",
-            "Run 'pip install -r requirements.txt'"
+            "Run 'pip install -r requirements.txt'",
         )
+    elif outdated:
+        return DiagnosticCheck(
+            "Dependencies",
+            "WARNING",
+            f"Outdated: {', '.join(outdated)}",
+            "Update dependencies: 'pip install -r requirements.txt'",
+        )
+    else:
+        msg = f"All core libraries present: {', '.join(versions[:3])}..."
+        return DiagnosticCheck("Dependencies", "OK", msg)
+
+
+def check_requirement_harmonization():
+    """Verify all requirements*.txt files are in sync."""
+    import re
+
+    root = Path(__file__).resolve().parents[1]
+    req_files = list(root.glob("requirements*.txt"))
+
+    all_requirements = {}
+    mismatches = []
+
+    def parse_requirements(filepath):
+        requirements = {}
+        with open(filepath, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or line.startswith("--"):
+                    continue
+                match = re.match(r"^([^;=<>!~]+)([=<>!~]+.*)$", line)
+                if match:
+                    package = match.group(1).strip()
+                    version = match.group(2).strip()
+                    requirements[package] = version
+        return requirements
+
+    for req_file in req_files:
+        try:
+            reqs = parse_requirements(req_file)
+            for package, version in reqs.items():
+                if package in all_requirements:
+                    if all_requirements[package]["version"] != version:
+                        mismatches.append(
+                            f"{package} ({all_requirements[package]['file']} vs {req_file.name})"
+                        )
+                else:
+                    all_requirements[package] = {"version": version, "file": req_file.name}
+        except Exception as e:
+            return DiagnosticCheck("Requirement Sync", "FAILED", f"Error parsing {req_file.name}: {e}")
+
+    if mismatches:
+        return DiagnosticCheck(
+            "Requirement Sync",
+            "FAILED",
+            f"Mismatches: {', '.join(mismatches[:2])}",
+            "Run 'python scripts/verify_dependencies.py' for details.",
+        )
+    else:
+        return DiagnosticCheck("Requirement Sync", "OK", f"All {len(req_files)} files harmonized")
 
 def check_env_file():
     env_path = Path(".env")
@@ -252,12 +336,13 @@ def main():
     checks = [
         check_python_version(),
         check_dependencies(),
+        check_requirement_harmonization(),
         check_env_file(),
         check_talib(),
         check_hardware_acceleration(),
         check_database(),
         check_file_permissions(),
-        check_mt5_config()
+        check_mt5_config(),
     ]
 
     version = get_system_version()
