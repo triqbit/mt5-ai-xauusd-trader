@@ -39,6 +39,7 @@ class FeatureEngineer:
         timeframes: list[str] | None = None,
         normalize: bool = True,
         method: str = "zscore",
+        include_mtf_patterns: bool = False,
     ):
         """
         Initialize the FeatureEngineer.
@@ -48,11 +49,13 @@ class FeatureEngineer:
             timeframes: List of timeframes for multi-timeframe features.
             normalize: Whether to normalize the output feature matrix.
             method: Normalization method ('zscore' or 'minmax').
+            include_mtf_patterns: Whether to compute candle patterns for MTF data (slow).
         """
         self.base_timeframe = base_timeframe
         self.timeframes = timeframes or ["M1", "M5", "M15", "H1", "H4", "D1"]
         self.normalize = normalize
         self.method = method
+        self.include_mtf_patterns = include_mtf_patterns
         self.feature_columns: list[str] = []
 
         # Normalization stats
@@ -97,11 +100,11 @@ class FeatureEngineer:
 
             # 2. Multi-Timeframe Features
             mtf_blocks = []
-            with profile_context("fe_mtf_all"):
+            with profile_context("fe_mtf_all", slow_threshold_ms=100.0):
                 for tf in self.timeframes:
                     if tf == self.base_timeframe:
                         continue
-                    with profile_context(f"fe_mtf_{tf}"):
+                    with profile_context(f"fe_mtf_{tf}", slow_threshold_ms=25.0):
                         mtf_features = self._compute_mtf_features(df, tf)
                         if not mtf_features.empty:
                             mtf_blocks.append(mtf_features)
@@ -115,16 +118,23 @@ class FeatureEngineer:
             # Optimization: Cast to float32 for efficiency
             full_df = full_df.astype(np.float32, copy=False)
 
-            # Identify all feature columns (excluding original OHLCV)
+            # Identify columns
             ohlcv_cols = ["open", "high", "low", "close", "tick_volume", "real_volume"]
-            feature_cols = [c for c in full_df.columns if c not in ohlcv_cols]
+            base_feature_cols = [c for c in base_features_df.columns if c not in ohlcv_cols]
 
-            # Drop any row that contains a NaN in ANY feature column (essential for MTF and large lookbacks)
-            # This ensures the matrix is ready for model inference.
-            features_only = full_df.dropna(subset=feature_cols)
+            # Resilience Improvement: Only drop NaNs from BASE features.
+            # MTF features often have huge gaps (e.g. D1 on M5 data).
+            # We forward-fill MTF and zero-fill remaining to maximize data utilization.
+            features_only = full_df.dropna(subset=base_feature_cols).copy()
+
+            # Identify all feature columns for consistent reindexing later
+            feature_cols = [c for c in features_only.columns if c not in ohlcv_cols]
+
+            # Forward fill then zero fill MTF gaps
+            features_only[feature_cols] = features_only[feature_cols].ffill().fillna(0.0)
 
             if features_only.empty:
-                logger.error("Feature engineering resulted in an empty DataFrame after dropping NaNs. Ensure input data is long enough for the lookbacks of higher timeframes.")
+                logger.error("Feature engineering resulted in an empty DataFrame. Ensure input data has sufficient history.")
                 return pd.DataFrame()
 
             # Remove original OHLCV columns if requested
@@ -331,7 +341,9 @@ class FeatureEngineer:
         mtf_all = {}
         prefix = f"mtf_{tf}"
         mtf_all.update(self._get_technical_indicators(resampled, prefix=prefix))
-        mtf_all.update(self._get_candle_patterns(resampled, prefix=prefix))
+
+        if self.include_mtf_patterns:
+            mtf_all.update(self._get_candle_patterns(resampled, prefix=prefix))
 
         combined_mtf = pd.DataFrame(mtf_all, index=resampled.index)
 
