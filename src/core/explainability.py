@@ -14,7 +14,7 @@ Usage:
         confidence=0.85,
         ...
     )
-    print(explainer.format_for_terminal(explanation))
+    # Use explainer.format_for_terminal(explanation) for visualization
 
 All attribution models in this module are immutable (frozen) and enforce strict
 validation to ensure technical trust and a reliable audit trail.
