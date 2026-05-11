@@ -46,7 +46,7 @@ The [DEPENDENCY_LICENSES.md](DEPENDENCY_LICENSES.md) file contains a comprehensi
 If the automated scanner detects a risky or incompatible license:
 1. **Identify Alternatives:** Search for a permissively licensed replacement.
 2. **Impact Assessment:** Determine if the dependency is critical or can be removed.
-3. **Formal Exception:** If no alternative exists, a formal risk assessment must be performed.
+3. **Formal Exception:** If no alternative exists, a formal risk assessment must be performed by the Governance Lead.
 
 ### Verified Exceptions
 The following dependencies have been manually reviewed and approved despite "UNKNOWN" or non-standard license metadata:
@@ -59,5 +59,5 @@ The following dependencies have been manually reviewed and approved despite "UNK
 LGPL dependencies are pre-approved for CI to ensure build stability, provided they are used as external libraries (dynamic linking) without modification to the library source.
 
 ---
-*Last Updated: 2024-06-05*
+*Last Updated: 2025-06-10*
 *Owner: Jules03 (Release & Governance Lead)*
