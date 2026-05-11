@@ -9,6 +9,7 @@ class TestHealthExtended(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock(spec=TradingConfig)
         self.config.symbol = "XAUUSD"
+        self.config.is_live = False  # Default to demo for tests
         self.connector = MagicMock(spec=MT5Connector)
         self.checker = HealthChecker(self.config, connector=self.connector)
 
@@ -56,10 +57,17 @@ class TestHealthExtended(unittest.TestCase):
         self.connector.get_terminal_status.return_value = {"algo_trading": False}
         self.connector.get_symbol_properties.return_value = {"tradable": True}
 
+        # Case 1: Demo mode -> DEGRADED
+        self.config.is_live = False
         status = self.checker.check_mt5()
         self.assertEqual(status.status, HealthStatus.DEGRADED)
         self.assertIn("Algo Trading is DISABLED", status.message)
-        self.assertIn("Enable 'Algo Trading' button", status.remedy)
+
+        # Case 2: Live mode -> FAILED
+        self.config.is_live = True
+        status = self.checker.check_mt5()
+        self.assertEqual(status.status, HealthStatus.FAILED)
+        self.assertIn("Algo Trading is DISABLED", status.message)
 
     def test_check_mt5_symbol_not_found_with_suggestions(self):
         self.connector._is_initialized = True
