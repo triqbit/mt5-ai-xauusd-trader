@@ -1,5 +1,5 @@
 # Runbook 01: CI Failure Recovery
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
 Standardized procedures for recovering from failures in GitHub Actions workflows (CI, Release, Pre-Deployment Validation). These gates are mandatory "Quality Gates" and must pass before any merge to `main`.
@@ -40,6 +40,7 @@ python scripts/generate_triage_report.py
   2. **Trivy (Container Scan):** Check for vulnerable base images or OS packages. Update the `Dockerfile` to use a later patched version of the base image.
   3. **Pip-Audit (Dependency Audit):** Run `pip-audit` locally to find vulnerable packages. Update `requirements.txt` or `pyproject.toml` to the patched versions.
   4. **License Compliance:** If `license-check` fails, ensure all new dependencies are listed in `docs/LICENSE_COMPLIANCE.md`.
+  5. **Governance Audit (Gate 4.8):** If `atlas_audit.py` fails, ensure `RISK_LIMITS.md` and `src/core/config.py` are synchronized and all runbooks are present.
 
 ## Expected Outcomes
 - All GitHub Actions workflows return a "Success" status.
@@ -56,5 +57,8 @@ python scripts/generate_triage_report.py
 - `mypy src/ main.py scripts/`
 - `pytest tests/ --cov=src --cov-fail-under=85`
 - `python scripts/verify_version_sync.py`
+- `python scripts/verify_migrations.py`
+- `python scripts/validate_env.py`
+- `python scripts/atlas_audit.py`
 - `pip-audit`
 - `ls docs/status/PR_TRIAGE_DAILY.md`
