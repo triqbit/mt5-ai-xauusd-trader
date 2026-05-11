@@ -14,6 +14,7 @@ License: MIT
 
 from __future__ import annotations
 
+import heapq
 import logging
 import time
 from dataclasses import dataclass
@@ -98,6 +99,18 @@ class BacktestEngine:
         self.trades: list[BacktestTrade] = []
         self.equity_curve: list[tuple[datetime, float]] = []
         self.results: PerformanceReport | None = None
+
+        # Optimization: Pre-calculate contract multiplier
+        self._contract_multiplier = 100 if "XAU" in self.symbol else 1
+
+        # Optimization: Maintain running sums for O(1) unrealized PnL calculation
+        # Sum of (direction * lot_size)
+        self._active_sum_dir_lot = 0.0
+        # Sum of (entry_price * direction * lot_size)
+        self._active_sum_entry_val = 0.0
+
+        # Optimization: Counter for heap stability
+        self._trade_counter = 0
 
     def run_walk_forward(
         self,
@@ -216,7 +229,7 @@ class BacktestEngine:
 
         # 3. Main Walk-Forward Loop
         start = 0
-        active_trades: list[dict[str, Any]] = []
+        active_trades: list[Any] = []  # Used as a min-heap of (exit_abs_idx, trade_data)
         last_processed_idx = -1
 
         # Optimization: Pre-extract data into NumPy arrays for fast access
@@ -225,6 +238,8 @@ class BacktestEngine:
         close_vals = data["close"].values
         atr_vals = data["atr"].values
         time_vals = data.index
+        # Pre-convert index to datetime list to avoid pandas indexing overhead in the loop
+        time_list = time_vals.to_pydatetime()
 
         # Feature matrix for model prediction
         cols_to_exclude = ["open", "high", "low", "close", "tick_volume", "atr", "real_volume"]
@@ -249,7 +264,7 @@ class BacktestEngine:
                     if abs_idx <= last_processed_idx or abs_idx >= n:
                         continue
 
-                    bar_time = time_vals[abs_idx]
+                    bar_time = time_list[abs_idx]
                     current_price = close_vals[abs_idx]
 
                     # 1. Update active trades: Check if any simulated exit is reached
@@ -330,7 +345,7 @@ class BacktestEngine:
                 start += step_size
 
         # 4. Finalization: Close any trailing trades
-        self._close_all_trades(active_trades, close_vals[-1], time_vals[-1])
+        self._close_all_trades(active_trades, close_vals[-1], time_list[-1])
         report = self._calculate_performance()
 
         duration = time.perf_counter() - start_wall_time
@@ -357,20 +372,17 @@ class BacktestEngine:
         return report
 
     def _record_equity(
-        self, timestamp: datetime, current_price: float, active_trades: list[dict[str, Any]]
+        self, timestamp: datetime, current_price: float, active_trades: list[Any]
     ) -> None:
-        """Records current portfolio equity (Balance + Unrealized PnL)."""
-        unrealized_pnl = 0.0
-        contract_multiplier = 100 if "XAU" in self.symbol else 1
-
-        for t in active_trades:
-            dir = int(t["signal"].direction)
-            unrealized_pnl += (
-                (current_price - t["entry_price"])
-                * dir
-                * t["signal"].lot_size
-                * contract_multiplier
-            )
+        """
+        Records current portfolio equity (Balance + Unrealized PnL).
+        Optimized to O(1) using running sums of active positions.
+        """
+        # Unrealized PnL = Sum((current_price - entry_price) * direction * lot_size * multiplier)
+        # Unrealized PnL = (current_price * Sum(dir * lot) - Sum(entry * dir * lot)) * multiplier
+        unrealized_pnl = (
+            (current_price * self._active_sum_dir_lot) - self._active_sum_entry_val
+        ) * self._contract_multiplier
 
         current_equity = self.balance + unrealized_pnl
         self.equity_curve.append((timestamp, current_equity))
@@ -378,7 +390,7 @@ class BacktestEngine:
 
     def _open_and_simulate_trade(
         self,
-        active_trades: list[dict[str, Any]],
+        active_trades: list[Any],
         signal: TradeSignal,
         entry_idx: int,
         high_vals: np.ndarray,
@@ -400,15 +412,18 @@ class BacktestEngine:
 
         # If no future bars, trade remains open until engine closes it
         if len(future_high) == 0:
-            active_trades.append(
-                {
-                    "signal": signal,
-                    "entry_price": entry_price,
-                    "mae": 0.0,
-                    "mfe": 0.0,
-                    "exit_abs_idx": np.inf,
-                }
-            )
+            trade_data = {
+                "signal": signal,
+                "entry_price": entry_price,
+                "mae": 0.0,
+                "mfe": 0.0,
+                "exit_abs_idx": np.inf,
+            }
+            self._trade_counter += 1
+            heapq.heappush(active_trades, (np.inf, self._trade_counter, trade_data))
+            # Update running sums for O(1) equity calculation
+            self._active_sum_dir_lot += direction * signal.lot_size
+            self._active_sum_entry_val += entry_price * direction * signal.lot_size
             return
 
         # Vectorized hit detection
@@ -423,15 +438,18 @@ class BacktestEngine:
 
         if not hits.any():
             # Trade survives until end of dataset
-            active_trades.append(
-                {
-                    "signal": signal,
-                    "entry_price": entry_price,
-                    "mae": 0.0,
-                    "mfe": 0.0,
-                    "exit_abs_idx": np.inf,
-                }
-            )
+            trade_data = {
+                "signal": signal,
+                "entry_price": entry_price,
+                "mae": 0.0,
+                "mfe": 0.0,
+                "exit_abs_idx": np.inf,
+            }
+            self._trade_counter += 1
+            heapq.heappush(active_trades, (np.inf, self._trade_counter, trade_data))
+            # Update running sums for O(1) equity calculation
+            self._active_sum_dir_lot += direction * signal.lot_size
+            self._active_sum_entry_val += entry_price * direction * signal.lot_size
             return
 
         # Find first exit index and price
@@ -453,27 +471,29 @@ class BacktestEngine:
             mfe = float(entry_price - np.min(trade_lows))
 
         # Queue trade for closing at exit_abs_idx
-        active_trades.append(
-            {
-                "signal": signal,
-                "entry_price": entry_price,
-                "mae": max(0.0, mae),
-                "mfe": max(0.0, mfe),
-                "exit_abs_idx": exit_abs_idx,
-                "exit_price": exit_price,
-                "exit_time": exit_time,
-            }
-        )
+        trade_data = {
+            "signal": signal,
+            "entry_price": entry_price,
+            "mae": max(0.0, mae),
+            "mfe": max(0.0, mfe),
+            "exit_abs_idx": exit_abs_idx,
+            "exit_price": exit_price,
+            "exit_time": exit_time,
+        }
+        self._trade_counter += 1
+        heapq.heappush(active_trades, (exit_abs_idx, self._trade_counter, trade_data))
 
-    def _update_active_trades(self, active_trades: list[dict[str, Any]], abs_idx: int) -> None:
-        """Finalizes trades whose simulated exit time has arrived."""
-        closed_indices = []
-        for i, t in enumerate(active_trades):
-            if abs_idx >= t.get("exit_abs_idx", np.inf):
-                closed_indices.append(i)
+        # Update running sums for O(1) equity calculation
+        self._active_sum_dir_lot += direction * signal.lot_size
+        self._active_sum_entry_val += entry_price * direction * signal.lot_size
 
-        for i in sorted(closed_indices, reverse=True):
-            trade_data = active_trades.pop(i)
+    def _update_active_trades(self, active_trades: list[Any], abs_idx: int) -> None:
+        """
+        Finalizes trades whose simulated exit time has arrived.
+        Optimized to O(log M) using a min-heap.
+        """
+        while active_trades and abs_idx >= active_trades[0][0]:
+            _, _, trade_data = heapq.heappop(active_trades)
             self._record_trade(trade_data, trade_data["exit_price"], trade_data["exit_time"])
 
     def _record_trade(self, trade: dict[str, Any], exit_price: float, exit_time: datetime) -> None:
@@ -513,12 +533,21 @@ class BacktestEngine:
         )
         self.balance += final_pnl
 
+        # Update running sums for O(1) equity calculation (decrement as trade is closed)
+        self._active_sum_dir_lot -= direction * signal.lot_size
+        self._active_sum_entry_val -= trade["entry_price"] * direction * signal.lot_size
+
     def _close_all_trades(
-        self, active_trades: list[dict[str, Any]], last_close: float, last_time: datetime
+        self, active_trades: list[Any], last_close: float, last_time: datetime
     ) -> None:
         """Force-close remaining positions at end of backtest."""
-        for trade in active_trades:
-            self._record_trade(trade, last_close, last_time)
+        for item in active_trades:
+            if isinstance(item, tuple):
+                # item is (exit_abs_idx, counter, trade_data)
+                trade_data = item[2]
+            else:
+                trade_data = item
+            self._record_trade(trade_data, last_close, last_time)
         active_trades.clear()
 
     def _calculate_performance(self) -> PerformanceReport:

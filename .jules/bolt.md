@@ -21,3 +21,7 @@
 ## 2026-05-10 - [Eliminating Redundant DataFrame Slicing in Backtest Loops]
 **Learning:** Repeatedly slicing a DataFrame using `.iloc[:idx]` inside a high-frequency loop (e.g., a backtester scanning 50,000+ bars) introduces significant overhead because Pandas creates a new (though often shallow) object and performs index alignment checks on every call. If technical indicators are already precomputed, passing `None` to validation methods can eliminate this $O(N^2)$ slicing pattern entirely.
 **Action:** When precomputing metrics for a loop, ensure the downstream consumers can accept `None` for the raw market data to avoid expensive and redundant slicing operations.
+
+## 2026-05-11 - [O(1) Equity and O(log M) Heap-based Trade Exits]
+**Learning:** In backtesting engines, calculating unrealized P&L and checking for trade exits by iterating over all active trades creates an O(N*M) bottleneck. For a 50,000 bar backtest with 100 concurrent positions, this can consume >70% of execution time. Unrealized P&L can be computed in O(1) using running sums of (direction * lot) and (entry * direction * lot). Trade exits can be managed in O(log M) using a min-heap.
+**Action:** When managing a collection of active items with scheduled expiry in a tight loop, use running sums for aggregations and a priority queue (min-heap) for efficient expiry checks. Always include a tie-breaking counter in the heap to avoid TypeErrors when comparing the payloads (e.g., dicts).
