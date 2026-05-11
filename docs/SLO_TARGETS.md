@@ -39,12 +39,12 @@ Inference and execution latency are measured via `src/core/profiler.py` and expo
 
 Response expectations for the operations team, aligned with the [Monitoring Runbook](runbooks/06-monitoring-alert-triage.md).
 
-| Severity | Target Response (ACK) | Target Resolution | Escalation Path |
-|----------|-----------------------|-------------------|-----------------|
-| **P0 (Critical)** | **< 5 mins** | < 1 hour | Jules03 + Lead Architect |
-| **P1 (High)** | **< 15 mins** | < 4 hours | Jules03 |
-| **P2 (Medium)** | < 2 hours | < 24 hours | Assigned Maintainer |
-| **P3 (Low)** | < 24 hours | 1 Week | Backlog Triage |
+| Severity | Target Response (ACK) | Target Resolution | Measurement Method |
+|----------|-----------------------|-------------------|--------------------|
+| **P0 (Critical)** | **< 5 mins** | < 1 hour | Time-to-Acknowledge (TTO) in Incident Tracker |
+| **P1 (High)** | **< 15 mins** | < 4 hours | Time-to-Acknowledge (TTO) in Incident Tracker |
+| **P2 (Medium)** | < 2 hours | < 24 hours | Time-to-Resolution (TTR) in Incident Tracker |
+| **P3 (Low)** | < 24 hours | 1 Week | JIRA/Issue Age Tracking |
 
 ## 5. Incident Recovery (RTO/RPO)
 
@@ -53,7 +53,7 @@ Defined in the [Disaster Recovery Plan](DISASTER_RECOVERY.md).
 | Metric | Target | Measurement Method |
 |--------|--------|--------------------|
 | **Recovery Time Objective (RTO)** | **15 mins** | Time from incident detection to `system_restored` event in audit log (logged via `AuditLogger.log_system_restored`). |
-| **Recovery Point Objective (RPO)** | **1 hour** | Maximum data age in the most recent valid database backup (`backup_verify.sh` logs). |
+| **Recovery Point Objective (RPO)** | **1 hour** | Maximum data age in the most recent valid database backup (verified via `scripts/backup_verify.sh` logs). |
 
 ## 6. Error Budget Framework (30-Day Rolling Window)
 
@@ -78,3 +78,4 @@ If any error budget reaches **0% remaining** within a 30-day window:
 - **Real-time Tracking**: SLO compliance is monitored via Grafana dashboards pulling from Prometheus.
 - **Weekly Review**: Reliability metrics are reviewed every Monday to assess remaining error budgets.
 - **Audit Trail**: Every SLO breach is logged as a `critical_event` in the `audit.db`.
+- **Stakeholder Report**: A monthly reliability summary is generated using `scripts/generate_research_report.py` (Enterprise Section).
