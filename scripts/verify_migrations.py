@@ -1,3 +1,6 @@
+import sys
+from unittest.mock import MagicMock
+sys.modules["talib"] = MagicMock()
 """
 MT5 AI/ML Trading Bot - Migration Safety Script
 Automates the verification of Alembic migrations by performing

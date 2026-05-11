@@ -139,6 +139,7 @@ written justification before the deadline passes.
 | **API Endpoints** | Unauthenticated FastAPI health endpoint abuse, information disclosure |
 | **Audit Trail** | AuditLogger tampering, log deletion, decision chain bypass |
 | **Macro Intelligence** | EventIntelligence manipulation to force trades during blocked windows |
+| **File Permissions** | Insecure permissions (group/world-readable) on `.env`, `data/`, `logs/`, or model files during `live` mode. |
 
 ### Out of Scope
 
