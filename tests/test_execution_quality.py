@@ -41,6 +41,9 @@ def mock_connector():
 @pytest.fixture
 def analyzer(mock_connector):
     # Use in-memory SQLite for testing
+    # Clear cache to ensure fresh DB for each test when using :memory:
+    from src.core.database import get_engine
+    get_engine.cache_clear()
     return ExecutionAnalyzer(db_url="sqlite:///:memory:", connector=mock_connector)
 
 def test_trade_execution_quality_model():
@@ -203,7 +206,13 @@ def test_generate_summary_report(analyzer):
             broker_slippage_pips=0.9, effective_spread_pips=2.0,
             execution_cost_pips=2.0, markout_pnls={"5m": 1.0}
         )
-        mock_abs.return_value = []
+        mock_abs.return_value = [
+            BlockedSignalQuality(
+                signal_id=10, symbol="XAUUSD", rejection_reason="Risk",
+                opportunity_cost_pnl=100.0, max_favorable_excursion=5.0,
+                max_adverse_excursion=2.0, would_have_won=True
+            )
+        ]
 
         with analyzer.Session() as session:
             t = Trade(ticket=1, symbol="XAUUSD", direction=1, entry_price=2300.0, lot_size=0.1, created_at=datetime.now(timezone.utc))
@@ -212,7 +221,43 @@ def test_generate_summary_report(analyzer):
 
         summary = analyzer.generate_summary_report(days=1)
         assert summary.avg_broker_slippage == 0.9
-        assert summary.to_report_section() is not None
+        assert summary.total_opportunity_cost == 100.0
+        assert summary.avg_mae == 2.0
+        assert summary.avg_mfe == 5.0
+
+        report_section = summary.to_report_section()
+        assert report_section is not None
+        assert "MAE: 2.00" in report_section.opportunity_cost
+        assert "MFE: 5.00" in report_section.opportunity_cost
+
+def test_alpha_decay_edge_cases(analyzer, mock_connector):
+    """Test alpha decay fallback logic."""
+    trade = MagicMock(spec=Trade)
+    trade.symbol = "XAUUSD"
+    trade.created_at = datetime.now(timezone.utc)
+    trade.direction = 1
+
+    signal = MagicMock(spec=ModelSignal)
+    signal.timestamp = trade.created_at - timedelta(seconds=2)
+    signal.direction = 1
+
+    # Case 1: Ticks fail, fallback to M1 rates
+    mock_connector.get_ticks_range.side_effect = Exception("No ticks")
+    mock_connector.get_rates_range.return_value = pd.DataFrame([
+        {"time": signal.timestamp, "open": 2300.0, "close": 2301.0},
+        {"time": trade.created_at, "open": 2301.0, "close": 2302.0}
+    ])
+
+    decay = analyzer.calculate_alpha_decay(trade, signal)
+    # market_move = (df.iloc[-1]["close"] - df.iloc[0]["open"]) * signal.direction
+    # (2302.0 - 2300.0) * 1 = 2.0
+    # XAUUSD pip_size = 0.1 -> 20.0 pips
+    assert decay == 20.0
+
+    # Case 2: Everything fails
+    mock_connector.get_rates_range.return_value = pd.DataFrame()
+    decay = analyzer.calculate_alpha_decay(trade, signal)
+    assert decay == 0.0
 
 def test_market_session_detection(analyzer):
     """Test that market sessions are correctly identified."""
