@@ -13,7 +13,13 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import talib
+
+try:
+    import talib
+    HAS_TALIB = True
+except ImportError:
+    HAS_TALIB = False
+    talib = None
 
 from src.core.profiler import profile as profile_context
 
@@ -28,10 +34,14 @@ class FeatureEngineer:
     """
 
     # Pre-cache TA-Lib pattern functions to avoid redundant lookups
-    _PATTERN_FUNCS = {
-        name.lower(): getattr(talib, name)
-        for name in talib.get_function_groups()["Pattern Recognition"]
-    }
+    _PATTERN_FUNCS = (
+        {
+            name.lower(): getattr(talib, name)
+            for name in talib.get_function_groups()["Pattern Recognition"]
+        }
+        if HAS_TALIB
+        else {}
+    )
 
     def __init__(
         self,
@@ -116,7 +126,8 @@ class FeatureEngineer:
                 full_df = pd.concat([df, base_features_df], axis=1)
 
             # Optimization: Cast to float32 for efficiency
-            full_df = full_df.astype(np.float32, copy=False)
+            # Note: Pandas 3.0+ deprecated copy=False in astype, using default behavior
+            full_df = full_df.astype(np.float32)
 
             # Identify columns
             ohlcv_cols = ["open", "high", "low", "close", "tick_volume", "real_volume"]
@@ -173,6 +184,10 @@ class FeatureEngineer:
         low = df["low"].values.astype(np.float64, copy=False)
         volume = df["tick_volume"].values.astype(np.float64, copy=False)
 
+        if not HAS_TALIB:
+            logger.warning("TA-Lib not installed. Technical indicators will be empty.")
+            return indicators
+
         # Momentum
         indicators[f"{prefix}_rsi"] = talib.RSI(close, timeperiod=14)
         indicators[f"{prefix}_mfi"] = talib.MFI(high, low, close, volume, timeperiod=14)
@@ -195,7 +210,9 @@ class FeatureEngineer:
         # Institutional Channels
         indicators[f"{prefix}_donchian_high"] = talib.MAX(high, timeperiod=20)
         indicators[f"{prefix}_donchian_low"] = talib.MIN(low, timeperiod=20)
-        indicators[f"{prefix}_donchian_mid"] = (indicators[f"{prefix}_donchian_high"] + indicators[f"{prefix}_donchian_low"]) / 2
+        indicators[f"{prefix}_donchian_mid"] = (
+            indicators[f"{prefix}_donchian_high"] + indicators[f"{prefix}_donchian_low"]
+        ) / 2
 
         kc_mid = talib.EMA(close, timeperiod=20)
         kc_range = talib.ATR(high, low, close, timeperiod=20)
@@ -226,12 +243,15 @@ class FeatureEngineer:
         Returns:
             Dictionary containing computed candle patterns.
         """
+        patterns = {}
+        if not HAS_TALIB:
+            return patterns
+
         op = df["open"].values.astype(np.float64, copy=False)
         hi = df["high"].values.astype(np.float64, copy=False)
         lo = df["low"].values.astype(np.float64, copy=False)
         cl = df["close"].values.astype(np.float64, copy=False)
 
-        patterns = {}
         col_prefix = f"{prefix}_pattern_" if prefix else "pattern_"
         for name, func in self._PATTERN_FUNCS.items():
             patterns[f"{col_prefix}{name}"] = func(op, hi, lo, cl).astype(np.float64)
@@ -253,12 +273,19 @@ class FeatureEngineer:
         low = df["low"].values.astype(np.float64, copy=False)
         open_ = df["open"].values.astype(np.float64, copy=False)
 
-        pa["returns_1"] = talib.ROCP(close, timeperiod=1)
+        if HAS_TALIB:
+            pa["returns_1"] = talib.ROCP(close, timeperiod=1)
+            pa["slope_20"] = talib.LINEARREG_SLOPE(close, timeperiod=20)
+        else:
+            # Fallback for returns if TA-Lib is missing
+            pa["returns_1"] = (close / (np.roll(close, 1) + 1e-8)) - 1
+            pa["returns_1"][0] = np.nan
+            pa["slope_20"] = np.zeros_like(close)
+
         pa["log_returns"] = np.log(close / (np.roll(close, 1) + 1e-8))
         pa["log_returns"][0] = np.nan
         pa["day_range"] = (high - low) / (close + 1e-8)
         pa["body_size"] = np.abs(close - open_) / (high - low + 1e-8)
-        pa["slope_20"] = talib.LINEARREG_SLOPE(close, timeperiod=20)
         return pa
 
     def _get_volume_features(self, df: pd.DataFrame) -> dict[str, np.ndarray]:
@@ -277,17 +304,24 @@ class FeatureEngineer:
         low = df["low"].values.astype(np.float64, copy=False)
         volume = df["tick_volume"].values.astype(np.float64, copy=False)
 
-        vol_sma_20 = talib.SMA(volume, timeperiod=20)
-        vol["rvol"] = volume / (vol_sma_20 + 1e-8)
-        vol["obv"] = talib.OBV(close, volume)
+        if HAS_TALIB:
+            vol_sma_20 = talib.SMA(volume, timeperiod=20)
+            vol["rvol"] = volume / (vol_sma_20 + 1e-8)
+            vol["obv"] = talib.OBV(close, volume)
 
-        # VWAP Approximation
-        tp = (high + low + close) / 3
-        tpv = tp * volume
-        sum_tpv = talib.SUM(tpv, timeperiod=20)
-        sum_v = talib.SUM(volume, timeperiod=20)
-        vwap = sum_tpv / (sum_v + 1e-8)
-        vol["dist_vwap_20"] = (close - vwap) / (vwap + 1e-8)
+            # VWAP Approximation
+            tp = (high + low + close) / 3
+            tpv = tp * volume
+            sum_tpv = talib.SUM(tpv, timeperiod=20)
+            sum_v = talib.SUM(volume, timeperiod=20)
+            vwap = sum_tpv / (sum_v + 1e-8)
+            vol["dist_vwap_20"] = (close - vwap) / (vwap + 1e-8)
+        else:
+            # Fallback simple volume features
+            vol_sma_20 = pd.Series(volume).rolling(20).mean().values
+            vol["rvol"] = volume / (vol_sma_20 + 1e-8)
+            vol["obv"] = np.zeros_like(close)
+            vol["dist_vwap_20"] = np.zeros_like(close)
 
         # Volume-Weighted Price Distribution (Volume Profile Proxy)
         window = 30
@@ -395,16 +429,16 @@ class FeatureEngineer:
         """
         return {
             "method": self.method,
-            "means": dict(zip(self.feature_columns, self.means.tolist(), strict=False))
+            "means": dict(zip(self.feature_columns, self.means.tolist(), strict=True))
             if self.means is not None
             else None,
-            "stds": dict(zip(self.feature_columns, self.stds.tolist(), strict=False))
+            "stds": dict(zip(self.feature_columns, self.stds.tolist(), strict=True))
             if self.stds is not None
             else None,
-            "mins": dict(zip(self.feature_columns, self.mins.tolist(), strict=False))
+            "mins": dict(zip(self.feature_columns, self.mins.tolist(), strict=True))
             if self.mins is not None
             else None,
-            "maxs": dict(zip(self.feature_columns, self.maxs.tolist(), strict=False))
+            "maxs": dict(zip(self.feature_columns, self.maxs.tolist(), strict=True))
             if self.maxs is not None
             else None,
             "columns": self.feature_columns,

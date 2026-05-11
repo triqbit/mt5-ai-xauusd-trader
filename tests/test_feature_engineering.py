@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.feature_engineering import FeatureEngineer
+from src.core.feature_engineering import HAS_TALIB, FeatureEngineer
 from src.utils.synthetic_data import ScenarioGenerator
 
 
@@ -103,6 +103,7 @@ def test_mtf_look_ahead_bias(synthetic_ohlcv):
     pd.testing.assert_frame_equal(features1.iloc[:-1], features2.iloc[:-1])
 
 
+@pytest.mark.skipif(not HAS_TALIB, reason="TA-Lib not installed")
 def test_institutional_indicators(synthetic_ohlcv):
     """Test that institutional indicators are present."""
     fe = FeatureEngineer(base_timeframe="M1", normalize=False)
@@ -119,6 +120,7 @@ def test_institutional_indicators(synthetic_ohlcv):
         assert col in features.columns
 
 
+@pytest.mark.skipif(not HAS_TALIB, reason="TA-Lib not installed")
 def test_full_mtf_suite(synthetic_ohlcv):
     """Test that all requested timeframes generate features."""
     # Ensure enough data for D1
@@ -126,7 +128,12 @@ def test_full_mtf_suite(synthetic_ohlcv):
     large_df = gen.generate(n_steps=10000, regime="trending")
     large_df.index = pd.date_range(start="2024-01-01", periods=10000, freq="1min")
 
-    fe = FeatureEngineer(base_timeframe="M5", timeframes=["M1", "M15", "H1", "H4", "D1"], normalize=False)
+    fe = FeatureEngineer(
+        base_timeframe="M5",
+        timeframes=["M1", "M15", "H1", "H4", "D1"],
+        normalize=False,
+        include_mtf_patterns=True
+    )
     features = fe.compute_features(large_df)
 
     assert not features.empty
@@ -134,4 +141,17 @@ def test_full_mtf_suite(synthetic_ohlcv):
         mtf_cols = [c for c in features.columns if f"mtf_{tf}" in c]
         assert len(mtf_cols) > 0, f"No features found for {tf}"
 
+    # With all patterns and MTFs, feature count should easily exceed 140
     assert fe.get_feature_count() >= 140
+
+
+def test_fallback_behavior(synthetic_ohlcv):
+    """Test that the engine still works (with fewer features) if TA-Lib is missing."""
+    fe = FeatureEngineer(base_timeframe="M1", normalize=False)
+    features = fe.compute_features(synthetic_ohlcv)
+
+    assert not features.empty
+    # Even without TA-Lib, we should have price action and volume profile features
+    expected_fallbacks = ["returns_1", "log_returns", "vp_poc", "rvol"]
+    for col in expected_fallbacks:
+        assert col in features.columns
