@@ -23,6 +23,7 @@ from datetime import date
 from typing import Dict, Optional
 
 from src.core.config import TradingConfig
+from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
@@ -81,6 +82,7 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        regime_info: Optional[RegimeInfo] = None,
     ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
@@ -101,7 +103,7 @@ class RiskManager:
             rejection_reason = "Risk-Reward ratio too low"
         elif not self._check_consecutive_losses():
             rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
+        elif not self._check_model_health(model_health, regime_info=regime_info):
             rejection_reason = "Model health metrics below threshold"
 
         passed = rejection_reason == ""
@@ -183,7 +185,7 @@ class RiskManager:
             return False
         return True
 
-    def _check_model_health(self, health: Optional[dict]) -> bool:
+    def _check_model_health(self, health: Optional[dict], regime_info: Optional[RegimeInfo] = None) -> bool:
         if health is None:
             return True
 
@@ -191,21 +193,44 @@ class RiskManager:
         accuracy = float(health.get("accuracy", 1.0))
         calibration = float(health.get("calibration", 0.0))
 
-        if drift > self.cfg.model_drift_threshold:
+        # Baseline thresholds from configuration
+        drift_threshold = self.cfg.model_drift_threshold
+        accuracy_floor = self.cfg.model_accuracy_floor
+        calibration_threshold = self.cfg.model_calibration_threshold
+
+        # Regime-Adaptive Guardrails (Institutional Safety)
+        regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
+
+        if regime == MarketRegime.NEWS_SHOCK:
+            # During news shocks, tighten drift and accuracy floors significantly
+            drift_threshold *= 0.5
+            accuracy_floor += 0.05
+            logger.info("Adaptive health: NEWS_SHOCK | drift_limit=%.2f acc_floor=%.2f", drift_threshold, accuracy_floor)
+        elif regime == MarketRegime.VOLATILE_BREAKOUT:
+            # Tighten drift limit during breakouts to avoid fakeouts
+            drift_threshold *= 0.75
+            logger.info("Adaptive health: VOLATILE_BREAKOUT | drift_limit=%.2f", drift_threshold)
+        elif regime == MarketRegime.MEAN_REVERSION:
+            # Calibration is critical for mean reversion (don't over-trade)
+            calibration_threshold *= 0.60
+            logger.info("Adaptive health: MEAN_REVERSION | cal_limit=%.2f", calibration_threshold)
+
+        if drift > drift_threshold:
             logger.warning(
-                "Model drift too high: %.2f > %.2f", drift, self.cfg.model_drift_threshold
+                "Model drift too high: %.2f > %.2f (regime: %s)", drift, drift_threshold, regime
             )
             return False
-        if accuracy < self.cfg.model_accuracy_floor:
+        if accuracy < accuracy_floor:
             logger.warning(
-                "Model accuracy too low: %.2f < %.2f", accuracy, self.cfg.model_accuracy_floor
+                "Model accuracy too low: %.2f < %.2f (regime: %s)", accuracy, accuracy_floor, regime
             )
             return False
-        if calibration > self.cfg.model_calibration_threshold:
+        if calibration > calibration_threshold:
             logger.warning(
-                "Model calibration error too high: %.2f > %.2f",
+                "Model calibration error too high: %.2f > %.2f (regime: %s)",
                 calibration,
-                self.cfg.model_calibration_threshold,
+                calibration_threshold,
+                regime,
             )
             return False
 
@@ -213,15 +238,17 @@ class RiskManager:
 
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
+        limit = self.cfg.max_drawdown
+        if drawdown >= limit:
             logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
+                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted (limit=%.1f%%)",
                 drawdown * 100,
+                limit * 100,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit {limit * 100:.1f}% limit",
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
@@ -250,7 +277,10 @@ class RiskManager:
             return False
         return True
 
-    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
+    def _check_minimum_confidence(self, confidence: float, threshold: Optional[float] = None) -> bool:
+        if threshold is None:
+            threshold = self.cfg.min_confidence
+
         if confidence < threshold:
             logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
             return False
