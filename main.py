@@ -399,11 +399,23 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    if direction != 0:
+                        open_positions = connector.get_positions(cfg.symbol)
+                        risk_decision = risk.approve(
+                            signal,
+                            market_data=df_raw,
+                            open_positions=open_positions,
+                            signal_id=signal_id,
+                            model_health=health,
+                        )
+                        risk_approved = risk_decision.is_approved
+                        if risk_approved:
+                            # Apply institutional sizing from the risk engine
+                            signal = signal.model_copy(
+                                update={"lot_size": risk_decision.adjusted_lot_size}
+                            )
+                    else:
+                        risk_approved = False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -578,7 +590,11 @@ def run_live(
                                 )
                 # 6. Check for closed positions to update logger
                 with profile("closed_positions_check"):
-                    current_positions = connector.get_positions(cfg.symbol)
+                    # Use cached positions if already fetched during risk check
+                    if direction != 0:
+                        current_positions = open_positions
+                    else:
+                        current_positions = connector.get_positions(cfg.symbol)
                     current_tickets = {p["ticket"] for p in current_positions}
 
                     closed_tickets = []

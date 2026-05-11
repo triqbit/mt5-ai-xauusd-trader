@@ -4,17 +4,19 @@ Verifies the 8-layer safety cascade, consecutive loss blocking, and model calibr
 """
 
 import pytest
+import pandas as pd
 from unittest.mock import MagicMock, patch
 from datetime import date
-from src.trading.risk_manager import RiskManager, DailyStats
+from src.trading.risk_manager import RiskManager
 from src.trading.audited_risk_manager import AuditedRiskManager
-from src.core.schemas import TradeSignal
+from src.core.schemas import DailyStats, TradeSignal
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 
 @pytest.fixture
 def mock_config():
     cfg = MagicMock(spec=TradingConfig)
+    cfg.symbol = "XAUUSD"
     cfg.max_daily_loss = 0.05
     cfg.max_positions = 5
     cfg.risk_per_trade = 0.01
@@ -23,6 +25,10 @@ def mock_config():
     cfg.model_drift_threshold = 0.3
     cfg.model_accuracy_floor = 0.5
     cfg.model_calibration_threshold = 0.25
+    cfg.min_lot_size = 0.01
+    cfg.max_trades_per_day = 100
+    cfg.max_single_direction_pct = 0.30
+    cfg.max_total_notional_pct = 10.0
     cfg.telegram_token = MagicMock()
     cfg.telegram_token.get_secret_value.return_value = ""
     return cfg
@@ -35,12 +41,19 @@ def mock_signal():
         entry_price=2000.0,
         stop_loss=1990.0,
         take_profit=2020.0,
-        lot_size=0.1,
+        lot_size=0.01,
         confidence=0.7,
         algorithm="ensemble"
     )
 
-def test_risk_manager_consecutive_losses(mock_config, mock_signal):
+@pytest.fixture
+def mock_market_data():
+    return pd.DataFrame({
+        "close": [2000.0] * 10,
+        "atr": [5.0] * 10
+    })
+
+def test_risk_manager_consecutive_losses(mock_config, mock_signal, mock_market_data):
     """Verify that RiskManager blocks trades after max consecutive losses."""
     rm = RiskManager(mock_config, account_balance=10000.0)
 
@@ -48,39 +61,39 @@ def test_risk_manager_consecutive_losses(mock_config, mock_signal):
     rm.record_pnl(-100.0)
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 2
-    assert rm.approve(mock_signal) is True
+    assert rm.approve(mock_signal, market_data=mock_market_data, open_positions=[]).is_approved is True
 
     # 2. Third loss (hit limit) - should reject
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 3
-    assert rm.approve(mock_signal) is False
+    assert rm.approve(mock_signal, market_data=mock_market_data, open_positions=[]).is_approved is False
 
     # 3. Reset on profit
     rm.record_pnl(50.0)
     assert rm.daily.consecutive_losses == 0
-    assert rm.approve(mock_signal) is True
+    assert rm.approve(mock_signal, market_data=mock_market_data, open_positions=[]).is_approved is True
 
-def test_risk_manager_model_health(mock_config, mock_signal):
+def test_risk_manager_model_health(mock_config, mock_signal, mock_market_data):
     """Verify that RiskManager blocks trades based on model health metrics."""
     rm = RiskManager(mock_config, account_balance=10000.0)
 
     # 1. Healthy model
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is True
+    assert rm.approve(mock_signal, market_data=mock_market_data, open_positions=[], model_health=health).is_approved is True
 
     # 2. High drift
     health = {"drift": 0.4, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.approve(mock_signal, market_data=mock_market_data, open_positions=[], model_health=health).is_approved is False
 
     # 3. Low accuracy
     health = {"drift": 0.1, "accuracy": 0.4, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.approve(mock_signal, market_data=mock_market_data, open_positions=[], model_health=health).is_approved is False
 
     # 4. High calibration error
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.3}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.approve(mock_signal, market_data=mock_market_data, open_positions=[], model_health=health).is_approved is False
 
-def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
+def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal, mock_market_data):
     """Verify that AuditedRiskManager traces all 8 layers."""
     with patch("src.trading.audited_risk_manager.get_audit_logger") as mock_get_audit:
         mock_audit = MagicMock()
@@ -90,15 +103,15 @@ def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
 
         # Test approval with all 8 layers passing
         health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.1}
-        arm.approve(mock_signal, model_health=health)
+        arm.approve(mock_signal, market_data=mock_market_data, open_positions=[], model_health=health)
 
         # Verify the decision chain passed to log_risk_decision
         call_args = mock_audit.log_risk_decision.call_args[1]
         decision_chain = call_args["decision_chain"]
 
         expected_layers = [
-            "circuit_breaker", "daily_loss", "max_positions", "symbol_allocation",
-            "min_confidence", "risk_reward", "consecutive_losses", "model_health"
+            "layer1_drawdown", "layer2_daily_loss", "layer3_activity", "layer4_exposure",
+            "layer5_symbol", "layer6_confidence", "layer7_risk_reward", "layer8_model_health"
         ]
         for layer in expected_layers:
             assert layer in decision_chain

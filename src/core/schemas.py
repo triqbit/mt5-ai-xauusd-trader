@@ -16,12 +16,43 @@ License: MIT
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Any
+import datetime
+from datetime import UTC
+from typing import Any, Dict, List, Optional
 
+import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.core.constants import SYMBOL_PATTERN, SignalDirection
+
+
+class DailyStats(BaseModel):
+    """
+    Intraday PnL tracker reset each trading day.
+    Captures mutable performance state for the risk engine.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    date: datetime.date = Field(default_factory=datetime.date.today)
+    realised_pnl: float = 0.0
+    trade_count: int = 0
+    peak_equity: float = 0.0
+    consecutive_losses: int = 0
+
+
+class RiskDecision(BaseModel):
+    """
+    Structured decision from the RiskManager.
+    Captures the result of the 8-layer cascading risk filter.
+    """
+
+    is_approved: bool = Field(..., description="Final approval status")
+    reason: str = Field("", description="Primary reason for rejection, if any")
+    adjusted_lot_size: float = Field(0.0, description="Calculated lot size after risk scaling")
+    trace: Dict[str, bool] = Field(
+        default_factory=dict, description="Audit trace of all 8 cascade layers"
+    )
 
 
 class TradeSignal(BaseModel):
@@ -60,8 +91,8 @@ class TradeSignal(BaseModel):
         le=1.0,
         description="The model's confidence score (0.0 to 1.0). Higher means more certainty.",
     )
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+    timestamp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(UTC),
         description="The UTC timestamp when the signal was generated",
     )
 

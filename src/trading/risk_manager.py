@@ -18,13 +18,13 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import DailyStats, RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
@@ -40,17 +40,6 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
     "USDJPY": 0.08,  # JPY - carry trade
     "EURJPY": 0.07,  # EUR/JPY cross
 }
-
-
-@dataclass
-class DailyStats:
-    """Intraday PnL tracker reset each trading day."""
-
-    date: date = field(default_factory=date.today)
-    realised_pnl: float = 0.0
-    trade_count: int = 0
-    peak_equity: float = 0.0
-    consecutive_losses: int = 0
 
 
 class RiskManager:
@@ -79,32 +68,53 @@ class RiskManager:
     def approve(
         self,
         signal: TradeSignal,
+        market_data: pd.DataFrame,
+        open_positions: List[Dict[str, Any]],
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
-        Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
-        """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
-        elif not self._check_consecutive_losses():
-            rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
-            rejection_reason = "Model health metrics below threshold"
+        Validate a trade signal against the 8-layer cascade.
 
-        passed = rejection_reason == ""
+        Layers:
+          1. Circuit Breakers (Equity Drawdown).
+          2. Daily Loss Limits (Cascading Levels).
+          3. Activity Limits (Max Daily Trades, Max Consecutive Losses).
+          4. Exposure Limits (Max Concurrent Positions, Single Direction, Total Notional).
+          5. Symbol Allocation (Approved Portfolio).
+          6. Prediction Limits (Min Confidence).
+          7. Risk-Reward Validation (Institutional R:R ratio).
+          8. Model Health (Drift, Accuracy, Calibration).
+
+        Returns:
+            RiskDecision: Approval status, reason, and adjusted lot size.
+        """
+        trace = {
+            "layer1_drawdown": self._check_circuit_breaker(),
+            "layer2_daily_loss": self._check_daily_loss(),
+            "layer3_activity": self._check_consecutive_losses()
+            and self.daily.trade_count < self.cfg.max_trades_per_day,
+            "layer4_exposure": self._check_max_positions()
+            and self._check_directional_exposure(signal, open_positions)
+            and self._check_total_notional(signal, open_positions, market_data),
+            "layer5_symbol": self._check_symbol_allocation(signal.symbol),
+            "layer6_confidence": self._check_minimum_confidence(signal.confidence),
+            "layer7_risk_reward": self._check_risk_reward(signal),
+            "layer8_model_health": self._check_model_health(model_health),
+        }
+
+        passed = all(trace.values())
+        rejection_reason = ""
+        if not passed:
+            rejection_reason = next((k for k, v in trace.items() if not v), "Unknown rejection")
+
+        adjusted_lots = 0.0
+        if passed:
+            adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
+            if adjusted_lots < self.cfg.min_lot_size:
+                passed = False
+                rejection_reason = f"Calculated lot size {adjusted_lots} below minimum"
+
         if not passed:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
@@ -119,7 +129,111 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+
+        return RiskDecision(
+            is_approved=passed,
+            reason=rejection_reason if not passed else "Approved",
+            adjusted_lot_size=adjusted_lots,
+            trace=trace,
+        )
+
+    def calculate_position_size(self, symbol: str, market_data: pd.DataFrame) -> float:
+        """
+        ATR-based position sizing according to RISK_LIMITS.md.
+        """
+        if market_data.empty or "atr" not in market_data.columns:
+            return self.cfg.min_lot_size
+
+        current_atr = market_data["atr"].iloc[-1]
+        # Approx 30 days of M5 (Assuming 24/5 trading)
+        avg_atr = market_data["atr"].tail(8640).mean()
+
+        vol_multiplier = 1.0
+        ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
+
+        if ratio > getattr(self.cfg, "volatility_extreme_threshold", 3.0):
+            return 0.0
+        elif ratio > getattr(self.cfg, "volatility_very_high_threshold", 2.0):
+            vol_multiplier = 0.5
+        elif ratio > getattr(self.cfg, "volatility_high_threshold", 1.5):
+            vol_multiplier = 0.75
+
+        loss_multiplier = self.get_size_multiplier_from_loss()
+        total_multiplier = vol_multiplier * loss_multiplier
+
+        if total_multiplier <= 0:
+            return 0.0
+
+        # Sizing: risk X% of balance
+        risk_amount = self.balance * self.cfg.risk_per_trade
+        # ATR * 100 converts gold ATR to $ per lot
+        lot_size = (risk_amount / (current_atr * 100)) * total_multiplier
+
+        # Cap at Max Position Size (e.g. 10% of equity)
+        max_notional_pct = getattr(self.cfg, "max_position_size_pct", 0.10)
+        max_notional = self.balance * max_notional_pct
+        price = market_data["close"].iloc[-1]
+        max_lots = max_notional / (price * 100)
+
+        final_lots = min(lot_size, max_lots)
+        final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
+
+        return final_lots
+
+    def get_size_multiplier_from_loss(self) -> float:
+        """Multiplier based on daily loss level."""
+        level = self.get_daily_loss_level()
+        mapping = {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.25, 4: 0.0}
+        return mapping.get(level, 0.0)
+
+    def get_daily_loss_level(self) -> int:
+        """Calculate daily loss level (0-4)."""
+        if self.daily.peak_equity <= 0 or self.daily.realised_pnl >= 0:
+            return 0
+
+        loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
+
+        if loss_pct >= self.cfg.max_daily_loss:
+            return 4
+        if loss_pct >= getattr(self.cfg, "daily_loss_lvl3", 0.05):
+            return 3
+        if loss_pct >= getattr(self.cfg, "daily_loss_lvl2", 0.03):
+            return 2
+        if loss_pct >= getattr(self.cfg, "daily_loss_lvl1", 0.015):
+            return 1
+        return 0
+
+    def _check_directional_exposure(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]]
+    ) -> bool:
+        """Layer 4: 30% net directional exposure."""
+        net_lots = 0.0
+        for pos in open_positions:
+            vol = pos.get("volume", 0.0)
+            if pos.get("type") == 0:  # BUY
+                net_lots += vol
+            else:  # SELL
+                net_lots -= vol
+
+        # Use signal's suggested lot size for estimation
+        # Note: signal.lot_size is frozen/immutable in the Pydantic schema
+        net_lots += signal.lot_size if signal.direction > 0 else -signal.lot_size
+        price_estimate = 2300.0  # Gold estimate
+        notional = abs(net_lots) * price_estimate * 100
+        exposure_pct = notional / self.balance if self.balance > 0 else 1.0
+
+        max_dir_pct = getattr(self.cfg, "max_single_direction_pct", 0.30)
+        return exposure_pct <= max_dir_pct
+
+    def _check_total_notional(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
+    ) -> bool:
+        """Layer 4: Total notional < 1000% equity (10x leverage)."""
+        total_lots = sum(pos.get("volume", 0.0) for pos in open_positions) + signal.lot_size
+        price = market_data["close"].iloc[-1] if not market_data.empty else 2300.0
+        total_notional = total_lots * price * 100
+        max_notional_pct = getattr(self.cfg, "max_total_notional_pct", 10.0)
+        return total_notional < (self.balance * max_notional_pct)
 
     def size_position(
         self,
@@ -268,4 +382,4 @@ class RiskManager:
         return True
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]
+__all__ = ["ALLOCATION_WEIGHTS", "RiskManager"]
