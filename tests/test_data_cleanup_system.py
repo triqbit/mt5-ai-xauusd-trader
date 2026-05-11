@@ -108,7 +108,7 @@ def test_cleanup_backtests(test_env):
     assert new_bt.exists()
 
     # Check if archive exists
-    archives = list(archive_dir.glob("archive_backtests_*.tar.gz"))
+    archives = list(archive_dir.glob("research/archive_backtests_*.tar.gz"))
     assert len(archives) == 1
     assert Path(str(archives[0]) + ".sha256").exists()
 
@@ -202,11 +202,11 @@ def test_cleanup_database_retention(test_env):
         assert len(audits) == 0
 
     # Verify Archives
-    assert len(list(archive_dir.glob("archive_risk_events_*.csv"))) == 1
-    assert len(list(archive_dir.glob("archive_performance_metrics_*.csv"))) == 1
-    assert len(list(archive_dir.glob("archive_trades_*.csv"))) == 1
-    assert len(list(archive_dir.glob("archive_audit_log_*.csv"))) == 1
-    assert len(list(archive_dir.glob("*.sha256"))) >= 4
+    assert len(list(archive_dir.glob("audit/archive_risk_events_*.csv"))) == 1
+    assert len(list(archive_dir.glob("performance/archive_performance_metrics_*.csv"))) == 1
+    assert len(list(archive_dir.glob("compliance/archive_trades_*.csv"))) == 1
+    assert len(list(archive_dir.glob("audit/archive_audit_log_*.csv"))) == 1
+    assert len(list(archive_dir.glob("**/*.sha256"))) >= 4
 
 def test_check_disk_space(test_env):
     archive_dir = test_env["archive_dir"]
