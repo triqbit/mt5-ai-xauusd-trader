@@ -106,7 +106,12 @@ python main.py --check
 ```
 
 ### 2. Configuration
-Create a `.env` file based on `src/core/config.py` defaults:
+The system features a **Guided Setup**. Simply run the bot, and it will offer to initialize your configuration:
+```bash
+python main.py
+```
+
+Alternatively, create a `.env` file manually:
 ```env
 MT5_LOGIN=your_account
 MT5_PASSWORD=your_password
@@ -115,7 +120,12 @@ MODE=demo
 ```
 
 ### 3. Execution
+The CLI is designed to be **resilient**. Diagnostic commands work even if dependencies are not yet installed:
+
 ```bash
+# Get help and usage examples (always available)
+python main.py --help
+
 # Verify environment and dependencies
 python main.py --doctor
 
