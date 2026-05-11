@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   # -----------------------------------------------------------
-  # JOB 1: Validation - Quality, Security, Tests, Compliance
+  # JOB 1: Validation - Quality, Security, Tests, Compliance, Governance
   # -----------------------------------------------------------
   validate:
     name: Release Validation
@@ -65,7 +65,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses pytest pytest-cov
+          pip install ruff==0.4.3 mypy==1.10.0 pip-audit==2.7.3 pip-licenses==5.5.5 pytest pytest-cov
           pip install -r requirements-ci.txt
 
       - name: Ruff Check
@@ -115,6 +115,9 @@ jobs:
           MT5_SERVER: "test"
           MODE: "demo"
 
+      - name: Gate 4.8: Atlas Governance Audit
+        run: python scripts/atlas_audit.py
+
       - name: Validate Environment Config
         run: python scripts/validate_env.py
 
@@ -124,7 +127,7 @@ jobs:
       - name: Validate Release Notes
         run: python scripts/check_release_notes.py
 
-      - name: Research & QA Vitals
+      - name: Research & QA Vitals (Jules02 Integration)
         env:
           PYTHONPATH: .
         run: |
@@ -198,7 +201,7 @@ jobs:
 
       - name: Install Release Tools
         run: |
-          pip install pydantic pydantic-settings sqlalchemy alembic httpx
+          pip install pydantic pydantic-settings sqlalchemy alembic httpx tomli
           # Required for generate_config_docs.py, smoke_test.py, and package_release.sh validations
 
       - name: Calculate Next Version
