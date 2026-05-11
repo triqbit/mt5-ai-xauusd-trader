@@ -148,8 +148,16 @@ for f in "${MANDATORY_FILES[@]}"; do
     fi
 done
 
+# Verify mandatory directories
+if [ ! -d "${RELEASE_PATH}/migrations" ]; then
+    echo "Error: Mandatory directory migrations/ is missing."
+    exit 1
+fi
+
 # Generate SHA256 checksums
 pushd "${RELEASE_PATH}" > /dev/null
+# Ensure clean manifest
+rm -f "checksums.sha256"
 find . -type f ! -name "checksums.sha256" | sort | while read -r f; do
     sha256_cmd "$f" >> "checksums.sha256"
 done
