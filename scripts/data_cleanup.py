@@ -51,6 +51,12 @@ RETENTION_TRADES = 7 * 365
 RETENTION_AUDIT_LOG = 7 * 365
 RETENTION_BACKTESTS = 365
 
+# Archive retention in days
+RETENTION_ARCHIVE_COMPLIANCE = 7 * 365
+RETENTION_ARCHIVE_AUDIT = 2 * 365
+RETENTION_ARCHIVE_PERFORMANCE = 2 * 365
+RETENTION_ARCHIVE_RESEARCH = 365
+
 # Minimum required disk space in MB
 MIN_DISK_SPACE_MB = 500
 
@@ -90,16 +96,18 @@ def generate_checksum(filepath: Path) -> str:
     return checksum
 
 
-def archive_records(records: List[Any], table_name: str, archive_dir: Path) -> bool:
+def archive_records(records: List[Any], table_name: str, archive_dir: Path, category: str = "general") -> bool:
     """Export a list of SQLAlchemy model instances to a CSV file. Returns True if successful."""
     if not records:
         return True
 
-    if not archive_dir.exists():
-        archive_dir.mkdir(parents=True, exist_ok=True)
+    # Use category-specific subdirectory
+    target_dir = archive_dir / category
+    if not target_dir.exists():
+        target_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    filepath = archive_dir / f"archive_{table_name}_{timestamp}.csv"
+    filepath = target_dir / f"archive_{table_name}_{timestamp}.csv"
 
     logger.info(f"Archiving {len(records)} records from {table_name} to {filepath}...")
 
@@ -126,6 +134,47 @@ def archive_records(records: List[Any], table_name: str, archive_dir: Path) -> b
     except Exception as e:
         logger.error(f"Failed to archive {table_name}: {e}")
         return False
+
+
+def cleanup_archives(archive_dir: Path, dry_run: bool = False) -> int:
+    """Purge expired archives based on their category."""
+    if not archive_dir.exists():
+        return 0
+
+    count = 0
+    now = datetime.now(timezone.utc)
+
+    # Category -> Retention mapping
+    categories = {
+        "compliance": RETENTION_ARCHIVE_COMPLIANCE,
+        "audit": RETENTION_ARCHIVE_AUDIT,
+        "performance": RETENTION_ARCHIVE_PERFORMANCE,
+        "research": RETENTION_ARCHIVE_RESEARCH,
+    }
+
+    for category, retention_days in categories.items():
+        cat_dir = archive_dir / category
+        if not cat_dir.exists():
+            continue
+
+        cutoff = now - timedelta(days=retention_days)
+        logger.info(f"Checking {category} archives older than {cutoff.date()}...")
+
+        for archive_file in cat_dir.glob("*"):
+            if not archive_file.is_file():
+                continue
+
+            try:
+                mtime = datetime.fromtimestamp(archive_file.stat().st_mtime, tz=timezone.utc)
+                if mtime < cutoff:
+                    logger.info(f"{'[DRY RUN] ' if dry_run else ''}Deleting expired {category} archive: {archive_file.name}")
+                    if not dry_run:
+                        archive_file.unlink()
+                    count += 1
+            except Exception as e:
+                logger.error(f"Failed to delete archive {archive_file}: {e}")
+
+    return count
 
 
 def cleanup_logs(logs_dir: Path, dry_run: bool = False) -> int:
@@ -180,11 +229,12 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False, archive_dir: Pa
 
     # Archive before deletion
     if not dry_run:
-        if not archive_dir.exists():
-            archive_dir.mkdir(parents=True, exist_ok=True)
+        research_archive_dir = archive_dir / "research"
+        if not research_archive_dir.exists():
+            research_archive_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        archive_path = archive_dir / f"archive_backtests_{timestamp}.tar.gz"
+        archive_path = research_archive_dir / f"archive_backtests_{timestamp}.tar.gz"
 
         logger.info(f"Archiving {len(to_cleanup)} backtest files to {archive_path}...")
         try:
@@ -255,7 +305,7 @@ def cleanup_database(
             )
             if not dry_run:
                 # Archiving risk events (Audit 2-year category, archived before purge)
-                if archive_records(risk_records, "risk_events", archive_dir):
+                if archive_records(risk_records, "risk_events", archive_dir, category="audit"):
                     # Also archive associated signals and analysis before deleting risk events
                     signal_ids = {r.signal_id for r in risk_records if r.signal_id}
                     if signal_ids:
@@ -266,7 +316,7 @@ def cleanup_database(
                             .scalars()
                             .all()
                         )
-                        archive_records(signals_to_archive, "linked_risk_signals", archive_dir)
+                        archive_records(signals_to_archive, "linked_risk_signals", archive_dir, category="audit")
 
                         bsa_to_archive = (
                             session.execute(
@@ -278,7 +328,7 @@ def cleanup_database(
                             .all()
                         )
                         if bsa_to_archive:
-                            archive_records(bsa_to_archive, "linked_risk_bsa", archive_dir)
+                            archive_records(bsa_to_archive, "linked_risk_bsa", archive_dir, category="audit")
 
                     # Bulk delete
                     ids_to_delete = [r.id for r in risk_records]
@@ -298,7 +348,7 @@ def cleanup_database(
             )
             if not dry_run:
                 # Archiving performance metrics (Operational 2-year category, archived before purge)
-                if archive_records(perf_records, "performance_metrics", archive_dir):
+                if archive_records(perf_records, "performance_metrics", archive_dir, category="performance"):
                     ids_to_delete = [p.id for p in perf_records]
                     session.execute(
                         delete(PerformanceMetric).where(PerformanceMetric.id.in_(ids_to_delete))
@@ -318,7 +368,7 @@ def cleanup_database(
             )
             if not dry_run:
                 # Mandatory archival for Compliance data
-                if archive_records(trade_records, "trades", archive_dir):
+                if archive_records(trade_records, "trades", archive_dir, category="compliance"):
                     ids_to_delete = [t.id for t in trade_records]
 
                     # Also archive and delete associated execution quality records
@@ -332,7 +382,7 @@ def cleanup_database(
                         .all()
                     )
                     if eq_records:
-                        archive_records(eq_records, "execution_qualities", archive_dir)
+                        archive_records(eq_records, "execution_qualities", archive_dir, category="compliance")
                         results["execution_qualities"] = len(eq_records)
                         session.execute(
                             delete(ExecutionQuality).where(
@@ -350,7 +400,7 @@ def cleanup_database(
                             .scalars()
                             .all()
                         )
-                        archive_records(signals_to_archive, "linked_signals", archive_dir)
+                        archive_records(signals_to_archive, "linked_signals", archive_dir, category="compliance")
 
                         bsa_to_archive = (
                             session.execute(
@@ -362,7 +412,7 @@ def cleanup_database(
                             .all()
                         )
                         if bsa_to_archive:
-                            archive_records(bsa_to_archive, "linked_bsa", archive_dir)
+                            archive_records(bsa_to_archive, "linked_bsa", archive_dir, category="compliance")
 
                     session.execute(delete(Trade).where(Trade.id.in_(ids_to_delete)))
                 else:
@@ -441,7 +491,7 @@ def cleanup_database(
             logger.info(f"{'[DRY RUN] ' if dry_run else ''}Purging {len(audit_records)} audit log entries older than {audit_cutoff.date()}")
             if not dry_run:
                 # Mandatory archival for Audit data
-                if archive_records(audit_records, "audit_log", archive_dir):
+                if archive_records(audit_records, "audit_log", archive_dir, category="audit"):
                     ids_to_delete = [a.id for a in audit_records]
                     session.execute(delete(AuditEntry).where(AuditEntry.id.in_(ids_to_delete)))
                 else:
@@ -449,6 +499,25 @@ def cleanup_database(
 
         if not dry_run:
             session.commit()
+
+            # Reclaim space for SQLite
+            if "sqlite" in db_url.lower():
+                try:
+                    from sqlalchemy import text
+                    session.execute(text("VACUUM"))
+                    logger.info("Executed VACUUM on primary database.")
+                except Exception as e:
+                    logger.error(f"Failed to VACUUM database: {e}")
+
+            if audit_db_url and audit_db_url != db_url and "sqlite" in audit_db_url.lower():
+                # For audit DB if separate
+                with AuditSession() as audit_session:
+                    try:
+                        from sqlalchemy import text
+                        audit_session.execute(text("VACUUM"))
+                        logger.info("Executed VACUUM on audit database.")
+                    except Exception as e:
+                        logger.error(f"Failed to VACUUM audit database: {e}")
 
     return results
 
@@ -514,6 +583,10 @@ def main():
     # Filesystem cleanup - Backtests
     backtest_count = cleanup_backtests(backtest_dir, dry_run=args.dry_run, archive_dir=archive_dir)
     logger.info(f"Backtest cleanup complete. Total files processed: {backtest_count}")
+
+    # Filesystem cleanup - Expired Archives
+    archive_count = cleanup_archives(archive_dir, dry_run=args.dry_run)
+    logger.info(f"Archive cleanup complete. Total archives deleted: {archive_count}")
 
     # Database cleanup
     db_results = cleanup_database(db_url, audit_db_url=audit_db_url, dry_run=args.dry_run, archive_dir=archive_dir)

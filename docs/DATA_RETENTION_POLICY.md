@@ -48,15 +48,26 @@ Prior to purging, data in the **Compliance**, **Audit**, **Operational (Performa
 - **Format**:
   - Database records are exported to compressed CSV format.
   - Filesystem-based research data (Backtest Results) is bundled into compressed `.tar.gz` archives.
-- **Destination**: Archives are stored in the `archives/` directory or enterprise cold-storage (e.g., AWS S3 Glacier).
+- **Destination**: Archives are stored in type-specific subdirectories within the `archives/` directory:
+  - `archives/compliance/`: Trade records and execution quality analytics.
+  - `archives/audit/`: Audit logs and risk events.
+  - `archives/performance/`: Performance metrics and snapshots.
+  - `archives/research/`: Backtest results and research artifacts.
 - **Integrity**: SHA256 checksums are generated for each archive file to ensure immutability.
 
-### 4.2 Automated Purging Schedule
+### 4.2 Archive Lifecycle Management
+Archives themselves are subject to a retention policy to prevent indefinite storage growth:
+- **Compliance Archives**: Kept for 7 years from the date of archival.
+- **Audit/Performance Archives**: Kept for 2 years from the date of archival.
+- **Research Archives**: Kept for 1 year from the date of archival.
+- **Cleanup**: The `scripts/data_cleanup.py` script is responsible for purging expired archives.
+
+### 4.3 Automated Purging Schedule
 The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a regular schedule.
 - **Recommended Schedule**: Weekly (Sundays at 00:00).
 - **Automation**: Managed via cron or CI/CD scheduled workflows.
 
-### 4.3 Safe Deletion Logic
+### 4.4 Safe Deletion Logic
 - **Foreign Key Integrity**: The cleanup script ensures that `model_signals` linked to `trades` or `risk_events` are NOT deleted if the parent record is still within its retention window.
 - **Dry-Run Mode**: All cleanup operations must support a `--dry-run` flag to verify deletions before execution.
 - **Logging**: Every cleanup operation is logged to the system audit trail.
