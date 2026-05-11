@@ -223,8 +223,22 @@ def test_market_session_detection(analyzer):
 
 def test_execution_quality_persistence(analyzer):
     """Test that execution quality metrics can be persisted to DB."""
+    # Since foreign keys are now enforced, we must create a trade first
+    with analyzer.Session() as session:
+        trade = Trade(
+            ticket=1001,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2000.0,
+            lot_size=0.1,
+            status="CLOSED"
+        )
+        session.add(trade)
+        session.commit()
+        trade_id = trade.id
+
     quality_data = TradeExecutionQuality(
-        trade_id=1, ticket=1001, symbol="XAUUSD", slippage_pips=1.2,
+        trade_id=trade_id, ticket=1001, symbol="XAUUSD", slippage_pips=1.2,
         execution_latency_ms=250.0, fill_quality_score=0.85,
         edge_capture=0.6, session="London", post_entry_drift_5m=0.5,
         post_entry_drift_15m=1.2, timing_efficiency=0.75,
@@ -237,7 +251,7 @@ def test_execution_quality_persistence(analyzer):
     analyzer.save_execution_quality(quality_data)
 
     with analyzer.Session() as session:
-        saved = session.query(ExecutionQuality).filter_by(trade_id=1).first()
+        saved = session.query(ExecutionQuality).filter_by(trade_id=trade_id).first()
         assert saved is not None
         assert saved.broker_slippage_pips == 0.9
         assert saved.effective_spread_pips == 2.0

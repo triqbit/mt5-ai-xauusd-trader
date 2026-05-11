@@ -382,3 +382,8 @@ The trade logging system has been implemented in `src/core/trade_logger.py` usin
 - Mandatory audit columns via `AuditMixin`.
 - SQLite compatibility using `render_as_batch=True`.
 - Automated performance reporting (Sharpe, Profit Factor, Max Drawdown).
+
+### Implementation Note (v1.2) - SQLite Hardening
+To ensure enterprise-grade reliability when using SQLite:
+- **Foreign Key Enforcement**: Enabled via SQLAlchemy event listeners (`PRAGMA foreign_keys=ON`). This ensures relational integrity that is disabled by default in SQLite.
+- **Write-Ahead Logging (WAL)**: Enabled via `PRAGMA journal_mode=WAL` to improve concurrency (allowing multiple readers and one writer) and provide better durability and performance.
