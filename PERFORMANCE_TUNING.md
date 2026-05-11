@@ -159,6 +159,8 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 - **Vectorized Backtest Loops**: In `BacktestEngine.run_walk_forward`, we pre-calculate all execution filter metrics (ATR, EMA, RSI, and slopes) outside the main walk-forward loop. Complexity is reduced from $O(N^2)$ to $O(N)$ by eliminating redundant slicing and rolling calculations.
 - **TradeLogger Caching**: Implemented an intelligent cache for performance reports in `TradeLogger` that invalidates only on trade closure. This prevents redundant database I/O and $O(N)$ P&L recalculations on every tick evaluation in live mode.
 - **Precomputed Execution Filters**: `ExecutionFilter.validate` now supports a `precomputed_metrics` parameter, enabling it to bypass all internal DataFrame processing when metrics are supplied by an optimized loop (like the backtester).
+- **Optional MTF Patterns**: `FeatureEngineer` now defaults to `include_mtf_patterns=False`. Disabling expensive candle pattern recognition on higher timeframes provides a ~60% speedup for large datasets (e.g., 50,000 bars) and reduces feature matrix dimensionality.
+- **Resilient NaN Handling**: `FeatureEngineer` now only drops rows missing *base* features and uses forward-filling for MTF gaps, significantly increasing data utilization for short historical windows.
 
 ```python
 # Bad: List comprehension with function call

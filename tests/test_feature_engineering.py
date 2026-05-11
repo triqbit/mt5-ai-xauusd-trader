@@ -36,8 +36,9 @@ def test_compute_features_shape(synthetic_ohlcv):
     fe = FeatureEngineer(base_timeframe="M1", timeframes=["M5"], normalize=False)
     features = fe.compute_features(synthetic_ohlcv)
 
-    # Should have a large number of features (140+ requested, actual ~552)
-    assert features.shape[1] >= 140
+    # Should have a large number of features (140+ requested)
+    # Note: reduced by default as include_mtf_patterns=False
+    assert features.shape[1] >= 130
     assert not features.empty
 
     # Should not contain original OHLCV columns by default
