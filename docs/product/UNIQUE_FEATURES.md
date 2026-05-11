@@ -368,3 +368,38 @@ Generic bots either trade fully blindly or send simple "Price Hit" alerts. The M
 
 ## Future Differentiators (Candidates)
 - **Sentiment-Driven Order Routing** (Analyzing retail vs. institutional positioning)
+
+---
+
+## 11. Institutional Gold Flow & Physical Demand Proxies
+
+### What it is and why it matters
+**Institutional Gold Flow & Physical Demand Proxies** is a specialized data integration layer that tracks the movement of physical gold and its major investment vehicles (ETFs). It monitors daily flows in major Gold ETFs (e.g., GLD, IAU), central bank reserve updates, and price premiums/discounts on the Shanghai Gold Exchange (SGE).
+
+XAUUSD is unique because it is both a financial instrument and a physical commodity. While retail bots focus exclusively on "Paper Gold" (COMEX futures and Spot price action), institutional players closely watch the "Physical Floor." Understanding whether a price move is backed by physical accumulation or is merely speculative churning in the futures market is critical for identifying high-conviction trend reversals.
+
+### How it differentiates from generic trading bots
+Generic bots are "Physical Blind." They cannot distinguish between a speculative pump and a fundamental shift in demand. The MT5 AI Trader differentiates by detecting **Physical-Paper Divergences**. For example, if the spot price is falling but ETF inflows are accelerating and the Shanghai premium is rising, the system recognizes a "Value Zone" where physical demand is absorbing paper selling—marking a high-probability reversal point that retail bots would miss or even short into.
+
+### Architecture Outline
+1.  **Demand Harvester**: A scheduled task in `src/data/physical_intelligence.py` that fetches daily AUM changes for GLD/IAU and monitors the SGE vs. London Spot premium.
+2.  **Flow Integrity Module**: A mathematical module that computes the "Physical Support Score" (0 to 100) based on the rate of change in physical holdings relative to price volatility.
+3.  **Divergence Detector**: An analytical engine that flags "Bullish Physical Divergence" (Price Down / Flows Up) or "Bearish Physical Exhaustion" (Price Up / Flows Down).
+4.  **Ensemble Integration**: The Physical Support Score is injected as a high-order feature into the `EnsembleModel`, providing a fundamental "Anchor" to the technical signals.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Automated daily tracking of net flows for at least top 2 Gold ETFs (GLD, IAU). |
+| **Functional** | Real-time calculation of the Shanghai Gold Exchange (SGE) premium/discount relative to Spot. |
+| **Technical** | Integration of the "Physical Support Score" into the ensemble model's feature vector. |
+| **Operational** | Display "Physical Demand: [Strong/Neutral/Weak]" in the Decision Cockpit. |
+| **Release Readiness** | Backtest must demonstrate a reduction in "False Breakout" entries by 15% through physical demand filtering. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on demand-flow mathematics, divergence algorithms, and physical-to-signal mapping.
+*   **Jules01 (Core Development)**: Lead on data harvesting infrastructure for ETF and SGE data.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires reliable access to ETF AUM data (via YFinance or dedicated providers) and SGE price feeds.
+*   **Constraints**: Physical demand data is typically reported with a 24-hour lag; the system must utilize "Flow Momentum" to project intraday impact without look-ahead bias.
