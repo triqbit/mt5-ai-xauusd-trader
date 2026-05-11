@@ -53,12 +53,14 @@ python scripts/generate_triage_report.py
 3. **Blocked Release:** Release Reliability Engineer (Jules03).
 
 ## Verification Commands
-- `ruff check .`
-- `mypy src/ main.py scripts/`
-- `pytest tests/ --cov=src --cov-fail-under=85`
-- `python scripts/verify_version_sync.py`
-- `python scripts/verify_migrations.py`
-- `python scripts/validate_env.py`
-- `python scripts/atlas_audit.py`
-- `pip-audit`
-- `ls docs/status/PR_TRIAGE_DAILY.md`
+```bash
+ruff check .
+mypy src/ main.py scripts/
+pytest tests/ --cov=src --cov-fail-under=85
+python scripts/verify_version_sync.py
+python scripts/verify_migrations.py
+python scripts/validate_env.py
+python scripts/atlas_audit.py
+pip-audit
+ls docs/status/PR_TRIAGE_DAILY.md
+```

@@ -2,7 +2,7 @@
 **Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
-Safe procedures for reverting a "bad" release. This covers reverting Docker images, rolling back database schema migrations (Alembic), and restoring environment configuration.
+Standard procedures for rolling back the production environment to a last known stable state following a failed deployment. Aligned with the [Release Playbook](../RELEASE_PLAYBOOK.md).
 
 ## Step-by-Step Instructions
 
@@ -89,9 +89,8 @@ If the release failure was due to invalid environment variables:
 3. **Incident Post-Mortem:** Engineering Lead.
 
 ## Verification Commands
-- `docker ps | grep xauusd_trader`
-- `docker exec -it xauusd_trader alembic current`
-- `python scripts/smoke_test.py`
-- `python scripts/verify_version_sync.py`
-- `python scripts/verify_migrations.py`
-- `curl -s http://localhost:8000/metrics | grep system_version`
+```bash
+docker ps | grep xauusd_trader
+docker exec -it xauusd_trader alembic current
+python scripts/smoke_test.py
+```

@@ -2,79 +2,49 @@
 **Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
-Procedures for resolving connection failures between the trading bot and MetaTrader 5 (MT5) or the MetaAPI cloud gateway.
+Procedures for diagnosing and recovering from connection loss between the bot and MetaTrader 5 or MetaAPI.
 
 ## Step-by-Step Instructions
 
-### 1. Diagnose Connectivity
-- Run the system doctor: `python scripts/doctor.py`. This script checks connectivity to the database, Redis, and validates MT5/MetaAPI configuration.
-- Check logs for specific error patterns:
-  - `Failed to connect to MetaTrader 5` -> Local MT5 issue.
-  - `MetaAPI error: 401 Unauthorized` -> Token rotation needed.
-  - `MetaAPI error: 503 Service Unavailable` -> Cloud outage.
-- Verify environment variables in `.env`: `MT5_LOGIN`, `MT5_SERVER`, `MT5_PASSWORD`, `METAAPI_TOKEN`, `METAAPI_ACCOUNT_ID`.
-- Run the environment validation gate: `python scripts/validate_env.py`
+### 1. Identify Connection State
+Check the logs for connection errors:
+```bash
+docker logs xauusd_trader --tail 100 | grep -E "MT5|MetaAPI"
+```
+Common errors:
+- `Connection failed: terminal not found`: Check `MT5_PATH` in `.env`.
+- `Login failed: invalid credentials`: Check `MT5_LOGIN` and `MT5_PASSWORD`.
+- `MetaAPI: 401 Unauthorized`: Check `METAAPI_TOKEN`.
 
-### 2. Recover Local MT5 (Windows Environment)
-- Ensure the MT5 Terminal application is running.
-- Check the MT5 `Journal` tab for:
-  - "Invalid Account" -> Credentials error.
-  - "No Connection" -> Network or Broker server issue.
-- If the terminal is frozen, restart the application.
-- Verify that "Algo Trading" is enabled (Green icon) in the top toolbar.
-- **Audit Manual Action:** Record the manual restart:
-  ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'mt5_terminal_restart', 'Manually restarted local MT5 terminal to resolve connectivity', datetime('now'));"
-  ```
+### 2. Terminal Health Check
+If running locally or via Wine:
+1. Ensure the MT5 Terminal application is open and logged into the correct account.
+2. Verify "Algo Trading" is enabled (button is green).
+3. Ensure the symbol `XAUUSD` is present in the Market Watch.
 
-### 3. Recover MetaAPI (Cloud Gateway)
-- Verify `METAAPI_TOKEN` and `METAAPI_ACCOUNT_ID` are valid in the MetaAPI Dashboard.
-- Check MetaAPI status: `https://status.metaapi.cloud/`.
-- **Failover Diagnostics:**
-  - If local MT5 is persistently down, consider switching to MetaAPI cloud execution by updating `.env`:
-    ```env
-    USE_METAAPI=True
-    METAAPI_TOKEN=your_token
-    METAAPI_ACCOUNT_ID=your_id
-    ```
-- If using Docker, restart the container to force a reconnection:
-  ```bash
-  docker restart xauusd_trader
-  ```
-- **Audit Manual Action:** Record the failover/restart:
-  ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'system_reconnection', 'Restarted container or enabled MetaAPI failover', datetime('now'));"
-  ```
+### 3. Manual Reconnection
+Restart the bot to trigger a clean initialization:
+```bash
+docker restart xauusd_trader
+```
 
-### 4. Connection Stability Check
-- Once reconnected, verify price flow:
-  ```bash
-  # Check if the readiness probe returns 200 OK
-  curl -f http://localhost:8000/health/readiness
-  ```
-- Ensure `MT5_CONNECTION_STATUS` in Prometheus metrics is `1.0`:
-  ```bash
-  curl -s http://localhost:8000/metrics | grep mt5_connection_status
-  ```
-- Run a smoke test to verify all dependencies:
-  ```bash
-  python scripts/smoke_test.py
-  ```
+### 4. Failover Management
+If native MT5 connection is unstable and MetaAPI is configured:
+1. The bot will automatically attempt failover if `METAAPI_TOKEN` is present.
+2. Monitor logs to confirm "Connected via MetaAPI cloud gateway".
 
 ## Expected Outcomes
-- `scripts/doctor.py` reports `PASSED` for all connectivity checks.
-- Application logs show active price updates for `XAUUSD`.
-- The readiness probe `/health/readiness` returns a `200 OK` status.
+- Logs show "Successfully connected to MT5".
+- `HealthChecker` reports `mt5` component as `healthy`.
+- Live tick data begins flowing in the console/dashboard.
 
 ## Escalation Path
-1. **Trading Connectivity:** Trading Ops (@maintainer-trading).
-2. **Platform Stability:** Release Reliability Engineer (Jules03).
-3. **Broker Issues:** Contact Broker Support via the Client Portal.
+1. **Persistent Auth Errors:** Broker Support.
+2. **MetaAPI Outage:** MetaAPI Status Page / Support.
+3. **Internal Connector Bugs:** Jules01 (Trading Lead).
 
 ## Verification Commands
-- `python scripts/doctor.py`
-- `python scripts/validate_env.py`
-- `python scripts/smoke_test.py`
-- `curl -i http://localhost:8000/health/readiness`
-- `curl -s http://localhost:8000/metrics | grep mt5_connection_status`
-- `docker logs xauusd_trader --tail 50`
+```bash
+python scripts/doctor.py
+curl -s http://localhost:8000/health/readiness
+```

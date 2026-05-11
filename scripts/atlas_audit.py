@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
-Atlas Governance Auditor
+Atlas Governance Auditor - Enterprise Edition
 Verifies synchronization between policy (RISK_LIMITS.md) and implementation (src/core/config.py),
-ensures mandatory runbook integrity, and validates artifact compliance.
+ensures mandatory runbook integrity, validates artifact compliance, and enforces
+pre-production checklist completion and security standards.
+
+Author: Atlas 🗺️ (Release Readiness Guardian)
 """
 
 import sys
@@ -84,14 +87,21 @@ def check_runbooks():
 
         content = rb_path.read_text()
         for section in mandatory_sections:
-            if f"## {section}" not in content and f"# {section}" not in content:
-                # Some might use slightly different headers, let's be a bit flexible but firm
-                if not re.search(rf"^[#]{{1,3}}\s+{section}", content, re.MULTILINE):
-                    print(f"[-] Runbook {rb} missing mandatory section: {section}")
+            pattern = rf"^[#]{{1,3}}\s+{section}"
+            if not re.search(pattern, content, re.MULTILINE):
+                print(f"[-] Runbook {rb} missing mandatory section: {section}")
+                success = False
+            elif section == "Verification Commands":
+                # Ensure the section actually contains code blocks (```)
+                # Find content between this header and the next header
+                sec_pattern = rf"^[#]{{1,3}}\s+{section}\n(.*?)(?=^[#]{{1,3}}\s+|$)"
+                sec_match = re.search(sec_pattern, content, re.MULTILINE | re.DOTALL)
+                if sec_match and "```" not in sec_match.group(1):
+                    print(f"[-] Runbook {rb} Verification Commands section missing actual code blocks (```)")
                     success = False
 
     if success:
-        print("[+] All mandatory runbooks present and structured.")
+        print("[+] All mandatory runbooks present and structured with executable commands.")
     return success
 
 def check_artifact_compliance():
@@ -122,23 +132,122 @@ def check_artifact_compliance():
     return success
 
 def check_preprod_checklist():
-    print("Checking PREPROD_CHECKLIST.md compliance...")
+    print("Checking PREPROD_CHECKLIST.md strict compliance...")
     checklist_path = Path("docs/PREPROD_CHECKLIST.md")
+    pyproject_path = Path("pyproject.toml")
+
     if not checklist_path.exists():
         print("[-] docs/PREPROD_CHECKLIST.md missing.")
         return False
 
     content = checklist_path.read_text()
+    success = True
+
+    # 1. Check for uncompleted items
+    # Note: We exclude the status selection line which contains both [x] and [ ]
     if "[ ]" in content:
-        print("[-] PREPROD_CHECKLIST.md contains uncompleted items.")
-        # Find lines with [ ]
         lines = content.splitlines()
+        uncompleted = []
         for i, line in enumerate(lines):
-            if "[ ]" in line:
-                print(f"    Line {i+1}: {line.strip()}")
+            if "[ ]" in line and "**Status:**" not in line:
+                uncompleted.append((i+1, line.strip()))
+
+        if uncompleted:
+            print("[-] PREPROD_CHECKLIST.md contains uncompleted items.")
+            for line_no, text in uncompleted:
+                print(f"    Line {line_no}: {text}")
+            success = False
+
+    # 2. Verify Version Synchronization
+    if pyproject_path.exists():
+        py_content = pyproject_path.read_text()
+        v_match = re.search(r'^version\s*=\s*"([^"]+)"', py_content, re.MULTILINE)
+        if v_match:
+            expected_version = v_match.group(1)
+            # Find version in checklist: **Release Version:** `v__________________`
+            cv_match = re.search(r"\*\*Release Version:\*\*\s*`v([^`]+)`", content)
+            if cv_match:
+                actual_version = cv_match.group(1).strip("_")
+                if actual_version != expected_version:
+                    print(f"[-] Checklist version mismatch: Found 'v{actual_version}', expected 'v{expected_version}'")
+                    success = False
+                else:
+                    print(f"[+] Checklist version 'v{actual_version}' synchronized.")
+            else:
+                 print("[-] Could not find Release Version marker in PREPROD_CHECKLIST.md")
+                 success = False
+
+    # 3. Verify Signatures (Non-empty placeholders)
+    # **Verified By (Operator):** ____________________
+    # **Approval (Governance):** ____________________
+    sig_fields = [
+        ("Verified By", r"\*\*Verified By \(Operator\):\*\*\s*(.+)"),
+        ("Approval", r"\*\*Approval \(Governance\):\*\*\s*(.+)")
+    ]
+    for label, pattern in sig_fields:
+        match = re.search(pattern, content)
+        if not match or "____" in match.group(1) or not match.group(1).strip():
+            print(f"[-] Checklist signature missing: {label}")
+            success = False
+        else:
+            print(f"[+] Checklist signature found for {label}.")
+
+    # 4. Verify GO status
+    # **Status:** [x] **GO** / [ ] **NO-GO**
+    if "**Status:** [x] **GO**" not in content:
+        print("[-] Checklist Status is NOT set to [x] GO.")
+        success = False
+    else:
+        print("[+] Checklist Status set to GO.")
+
+    if success:
+        print("[+] PREPROD_CHECKLIST.md is complete and verified.")
+    return success
+
+def check_governance_vitals():
+    print("Checking Governance Vitals existence...")
+    mandatory_files = [
+        ".github/CODEOWNERS",
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".github/ISSUE_TEMPLATE/bug_report.yml",
+        ".github/ISSUE_TEMPLATE/feature_request.yml",
+        ".github/ISSUE_TEMPLATE/security_report.yml",
+        "docs/CONTRIBUTING.md",
+        "docs/PREPROD_CHECKLIST.md",
+        "docs/ENTERPRISE_STANDARDS.md",
+        "docs/LICENSE_COMPLIANCE.md",
+        "docs/DEPENDENCY_LICENSES.md",
+        "docs/SLO_TARGETS.md",
+        "docs/VERSIONING_POLICY.md",
+        "SECURITY.md",
+    ]
+
+    success = True
+    for f in mandatory_files:
+        path = Path(f)
+        if not path.exists():
+            print(f"[-] Mandatory governance file missing: {f}")
+            success = False
+        else:
+            print(f"[+] Governance file present: {f}")
+
+    return success
+
+def check_docker_security():
+    print("Checking Docker Security Standards...")
+    dockerfile_path = Path("Dockerfile")
+    if not dockerfile_path.exists():
+        print("[-] Dockerfile missing.")
         return False
 
-    print("[+] PREPROD_CHECKLIST.md is complete.")
+    content = dockerfile_path.read_text()
+
+    # Enforce non-root USER instruction
+    if not re.search(r"^USER\s+\w+", content, re.MULTILINE):
+        print("[-] Dockerfile violation: No non-root USER instruction found. Running as root is prohibited.")
+        return False
+
+    print("[+] Dockerfile security check passed (non-root USER found).")
     return True
 
 def main():
@@ -147,7 +256,9 @@ def main():
         check_risk_sync(),
         check_runbooks(),
         check_artifact_compliance(),
-        check_preprod_checklist()
+        check_preprod_checklist(),
+        check_governance_vitals(),
+        check_docker_security()
     ]
 
     if all(results):

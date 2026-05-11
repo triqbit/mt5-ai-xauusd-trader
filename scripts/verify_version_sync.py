@@ -77,7 +77,13 @@ def main():
     if changelog_v not in ("OPTIONAL_MISSING", "NOT_FOUND"):
         authoritative["CHANGELOG.md"] = changelog_v
     elif changelog_v == "NOT_FOUND":
-         print("WARNING: No versioned headers found in CHANGELOG.md (only [Unreleased]?)")
+        print("=" * 60)
+        print("❌ DEPLOYMENT BLOCKED: CHANGELOG.md VERSION MISSING")
+        print("=" * 60)
+        print("Error: No versioned headers found in CHANGELOG.md (only [Unreleased]?)")
+        print("REMEDIATION: Add a versioned header matching the release (e.g. ## [1.2.3]).")
+        print("=" * 60)
+        sys.exit(1)
 
     unique_versions = set(authoritative.values())
 
