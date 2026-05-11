@@ -6,13 +6,16 @@ Benchmarking framework to compare advanced models against baseline strategies.
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
 from src.core.constants import ModelAction
+
+if TYPE_CHECKING:
+    from src.models.regime_detector import RegimeInfo
 
 
 class BenchmarkStrategy(Protocol):
@@ -513,20 +516,48 @@ class BenchmarkEvaluator:
         return BenchmarkSection(comparisons=comparisons, statistical_summary=summary)
 
 
-class EnsembleAdapter:
+class AdapterBase:
+    """Base class for model adapters to centralize common utility logic."""
+
+    def _extract_regime_info(self, row: pd.Series) -> Optional[RegimeInfo]:
+        """Extract RegimeInfo from a DataFrame row if columns exist."""
+        from src.models.regime_detector import MarketRegime, RegimeInfo
+
+        if "regime" not in row:
+            return None
+
+        try:
+            return RegimeInfo(
+                label=MarketRegime(row["regime"]),
+                confidence=float(row.get("regime_confidence", 1.0)),
+                transition_score=float(row.get("regime_transition_score", 0.0)),
+                volatility_index=float(row.get("volatility_index", 1.0)),
+                transition_probabilities={},
+                raw_features={},
+            )
+        except Exception:
+            return None
+
+    def _get_feature_cols(self, df: pd.DataFrame) -> list[str]:
+        """Identify feature columns by excluding non-feature metadata."""
+        exclude = [
+            "timestamp",
+            "datetime",
+            "regime",
+            "regime_confidence",
+            "regime_transition_score",
+            "volatility_index",
+        ]
+        return [c for c in df.columns if c not in exclude]
+
+
+class EnsembleAdapter(AdapterBase):
     """
     Adapter for EnsembleModel to match BenchmarkStrategy interface.
     Handles windowing for LSTM-Attention component and per-step inference.
     """
 
     def __init__(self, model: Any, window_size: int = 60, name: str = "Ensemble_Model"):
-        """
-        Initialize the adapter.
-        Args:
-            model: An instance of EnsembleModel.
-            window_size: Lookback window size for the LSTM component.
-            name: Label for the strategy.
-        """
         self.model = model
         self.window_size = window_size
         self._name = name
@@ -536,48 +567,34 @@ class EnsembleAdapter:
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        """
-        Generate signals using rolling windows.
-        Args:
-            df: DataFrame containing OHLCV and technical indicators.
-        Returns:
-            np.ndarray: Array of signals.
-        """
         import torch
 
         signals = np.zeros(len(df))
-        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        feature_cols = self._get_feature_cols(df)
 
         for i in range(self.window_size - 1, len(df)):
-            # Current observation for PPO
-            obs = df.iloc[i][feature_cols].values.astype(np.float32)
-
-            # Sequence for LSTM
+            row = df.iloc[i]
+            obs = row[feature_cols].values.astype(np.float32)
             seq_data = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values.astype(
                 np.float32
             )
             seq = torch.from_numpy(seq_data).float()
+            regime_info = self._extract_regime_info(row)
 
-            # EnsembleModel.predict returns a Signal object
-            signal = self.model.predict(obs, seq=seq)
+            # EnsembleModel always supports regime_info in predict
+            signal = self.model.predict(obs, seq=seq, regime_info=regime_info)
             signals[i] = float(signal.direction)
 
         return signals
 
 
-class PPOAdapter:
+class PPOAdapter(AdapterBase):
     """
     Adapter for PPOAgent to match BenchmarkStrategy interface.
     Supports basic feature alignment and ModelAction to SignalDirection mapping.
     """
 
     def __init__(self, agent: Any, name: str = "PPO_Agent"):
-        """
-        Initialize the adapter.
-        Args:
-            agent: An instance of PPOAgent.
-            name: Label for the strategy.
-        """
         self.agent = agent
         self._name = name
 
@@ -586,22 +603,22 @@ class PPOAdapter:
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        """
-        Generate signals for the given dataset.
-        """
         signals = np.zeros(len(df))
-        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        feature_cols = self._get_feature_cols(df)
 
         for i in range(len(df)):
-            obs = df.iloc[i][feature_cols].values.astype(np.float32)
-            # PPOAgent.predict returns a Signal NamedTuple
-            signal = self.agent.predict(obs)
+            row = df.iloc[i]
+            obs = row[feature_cols].values.astype(np.float32)
+            regime_info = self._extract_regime_info(row)
+
+            # PPOAgent supports **kwargs in predict
+            signal = self.agent.predict(obs, regime_info=regime_info)
             signals[i] = float(signal.direction)
 
         return signals
 
 
-class TransformerAdapter:
+class TransformerAdapter(AdapterBase):
     """
     Adapter for TimeSeriesTransformer to match BenchmarkStrategy interface.
     Handles sliding window extraction and device placement.
@@ -614,14 +631,6 @@ class TransformerAdapter:
         name: str = "Transformer_Model",
         device: str = "cpu",
     ):
-        """
-        Initialize the adapter.
-        Args:
-            model: An instance of TimeSeriesTransformer.
-            window_size: Lookback window required by the model.
-            name: Label for the strategy.
-            device: Computing device ('cpu' or 'cuda').
-        """
         self.model = model
         self.window_size = window_size
         self._name = name
@@ -632,28 +641,37 @@ class TransformerAdapter:
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        """
-        Generate signals using a sliding window approach.
-        """
         import torch
 
         self.model.eval()
         signals = np.zeros(len(df))
-        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        feature_cols = self._get_feature_cols(df)
 
         with torch.no_grad():
             for i in range(self.window_size - 1, len(df)):
+                row = df.iloc[i]
                 window = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values
                 data = torch.FloatTensor(window).unsqueeze(0).to(self.device)
+                regime_info = self._extract_regime_info(row)
 
-                probs = self.model(data)
+                if hasattr(self.model, "predict"):
+                    # If predict returns a Signal object, use its direction
+                    output = self.model.predict(data, regime_info=regime_info)
+                    if hasattr(output, "direction"):
+                        signals[i] = float(output.direction)
+                        continue
+                    # Otherwise assume it's probs/logits
+                    probs = output
+                else:
+                    probs = self.model(data)
+
                 action_idx = int(torch.argmax(probs, dim=-1).item())
                 signals[i] = float(ModelAction(action_idx).to_direction())
 
         return signals
 
 
-class LSTMAdapter:
+class LSTMAdapter(AdapterBase):
     """
     Adapter for LSTMPricePredictor to match BenchmarkStrategy interface.
     Handles sliding window extraction for sequence processing.
@@ -666,14 +684,6 @@ class LSTMAdapter:
         name: str = "LSTM_Model",
         device: str = "cpu",
     ):
-        """
-        Initialize the adapter.
-        Args:
-            model: An instance of LSTMPricePredictor.
-            window_size: Lookback window required by the model.
-            name: Label for the strategy.
-            device: Computing device ('cpu' or 'cuda').
-        """
         self.model = model
         self.window_size = window_size
         self._name = name
@@ -684,41 +694,44 @@ class LSTMAdapter:
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        """
-        Generate signals using a sliding window approach.
-        """
         import torch
 
         self.model.eval()
         signals = np.zeros(len(df))
-        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        feature_cols = self._get_feature_cols(df)
 
         with torch.no_grad():
             for i in range(self.window_size - 1, len(df)):
+                row = df.iloc[i]
                 window = df.iloc[i - self.window_size + 1 : i + 1][feature_cols].values
                 data = torch.FloatTensor(window).unsqueeze(0).to(self.device)
+                regime_info = self._extract_regime_info(row)
 
-                logits = self.model(data)
-                probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+                if hasattr(self.model, "predict"):
+                    output = self.model.predict(data, regime_info=regime_info)
+                    if hasattr(output, "direction"):
+                        signals[i] = float(output.direction)
+                        continue
+                    probs = output
+                else:
+                    probs = self.model(data)
+
+                if isinstance(probs, torch.Tensor):
+                    probs = torch.softmax(probs, dim=-1).cpu().numpy()[0]
+
                 action_idx = int(np.argmax(probs))
                 signals[i] = float(ModelAction(action_idx).to_direction())
 
         return signals
 
 
-class DreamerAdapter:
+class DreamerAdapter(AdapterBase):
     """
     Adapter for DreamerAgent to match BenchmarkStrategy interface.
     Supports state-aware inference if implemented in the agent.
     """
 
     def __init__(self, agent: Any, name: str = "Dreamer_Agent"):
-        """
-        Initialize the adapter.
-        Args:
-            agent: An instance of DreamerAgent.
-            name: Label for the strategy.
-        """
         self.agent = agent
         self._name = name
 
@@ -727,26 +740,23 @@ class DreamerAdapter:
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        """
-        Generate signals for the given dataset.
-        """
         signals = np.zeros(len(df))
-        feature_cols = [c for c in df.columns if c not in ["timestamp", "datetime"]]
+        feature_cols = self._get_feature_cols(df)
 
-        # Reset state at start of sequence if agent supports it
         if hasattr(self.agent, "reset_state"):
             self.agent.reset_state()
 
         for i in range(len(df)):
-            obs = df.iloc[i][feature_cols].values.astype(np.float32)
-            # DreamerAgent.predict returns a Signal NamedTuple
-            signal = self.agent.predict(obs)
+            row = df.iloc[i]
+            obs = row[feature_cols].values.astype(np.float32)
+            regime_info = self._extract_regime_info(row)
+
+            # DreamerAgent supports **kwargs in predict
+            signal = self.agent.predict(obs, regime_info=regime_info)
             direction = float(signal.direction)
             signals[i] = direction
 
-            # Update latent state if supported by the agent (for recurrent models)
             if hasattr(self.agent, "update_state"):
-                # We use placeholder reward=0.0 and is_terminal=False for pure inference
                 self.agent.update_state(obs, action=int(direction), reward=0.0, is_terminal=False)
 
         return signals
