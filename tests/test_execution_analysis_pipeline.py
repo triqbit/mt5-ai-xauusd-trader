@@ -19,6 +19,7 @@ from src.analytics.execution_quality import ExecutionAnalyzer
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger, Trade, RiskEvent, BlockedSignalAnalysis, ExecutionQuality
 from src.trading.audited_risk_manager import AuditedRiskManager
+from src.trading.execution_filter import ExecutionFilter
 
 @pytest.fixture
 def test_db(tmp_path):

@@ -142,6 +142,9 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     from src.core.health import HealthChecker
     with patch.object(HealthChecker, "check_config", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
          patch.object(HealthChecker, "check_redis", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
+         patch.object(HealthChecker, "check_system_resources", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
+         patch.object(HealthChecker, "check_database", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
+         patch.object(HealthChecker, "check_audit_log", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
          patch.object(HealthChecker, "check_mt5", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")):
 
             health_checker = init_health_checker(cfg, connector, trade_logger, mock_model, audit_logger=audit_logger)

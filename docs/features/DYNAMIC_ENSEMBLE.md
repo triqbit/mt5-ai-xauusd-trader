@@ -1,58 +1,29 @@
 # Dynamic Ensemble Weighting
 
-The `DynamicEnsemble` class implements an adaptive weighting engine that adjusts the influence of individual models within an ensemble based on their real-time performance and market context.
+The Dynamic Ensemble Weighting system provides an institutional-grade adaptive model weighting engine for the XAUUSD trading ensemble. It adjusts model influence based on real-time performance metrics and market context, ensuring the most reliable models dominate the final signal.
 
-## Key Features
+## Core Mechanisms
 
-- **Adaptive Scoring**: Model weights are adjusted based on a composite score of:
-    - **Accuracy**: Recent Sharpe ratio or win-rate.
-    - **Calibration Error**: How well the model's confidence aligns with realized outcomes.
-    - **Drift Score**: Detection of performance degradation or concept drift.
-- **Stability Controls**:
-    - **EMA Smoothing**: Prevents erratic jumps in weights.
-    - **Weight Swing Caps**: Limits the maximum change in any single update.
-- **Initial Weight Support**: Allows setting custom starting weight distributions.
-    - **Oscillation Dampening**: Detects and slows down adaptation when target weights flip-flop across the current mean.
-- **Regime & Volatility Awareness**: Weights are adjusted based on the current `RegimeInfo`, including `MarketRegime` (e.g., penalizing drift during news shocks) and a `volatility_index` which modulates the adaptation speed.
-- **XAUUSD Heuristics**: Specific scoring logic tailored for gold market behaviors:
-    - **Trending**: Favors models with low drift to capitalize on sustained moves.
-    - **Low Volatility Drift**: Focuses on accuracy as the primary weight driver.
-    - **Volatile Breakout**: Prioritizes calibration for reliable stop-loss and exit signals.
-    - **Mean Reversion**: Penalizes overconfidence/high calibration error to avoid traps.
-    - **News Shock**: Aggressively penalizes models showing significant performance drift.
+### 1. Multi-Factor Scoring
+Models are scored based on three primary metrics:
+- **Accuracy (Win Rate)**: The primary driver of model weight.
+- **Confidence Calibration (Brier Score)**: Penalizes models that are overconfident or poorly calibrated.
+- **Performance Drift**: Detects rapid degradation in recent performance compared to long-term averages.
 
-## Implementation Details
+### 2. Stability Controls
+To prevent erratic behavior in live trading, the engine employs several safeguards:
+- **EMA Decay**: Weights move towards target scores via an Exponential Moving Average, smoothing out transitions.
+- **Swing Caps**: The maximum allowed weight change per update is strictly capped (default 5%).
+- **Oscillation Dampening**: Aggressively reduces the adaptation rate if model targets 'flip-flop', preserving portfolio stability.
 
-The weighting engine ensures that:
-1. Weights always sum to 1.0.
-2. No model weight falls below a configurable `min_weight` floor.
-3. Transitions are smooth and mathematically sound, with adaptation speed automatically slowing down during high volatility or target oscillations.
-4. Memory safety is maintained in the orchestrator via rolling window deques for performance metrics.
+### 3. Regime Awareness
+The weighting logic adapts to the current market environment:
+- **Volatility Scaling**: Adaptation slows down automatically in high-volatility regimes to avoid reacting to noise.
+- **Regime Heuristics**:
+    - In **NEWS_SHOCK**, adaptation is extremely cautious.
+    - In **TRENDING** markets, consistency (low drift) is prioritized.
+    - In **MEAN_REVERSION**, calibration is critical to avoid overextended entries.
 
-## Usage
+## System Integration
 
-```python
-from src.models.dynamic_ensemble import DynamicEnsemble
-from src.models.regime_detector import MarketRegime, RegimeInfo
-
-ensemble = DynamicEnsemble(
-    model_names=["ppo", "lstm", "transformer"],
-    smoothing_factor=0.1,
-    max_swing=0.05
-)
-
-# Mock regime info
-regime_info = RegimeInfo(
-    label=MarketRegime.TRENDING,
-    confidence=0.9,
-    transition_score=0.1,
-    volatility_index=1.2
-)
-
-# Update weights with current metrics
-metrics = {
-    "ppo": {"accuracy": 0.85, "calibration_error": 0.05, "drift_score": 0.02},
-    "lstm": {"accuracy": 0.70, "calibration_error": 0.15, "drift_score": 0.08},
-}
-new_weights = ensemble.update_weights(metrics, regime_info=regime_info)
-```
+The system is integrated into the core trading loop (`main.py`), where market outcomes are recorded and weights are updated immediately after regime detection but before the next signal generation. This ensures the ensemble is always using the most contextually relevant weights for the current market state.

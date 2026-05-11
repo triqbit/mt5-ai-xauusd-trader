@@ -134,7 +134,7 @@ class EnsembleModel(BaseModel):
         }
 
     def observe_outcome(
-        self, actual_direction: SignalDirection, regime_info: Optional[RegimeInfo] = None
+        self, actual_direction: SignalDirection, regime_info: Optional["RegimeInfo"] = None
     ) -> None:
         """
         Record market outcome and update dynamic weights.
