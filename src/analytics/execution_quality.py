@@ -596,7 +596,8 @@ class ExecutionAnalyzer:
 
         would_win = False
         if signal.direction > 0: # BUY
-            mfe, mae = np.max(highs) - signal.entry_price, signal.entry_price - np.min(lows)
+            mfe_price, mae_price = np.max(highs) - signal.entry_price, signal.entry_price - np.min(lows)
+            mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
                 if h_val >= (signal.take_profit or float("inf")):
                     would_win = True
@@ -607,7 +608,8 @@ class ExecutionAnalyzer:
             contract_size = self._get_contract_size(signal.symbol)
             opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * contract_size
         else: # SELL
-            mfe, mae = signal.entry_price - np.min(lows), np.max(highs) - signal.entry_price
+            mfe_price, mae_price = signal.entry_price - np.min(lows), np.max(highs) - signal.entry_price
+            mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
                 if l_val <= (signal.take_profit or float("-inf")):
                     would_win = True

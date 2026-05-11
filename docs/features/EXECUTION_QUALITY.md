@@ -24,7 +24,7 @@ Measures the percentage of the theoretical signal edge (distance from entry to t
 Tracks price movement at fixed horizons (1m, 5m, 15m, 30m, 60m) after trade entry. This helps identify if entries are being "picked off" (negative drift) or if they are timed well.
 
 ### 6. Blocked Signal Quality (Opportunity Cost)
-Analyzes signals rejected by risk management to determine if they would have hit their Take-Profit or Stop-Loss first. This measures the opportunity cost of being too risk-averse.
+Analyzes signals rejected by risk management to determine if they would have hit their Take-Profit or Stop-Loss first. This measures the opportunity cost of being too risk-averse. It also tracks **Max Adverse Excursion (MAE)** and **Max Favorable Excursion (MFE)** for these signals to quantify the price movement they experienced.
 
 ## Usage
 
