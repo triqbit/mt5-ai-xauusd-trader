@@ -77,7 +77,7 @@ class TradingConfig(BaseSettings):
     risk_per_trade: float = Field(
         default=0.01,
         ge=0.001,
-        le=0.02,
+        le=0.01,
         description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)",
     )
     max_position_size_pct: float = Field(
@@ -248,8 +248,8 @@ class TradingConfig(BaseSettings):
     @field_validator("risk_per_trade")
     @classmethod
     def risk_must_be_safe(cls, v: float) -> float:
-        if v > 0.02:
-            raise ValueError("risk_per_trade > 2% is not permitted in production.")
+        if v > 0.01:
+            raise ValueError("risk_per_trade > 1% is not permitted in production.")
         return v
 
     @property
