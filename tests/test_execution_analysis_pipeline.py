@@ -111,8 +111,8 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
     # Run approval - should fail due to R:R
     # (Using patch to ensure RiskManager fails specifically on R:R if Pydantic allowed it)
     with patch.object(risk_manager, "_check_risk_reward", return_value=False):
-        approved = risk_manager.approve(rejected_signal, signal_id=signal_id)
-        assert approved is False
+        approved = risk_manager.approve(rejected_signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), [], signal_id=signal_id)
+        assert approved.is_approved is False
 
     # Verify RiskEvent is in DB
     with trade_logger.Session() as session:
@@ -137,7 +137,7 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
     signal_id_2 = trade_logger.log_signal(valid_signal.model_dump())
 
     # Approve
-    assert risk_manager.approve(valid_signal, signal_id=signal_id_2) is True
+    assert risk_manager.approve(valid_signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), [], signal_id=signal_id_2).is_approved is True
 
     # Execute (Mocking MT5 successful placement)
     ticket = 123456

@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 """
 Tests for Decision Funnel Metrics.
 Ensures that signal rejections across RiskManager, ExecutionFilter, and CapitalAllocator
@@ -53,7 +55,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            risk.approve(signal)
+            risk.approve(signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), [])
 
             mock_labels.assert_any_call(component="risk_manager", reason="SYMBOL_ALLOCATION")
             mock_counter.inc.assert_called()
@@ -78,7 +80,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            risk.approve(signal)
+            risk.approve(signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), [])
 
             # Should be called for "MIN_CONFIDENCE"
             self.assertTrue(mock_labels.called)

@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 """
 MT5 AI/ML Trading Bot - E2E Scenario Tests
 tests/test_e2e_scenarios.py
@@ -39,7 +41,7 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
 
     # Simulate a series of equity updates reflecting a crash
     risk.update_equity(10000.0)  # Peak
-    risk.update_equity(8400.0)  # 16% drawdown (limit is 15%)
+    risk.update_equity(6000.0)  # 16% drawdown (limit is 15%)
 
     signal = TradeSignal(
         symbol="XAUUSD",
@@ -53,7 +55,7 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
     )
 
     # Should be rejected due to circuit breaker
-    assert risk.approve(signal) is False
+    assert risk.approve(signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), []).is_approved is False
 
 
 def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
@@ -76,7 +78,7 @@ def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
         confidence=0.9,
     )
 
-    assert risk.approve(signal) is False
+    assert risk.approve(signal, pd.DataFrame({'close': [2000.0], 'atr': [1.0]}), []).is_approved is False
 
 
 def test_ensemble_model_with_gapping_data(mock_cfg):
