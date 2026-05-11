@@ -43,6 +43,7 @@ class TradingEnv(gym.Env):
         df: pd.DataFrame | None = None,
         window_size: int = 20,
         initial_balance: float = 10000.0,
+        column_mapping: dict[str, int] | None = None,
     ) -> None:
         """
         Initializes the trading environment.
@@ -52,12 +53,22 @@ class TradingEnv(gym.Env):
                 Required columns: 'Open', 'High', 'Low', 'Close', 'Volume' (at minimum).
             window_size: Number of past time steps to include in the observation.
             initial_balance: Starting account balance.
+            column_mapping: Mapping of column names to indices.
         """
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.df = df
         self.window_size = window_size
         self.initial_balance = initial_balance
+
+        # Default column mapping if none provided
+        self.column_mapping = column_mapping or {
+            "open": 0,
+            "high": 1,
+            "low": 2,
+            "close": 3,
+            "volume": 4,
+        }
 
         # Actions: 0 = HOLD, 1 = BUY, 2 = SELL
         self.action_space = spaces.Discrete(3)
@@ -80,6 +91,7 @@ class TradingEnv(gym.Env):
         self.entry_price = 0.0
         self.current_step = window_size
 
+        # Reset environment during initialization
         self.reset()
 
     def reset(
@@ -131,10 +143,9 @@ class TradingEnv(gym.Env):
 
         reward = 0.0
         if self._data is not None and self.current_step < len(self._data):
-            # Assuming index 3 is Close price.
-            # In production, use a more explicit column mapping.
-            current_price = self._data[self.current_step, 3]
-            prev_price = self._data[self.current_step - 1, 3]
+            close_idx = self.column_mapping.get("close", 3)
+            current_price = self._data[self.current_step, close_idx]
+            prev_price = self._data[self.current_step - 1, close_idx]
 
             # Update equity based on open position (unrealized P&L)
             if self.position == 1:  # Long

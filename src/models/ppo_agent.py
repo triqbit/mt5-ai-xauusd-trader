@@ -7,10 +7,20 @@ Proximal Policy Optimization (PPO) agent using Stable-Baselines3.
 from __future__ import annotations
 
 import logging
+import contextlib
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+try:
+    import torch
+    from stable_baselines3 import PPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+except ImportError:
+    torch = None
+    PPO = None
+    DummyVecEnv = None
 
 from src.core.constants import ModelAction, SignalDirection
 from src.models.base_model import BaseModel, Signal
@@ -46,16 +56,13 @@ class PPOAgent(BaseModel):
         ppo_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
-        Initializes the PPO agent with lazy loading for stable-baselines3.
+        Initializes the PPO agent.
 
         Args:
             env: An instance of the Gymnasium-compatible TradingEnv.
             model_path: Optional path to a pre-trained PPO model file (.zip).
             device: Computing device to use ('cpu', 'cuda', 'auto').
             ppo_kwargs: Optional dictionary of hyperparameters for the PPO constructor.
-
-        Raises:
-            ImportError: If stable-baselines3 is not installed (logged as warning).
         """
         self.logger = logging.getLogger(__name__)
         self.device = device
@@ -63,34 +70,30 @@ class PPOAgent(BaseModel):
         self.env = None
         self.ppo_kwargs = ppo_kwargs or {}
 
-        # Lazy loading of SB3 to avoid dependency issues in non-training environments
-        try:
-            from stable_baselines3 import PPO
-            from stable_baselines3.common.vec_env import DummyVecEnv
+        if PPO is None:
+            self.logger.warning("Stable-Baselines3 not installed. PPOAgent will be limited.")
+            return
 
-            if env is not None:
-                # Wrap in DummyVecEnv as SB3 models expect vectorized environments
-                self.env = DummyVecEnv([lambda: env])
+        if env is not None and DummyVecEnv is not None:
+            # Wrap in DummyVecEnv as SB3 models expect vectorized environments
+            self.env = DummyVecEnv([lambda: env])
 
-            if model_path and Path(model_path).exists():
-                self.logger.info(f"Loading existing PPO model from {model_path}")
-                self.model = PPO.load(model_path, env=self.env, device=device)
-            elif self.env is not None:
-                self.logger.info("Creating new PPO model with MlpPolicy...")
-                # Combine default parameters with user-provided kwargs
-                default_kwargs = {
-                    "policy": "MlpPolicy",
-                    "env": self.env,
-                    "verbose": 1,
-                    "device": device,
-                }
-                combined_kwargs = {**default_kwargs, **self.ppo_kwargs}
-                self.model = PPO(**combined_kwargs)
-            else:
-                self.logger.debug("PPOAgent initialized without model or environment.")
-
-        except ImportError as e:
-            self.logger.warning(f"Stable-Baselines3 not installed. PPOAgent will be limited: {e}")
+        if model_path and Path(model_path).exists():
+            self.logger.info(f"Loading existing PPO model from {model_path}")
+            self.model = PPO.load(model_path, env=self.env, device=device)
+        elif self.env is not None:
+            self.logger.info("Creating new PPO model with MlpPolicy...")
+            # Combine default parameters with user-provided kwargs
+            default_kwargs = {
+                "policy": "MlpPolicy",
+                "env": self.env,
+                "verbose": 1,
+                "device": device,
+            }
+            combined_kwargs = {**default_kwargs, **self.ppo_kwargs}
+            self.model = PPO(**combined_kwargs)
+        else:
+            self.logger.debug("PPOAgent initialized without model or environment.")
 
     def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
         """
@@ -158,23 +161,22 @@ class PPOAgent(BaseModel):
             # Extract probabilities for confidence
             confidence = 1.0
             probabilities = []
-            try:
-                import torch
+            if torch is not None:
+                try:
+                    # Convert observation to torch tensor for the policy
+                    obs_tensor = torch.as_tensor(obs).to(self.model.device)
 
-                # Convert observation to torch tensor for the policy
-                obs_tensor = torch.as_tensor(obs).to(self.model.device)
-
-                # Get the distribution from the policy
-                with torch.no_grad():
-                    # For Discrete action spaces, this returns a Categorical distribution
-                    distribution = self.model.policy.get_distribution(obs_tensor)
-                    # distribution.distribution.probs has shape (batch, n_actions)
-                    probs_batch = distribution.distribution.probs.cpu().numpy()
-                    probs = probs_batch[0]  # Get probabilities for the first (and only) observation
-                    probabilities = probs.tolist()
-                    confidence = float(probs[action_val])
-            except Exception as prob_err:
-                self.logger.debug(f"Could not extract probabilities from policy: {prob_err}")
+                    # Get the distribution from the policy
+                    with torch.no_grad():
+                        # For Discrete action spaces, this returns a Categorical distribution
+                        distribution = self.model.policy.get_distribution(obs_tensor)
+                        # distribution.distribution.probs has shape (batch, n_actions)
+                        probs_batch = distribution.distribution.probs.cpu().numpy()
+                        probs = probs_batch[0]  # Get probabilities for the first (and only) observation
+                        probabilities = probs.tolist()
+                        confidence = float(probs[action_val])
+                except Exception as prob_err:
+                    self.logger.debug(f"Could not extract probabilities from policy: {prob_err}")
 
             return Signal(
                 direction=direction,

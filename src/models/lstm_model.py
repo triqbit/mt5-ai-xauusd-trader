@@ -28,17 +28,26 @@ from src.models.base_model import BaseModel, Signal
 
 class LSTMAttentionModel(nn.Module if nn else object):
     """
-    Bidirectional LSTM with multi-head self-attention.
+    Bidirectional LSTM with multi-head self-attention for sequence classification.
+
+    This model leverages both forward and backward temporal dependencies via
+    a bidirectional LSTM, followed by a multi-head self-attention mechanism
+    to weigh the importance of different time steps in the sequence.
 
     Architecture:
-        1. Bidirectional LSTM for temporal feature extraction.
-        2. Multi-head Self-Attention to focus on critical time steps.
-        3. Layer Normalization and Residual connection.
-        4. Global Average Pooling.
-        5. Fully Connected head for 3-class classification (HOLD, BUY, SELL).
+        1. Bidirectional LSTM: Extracts temporal features in both directions.
+        2. Multi-head Self-Attention: Focuses on critical time steps.
+        3. Layer Normalization & Residual Connection: Stabilizes training and improves flow.
+        4. Global Average Pooling: Aggregates sequence information.
+        5. Fully Connected Head: Produces 3-class logits (HOLD, BUY, SELL).
 
-    Input: (batch, seq_len, n_features)
-    Output: (batch, 3) -> [HOLD_logit, BUY_logit, SELL_logit]
+    Input:
+        Shape: (batch, seq_len, n_features)
+        Description: A batch of sequences of normalized features.
+
+    Output:
+        Shape: (batch, 3)
+        Description: Unnormalized logits for [HOLD, BUY, SELL].
     """
 
     def __init__(
@@ -109,11 +118,24 @@ class LSTMPricePredictor(nn.Module if nn else object):
     """
     Standard LSTM-based neural network for price direction prediction.
 
-    Simple architecture using the final hidden state of an LSTM for classification.
+    A traditional recurrent architecture that utilizes the final hidden state
+    of a multi-layer LSTM to classify market direction.
+
+    Architecture:
+        1. LSTM Layers: Processes the input sequence to capture temporal trends.
+        2. Fully Connected Head: Maps the final hidden state to 3-class logits.
 
     Attributes:
         lstm: LSTM layer for processing temporal sequences.
         fc: Fully connected layer for classification (HOLD, BUY, SELL).
+
+    Input:
+        Shape: (batch, seq_len, n_features)
+        Description: A batch of sequences of normalized features.
+
+    Output:
+        Shape: (batch, 3)
+        Description: Unnormalized logits for [HOLD, BUY, SELL].
     """
 
     def __init__(
@@ -310,6 +332,22 @@ class LSTMModel(BaseModel):
                 confidence=0.0,
                 metadata={"error": str(e)},
             )
+
+    def train(self, data: Any, **kwargs: Any) -> None:
+        """
+        Trains the LSTM model using the provided data.
+
+        In a production implementation, this would involve a training loop with
+        backpropagation, loss calculation, and optimization.
+
+        Args:
+            data: Training data (e.g., DataLoader or feature/target tensors).
+            **kwargs: Hyperparameters (learning_rate, epochs, batch_size, etc.).
+        """
+        self.logger.info("LSTMModel.train called (placeholder).")
+        if self.model is None or not torch:
+            self.logger.error("Cannot train: Model not initialized or PyTorch missing.")
+            return
 
     def save(self, path: str | Path) -> None:
         """
