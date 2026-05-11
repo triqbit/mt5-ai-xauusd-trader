@@ -6,13 +6,18 @@
 set -e
 
 # Configuration
-DB_FILES=("trades.db" "audit.db")
-LOGS_DIR="logs"
-REPORTS_DIR="reports"
-BACKUP_ROOT="backups"
+# Allow environment variables to override defaults
+DB_FILES_ENV=${DB_FILES:-"trades.db audit.db"}
+IFS=' ' read -r -a DB_FILES <<< "$DB_FILES_ENV"
+
+LOGS_DIR=${LOGS_DIR:-"logs"}
+REPORTS_DIR=${REPORTS_DIR:-"reports"}
+MODELS_DIR=${MODELS_DIR:-"models/trained"}
+BACKUP_ROOT=${BACKUP_ROOT:-"backups"}
 DB_BACKUP_DIR="${BACKUP_ROOT}/db"
 LOGS_BACKUP_DIR="${BACKUP_ROOT}/logs"
 REPORTS_BACKUP_DIR="${BACKUP_ROOT}/reports"
+MODELS_BACKUP_DIR="${BACKUP_ROOT}/models"
 BACKUP_LOG="logs/backup.log"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RETENTION_DAYS=30
@@ -22,6 +27,7 @@ MIN_DISK_SPACE_MB=500
 mkdir -p "${DB_BACKUP_DIR}"
 mkdir -p "${LOGS_BACKUP_DIR}"
 mkdir -p "${REPORTS_BACKUP_DIR}"
+mkdir -p "${MODELS_BACKUP_DIR}"
 mkdir -p "logs"
 
 log_message() {
@@ -166,7 +172,27 @@ else
     log_message "INFO: Reports directory empty or not found. Skipping report archival."
 fi
 
-# 6. Retention Policy Enforcement
+# 6. Models Archival
+if [ -d "${MODELS_DIR}" ] && [ "$(ls -A ${MODELS_DIR})" ]; then
+    MODELS_ARCHIVE="${MODELS_BACKUP_DIR}/models_${TIMESTAMP}.tar.gz"
+    log_message "Archiving models to ${MODELS_ARCHIVE}..."
+    tar -czf "${MODELS_ARCHIVE}" -C "${MODELS_DIR}" .
+
+    # 6.1 Verify Model Archive Integrity
+    log_message "Verifying model archive integrity..."
+    if tar -tzf "${MODELS_ARCHIVE}" > /dev/null; then
+        log_message "SUCCESS: Model archive integrity verified."
+    else
+        log_message "FAILURE: Model archive is corrupt."
+        exit 1
+    fi
+
+    (cd "${MODELS_BACKUP_DIR}" && sha256sum "$(basename "${MODELS_ARCHIVE}")" > "$(basename "${MODELS_ARCHIVE}").sha256")
+else
+    log_message "INFO: Models directory empty or not found. Skipping model archival."
+fi
+
+# 7. Retention Policy Enforcement
 log_message "Enforcing retention policy (Pruning files older than ${RETENTION_DAYS} days)..."
 # Prune data files and their associated .sha256 files using specific patterns for safety
 find "${BACKUP_ROOT}" -type f \( -name "*.db" -o -name "*.tar.gz" -o -name "*.sha256" \) -mtime +${RETENTION_DAYS} -exec rm -f {} +
