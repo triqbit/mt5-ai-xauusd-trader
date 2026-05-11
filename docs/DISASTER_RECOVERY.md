@@ -24,8 +24,8 @@ The following table summarizes the backup and retention strategy for all critica
 ## 4. Archival Policy
 
 ### 4.1 Trade Logs and Audit Trails
-To ensure regulatory compliance and long-term traceability:
-- **Annual Export**: Every year, all records from `trades` and `audit_log` tables older than 1 year are exported to compressed CSV/Parquet format.
+To ensure regulatory compliance and long-term traceability, long-term archival is managed by `scripts/data_cleanup.py`:
+- **Annual Export**: Every year, all records from `trades` and `audit_log` tables older than 1 year are exported to compressed CSV format.
 - **Immutable Storage**: These exports are moved to WORM (Write Once, Read Many) storage for a minimum of 7 years.
 - **Checksum Manifest**: Each export is accompanied by a SHA256 checksum manifest to ensure immutability.
 
@@ -133,7 +133,24 @@ For manual verification, ensure the following tables are present in the restored
    ls -R reports/
    ```
 
-### 6.3. Complete System Loss
+### 6.3 Model Weight Restoration
+1. **Source**: Model weights are managed via Git LFS or a model registry.
+2. **Restore**:
+   ```bash
+   # Ensure models/trained directory exists
+   mkdir -p models/trained
+   # Pull latest weights if using Git LFS
+   git lfs pull
+   # Or copy from a known backup location
+   cp /path/to/backup/ensemble_latest.pt models/trained/
+   ```
+3. **Verify**:
+   ```bash
+   # Confirm model file exists and has correct size
+   ls -lh models/trained/ensemble_latest.pt
+   ```
+
+### 6.4. Complete System Loss
 1. Provision a new environment.
 2. Clone the repository and install dependencies.
 3. Restore `.env` from secure storage.
