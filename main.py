@@ -20,7 +20,23 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from structlog import BoundLogger
+
+    from src.core.audit_log import AuditLogger
+    from src.core.decision_support import DecisionSupportSystem
+    from src.core.feature_engineering import FeatureEngineer
+    from src.core.monitor import Monitor
+    from src.core.schemas import TradeSignal
+    from src.core.trade_logger import TradeLogger
+    from src.models.base_model import BaseModel
+    from src.models.regime_detector import RegimeDetector
+    from src.trading.capital_allocator import CapitalAllocator
+    from src.trading.execution_filter import ExecutionFilter
+    from src.trading.mt5_connector import MT5Connector
+    from src.trading.risk_manager import RiskManager
 
 HAS_DEPENDENCIES = True
 BOOTSTRAP_ERROR = None
@@ -94,7 +110,6 @@ def _prepare_trade_signal(
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
     based on institutional risk and capital allocation.
     """
-    from src.core.constants import SignalDirection
     from src.core.schemas import TradeSignal
 
     log = structlog.get_logger("main.risk")
@@ -163,6 +178,7 @@ def run_live(
     audit_logger: Optional["AuditLogger"] = None,
 ) -> None:
     import structlog.contextvars
+
     from src.core import profile
     from src.core.constants import SignalDirection
     from src.core.exceptions import (
@@ -852,9 +868,7 @@ def main() -> int:
     # 1. Guided Setup: Detect missing .env and offer to initialize it
     env_file = Path(".env")
     example_file = Path(".env.example")
-    if not is_diagnostic and not env_file.exists() and example_file.exists():
-        # Check if we are in an interactive terminal
-        if sys.stdin.isatty():
+    if not is_diagnostic and not env_file.exists() and example_file.exists() and sys.stdin.isatty():
             print("\n[!] Configuration file (.env) is missing.")
             try:
                 choice = (
@@ -871,24 +885,23 @@ def main() -> int:
                 print("\nSetup skipped.")
 
     # 2. Handle missing dependencies gracefully for diagnostic flags
-    if not HAS_DEPENDENCIES:
-        if not is_diagnostic:
-            import platform
+    if not HAS_DEPENDENCIES and not is_diagnostic:
+        import platform
 
-            print("=" * 70)
-            print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
-            print("=" * 70)
-            print(f"Details: {BOOTSTRAP_ERROR}")
-            print(f"Platform: {platform.system()} {platform.release()}")
-            print(f"Python:   {sys.version.split()[0]}")
-            print("\nREMEDIATION STEPS:")
-            print("1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics.")
-            print("2. Run 'pip install -r requirements.txt' to install all required libraries.")
-            if platform.system() == "Linux":
-                print("3. On Linux, if TA-Lib is missing, ensure the C-library is installed:")
-                print("   'sudo apt-get install libta-lib0' or equivalent.")
-            print("-" * 70)
-            return 1
+        print("=" * 70)
+        print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
+        print("=" * 70)
+        print(f"Details: {BOOTSTRAP_ERROR}")
+        print(f"Platform: {platform.system()} {platform.release()}")
+        print(f"Python:   {sys.version.split()[0]}")
+        print("\nREMEDIATION STEPS:")
+        print("1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics.")
+        print("2. Run 'pip install -r requirements.txt' to install all required libraries.")
+        if platform.system() == "Linux":
+            print("3. On Linux, if TA-Lib is missing, ensure the C-library is installed:")
+            print("   'sudo apt-get install libta-lib0' or equivalent.")
+        print("-" * 70)
+        return 1
 
     args = parse_args()
 
