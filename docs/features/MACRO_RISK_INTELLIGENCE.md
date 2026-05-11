@@ -23,7 +23,12 @@ The system utilizes a multi-provider architecture for redundancy and enhanced co
 The `EventIntelligence` orchestrator automatically de-duplicates events appearing across multiple providers.
 
 ## Configuration
-Risk windows are configurable via `pre_event_minutes` and `post_event_minutes` dictionaries mapping `EventImpact` levels to durations.
+Risk windows are configurable via `TradingConfig` (defined in `src/core/config.py`):
+- `enable_macro_guard`: Boolean flag to enable/disable the automatic execution blocking (Layer 11).
+- `macro_pre_event_minutes`: Dictionary mapping `EventImpact` integers (1-4) to minutes before an event.
+- `macro_post_event_minutes`: Dictionary mapping `EventImpact` integers (1-4) to minutes after an event (cooldown).
+
+If these parameters are not provided in the configuration, the system falls back to institutional defaults.
 
 ## Integration
 The module is integrated into the `DecisionSupportSystem` to provide macro context in the pre-trade briefing dashboard.
@@ -31,7 +36,7 @@ The module is integrated into the `DecisionSupportSystem` to provide macro conte
 ### Risk Windows and Multipliers
 The system implements tiered risk management based on event impact:
 - **Critical Impact:** Blocks execution (`is_blocked=True`) and sets `risk_multiplier=0.0`.
-- **High Impact (Major):** For FOMC, NFP, and Interest Rate decisions, a stricter `risk_multiplier=0.25` is applied, with a minimum 2-hour pre-event window and 3-hour cooldown.
+- **High Impact (Major):** For FOMC, NFP, Interest Rate decisions, and **CPI**, a stricter `risk_multiplier=0.25` is applied, with a minimum 2-hour pre-event window and 3-hour cooldown.
 - **High Impact (Generic):** Applies a `risk_multiplier=0.5`.
 - **Medium Impact:** Applies a `risk_multiplier=0.75`.
 The internal `RiskStatus` model provides structured output for downstream components:
