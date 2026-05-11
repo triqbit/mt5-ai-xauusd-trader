@@ -1,5 +1,5 @@
 # Runbook 03: Circuit Breaker Triggered
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
 Critical response procedure for when the automated `RiskManager` circuit breaker halts trading due to safety breaches (e.g., 15% equity drawdown, extreme spread, or model calibration failure).
@@ -13,6 +13,11 @@ Critical response procedure for when the automated `RiskManager` circuit breaker
   docker stop xauusd_trader
   ```
 - **Manual Intervention:** Open the MT5 Terminal or Mobile App and manually close or hedge any remaining open positions that pose a risk to capital.
+- **Audit Manual Action:** Record the manual intervention in the audit trail (if the database is accessible):
+  ```bash
+  # Example: Logging manual position closure
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'manual_position_closure', 'Manually closed all XAUUSD positions due to circuit breaker', datetime('now'));"
+  ```
 
 ### 2. Incident Analysis & Triage
 - Generate an automated incident report to understand the breach:
@@ -44,6 +49,10 @@ Critical response procedure for when the automated `RiskManager` circuit breaker
 - Once authorized to resume, restart the bot:
   ```bash
   docker start xauusd_trader
+  ```
+- **Log Resolution:** Ensure the resolution is recorded:
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'incident_resolved', 'Root cause identified and addressed. System resumed.', datetime('now'));"
   ```
 - Monitor the `logs/` directory and the Prometheus `/metrics` endpoint closely for the first 5 trades.
 - Verify the `circuit_breaker_status` metric is reset to `0.0` (Healthy):

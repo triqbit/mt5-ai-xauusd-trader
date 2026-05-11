@@ -1,5 +1,5 @@
 # Runbook 02: MT5 Connection Outage
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
 Procedures for resolving connection failures between the trading bot and MetaTrader 5 (MT5) or the MetaAPI cloud gateway.
@@ -22,6 +22,10 @@ Procedures for resolving connection failures between the trading bot and MetaTra
   - "No Connection" -> Network or Broker server issue.
 - If the terminal is frozen, restart the application.
 - Verify that "Algo Trading" is enabled (Green icon) in the top toolbar.
+- **Audit Manual Action:** Record the manual restart:
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'mt5_terminal_restart', 'Manually restarted local MT5 terminal to resolve connectivity', datetime('now'));"
+  ```
 
 ### 3. Recover MetaAPI (Cloud Gateway)
 - Verify `METAAPI_TOKEN` and `METAAPI_ACCOUNT_ID` are valid in the MetaAPI Dashboard.
@@ -37,9 +41,9 @@ Procedures for resolving connection failures between the trading bot and MetaTra
   ```bash
   docker restart xauusd_trader
   ```
-- Monitor logs to ensure the provisioning process completes:
+- **Audit Manual Action:** Record the failover/restart:
   ```bash
-  docker logs xauusd_trader --tail 100 | grep -E "MT5|MetaAPI"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'system_reconnection', 'Restarted container or enabled MetaAPI failover', datetime('now'));"
   ```
 
 ### 4. Connection Stability Check

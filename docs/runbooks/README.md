@@ -1,5 +1,5 @@
 # Operational Runbooks
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 This directory contains enterprise-grade operational runbooks for the MT5 AI/ML Trading Bot. These documents provide standardized procedures for responding to common failure scenarios, ensuring production safety, auditability, and rapid recovery.
 

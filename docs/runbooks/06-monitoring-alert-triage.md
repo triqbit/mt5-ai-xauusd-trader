@@ -1,17 +1,17 @@
 # Runbook 06: Monitoring Alert Triage
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
 Defined process for triaging alerts from Telegram and Prometheus/Grafana. This ensures that the most critical events (P0/P1) are addressed with priority to minimize capital risk.
 
 ## Alert Severity Levels
 
-| Severity | Definition | Target Response (TTO) |
-|---|---|---|
-| **P0** | **Critical:** Immediate risk to capital (e.g., Circuit Breaker, Large Drawdown, DB Corruption). | < 5 Minutes |
-| **P1** | **High:** Service failure/degradation (e.g., MT5 Disconnected, API 503, Health Check Failed). | < 15 Minutes |
-| **P2** | **Medium:** Efficiency or drift issues (e.g., High Spread, Model Accuracy Drop, Disk Space 80%). | < 2 Hours |
-| **P3** | **Low:** Informational or Routine (e.g., Daily performance summary, Minor linting warning). | < 24 Hours |
+| Severity | Definition | Target Response (ACK) | Target Resolution |
+|---|---|---|---|
+| **P0** | **Critical:** Immediate risk to capital (e.g., Circuit Breaker, Large Drawdown, DB Corruption). | < 5 Minutes | < 1 Hour |
+| **P1** | **High:** Service failure/degradation (e.g., MT5 Disconnected, API 503, Health Check Failed). | < 15 Minutes | < 4 Hours |
+| **P2** | **Medium:** Efficiency or drift issues (e.g., High Spread, Model Accuracy Drop, Disk Space 80%). | < 2 Hours | < 24 Hours |
+| **P3** | **Low:** Informational or Routine (e.g., Daily performance summary, Minor linting warning). | < 24 Hours | 1 Week |
 
 ## Step-by-Step Instructions
 

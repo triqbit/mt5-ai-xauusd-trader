@@ -1,5 +1,5 @@
 # Runbook 04: Database Corruption Recovery
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
 Procedures for recovering from SQLite corruption in `trades.db` or `audit.db`. This runbook leverages the built-in backup and verification framework defined in `docs/DISASTER_RECOVERY.md`.
@@ -19,6 +19,10 @@ sqlite3 trades_recovered.db "PRAGMA integrity_check;"
   ```bash
   mv trades.db trades.db.corrupt
   mv trades_recovered.db trades.db
+  ```
+- **Audit Manual Action:**
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_repair_attempt', 'Attempted in-place repair of trades.db', datetime('now'));"
   ```
 
 ### 2. Backup Restoration (Major Corruption)
@@ -42,6 +46,10 @@ If in-place repair fails or the file is physically corrupted/missing:
    ```bash
    sqlite3 ../../trades.db "PRAGMA integrity_check;"
    ```
+- **Audit Manual Action:** Record the restoration:
+  ```bash
+  sqlite3 ../../audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_restoration', 'Restored trades.db from backup trades_YYYYMMDD_HHMMSS.db', datetime('now'));"
+  ```
 
 ### 3. Proactive Verification
 Run the backup verification script to ensure all existing backups are healthy:
@@ -60,6 +68,10 @@ bash scripts/backup_verify.sh
   sqlite3 audit.db "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 5;"
   ```
 - Once verified, restart the bot: `docker start xauusd_trader`.
+- **Audit Manual Action:**
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_incident_resolved', 'Database corruption resolved and service resumed', datetime('now'));"
+  ```
 
 ## Expected Outcomes
 - Databases pass `PRAGMA integrity_check` with an `ok` result.

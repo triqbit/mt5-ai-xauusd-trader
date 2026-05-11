@@ -1,5 +1,5 @@
 # Runbook 07: Secret Rotation Procedure
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
 Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Telegram Bot Token) safely to maintain system security and compliance.
@@ -26,6 +26,10 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
    ```bash
    python scripts/validate_env.py
    ```
+- **Audit Manual Action:**
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'secret_rotation_initiated', 'Starting rotation of <SECRET_NAME>', datetime('now'));"
+  ```
 
 ### 3. Apply & Verify
 1. **Restart the Bot:**
@@ -53,6 +57,10 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
 ### 4. Cleanup
 1. **Old Secrets:** Ensure the old secret is revoked at the provider and cannot be used.
 2. **Audit:** Verify the `audit.db` contains a record of the system restart following the credential change.
+- **Audit Manual Action:**
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'secret_rotation_completed', 'Successfully rotated <SECRET_NAME> and verified connectivity', datetime('now'));"
+  ```
 
 ## Expected Outcomes
 - New secrets are applied across the stack without downtime exceeding 2 minutes.

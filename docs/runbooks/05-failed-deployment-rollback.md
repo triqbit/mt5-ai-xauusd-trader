@@ -1,5 +1,5 @@
 # Runbook 05: Failed Deployment Rollback
-**Version:** 1.4.0 | **Last Updated:** 2024-06-01
+**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
 
 ## Overview
 Safe procedures for reverting a "bad" release. This covers reverting Docker images, rolling back database schema migrations (Alembic), and restoring environment configuration.
@@ -24,6 +24,10 @@ Identify the last known stable version (e.g., `v1.1.0-rc3`) from the deployment 
    ```bash
    docker-compose up -d
    ```
+- **Audit Manual Action:**
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'rollback_initiated', 'Rolling back to version v1.1.0-rc3 due to deployment failure', datetime('now'));"
+  ```
 
 ### 3. Downgrade Database Schema (If Necessary)
 If the failed release included database migrations (Alembic), you must downgrade the schema to match the code version.
@@ -44,6 +48,10 @@ If the failed release included database migrations (Alembic), you must downgrade
    docker exec -it xauusd_trader alembic downgrade <previous_revision_id>
    ```
    *Note: Ensure you have a database backup (Runbook 04) before performing downgrades.*
+- **Audit Manual Action:**
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_migration_downgrade', 'Downgraded database schema to revision <previous_revision_id>', datetime('now'));"
+  ```
 
 ### 4. Restoration of Configuration
 If the release failure was due to invalid environment variables:
@@ -65,6 +73,10 @@ If the release failure was due to invalid environment variables:
   python scripts/smoke_test.py
   ```
 - Monitor the audit trail for "System Startup" events.
+- **Audit Manual Action:**
+  ```bash
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'rollback_verified', 'Rollback to v1.1.0-rc3 verified and stable', datetime('now'));"
+  ```
 
 ## Expected Outcomes
 - The system is restored to a previous stable state (Code + Schema + Config).
