@@ -87,31 +87,22 @@ class RiskManager:
         Returns True only if ALL layers pass.
         """
         rejection_reason = ""
-        metric_reason = ""
         if not self._check_circuit_breaker():
             rejection_reason = "Circuit breaker active"
-            metric_reason = "CIRCUIT_BREAKER"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
-            metric_reason = "DAILY_LOSS"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
-            metric_reason = "MAX_POSITIONS"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-            metric_reason = "SYMBOL_ALLOCATION"
         elif not self._check_minimum_confidence(signal.confidence):
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-            metric_reason = "MIN_CONFIDENCE"
         elif not self._check_risk_reward(signal):
             rejection_reason = "Risk-Reward ratio too low"
-            metric_reason = "RISK_REWARD"
         elif not self._check_consecutive_losses():
             rejection_reason = "Max consecutive losses reached"
-            metric_reason = "CONSECUTIVE_LOSSES"
         elif not self._check_model_health(model_health):
             rejection_reason = "Model health metrics below threshold"
-            metric_reason = "MODEL_HEALTH"
 
         passed = rejection_reason == ""
         if not passed:
@@ -121,8 +112,6 @@ class RiskManager:
                 signal.direction,
                 rejection_reason,
             )
-            if self.monitor:
-                self.monitor.record_internal_rejection("risk_manager", metric_reason)
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",

@@ -32,9 +32,9 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
         with patch('telegram.Bot'):
             self.monitor = Monitor(self.config)
 
-    def test_risk_manager_rejection_metrics(self):
-        # Setup RiskManager with monitor
-        risk = RiskManager(self.config, account_balance=10000.0, monitor=self.monitor)
+    def test_audited_risk_manager_rejection_metrics_symbol(self):
+        # Setup AuditedRiskManager with monitor
+        risk = AuditedRiskManager(self.config, account_balance=10000.0, monitor=self.monitor)
 
         # Create a signal that will be rejected (e.g., symbol not in portfolio)
         # Using model_construct to bypass Pydantic validation (including SYMBOL_PATTERN)
@@ -58,7 +58,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             mock_labels.assert_any_call(component="risk_manager", reason="SYMBOL_ALLOCATION")
             mock_counter.inc.assert_called()
 
-    def test_audited_risk_manager_rejection_metrics(self):
+    def test_audited_risk_manager_rejection_metrics_confidence(self):
         # Setup AuditedRiskManager with monitor
         risk = AuditedRiskManager(self.config, account_balance=10000.0, monitor=self.monitor)
 

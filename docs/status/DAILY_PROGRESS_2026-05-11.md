@@ -6,7 +6,7 @@ Implemented Decision Funnel Metrics to improve system observability and decision
 ## Key Accomplishments
 - **Observability Enhancement**: Added a new Prometheus counter `trading_internal_rejections_total` to track signal rejections at various pipeline stages.
 - **Component Instrumentation**:
-    - Instrumented `RiskManager` and `AuditedRiskManager` for risk-based rejections.
+    - Instrumented `AuditedRiskManager` for risk-based rejections (preserving `RiskManager` as a high-risk core component).
     - Instrumented `ExecutionFilter` for technical filter blocks.
     - Instrumented `CapitalAllocator` for capital and concentration limit rejections.
 - **Metric Quality**: Enforced static, standardized rejection reason codes (uppercase) to maintain low metric cardinality.
