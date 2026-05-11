@@ -15,9 +15,8 @@ from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
+from src.core.database import get_engine, get_session_factory
 from src.core.trade_logger import (
     Base,
     BlockedSignalAnalysis,
@@ -99,6 +98,8 @@ class ExecutionSummary(BaseModel):
     execution_efficiency_score: float
     rejected_signal_count: int
     executed_trade_count: int
+    avg_mae: float = Field(default=0.0, description="Avg Max Adverse Excursion of blocked signals")
+    avg_mfe: float = Field(default=0.0, description="Avg Max Favorable Excursion of blocked signals")
 
     def to_report_section(self) -> Any:
         """Convert to reporting model."""
@@ -145,7 +146,7 @@ class ExecutionSummary(BaseModel):
         return ExecutionQualitySection(
             efficiency_score=float(self.execution_efficiency_score * 100),
             metrics=metrics,
-            opportunity_cost=f"${self.total_opportunity_cost:,.2f}",
+            opportunity_cost=f"${self.total_opportunity_cost:,.2f} (MAE: {self.avg_mae:.2f}, MFE: {self.avg_mfe:.2f})",
             trade_count=self.executed_trade_count,
             rejected_count=self.rejected_signal_count,
         )
@@ -162,9 +163,9 @@ class ExecutionAnalyzer:
         db_url: str = "sqlite:///trades.db",
         connector: MT5Connector | None = None,
     ) -> None:
-        self.engine = create_engine(db_url)
+        self.engine = get_engine(db_url)
         Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
+        self.Session = get_session_factory(self.engine)
         self.connector = connector
 
     def _get_pip_size(self, symbol: str) -> float:
@@ -557,23 +558,46 @@ class ExecutionAnalyzer:
         """Calculate MFE, MAE, and potential PnL for a rejected signal."""
         if not self.connector:
             return None
-        start_time = signal.timestamp.replace(tzinfo=UTC) if signal.timestamp.tzinfo is None else signal.timestamp
-        end_time = min(datetime.now(UTC), start_time + timedelta(hours=24))
+
+        # 1. Setup temporal window (max 24h look-ahead)
+        start_time = (
+            signal.timestamp.replace(tzinfo=UTC)
+            if signal.timestamp.tzinfo is None
+            else signal.timestamp
+        )
+        # Give it a bit more time than 24h just in case we need to see the full outcome
+        end_time = min(datetime.now(UTC), start_time + timedelta(hours=26))
+
+        # 2. Fetch historical data (prefer M5 for balance of precision and range)
         df = self.connector.get_rates_range(signal.symbol, "M5", start_time, end_time)
         if df.empty:
-            df = self.connector.get_rates(signal.symbol, "M5", 200)
+            # Fallback to recent data if range fetch failed
+            df = self.connector.get_rates(signal.symbol, "M5", 500)
+
         if df.empty:
+            logger.warning(
+                "Could not fetch historical data for signal %s opportunity cost", signal.id
+            )
             return None
+
+        # 3. Standardize timezone and filter
         if df["time"].dt.tz is None:
             df["time"] = df["time"].dt.tz_localize(UTC)
-        df = df[df["time"] >= start_time]
+        else:
+            df["time"] = df["time"].dt.tz_convert(UTC)
+
+        df = df[df["time"] >= start_time].copy()
         if df.empty:
             return None
+
+        # 4. Calculate excursions and temporal outcome
         prices, highs, lows = df["close"].values, df["high"].values, df["low"].values
+        pip_size = self._get_pip_size(signal.symbol)
 
         would_win = False
         if signal.direction > 0: # BUY
-            mfe, mae = np.max(highs) - signal.entry_price, signal.entry_price - np.min(lows)
+            mfe_price, mae_price = np.max(highs) - signal.entry_price, signal.entry_price - np.min(lows)
+            mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
                 if h_val >= (signal.take_profit or float("inf")):
                     would_win = True
@@ -584,7 +608,8 @@ class ExecutionAnalyzer:
             contract_size = self._get_contract_size(signal.symbol)
             opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * contract_size
         else: # SELL
-            mfe, mae = signal.entry_price - np.min(lows), np.max(highs) - signal.entry_price
+            mfe_price, mae_price = signal.entry_price - np.min(lows), np.max(highs) - signal.entry_price
+            mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
                 if l_val <= (signal.take_profit or float("-inf")):
                     would_win = True
@@ -629,18 +654,35 @@ class ExecutionAnalyzer:
         """Aggregate execution quality metrics into a summary report."""
         start_time = datetime.now(UTC) - timedelta(days=days)
         with self.Session() as session:
-            trades = session.query(Trade).filter(Trade.created_at >= start_time).all()
+            trades = (
+                session.query(Trade)
+                .filter(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
+                .all()
+            )
             qualities = [self.analyze_trade(t.id, persist=persist) for t in trades]
             qualities = [q for q in qualities if q]
             blocked = self.analyze_blocked_signals(start_time, persist=persist)
+
+            avg_mae = np.mean([b.max_adverse_excursion for b in blocked]) if blocked else 0.0
+            avg_mfe = np.mean([b.max_favorable_excursion for b in blocked]) if blocked else 0.0
+
             if not qualities:
                 return ExecutionSummary(
-                    avg_slippage=0.0, avg_broker_slippage=0.0, avg_latency_ms=0.0,
-                    total_opportunity_cost=sum(b.opportunity_cost_pnl for b in blocked),
-                    avg_fill_quality=0.0, avg_edge_capture=0.0, avg_timing_efficiency=0.0,
-                    avg_alpha_decay=0.0, execution_efficiency_score=0.0,
-                    rejected_signal_count=len(blocked), executed_trade_count=0
+                    avg_slippage=0.0,
+                    avg_broker_slippage=0.0,
+                    avg_latency_ms=0.0,
+                    total_opportunity_cost=float(sum(b.opportunity_cost_pnl for b in blocked)),
+                    avg_fill_quality=0.0,
+                    avg_edge_capture=0.0,
+                    avg_timing_efficiency=0.0,
+                    avg_alpha_decay=0.0,
+                    execution_efficiency_score=0.0,
+                    rejected_signal_count=len(blocked),
+                    executed_trade_count=0,
+                    avg_mae=float(avg_mae),
+                    avg_mfe=float(avg_mfe),
                 )
+
             avg_slippage = np.mean([q.slippage_pips for q in qualities])
             avg_broker = np.mean([q.broker_slippage_pips for q in qualities])
             avg_latency = np.mean([q.execution_latency_ms for q in qualities])
@@ -649,12 +691,19 @@ class ExecutionAnalyzer:
             avg_timing = np.mean([q.timing_efficiency for q in qualities])
             avg_alpha = np.mean([q.alpha_decay_pips for q in qualities])
             eff_score = (avg_fill * 0.7) + (max(0.0, 1.0 - (avg_latency / 5000.0)) * 0.3)
+
             return ExecutionSummary(
-                avg_slippage=float(avg_slippage), avg_broker_slippage=float(avg_broker),
+                avg_slippage=float(avg_slippage),
+                avg_broker_slippage=float(avg_broker),
                 avg_latency_ms=float(avg_latency),
                 total_opportunity_cost=float(sum(b.opportunity_cost_pnl for b in blocked)),
-                avg_fill_quality=float(avg_fill), avg_edge_capture=float(avg_edge),
-                avg_timing_efficiency=float(avg_timing), avg_alpha_decay=float(avg_alpha),
+                avg_fill_quality=float(avg_fill),
+                avg_edge_capture=float(avg_edge),
+                avg_timing_efficiency=float(avg_timing),
+                avg_alpha_decay=float(avg_alpha),
                 execution_efficiency_score=float(eff_score),
-                rejected_signal_count=len(blocked), executed_trade_count=len(qualities)
+                rejected_signal_count=len(blocked),
+                executed_trade_count=len(qualities),
+                avg_mae=float(avg_mae),
+                avg_mfe=float(avg_mfe),
             )
