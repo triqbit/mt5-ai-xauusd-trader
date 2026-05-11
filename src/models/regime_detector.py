@@ -1,7 +1,22 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/models/regime_detector.py
-Market regime detection for XAUUSD.
+
+Institutional-grade market regime detection for XAUUSD.
+Uses statistical price features and Gaussian Mixture Models (GMM) to classify
+market states into categories such as Trending, Ranging, and News Shock.
+
+Usage:
+    detector = RegimeDetector()
+    # For real-time detection
+    regime_info = detector.detect(ohlcv_df)
+
+    # For historical labeling
+    df_with_regimes = detector.label_history(large_df)
+
+Regime data structures are immutable (frozen) and enforce strict confidence
+and transition score validation to ensure technical trust in market analysis.
+
 Author : triqbit
 License: MIT
 """
@@ -16,7 +31,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import structlog
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from scipy import stats
 from sklearn.mixture import GaussianMixture
 
@@ -51,11 +66,20 @@ class MarketRegime(str, Enum):
 
 
 class RegimeInfo(BaseModel):
-    """Structured regime detection output with transparency for signal attribution."""
+    """
+    Structured regime detection output with transparency for signal attribution.
+
+    This model is immutable (frozen) and forbids extra fields to ensure
+    market regime data is consistent and auditable.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     label: MarketRegime = Field(..., description="Detected regime label")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence")
-    transition_score: float = Field(..., description="Likelihood of a regime transition")
+    transition_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Likelihood of a regime transition"
+    )
     volatility_index: float = Field(..., description="Normalized volatility metric")
     raw_features: dict[str, float] = Field(
         default_factory=dict, description="Underlying statistical features used for detection"
