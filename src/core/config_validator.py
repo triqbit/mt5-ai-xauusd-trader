@@ -44,6 +44,7 @@ class ConfigValidator:
         self._check_risk_parameters()
         self._check_exposure_limits()
         self._check_margin_and_volatility_limits()
+        self._check_allocator_settings()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -54,16 +55,40 @@ class ConfigValidator:
     def _check_mt5_credentials(self) -> None:
         """Verify MT5 credentials are provided and formatted correctly."""
         # Specific placeholders that shouldn't be used
-        full_match_placeholders = ["TEST", "PASSWORD", "CHANGE_ME", "SERVER_NAME", ""]
-        substring_placeholders = ["YOUR_SERVER_HERE", "YOUR_PASSWORD_HERE", "YOUR_TOKEN"]
+        full_match_placeholders = ["TEST", "PASSWORD", "CHANGE_ME", "SERVER_NAME", "ANY", ""]
+        substring_placeholders = [
+            "YOUR_SERVER_HERE",
+            "YOUR_PASSWORD_HERE",
+            "YOUR_TOKEN",
+            "ENTER_YOUR",
+            "REPLACE_WITH",
+        ]
 
         if self.config.mt5_login <= 0:
             self.errors.append(
                 ValidationError(
                     "MT5_LOGIN",
-                    "MT5 login must be a positive integer.",
+                    "MT5 login is missing or invalid.",
                     True,
-                    "Set MT5_LOGIN in your .env file with your account number.",
+                    "Set MT5_LOGIN in your .env file with your numeric account number.",
+                )
+            )
+        elif self.config.mt5_login < 1000:
+            self.errors.append(
+                ValidationError(
+                    "MT5_LOGIN",
+                    f"MT5 login {self.config.mt5_login} is suspiciously low.",
+                    False,
+                    "Verify MT5_LOGIN is correct.",
+                )
+            )
+        elif self.config.mt5_login > 100_000_000:
+            self.errors.append(
+                ValidationError(
+                    "MT5_LOGIN",
+                    f"MT5 login {self.config.mt5_login} exceeds standard range.",
+                    False,
+                    "Verify MT5_LOGIN is correct.",
                 )
             )
 
@@ -212,15 +237,26 @@ class ConfigValidator:
 
         # Check Telegram
         telegram_token = self.config.telegram_token.get_secret_value()
-        if telegram_token and any(p in telegram_token.upper() for p in placeholders):
-            self.errors.append(
-                ValidationError(
-                    "TELEGRAM_TOKEN",
-                    "Telegram token contains placeholder text.",
-                    True,
-                    "Replace with your actual BotFather token in .env.",
+        if telegram_token:
+            if any(p in telegram_token.upper() for p in placeholders):
+                self.errors.append(
+                    ValidationError(
+                        "TELEGRAM_TOKEN",
+                        "Telegram token contains placeholder text.",
+                        True,
+                        "Replace with your actual BotFather token in .env.",
+                    )
                 )
-            )
+            # Basic Telegram Token format check (numeric_id:secret_string)
+            if ":" not in telegram_token:
+                self.errors.append(
+                    ValidationError(
+                        "TELEGRAM_TOKEN",
+                        "Invalid Telegram token format.",
+                        True,
+                        "Ensure token is in the format '123456789:ABCDefgh...'.",
+                    )
+                )
 
         if self.config.telegram_chat_id and any(
             p in str(self.config.telegram_chat_id).upper() for p in placeholders
@@ -236,15 +272,25 @@ class ConfigValidator:
 
         # Check MetaAPI
         metaapi_token = self.config.metaapi_token.get_secret_value()
-        if metaapi_token and any(p in metaapi_token.upper() for p in placeholders):
-            self.errors.append(
-                ValidationError(
-                    "METAAPI_TOKEN",
-                    "MetaAPI token contains placeholder text.",
-                    True,
-                    "Replace with your actual MetaAPI token in .env.",
+        if metaapi_token:
+            if any(p in metaapi_token.upper() for p in placeholders):
+                self.errors.append(
+                    ValidationError(
+                        "METAAPI_TOKEN",
+                        "MetaAPI token contains placeholder text.",
+                        True,
+                        "Replace with your actual MetaAPI token in .env.",
+                    )
                 )
-            )
+            if len(metaapi_token) < 20:
+                self.errors.append(
+                    ValidationError(
+                        "METAAPI_TOKEN",
+                        "MetaAPI token appears too short.",
+                        True,
+                        "Ensure you have copied the full token from MetaAPI dashboard.",
+                    )
+                )
 
         metaapi_account_id = self.config.metaapi_account_id.get_secret_value()
         if metaapi_account_id and any(p in metaapi_account_id.upper() for p in placeholders):
@@ -289,33 +335,24 @@ class ConfigValidator:
     def _check_risk_parameters(self) -> None:
         """Verify risk parameters are within safe enterprise bounds (RISK_LIMITS.md)."""
         # 1. Per-trade risk limits (RISK_LIMITS.md 1.3)
-        # Policy limit is 1%, 2% is hard prohibition.
-        if self.config.risk_per_trade > 0.02:
+        # Policy limit is 1%, which is the hard prohibition.
+        if self.config.risk_per_trade > 0.01:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds 2%.",
+                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds 1% hard limit.",
                     True,
-                    "Reduce RISK_PER_TRADE to 0.02 (2%) or less.",
-                )
-            )
-        elif self.config.risk_per_trade > 0.01:
-            self.errors.append(
-                ValidationError(
-                    "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds policy limit of 1%.",
-                    False,  # Non-critical warning
-                    "Consider reducing RISK_PER_TRADE to 0.01 (1%) for better risk parity.",
+                    "Reduce RISK_PER_TRADE to 0.01 (1%) or less.",
                 )
             )
 
         # 2. Daily loss limits (RISK_LIMITS.md 2.1)
-        # Level 4 (Emergency Stop) is 5%.
+        # Level 4 (Emergency Stop) is 5%, Hard Stop is 6%.
         if self.config.max_daily_loss > 0.06:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 6%.",
+                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 6% Hard Stop.",
                     True,
                     "Reduce MAX_DAILY_LOSS to 0.06 or less.",
                 )
@@ -324,7 +361,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% limit.",
+                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% Emergency Stop limit.",
                     False,
                     "Set MAX_DAILY_LOSS to 0.05 for compliance with enterprise standards.",
                 )
@@ -352,23 +389,23 @@ class ConfigValidator:
                 )
 
         # 2.2 Weekly/Monthly Loss Limits (RISK_LIMITS.md 3.1, 3.2)
-        if self.config.max_weekly_loss > 0.15:
+        if self.config.max_weekly_loss > 0.10:
             self.errors.append(
                 ValidationError(
                     "MAX_WEEKLY_LOSS",
-                    f"Max weekly loss {self.config.max_weekly_loss*100}% exceeds 15% safety limit.",
+                    f"Max weekly loss {self.config.max_weekly_loss*100}% exceeds 10% safety limit.",
                     True,
-                    "Reduce MAX_WEEKLY_LOSS to 0.15 or less.",
+                    "Reduce MAX_WEEKLY_LOSS to 0.10 or less.",
                 )
             )
 
-        if self.config.max_monthly_loss > 0.25:
+        if self.config.max_monthly_loss > 0.15:
             self.errors.append(
                 ValidationError(
                     "MAX_MONTHLY_LOSS",
-                    f"Max monthly loss {self.config.max_monthly_loss*100}% exceeds 25% safety limit.",
+                    f"Max monthly loss {self.config.max_monthly_loss*100}% exceeds 15% safety limit.",
                     True,
-                    "Reduce MAX_MONTHLY_LOSS to 0.25 or less.",
+                    "Reduce MAX_MONTHLY_LOSS to 0.15 or less.",
                 )
             )
 
@@ -402,102 +439,57 @@ class ConfigValidator:
                 )
 
         # 3. Confidence Threshold (RISK_LIMITS.md 4.1)
-        if self.config.min_confidence < 0.50:
+        if self.config.min_confidence < 0.55:
             self.errors.append(
                 ValidationError(
                     "MIN_CONFIDENCE",
-                    f"Confidence threshold {self.config.min_confidence} is dangerously low.",
+                    f"Confidence threshold {self.config.min_confidence} is below 0.55 policy limit.",
                     True,
-                    "Set MIN_CONFIDENCE to at least 0.50.",
-                )
-            )
-        elif self.config.min_confidence < 0.55:
-            self.errors.append(
-                ValidationError(
-                    "MIN_CONFIDENCE",
-                    f"Confidence threshold {self.config.min_confidence} is below recommended 0.55.",
-                    False,
-                    "Increase MIN_CONFIDENCE to 0.55 for better signal quality.",
+                    "Set MIN_CONFIDENCE to at least 0.55.",
                 )
             )
 
         # 4. Position limits (RISK_LIMITS.md 1.1)
         # Maximum 5 open positions is the policy limit.
-        if self.config.max_positions > 10:
+        if self.config.max_positions > 5:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
-                    f"Maximum positions {self.config.max_positions} is prohibited.",
+                    f"Maximum positions {self.config.max_positions} exceeds 5 position limit.",
                     True,
-                    "Set MAX_POSITIONS to 10 or less.",
-                )
-            )
-        elif self.config.max_positions > 5:
-            self.errors.append(
-                ValidationError(
-                    "MAX_POSITIONS",
-                    f"Maximum positions {self.config.max_positions} exceeds limit of 5.",
-                    False,
-                    "Reduce MAX_POSITIONS to 5 or less for production safety.",
+                    "Set MAX_POSITIONS to 5 or less for production safety.",
                 )
             )
 
         # 5. Leverage and Exposure (RISK_LIMITS.md 1.1)
-        if self.config.max_leverage > 20:
+        if self.config.max_leverage > 10:
             self.errors.append(
                 ValidationError(
                     "MAX_LEVERAGE",
-                    f"Max leverage {self.config.max_leverage} is too high.",
+                    f"Max leverage {self.config.max_leverage} exceeds 10:1 policy limit.",
                     True,
-                    "Reduce MAX_LEVERAGE to 20 or less (Policy is 10:1).",
-                )
-            )
-        elif self.config.max_leverage > 10:
-            self.errors.append(
-                ValidationError(
-                    "MAX_LEVERAGE",
-                    f"Max leverage {self.config.max_leverage} exceeds policy limit of 10.",
-                    False,
-                    "Set MAX_LEVERAGE to 10 for enterprise compliance.",
+                    "Set MAX_LEVERAGE to 10 or less for enterprise compliance.",
                 )
             )
 
-        if self.config.max_position_size_pct > 0.20:
-            self.errors.append(
-                ValidationError(
-                    "MAX_POSITION_SIZE_PCT",
-                    f"Max position size {self.config.max_position_size_pct*100}% is dangerously high.",
-                    True,
-                    "Reduce MAX_POSITION_SIZE_PCT to 0.20 or less.",
-                )
-            )
-        elif self.config.max_position_size_pct > 0.10:
+        if self.config.max_position_size_pct > 0.10:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITION_SIZE_PCT",
                     f"Max position size {self.config.max_position_size_pct*100}% exceeds 10% limit.",
-                    False,
+                    True,
                     "Set MAX_POSITION_SIZE_PCT to 0.10 for compliance.",
                 )
             )
 
         # 6. Drawdown Limits (RISK_LIMITS.md 6.1)
-        if self.config.max_drawdown > 0.40:
-            self.errors.append(
-                ValidationError(
-                    "MAX_DRAWDOWN",
-                    f"Max drawdown {self.config.max_drawdown*100}% is unacceptable.",
-                    True,
-                    "Reduce MAX_DRAWDOWN to 0.40 or less.",
-                )
-            )
-        elif self.config.max_drawdown > 0.30:
+        if self.config.max_drawdown > 0.30:
             self.errors.append(
                 ValidationError(
                     "MAX_DRAWDOWN",
                     f"Max drawdown {self.config.max_drawdown*100}% exceeds 30% policy limit.",
-                    False,
-                    "Set MAX_DRAWDOWN to 0.30 for enterprise standards.",
+                    True,
+                    "Set MAX_DRAWDOWN to 0.30 or less for enterprise standards.",
                 )
             )
 
@@ -547,52 +539,34 @@ class ConfigValidator:
 
     def _check_exposure_limits(self) -> None:
         """Verify exposure and notional limits (RISK_LIMITS.md 1.2)."""
-        if self.config.max_single_direction_pct > 0.50:
-            self.errors.append(
-                ValidationError(
-                    "MAX_SINGLE_DIRECTION_PCT",
-                    f"Max single direction exposure {self.config.max_single_direction_pct*100}% is too high.",
-                    True,
-                    "Reduce MAX_SINGLE_DIRECTION_PCT to 0.50 or less (Policy is 0.30).",
-                )
-            )
-        elif self.config.max_single_direction_pct > 0.30:
+        if self.config.max_single_direction_pct > 0.30:
             self.errors.append(
                 ValidationError(
                     "MAX_SINGLE_DIRECTION_PCT",
                     f"Max single direction exposure {self.config.max_single_direction_pct*100}% exceeds 30% policy.",
-                    False,
-                    "Set MAX_SINGLE_DIRECTION_PCT to 0.30 for compliance.",
+                    True,
+                    "Set MAX_SINGLE_DIRECTION_PCT to 0.30 or less for compliance.",
                 )
             )
 
-        if self.config.max_total_notional_pct > 1.50:
-            self.errors.append(
-                ValidationError(
-                    "MAX_TOTAL_NOTIONAL_PCT",
-                    f"Max total notional {self.config.max_total_notional_pct*100}% is dangerously high.",
-                    True,
-                    "Reduce MAX_TOTAL_NOTIONAL_PCT to 1.50 or less.",
-                )
-            )
-        elif self.config.max_total_notional_pct > 1.00:
+        if self.config.max_total_notional_pct > 1.00:
             self.errors.append(
                 ValidationError(
                     "MAX_TOTAL_NOTIONAL_PCT",
                     f"Max total notional {self.config.max_total_notional_pct*100}% exceeds 100% equity.",
-                    False,
-                    "Set MAX_TOTAL_NOTIONAL_PCT to 1.00 for enterprise safety.",
+                    True,
+                    "Set MAX_TOTAL_NOTIONAL_PCT to 1.00 or less for enterprise safety.",
                 )
             )
 
-        # Max Trades Per Day validation (Plan requirement)
-        if self.config.max_trades_per_day > 50:
+        # Max Trades Per Day validation (Plan requirement & RISK_LIMITS.md 2.3)
+        if self.config.max_trades_per_day > 20:
             self.errors.append(
                 ValidationError(
                     "MAX_TRADES_PER_DAY",
-                    f"Max trades per day ({self.config.max_trades_per_day}) exceeds institutional limit of 50.",
+                    f"Max trades per day ({self.config.max_trades_per_day}) exceeds institutional limit of 20.",
                     True,
-                    "Reduce MAX_TRADES_PER_DAY to 50 or less.",
+                    "Reduce MAX_TRADES_PER_DAY to 20 or less.",
                 )
             )
 
@@ -604,6 +578,38 @@ class ConfigValidator:
                     f"Min lot size ({self.config.min_lot_size}) is below 0.01.",
                     True,
                     "Set MIN_LOT_SIZE to 0.01 or higher to avoid rounding issues.",
+                )
+            )
+
+    def _check_allocator_settings(self) -> None:
+        """Verify capital allocator settings."""
+        if self.config.allocator_max_total_heat > 1.0 or self.config.allocator_max_total_heat <= 0:
+            self.errors.append(
+                ValidationError(
+                    "ALLOCATOR_MAX_TOTAL_HEAT",
+                    f"Invalid total heat {self.config.allocator_max_total_heat}.",
+                    True,
+                    "Set ALLOCATOR_MAX_TOTAL_HEAT between 0.01 and 1.0.",
+                )
+            )
+
+        if self.config.allocator_max_symbol_risk > 1.0 or self.config.allocator_max_symbol_risk <= 0:
+            self.errors.append(
+                ValidationError(
+                    "ALLOCATOR_MAX_SYMBOL_RISK",
+                    f"Invalid symbol risk {self.config.allocator_max_symbol_risk}.",
+                    True,
+                    "Set ALLOCATOR_MAX_SYMBOL_RISK between 0.01 and 1.0.",
+                )
+            )
+
+        if self.config.risk_per_trade > self.config.allocator_max_symbol_risk:
+            self.errors.append(
+                ValidationError(
+                    "RISK_PER_TRADE",
+                    f"Risk per trade ({self.config.risk_per_trade}) exceeds allocator symbol limit ({self.config.allocator_max_symbol_risk}).",
+                    True,
+                    "Reduce RISK_PER_TRADE or increase ALLOCATOR_MAX_SYMBOL_RISK.",
                 )
             )
 
@@ -648,7 +654,19 @@ class ConfigValidator:
 
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
-        # 0. Database Choice
+        # 0. Mode and Server mismatch
+        mt5_server = self.config.mt5_server.upper() if self.config.mt5_server else ""
+        if self.config.mode == "demo" and "LIVE" in mt5_server:
+            self.errors.append(
+                ValidationError(
+                    "MODE",
+                    "DEMO mode selected but LIVE server detected.",
+                    False,
+                    "Verify if you intended to use a demo account.",
+                )
+            )
+
+        # 0.1 Database Choice
         if (
             self.config.mode == "live"
             and "sqlite" in self.config.database_url.get_secret_value().lower()
