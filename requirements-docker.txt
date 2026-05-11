@@ -33,7 +33,7 @@ httpx==0.28.1
 psycopg2-binary==2.9.10
 sqlalchemy==2.0.38
 alembic==1.14.1
-redis==5.2.1
+redis==7.4.0
 
 # -- Monitoring & Logging ------------------------------------
 prometheus-client==0.21.1
