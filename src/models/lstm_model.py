@@ -365,7 +365,7 @@ class LSTMModel(BaseModel):
             self.logger.info("Executing LSTM training loop...")
             for epoch in range(epochs):
                 running_loss = 0.0
-                for batch_idx, (features, targets) in enumerate(data):
+                for _, (features, targets) in enumerate(data):
                     optimizer.zero_grad()
                     outputs = self.model(features.to(self.device))
                     loss = criterion(outputs, targets.to(self.device))
