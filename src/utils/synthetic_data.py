@@ -6,13 +6,17 @@ Deterministic scenario generator for testing system robustness across market reg
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 
+from src.core.constants import EventCategory, EventImpact, SignalDirection
 from src.core.schemas import TradeSignal
+from src.data.event_models import MacroEvent, RiskStatus
+from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.trading.capital_allocator import AllocationRequest, StrategyConfig
 
 
@@ -780,3 +784,221 @@ class PortfolioScenarioBuilder:
                 capital_cap=100000,
             ),
         ]
+
+
+class MacroScenarioBuilder:
+    """
+    Generates deterministic sequences of MacroEvent and RiskStatus objects.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.rng = np.random.default_rng(seed)
+
+    def nfp_shock(self, timestamp: datetime | None = None) -> list[MacroEvent]:
+        """High-impact employment data release."""
+        ts = timestamp or datetime.now(UTC)
+        return [
+            MacroEvent(
+                name="Non-Farm Payrolls",
+                category=EventCategory.NFP,
+                impact=EventImpact.HIGH,
+                timestamp=ts,
+                symbol_impact=["XAUUSD", "USD"],
+            )
+        ]
+
+    def fomc_policy_day(self, timestamp: datetime | None = None) -> list[MacroEvent]:
+        """Critical FOMC decision and rate announcement."""
+        ts = timestamp or datetime.now(UTC)
+        return [
+            MacroEvent(
+                name="FOMC Statement",
+                category=EventCategory.FOMC,
+                impact=EventImpact.CRITICAL,
+                timestamp=ts,
+            ),
+            MacroEvent(
+                name="Fed Interest Rate Decision",
+                category=EventCategory.RATES,
+                impact=EventImpact.CRITICAL,
+                timestamp=ts,
+            ),
+        ]
+
+    def geopolitical_tension(self, timestamp: datetime | None = None) -> list[MacroEvent]:
+        """Ongoing geopolitical crisis with extended duration."""
+        ts = timestamp or datetime.now(UTC)
+        return [
+            MacroEvent(
+                name="Geopolitical Conflict Escalation",
+                category=EventCategory.GEOPOLITICAL,
+                impact=EventImpact.HIGH,
+                timestamp=ts - timedelta(hours=2),
+                end_timestamp=ts + timedelta(hours=22),
+            )
+        ]
+
+    def cpi_cluster(self, timestamp: datetime | None = None) -> list[MacroEvent]:
+        """Sequence of inflation-related releases."""
+        ts = timestamp or datetime.now(UTC)
+        return [
+            MacroEvent(
+                name="Core CPI m/m",
+                category=EventCategory.CPI,
+                impact=EventImpact.HIGH,
+                timestamp=ts,
+            ),
+            MacroEvent(
+                name="CPI y/y",
+                category=EventCategory.CPI,
+                impact=EventImpact.MEDIUM,
+                timestamp=ts,
+            ),
+        ]
+
+    def extreme_risk_status(self, reason: str = "Simulated Critical Risk") -> RiskStatus:
+        """RiskStatus that blocks all execution."""
+        return RiskStatus(
+            is_blocked=True,
+            risk_multiplier=0.0,
+            reason=reason,
+            blocking_events=self.fomc_policy_day(),
+        )
+
+    def modulated_risk_status(self, multiplier: float = 0.5) -> RiskStatus:
+        """RiskStatus that reduces sizing without blocking."""
+        return RiskStatus(
+            is_blocked=False,
+            risk_multiplier=multiplier,
+            reason=f"Caution: Impact Multiplier {multiplier}",
+            active_events=self.cpi_cluster(),
+        )
+
+
+@dataclass(frozen=True)
+class SystemScenarioContext:
+    """
+    Unified container for a complete system state scenario.
+    """
+
+    ohlcv: pd.DataFrame
+    signal: TradeSignal
+    macro_risk: RiskStatus
+    model_health: dict[str, float]
+    performance: dict[str, Any]
+    regime: RegimeInfo
+
+
+class SystemContextBuilder:
+    """
+    Orchestrates multiple builders to create high-fidelity system contexts.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.market_gen = ScenarioGenerator(seed=seed)
+        self.exec_builder = ExecutionScenarioBuilder(seed=seed)
+        self.macro_builder = MacroScenarioBuilder(seed=seed)
+        self.health_gen = ModelHealthGenerator()
+
+    def create_crisis_scenario(self, symbol: str = "XAUUSD") -> SystemScenarioContext:
+        """
+        High-volatility crash during a geopolitical crisis.
+        Expected: BLOCKED by multiple filters and macro risk.
+        """
+        # 2024-05-22 is a Wednesday (open session)
+        ts = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
+
+        # 1. Market Data: Flash Crash
+        df = self.market_gen.generate(
+            n_steps=200,
+            regime="flash_crash",
+            start_price=2300.0,
+            start_date=ts - timedelta(minutes=200 * 5),
+        )
+
+        # 2. Signal: BUY attempt during crash (Knife catching)
+        signal = TradeSignal(
+            symbol=symbol,
+            direction=SignalDirection.BUY,
+            entry_price=df["close"].iloc[-1],
+            stop_loss=df["close"].iloc[-1] - 50.0,
+            take_profit=df["close"].iloc[-1] + 100.0,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.85,
+            timestamp=df.index[-1],
+        )
+
+        # 3. Macro: Geopolitical Tension
+        events = self.macro_builder.geopolitical_tension(timestamp=df.index[-1])
+        risk = RiskStatus(
+            is_blocked=True,
+            risk_multiplier=0.0,
+            active_events=events,
+            blocking_events=events,
+            reason="Active Geopolitical Conflict",
+        )
+
+        # 4. Health & Perf
+        health = self.health_gen.degraded_drift()
+        perf = {"win_rate": 0.42, "total_trades": 100, "sharpe_ratio": 0.5}
+
+        # 5. Regime
+        regime = RegimeInfo(
+            label=MarketRegime.VOLATILE_BREAKOUT,
+            confidence=0.9,
+            volatility_index=3.5,
+            transition_score=0.8,
+        )
+
+        return SystemScenarioContext(
+            ohlcv=df,
+            signal=signal,
+            macro_risk=risk,
+            model_health=health,
+            performance=perf,
+            regime=regime,
+        )
+
+    def create_bull_run_scenario(self, symbol: str = "XAUUSD") -> SystemScenarioContext:
+        """
+        Steady bullish trend with clear skies.
+        Expected: APPROVED for execution.
+        """
+        df = self.market_gen.generate(
+            n_steps=200, regime="trending", trend_strength=0.001, volatility=0.0005
+        )
+        # 2024-05-22 is a Wednesday (open session)
+        ts = datetime(2024, 5, 22, 12, 0, tzinfo=UTC)
+        df.index = pd.date_range(end=ts, periods=200, freq="5min")
+
+        signal = TradeSignal(
+            symbol=symbol,
+            direction=SignalDirection.BUY,
+            entry_price=df["close"].iloc[-1],
+            stop_loss=df["close"].iloc[-1] - 10.0,
+            take_profit=df["close"].iloc[-1] + 20.0,
+            lot_size=0.1,
+            algorithm="ensemble",
+            confidence=0.9,
+            timestamp=ts,
+        )
+
+        risk = RiskStatus(is_blocked=False, risk_multiplier=1.0, reason="Clear conditions")
+        health = self.health_gen.perfect_health()
+        perf = {"win_rate": 0.65, "total_trades": 200, "sharpe_ratio": 2.5}
+        regime = RegimeInfo(
+            label=MarketRegime.TRENDING,
+            confidence=0.95,
+            volatility_index=1.0,
+            transition_score=0.1,
+        )
+
+        return SystemScenarioContext(
+            ohlcv=df,
+            signal=signal,
+            macro_risk=risk,
+            model_health=health,
+            performance=perf,
+            regime=regime,
+        )
