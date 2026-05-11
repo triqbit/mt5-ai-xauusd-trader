@@ -15,7 +15,9 @@ The `DecisionPacket` is a structured Pydantic model that serves as the single so
 - **Decision Score:** A composite score (0-100) aggregating multiple intelligence dimensions. The score is strictly clamped between 0 and 100 for numerical stability.
 - **Sizing Multiplier:** A recommended scaling factor (0.0-1.0) for position sizing based on risk and confidence.
 - **Execution Status:** A final "Go/No-Go" flag determined by the combined state of all filters.
+- **Requires Review:** A flag indicating if the trade setup carries enough uncertainty or risk to mandate manual operator approval.
 - **Blocking Reasons:** A clear list of reasons if a trade is prevented from executing.
+- **Executive Summary:** A high-level natural language rationale explaining the "Why" behind the decision in institutional terms.
 
 ### 2. Multi-Dimensional Summary
 The DSS summarizes the following dimensions:

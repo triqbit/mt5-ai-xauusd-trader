@@ -122,8 +122,14 @@ class DecisionPacket(BaseModel):
     is_executable: bool = Field(
         False, description="Final binary decision on whether execution is permitted."
     )
+    requires_review: bool = Field(
+        False, description="Flag indicating if the decision requires manual operator review."
+    )
     blocking_reasons: list[str] = Field(
         default_factory=list, description="Explicit reasons for blocking the trade, if any."
+    )
+    executive_summary: str = Field(
+        "", description="High-level natural language summary of the decision rationale."
     )
 
     # Components
@@ -210,6 +216,11 @@ class DecisionSupportSystem:
             decision_score, status_level, macro_risk
         )
 
+        # Determine if review is required
+        requires_review = status_level == DecisionStatus.CAUTION or (
+            is_executable and decision_score < 80.0
+        )
+
         # Construct Performance Context
         performance = PerformanceContext(
             sharpe_ratio=performance_metrics.get("sharpe_ratio", 0.0),
@@ -221,6 +232,11 @@ class DecisionSupportSystem:
             total_trades=int(performance_metrics.get("total_trades", 0)),
         )
 
+        # Generate executive summary
+        executive_summary = self._generate_executive_summary(
+            symbol, explanation, regime_info, status_level, decision_score, blocking_reasons
+        )
+
         return DecisionPacket(
             symbol=symbol,
             direction=explanation.direction,
@@ -229,12 +245,43 @@ class DecisionSupportSystem:
             decision_score=decision_score,
             sizing_multiplier=sizing_multiplier,
             is_executable=is_executable,
+            requires_review=requires_review,
             blocking_reasons=blocking_reasons,
+            executive_summary=executive_summary,
             explanation=explanation,
             regime=regime_info,
             macro_risk=macro_risk,
             performance=performance,
         )
+
+    def _generate_executive_summary(
+        self,
+        symbol: str,
+        explanation: SignalExplanation,
+        regime: RegimeInfo,
+        status: DecisionStatus,
+        score: float,
+        blocking_reasons: list[str],
+    ) -> str:
+        """
+        Generate a concise executive summary for the operator.
+        """
+        if status == DecisionStatus.BLOCKED:
+            reasons = "; ".join(blocking_reasons)
+            return f"Trade for {symbol} BLOCKED. Rationale: {reasons}"
+
+        dir_str = explanation.direction.name
+        summary = (
+            f"Institutional {dir_str} signal for {symbol} with a decision score of {score:.1f}/100. "
+        )
+        summary += f"Current market state is {regime.label.value} (Confidence: {regime.confidence:.1%}). "
+
+        if status == DecisionStatus.EXECUTE:
+            summary += "Signal shows strong confluence and satisfies all institutional guardrails."
+        else:
+            summary += "Signal is valid but carries elevated risk; exercise caution and monitor execution."
+
+        return summary
 
     def _calculate_decision_score(
         self, explanation: SignalExplanation, regime: RegimeInfo, macro_risk: RiskStatus
@@ -372,6 +419,9 @@ class DecisionSupportSystem:
             header_content.append("  |  CONSENSUS: ", style="bold")
             header_content.append(packet.consensus.upper(), style="bold cyan")
 
+            if packet.requires_review:
+                header_content.append("\n[REVIEW REQUIRED]", style="bold blink yellow")
+
             blocking_panel = None
             if packet.blocking_reasons:
                 blocking_content = Text()
@@ -385,9 +435,13 @@ class DecisionSupportSystem:
                     box=box.HEAVY,
                 )
 
+            title = "💠 [bold]Institutional Decision Support[/bold]"
+            if packet.decision_score >= 90.0 and packet.is_executable:
+                title = "💠 [bold]Institutional Decision Support [💎 HIGH CONVICTION][/bold]"
+
             header = Panel(
                 header_content,
-                title="💠 [bold]Institutional Decision Support[/bold]",
+                title=title,
                 subtitle=packet.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 border_style=status_color,
                 box=box.DOUBLE,
@@ -408,7 +462,7 @@ class DecisionSupportSystem:
             score_text = Text()
             score_text.append("Decision Score: ", style="bold")
             score_text.append(f"{packet.decision_score:.1f}/100", style=f"bold {score_color}")
-            score_text.append("\nSizing Rec:     ", style="bold")
+            score_text.append("\n💰 Sizing Rec:  ", style="bold")
             score_text.append(f"{packet.sizing_multiplier:.1%}", style="bold cyan")
 
             if packet.decision_score >= 90.0 and packet.is_executable:
@@ -433,6 +487,13 @@ class DecisionSupportSystem:
                 score_content, title="🎯 Augmentation Metrics", border_style="blue"
             )
 
+            # Executive Summary Panel
+            exec_summary_panel = Panel(
+                Text(packet.executive_summary, style="italic"),
+                title="📝 Executive Summary",
+                border_style="white",
+            )
+
             # 2. Market and Performance Overview (Two-column table)
             overview_table = Table.grid(expand=True)
             overview_table.add_column(ratio=1)
@@ -440,10 +501,10 @@ class DecisionSupportSystem:
 
             # Left Column: Regime
             regime_content = (
-                f"Label: [bold cyan]{packet.regime.label.value.upper()}[/bold cyan]\n"
-                f"Confidence: [bold]{packet.regime.confidence:.1%}[/bold]\n"
-                f"Volatility: [bold]{packet.regime.volatility_index:.2f}[/bold]\n"
-                f"Transition: {packet.regime.transition_score:.2f}"
+                f"🏷️ Label: [bold cyan]{packet.regime.label.value.upper()}[/bold cyan]\n"
+                f"🎯 Confidence: [bold]{packet.regime.confidence:.1%}[/bold]\n"
+                f"🌪️ Volatility: [bold]{packet.regime.volatility_index:.2f}[/bold]\n"
+                f"🔄 Transition: {packet.regime.transition_score:.2f}"
             )
             regime_panel = Panel(regime_content, title="🌐 Market Regime", border_style="cyan")
 
@@ -462,12 +523,12 @@ class DecisionSupportSystem:
             wl_color = get_color(packet.performance.win_loss_ratio, 2.0, 1.2)
 
             perf_content = (
-                f"Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
-                f"Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
-                f"Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
-                f"Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]\n"
-                f"W/L Ratio:     [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
-                f"Total Trades:  {packet.performance.total_trades}"
+                f"📈 Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
+                f"💰 Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
+                f"🛡️ Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
+                f"🎯 Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]\n"
+                f"⚖️ W/L Ratio:     [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
+                f"🔢 Total Trades:  {packet.performance.total_trades}"
             )
             perf_panel = Panel(perf_content, title="📊 Recent Performance", border_style="magenta")
 
@@ -512,6 +573,7 @@ class DecisionSupportSystem:
 
             components.extend([
                 augmentation_panel,
+                exec_summary_panel,
                 overview_table,
                 macro_panel,
                 attribution_summary,
@@ -538,6 +600,11 @@ class DecisionSupportSystem:
             res += f"STATUS: {packet.status_level.value.upper()}\n"
             res += f"DECISION SCORE: {packet.decision_score:.1f}/100 | SIZING: {packet.sizing_multiplier:.1%}\n"
             res += f"DIRECTION: {packet.direction.name} | CONSENSUS: {packet.consensus}\n"
+
+            if packet.requires_review:
+                res += "!!! REVIEW REQUIRED !!!\n"
+
+            res += f"EXECUTIVE SUMMARY: {packet.executive_summary}\n"
 
             if packet.blocking_reasons:
                 res += "BLOCKING REASONS:\n"
