@@ -1,9 +1,11 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from src.core.exceptions import MT5DataError, MT5ExecutionError, TradingError
 from src.core.retry import with_retry
-from src.trading.mt5_connector import MT5Connector
 from src.core.schemas import TradeSignal
+from src.trading.mt5_connector import MT5Connector
 
 # --- Enhanced Retry Tests ---
 

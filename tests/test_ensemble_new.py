@@ -1,7 +1,7 @@
-import pytest
-from src.models.ensemble import EnsembleModel
-from src.models.base_model import Signal
 from src.core.constants import SignalDirection
+from src.models.base_model import Signal
+from src.models.ensemble import EnsembleModel
+
 
 def test_ensemble_dissent():
     ensemble = EnsembleModel()

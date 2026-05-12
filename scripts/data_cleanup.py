@@ -14,7 +14,7 @@ import sys
 import tarfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List
 
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import sessionmaker

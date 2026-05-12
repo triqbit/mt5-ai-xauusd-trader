@@ -2,6 +2,7 @@
 import sys
 
 import pytest
+from pydantic import ValidationError
 
 from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
@@ -185,18 +186,18 @@ def test_validator_market_parameters(monkeypatch, tmp_path):
 
     # 1. Empty Symbol
     monkeypatch.setenv("SYMBOL", "")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TradingConfig()
 
     # 2. Lowercase Symbol
     monkeypatch.setenv("SYMBOL", "xauusd")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TradingConfig()
 
     # 3. Invalid Timeframe
     monkeypatch.setenv("SYMBOL", "XAUUSD")
     monkeypatch.setenv("TIMEFRAME", "M7")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TradingConfig()
 
     # 4. Valid
@@ -264,7 +265,7 @@ def test_validator_max_daily_loss(monkeypatch, tmp_path):
 
     # Hard stop is 6%. Pydantic catches 7%.
     monkeypatch.setenv("MAX_DAILY_LOSS", "0.07")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TradingConfig()
 
     # Warning if > 5% (Emergency Stop)
@@ -451,7 +452,7 @@ def test_validator_min_confidence(monkeypatch, tmp_path):
     # Critical breach (< 0.50)
     monkeypatch.setenv("MIN_CONFIDENCE", "0.45")
     # Pydantic has ge=0.5, so this should raise
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TradingConfig()
 
     # Warning (< 0.55)
@@ -568,7 +569,7 @@ def test_validator_stability_guards(monkeypatch, tmp_path):
     cfg = TradingConfig()
     monkeypatch.setenv("MODEL_ACCURACY_FLOOR", "0.40")
     # Pydantic ge=0.5
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TradingConfig()
 
     # Accuracy floor is 0.5 in TradingConfig default
@@ -580,7 +581,7 @@ def test_validator_stability_guards(monkeypatch, tmp_path):
 
     # Model Win Rate Floor Critical (< 0.45)
     monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.35")
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TradingConfig()
 
     monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.40")

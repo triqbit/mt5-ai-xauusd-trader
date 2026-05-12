@@ -1,9 +1,10 @@
-import pytest
-import time
 from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.core.exceptions import CircuitBreakerError, MT5ConnectionError, MT5DataError
 from src.trading.mt5_connector import MT5Connector
-from src.core.config import TradingConfig
-from src.core.exceptions import MT5ConnectionError, MT5DataError, CircuitBreakerError
+
 
 @pytest.fixture
 def mock_config():

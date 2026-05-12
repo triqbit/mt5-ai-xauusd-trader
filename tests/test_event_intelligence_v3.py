@@ -1,24 +1,27 @@
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
 import pytest
-from datetime import datetime, timedelta, UTC
-from unittest.mock import patch, MagicMock
+
 from src.data.event_intelligence import (
-    EventIntelligence,
-    MetaAPIEventProvider,
-    MacroEvent,
+    BaseEventProvider,
     EventCategory,
     EventImpact,
-    BaseEventProvider
+    EventIntelligence,
+    MacroEvent,
+    MetaAPIEventProvider,
 )
+
 
 @pytest.fixture
 def now():
     return datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
-def test_metaapi_provider_extra_fields(mock_init_session, now):
-    mock_session = MagicMock()
-    mock_init_session.return_value = mock_session
-    mock_get = mock_session.get
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
+def test_metaapi_provider_extra_fields(mock_init_client, now):
+    mock_client = MagicMock()
+    mock_init_client.return_value = mock_client
+    mock_get = mock_client.get
 
     mock_response = MagicMock()
     mock_response.status_code = 200
