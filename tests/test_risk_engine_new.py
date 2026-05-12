@@ -1,7 +1,9 @@
-import pytest
 import pandas as pd
-from src.trading.risk_engine import RiskEngine
+import pytest
+
 from src.core.config import TradingConfig
+from src.trading.risk_engine import RiskEngine
+
 
 @pytest.fixture
 def risk_engine():
@@ -25,8 +27,8 @@ def test_calculate_position_size(risk_engine):
     assert size >= 0.01
 
 def test_validate_signal_rejection(risk_engine):
-    from src.core.schemas import TradeSignal
     from src.core.constants import SignalDirection
+    from src.core.schemas import TradeSignal
 
     signal = TradeSignal(
         symbol="XAUUSD",

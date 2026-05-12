@@ -44,6 +44,9 @@ class ConfigValidator:
         self._check_risk_parameters()
         self._check_exposure_limits()
         self._check_margin_and_volatility_limits()
+        self._check_capital_allocator_settings()
+        self._check_execution_parameters()
+        self._check_streak_and_win_limits()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -195,6 +198,8 @@ class ConfigValidator:
             "EXAMPLE_TOKEN",
             "DUMMY",
             "FAKE",
+            "YOUR_PASSWORD_HERE",
+            "YOUR_SERVER_HERE",
         ]
 
         # Check database URL
@@ -258,15 +263,18 @@ class ConfigValidator:
             )
 
         # Check Redis URL
+        default_redis = "redis://localhost:6379/0"
         redis_url = self.config.redis_url
         if hasattr(redis_url, "get_secret_value"):
             redis_url = redis_url.get_secret_value()
 
-        if redis_url and any(p in redis_url.upper() for p in placeholders):
+        if redis_url == default_redis or (
+            redis_url and any(p in redis_url.upper() for p in placeholders)
+        ):
             self.errors.append(
                 ValidationError(
                     "REDIS_URL",
-                    "Redis URL contains placeholder text.",
+                    "Redis URL is using default placeholder or contains placeholder text.",
                     True,
                     "Update REDIS_URL in .env with your actual Redis connection string.",
                 )
@@ -645,6 +653,92 @@ class ConfigValidator:
                         "Correct the volatility threshold hierarchy in .env.",
                     )
                 )
+
+    def _check_capital_allocator_settings(self) -> None:
+        """Verify capital allocator settings are within safe institutional ranges."""
+        if self.config.allocator_max_total_heat > 0.9:
+            self.errors.append(
+                ValidationError(
+                    "ALLOCATOR_MAX_TOTAL_HEAT",
+                    f"Max total heat {self.config.allocator_max_total_heat*100}% is too high.",
+                    True,
+                    "Reduce ALLOCATOR_MAX_TOTAL_HEAT to 0.9 (90%) or less.",
+                )
+            )
+
+        if self.config.allocator_max_symbol_risk > 0.5:
+            self.errors.append(
+                ValidationError(
+                    "ALLOCATOR_MAX_SYMBOL_RISK",
+                    f"Max symbol risk {self.config.allocator_max_symbol_risk*100}% exceeds 50% limit.",
+                    True,
+                    "Reduce ALLOCATOR_MAX_SYMBOL_RISK to 0.5 or less.",
+                )
+            )
+
+        if self.config.allocator_max_family_risk > 0.5:
+            self.errors.append(
+                ValidationError(
+                    "ALLOCATOR_MAX_FAMILY_RISK",
+                    f"Max family risk {self.config.allocator_max_family_risk*100}% exceeds 50% limit.",
+                    True,
+                    "Reduce ALLOCATOR_MAX_FAMILY_RISK to 0.5 or less.",
+                )
+            )
+
+    def _check_execution_parameters(self) -> None:
+        """Verify execution parameters against institutional safety standards."""
+        if self.config.max_slippage_pips > 5.0:
+            self.errors.append(
+                ValidationError(
+                    "MAX_SLIPPAGE_PIPS",
+                    f"Max slippage {self.config.max_slippage_pips} pips is dangerously high.",
+                    True,
+                    "Reduce MAX_SLIPPAGE_PIPS to 5.0 or less.",
+                )
+            )
+
+        if self.config.execution_latency_threshold > 5.0:
+            self.errors.append(
+                ValidationError(
+                    "EXECUTION_LATENCY_THRESHOLD",
+                    f"Execution latency threshold {self.config.execution_latency_threshold}s is too high.",
+                    True,
+                    "Reduce EXECUTION_LATENCY_THRESHOLD to 5.0s or less.",
+                )
+            )
+
+    def _check_streak_and_win_limits(self) -> None:
+        """Verify streak and win limits to prevent over-trading."""
+        if self.config.max_losing_streak > 10:
+            self.errors.append(
+                ValidationError(
+                    "MAX_LOSING_STREAK",
+                    f"Max losing streak {self.config.max_losing_streak} is too high.",
+                    True,
+                    "Reduce MAX_LOSING_STREAK to 10 or less.",
+                )
+            )
+
+        if self.config.max_winning_streak > 20:
+            self.errors.append(
+                ValidationError(
+                    "MAX_WINNING_STREAK",
+                    f"Max winning streak {self.config.max_winning_streak} is too high.",
+                    True,
+                    "Reduce MAX_WINNING_STREAK to 20 or less.",
+                )
+            )
+
+        if self.config.daily_win_cap > 0.30:
+            self.errors.append(
+                ValidationError(
+                    "DAILY_WIN_CAP",
+                    f"Daily win cap {self.config.daily_win_cap*100}% is too aggressive.",
+                    True,
+                    "Reduce DAILY_WIN_CAP to 0.30 (30%) or less.",
+                )
+            )
 
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""

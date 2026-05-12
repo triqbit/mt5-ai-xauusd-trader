@@ -3,14 +3,16 @@ Tests for Jules02 risk hardening and drift monitoring enhancements.
 Verifies the 8-layer safety cascade, consecutive loss blocking, and model calibration alerts.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from datetime import date
-from src.trading.risk_manager import RiskManager, DailyStats
-from src.trading.audited_risk_manager import AuditedRiskManager
-from src.core.schemas import TradeSignal
+
+import pytest
+
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
+from src.core.schemas import TradeSignal
+from src.trading.audited_risk_manager import AuditedRiskManager
+from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def mock_config():

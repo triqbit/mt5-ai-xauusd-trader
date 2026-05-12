@@ -1,8 +1,9 @@
 
 import numpy as np
 import pandas as pd
-import pytest
+
 from src.trading.trading_env import TradingEnv
+
 
 def test_trading_env_optimized_observation():
     """Verify that the optimized observation retrieval is correct and matches the original data."""

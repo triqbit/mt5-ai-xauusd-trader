@@ -3,7 +3,9 @@ Unit tests for the profiler with Prometheus integration.
 """
 import time
 from unittest.mock import MagicMock, patch
+
 from src.core.profiler import profile
+
 
 def test_profile_prometheus_interaction():
     """Verify that the profiler calls Prometheus observe."""

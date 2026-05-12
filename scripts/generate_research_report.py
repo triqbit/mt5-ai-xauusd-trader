@@ -6,23 +6,24 @@ Automated institutional-grade research report generation demonstration.
 
 import os
 import sys
-from datetime import datetime, timezone
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.research.reporting import ResearchOrchestrator, ResearchReporter, RareEventSection
-from src.models.regime_detector import RegimeDetector
-from src.research.stress_lab import StressLab, StressTestMetrics
-from src.research.benchmarks import EMACrossoverStrategy
-from src.research.hyperopt_walkforward import WalkForwardOptimizer, WalkForwardConfig
-from src.analytics.journal_mining import JournalMiner
 from src.analytics.drift_analyzer import DriftAnalyzer
+from src.analytics.journal_mining import JournalMiner
+from src.core.trade_logger import TradeLogger
+from src.models.regime_detector import RegimeDetector
+from src.research.benchmarks import EMACrossoverStrategy
+from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
+from src.research.rare_event_simulator import RareEventConfig, RareEventSimulator, RareEventType
+from src.research.reporting import RareEventSection, ResearchOrchestrator, ResearchReporter
+from src.research.stress_lab import StressLab, StressTestMetrics
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.research.rare_event_simulator import RareEventSimulator, RareEventConfig, RareEventType
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade, RiskEvent
+
 
 def generate_synthetic_data(n=1000):
     """Generate professional synthetic XAUUSD data."""
@@ -171,7 +172,7 @@ def main():
     reporter.save_markdown(report, md_path)
     reporter.save_html(report, html_path)
 
-    print(f"\n✅ Report generated successfully!")
+    print("\n✅ Report generated successfully!")
     print(f"   - Markdown: {os.path.abspath(md_path)}")
     print(f"   - HTML:     {os.path.abspath(html_path)}")
 

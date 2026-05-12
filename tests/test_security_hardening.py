@@ -1,5 +1,4 @@
 import os
-import stat
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -60,6 +59,7 @@ def test_audit_logger_redaction(tmp_path):
 
     # Check the database
     from sqlalchemy import create_engine, select
+
     from src.core.audit_log import AuditEntry
     engine = create_engine(db_url)
     with engine.connect() as conn:
@@ -126,6 +126,13 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config.volatility_high_threshold = 1.5
     config.volatility_very_high_threshold = 2.0
     config.volatility_extreme_threshold = 3.0
+    config.allocator_max_total_heat = 0.70
+    config.allocator_max_symbol_risk = 0.40
+    config.allocator_max_family_risk = 0.40
+    config.max_slippage_pips = 1.0
+    config.max_losing_streak = 3
+    config.max_winning_streak = 5
+    config.daily_win_cap = 0.10
 
     validator = ConfigValidator(config)
 

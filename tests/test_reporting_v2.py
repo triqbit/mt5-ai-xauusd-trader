@@ -3,8 +3,8 @@ Extended tests for the research reporting system.
 Focuses on overall status and actionable recommendations.
 """
 
-import pytest
-from src.research.reporting import ResearchOrchestrator, ResearchReporter, ResearchReport
+from src.research.reporting import ResearchOrchestrator, ResearchReporter
+
 
 def test_reporting_v2_status_and_recommendations():
     orchestrator = ResearchOrchestrator(

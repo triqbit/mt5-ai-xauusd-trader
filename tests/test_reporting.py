@@ -3,22 +3,25 @@ Tests for the research reporting system.
 """
 
 import os
+
 import pytest
+
 from src.research.reporting import (
     AllocationEntry,
     AllocationSection,
-    RegimeSection,
-    RegimeSummary,
-    ResearchReport,
-    ResearchReporter,
-    StressedMetric,
-    StressTestSection,
-    ResearchOrchestrator,
     RareEventSection,
     RareEventSummary,
-    TradePatternSection,
+    RegimeSection,
+    RegimeSummary,
+    ResearchOrchestrator,
+    ResearchReport,
+    ResearchReporter,
     SignalMotif,
+    StressedMetric,
+    StressTestSection,
+    TradePatternSection,
 )
+
 
 @pytest.fixture
 def sample_report():
@@ -389,8 +392,9 @@ def test_terminal_dynamic_numbering(mocker):
 
 def test_generate_audit_report_smoke_test():
     """Verify that the audit report generation script runs without error."""
-    from src.research.generate_audit_report import generate_full_audit
     import os
+
+    from src.research.generate_audit_report import generate_full_audit
 
     # Run the generation
     generate_full_audit()
