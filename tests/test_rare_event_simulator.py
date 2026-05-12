@@ -210,6 +210,49 @@ def test_news_shock_behavior(simulator):
 
     assert post_shock_vol > pre_shock_vol * 3
 
+    # Institutional Regime Threshold verification
+    from src.models.regime_detector import RegimeDetector
+    detector = RegimeDetector()
+    regime_info = detector.detect(df.iloc[:result.end_index])
+    # Should be NEWS_SHOCK or at least VOLATILE_BREAKOUT due to high ER and ATR
+    assert regime_info.label in ["news_shock", "volatile_breakout"]
+
+
+def test_fat_finger_behavior(simulator):
+    config = RareEventConfig(event_type=RareEventType.FAT_FINGER, n_steps=200, event_magnitude=2.0)
+    df, result = simulator.generate_scenario(config)
+
+    assert result.event_type == RareEventType.FAT_FINGER
+    assert abs(result.peak_impact_pct) > 0.02
+
+    # Check for the massive wick
+    idx = result.start_index
+    bar = df.iloc[idx]
+    wick_size = (bar["high"] - max(bar["open"], bar["close"])) if result.peak_impact_pct > 0 else (min(bar["open"], bar["close"]) - bar["low"])
+    assert wick_size > config.start_price * 0.02
+
+    # Spread should be widened
+    assert df.loc[df.index[idx], "spread"] > 2.0
+
+
+def test_bull_bear_trap_behavior(simulator):
+    config = RareEventConfig(event_type=RareEventType.BULL_BEAR_TRAP, n_steps=300)
+    df, result = simulator.generate_scenario(config)
+
+    assert result.event_type == RareEventType.BULL_BEAR_TRAP
+    # Trap means it reversed, so peak impact (the reversal) should be significant
+    assert abs(result.peak_impact_pct) > 0.01
+
+    # Check for reversal: final price of event should be on the opposite side of the breakout
+    breakout_price = df["close"].iloc[result.start_index + 4] # End of breakout phase
+    final_price = df["close"].iloc[result.end_index - 1]
+    start_price = df["close"].iloc[result.start_index - 1]
+
+    if breakout_price > start_price: # Bull Trap
+        assert final_price < breakout_price
+    else: # Bear Trap
+        assert final_price > breakout_price
+
 
 def test_generate_suite(simulator):
     suite = simulator.generate_suite(n_steps=200, magnitude=1.5, seed=100)
