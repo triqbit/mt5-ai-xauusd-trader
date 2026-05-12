@@ -9,6 +9,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from functools import lru_cache
 from typing import Any
 
@@ -67,6 +69,16 @@ def get_engine(db_url: str) -> Engine:
         engine_kwargs["max_overflow"] = 40
 
     engine = create_engine(db_url, **engine_kwargs)
+
+    # Harden file permissions for SQLite databases
+    if is_sqlite and sys.platform != "win32":
+        db_path = db_url.replace("sqlite:///", "")
+        if db_path and not db_path.startswith(":memory:") and os.path.exists(db_path):
+            try:
+                os.chmod(db_path, 0o600)
+                logger.debug("Hardened SQLite file permissions (0600) for: %s", db_path)
+            except Exception as e:
+                logger.warning("Failed to harden SQLite file permissions: %s", e)
 
     logger.info("Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url)
     return engine

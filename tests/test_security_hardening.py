@@ -140,6 +140,25 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     assert len(permission_errors) > 0
     assert "Insecure permissions" in permission_errors[0].message
 
+def test_sqlite_hardening(tmp_path):
+    """Verify that SQLite files are hardened with 0600 permissions."""
+    if sys.platform == "win32":
+        pytest.skip("Permission check only on Linux/Mac")
+
+    from src.core.database import get_engine
+    db_file = tmp_path / "test_hardened.db"
+    db_url = f"sqlite:///{db_file}"
+
+    # Pre-create the file to simulate it existing
+    db_file.write_text("")
+    os.chmod(db_file, 0o644) # Make it insecure first
+
+    engine = get_engine(db_url)
+
+    # Check permissions
+    mode = os.stat(db_file).st_mode
+    assert stat.S_IMODE(mode) == 0o600
+
 def test_safe_pytorch_loading():
     """
     Statically analyze the codebase to ensure all torch.load calls
