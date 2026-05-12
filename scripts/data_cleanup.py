@@ -19,6 +19,8 @@ from typing import Any, List, Optional
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import sessionmaker
 
+__version__ = "1.1.0"
+
 # Add src to path to import models
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
