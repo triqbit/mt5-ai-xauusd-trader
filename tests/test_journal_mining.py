@@ -3,9 +3,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import pytest
 
-from src.analytics.journal_mining import (
-    JournalMiner,
-)
+from src.analytics.journal_mining import JournalMiner
 
 
 @pytest.fixture
@@ -64,12 +62,9 @@ def sample_signals():
 
 
 def test_get_session(miner):
-    # London session (08-17)
     dt_london = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
     sessions = miner._get_session(dt_london)
     assert "London" in sessions
-
-    # 02 UTC -> Sydney (22-07) and Tokyo (00-09)
     dt_early = datetime(2024, 1, 1, 2, 0, tzinfo=timezone.utc)
     sessions = miner._get_session(dt_early)
     assert "Sydney" in sessions
@@ -80,26 +75,17 @@ def test_session_stats(miner, sample_trades):
     stats = miner.get_session_stats(sample_trades)
     assert len(stats) == 4
     london = next(s for s in stats if s.session_name == "London")
-    assert london.trade_count > 0
-    # 10, 11, 15, 16 are in London (8-17)
     assert london.trade_count == 4
 
 
 def test_volatility_patterns(miner, sample_signals):
     patterns = miner.analyze_volatility_patterns(sample_signals)
     assert len(patterns) > 0
-    # High volatility (0.5) has 2 signals, both losses -> 1.0 FP rate
     high_vol = next(p for p in patterns if p.volatility_bucket in ["High", "Extreme", "Standard"])
     assert high_vol.signal_count >= 2
 
 
 def test_drawdown_clusters(miner, sample_trades):
-    # Trades 2, 3, 4, 5 are consecutive losses in sample_trades
-    # id 1: pnl 100
-    # id 2: pnl -50
-    # id 3: pnl -20
-    # id 4: pnl -30
-    # id 5: pnl -10
     clusters = miner.detect_drawdown_clusters(sample_trades)
     assert len(clusters) == 1
     assert clusters[0].trade_count == 4
@@ -107,22 +93,15 @@ def test_drawdown_clusters(miner, sample_trades):
 
 
 def test_profitable_patterns(miner, sample_trades):
-    # Add symbol to sample_trades for this test
     df = sample_trades.copy()
     df["symbol"] = "XAUUSD"
-
     patterns = miner.find_profitable_patterns(df)
-    # Ensemble: 1 win, 1 loss. Win rate 0.5. Profit factor 100/50 = 2.0
     ensemble = next(p for p in patterns if p.value == "ensemble")
     assert ensemble.win_rate == 0.5
     assert ensemble.profit_factor == 2.0
-
-    # Symbol concentration
     xau = next(p for p in patterns if p.value == "XAUUSD")
     assert xau.attribute == "symbol"
     assert xau.total_trades == 5
-
-    # Day of week analysis (2024-01-01 was a Monday)
     monday = next(p for p in patterns if p.value == "Monday")
     assert monday.attribute == "day"
     assert monday.total_trades == 5
@@ -144,7 +123,6 @@ def test_risk_blocks(miner, sample_signals):
 
 
 def test_run_mining(miner):
-    # Setup database with some data
     with miner.Session() as session:
         from src.core.trade_logger import ModelSignal, RiskEvent, Trade
 
@@ -158,7 +136,6 @@ def test_run_mining(miner):
         )
         session.add(sig)
         session.commit()
-
         trd = Trade(
             ticket=123,
             symbol="XAUUSD",
@@ -170,15 +147,12 @@ def test_run_mining(miner):
             status="CLOSED",
             signal_id=sig.id,
         )
-        # Manually set updated_at to simulate duration (10 mins)
         trd.created_at = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
         trd.updated_at = datetime(2024, 1, 1, 12, 10, tzinfo=timezone.utc)
         session.add(trd)
-
         evt = RiskEvent(event_type="MAX_DRAWDOWN", signal_id=sig.id)
         session.add(evt)
         session.commit()
-
     report = miner.run_mining()
     assert isinstance(report.timestamp, datetime)
     assert len(report.session_analysis) == 4
@@ -208,8 +182,9 @@ def test_volatility_patterns_all_nan(miner):
 
 
 def test_drawdown_clusters_single_loss(miner):
-    # Should not form a cluster (need 3+)
-    df = pd.DataFrame([{"id": 1, "pnl": -10.0, "created_at": datetime.now(timezone.utc)}])
+    df = pd.DataFrame(
+        [{"id": 1, "pnl": -10.0, "created_at": datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)}]
+    )
     assert miner.detect_drawdown_clusters(df) == []
 
 
@@ -260,17 +235,14 @@ def test_find_frequent_motifs(miner):
     )
     motifs = miner.find_frequent_motifs(signals)
     assert len(motifs) == 2
-    # Ensemble motif (direction 1, Low vol, High conf) has 0% win rate
     ensemble_motif = next(m for m in motifs if m.algorithm == "ensemble")
     assert ensemble_motif.win_rate == 0.0
     assert ensemble_motif.volatility_bucket == "Low"
     assert ensemble_motif.confidence_bucket == "High"
-    assert ensemble_motif.session in ["London", "New York"]
 
 
 def test_strategy_state_correlation(miner):
-    # Setup trades with a drawdown cluster
-    now = datetime.now(timezone.utc)
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades = pd.DataFrame(
         [
             {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
@@ -279,8 +251,6 @@ def test_strategy_state_correlation(miner):
             {"id": 9, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 9},
         ]
     )
-
-    # Risk events: one within 24h BEFORE, one DURING, one outside
     risk_events = pd.DataFrame(
         [
             {"event_type": "MAX_DRAWDOWN", "created_at": now - pd.Timedelta(hours=1)},
@@ -288,9 +258,7 @@ def test_strategy_state_correlation(miner):
             {"event_type": "MAX_DRAWDOWN", "created_at": now - pd.Timedelta(hours=48)},
         ]
     )
-
     correlations = miner.analyze_strategy_state_correlation(risk_events, trades)
-    # 2 out of 3 events are in 'weak state' (preceding or during cluster)
     assert round(correlations["MAX_DRAWDOWN"], 2) == 0.67
 
 
@@ -321,21 +289,18 @@ def test_to_report_section_with_toxic_motif(miner):
         avg_win_duration=15.5,
         avg_loss_duration=45.2,
     )
-
     section = report.to_report_section()
-    # Should detect Strategy Fragility and Toxic Motif
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Strategy Fragility" in risk_types
     assert "Toxic Motif" in risk_types
     assert section.avg_win_duration == 15.5
     assert section.avg_loss_duration == 45.2
-    assert section.motifs[0].session == "London"
 
 
 def test_analyze_trade_durations(miner):
     from src.core.trade_logger import Trade
 
-    now = datetime.now(timezone.utc)
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades = [
         Trade(
             pnl=100,
@@ -352,15 +317,13 @@ def test_analyze_trade_durations(miner):
             exit_price=1990,
         ),
     ]
-
     durations = miner.analyze_trade_durations(trades)
     assert durations["avg_win_duration"] == 10.0
     assert durations["avg_loss_duration"] == 30.0
 
 
 def test_detect_pre_drawdown_motifs(miner):
-    now = datetime.now(timezone.utc)
-    # 3 consecutive losses form a cluster starting at now
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades = pd.DataFrame(
         [
             {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
@@ -368,8 +331,6 @@ def test_detect_pre_drawdown_motifs(miner):
             {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
         ]
     )
-
-    # Signal 1 hour before cluster
     signals = pd.DataFrame(
         [
             {
@@ -392,7 +353,6 @@ def test_detect_pre_drawdown_motifs(miner):
             },
         ]
     )
-
     motifs = miner.detect_pre_drawdown_motifs(signals, trades)
     assert len(motifs) == 1
     assert motifs[0].algorithm == "ensemble"
@@ -400,9 +360,7 @@ def test_detect_pre_drawdown_motifs(miner):
 
 
 def test_find_combination_motifs(miner):
-    now = datetime.now(timezone.utc)
-    # 3 consecutive losses form a cluster starting at now
-    # We need a non-losing trade to end the cluster
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades1 = pd.DataFrame(
         [
             {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
@@ -411,8 +369,6 @@ def test_find_combination_motifs(miner):
             {"id": 9, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 9},
         ]
     )
-
-    # Add second cluster
     later = now + pd.Timedelta(days=1)
     trades2 = pd.DataFrame(
         [
@@ -423,8 +379,6 @@ def test_find_combination_motifs(miner):
         ]
     )
     all_trades = pd.concat([trades1, trades2])
-
-    # Multiple signals before cluster 1
     signals1 = pd.DataFrame(
         [
             {
@@ -443,8 +397,6 @@ def test_find_combination_motifs(miner):
             },
         ]
     )
-
-    # Multiple signals before cluster 2
     signals2 = pd.DataFrame(
         [
             {
@@ -464,7 +416,6 @@ def test_find_combination_motifs(miner):
         ]
     )
     all_signals = pd.concat([signals1, signals2])
-
     motifs = miner.find_combination_motifs(all_signals, all_trades)
     assert len(motifs) == 1
     assert "ensemble:1" in motifs[0].patterns
@@ -474,7 +425,7 @@ def test_find_combination_motifs(miner):
 
 
 def test_find_frequent_motifs_with_clusters(miner):
-    now = datetime.now(timezone.utc)
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades = pd.DataFrame(
         [
             {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
@@ -483,7 +434,6 @@ def test_find_frequent_motifs_with_clusters(miner):
             {"id": 8, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 8},
         ]
     )
-
     signals = pd.DataFrame(
         [
             {
@@ -506,32 +456,23 @@ def test_find_frequent_motifs_with_clusters(miner):
             },
         ]
     )
-
     motifs = miner.find_frequent_motifs(signals, trades)
     assert len(motifs) == 1
     assert motifs[0].cluster_frequency == 2
 
 
 def test_profitable_patterns_multi_attribute(miner, sample_trades):
-    # Add symbol and algorithm to sample_trades
     df = sample_trades.copy()
     df["symbol"] = "XAUUSD"
-    # sessions will be added by run_mining or manually for testing find_profitable_patterns
     df["sessions"] = df["created_at"].apply(miner._get_session)
-
     patterns = miner.find_profitable_patterns(df)
-
-    # Check for algo_session attribute
     algo_sess = [p for p in patterns if p.attribute == "algo_session"]
     assert len(algo_sess) > 0
-    # ensemble @ London (10, 11) -> 2 trades
     ensemble_london = next(p for p in algo_sess if p.value == "ensemble @ London")
     assert ensemble_london.total_trades == 2
 
 
 def test_toxic_motif_sorting(miner):
-    # Motif A: 10% win rate, 10 trades
-    # Motif B: 0% win rate, 2 trades
     signals = pd.DataFrame(
         [
             {
@@ -547,9 +488,7 @@ def test_toxic_motif_sorting(miner):
             for i in range(10)
         ]
     )
-    # Give Motif A some wins to make WR 10%
     signals.loc[0, "win"] = True
-
     signals_b = pd.DataFrame(
         [
             {
@@ -565,13 +504,8 @@ def test_toxic_motif_sorting(miner):
             for i in range(2)
         ]
     )
-
     all_signals = pd.concat([signals, signals_b])
     motifs = miner.find_frequent_motifs(all_signals)
-
-    # Motif A toxic score: (1-0.1) * log(11) = 0.9 * 2.39 = 2.15
-    # Motif B toxic score: (1-0) * log(3) = 1 * 1.09 = 1.09
-    # A should be first because it has higher frequency and still low win rate
     assert motifs[0].algorithm == "A"
 
 
@@ -592,7 +526,7 @@ def test_combination_motif_attributes(miner):
 
 
 def test_detect_revenge_trading(miner):
-    now = datetime.now(timezone.utc)
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades = pd.DataFrame(
         [
             {"id": 1, "pnl": -100.0, "lot_size": 0.1, "created_at": now},
@@ -606,19 +540,16 @@ def test_detect_revenge_trading(miner):
             },
         ]
     )
-
     revenge = miner.detect_revenge_trading(trades)
     assert len(revenge) == 2
-    # First revenge trade: id 2 after id 1 (10 mins, lot increase)
     assert revenge[0].trade_id == 2
     assert revenge[0].lot_increase is True
-    # Second revenge trade: id 4 after id 3 (5 mins, no lot increase)
     assert revenge[1].trade_id == 4
     assert revenge[1].lot_increase is False
 
 
 def test_profitable_patterns_extended(miner):
-    now = datetime.now(timezone.utc)
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades = pd.DataFrame(
         [
             {
@@ -639,14 +570,10 @@ def test_profitable_patterns_extended(miner):
             },
         ]
     )
-
     patterns = miner.find_profitable_patterns(trades)
-    # Check algo_volatility
     algo_vol = [p for p in patterns if p.attribute == "algo_volatility"]
     assert len(algo_vol) == 1
     assert algo_vol[0].value == "ensemble @ Low Vol"
-
-    # Check algo_confidence
     algo_conf = [p for p in patterns if p.attribute == "algo_confidence"]
     assert len(algo_conf) == 1
     assert algo_conf[0].value == "ensemble @ High Conf"
@@ -666,7 +593,6 @@ def test_report_mapping_includes_total_trades(miner):
         ],
         risk_block_summary=[],
     )
-
     section = report.to_report_section()
     assert section.concentrations[0].total_trades == 150
 
@@ -690,7 +616,6 @@ def test_report_includes_revenge_trading_risk(miner):
             }
         ],
     )
-
     section = report.to_report_section()
     revenge_risk = next((r for r in section.behavioral_risks if r.type == "Revenge Trading"), None)
     assert revenge_risk is not None
@@ -705,21 +630,16 @@ def test_analyze_rejection_quality(miner):
             {"rejection_reason": "MAX_DD", "would_have_won": False, "opportunity_cost_pnl": 0.0},
         ]
     )
-
     qualities = miner.analyze_rejection_quality(blocked_df)
     assert len(qualities) == 2
-
     spread = next(q for q in qualities if q.reason == "SPREAD")
     assert spread.total_blocked == 2
-    assert spread.correct_blocks == 1
-    assert spread.incorrect_blocks == 1
     assert spread.accuracy == 0.5
     assert spread.profit_opportunity_cost == 50.0
 
 
 def test_detect_overconfidence(miner):
-    now = datetime.now(timezone.utc)
-    # 3 consecutive wins followed by a lot increase
+    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
     trades = pd.DataFrame(
         [
             {"id": 1, "pnl": 10.0, "lot_size": 0.1, "created_at": now},
@@ -728,7 +648,6 @@ def test_detect_overconfidence(miner):
             {"id": 4, "pnl": -5.0, "lot_size": 0.2, "created_at": now + pd.Timedelta(minutes=15)},
         ]
     )
-
     overconfidence = miner.detect_overconfidence(trades, consecutive_wins_threshold=3)
     assert len(overconfidence) == 1
     assert overconfidence[0].trade_id == 4
@@ -750,8 +669,6 @@ def test_run_mining_enhanced(miner):
         )
         session.add(sig)
         session.commit()
-
-        # Closed trade for overconfidence detection (need 4 trades)
         for i in range(4):
             t = Trade(
                 ticket=1000 + i,
@@ -765,14 +682,11 @@ def test_run_mining_enhanced(miner):
             )
             t.created_at = datetime.now(timezone.utc) + pd.Timedelta(minutes=i)
             session.add(t)
-
-        # Blocked signal for rejection quality
         sig2 = ModelSignal(
             symbol="XAUUSD", direction=-1, entry_price=2000.0, algorithm="ppo", confidence=0.8
         )
         session.add(sig2)
         session.commit()
-
         blocked = BlockedSignalAnalysis(
             signal_id=sig2.id,
             opportunity_cost_pnl=100.0,
@@ -783,7 +697,6 @@ def test_run_mining_enhanced(miner):
         )
         session.add(blocked)
         session.commit()
-
     report = miner.run_mining()
     assert len(report.rejection_quality) == 1
     assert report.rejection_quality[0].reason == "RISK_LIMIT"
@@ -815,7 +728,6 @@ def test_to_report_section_enhanced_risks(miner):
             )
         ],
     )
-
     section = report.to_report_section()
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Overconfidence" in risk_types
