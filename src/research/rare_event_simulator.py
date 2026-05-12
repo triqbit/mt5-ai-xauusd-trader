@@ -28,6 +28,8 @@ class RareEventType(str, Enum):
     VOL_CLUSTER = "vol_cluster"
     MULTI_SESSION_DISLOCATION = "multi_session_dislocation"
     NEWS_SHOCK = "news_shock"
+    FAT_FINGER = "fat_finger"
+    BULL_BEAR_TRAP = "bull_bear_trap"
 
 
 class RareEventConfig(BaseModel):
@@ -137,6 +139,10 @@ class RareEventSimulator:
             return self._simulate_multi_session_dislocation(config)
         if config.event_type == RareEventType.NEWS_SHOCK:
             return self._simulate_news_shock(config)
+        if config.event_type == RareEventType.FAT_FINGER:
+            return self._simulate_fat_finger(config)
+        if config.event_type == RareEventType.BULL_BEAR_TRAP:
+            return self._simulate_bull_bear_trap(config)
         raise ValueError(f"Unknown rare event type: {config.event_type}")
 
     def _generate_base_ohlc(
@@ -601,30 +607,35 @@ class RareEventSimulator:
     def _simulate_news_shock(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
         """
         Simulates a violent directional move (News Shock) followed by sustained
-        high volatility and erratic behavior.
+        high volatility and erratic behavior. Designed to trigger NEWS_SHOCK regime.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
         vols = np.full(n, config.base_volatility)
 
         shock_idx = n // 3
-        shock_magnitude = 0.015 * config.event_magnitude * self.rng.choice([-1, 1])
+        # Magnitude needs to be high enough to hit ER > 0.7 and ATR Ratio > 2.0
+        shock_magnitude = 0.025 * config.event_magnitude * self.rng.choice([-1, 1])
 
-        # Phase 1: The Shock
-        returns[shock_idx] += shock_magnitude
-        vols[shock_idx] *= 10.0 * config.event_magnitude
-
-        # Phase 2: Sustained Volatility and erratic follow-through
-        shock_duration = int(50 * config.event_magnitude)
-        for i in range(1, shock_duration):
+        # Phase 1: The Shock (multi-bar directional move to keep ER high)
+        shock_len = max(1, int(12 * config.event_magnitude))
+        for i in range(shock_len):
             idx = shock_idx + i
             if idx < n:
-                # Decay volatility but keep it high
-                decay_factor = np.exp(-i / (20 * config.event_magnitude))
+                returns[idx] = (shock_magnitude / shock_len) * self.rng.uniform(0.8, 1.2)
+                vols[idx] *= 15.0 * config.event_magnitude
+
+        # Phase 2: Sustained Volatility and erratic follow-through
+        shock_duration = int(40 * config.event_magnitude)
+        for i in range(shock_len, shock_duration):
+            idx = shock_idx + i
+            if idx < n:
+                # Decay volatility but keep it high to maintain VoV and ATR Ratio
+                decay_factor = np.exp(-(i - shock_len) / (25 * config.event_magnitude))
                 vols[idx] = config.base_volatility * (
-                    1 + 5.0 * config.event_magnitude * decay_factor
+                    1 + 10.0 * config.event_magnitude * decay_factor
                 )
-                returns[idx] = self._generate_t_returns(1, config.drift, vols[idx], df=2.5)[0]
+                returns[idx] = self._generate_t_returns(1, config.drift, vols[idx], df=1.2)[0]
 
         df = self._generate_base_ohlc(
             config.start_price,
@@ -653,6 +664,122 @@ class RareEventSimulator:
         )
         return df, result
 
+    def _simulate_fat_finger(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
+        """
+        Simulates an extreme single-tick outlier (wick) that quickly returns to
+        the prior price level. Tests stop-loss resilience.
+        """
+        n = config.n_steps
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
+
+        shock_idx = n // 2
+        # Massive outlier: 15-30x base volatility in a single candle's range
+        shock_direction = self.rng.choice([-1, 1])
+        wick_magnitude = 0.03 * config.event_magnitude * shock_direction
+
+        df = self._generate_base_ohlc(
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
+        )
+
+        # Inject the fat finger into the high/low of a single candle
+        # without significantly moving the close (unless it's a huge move)
+        target_idx = df.index[shock_idx]
+        if shock_direction == 1:
+            df.loc[target_idx, "high"] += config.start_price * abs(wick_magnitude)
+        else:
+            df.loc[target_idx, "low"] -= config.start_price * abs(wick_magnitude)
+
+        # Widened spread during the fat finger candle
+        df.loc[target_idx, "spread"] *= 15.0 * config.event_magnitude
+
+        result = RareEventResult(
+            event_type=RareEventType.FAT_FINGER,
+            config=config,
+            start_index=shock_idx,
+            end_index=shock_idx + 1,
+            peak_impact_pct=wick_magnitude,
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
+            recovery_attained=1.0,
+            description=f"Fat finger trade causing {wick_magnitude:.2%} outlier wick.",
+        )
+        return df, result
+
+    def _simulate_bull_bear_trap(
+        self, config: RareEventConfig
+    ) -> tuple[pd.DataFrame, RareEventResult]:
+        """
+        Simulates a fake breakout past a consolidation range followed by a
+        violent reversal. Tests trend-following strategy robustness.
+        """
+        n = config.n_steps
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
+
+        start_idx = n // 3
+        consolidation_len = 30
+        breakout_len = 5
+        reversal_len = 15
+
+        # Phase 1: Consolidation (Very low vol)
+        vols[start_idx : start_idx + consolidation_len] *= 0.3
+        returns[start_idx : start_idx + consolidation_len] *= 0.2
+
+        # Phase 2: Breakout (Fake)
+        direction = self.rng.choice([-1, 1])
+        breakout_idx = start_idx + consolidation_len
+        breakout_mag = 0.01 * config.event_magnitude * direction
+        for i in range(breakout_len):
+            idx = breakout_idx + i
+            if idx < n:
+                returns[idx] = (breakout_mag / breakout_len) * self.rng.uniform(0.8, 1.2)
+                vols[idx] *= 2.0 * config.event_magnitude
+
+        # Phase 3: Violent Reversal (The Trap)
+        reversal_idx = breakout_idx + breakout_len
+        # Reversal is 2x the breakout magnitude in the opposite direction
+        reversal_mag = -2.5 * breakout_mag
+        for i in range(reversal_len):
+            idx = reversal_idx + i
+            if idx < n:
+                returns[idx] = (reversal_mag / reversal_len) * self.rng.uniform(0.9, 1.3)
+                vols[idx] *= 4.0 * config.event_magnitude
+
+        df = self._generate_base_ohlc(
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
+        )
+
+        event_prices = df["close"].iloc[breakout_idx : reversal_idx + reversal_len]
+        start_price_val = (
+            df["close"].iloc[breakout_idx - 1] if breakout_idx > 0 else df["close"].iloc[0]
+        )
+        deviations = (event_prices / start_price_val - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
+
+        result = RareEventResult(
+            event_type=RareEventType.BULL_BEAR_TRAP,
+            config=config,
+            start_index=breakout_idx,
+            end_index=min(n - 1, reversal_idx + reversal_len),
+            peak_impact_pct=peak_impact,
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
+            recovery_attained=0.0,
+            description=f"{'Bull' if direction == 1 else 'Bear'} trap: {peak_impact:.2%} reversal after breakout.",
+        )
+        return df, result
+
     def _simulate_multi_session_dislocation(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
@@ -664,7 +791,9 @@ class RareEventSimulator:
 
         # Dynamically determine session boundaries and regime parameters
         num_sessions = self.rng.integers(3, 6)
-        session_boundaries = np.sort(self.rng.choice(range(10, n - 10), num_sessions - 1, replace=False))
+        session_boundaries = np.sort(
+            self.rng.choice(range(10, n - 10), num_sessions - 1, replace=False)
+        )
         session_boundaries = np.concatenate(([0], session_boundaries, [n]))
 
         for i in range(num_sessions):
@@ -695,7 +824,9 @@ class RareEventSimulator:
         first_session_end = int(session_boundaries[1])
         event_prices = df["close"].iloc[first_session_end:]
         start_price_val = (
-            df["close"].iloc[first_session_end - 1] if first_session_end > 0 else df["close"].iloc[0]
+            df["close"].iloc[first_session_end - 1]
+            if first_session_end > 0
+            else df["close"].iloc[0]
         )
         deviations = (event_prices / start_price_val - 1).values
         peak_impact = float(deviations[np.argmax(np.abs(deviations))])
