@@ -20,12 +20,14 @@ Provides a weighted breakdown of contributions from the ensemble's constituent m
 - **Dominance**: Identifies the primary driver of the final decision.
 
 ### 3. Feature Contributions
-Attributes decisions to specific feature clusters.
+Attributes decisions to specific feature clusters and identifies confluence between supporting and opposing factors.
 - **Trend Cluster**: Contribution from moving averages (EMA), ADX, and Hilbert Transform (`ht_`) trendlines.
 - **Momentum Cluster**: Impact of RSI, MFI, MACD, Stochastic, and price velocity indicators (returns, log returns, and distance from moving averages).
 - **Volatility Cluster**: Impact of ATR, Bollinger Band width, Keltner Channels, and price action range features (`body_size`, `day_range`).
 - **Volume Cluster**: Influence of relative volume (`rvol`), OBV, VWAP distance, and volume profile proxies.
 - **Pattern Cluster**: Contribution from candle pattern recognition (e.g., Hammer, Engulfing).
+
+**Confluence Logic**: The system automatically categorizes feature impacts as either "Supported by" (aligning with the signal direction) or "Opposed by" (conflicting with the signal direction) in the natural language summary. This provides immediate clarity on decision tension.
 
 ### 4. Market Regime Context
 Provides the environmental background for the signal.
@@ -82,6 +84,9 @@ print(explainer.format_for_terminal(explanation))
 ```
 
 ## Advanced Attribution Features
+
+### Defensive Robustness
+The `SignalExplainer` implements institutional-grade defensive validation for all input components (`risk_data`, `regime_info`, `execution_data`, `feature_impacts`). It gracefully handles missing, partial, or malformed data by providing sensible defaults and detailed warning logs, ensuring that the explainability system never causes a pipeline crash during execution.
 
 ### Individual Model Confidences
 The `SignalExplainer.explain` method supports an optional `model_confidences` dictionary. This allows the ensemble to provide specific confidence scores for each constituent model, enabling more precise attribution and dominance calculation than the standard ensemble-level fallback.

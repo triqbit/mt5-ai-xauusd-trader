@@ -258,8 +258,8 @@ def test_signal_explainer_feature_contributions():
     assert trend.contribution_score == 0.8
     assert trend.impact_level == "High"
 
-    # Check that high impact feature is in summary
-    assert "Key impacts: Trend: Strong bullish trend" in explanation.human_readable_summary
+    # Check that high impact feature is in summary (now via Confluence Logic)
+    assert "Supported by: Trend (+0.80)" in explanation.human_readable_summary
 
     # Check machine attribution for features
     assert "feature_impacts" in explanation.machine_attribution
@@ -555,3 +555,75 @@ def test_signal_explainer_summary_regime_favorability():
         regime_info={"name": "Volatile", "is_favorable": False},
     )
     assert "Market state is UNFAVORABLE/CAUTIONARY for this strategy" in exp_unfavorable.human_readable_summary
+
+
+def test_human_readable_summary_confluence():
+    """Test that the summary correctly identifies supporting and opposing factors."""
+    explainer = SignalExplainer()
+    feature_impacts = {
+        "rsi": 0.8,    # Supporting BUY
+        "atr": -0.3,   # Opposing BUY
+        "volume": 0.5, # Supporting BUY
+    }
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,  # BUY
+        confidence=0.8,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        feature_impacts=feature_impacts,
+    )
+
+    summary = explanation.human_readable_summary
+    assert "Supported by:" in summary
+    assert "Momentum (+0.80)" in summary
+    assert "Volume (+0.50)" in summary
+    assert "Opposed by:" in summary
+    assert "Volatility (-0.30)" in summary
+
+
+def test_explain_malformed_inputs():
+    """Ensure the system doesn't crash when receiving unexpected or partial data structures."""
+    explainer = SignalExplainer()
+
+    # Test with None or empty values where dicts/lists are expected
+    explanation = explainer.explain(
+        symbol="",  # Should fallback to XAUUSD
+        direction=1,
+        confidence=0.5,
+        model_votes=None,
+        model_weights={},
+        risk_data=None,
+        regime_info=None,
+        execution_data="not a dict",
+        feature_impacts="not a list",
+    )
+
+    assert explanation.symbol == "XAUUSD"
+    assert explanation.execution_summary.passed is False
+    assert "Malformed execution data detected" in explanation.execution_summary.summary
+    assert explanation.regime_context.regime_name == "Unknown"
+    assert explanation.risk_assessment.passed is False
+    assert len(explanation.model_attributions) == 0
+
+
+def test_explain_invalid_model_votes():
+    """Test robustness against invalid model vote indices."""
+    explainer = SignalExplainer()
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": "invalid", "lstm": 999},
+        model_weights={"ppo": 0.5, "lstm": 0.5},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+    )
+
+    # Invalid votes should fallback to HOLD (0)
+    for attr in explanation.model_attributions:
+        assert attr.vote == SignalDirection.HOLD
