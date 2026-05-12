@@ -1,6 +1,8 @@
 import unittest
 import numpy as np
 import pandas as pd
+import os
+import tempfile
 from src.models.regime_detector import MarketRegime, RegimeDetector
 
 class TestRegimeDetector(unittest.TestCase):
@@ -14,7 +16,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': 2000.0 + np.random.randn(50) * 0.1,
             'high': 2000.2 + np.random.randn(50) * 0.1,
-            'low': 1999.8 + np.random.randn(50) * 0.1
+            'low': 1999.8 + np.random.randn(50) * 0.1,
+            'open': 2000.0 + np.random.randn(50) * 0.1
         })
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.RANGING)
@@ -25,7 +28,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': close,
             'high': close + 0.1,
-            'low': close - 0.1
+            'low': close - 0.1,
+            'open': close - 0.05
         })
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.TRENDING)
@@ -42,7 +46,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': close,
             'high': high,
-            'low': low
+            'low': low,
+            'open': close - 0.5
         })
         # Need to ensure vov is high. Volatility is zero before 90, then huge.
         info = self.detector.detect(data)
@@ -63,7 +68,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': close,
             'high': high,
-            'low': low
+            'low': low,
+            'open': close - 0.5
         })
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.MEAN_REVERSION)
@@ -83,7 +89,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': close,
             'high': high,
-            'low': low
+            'low': low,
+            'open': close - 0.1
         })
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.LOW_VOLATILITY_DRIFT)
@@ -93,7 +100,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
             'high': 2000.5 + np.cumsum(np.random.randn(100) * 0.1),
-            'low': 1999.5 + np.cumsum(np.random.randn(100) * 0.1)
+            'low': 1999.5 + np.cumsum(np.random.randn(100) * 0.1),
+            'open': 2000.0 + np.cumsum(np.random.randn(100) * 0.1)
         })
 
         df_history = self.detector.label_history(data)
@@ -121,7 +129,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': np.concatenate([ranging, trending, volatile]),
             'high': np.concatenate([ranging + 0.1, trending + 0.1, volatile + 1.0]),
-            'low': np.concatenate([ranging - 0.1, trending - 0.1, volatile - 1.0])
+            'low': np.concatenate([ranging - 0.1, trending - 0.1, volatile - 1.0]),
+            'open': np.concatenate([ranging, trending, volatile]) - 0.05
         })
 
         # Fit GMM
@@ -139,7 +148,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': 2000.0 + np.cumsum(np.random.randn(150) * 0.1),
             'high': 2000.0 + np.cumsum(np.random.randn(150) * 0.1) + 0.1,
-            'low': 2000.0 + np.cumsum(np.random.randn(150) * 0.1) - 0.1
+            'low': 2000.0 + np.cumsum(np.random.randn(150) * 0.1) - 0.1,
+            'open': 2000.0 + np.cumsum(np.random.randn(150) * 0.1)
         })
 
         df_vec = self.detector.label_history(data, use_vectorized=True)
@@ -158,6 +168,7 @@ class TestRegimeDetector(unittest.TestCase):
             'close': 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
             'high': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) + 0.1,
             'low': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) - 0.1,
+            'open': 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
             'returns': np.random.randn(200) * 0.001
         })
 
@@ -181,7 +192,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': 2000.0 + np.random.randn(50) * 0.1,
             'high': 2000.2 + np.random.randn(50) * 0.1,
-            'low': 1999.8 + np.random.randn(50) * 0.1
+            'low': 1999.8 + np.random.randn(50) * 0.1,
+            'open': 2000.0 + np.random.randn(50) * 0.1
         })
 
         # 1. Heuristic mode
@@ -197,7 +209,8 @@ class TestRegimeDetector(unittest.TestCase):
         fit_data = pd.DataFrame({
             'close': np.concatenate([ranging, trending]),
             'high': np.concatenate([ranging + 0.1, trending + 0.1]),
-            'low': np.concatenate([ranging - 0.1, trending - 0.1])
+            'low': np.concatenate([ranging - 0.1, trending - 0.1]),
+            'open': np.concatenate([ranging, trending])
         })
         self.detector.fit(fit_data, n_clusters=2)
 
@@ -215,7 +228,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': 2000.0 + np.cumsum(np.random.randn(size) * 0.1),
             'high': 2000.0 + np.cumsum(np.random.randn(size) * 0.1) + 0.1,
-            'low': 2000.0 + np.cumsum(np.random.randn(size) * 0.1) - 0.1
+            'low': 2000.0 + np.cumsum(np.random.randn(size) * 0.1) - 0.1,
+            'open': 2000.0 + np.cumsum(np.random.randn(size) * 0.1)
         })
 
         # Benchmarking label_history (vectorized)
@@ -250,13 +264,14 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
             'high': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) + 0.1,
-            'low': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) - 0.1
+            'low': 2000.0 + np.cumsum(np.random.randn(200) * 0.1) - 0.1,
+            'open': 2000.0 + np.cumsum(np.random.randn(200) * 0.1)
         })
 
         self.detector.fit(data, n_clusters=3)
         self.assertIsNotNone(self.detector._gmm)
 
-        info_orig = self.detector.detect(data.iloc[-self.detector.long_window:])
+        info_orig = self.detector.detect(data.iloc[-self.detector.long_window-1:])
 
         with tempfile.NamedTemporaryFile(suffix=".joblib", delete=False) as tmp:
             tmp_path = tmp.name
@@ -271,7 +286,7 @@ class TestRegimeDetector(unittest.TestCase):
             self.assertIsNotNone(new_detector._gmm)
             self.assertEqual(new_detector._cluster_to_regime, self.detector._cluster_to_regime)
 
-            info_loaded = new_detector.detect(data.iloc[-self.detector.long_window:])
+            info_loaded = new_detector.detect(data.iloc[-self.detector.long_window-1:])
 
             self.assertEqual(info_orig.label, info_loaded.label)
             self.assertAlmostEqual(info_orig.confidence, info_loaded.confidence)
@@ -286,7 +301,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': [1000.0] * 50,
             'high': [1000.1] * 50,
-            'low': [999.9] * 50
+            'low': [999.9] * 50,
+            'open': [1000.0] * 50
         })
         # Inject NaNs
         data.iloc[10:20, 0] = np.nan
@@ -303,7 +319,8 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': 2000.0 + np.random.randn(50) * 0.1,
             'high': 2000.2 + np.random.randn(50) * 0.1,
-            'low': 1999.8 + np.random.randn(50) * 0.1
+            'low': 1999.8 + np.random.randn(50) * 0.1,
+            'open': 2000.0 + np.random.randn(50) * 0.1
         })
         info = self.detector.detect(data)
         self.assertIsInstance(info.raw_features, dict)
@@ -316,12 +333,42 @@ class TestRegimeDetector(unittest.TestCase):
         data = pd.DataFrame({
             'close': [2000.0] * 100,
             'high': [2000.0] * 100,
-            'low': [2000.0] * 100
+            'low': [2000.0] * 100,
+            'open': [2000.0] * 100
         })
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.RANGING)
         self.assertEqual(info.confidence, 0.5) # 1.0 - er(0.5)
         self.assertEqual(info.volatility_index, 1.0) # filled value
+
+    def test_unified_logic_consistency(self):
+        """Ensure detect() matches the last row of label_history()."""
+        np.random.seed(42)
+        data = pd.DataFrame({
+            'close': 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+            'high': 2001.0 + np.cumsum(np.random.randn(100) * 0.1),
+            'low': 1999.0 + np.cumsum(np.random.randn(100) * 0.1),
+            'open': 2000.0 + np.cumsum(np.random.randn(100) * 0.1)
+        })
+
+        # 1. Heuristic mode
+        df_history = self.detector.label_history(data)
+        info_detect = self.detector.detect(data)
+
+        self.assertEqual(info_detect.label.value, df_history['regime'].iloc[-1])
+        self.assertAlmostEqual(info_detect.confidence, df_history['regime_confidence'].iloc[-1])
+        self.assertAlmostEqual(info_detect.transition_score, df_history['regime_transition_score'].iloc[-1])
+        self.assertAlmostEqual(info_detect.volatility_index, df_history['volatility_index'].iloc[-1])
+
+        # 2. GMM mode
+        self.detector.fit(data)
+        df_history_gmm = self.detector.label_history(data)
+        info_detect_gmm = self.detector.detect(data)
+
+        self.assertEqual(info_detect_gmm.label.value, df_history_gmm['regime'].iloc[-1])
+        self.assertAlmostEqual(info_detect_gmm.confidence, df_history_gmm['regime_confidence'].iloc[-1])
+        # Transition scores might slightly differ due to state updates in detect if we don't reset last_regime
+        # But here we just care about logical consistency of the calculation path.
 
 if __name__ == '__main__':
     unittest.main()
