@@ -334,11 +334,12 @@ class TestDynamicEnsemble(unittest.TestCase):
         self.assertEqual(len(history), 1)
         self.assertTrue(history[0]["correct"])
         self.assertEqual(history[0]["accuracy_gain"], 1.0)
-        self.assertAlmostEqual(history[0]["calibration_error"], 0.2)  # abs(0.8 - 1.0)
+        # Brier score = (0.8 - 1.0)**2 = 0.04
+        self.assertAlmostEqual(history[0]["calibration_error"], 0.04)
 
     def test_calculate_metrics(self):
         """Verify calculate_metrics returns expected values."""
-        # 4 correct, 1 incorrect
+        # 4 correct, 1 incorrect. Confidence always 1.0.
         for _ in range(4):
             self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
             self.ensemble.record_outcome("ppo", SignalDirection.BUY)
@@ -347,7 +348,9 @@ class TestDynamicEnsemble(unittest.TestCase):
 
         metrics = self.ensemble.calculate_metrics("ppo")
         self.assertAlmostEqual(metrics["accuracy"], 0.8)
-        self.assertAlmostEqual(metrics["calibration_error"], 0.2)  # (0*4 + 1*1) / 5
+        # Brier scores: 4 * (1-1)^2 + 1 * (1-0)^2 = 1.0
+        # Avg = 1.0 / 5 = 0.2
+        self.assertAlmostEqual(metrics["calibration_error"], 0.2)
 
     def test_drift_detection(self):
         """Verify drift_score calculation (recent performance drop)."""
@@ -398,6 +401,77 @@ class TestDynamicEnsemble(unittest.TestCase):
         new_weights = self.ensemble.update_weights(metrics=external_metrics)
 
         self.assertLess(new_weights["ppo"], initial_ppo)
+
+    def test_brier_score_calibration(self):
+        """Verify that calibration error uses Brier Score (squared error)."""
+        # Prediction confidence 0.8, outcome correct (1.0)
+        # Brier score = (0.8 - 1.0)^2 = 0.04
+        self.ensemble.record_prediction("ppo", SignalDirection.BUY, 0.8)
+        self.ensemble.record_outcome("ppo", SignalDirection.BUY)
+
+        metrics = self.ensemble.calculate_metrics("ppo")
+        self.assertAlmostEqual(metrics["calibration_error"], 0.04)
+
+        # Prediction confidence 0.8, outcome incorrect (0.0)
+        # Brier score = (0.8 - 0.0)^2 = 0.64
+        # Avg = (0.04 + 0.64) / 2 = 0.34
+        self.ensemble.record_prediction("lstm", SignalDirection.BUY, 0.8)
+        self.ensemble.record_outcome("lstm", SignalDirection.SELL)
+
+        metrics = self.ensemble.calculate_metrics("lstm")
+        self.assertAlmostEqual(metrics["calibration_error"], 0.64)
+
+    def test_sensitivity_ratio_drift(self):
+        """Verify drift_score calculation using sensitivity-ratio approach."""
+        # Sensitivity-ratio: (acc - recent_acc) / (acc + 1e-9) * 2.0
+
+        # Window: 10 predictions
+        # 8 correct in first 8
+        for _ in range(8):
+            self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("ppo", SignalDirection.BUY)
+
+        # 2 incorrect in last 2 (recent 20%)
+        for _ in range(2):
+            self.ensemble.record_prediction("ppo", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("ppo", SignalDirection.SELL)
+
+        # Total acc = 8/10 = 0.8
+        # Recent acc (last 2) = 0/2 = 0.0
+        # Drift = (0.8 - 0.0) / (0.8 + 1e-9) * 2.0 = 2.0 -> capped at 1.0
+        metrics = self.ensemble.calculate_metrics("ppo")
+        self.assertEqual(metrics["drift_score"], 1.0)
+
+        # Let's try a less extreme case
+        # Reset and use 10 predictions
+        self.ensemble._history["lstm"].clear()
+        # 10 total. 5 correct first. Then 3 correct of last 5.
+        # Wait, recent_split = max(1, 10 // 5) = 2
+        # First 8: 6 correct.
+        # Last 2: 0 correct.
+        # Total acc = 6/10 = 0.6
+        # Recent acc = 0/2 = 0.0
+        # Drift = (0.6 - 0.0) / (0.6 + 1e-9) * 2.0 = 2.0 -> cap 1.0
+
+        # Try:
+        # First 8: 8 correct.
+        # Last 2: 1 correct.
+        # Total acc = 9/10 = 0.9
+        # Recent acc = 1/2 = 0.5
+        # Drift = (0.9 - 0.5) / (0.9 + 1e-9) * 2.0 = 0.4 / 0.9 * 2 = 0.888...
+        self.ensemble._history["transformer"].clear()
+        for _ in range(8):
+            self.ensemble.record_prediction("transformer", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("transformer", SignalDirection.BUY)
+        for _ in range(1):
+            self.ensemble.record_prediction("transformer", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("transformer", SignalDirection.BUY)
+        for _ in range(1):
+            self.ensemble.record_prediction("transformer", SignalDirection.BUY, 1.0)
+            self.ensemble.record_outcome("transformer", SignalDirection.SELL)
+
+        metrics = self.ensemble.calculate_metrics("transformer")
+        self.assertAlmostEqual(metrics["drift_score"], 0.8 / 0.9, places=5)
 
 if __name__ == '__main__':
     unittest.main()
