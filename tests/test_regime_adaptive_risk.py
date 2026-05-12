@@ -3,15 +3,17 @@ Tests for Regime-Adaptive Model Health Guardrails in RiskManager.
 Verifies that model health thresholds are correctly tightened during unstable market states.
 """
 
-import pytest
-from unittest.mock import MagicMock
 from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
-from src.trading.risk_manager import RiskManager
+import pytest
+
 from src.core.config import TradingConfig
-from src.core.schemas import TradeSignal
 from src.core.constants import SignalDirection
+from src.core.schemas import TradeSignal
 from src.models.regime_detector import MarketRegime, RegimeInfo
+from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def mock_config():

@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
