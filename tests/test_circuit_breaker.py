@@ -1,9 +1,10 @@
-import pytest
-import time
 from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.core.exceptions import CircuitBreakerError, MT5ConnectionError, MT5DataError
 from src.trading.mt5_connector import MT5Connector
-from src.core.config import TradingConfig
-from src.core.exceptions import MT5ConnectionError, MT5DataError, CircuitBreakerError
+
 
 @pytest.fixture
 def mock_config():
@@ -13,6 +14,7 @@ def mock_config():
     cfg.mt5_password.get_secret_value.return_value = "pass"
     cfg.metaapi_token = None
     return cfg
+
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
@@ -47,6 +49,7 @@ def test_circuit_breaker_tripping_full(mock_mt5, mock_config):
         # Fail 4 -> CircuitBreakerError
         with pytest.raises(CircuitBreakerError):
             connector.initialize()
+
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)

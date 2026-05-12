@@ -269,9 +269,12 @@ class MetaAPIEventProvider(BaseEventProvider):
             ]
         ):
             return EventCategory.NFP
-        if any(
-            kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT"]
-        ) and "PHILLY FED" not in name_upper:
+        if (
+            any(
+                kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT"]
+            )
+            and "PHILLY FED" not in name_upper
+        ):
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
@@ -415,7 +418,8 @@ class EventIntelligence:
             # Filter out stale events from cache to keep it performant
             stale_threshold = now - timedelta(days=2)
             self._cached_events = [
-                e for e in unique_events.values()
+                e
+                for e in unique_events.values()
                 if (e.end_timestamp or e.timestamp) >= stale_threshold
             ]
             self._last_successful_fetch = now

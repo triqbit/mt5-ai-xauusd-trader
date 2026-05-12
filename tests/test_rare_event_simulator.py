@@ -2,15 +2,15 @@
 Tests for RareEventSimulator.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 
 from src.research.rare_event_simulator import (
     RareEventConfig,
+    RareEventResult,
     RareEventSimulator,
     RareEventType,
-    RareEventResult,
 )
 
 
@@ -77,7 +77,9 @@ def test_reproducibility(simulator):
 
 
 def test_flash_crash_behavior(simulator):
-    config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=300, event_magnitude=2.0, recovery_factor=0.8)
+    config = RareEventConfig(
+        event_type=RareEventType.FLASH_CRASH, n_steps=300, event_magnitude=2.0, recovery_factor=0.8
+    )
     df, result = simulator.generate_scenario(config)
 
     assert result.peak_impact_pct < -0.05
@@ -85,7 +87,7 @@ def test_flash_crash_behavior(simulator):
 
     # Check volume spike
     crash_vol = df["tick_volume"].iloc[result.start_index : result.start_index + 10].mean()
-    normal_vol = df["tick_volume"].iloc[:result.start_index].mean()
+    normal_vol = df["tick_volume"].iloc[: result.start_index].mean()
     assert crash_vol > normal_vol * 2
 
     # Verify peak impact calculation (it should be negative for a crash)
@@ -101,19 +103,19 @@ def test_liquidity_vacuum_behavior(simulator):
     assert (vacuum_df["tick_volume"] < 10).all()
 
     # Spreads should be high
-    normal_spread = df["spread"].iloc[:result.start_index].mean()
+    normal_spread = df["spread"].iloc[: result.start_index].mean()
     vacuum_spread = vacuum_df["spread"].mean()
     assert vacuum_spread > normal_spread * 3
 
     # Volatility in vacuum should be higher
     returns = df["close"].pct_change().dropna()
     vacuum_returns = returns.iloc[result.start_index : result.end_index]
-    normal_returns = returns.iloc[:result.start_index]
+    normal_returns = returns.iloc[: result.start_index]
     assert vacuum_returns.std() > normal_returns.std() * 5
 
     # Check high/low expansion in vacuum
     vacuum_range = (df["high"] - df["low"]).iloc[result.start_index : result.end_index].mean()
-    normal_range = (df["high"] - df["low"]).iloc[:result.start_index].mean()
+    normal_range = (df["high"] - df["low"]).iloc[: result.start_index].mean()
     assert vacuum_range > normal_range * 2
 
 
@@ -124,7 +126,7 @@ def test_gold_gap_behavior(simulator):
     # Calculate gap
     gap_idx = result.start_index
     gap = df["open"].iloc[gap_idx] - df["close"].iloc[gap_idx - 1]
-    assert abs(gap) > 10 # Assuming start_price 2300 and 2% gap
+    assert abs(gap) > 10  # Assuming start_price 2300 and 2% gap
     assert abs(result.peak_impact_pct) > 0.01
 
 
@@ -149,8 +151,8 @@ def test_dislocation_behavior(simulator):
     df, result = simulator.generate_scenario(config)
 
     returns = df["close"].pct_change().dropna()
-    pre_dis_returns = returns.iloc[:result.start_index-1]
-    post_dis_returns = returns.iloc[result.start_index + 1:]
+    pre_dis_returns = returns.iloc[: result.start_index - 1]
+    post_dis_returns = returns.iloc[result.start_index + 1 :]
 
     pre_dis_vol = pre_dis_returns.std()
     post_dis_vol = post_dis_returns.std()
@@ -205,7 +207,7 @@ def test_news_shock_behavior(simulator):
     assert result.peak_impact_pct > 0.01
 
     returns = df["close"].pct_change().dropna()
-    pre_shock_vol = returns.iloc[:result.start_index-1].std()
+    pre_shock_vol = returns.iloc[: result.start_index - 1].std()
     post_shock_vol = returns.iloc[result.start_index : result.end_index].std()
 
     assert post_shock_vol > pre_shock_vol * 3
@@ -241,7 +243,9 @@ def test_custom_bars_per_day(simulator):
 
 def test_start_date_config(simulator):
     start_date = "2023-06-01"
-    config = RareEventConfig(event_type=RareEventType.VOL_CLUSTER, n_steps=100, start_date=start_date)
+    config = RareEventConfig(
+        event_type=RareEventType.VOL_CLUSTER, n_steps=100, start_date=start_date
+    )
     df, _ = simulator.generate_scenario(config)
 
     assert df.index[0].strftime("%Y-%m-%d") == start_date

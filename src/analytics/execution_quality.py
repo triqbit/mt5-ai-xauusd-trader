@@ -77,9 +77,7 @@ class BlockedSignalQuality(BaseModel):
     max_favorable_excursion: float = Field(
         ..., description="Max favorable price movement after signal"
     )
-    max_adverse_excursion: float = Field(
-        ..., description="Max adverse price movement after signal"
-    )
+    max_adverse_excursion: float = Field(..., description="Max adverse price movement after signal")
     would_have_won: bool = Field(..., description="True if signal would have hit TP before SL")
 
 
@@ -99,7 +97,9 @@ class ExecutionSummary(BaseModel):
     rejected_signal_count: int
     executed_trade_count: int
     avg_mae: float = Field(default=0.0, description="Avg Max Adverse Excursion of blocked signals")
-    avg_mfe: float = Field(default=0.0, description="Avg Max Favorable Excursion of blocked signals")
+    avg_mfe: float = Field(
+        default=0.0, description="Avg Max Favorable Excursion of blocked signals"
+    )
 
     def to_report_section(self) -> Any:
         """Convert to reporting model."""
@@ -542,7 +542,9 @@ class ExecutionAnalyzer:
                 .all()
             )
             for event in blocked_events:
-                signal = session.query(ModelSignal).filter(ModelSignal.id == event.signal_id).first()
+                signal = (
+                    session.query(ModelSignal).filter(ModelSignal.id == event.signal_id).first()
+                )
                 if not signal or signal.trade:
                     continue
                 analysis = self._evaluate_opportunity_cost(signal, event.description)
@@ -595,8 +597,11 @@ class ExecutionAnalyzer:
         pip_size = self._get_pip_size(signal.symbol)
 
         would_win = False
-        if signal.direction > 0: # BUY
-            mfe_price, mae_price = np.max(highs) - signal.entry_price, signal.entry_price - np.min(lows)
+        if signal.direction > 0:  # BUY
+            mfe_price, mae_price = (
+                np.max(highs) - signal.entry_price,
+                signal.entry_price - np.min(lows),
+            )
             mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
                 if h_val >= (signal.take_profit or float("inf")):
@@ -607,8 +612,11 @@ class ExecutionAnalyzer:
                     break
             contract_size = self._get_contract_size(signal.symbol)
             opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * contract_size
-        else: # SELL
-            mfe_price, mae_price = signal.entry_price - np.min(lows), np.max(highs) - signal.entry_price
+        else:  # SELL
+            mfe_price, mae_price = (
+                signal.entry_price - np.min(lows),
+                np.max(highs) - signal.entry_price,
+            )
             mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
                 if l_val <= (signal.take_profit or float("-inf")):

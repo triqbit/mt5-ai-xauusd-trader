@@ -8,9 +8,10 @@ pre-production checklist completion and security standards.
 Author: Atlas 🗺️ (Release Readiness Guardian)
 """
 
-import sys
 import re
+import sys
 from pathlib import Path
+
 
 def check_risk_sync():
     print("Checking RISK_LIMITS.md vs src/core/config.py synchronization...")
@@ -48,7 +49,9 @@ def check_risk_sync():
         if config_match:
             actual_val = float(config_match.group(1))
             if actual_val != expected_val:
-                print(f"[-] Config mismatch: {config_field} default is {actual_val}, expected {expected_val} (per policy)")
+                print(
+                    f"[-] Config mismatch: {config_field} default is {actual_val}, expected {expected_val} (per policy)"
+                )
                 success = False
             else:
                 print(f"[+] {config_field} synchronized.")
@@ -57,6 +60,7 @@ def check_risk_sync():
             success = False
 
     return success
+
 
 def check_runbooks():
     print("Checking Runbook Integrity...")
@@ -75,7 +79,13 @@ def check_runbooks():
         "07-secret-rotation-procedure.md",
     ]
 
-    mandatory_sections = ["Overview", "Step-by-Step Instructions", "Expected Outcomes", "Escalation Path", "Verification Commands"]
+    mandatory_sections = [
+        "Overview",
+        "Step-by-Step Instructions",
+        "Expected Outcomes",
+        "Escalation Path",
+        "Verification Commands",
+    ]
 
     success = True
     for rb in mandatory_runbooks:
@@ -97,12 +107,15 @@ def check_runbooks():
                 sec_pattern = rf"^[#]{{1,3}}\s+{section}\n(.*?)(?=^[#]{{1,3}}\s+|$)"
                 sec_match = re.search(sec_pattern, content, re.MULTILINE | re.DOTALL)
                 if sec_match and "```" not in sec_match.group(1):
-                    print(f"[-] Runbook {rb} Verification Commands section missing actual code blocks (```)")
+                    print(
+                        f"[-] Runbook {rb} Verification Commands section missing actual code blocks (```)"
+                    )
                     success = False
 
     if success:
         print("[+] All mandatory runbooks present and structured with executable commands.")
     return success
+
 
 def check_artifact_compliance():
     print("Checking Artifact Compliance (package_release.sh vs RELEASE_ARTIFACTS.md)...")
@@ -124,12 +137,15 @@ def check_artifact_compliance():
     for f in mandatory_files:
         if f not in pkg_content:
             # Simple check if the filename is mentioned in the script (usually in collection logic)
-            print(f"[-] Artifact mismatch: {f} defined in standards but not found in package_release.sh")
+            print(
+                f"[-] Artifact mismatch: {f} defined in standards but not found in package_release.sh"
+            )
             success = False
         else:
             print(f"[+] Artifact {f} included in packaging script.")
 
     return success
+
 
 def check_preprod_checklist():
     print("Checking PREPROD_CHECKLIST.md strict compliance...")
@@ -150,7 +166,7 @@ def check_preprod_checklist():
         uncompleted = []
         for i, line in enumerate(lines):
             if "[ ]" in line and "**Status:**" not in line:
-                uncompleted.append((i+1, line.strip()))
+                uncompleted.append((i + 1, line.strip()))
 
         if uncompleted:
             print("[-] PREPROD_CHECKLIST.md contains uncompleted items.")
@@ -169,20 +185,22 @@ def check_preprod_checklist():
             if cv_match:
                 actual_version = cv_match.group(1).strip("_")
                 if actual_version != expected_version:
-                    print(f"[-] Checklist version mismatch: Found 'v{actual_version}', expected 'v{expected_version}'")
+                    print(
+                        f"[-] Checklist version mismatch: Found 'v{actual_version}', expected 'v{expected_version}'"
+                    )
                     success = False
                 else:
                     print(f"[+] Checklist version 'v{actual_version}' synchronized.")
             else:
-                 print("[-] Could not find Release Version marker in PREPROD_CHECKLIST.md")
-                 success = False
+                print("[-] Could not find Release Version marker in PREPROD_CHECKLIST.md")
+                success = False
 
     # 3. Verify Signatures (Non-empty placeholders)
     # **Verified By (Operator):** ____________________
     # **Approval (Governance):** ____________________
     sig_fields = [
         ("Verified By", r"\*\*Verified By \(Operator\):\*\*\s*(.+)"),
-        ("Approval", r"\*\*Approval \(Governance\):\*\*\s*(.+)")
+        ("Approval", r"\*\*Approval \(Governance\):\*\*\s*(.+)"),
     ]
     for label, pattern in sig_fields:
         match = re.search(pattern, content)
@@ -203,6 +221,7 @@ def check_preprod_checklist():
     if success:
         print("[+] PREPROD_CHECKLIST.md is complete and verified.")
     return success
+
 
 def check_governance_vitals():
     print("Checking Governance Vitals existence...")
@@ -233,6 +252,7 @@ def check_governance_vitals():
 
     return success
 
+
 def check_docker_security():
     print("Checking Docker Security Standards...")
     dockerfile_path = Path("Dockerfile")
@@ -244,11 +264,14 @@ def check_docker_security():
 
     # Enforce non-root USER instruction
     if not re.search(r"^USER\s+\w+", content, re.MULTILINE):
-        print("[-] Dockerfile violation: No non-root USER instruction found. Running as root is prohibited.")
+        print(
+            "[-] Dockerfile violation: No non-root USER instruction found. Running as root is prohibited."
+        )
         return False
 
     print("[+] Dockerfile security check passed (non-root USER found).")
     return True
+
 
 def main():
     print("=== Atlas Governance Audit starting ===")
@@ -258,7 +281,7 @@ def main():
         check_artifact_compliance(),
         check_preprod_checklist(),
         check_governance_vitals(),
-        check_docker_security()
+        check_docker_security(),
     ]
 
     if all(results):
@@ -267,6 +290,7 @@ def main():
     else:
         print("=== Audit FAILED ===")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -330,7 +330,6 @@ class MT5Connector:
                 df["time"] = pd.to_datetime(df["time"], unit="s")
                 return df
             else:
-
                 candles = self._run_async(
                     self.metaapi_connection.get_historical_candles(symbol, timeframe, None, n_bars)
                 )
@@ -347,9 +346,7 @@ class MT5Connector:
             raise MT5DataError(f"Unexpected data retrieval error: {e}") from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
-    def get_ticks_range(
-        self, symbol: str, date_from: datetime, date_to: datetime
-    ) -> pd.DataFrame:
+    def get_ticks_range(self, symbol: str, date_from: datetime, date_to: datetime) -> pd.DataFrame:
         """
         Fetch historical tick data for a specific date range.
 
@@ -720,7 +717,9 @@ class MT5Connector:
                 err_code, err_desc = mt5.last_error()
                 if err_code in [-1, 10001, 10002, 10003, 10004]:
                     self._is_initialized = False
-                raise MT5DataError(f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})")
+                raise MT5DataError(
+                    f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})"
+                )
             return {
                 "name": info.name,
                 "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
@@ -743,7 +742,9 @@ class MT5Connector:
                 }
             except Exception as e:
                 self._is_initialized = False
-                raise MT5DataError(f"MetaAPI get_symbol_specification failed for {symbol}: {e}") from e
+                raise MT5DataError(
+                    f"MetaAPI get_symbol_specification failed for {symbol}: {e}"
+                ) from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def find_symbols(self, pattern: str) -> List[str]:
@@ -761,7 +762,9 @@ class MT5Connector:
                 err_code, err_desc = mt5.last_error()
                 if err_code in [-1, 10001, 10002, 10003, 10004]:
                     self._is_initialized = False
-                raise MT5DataError(f"Failed to find symbols with pattern {pattern}: {err_desc} (code: {err_code})")
+                raise MT5DataError(
+                    f"Failed to find symbols with pattern {pattern}: {err_desc} (code: {err_code})"
+                )
             return [s.name for s in symbols]
         else:
             # For MetaAPI, we'd need to fetch all and filter, which is slow.

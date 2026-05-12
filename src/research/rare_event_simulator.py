@@ -664,7 +664,9 @@ class RareEventSimulator:
 
         # Dynamically determine session boundaries and regime parameters
         num_sessions = self.rng.integers(3, 6)
-        session_boundaries = np.sort(self.rng.choice(range(10, n - 10), num_sessions - 1, replace=False))
+        session_boundaries = np.sort(
+            self.rng.choice(range(10, n - 10), num_sessions - 1, replace=False)
+        )
         session_boundaries = np.concatenate(([0], session_boundaries, [n]))
 
         for i in range(num_sessions):
@@ -695,7 +697,9 @@ class RareEventSimulator:
         first_session_end = int(session_boundaries[1])
         event_prices = df["close"].iloc[first_session_end:]
         start_price_val = (
-            df["close"].iloc[first_session_end - 1] if first_session_end > 0 else df["close"].iloc[0]
+            df["close"].iloc[first_session_end - 1]
+            if first_session_end > 0
+            else df["close"].iloc[0]
         )
         deviations = (event_prices / start_price_val - 1).values
         peak_impact = float(deviations[np.argmax(np.abs(deviations))])
