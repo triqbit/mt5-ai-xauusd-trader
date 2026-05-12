@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from src.core.schemas import TradeSignal
+from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.backtester import BacktestEngine, PerformanceReport
 from src.trading.capital_allocator import (
     AllocationRequest,
@@ -11,7 +12,6 @@ from src.trading.capital_allocator import (
     RejectionCode,
     StrategyConfig,
 )
-from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_manager import RiskManager
 
