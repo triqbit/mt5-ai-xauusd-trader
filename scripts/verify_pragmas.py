@@ -1,10 +1,10 @@
-
-import os
-import sqlite3
 import logging
+import os
+
 from src.core.database import get_engine
 
 logging.basicConfig(level=logging.DEBUG)
+
 
 def verify_pragmas():
     db_path = "test_verify_pragmas.db"
@@ -49,8 +49,10 @@ def verify_pragmas():
             if os.path.exists(db_path + suffix):
                 os.remove(db_path + suffix)
 
+
 if __name__ == "__main__":
     import sys
+
     if verify_pragmas():
         sys.exit(0)
     else:

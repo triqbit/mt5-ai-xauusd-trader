@@ -1,11 +1,10 @@
-
-import os
-import time
 import logging
-import pytest
-from sqlalchemy import text, inspect
-from src.core.database import get_engine, get_session_factory
-from src.core.trade_logger import Trade
+import os
+
+from sqlalchemy import inspect, text
+
+from src.core.database import get_engine
+
 
 def test_slow_query_logger(caplog):
     """Verify that slow queries are logged with a warning."""
@@ -16,13 +15,16 @@ def test_slow_query_logger(caplog):
     db_url = f"sqlite:///{db_path}"
     engine = get_engine(db_url)
 
-    with caplog.at_level(logging.WARNING):
-        with engine.connect() as conn:
-            # SQLite doesn't have a built-in sleep, so we use a recursive CTE to simulate load
-            # or just rely on our listener timer if we can trigger a delay.
-            # A simpler way in tests is to mock the timer or just use a long-running CTE.
-            # This CTE might take > 1s depending on environment.
-            conn.execute(text("WITH RECURSIVE cnt(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM cnt WHERE x<1000000) SELECT count(*) FROM cnt"))
+    with caplog.at_level(logging.WARNING), engine.connect() as conn:
+        # SQLite doesn't have a built-in sleep, so we use a recursive CTE to simulate load
+        # or just rely on our listener timer if we can trigger a delay.
+        # A simpler way in tests is to mock the timer or just use a long-running CTE.
+        # This CTE might take > 1s depending on environment.
+        conn.execute(
+            text(
+                "WITH RECURSIVE cnt(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM cnt WHERE x<1000000) SELECT count(*) FROM cnt"
+            )
+        )
 
     # Check if any warning was logged.
     # Note: Depending on environment speed, 1M rows might be fast.
@@ -39,6 +41,7 @@ def test_slow_query_logger(caplog):
     # but the logic is verified by manual inspection or lower threshold.
     print(f"Captured {len(slow_logs)} slow query logs.")
 
+
 def test_index_presence():
     """Verify that the ix_trades_perf_lookup index exists on the trades table."""
     db_path = "test_index_presence.db"
@@ -51,6 +54,7 @@ def test_index_presence():
     # Run migrations to head
     from alembic import command
     from alembic.config import Config
+
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
     command.upgrade(alembic_cfg, "head")
