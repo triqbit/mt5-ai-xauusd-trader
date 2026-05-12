@@ -10,8 +10,6 @@ import pandas as pd
 import pytest
 
 from src.core.constants import SignalDirection
-
-HAS_TORCH = importlib.util.find_spec("torch") is not None
 from src.models.base_model import Signal
 from src.research.benchmarks import (
     BenchmarkEvaluator,
@@ -30,6 +28,8 @@ from src.research.benchmarks import (
     TransformerAdapter,
     VolatilityBreakoutStrategy,
 )
+
+HAS_TORCH = importlib.util.find_spec("torch") is not None
 
 
 @pytest.fixture
@@ -292,8 +292,11 @@ def test_comparison_no_trades(sample_data):
     # Mock strategy with no signals
     class NoTradeStrategy:
         @property
-        def name(self): return "No_Trade"
-        def predict(self, df): return np.zeros(len(df))
+        def name(self):
+            return "No_Trade"
+
+        def predict(self, df):
+            return np.zeros(len(df))
 
     s1 = EMACrossoverStrategy(5, 10)
     s2 = NoTradeStrategy()
@@ -335,7 +338,9 @@ def test_comparison_very_few_trades(sample_data):
     # Strategy with only 1 trade
     class FewTradeStrategy:
         @property
-        def name(self): return "Few_Trade"
+        def name(self):
+            return "Few_Trade"
+
         def predict(self, df):
             signals = np.zeros(len(df))
             signals[10] = 1

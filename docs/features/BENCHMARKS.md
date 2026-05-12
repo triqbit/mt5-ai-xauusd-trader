@@ -8,6 +8,7 @@ The Institutional Benchmarking Framework provides a standardized way to evaluate
 - **Momentum (ROC)**: Rate of Change indicator to follow price trends.
 - **Volatility Breakout**: Bollinger Band expansion signals.
 - **Naive Directional**: Persistence of the previous candle's direction.
+- **ADX Trend**: Trend-following strategy using the Average Directional Index (ADX) and Directional Indicators (+DI/-DI).
 - **Risk-Filtered EMA**: EMA crossover logic combined with a volatility regime filter.
 - **MACD**: Moving Average Convergence Divergence.
 - **Mean Reversion**: RSI-based overbought/oversold logic.
@@ -17,6 +18,7 @@ The Institutional Benchmarking Framework provides a standardized way to evaluate
 ## Advanced Metrics
 
 The framework calculates a wide array of institutional-grade metrics:
+- **Execution Costs**: Support for transaction commissions and execution slippage per trade.
 - **Risk-Adjusted Returns**: Sharpe Ratio, Sortino Ratio, Calmar Ratio.
 - **Trading Quality**: Profit Factor, Expectancy, System Quality Number (SQN).
 - **Risk Metrics**: Max Drawdown, Value at Risk (VaR 95%), Conditional VaR (CVaR 95%), Ulcer Index.
