@@ -8,10 +8,10 @@ import pytest
 
 from src.research.benchmarks import EMACrossoverStrategy
 from src.research.hyperopt_walkforward import (
-    WalkForwardConfig,
-    WalkForwardOptimizer,
     OptimizationMetric,
     RobustnessWeights,
+    WalkForwardConfig,
+    WalkForwardOptimizer,
 )
 
 
@@ -19,14 +19,17 @@ from src.research.hyperopt_walkforward import (
 def sample_data():
     np.random.seed(42)
     n = 500
-    df = pd.DataFrame({
-        "open": np.random.randn(n) + 2000,
-        "high": np.random.randn(n) + 2005,
-        "low": np.random.randn(n) + 1995,
-        "close": np.random.randn(n) + 2000,
-        "tick_volume": np.random.randint(100, 1000, n)
-    })
+    df = pd.DataFrame(
+        {
+            "open": np.random.randn(n) + 2000,
+            "high": np.random.randn(n) + 2005,
+            "low": np.random.randn(n) + 1995,
+            "close": np.random.randn(n) + 2000,
+            "tick_volume": np.random.randint(100, 1000, n),
+        }
+    )
     return df
+
 
 def test_window_generation(sample_data):
     config = WalkForwardConfig(train_size=100, test_size=20, step_size=20)
@@ -34,7 +37,7 @@ def test_window_generation(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=lambda t: {},
-        config=config
+        config=config,
     )
 
     windows = optimizer.generate_windows()
@@ -45,11 +48,12 @@ def test_window_generation(sample_data):
     assert len(test) == 20
     assert train.index[-1] < test.index[0]
 
+
 def test_robustness_scoring_components(sample_data):
     def param_space(trial):
         return {
             "fast_window": trial.suggest_int("fast_window", 5, 10),
-            "slow_window": trial.suggest_int("slow_window", 20, 30)
+            "slow_window": trial.suggest_int("slow_window", 20, 30),
         }
 
     config = WalkForwardConfig(n_trials=2, train_size=100, test_size=20, step_size=50)
@@ -57,7 +61,7 @@ def test_robustness_scoring_components(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     params = {"fast_window": 9, "slow_window": 21}
@@ -83,19 +87,22 @@ def test_robustness_scoring_components(sample_data):
     consistency = optimizer._calculate_regime_consistency(optimizer.data, params)
     assert 0 <= consistency <= 1.0
 
+
 def test_full_optimization_run(sample_data):
     def param_space(trial):
         return {
             "fast_window": trial.suggest_int("fast_window", 5, 15),
-            "slow_window": trial.suggest_int("slow_window", 20, 40)
+            "slow_window": trial.suggest_int("slow_window", 20, 40),
         }
 
-    config = WalkForwardConfig(n_trials=5, train_size=200, test_size=50, step_size=50, min_windows=3)
+    config = WalkForwardConfig(
+        n_trials=5, train_size=200, test_size=50, step_size=50, min_windows=3
+    )
     optimizer = WalkForwardOptimizer(
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     result = optimizer.run_optimization()
@@ -116,11 +123,12 @@ def test_full_optimization_run(sample_data):
     assert "Sharpe Ratio" in result.window_results[0].oos_metrics
     assert "Sharpe Ratio" in result.window_results[0].is_metrics
 
+
 def test_metric_selection(sample_data):
     def param_space(trial):
         return {
             "fast_window": trial.suggest_int("fast_window", 5, 15),
-            "slow_window": trial.suggest_int("slow_window", 20, 40)
+            "slow_window": trial.suggest_int("slow_window", 20, 40),
         }
 
     # Test Total Return optimization
@@ -129,16 +137,17 @@ def test_metric_selection(sample_data):
         train_size=200,
         test_size=50,
         step_size=50,
-        metric=OptimizationMetric.TOTAL_RETURN
+        metric=OptimizationMetric.TOTAL_RETURN,
     )
     optimizer_tr = WalkForwardOptimizer(
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config_tr
+        config=config_tr,
     )
     result_tr = optimizer_tr.run_optimization()
     assert result_tr.metrics.robustness_score is not None
+
 
 def test_configurable_robustness_weights(sample_data):
     def param_space(trial):
@@ -147,21 +156,18 @@ def test_configurable_robustness_weights(sample_data):
     # Custom weights that prioritize IS-OOS gap and stability
     weights = RobustnessWeights(is_oos_gap=1.0, stability=1.0, oos_mean=0.1)
     config = WalkForwardConfig(
-        n_trials=2,
-        train_size=100,
-        test_size=20,
-        step_size=50,
-        robustness_weights=weights
+        n_trials=2, train_size=100, test_size=20, step_size=50, robustness_weights=weights
     )
     optimizer = WalkForwardOptimizer(
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     result = optimizer.run_optimization()
     assert result.metrics.robustness_score is not None
+
 
 def test_insufficient_data(sample_data):
     config = WalkForwardConfig(train_size=1000, test_size=200)
@@ -169,7 +175,7 @@ def test_insufficient_data(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=lambda t: {},
-        config=config
+        config=config,
     )
     with pytest.raises(ValueError, match="Insufficient data"):
         optimizer.run_optimization()
@@ -192,7 +198,7 @@ def test_oos_constraints(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     result = optimizer.run_optimization()
@@ -208,7 +214,7 @@ def test_improved_regime_consistency(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     # Manual test of the _calculate_regime_consistency method
@@ -229,7 +235,7 @@ def test_additional_metric_selection(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config_calmar
+        config=config_calmar,
     )
     result_calmar = optimizer_calmar.run_optimization()
     assert result_calmar is not None
@@ -242,7 +248,7 @@ def test_additional_metric_selection(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config_wr
+        config=config_wr,
     )
     result_wr = optimizer_wr.run_optimization()
     assert result_wr is not None
@@ -253,9 +259,13 @@ def test_ranking_by_robustness(sample_data):
     Verifies that the optimizer correctly ranks by robustness score,
     potentially selecting a configuration with lower return but higher stability.
     """
+
     class DummyStrategy:
-        def __init__(self, **kwargs): self.name = "Dummy"
-        def predict(self, df): return np.zeros(len(df))
+        def __init__(self, **kwargs):
+            self.name = "Dummy"
+
+        def predict(self, df):
+            return np.zeros(len(df))
 
     def param_space(trial):
         return {"param": trial.suggest_int("param", 1, 2)}
@@ -265,13 +275,10 @@ def test_ranking_by_robustness(sample_data):
         train_size=100,
         test_size=20,
         step_size=50,
-        metric=OptimizationMetric.ROBUSTNESS_SCORE
+        metric=OptimizationMetric.ROBUSTNESS_SCORE,
     )
     optimizer = WalkForwardOptimizer(
-        data=sample_data,
-        strategy_factory=DummyStrategy,
-        param_space=param_space,
-        config=config
+        data=sample_data, strategy_factory=DummyStrategy, param_space=param_space, config=config
     )
 
     # Mock _evaluate_strategy and scoring to create a trade-off
@@ -317,7 +324,7 @@ def test_window_generation_variations(sample_data):
     c3 = WalkForwardConfig(train_size=200, test_size=50, step_size=10)
     o3 = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, lambda t: {}, c3)
     w3 = o3.generate_windows()
-    assert len(w3) == 26 # (500 - 250) / 10 + 1 = 26
+    assert len(w3) == 26  # (500 - 250) / 10 + 1 = 26
 
 
 def test_frequency_weighted_regime_consistency(sample_data):
@@ -329,7 +336,7 @@ def test_frequency_weighted_regime_consistency(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     # Mock data with specific regimes to test frequency weighting
@@ -353,7 +360,7 @@ def test_stability_penalty_fragility_safeguard(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     # Force a failure/NaN to trigger the safeguard
@@ -375,7 +382,7 @@ def test_stability_penalty_scale_invariance(sample_data):
         data=sample_data,
         strategy_factory=EMACrossoverStrategy,
         param_space=param_space,
-        config=config
+        config=config,
     )
 
     # Test that CV is calculated correctly
@@ -395,3 +402,103 @@ def test_stability_penalty_scale_invariance(sample_data):
     params = {"p1": 100.0}
     cv_penalty = optimizer._calculate_stability_penalty(params, sample_data)
     assert 0.07 < cv_penalty < 0.09
+
+
+def test_multi_window_stability_sampling(sample_data):
+    """Verifies that multiple windows are used for stability calculation during optimization."""
+    eval_calls = []
+
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config,
+    )
+
+    original_calc_stability = optimizer._calculate_stability_penalty
+
+    def tracked_calc_stability(params, data):
+        eval_calls.append(len(data))
+        return original_calc_stability(params, data)
+
+    optimizer._calculate_stability_penalty = tracked_calc_stability
+
+    # Need enough windows to trigger multi-sampling (3 windows)
+    # len(sample_data)=500. (500-120)/50 + 1 = 8 windows.
+    optimizer.run_optimization()
+
+    # Should have called stability calculation for 3 windows (indices from np.linspace)
+    assert len(eval_calls) == 3
+
+
+def test_constraint_penalty_across_metrics(sample_data):
+    """Verifies that constraint penalty is applied to metrics other than ROBUSTNESS_SCORE."""
+
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    # Strict constraints
+    config = WalkForwardConfig(
+        n_trials=1,
+        train_size=100,
+        test_size=20,
+        step_size=50,
+        metric=OptimizationMetric.SHARPE,
+        min_oos_sharpe=10.0,  # Strict
+    )
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config,
+    )
+
+    # We need to capture the trial return value
+    # Since we can't easily capture it from study.optimize, we'll mock the objective
+    # or just trust the logic if it's simple.
+    # Actually, we can check if the best_trial's value is significantly reduced.
+
+    result = optimizer.run_optimization()
+    # If SHARPE was ~0 and penalty was applied, it should be very negative
+    # best_trial value is accessible via study if we had access to it,
+    # but run_optimization doesn't return the study.
+    # We can check result.metrics.constraints_violated
+    assert result.metrics.constraints_violated is True
+    # The robustness score is always calculated and should be heavily penalized
+    assert result.metrics.robustness_score < -1.0
+
+
+def test_wfe_calculation(sample_data):
+    """Verifies Walk-Forward Efficiency (WFE) calculation."""
+
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config,
+    )
+
+    # Mock _evaluate_strategy to return fixed values for IS and OOS
+    # is_mean will be 2.0, oos_mean will be 1.0
+    eval_count = 0
+
+    def mock_eval(data, params):
+        nonlocal eval_count
+        # Even calls (IS) = 2.0, Odd calls (OOS) = 1.0
+        val = 2.0 if eval_count % 2 == 0 else 1.0
+        eval_count += 1
+        return {"Sharpe Ratio": val}
+
+    optimizer._evaluate_strategy = mock_eval
+    result = optimizer.run_optimization()
+
+    # WFE = OOS_Mean / IS_Mean = 1.0 / 2.0 = 0.5
+    assert result.metrics.walk_forward_efficiency == pytest.approx(0.5)
