@@ -10,7 +10,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 PYPROJECT_FILE="pyproject.toml"
 RELEASES_DIR="releases"
-IMAGE_NAME="mt5-ai-xauusd-trader"
+IMAGE_NAME="triqbit/mt5-ai-xauusd-trader"
 
 cd "$PROJECT_ROOT"
 

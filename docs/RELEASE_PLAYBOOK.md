@@ -28,6 +28,7 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
     - **Journal Mining & Pattern Detection** verification.
     - **Model Explainability & UI** verification.
     - **Consolidated Research Audit Report** generation (`research_audit_report.md`).
+    - **Reliability SLO Audit**: Verification of uptime, RTO, and error budget targets.
 
 3.  **Build & Runtime Verification Stage:**
     - Multi-stage Docker image build.
@@ -101,18 +102,26 @@ If the new version exhibits unstable behavior (high latency, frequent crashes, m
 1.  **Identify Stable Version**: Find the last known stable tag from the [Releases](https://github.com/triqbit/mt5-ai-xauusd-trader/releases) page (e.g., `v1.2.2`).
 2.  **Redeploy**: Run the following command on the production host:
     ```bash
-    # Stop the current unstable container
+    # 1. Stop the current unstable container
     docker stop trading-bot
 
-    # Start the previous stable version
+    # 2. Start the previous stable version (e.g., v1.2.2)
+    export STABLE_TAG=v1.2.2
     docker run -d \
       --name trading-bot \
       --restart always \
       --env-file .env \
+      -p 8000:8000 \
       -v $(pwd)/data:/app/data \
-      triqbit/mt5-ai-xauusd-trader:v1.2.2
+      triqbit/mt5-ai-xauusd-trader:${STABLE_TAG}
     ```
-3.  **Verify**: Check health status immediately: `curl http://localhost:8000/health/readiness`.
+3.  **Verify**: Check health status immediately:
+    ```bash
+    # Verify liveness
+    curl -f http://localhost:8000/health/liveness
+    # Verify readiness (wait up to 30s)
+    for i in {1..6}; do curl -s http://localhost:8000/health/readiness | grep -q "UP" && break || sleep 5; done
+    ```
 
 ### B. Code/Git Rollback
 If the release contains functional bugs or logic errors that require a full revert:
@@ -126,9 +135,24 @@ If the release contains functional bugs or logic errors that require a full reve
 
 ### C. Database Migration Rollback
 If a schema change causes data corruption or application failure:
-1.  Exec into the running container: `docker exec -it trading-bot bash`.
-2.  Downgrade the schema by one version: `alembic downgrade -1`.
-3.  Verify the current version: `alembic current`.
+1.  **Exec into the running container**:
+    ```bash
+    docker exec -it trading-bot bash
+    ```
+2.  **Downgrade the schema**:
+    ```bash
+    # Downgrade by one version
+    alembic downgrade -1
+    ```
+3.  **Verify current schema version**:
+    ```bash
+    alembic current
+    ```
+4.  **Restart the container** (to ensure application state is synchronized with DB):
+    ```bash
+    exit
+    docker restart trading-bot
+    ```
 
 ### D. Emergency Protocols & MT5 Kill-Switch
 In case of catastrophic trading behavior, risk limit breaches, or circuit breaker activation (e.g., rogue orders, risk limit bypass):
@@ -161,4 +185,4 @@ If the deployment causes unrecoverable database state:
 
 ---
 **Author:** Jules03 (Release Reliability & Governance)
-**Last Updated:** 2024-05-24
+**Last Updated:** 2024-06-10
