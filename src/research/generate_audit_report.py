@@ -123,7 +123,9 @@ def generate_full_audit():
     hyper_section = HyperparameterSection(
         stability_score=92.0,
         parameters=[
-            ParameterRobustness(name="fast_ema_window", range="5-25", optimal="12", sensitivity="Low"),
+            ParameterRobustness(
+                name="fast_ema_window", range="5-25", optimal="12", sensitivity="Low"
+            ),
             ParameterRobustness(
                 name="confidence_threshold", range="0.5-0.9", optimal="0.65", sensitivity="Medium"
             ),
@@ -231,6 +233,7 @@ def generate_full_audit():
 
     # 8. RL Evaluation
     from src.research.reporting import RLMetric, RLSection
+
     rl_section = RLSection(
         comparison_summary="Ensemble outperfoms baseline PPO by 15% in Sharpe.",
         best_agent="Ensemble_V2",
@@ -249,7 +252,7 @@ def generate_full_audit():
                 sqn=3.10,
                 var_95=0.015,
                 common_sense_ratio=2.45,
-                gain_to_pain_ratio=1.85
+                gain_to_pain_ratio=1.85,
             ),
             RLMetric(
                 agent_name="Baseline_PPO",
@@ -264,9 +267,9 @@ def generate_full_audit():
                 sqn=1.85,
                 var_95=0.025,
                 common_sense_ratio=1.65,
-                gain_to_pain_ratio=1.20
-            )
-        ]
+                gain_to_pain_ratio=1.20,
+            ),
+        ],
     )
     orchestrator.add_section(rl_section)
 
