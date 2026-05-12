@@ -68,3 +68,23 @@ Non-critical errors are logged as `WARNING` but do not block the application lau
 ## Integration
 
 The validator is integrated directly into the `main.py` entry point and is executed immediately after the configuration is loaded from environment variables or the `.env` file.
+
+## Configuration Transparency & Source Attribution
+
+To improve operator awareness, the system includes features to track and display the origin of each configuration parameter.
+
+### 1. Source Attribution in `--show-config`
+Running the bot with the `--show-config` flag displays a table containing all active parameters along with their **Source**:
+- **CLI**: The value was explicitly provided as a command-line argument.
+- **ENV**: The value was loaded from an environment variable or the `.env` file.
+- **DEFAULT**: The system is using its built-in default value.
+
+### 2. Startup Operational Summary
+The main startup panel highlights parameters overridden via the CLI with a `(CLI OVERRIDE)` tag. This ensures that operators are aware of any non-standard settings being used for the current session.
+
+## Automated Setup & Hardening
+
+The `main.py` entrypoint includes a **Guided Setup** flow for first-time initialization:
+- **Directory Initialization**: Automatically creates required `data/`, `logs/`, and `models/trained/` directories if they are missing.
+- **Environment Template**: Offers to initialize a `.env` file from `.env.example`.
+- **Security Hardening**: Immediately applies restrictive `0o600` (read/write for owner only) permissions to the generated `.env` file to protect credentials.

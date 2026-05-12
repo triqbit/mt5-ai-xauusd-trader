@@ -879,14 +879,13 @@ def main() -> int:
                     .lower()
                 )
                 if choice in ["", "y", "yes"]:
+                    import contextlib
                     import shutil
 
                     shutil.copy(".env.example", ".env")
                     # Apply restrictive permissions immediately
-                    try:
+                    with contextlib.suppress(Exception):
                         os.chmod(env_file, 0o600)
-                    except Exception:
-                        pass
 
                     # Ensure required directories exist
                     for d in ["data", "logs", "models/trained"]:
