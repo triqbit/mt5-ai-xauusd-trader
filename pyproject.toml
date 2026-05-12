@@ -15,7 +15,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-    "torch==2.5.1",
+    "torch==2.7.1+cpu",
     "torchvision==0.20.1",
     "stable-baselines3==2.8.0",
     "gymnasium==1.0.0",
