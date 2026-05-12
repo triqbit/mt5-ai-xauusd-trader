@@ -2,10 +2,8 @@
 Integration tests for PortfolioScenarioBuilder and CapitalAllocator.
 """
 import pytest
-
-from src.trading.capital_allocator import CapitalAllocator, RejectionCode, StrategyConfig
 from src.utils.synthetic_data import PortfolioScenarioBuilder
-
+from src.trading.capital_allocator import CapitalAllocator, RejectionCode, StrategyConfig
 
 @pytest.fixture
 def builder():

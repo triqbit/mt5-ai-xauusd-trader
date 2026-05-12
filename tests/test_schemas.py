@@ -1,9 +1,7 @@
 
 import pytest
 from pydantic import ValidationError
-
-from src.core.schemas import SignalDirection, TradeSignal
-
+from src.core.schemas import TradeSignal, SignalDirection
 
 def test_trade_signal_schema_valid():
     """Verify that a valid signal data dictionary passes validation."""

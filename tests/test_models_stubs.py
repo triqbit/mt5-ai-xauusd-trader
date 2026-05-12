@@ -1,14 +1,12 @@
-
 import numpy as np
 import pytest
-
+from pathlib import Path
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
 from src.models.dreamer_agent import DreamerAgent
-from src.models.lstm_model import LSTMAttentionModel, LSTMModel, LSTMPricePredictor
+from src.models.lstm_model import LSTMModel, LSTMAttentionModel, LSTMPricePredictor
 from src.models.ppo_agent import PPOAgent
 from src.trading.trading_env import TradingEnv
-
 
 def test_ppo_agent_stub():
     """Test PPOAgent initialization and prediction behavior."""
@@ -53,6 +51,7 @@ def test_agent_save_directory_creation(tmp_path):
     if lstm_agent.model is not None:
         lstm_path = save_dir / "lstm_model.pt"
         # We need to mock torch.save to avoid actual file write errors
+        import torch
         from unittest.mock import patch
         with patch("torch.save") as mock_save:
             lstm_agent.save(lstm_path)

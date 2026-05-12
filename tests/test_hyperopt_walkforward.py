@@ -8,10 +8,10 @@ import pytest
 
 from src.research.benchmarks import EMACrossoverStrategy
 from src.research.hyperopt_walkforward import (
-    OptimizationMetric,
-    RobustnessWeights,
     WalkForwardConfig,
     WalkForwardOptimizer,
+    OptimizationMetric,
+    RobustnessWeights,
 )
 
 

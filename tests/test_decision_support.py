@@ -2,26 +2,20 @@
 Unit tests for the Decision Support System.
 """
 
+import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-import pytest
-
-from src.core.constants import SignalDirection
 from src.core.decision_support import (
-    DecisionPacket,
-    DecisionStatus,
     DecisionSupportSystem,
+    DecisionPacket,
     PerformanceContext,
+    DecisionStatus,
 )
-from src.core.explainability import (
-    ExecutionSummary,
-    ModelAttribution,
-    RiskAssessment,
-    SignalExplanation,
-)
-from src.data.event_intelligence import RiskStatus
-from src.models.regime_detector import MarketRegime, RegimeInfo
+from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment, ModelAttribution
+from src.core.constants import SignalDirection
+from src.models.regime_detector import RegimeInfo, MarketRegime
+from src.data.event_intelligence import RiskStatus, MacroEvent, EventCategory, EventImpact
 
 
 @pytest.fixture

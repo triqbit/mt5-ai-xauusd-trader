@@ -16,9 +16,8 @@ At startup, the `ConfigValidator` performs the following checks:
 - **LIVE Mode**: If `MODE` is set to `live`, the environment variable `CONFIRM_LIVE_TRADING` must be explicitly set to `YES`. This acts as a safety switch to prevent accidental production execution.
 
 ### 3. Secrets & Placeholders
-Detects default values or placeholder patterns (`YOUR_TOKEN`, `CHANGE_ME`, `YOUR_ACCOUNT_ID`, `YOUR_CHAT_ID`, `123456789`, `YOUR_SERVER_HERE`, `YOUR_PASSWORD_HERE`, `YOUR_PASSWORD_HERE`, `YOUR_SERVER_HERE`) in the following fields:
+Detects default values or placeholder patterns (`YOUR_TOKEN`, `CHANGE_ME`, `YOUR_ACCOUNT_ID`, `YOUR_CHAT_ID`, `123456789`, `YOUR_SERVER_HERE`, `YOUR_PASSWORD_HERE`) in the following fields:
 - **DATABASE_URL**
-- **REDIS_URL**: Specifically blocks the default `redis://localhost:6379/0`.
 - **TELEGRAM_TOKEN**
 - **TELEGRAM_CHAT_ID**
 - **METAAPI_TOKEN**
@@ -49,20 +48,6 @@ Detects default values or placeholder patterns (`YOUR_TOKEN`, `CHANGE_ME`, `YOUR
 - **Volatility Hierarchy**: High < Very High < Extreme thresholds.
 - **MAX_TRADES_PER_DAY**: Limited to 50 per institutional policy.
 - **MIN_LOT_SIZE**: Minimum 0.01 lot to prevent rounding errors.
-
-### 7. Capital Allocator Settings
-- **ALLOCATOR_MAX_TOTAL_HEAT**: Strictly prohibited if greater than 90% (0.9).
-- **ALLOCATOR_MAX_SYMBOL_RISK**: Strictly prohibited if greater than 50% (0.5).
-- **ALLOCATOR_MAX_FAMILY_RISK**: Strictly prohibited if greater than 50% (0.5).
-
-### 8. Execution & Behavior Limits
-- **MAX_SLIPPAGE_PIPS**: Strictly prohibited if greater than 5.0 pips.
-- **EXECUTION_LATENCY_THRESHOLD**: Strictly prohibited if greater than 5.0 seconds.
-- **MAX_LOSING_STREAK**: Strictly prohibited if greater than 10.
-- **MAX_WINNING_STREAK**: Strictly prohibited if greater than 20.
-- **DAILY_WIN_CAP**: Strictly prohibited if greater than 30% (0.30).
-
-### 9. Incompatible Settings & Consistency
 
 ### 7. Incompatible Settings & Consistency
 - **LOG_LEVEL**: Warning if set to `DEBUG` in `live` mode.

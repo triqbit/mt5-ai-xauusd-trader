@@ -13,7 +13,6 @@ import re
 import sys
 from pathlib import Path
 
-
 def extract_version_pyproject(root: Path) -> str:
     path = root / "pyproject.toml"
     if not path.exists():

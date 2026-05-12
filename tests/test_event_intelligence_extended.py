@@ -1,16 +1,14 @@
-from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
-
 import pytest
-
+from datetime import datetime, timedelta, UTC
+from unittest.mock import patch, MagicMock
 from src.data.event_intelligence import (
-    EventCategory,
-    EventImpact,
     EventIntelligence,
-    MacroEvent,
     MetaAPIEventProvider,
+    TradingViewEventProvider,
+    MacroEvent,
+    EventCategory,
+    EventImpact
 )
-
 
 @pytest.fixture
 def now():
@@ -106,7 +104,7 @@ def test_multi_provider_deduplication(now):
     provider2.get_upcoming_events.return_value = [event2]
 
     intel = EventIntelligence([provider1, provider2])
-    intel.get_risk_status(now)
+    status = intel.get_risk_status(now)
 
     assert len(intel._cached_events) == 2
     names = [e.name for e in intel._cached_events]

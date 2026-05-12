@@ -6,25 +6,18 @@ Advanced tests for DecisionSupportSystem enhancements, including executive summa
 review flags, and complex decision scenarios.
 """
 
-from datetime import datetime, timezone
-
 import pytest
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
-from src.core.constants import SignalDirection
 from src.core.decision_support import (
-    DecisionStatus,
     DecisionSupportSystem,
+    DecisionStatus,
 )
-from src.core.explainability import (
-    ExecutionSummary,
-    ModelAttribution,
-    RegimeContext,
-    RiskAssessment,
-    SignalExplanation,
-)
+from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment, ModelAttribution, RegimeContext
+from src.core.constants import SignalDirection
+from src.models.regime_detector import RegimeInfo, MarketRegime
 from src.data.event_intelligence import RiskStatus
-from src.models.regime_detector import MarketRegime, RegimeInfo
-
 
 @pytest.fixture
 def dss():

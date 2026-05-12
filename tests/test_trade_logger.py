@@ -84,12 +84,13 @@ def test_audit_columns(logger):
 def test_constraints(logger):
     from sqlalchemy.exc import IntegrityError
     # Test price constraint
-    with pytest.raises(IntegrityError), logger.Session() as session:
-        from src.core.trade_logger import ModelSignal
-        bad_signal = ModelSignal(
-            symbol="XAUUSD",
-            direction=1,
-            entry_price=-10.0 # Should fail
-        )
-        session.add(bad_signal)
-        session.commit()
+    with pytest.raises(IntegrityError):
+        with logger.Session() as session:
+            from src.core.trade_logger import ModelSignal
+            bad_signal = ModelSignal(
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=-10.0 # Should fail
+            )
+            session.add(bad_signal)
+            session.commit()

@@ -6,37 +6,39 @@ scripts/verify_reporting_system.py
 
 import os
 import sys
+from datetime import datetime, timezone
+import pandas as pd
+import numpy as np
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.research.reporting import (
-    AllocationEntry,
-    AllocationSection,
-    BehavioralRisk,
-    BenchmarkComparison,
-    BenchmarkSection,
-    DriftMetric,
-    ExecutionMetric,
-    ExecutionQualitySection,
-    HyperparameterSection,
-    ModelDriftSection,
-    ParameterRobustness,
-    PatternConcentration,
-    RareEventSection,
-    RareEventSummary,
-    RegimeSection,
-    RegimeSummary,
     ResearchOrchestrator,
     ResearchReporter,
-    RLMetric,
-    RLSection,
-    SignalMotif,
-    StressedMetric,
+    RegimeSection,
+    RegimeSummary,
     StressTestSection,
+    StressedMetric,
+    HyperparameterSection,
+    ParameterRobustness,
     TradePatternSection,
+    PatternConcentration,
+    BehavioralRisk,
+    SignalMotif,
+    ModelDriftSection,
+    DriftMetric,
+    AllocationSection,
+    AllocationEntry,
+    BenchmarkSection,
+    BenchmarkComparison,
+    RLSection,
+    RLMetric,
+    RareEventSection,
+    RareEventSummary,
+    ExecutionQualitySection,
+    ExecutionMetric,
 )
-
 
 def main():
     print("🚀 Starting Gold Standard Reporting Verification...")
@@ -191,7 +193,7 @@ def main():
     reporter.save_markdown(report, md_path)
     reporter.save_html(report, html_path)
 
-    print("\n✅ Verification complete!")
+    print(f"\n✅ Verification complete!")
     print(f"   - Markdown: {os.path.abspath(md_path)}")
     print(f"   - HTML:     {os.path.abspath(html_path)}")
 

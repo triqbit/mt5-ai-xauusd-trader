@@ -4,11 +4,11 @@ Verification tests for structured observability improvements.
 
 import unittest
 from unittest.mock import MagicMock, patch
-
-from src.core.monitor import Monitor
-from src.core.resilience import CircuitBreaker
+from datetime import datetime, timezone
+import structlog
+from src.core.resilience import CircuitBreaker, CircuitState
 from src.trading.mt5_connector import MT5Connector
-
+from src.core.monitor import Monitor
 
 class TestStructuredObservability(unittest.TestCase):
     def test_circuit_breaker_logging(self):

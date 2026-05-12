@@ -1,19 +1,16 @@
-from datetime import UTC, datetime, timedelta
-
 import pytest
-
-from src.core.config import TradingConfig
-from src.core.schemas import TradeSignal
+from datetime import datetime, timedelta, UTC
 from src.data.event_intelligence import (
+    EventIntelligence,
+    MockEventProvider,
+    MacroEvent,
     EventCategory,
     EventImpact,
-    EventIntelligence,
-    MacroEvent,
-    MetaAPIEventProvider,
-    MockEventProvider,
+    MetaAPIEventProvider
 )
 from src.trading.execution_filter import ExecutionFilter
-
+from src.core.config import TradingConfig
+from src.core.schemas import TradeSignal
 
 @pytest.fixture
 def now():

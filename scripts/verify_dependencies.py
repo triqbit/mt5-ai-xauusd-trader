@@ -1,8 +1,7 @@
 
-import re
 import sys
 from pathlib import Path
-
+import re
 
 def parse_requirements(filepath):
     requirements = {}

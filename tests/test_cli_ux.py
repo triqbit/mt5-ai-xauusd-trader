@@ -2,14 +2,14 @@
 MT5 AI/ML Trading Bot - CLI and UX Tests
 tests/test_cli_ux.py
 """
-import logging
 import os
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import SecretStr
 
-from main import get_parser, main
+from main import main, get_parser
 from src.core.config import get_config
 
 

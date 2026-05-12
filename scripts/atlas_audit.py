@@ -8,10 +8,9 @@ pre-production checklist completion and security standards.
 Author: Atlas 🗺️ (Release Readiness Guardian)
 """
 
-import re
 import sys
+import re
 from pathlib import Path
-
 
 def check_risk_sync():
     print("Checking RISK_LIMITS.md vs src/core/config.py synchronization...")

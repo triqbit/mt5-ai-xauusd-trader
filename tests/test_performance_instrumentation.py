@@ -1,12 +1,10 @@
 
-from unittest.mock import MagicMock, patch
-
-import numpy as np
+import pytest
 import pandas as pd
-
+import numpy as np
+from unittest.mock import MagicMock, patch
 from src.core.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
-
 
 def test_feature_engineer_profiling_blocks():
     """Verify that FeatureEngineer uses the granular profiling blocks."""
@@ -41,8 +39,8 @@ def test_ensemble_model_profiling_blocks():
     model = EnsembleModel()
     model.ppo_agent = MagicMock()
     # Mock the return value of ppo.predict which returns a Signal
-    from src.core.constants import SignalDirection
     from src.models.base_model import Signal
+    from src.core.constants import SignalDirection
     model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
 
     features = np.random.randn(140)

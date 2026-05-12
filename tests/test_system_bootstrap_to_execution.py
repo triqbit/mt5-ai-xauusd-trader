@@ -7,8 +7,10 @@ Config Loading -> Component Bootstrap -> Health Gate -> Full Execution Iteration
 """
 
 import os
+import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -18,18 +20,18 @@ from sqlalchemy import select
 
 # We rely on conftest.py for initial mocks of talib, MetaTrader5, and telegram.
 # We only add specific overrides here if needed.
-from src.core.audit_log import AuditEntry, AuditLogger
+
+from src.core.audit_log import AuditLogger, AuditEntry
 from src.core.config import get_config
-from src.core.constants import SignalDirection
-from src.core.feature_engineering import FeatureEngineer
-from src.core.health import ComponentStatus, HealthStatus, init_health_checker
+from src.core.health import init_health_checker, HealthStatus, ComponentStatus
 from src.core.schemas import TradeSignal
-from src.core.trade_logger import RiskEvent, Trade, TradeLogger
-from src.models.base_model import Signal
+from src.core.trade_logger import TradeLogger, Trade, RiskEvent
+from src.trading.mt5_connector import MT5Connector
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.execution_filter import ExecutionFilter
-from src.trading.mt5_connector import MT5Connector
-
+from src.core.feature_engineering import FeatureEngineer
+from src.models.base_model import Signal
+from src.core.constants import SignalDirection
 
 @pytest.fixture
 def system_env(tmp_path):

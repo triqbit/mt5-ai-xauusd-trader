@@ -17,7 +17,6 @@ def base_config(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "securepassword")
     monkeypatch.setenv("MT5_SERVER", "Broker-Demo")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db_real")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     return TradingConfig()
 
@@ -37,7 +36,6 @@ def test_validator_mt5_login_invalid(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_LOGIN", "0")
     monkeypatch.setenv("MT5_PASSWORD", "pass")
     monkeypatch.setenv("MT5_SERVER", "server")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
@@ -52,7 +50,6 @@ def test_validator_mt5_placeholders(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "your_password_here")
     monkeypatch.setenv("MT5_SERVER", "your_server_here")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
@@ -70,7 +67,6 @@ def test_validator_mt5_server_spaces_live(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_SERVER", "IC Markets Demo")
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
 
@@ -87,7 +83,6 @@ def test_validator_mt5_server_spaces_demo(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "IC Markets Demo")
     monkeypatch.setenv("MODE", "demo")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db_real")
 
@@ -107,7 +102,6 @@ def test_validator_mt5_path_windows(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "pass")
     monkeypatch.setenv("MT5_SERVER", "server")
     monkeypatch.setenv("MT5_PATH", "C:/non_existent_path.exe")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
@@ -124,7 +118,6 @@ def test_validator_live_mode_no_confirmation(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_SERVER", "Broker-Live")
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "NO")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -143,7 +136,6 @@ def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -180,7 +172,6 @@ def test_validator_market_parameters(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db_real")
 
@@ -215,7 +206,6 @@ def test_validator_risk_parameters(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # 1. Critical risk breach (> 2%)
@@ -241,7 +231,6 @@ def test_validator_risk_warnings(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Policy limit is 1%, Warning if > 1%
@@ -260,7 +249,6 @@ def test_validator_max_daily_loss(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Hard stop is 6%. Pydantic catches 7%.
@@ -287,7 +275,6 @@ def test_validator_incompatible_live_positions(monkeypatch, tmp_path):
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("MAX_POSITIONS", "6")  # Limit is 5 in LIVE mode
     monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -303,7 +290,6 @@ def test_validator_backtest_warning(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODE", "backtest")
     monkeypatch.setenv("TELEGRAM_TOKEN", "123:ABC")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "12345")
@@ -324,7 +310,6 @@ def test_validator_metaapi_consistency(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Token but no account ID
@@ -354,7 +339,6 @@ def test_validator_telegram_consistency(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Token but no chat ID
@@ -380,7 +364,6 @@ def test_validator_telegram_chat_id_placeholder(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("TELEGRAM_TOKEN", "real_token")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "YOUR_CHAT_ID")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
@@ -396,7 +379,6 @@ def test_validator_model_path_existence(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
 
     # Path does not exist
     non_existent = tmp_path / "non_existent.pt"
@@ -426,7 +408,6 @@ def test_validator_live_debug_warning(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker-Live")
     monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -446,7 +427,6 @@ def test_validator_min_confidence(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Critical breach (< 0.50)
@@ -469,7 +449,6 @@ def test_validator_placeholder_server_password(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_LOGIN", "123456")
     monkeypatch.setenv("MT5_PASSWORD", "YOUR_PASSWORD_HERE")
     monkeypatch.setenv("MT5_SERVER", "YOUR_SERVER_HERE")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -486,7 +465,6 @@ def test_validator_leverage_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Critical (> 20)
@@ -511,7 +489,6 @@ def test_validator_drawdown_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Critical (> 40%)
@@ -536,7 +513,6 @@ def test_validator_position_size_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Critical (> 20%)
@@ -561,7 +537,6 @@ def test_validator_stability_guards(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Model Accuracy Floor Critical (< 0.50)
@@ -607,7 +582,6 @@ def test_validator_calibration_threshold_critical(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     monkeypatch.setenv("MODEL_CALIBRATION_THRESHOLD", "0.30")
@@ -626,7 +600,6 @@ def test_validator_sqlite_live_warning(monkeypatch, tmp_path):
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///trades.db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -644,7 +617,6 @@ def test_validator_mt5_server_demo_live(monkeypatch, tmp_path):
     monkeypatch.setenv("MODE", "live")
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     cfg = TradingConfig()
@@ -660,7 +632,6 @@ def test_validator_daily_loss_hierarchy(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # L1 >= L2
@@ -679,7 +650,6 @@ def test_validator_weekly_monthly_loss_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Weekly critical (> 15%)
@@ -705,7 +675,6 @@ def test_validator_exposure_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Single direction critical (> 50%)
@@ -745,7 +714,6 @@ def test_validator_spread_hierarchy(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Alert >= Reduce
@@ -764,7 +732,6 @@ def test_validator_margin_hierarchy(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Alert >= Halt
@@ -783,7 +750,6 @@ def test_validator_volatility_hierarchy(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # High >= Very High
@@ -802,7 +768,6 @@ def test_validator_max_trades_per_day(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Exceeds institutional limit of 50
@@ -820,7 +785,6 @@ def test_validator_min_lot_size(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Below 0.01
@@ -852,7 +816,6 @@ def test_validator_file_permissions(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("REDIS_URL", "redis://realuser:realpass@localhost:6379/0")
 
     # We need to make sure TradingConfig uses our tmp_path/.env
     # The TradingConfig class defines ROOT / ".env"
@@ -887,107 +850,3 @@ def test_validator_file_permissions(monkeypatch, tmp_path):
     # It should give a warning (not critical)
     assert any(e.field == "FILE_PERMISSION" and ".env" in e.message for e in result.errors)
     assert all(not e.critical for e in result.errors if e.field == "FILE_PERMISSION")
-
-def test_validator_capital_allocator_settings(monkeypatch, tmp_path):
-    """Test validator detects unsafe capital allocator settings."""
-    model_file = tmp_path / "model.pt"
-    model_file.write_text("data")
-    monkeypatch.setenv("MT5_LOGIN", "123456")
-    monkeypatch.setenv("MT5_PASSWORD", "secure")
-    monkeypatch.setenv("MT5_SERVER", "Broker")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("MODEL_PATH", str(model_file))
-
-    # Total Heat Critical (> 90%)
-    monkeypatch.setenv("ALLOCATOR_MAX_TOTAL_HEAT", "0.95")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "ALLOCATOR_MAX_TOTAL_HEAT" and e.critical for e in result.errors)
-
-    # Symbol Risk Critical (> 50%)
-    monkeypatch.setenv("ALLOCATOR_MAX_TOTAL_HEAT", "0.70")
-    monkeypatch.setenv("ALLOCATOR_MAX_SYMBOL_RISK", "0.60")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "ALLOCATOR_MAX_SYMBOL_RISK" and e.critical for e in result.errors)
-
-    # Family Risk Critical (> 50%)
-    monkeypatch.setenv("ALLOCATOR_MAX_SYMBOL_RISK", "0.40")
-    monkeypatch.setenv("ALLOCATOR_MAX_FAMILY_RISK", "0.55")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "ALLOCATOR_MAX_FAMILY_RISK" and e.critical for e in result.errors)
-
-def test_validator_execution_parameters(monkeypatch, tmp_path):
-    """Test validator detects unsafe execution parameters."""
-    model_file = tmp_path / "model.pt"
-    model_file.write_text("data")
-    monkeypatch.setenv("MT5_LOGIN", "123456")
-    monkeypatch.setenv("MT5_PASSWORD", "secure")
-    monkeypatch.setenv("MT5_SERVER", "Broker")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("MODEL_PATH", str(model_file))
-
-    # Slippage Critical (> 5.0)
-    monkeypatch.setenv("MAX_SLIPPAGE_PIPS", "6.0")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "MAX_SLIPPAGE_PIPS" and e.critical for e in result.errors)
-
-    # Latency Critical (> 5.0s)
-    monkeypatch.setenv("MAX_SLIPPAGE_PIPS", "1.0")
-    monkeypatch.setenv("EXECUTION_LATENCY_THRESHOLD", "6.0")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "EXECUTION_LATENCY_THRESHOLD" and e.critical for e in result.errors)
-
-def test_validator_streak_and_win_limits(monkeypatch, tmp_path):
-    """Test validator detects unsafe streak and win limits."""
-    model_file = tmp_path / "model.pt"
-    model_file.write_text("data")
-    monkeypatch.setenv("MT5_LOGIN", "123456")
-    monkeypatch.setenv("MT5_PASSWORD", "secure")
-    monkeypatch.setenv("MT5_SERVER", "Broker")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-    monkeypatch.setenv("MODEL_PATH", str(model_file))
-
-    # Losing Streak Critical (> 10)
-    monkeypatch.setenv("MAX_LOSING_STREAK", "11")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "MAX_LOSING_STREAK" and e.critical for e in result.errors)
-
-    # Winning Streak Critical (> 20)
-    monkeypatch.setenv("MAX_LOSING_STREAK", "3")
-    monkeypatch.setenv("MAX_WINNING_STREAK", "21")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "MAX_WINNING_STREAK" and e.critical for e in result.errors)
-
-    # Win Cap Critical (> 30%)
-    monkeypatch.setenv("MAX_WINNING_STREAK", "5")
-    monkeypatch.setenv("DAILY_WIN_CAP", "0.35")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "DAILY_WIN_CAP" and e.critical for e in result.errors)
-
-def test_validator_redis_placeholder(monkeypatch, tmp_path):
-    """Test validator detects default or placeholder Redis URL."""
-    model_file = tmp_path / "model.pt"
-    model_file.write_text("data")
-    monkeypatch.setenv("MT5_LOGIN", "123456")
-    monkeypatch.setenv("MT5_PASSWORD", "secure")
-    monkeypatch.setenv("MT5_SERVER", "Broker")
-    monkeypatch.setenv("MODEL_PATH", str(model_file))
-
-    # Default Redis URL
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "REDIS_URL" and e.critical for e in result.errors)
-
-    # Placeholder Redis URL
-    monkeypatch.setenv("REDIS_URL", "redis://YOUR_PASSWORD@host:6379/0")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert any(e.field == "REDIS_URL" and e.critical for e in result.errors)

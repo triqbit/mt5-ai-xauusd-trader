@@ -6,19 +6,19 @@ Verifies the high-value integration path:
 Data Generation -> Backtest Engine -> Benchmark Evaluation -> Stress Testing -> Research Reporting
 """
 
-from unittest.mock import MagicMock
+import os
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.feature_engineering import FeatureEngineer
 from src.research.benchmarks import BenchmarkEvaluator
 from src.research.reporting import ResearchOrchestrator, ResearchReporter
 from src.research.stress_lab import StressLab, StressTestMetrics
 from src.trading.backtester import BacktestEngine
 from src.utils.synthetic_data import ScenarioGenerator
-
+from src.core.feature_engineering import FeatureEngineer
 
 @pytest.fixture
 def data_generator():

@@ -2,9 +2,7 @@
 import unittest
 from datetime import datetime
 from unittest.mock import MagicMock
-
 from src.trading.backtester import BacktestEngine
-
 
 class TestBacktestDrawdownOptimization(unittest.TestCase):
     def setUp(self):
