@@ -4,9 +4,10 @@ Verifies the 8-layer safety cascade, consecutive loss blocking, and model calibr
 """
 
 import pytest
+import pandas as pd
 from unittest.mock import MagicMock, patch
 from datetime import date
-from src.trading.risk_manager import RiskManager, DailyStats
+from src.trading.risk_manager import RiskManager
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.core.schemas import TradeSignal
 from src.core.config import TradingConfig
@@ -43,42 +44,61 @@ def mock_signal():
 def test_risk_manager_consecutive_losses(mock_config, mock_signal):
     """Verify that RiskManager blocks trades after max consecutive losses."""
     rm = RiskManager(mock_config, account_balance=10000.0)
+    market_data = pd.DataFrame()
+    open_positions = []
 
     # 1. First 2 losses - should still approve
     rm.record_pnl(-100.0)
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 2
-    assert rm.approve(mock_signal) is True
+    decision = rm.approve(mock_signal, market_data=market_data, open_positions=open_positions)
+    assert decision.is_approved is True
 
     # 2. Third loss (hit limit) - should reject
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 3
-    assert rm.approve(mock_signal) is False
+    decision = rm.approve(mock_signal, market_data=market_data, open_positions=open_positions)
+    assert decision.is_approved is False
 
     # 3. Reset on profit
     rm.record_pnl(50.0)
     assert rm.daily.consecutive_losses == 0
-    assert rm.approve(mock_signal) is True
+    decision = rm.approve(mock_signal, market_data=market_data, open_positions=open_positions)
+    assert decision.is_approved is True
 
 def test_risk_manager_model_health(mock_config, mock_signal):
     """Verify that RiskManager blocks trades based on model health metrics."""
     rm = RiskManager(mock_config, account_balance=10000.0)
+    market_data = pd.DataFrame()
+    open_positions = []
 
     # 1. Healthy model
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is True
+    decision = rm.approve(
+        mock_signal, market_data=market_data, open_positions=open_positions, model_health=health
+    )
+    assert decision.is_approved is True
 
     # 2. High drift
     health = {"drift": 0.4, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    decision = rm.approve(
+        mock_signal, market_data=market_data, open_positions=open_positions, model_health=health
+    )
+    assert decision.is_approved is False
 
     # 3. Low accuracy
     health = {"drift": 0.1, "accuracy": 0.4, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    decision = rm.approve(
+        mock_signal, market_data=market_data, open_positions=open_positions, model_health=health
+    )
+    assert decision.is_approved is False
 
     # 4. High calibration error
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.3}
-    assert rm.approve(mock_signal, model_health=health) is False
+    decision = rm.approve(
+        mock_signal, market_data=market_data, open_positions=open_positions, model_health=health
+    )
+    assert decision.is_approved is False
 
 def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
     """Verify that AuditedRiskManager traces all 8 layers."""
@@ -87,10 +107,14 @@ def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
         mock_get_audit.return_value = mock_audit
 
         arm = AuditedRiskManager(mock_config, account_balance=10000.0)
+        market_data = pd.DataFrame()
+        open_positions = []
 
         # Test approval with all 8 layers passing
         health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.1}
-        arm.approve(mock_signal, model_health=health)
+        arm.approve(
+            mock_signal, market_data=market_data, open_positions=open_positions, model_health=health
+        )
 
         # Verify the decision chain passed to log_risk_decision
         call_args = mock_audit.log_risk_decision.call_args[1]
