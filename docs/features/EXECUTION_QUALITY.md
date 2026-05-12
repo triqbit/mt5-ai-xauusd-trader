@@ -26,6 +26,13 @@ Tracks price movement at fixed horizons (1m, 5m, 15m, 30m, 60m) after trade entr
 ### 6. Blocked Signal Quality (Opportunity Cost)
 Analyzes signals rejected by risk management to determine if they would have hit their Take-Profit or Stop-Loss first. This measures the opportunity cost of being too risk-averse. It also tracks **Max Adverse Excursion (MAE)** and **Max Favorable Excursion (MFE)** for these signals to quantify the price movement they experienced.
 
+### 7. Institutional Symbol Robustness
+The system features a centralized property detection engine for institutional assets:
+- **XAUUSD/Gold:** Standardized to 0.1 pip size and 100 contract size.
+- **JPY Pairs:** Standardized to 0.01 pip size.
+- **Crypto (BTC/ETH):** Standardized to 1.0 pip size.
+- **Dynamic Detection:** Automatically pulls digits and contract specifications from MT5/MetaAPI properties when available.
+
 ## Usage
 
 Metrics are automatically calculated and persisted to the `execution_qualities` database table. Aggregate summaries can be generated via the `ExecutionAnalyzer.generate_summary_report()` method, which integrates with the research reporting system.
