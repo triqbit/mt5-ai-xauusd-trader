@@ -3,22 +3,25 @@ Tests for the research reporting system.
 """
 
 import os
+
 import pytest
+
 from src.research.reporting import (
     AllocationEntry,
     AllocationSection,
-    RegimeSection,
-    RegimeSummary,
-    ResearchReport,
-    ResearchReporter,
-    StressedMetric,
-    StressTestSection,
-    ResearchOrchestrator,
     RareEventSection,
     RareEventSummary,
-    TradePatternSection,
+    RegimeSection,
+    RegimeSummary,
+    ResearchOrchestrator,
+    ResearchReport,
+    ResearchReporter,
     SignalMotif,
+    StressedMetric,
+    StressTestSection,
+    TradePatternSection,
 )
+
 
 @pytest.fixture
 def sample_report():
@@ -28,30 +31,53 @@ def sample_report():
         regime_analysis=RegimeSection(
             summary="Market was primarily trending with low volatility.",
             regimes=[
-                RegimeSummary(label="Trending", frequency_pct=65.0, avg_duration_bars=45, profitability="High"),
-                RegimeSummary(label="Ranging", frequency_pct=25.0, avg_duration_bars=12, profitability="Low"),
+                RegimeSummary(
+                    label="Trending", frequency_pct=65.0, avg_duration_bars=45, profitability="High"
+                ),
+                RegimeSummary(
+                    label="Ranging", frequency_pct=25.0, avg_duration_bars=12, profitability="Low"
+                ),
             ],
-            transition_insights="Slow transitions between trending and ranging regimes."
+            transition_insights="Slow transitions between trending and ranging regimes.",
         ),
         stress_tests=StressTestSection(
             resilience_score=85.5,
-            baseline=StressedMetric(name="Baseline", total_return="12.5%", max_drawdown="4.2%", sharpe="2.1", outcome="PASS"),
+            baseline=StressedMetric(
+                name="Baseline",
+                total_return="12.5%",
+                max_drawdown="4.2%",
+                sharpe="2.1",
+                outcome="PASS",
+            ),
             scenarios=[
-                StressedMetric(name="Spread Widening", total_return="10.1%", max_drawdown="5.8%", sharpe="1.8", outcome="PASS"),
-                StressedMetric(name="News Shock", total_return="-2.5%", max_drawdown="15.2%", sharpe="-0.5", outcome="FAIL"),
+                StressedMetric(
+                    name="Spread Widening",
+                    total_return="10.1%",
+                    max_drawdown="5.8%",
+                    sharpe="1.8",
+                    outcome="PASS",
+                ),
+                StressedMetric(
+                    name="News Shock",
+                    total_return="-2.5%",
+                    max_drawdown="15.2%",
+                    sharpe="-0.5",
+                    outcome="FAIL",
+                ),
             ],
             fragility_indicators=["High drawdown during volatility spikes"],
-            failure_points=["Sudden 50bp price jumps"]
+            failure_points=["Sudden 50bp price jumps"],
         ),
         allocation_insights=AllocationSection(
             total_heat_pct=45.0,
             allocations=[
                 AllocationEntry(name="XAUUSD_PPO", amount="$45,000", heat_pct=45.0, multiplier=1.2)
             ],
-            rejection_summary={"Symbol concentration": 5}
+            rejection_summary={"Symbol concentration": 5},
         ),
-        conclusion="Recommend deploying with reduced size during high-impact news."
+        conclusion="Recommend deploying with reduced size during high-impact news.",
     )
+
 
 def test_markdown_generation(sample_report):
     reporter = ResearchReporter()
@@ -71,6 +97,7 @@ def test_markdown_generation(sample_report):
     assert "$45,000" in markdown
     assert "Recommend deploying" in markdown
 
+
 def test_terminal_formatting(sample_report, capsys):
     reporter = ResearchReporter()
     reporter.format_for_terminal(sample_report)
@@ -82,6 +109,7 @@ def test_terminal_formatting(sample_report, capsys):
     assert "Resilience Score: 85.5/100" in captured.out
     assert "Capital Allocation" in captured.out
 
+
 def test_save_markdown(sample_report, tmp_path):
     reporter = ResearchReporter()
     file_path = tmp_path / "test_report.md"
@@ -92,17 +120,20 @@ def test_save_markdown(sample_report, tmp_path):
         content = f.read()
         assert "Q1 2024 Strategy Robustness Audit" in content
 
+
 def test_research_orchestrator():
     orchestrator = ResearchOrchestrator(
-        title="Orchestrated Report",
-        executive_summary="Summary",
-        conclusion="Conclusion"
+        title="Orchestrated Report", executive_summary="Summary", conclusion="Conclusion"
     )
 
     regime = RegimeSection(
         summary="Test Summary",
-        regimes=[RegimeSummary(label="Trending", frequency_pct=50, avg_duration_bars=10, profitability="Neutral")],
-        transition_insights="None"
+        regimes=[
+            RegimeSummary(
+                label="Trending", frequency_pct=50, avg_duration_bars=10, profitability="Neutral"
+            )
+        ],
+        transition_insights="None",
     )
 
     orchestrator.add_section(regime)
@@ -112,19 +143,25 @@ def test_research_orchestrator():
     assert report.regime_analysis is not None
     assert report.regime_analysis.summary == "Test Summary"
 
+
 def test_rare_event_reporting():
     rare_event_section = RareEventSection(
         scenarios=[
-            RareEventSummary(event_type="flash_crash", peak_impact_pct=-0.05, realized_volatility=0.1, recovery_attained=0.8)
+            RareEventSummary(
+                event_type="flash_crash",
+                peak_impact_pct=-0.05,
+                realized_volatility=0.1,
+                recovery_attained=0.8,
+            )
         ],
-        insights="Resilient to small crashes."
+        insights="Resilient to small crashes.",
     )
 
     report = ResearchReport(
         title="Rare Event Audit",
         executive_summary="Testing rare events.",
         rare_events=rare_event_section,
-        conclusion="Final."
+        conclusion="Final.",
     )
 
     reporter = ResearchReporter()
@@ -139,15 +176,30 @@ def test_rare_event_reporting():
     assert "Rare Event Simulations" in html
     assert "flash_crash" in html
     assert 'href="#rare-events"' in html
-    assert 'role="progressbar"' not in html # No stress tests here
+    assert 'role="progressbar"' not in html  # No stress tests here
+
 
 def test_calibration_reporting():
     """Verify that CalibrationResult integrates with the reporting system."""
     from src.models.calibration import CalibrationResult, ConfidenceBucket
 
     buckets = [
-        ConfidenceBucket(range_start=0.5, range_end=0.6, avg_confidence=0.55, accuracy=0.52, sample_count=10, deviation=0.03),
-        ConfidenceBucket(range_start=0.9, range_end=1.0, avg_confidence=0.95, accuracy=0.92, sample_count=5, deviation=0.03)
+        ConfidenceBucket(
+            range_start=0.5,
+            range_end=0.6,
+            avg_confidence=0.55,
+            accuracy=0.52,
+            sample_count=10,
+            deviation=0.03,
+        ),
+        ConfidenceBucket(
+            range_start=0.9,
+            range_end=1.0,
+            avg_confidence=0.95,
+            accuracy=0.92,
+            sample_count=5,
+            deviation=0.03,
+        ),
     ]
     cal_res = CalibrationResult(
         brier_score=0.05,
@@ -158,14 +210,14 @@ def test_calibration_reporting():
         mce=0.08,
         buckets=buckets,
         optimal_threshold=0.65,
-        status="VERIFIED"
+        status="VERIFIED",
     )
 
     report = ResearchReport(
         title="Calibration Audit",
         executive_summary="Testing calibration.",
         calibration_analysis=cal_res.to_report_section(),
-        conclusion="Calibrated."
+        conclusion="Calibrated.",
     )
 
     reporter = ResearchReporter()
@@ -182,23 +234,24 @@ def test_calibration_reporting():
     assert "0.04" in html
     assert "0.65" in html
 
+
 def test_html_dynamic_elements(sample_report):
     """Verify TOC, dynamic numbering and progress bars in HTML."""
     reporter = ResearchReporter()
     html = reporter.generate_html(sample_report)
 
     # TOC and Navigation
-    assert 'Table of Contents' in html
+    assert "Table of Contents" in html
     assert 'href="#executive-summary"' in html
     assert 'href="#regime-analysis"' in html
     assert 'href="#stress-tests"' in html
 
     # Dynamic Numbering in TOC (Executive Summary is 1, Regime is 2, Stress is 3, Allocation is 4, Conclusion is 5)
-    assert '1. Executive Summary' in html
-    assert '2. Market Regime Analysis' in html
-    assert '3. Stress Test Outcomes' in html
-    assert '4. Capital Allocation Insights' in html
-    assert '5. Conclusion & Recommendations' in html
+    assert "1. Executive Summary" in html
+    assert "2. Market Regime Analysis" in html
+    assert "3. Stress Test Outcomes" in html
+    assert "4. Capital Allocation Insights" in html
+    assert "5. Conclusion & Recommendations" in html
 
     # Progress Bars (ARIA)
     assert 'role="progressbar"' in html
@@ -207,26 +260,28 @@ def test_html_dynamic_elements(sample_report):
     # Accessibility
     assert 'scope="col"' in html
 
+
 def test_html_ux_enhancements(sample_report):
     """Verify smooth scroll, back-to-top and color coding in HTML."""
     reporter = ResearchReporter()
     html = reporter.generate_html(sample_report)
 
     # Smooth scroll
-    assert 'scroll-behavior: smooth;' in html
+    assert "scroll-behavior: smooth;" in html
 
     # Back to top button
     assert 'class="back-to-top"' in html
     assert 'aria-label="Scroll back to top"' in html
 
     # Color coding classes
-    assert '.fill-low' in html
-    assert '.fill-medium' in html
-    assert '.fill-high' in html
+    assert ".fill-low" in html
+    assert ".fill-medium" in html
+    assert ".fill-high" in html
 
     # Resilience score is 85.5 -> should have fill-high
-    assert 'fill-high' in html
+    assert "fill-high" in html
     assert 'aria-label="Strategy resilience score: 85.5 out of 100"' in html
+
 
 def test_html_accessibility_hardening(sample_report):
     """Verify accessibility and print hardening in HTML."""
@@ -236,11 +291,11 @@ def test_html_accessibility_hardening(sample_report):
     # Skip to main content link
     assert 'class="skip-link"' in html
     assert 'href="#main-content"' in html
-    assert 'Skip to main content' in html
+    assert "Skip to main content" in html
 
     # Semantic main tag
     assert '<main id="main-content">' in html
-    assert '</main>' in html
+    assert "</main>" in html
 
     # ARIA labels
     assert 'role="banner"' in html
@@ -249,9 +304,35 @@ def test_html_accessibility_hardening(sample_report):
     assert 'aria-hidden="true"' in html  # For the back-to-top icon
 
     # Print styles
-    assert '@media print' in html
-    assert '.print-btn' in html
-    assert 'window[\'print\']()' in html
+    assert "@media print" in html
+    assert ".print-btn" in html
+    assert "window['print']()" in html
+
+
+def test_critical_warnings_panel():
+    """Verify that the critical warnings panel appears when there are issues."""
+    from src.research.reporting import DriftMetric, ModelDriftSection
+
+    report = ResearchReport(
+        title="Warning Test",
+        executive_summary="Summary",
+        model_drift=ModelDriftSection(
+            metrics=[
+                DriftMetric(
+                    name="Test", baseline="1", current="2", drift_pct=100.0, status="CRITICAL"
+                )
+            ],
+            feature_shifts="None",
+        ),
+        conclusion="Conclusion",
+    )
+
+    reporter = ResearchReporter()
+    html = reporter.generate_html(report)
+
+    assert "Critical Research Warnings" in html
+    assert "CRITICAL" in html
+
 
 def test_trade_pattern_motifs():
     trade_section = TradePatternSection(
@@ -259,15 +340,22 @@ def test_trade_pattern_motifs():
         concentrations=[],
         behavioral_risks=[],
         motifs=[
-            SignalMotif(algorithm="PPO", direction=1, volatility_bucket="High", confidence_bucket="Low", frequency=5, win_rate=0.2)
-        ]
+            SignalMotif(
+                algorithm="PPO",
+                direction=1,
+                volatility_bucket="High",
+                confidence_bucket="Low",
+                frequency=5,
+                win_rate=0.2,
+            )
+        ],
     )
 
     report = ResearchReport(
         title="Motif Audit",
         executive_summary="Testing motifs.",
         trade_patterns=trade_section,
-        conclusion="Final."
+        conclusion="Final.",
     )
 
     reporter = ResearchReporter()
@@ -276,6 +364,7 @@ def test_trade_pattern_motifs():
     assert "### Signal Motifs (Losing Combinations)" in md
     assert "PPO" in md
     assert "20.0%" in md
+
 
 def test_rl_evaluation_reporting():
     from src.research.reporting import RLMetric, RLSection
@@ -292,16 +381,16 @@ def test_rl_evaluation_reporting():
                 profit_factor=1.8,
                 max_dd=0.12,
                 win_rate=0.6,
-                recovery_factor=4.2
+                recovery_factor=4.2,
             )
-        ]
+        ],
     )
 
     report = ResearchReport(
         title="RL Audit",
         executive_summary="Testing RL.",
         rl_evaluation=rl_section,
-        conclusion="Final."
+        conclusion="Final.",
     )
 
     reporter = ResearchReporter()
@@ -317,8 +406,10 @@ def test_rl_evaluation_reporting():
     assert "Agent_V2" in html
     assert 'href="#rl-evaluation"' in html
 
+
 def test_rl_metric_new_fields():
     from src.research.reporting import RLMetric
+
     metric = RLMetric(
         agent_name="TestAgent",
         sharpe=1.5,
@@ -327,20 +418,18 @@ def test_rl_metric_new_fields():
         win_rate=0.5,
         tail_ratio=1.8,
         common_sense_ratio=2.1,
-        gain_to_pain_ratio=1.4
+        gain_to_pain_ratio=1.4,
     )
     assert metric.tail_ratio == 1.8
     assert metric.common_sense_ratio == 2.1
     assert metric.gain_to_pain_ratio == 1.4
 
+
 def test_pattern_concentration_total_trades():
     from src.research.reporting import PatternConcentration
+
     pc = PatternConcentration(
-        attribute="Algo",
-        value="PPO",
-        win_rate=0.6,
-        profit_factor=2.0,
-        total_trades=100
+        attribute="Algo", value="PPO", win_rate=0.6, profit_factor=2.0, total_trades=100
     )
     assert pc.total_trades == 100
 
@@ -385,12 +474,16 @@ def test_terminal_dynamic_numbering(mocker):
     found_rl = any("2. RL Agent Evaluation" in s for s in calls)
 
     assert found_regime, f"Regime analysis header not found in: {calls}"
-    assert found_rl, f"RL Evaluation should be section 2, but header not found correctly in: {calls}"
+    assert found_rl, (
+        f"RL Evaluation should be section 2, but header not found correctly in: {calls}"
+    )
+
 
 def test_generate_audit_report_smoke_test():
     """Verify that the audit report generation script runs without error."""
-    from src.research.generate_audit_report import generate_full_audit
     import os
+
+    from src.research.generate_audit_report import generate_full_audit
 
     # Run the generation
     generate_full_audit()

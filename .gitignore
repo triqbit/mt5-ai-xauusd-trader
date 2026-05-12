@@ -100,3 +100,5 @@ releases/
 
 # Archives (Cleanup outputs)
 archives/
+reports/*
+!reports/.gitkeep

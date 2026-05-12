@@ -133,6 +133,8 @@ class BenchmarkComparison(BaseModel):
     profit_factor: str = "0.00"
     sqn: str = "0.00"
     recovery_factor: str = "0.00"
+    calmar_ratio: str = "0.00"
+    expected_shortfall: str = "0.00"
 
 
 class BenchmarkSection(BaseModel):
@@ -252,7 +254,9 @@ class ResearchReporter:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             template_dir = os.path.join(base_dir, "templates")
 
-        self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(template_dir), extensions=["jinja2.ext.do"]
+        )
         self.console = Console()
 
     def generate_markdown(self, report: ResearchReport) -> str:
@@ -427,7 +431,7 @@ class ResearchReporter:
                 m_table.add_column("WR")
                 for m in report.trade_patterns.motifs:
                     if m.win_rate < 0.5:
-                        wr_color = self._get_color_for_metric(m.win_rate, 'win_rate')
+                        wr_color = self._get_color_for_metric(m.win_rate, "win_rate")
                         m_table.add_row(
                             m.algorithm,
                             m.volatility_bucket,
@@ -472,6 +476,7 @@ class ResearchReporter:
             table.add_column("PF")
             table.add_column("SQN")
             table.add_column("Recov")
+            table.add_column("Calmar")
             table.add_column("P-Value")
             for b in report.benchmarks.comparisons:
                 table.add_row(
@@ -482,6 +487,7 @@ class ResearchReporter:
                     f"[{self._get_color_for_metric(b.profit_factor, 'pf')}]{b.profit_factor}[/]",
                     b.sqn,
                     f"[{self._get_color_for_metric(b.recovery_factor, 'recovery')}]{b.recovery_factor}[/]",
+                    b.calmar_ratio,
                     b.p_value,
                 )
             self.console.print(table)
@@ -524,7 +530,9 @@ class ResearchReporter:
             self.console.print(table)
 
         if report.calibration_analysis:
-            self.console.print(f"\n[bold cyan]{section_idx}. Confidence Calibration & Reliability[/]")
+            self.console.print(
+                f"\n[bold cyan]{section_idx}. Confidence Calibration & Reliability[/]"
+            )
             section_idx += 1
             self.console.print(
                 f"ECE: [bold]{report.calibration_analysis.ece:.4f}[/] | "
@@ -537,11 +545,11 @@ class ResearchReporter:
             table.add_column("Avg Confidence")
             table.add_column("Samples")
             for b in report.calibration_analysis.buckets:
-                table.add_row(
-                    b.range, f"{b.accuracy:.1%}", f"{b.confidence:.1%}", str(b.samples)
-                )
+                table.add_row(b.range, f"{b.accuracy:.1%}", f"{b.confidence:.1%}", str(b.samples))
             self.console.print(table)
-            self.console.print(f"[dim]Insight: {report.calibration_analysis.reliability_insight}[/]")
+            self.console.print(
+                f"[dim]Insight: {report.calibration_analysis.reliability_insight}[/]"
+            )
 
         if report.execution_quality:
             self.console.print(f"\n[bold blue]{section_idx}. Execution Quality & Alpha Decay[/]")

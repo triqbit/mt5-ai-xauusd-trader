@@ -123,7 +123,9 @@ def generate_full_audit():
     hyper_section = HyperparameterSection(
         stability_score=92.0,
         parameters=[
-            ParameterRobustness(name="fast_ema_window", range="5-25", optimal="12", sensitivity="Low"),
+            ParameterRobustness(
+                name="fast_ema_window", range="5-25", optimal="12", sensitivity="Low"
+            ),
             ParameterRobustness(
                 name="confidence_threshold", range="0.5-0.9", optimal="0.65", sensitivity="Medium"
             ),
@@ -228,6 +230,48 @@ def generate_full_audit():
         statistical_summary="Compared 2 strategies against Ensemble. 2 showed outperformance.",
     )
     orchestrator.add_section(bench_section)
+
+    # 8. RL Evaluation
+    from src.research.reporting import RLMetric, RLSection
+
+    rl_section = RLSection(
+        comparison_summary="Ensemble outperfoms baseline PPO by 15% in Sharpe.",
+        best_agent="Ensemble_V2",
+        performance_gap=15.2,
+        metrics=[
+            RLMetric(
+                agent_name="Ensemble_V2",
+                sharpe=2.85,
+                sortino=3.20,
+                profit_factor=2.15,
+                max_dd=0.08,
+                win_rate=0.58,
+                recovery_factor=4.50,
+                lake_ratio=0.82,
+                tail_ratio=1.45,
+                sqn=3.10,
+                var_95=0.015,
+                common_sense_ratio=2.45,
+                gain_to_pain_ratio=1.85,
+            ),
+            RLMetric(
+                agent_name="Baseline_PPO",
+                sharpe=1.95,
+                sortino=2.10,
+                profit_factor=1.65,
+                max_dd=0.14,
+                win_rate=0.52,
+                recovery_factor=2.80,
+                lake_ratio=0.65,
+                tail_ratio=1.10,
+                sqn=1.85,
+                var_95=0.025,
+                common_sense_ratio=1.65,
+                gain_to_pain_ratio=1.20,
+            ),
+        ],
+    )
+    orchestrator.add_section(rl_section)
 
     # Build and Export
     report = orchestrator.build()

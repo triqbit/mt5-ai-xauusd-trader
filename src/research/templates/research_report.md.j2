@@ -159,10 +159,10 @@
 {% if benchmarks %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Benchmark Comparisons
-| Strategy | Total Return | Sharpe | MaxDD | PF | SQN | Recov | P-Value |
-|----------|--------------|--------|-------|----|-----|-------|---------|
+| Strategy | Total Return | Sharpe | MaxDD | CVaR | PF | SQN | Recov | Calmar | P-Value |
+|----------|--------------|--------|-------|------|----|-----|-------|--------|---------|
 {% for b in benchmarks.comparisons %}
-| {{ b.name }} | {{ b.total_return }} | {{ b.sharpe }} | {{ b.max_drawdown }} | {{ b.profit_factor }} | {{ b.sqn }} | {{ b.recovery_factor }} | {{ b.p_value }} |
+| {{ b.name }} | {{ b.total_return }} | {{ b.sharpe }} | {{ b.max_drawdown }} | {{ b.expected_shortfall }} | {{ b.profit_factor }} | {{ b.sqn }} | {{ b.recovery_factor }} | {{ b.calmar_ratio }} | {{ b.p_value }} |
 {% endfor %}
 
 **Statistical Significance:**
@@ -174,10 +174,10 @@
 ## {{ ns.count }}. RL Agent Evaluation
 **Summary:** {{ rl_evaluation.comparison_summary }}
 
-| Agent | Sharpe | Sortino | PF | MaxDD | Recovery | VaR(95%) | CSR | G2P |
-|-------|--------|---------|----|-------|----------|----------|-----|-----|
+| Agent | Sharpe | Sortino | PF | MaxDD | Recovery | VaR(95%) | CSR | G2P | Lake | Tail | SQN |
+|-------|--------|---------|----|-------|----------|----------|-----|-----|------|------|-----|
 {% for m in rl_evaluation.metrics %}
-| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.sortino|round(2) }} | {{ m.profit_factor|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ m.recovery_factor|round(2) }} | {{ (m.var_95 * 100)|round(2) }}% | {{ m.common_sense_ratio|round(2) }} | {{ m.gain_to_pain_ratio|round(2) }} |
+| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.sortino|round(2) }} | {{ m.profit_factor|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ m.recovery_factor|round(2) }} | {{ (m.var_95 * 100)|round(2) }}% | {{ m.common_sense_ratio|round(2) }} | {{ m.gain_to_pain_ratio|round(2) }} | {{ m.lake_ratio|round(2) }} | {{ m.tail_ratio|round(2) }} | {{ m.sqn|round(2) }} |
 {% endfor %}
 {% endif %}
 

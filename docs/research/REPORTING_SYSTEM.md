@@ -1,3 +1,38 @@
-- **Institutional Metrics:** Calculates advanced metrics such as Tail Ratio, Common Sense Ratio, and Gain-to-Pain Ratio.
-- **Professional Visualization:** High-fidelity HTML reports with interactive elements (TOC, back-to-top) and color-coded status indicators. Terminal reports feature dynamic section numbering for logical indexing and institutional color-coding for key performance metrics (Sharpe, PF, WR).
-- **Accessibility & Print Optimization:** Hardened HTML with ARIA labels, skip-links, and `@media print` CSS for professional PDF exports.
+# Research Reporting System
+
+The research reporting system is a high-fidelity audit framework designed to provide decision-useful insights for institutional stakeholders, including PMs, Quant Leads, and Auditors.
+
+## Core Features
+
+- **Multi-Format Export:** Supports professional HTML, Markdown, and scannable Terminal (Rich) output.
+- **Institutional Metrics:** Calculates and reports advanced quant metrics:
+    - Calmar Ratio & Expected Shortfall (CVaR)
+    - Ulcer Index & Lake Ratio
+    - Tail Ratio & SQN
+    - Common Sense Ratio & Gain-to-Pain Ratio
+- **Automated Risk Triage:** Integrated 'Critical Research Warnings' panel in HTML reports that dynamically highlights FAIL/CRITICAL statuses from stress tests, model drift, and calibration audits.
+- **Professional Visualization:**
+    - High-density KPI dashboards.
+    - Interactive elements (Sticky navigation, TOC, Back-to-top).
+    - ARIA-hardened accessibility and print-optimized CSS for PDF generation.
+- **Modular Architecture:** Pydantic-based data models for extensible research sections.
+
+## Components
+
+1. **ResearchReporter:** The main engine for template rendering and terminal display.
+2. **ResearchOrchestrator:** Automates the aggregation of data from various research subsystems (Regime, Stress, Hyperopt, etc.) into a unified report.
+3. **Audit Templates:** Professional Jinja2 templates for Markdown and HTML exports.
+
+## Usage
+
+```python
+from src.research.reporting import ResearchOrchestrator, ResearchReporter
+
+orchestrator = ResearchOrchestrator(title="Audit", ...)
+orchestrator.add_section(stress_test_section)
+report = orchestrator.build()
+
+reporter = ResearchReporter()
+reporter.format_for_terminal(report)
+reporter.save_html(report, "audit.html")
+```

@@ -46,8 +46,8 @@
         .badge-critical { background: #fde8e8; color: #9b1c1c; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         .kpi-dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 2.5rem; }
-        .kpi-card { background: var(--white); padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid var(--secondary); }
-        .kpi-value { font-size: 2rem; font-weight: 800; color: var(--primary); display: block; }
+        .kpi-card { background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid var(--secondary); }
+        .kpi-value { font-size: 1.5rem; font-weight: 800; color: var(--primary); display: block; }
         .kpi-label { font-size: 0.85rem; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.025em; }
         .status-badge { padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; }
         .status-verified { background: #def7ec; color: #03543f; }
@@ -114,6 +114,38 @@
             </span>
         </div>
     </header>
+
+    {% set critical_flags = [] %}
+    {% if model_drift %}
+        {% for m in model_drift.metrics %}
+            {% if m.status in ['WARNING', 'CRITICAL'] %}
+                {% if m.status not in critical_flags %}{% do critical_flags.append(m.status) %}{% endif %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    {% if stress_tests %}
+        {% for s in stress_tests.scenarios %}
+            {% if s.outcome == 'FAIL' %}
+                {% if 'FAIL' not in critical_flags %}{% do critical_flags.append('FAIL') %}{% endif %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    {% if calibration_analysis %}
+        {% if calibration_analysis.status in ['WARNING', 'CRITICAL'] %}
+            {% if calibration_analysis.status not in critical_flags %}{% do critical_flags.append(calibration_analysis.status) %}{% endif %}
+        {% endif %}
+    {% endif %}
+
+    {% if critical_flags %}
+    <div class="insight-box" style="background-color: #fff5f5; border: 1px solid #feb2b2; color: #9b2c2c; margin-bottom: 2rem; border-left: 6px solid var(--danger);">
+        <strong style="font-size: 1.2rem;">⚠️ Critical Research Warnings</strong>
+        <p style="margin-top: 0.5rem; margin-bottom: 0;">
+            This report contains indicators that require immediate attention:
+            <strong>{{ critical_flags|join(', ') }}</strong>.
+            Review the Model Drift and Stress Test sections for details.
+        </p>
+    </div>
+    {% endif %}
 
     <div class="kpi-dashboard">
         {% if stress_tests %}
@@ -454,9 +486,11 @@
                 <th scope="col">Return</th>
                 <th scope="col">Sharpe</th>
                 <th scope="col">MaxDD</th>
+                <th scope="col">CVaR</th>
                 <th scope="col">PF</th>
                 <th scope="col">SQN</th>
                 <th scope="col">Recovery</th>
+                <th scope="col">Calmar</th>
                 <th scope="col">P-Value</th>
             </tr>
         </thead>
@@ -467,9 +501,11 @@
                 <td>{{ b.total_return }}</td>
                 <td>{{ b.sharpe }}</td>
                 <td>{{ b.max_drawdown }}</td>
+                <td>{{ b.expected_shortfall }}</td>
                 <td>{{ b.profit_factor }}</td>
                 <td>{{ b.sqn }}</td>
                 <td>{{ b.recovery_factor }}</td>
+                <td>{{ b.calmar_ratio }}</td>
                 <td>{{ b.p_value }}</td>
             </tr>
             {% endfor %}
@@ -490,12 +526,13 @@
                     <th scope="col">Agent</th>
                     <th scope="col">Sharpe</th>
                     <th scope="col">Sortino</th>
-                    <th scope="col">Profit Factor</th>
+                    <th scope="col">PF</th>
                     <th scope="col">MaxDD</th>
-                    <th scope="col">Recovery</th>
-                    <th scope="col">VaR(95%)</th>
-                    <th scope="col">Tail Ratio</th>
-                    <th scope="col">CSR</th>
+                    <th scope="col">Recov</th>
+                    <th scope="col">VaR(95)</th>
+                    <th scope="col">Tail</th>
+                    <th scope="col">Lake</th>
+                    <th scope="col">SQN</th>
                 </tr>
             </thead>
             <tbody>
@@ -509,7 +546,8 @@
                     <td>{{ m.recovery_factor|round(2) }}</td>
                     <td>{{ (m.var_95 * 100)|round(2) }}%</td>
                     <td>{{ m.tail_ratio|round(2) }}</td>
-                    <td>{{ m.common_sense_ratio|round(2) }}</td>
+                    <td>{{ m.lake_ratio|round(2) }}</td>
+                    <td>{{ m.sqn|round(2) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
