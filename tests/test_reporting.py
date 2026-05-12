@@ -253,6 +253,26 @@ def test_html_accessibility_hardening(sample_report):
     assert '.print-btn' in html
     assert 'window[\'print\']()' in html
 
+def test_critical_warnings_panel():
+    """Verify that the critical warnings panel appears when there are issues."""
+    from src.research.reporting import DriftMetric, ModelDriftSection
+
+    report = ResearchReport(
+        title="Warning Test",
+        executive_summary="Summary",
+        model_drift=ModelDriftSection(
+            metrics=[DriftMetric(name="Test", baseline="1", current="2", drift_pct=100.0, status="CRITICAL")],
+            feature_shifts="None"
+        ),
+        conclusion="Conclusion"
+    )
+
+    reporter = ResearchReporter()
+    html = reporter.generate_html(report)
+
+    assert "Critical Research Warnings" in html
+    assert "CRITICAL" in html
+
 def test_trade_pattern_motifs():
     trade_section = TradePatternSection(
         primary_insight="Insight",
