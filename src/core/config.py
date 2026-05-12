@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -276,6 +276,18 @@ class TradingConfig(BaseSettings):
     @property
     def logs_dir(self) -> Path:
         return ROOT / "logs"
+
+    def get_sanitized_dump(self) -> dict[str, Any]:
+        """
+        Return a sanitized dictionary representation of the configuration.
+        Automatically redacts all fields annotated as SecretStr or SecretBytes.
+        """
+        # Dynamic identification of secret fields using Pydantic metadata
+        secret_fields = {
+            name for name, field in self.__class__.model_fields.items()
+            if "Secret" in str(field.annotation)
+        }
+        return self.model_dump(mode="json", exclude=secret_fields)
 
 
 @lru_cache(maxsize=1)

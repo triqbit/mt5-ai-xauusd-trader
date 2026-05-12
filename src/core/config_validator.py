@@ -751,6 +751,9 @@ class ConfigValidator:
             Path(".env"),
             Path("trades.db"),
             Path("audit.db"),
+            self.config.data_dir,
+            self.config.logs_dir,
+            self.config.model_path,
             self.config.model_config.get("env_file"),
         ]
 
@@ -763,12 +766,14 @@ class ConfigValidator:
                 # Check if group or others have any permissions (0o077 mask)
                 if mode & (stat.S_IRWXG | stat.S_IRWXO):
                     current_mode = oct(stat.S_IMODE(mode))
+                    # Elevate to CRITICAL in live mode to prevent trading with insecure credentials or logs
+                    is_critical = self.config.mode == "live"
                     self.errors.append(
                         ValidationError(
                             "FILE_PERMISSION",
                             f"Insecure permissions for {path.name}: {current_mode}",
-                            False,  # Warning for now to avoid breaking existing setups
-                            f"Run 'chmod 600 {path.name}' to restrict access.",
+                            is_critical,
+                            f"Run 'chmod 600 {path.name}' (or 700 for dirs) to restrict access.",
                         )
                     )
             except Exception:

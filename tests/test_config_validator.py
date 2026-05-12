@@ -129,6 +129,8 @@ def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     """Test validator succeeds in LIVE mode with confirmation."""
     model_file = tmp_path / "model.pt"
     model_file.write_text("data")
+    import os
+    os.chmod(model_file, 0o600)
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker-Live")
@@ -402,6 +404,8 @@ def test_validator_live_debug_warning(monkeypatch, tmp_path):
     # Ensure model path exists to avoid other errors
     model_file = tmp_path / "model.pt"
     model_file.write_text("data")
+    import os
+    os.chmod(model_file, 0o600)
 
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
@@ -593,6 +597,8 @@ def test_validator_sqlite_live_warning(monkeypatch, tmp_path):
     """Test validator gives warning for SQLite in LIVE mode."""
     model_file = tmp_path / "model.pt"
     model_file.write_text("data")
+    import os
+    os.chmod(model_file, 0o600)
     monkeypatch.setenv("MT5_LOGIN", "12345")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")

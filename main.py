@@ -203,16 +203,8 @@ def run_live(
 
         # 0. Periodic Audit of Configuration State
         if loop_count % 100 == 0 and audit_logger:
-            # Dynamic exclusion of all SecretStr/SecretBytes fields
-            secret_fields = {
-                f for f, info in cfg.__class__.model_fields.items()
-                if "Secret" in str(info.annotation)
-            }
             audit_logger.log_config_snapshot(
-                cfg.model_dump(
-                    mode="json",
-                    exclude=secret_fields,
-                ),
+                cfg.get_sanitized_dump(),
                 reason=f"periodic_check_loop_{loop_count}",
             )
         loop_count += 1
@@ -880,7 +872,14 @@ def main() -> int:
                     import shutil
 
                     shutil.copy(".env.example", ".env")
-                    print("✅ Created .env from template. Please edit it with your credentials.\n")
+                    # Immediately restrict permissions to owner-only for security
+                    try:
+                        os.chmod(".env", 0o600)
+                        print("✅ Created .env from template with secure permissions (0600).")
+                        print("   Please edit it with your credentials.\n")
+                    except Exception:
+                        print("✅ Created .env from template. [!] Failed to set restrictive permissions.")
+                        print("   Please run 'chmod 600 .env' manually and edit it with your credentials.\n")
             except (KeyboardInterrupt, EOFError):
                 print("\nSetup skipped.")
 
@@ -998,17 +997,8 @@ def main() -> int:
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="white")
 
-        # Dynamic exclusion of all SecretStr/SecretBytes fields
-        secret_fields = {
-            f for f, info in cfg.__class__.model_fields.items()
-            if "Secret" in str(info.annotation)
-        }
-
-        # Get sanitized dump
-        sanitized_cfg = cfg.model_dump(
-            mode="json",
-            exclude=secret_fields,
-        )
+        # Get sanitized dump using the centralized method
+        sanitized_cfg = cfg.get_sanitized_dump()
 
         for key, value in sorted(sanitized_cfg.items()):
             config_table.add_row(key, str(value))
@@ -1124,19 +1114,8 @@ def main() -> int:
     audit_db_url = database_url if "sqlite" in database_url else "sqlite:///audit.db"
     audit_logger = AuditLogger(db_url=audit_db_url)
 
-    # Dynamic exclusion of all SecretStr/SecretBytes fields for audit snapshot
-    secret_fields = {
-        f for f, info in cfg.__class__.model_fields.items()
-        if "Secret" in str(info.annotation)
-    }
-
-    # Log sanitized configuration snapshot
-    audit_logger.log_config_snapshot(
-        cfg.model_dump(
-            mode="json",
-            exclude=secret_fields,
-        )
-    )
+    # Log sanitized configuration snapshot using centralized redaction
+    audit_logger.log_config_snapshot(cfg.get_sanitized_dump())
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
     from src.core.exceptions import MT5ConnectionError
