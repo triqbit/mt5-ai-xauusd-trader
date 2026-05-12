@@ -4,6 +4,8 @@ src/core/resilience.py
 Robust Circuit Breaker pattern for graceful failure and self-healing.
 """
 
+from __future__ import annotations
+
 import functools
 import time
 from enum import Enum
@@ -38,15 +40,20 @@ class CircuitBreaker:
         failure_threshold: int = 5,
         recovery_timeout: float = 60.0,
         expected_exceptions: Optional[tuple[Type[Exception], ...]] = None,
+        monitor: Any | None = None,
     ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.expected_exceptions = expected_exceptions or (Exception,)
+        self.monitor = monitor
 
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._last_failure_time: Optional[float] = None
+
+        # Initialize metric
+        self._update_metrics()
 
     @property
     def state(self) -> CircuitState:
@@ -64,7 +71,16 @@ class CircuitBreaker:
                 reason="recovery_timeout_reached",
             )
             self._state = CircuitState.HALF_OPEN
+            self._update_metrics()
         return self._state
+
+    def _update_metrics(self) -> None:
+        """Update Prometheus gauge via monitor if available."""
+        if self.monitor:
+            try:
+                self.monitor.update_circuit_breaker(self.name, self._state.value)
+            except Exception as e:
+                logger.debug("failed_to_update_circuit_breaker_metrics", error=str(e))
 
     def _handle_success(self) -> None:
         """Reset the breaker on success."""
@@ -76,6 +92,9 @@ class CircuitBreaker:
                 to_state=CircuitState.CLOSED.value,
                 reason="test_success",
             )
+            self._state = CircuitState.CLOSED
+            self._update_metrics()
+
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._last_failure_time = None
@@ -94,6 +113,9 @@ class CircuitBreaker:
                     failure_count=self._failure_count,
                     error=str(exception),
                 )
+                self._state = CircuitState.OPEN
+                self._update_metrics()
+
             self._state = CircuitState.OPEN
 
     def __call__(self, func: Callable):

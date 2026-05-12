@@ -90,14 +90,16 @@ class MT5Connector:
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
     """
 
-    def __init__(self, config: TradingConfig) -> None:
+    def __init__(self, config: TradingConfig, monitor: Any | None = None) -> None:
         """
         Initialize the connector with configuration.
 
         Args:
             config: TradingConfig object containing credentials and settings.
+            monitor: Optional monitor instance for metrics.
         """
         self.cfg = config
+        self.monitor = monitor
         self.use_metaapi: bool = False
         self.metaapi: Any | None = None
         self.metaapi_account: Any | None = None
@@ -111,6 +113,7 @@ class MT5Connector:
             failure_threshold=5,
             recovery_timeout=60.0,
             expected_exceptions=(MT5ConnectionError, MT5DataError),
+            monitor=self.monitor,
         )
 
     @property
@@ -143,7 +146,23 @@ class MT5Connector:
             CircuitBreakerError: If the circuit is OPEN.
         """
         # Circuit Breaker check
-        return self.breaker(self._initialize_logic)()
+        result = self.breaker(self._initialize_logic)()
+        self._update_terminal_metrics()
+        return result
+
+    def _update_terminal_metrics(self) -> None:
+        """Fetch terminal status and update Prometheus metrics via monitor."""
+        if not self.monitor:
+            return
+
+        try:
+            status = self.get_terminal_status()
+            algo_enabled = status.get("algo_trading", False)
+            # If we reached here, we are at least partially connected or circuit is closed
+            self.monitor.update_terminal_status(connected=self._is_initialized, algo_enabled=algo_enabled)
+        except Exception as e:
+            logger.debug("failed_to_update_terminal_metrics", error=str(e))
+            self.monitor.update_terminal_status(connected=self._is_initialized, algo_enabled=False)
 
     def _initialize_logic(self) -> bool:
         """Internal initialization logic wrapped by circuit breaker."""
@@ -296,7 +315,9 @@ class MT5Connector:
         Returns:
             pd.DataFrame: OHLCV data.
         """
-        return self.breaker(self._get_rates_logic)(symbol, timeframe, n_bars)
+        result = self.breaker(self._get_rates_logic)(symbol, timeframe, n_bars)
+        self._update_terminal_metrics()
+        return result
 
     def _get_rates_logic(self, symbol: str, timeframe: str, n_bars: int) -> pd.DataFrame:
         """Internal data retrieval logic wrapped by circuit breaker."""
@@ -627,7 +648,9 @@ class MT5Connector:
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieve account information."""
-        return self.breaker(self._get_account_info_logic)()
+        result = self.breaker(self._get_account_info_logic)()
+        self._update_terminal_metrics()
+        return result
 
     def _get_account_info_logic(self) -> Dict[str, Any]:
         """Internal account information retrieval logic."""

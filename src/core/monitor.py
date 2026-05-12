@@ -38,6 +38,13 @@ WIN_RATE_GAUGE = Gauge("trading_win_rate", "Trading win rate percentage")
 AVG_TRADE_DURATION_GAUGE = Gauge(
     "trading_avg_trade_duration_seconds", "Mean trade holding time in seconds"
 )
+MT5_CONNECTED_GAUGE = Gauge("trading_mt5_connected", "MT5 terminal connection status (1=Connected, 0=Disconnected)")
+MT5_ALGO_ENABLED_GAUGE = Gauge("trading_mt5_algo_enabled", "MT5 Algo Trading status (1=Enabled, 0=Disabled)")
+CIRCUIT_BREAKER_STATE_GAUGE = Gauge(
+    "trading_circuit_breaker_state",
+    "Status of internal circuit breakers (0=CLOSED, 1=HALF_OPEN, 2=OPEN)",
+    ["name"]
+)
 
 # 2. Execution Metrics
 EXECUTION_LATENCY_HISTOGRAM = Histogram(
@@ -304,6 +311,26 @@ class Monitor:
         msg = "✅ INFO: Broker Connection Restored."
         self.send_message(msg)
         logger.info("broker_connection_restored_alert")
+
+    def update_terminal_status(self, connected: bool, algo_enabled: bool) -> None:
+        """Update MT5 terminal connectivity and algo trading status metrics."""
+        MT5_CONNECTED_GAUGE.set(1.0 if connected else 0.0)
+        MT5_ALGO_ENABLED_GAUGE.set(1.0 if algo_enabled else 0.0)
+        logger.debug(
+            "terminal_status_updated",
+            connected=connected,
+            algo_enabled=algo_enabled,
+        )
+
+    def update_circuit_breaker(self, name: str, state: str) -> None:
+        """
+        Update the status of a specific circuit breaker.
+        States: CLOSED (0), HALF_OPEN (1), OPEN (2)
+        """
+        state_map = {"CLOSED": 0.0, "HALF_OPEN": 1.0, "OPEN": 2.0}
+        val = state_map.get(state.upper(), 2.0)  # Default to OPEN if unknown
+        CIRCUIT_BREAKER_STATE_GAUGE.labels(name=name).set(val)
+        logger.debug("circuit_breaker_metric_updated", name=name, state=state, value=val)
 
     def log_execution_quality(
         self, latency_ms: float, slippage_pips: float, fill_rate: float
