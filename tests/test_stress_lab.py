@@ -185,6 +185,53 @@ def test_slippage_spike_logic(sample_data):
     assert metrics.max_slippage_experienced == 105.0
 
 
+def test_spread_spike_logic(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # 1. Normal run
+    normal_scenario = StressScenario(name="Normal", description="test", spread_multiplier=1.0)
+    normal_metrics = lab.run_scenario(normal_scenario)
+
+    # 2. Spread spike run
+    spike_scenario = StressScenario(
+        name="Spike",
+        description="Testing spread spikes",
+        spread_multiplier=1.0,
+        spread_spike_prob=1.0,  # Force spike every step
+        spread_spike_magnitude=10.0,
+    )
+    spike_metrics = lab.run_scenario(spike_scenario)
+
+    if normal_metrics.num_trades > 0:
+        assert spike_metrics.total_return < normal_metrics.total_return
+
+
+def test_execution_delay_jitter(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # Fixed delay
+    fixed_scenario = StressScenario(
+        name="Fixed", description="test", execution_delay_steps=5, seed=42
+    )
+    fixed_metrics = lab.run_scenario(fixed_scenario)
+
+    # Jittered delay
+    jitter_scenario = StressScenario(
+        name="Jitter",
+        description="test",
+        execution_delay_steps=5,
+        execution_delay_jitter=2,
+        seed=42,
+    )
+    jitter_metrics = lab.run_scenario(jitter_scenario)
+
+    # They should differ if trades were made
+    if fixed_metrics.num_trades > 0:
+        assert fixed_metrics.total_return != jitter_metrics.total_return
+
+
 def test_factory_methods():
     hell = StressLab.create_execution_hell_scenario()
     assert hell.name == "Execution Hell"
@@ -252,7 +299,7 @@ def test_backtest_pnl_accuracy(sample_data):
         name="Fixed Cost",
         description="test",
         spread_multiplier=1.0,
-        slippage_bps=10.0 # 0.1%
+        slippage_bps=10.0,  # 0.1%
     )
 
     # We want to manually trace one trade if possible
@@ -314,7 +361,7 @@ def test_stale_data_simulation(sample_data):
     scenario = StressScenario(
         name="Stale",
         description="High stale data probability",
-        stale_data_prob=1.0 # Force stale data for all steps after first
+        stale_data_prob=1.0,  # Force stale data for all steps after first
     )
 
     perturbed = lab._apply_perturbations(sample_data, scenario)
@@ -362,7 +409,7 @@ def test_report_decay_metrics_negative_baseline(sample_data):
         num_trades=10,
         execution_quality_score=1.0,
         latency_impact=0.0,
-        sortino_ratio=-1.2
+        sortino_ratio=-1.2,
     )
 
     # Mock a result that is even worse
@@ -374,7 +421,7 @@ def test_report_decay_metrics_negative_baseline(sample_data):
         num_trades=10,
         execution_quality_score=1.0,
         latency_impact=0.0,
-        sortino_ratio=-2.4
+        sortino_ratio=-2.4,
     )
 
     report = lab.generate_report(baseline)
@@ -398,7 +445,7 @@ def test_report_decay_metrics_positive_baseline(sample_data):
         num_trades=10,
         execution_quality_score=1.0,
         latency_impact=0.0,
-        sortino_ratio=2.5
+        sortino_ratio=2.5,
     )
 
     # Run a scenario that degrades performance
@@ -441,7 +488,9 @@ def test_fragility_detection_negative_edge(sample_data):
     )
 
     report = lab.generate_report(baseline)
-    assert any("Negative edge (PF < 1.0) in NegativeEdge" in fi for fi in report.fragility_indicators)
+    assert any(
+        "Negative edge (PF < 1.0) in NegativeEdge" in fi for fi in report.fragility_indicators
+    )
 
 
 def test_fragility_detection_overtrading(sample_data):
