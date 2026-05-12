@@ -6,25 +6,27 @@ Automated institutional-grade research report generation demonstration.
 
 import os
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.research.reporting import ResearchOrchestrator, ResearchReporter, RareEventSection
-from src.models.regime_detector import RegimeDetector
-from src.research.stress_lab import StressLab, StressTestMetrics
-from src.research.benchmarks import EMACrossoverStrategy
-from src.research.hyperopt_walkforward import WalkForwardOptimizer, WalkForwardConfig
-from src.analytics.journal_mining import JournalMiner
 from src.analytics.drift_analyzer import DriftAnalyzer
 from src.analytics.execution_quality import ExecutionAnalyzer
+from src.analytics.journal_mining import JournalMiner
+from src.core.trade_logger import TradeLogger
+from src.models.regime_detector import RegimeDetector
+from src.research.benchmarks import EMACrossoverStrategy
+from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
+from src.research.rare_event_simulator import RareEventConfig, RareEventSimulator, RareEventType
+from src.research.reporting import RareEventSection, ResearchOrchestrator, ResearchReporter
+from src.research.stress_lab import StressLab, StressTestMetrics
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.research.rare_event_simulator import RareEventSimulator, RareEventConfig, RareEventType
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade, RiskEvent
+
 
 def generate_synthetic_data(n=1000):
     """Generate professional synthetic XAUUSD data."""
@@ -70,7 +72,7 @@ def setup_mock_journal_db(db_url="sqlite:///mock_trades.db"):
         logger.update_trade(ticket=1000 + i, exit_price=2300.0 + i + (pnl/100), pnl=pnl)
 
     # Add risk events for blocked signal analysis
-    for i in range(3):
+    for _ in range(3):
         sig_id = logger.log_signal({
             "symbol": "XAUUSD",
             "direction": 1,
@@ -164,8 +166,12 @@ def main():
     # 8. Rare Event Simulations
     print("☄️  Simulating Rare Events...")
     simulator = RareEventSimulator(seed=123)
-    flash_crash_df, flash_crash_res = simulator.generate_scenario(RareEventConfig(event_type=RareEventType.FLASH_CRASH))
-    vacuum_df, vacuum_res = simulator.generate_scenario(RareEventConfig(event_type=RareEventType.LIQUIDITY_VACUUM))
+    _, flash_crash_res = simulator.generate_scenario(
+        RareEventConfig(event_type=RareEventType.FLASH_CRASH)
+    )
+    _, vacuum_res = simulator.generate_scenario(
+        RareEventConfig(event_type=RareEventType.LIQUIDITY_VACUUM)
+    )
 
     rare_event_section = RareEventSection(
         scenarios=[flash_crash_res.to_report_summary(), vacuum_res.to_report_summary()],
@@ -209,7 +215,7 @@ def main():
     reporter.save_markdown(report, md_path)
     reporter.save_html(report, html_path)
 
-    print(f"\n✅ Report generated successfully!")
+    print("\n✅ Report generated successfully!")
     print(f"   - Markdown: {os.path.abspath(md_path)}")
     print(f"   - HTML:     {os.path.abspath(html_path)}")
 

@@ -4,17 +4,16 @@ Focuses on edge cases, missing data, and malformed inputs.
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
-import numpy as np
 
 from src.analytics.execution_quality import (
     ExecutionAnalyzer,
-    TradeExecutionQuality,
 )
-from src.core.trade_logger import ModelSignal, Trade, ExecutionQuality, RiskEvent
+from src.core.trade_logger import ModelSignal, Trade
+
 
 @pytest.fixture
 def mock_connector():
