@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from src.core.decision_support import DecisionSupportSystem
     from src.core.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
-    from src.core.schemas import TradeSignal
+    from src.core.schemas import RiskDecision, TradeSignal
     from src.core.trade_logger import TradeLogger
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
@@ -399,11 +399,20 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    # Fetch current positions for risk validation context
+                    current_positions = connector.get_positions(cfg.symbol)
+
+                    risk_decision = None
+                    risk_approved = False
+                    if direction != 0:
+                        risk_decision = risk.approve(
+                            signal,
+                            market_data=df_raw,
+                            open_positions=current_positions,
+                            signal_id=signal_id,
+                            model_health=health,
+                        )
+                        risk_approved = risk_decision.is_approved
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -447,14 +456,16 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": [k for k, v in risk_decision.trace.items() if not v]
+                            if risk_decision
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason
+                            if risk_decision and not risk_approved
+                            else "Passed all risk gates",
                         }
 
                         regime_data = {
@@ -578,7 +589,7 @@ def run_live(
                                 )
                 # 6. Check for closed positions to update logger
                 with profile("closed_positions_check"):
-                    current_positions = connector.get_positions(cfg.symbol)
+                    # current_positions fetched earlier during risk check
                     current_tickets = {p["ticket"] for p in current_positions}
 
                     closed_tickets = []

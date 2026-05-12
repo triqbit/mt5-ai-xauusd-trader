@@ -8,9 +8,9 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-perfo
 
 | Category | Maturity | Gaps & Observations |
 | :--- | :--- | :--- |
-| **Product Capability** | 🟢 8.2/10 | **Status:** 11-layer `ExecutionFilter` and `AuditedRiskManager` are fully integrated into the live loop. **Gap:** Real-time feedback loop for slippage-based execution adjustment is missing. |
-| **Usability** | 🟢 7.5/10 | **Status:** Decision Cockpit TUI is institutional-grade. **Gap:** Remote management and human-in-the-loop signal approval (Telegram) are not yet active. |
-| **Safety** | 🟢 8.5/10 | **Status:** 8-layer risk cascade and capital allocation are structurally enforced. **Gap:** "Flatten & Fence" (Emergency Kill Switch) remains a verified stub in the Makefile. |
+| **Product Capability** | 🟢 8.2/10 | **Status:** 11-layer `ExecutionFilter` and harmonized `AuditedRiskManager` are fully integrated. **Gap:** Real-time feedback loop for slippage-based execution adjustment is missing. |
+| **Usability** | 🟢 7.5/10 | **Status:** Decision Cockpit TUI is institutional-grade with structured risk rejection reasons. **Gap:** Remote management and human-in-the-loop signal approval (Telegram) are not yet active. |
+| **Safety** | 🟢 8.5/10 | **Status:** 8-layer risk cascade and capital allocation are structurally enforced via a unified `RiskDecision` interface. **Gap:** "Flatten & Fence" (Emergency Kill Switch) remains a verified stub in the Makefile. |
 | **Intelligence** | 🟢 7.0/10 | **Status:** Regime stability scoring and feature engineering (140+) are live. **Gap:** live trading loop still relies on stubs for real-time Macro Risk (FRED/YFinance). |
 | **Market Differentiation** | 🟢 8.5/10 | **Status:** "Glass Box" transparency and auditability are repo-wide standards. **Gap:** Specialized gold-specific macro overlays (Real Yields/DXY) are not yet active. |
 

@@ -18,13 +18,13 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import DailyStats, RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
@@ -40,17 +40,6 @@ ALLOCATION_WEIGHTS: Dict[str, float] = {
     "USDJPY": 0.08,  # JPY - carry trade
     "EURJPY": 0.07,  # EUR/JPY cross
 }
-
-
-@dataclass
-class DailyStats:
-    """Intraday PnL tracker reset each trading day."""
-
-    date: date = field(default_factory=date.today)
-    realised_pnl: float = 0.0
-    trade_count: int = 0
-    peak_equity: float = 0.0
-    consecutive_losses: int = 0
 
 
 class RiskManager:
@@ -79,35 +68,37 @@ class RiskManager:
     def approve(
         self,
         signal: TradeSignal,
+        market_data: pd.DataFrame,
+        open_positions: List[Dict[str, Any]],
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision object with audit trace.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
-        elif not self._check_consecutive_losses():
-            rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
-            rejection_reason = "Model health metrics below threshold"
+        trace = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": len(open_positions) < self.cfg.max_positions,
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+            "consecutive_losses": self._check_consecutive_losses(),
+            "model_health": self._check_model_health(model_health),
+        }
 
-        passed = rejection_reason == ""
+        # Additional checks from harmonized logic
+        if trace["max_positions"] and len(open_positions) >= self.cfg.max_positions:
+            trace["max_positions"] = False
+
+        passed = all(trace.values())
+        rejection_reason = ""
         if not passed:
+            rejection_reasons = [k for k, v in trace.items() if not v]
+            rejection_reason = f"Failed filters: {', '.join(rejection_reasons)}"
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
+                "Signal REJECTED | %s %s | %s",
                 signal.symbol,
                 signal.direction,
                 rejection_reason,
@@ -119,7 +110,19 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+
+        # Calculate lot size if approved
+        adjusted_lots = 0.0
+        if passed:
+            # For simplicity, using the signal's lot size but we could use sizing logic here
+            adjusted_lots = signal.lot_size
+
+        return RiskDecision(
+            is_approved=passed,
+            reason=rejection_reason,
+            adjusted_lot_size=adjusted_lots,
+            trace=trace,
+        )
 
     def size_position(
         self,
