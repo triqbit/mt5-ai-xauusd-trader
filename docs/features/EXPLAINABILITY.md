@@ -18,22 +18,24 @@ Provides a weighted breakdown of contributions from the ensemble's constituent m
 - **Confidence**: Model-specific certainty scores.
 - **Weight**: Current importance of the model in the ensemble.
 - **Dominance**: Identifies the primary driver of the final decision.
+- **Dominance Ratio**: Quantifies the relative influence of each model within the ensemble decision (e.g., "PPO provided 75% of the total weighted conviction").
 
 ### 3. Feature Contributions
-Attributes decisions to specific feature clusters and identifies confluence between supporting and opposing factors.
+Attributes decisions to specific feature clusters and identifies strategic confluence between technical setups and market regimes.
 - **Trend Cluster**: Contribution from moving averages (EMA), ADX, and Hilbert Transform (`ht_`) trendlines.
 - **Momentum Cluster**: Impact of RSI, MFI, MACD, Stochastic, and price velocity indicators (returns, log returns, and distance from moving averages).
 - **Volatility Cluster**: Impact of ATR, Bollinger Band width, Keltner Channels, and price action range features (`body_size`, `day_range`).
 - **Volume Cluster**: Influence of relative volume (`rvol`), OBV, VWAP distance, and volume profile proxies.
 - **Pattern Cluster**: Contribution from candle pattern recognition (e.g., Hammer, Engulfing).
 
-**Confluence Logic**: The system automatically categorizes feature impacts as either "Supported by" (aligning with the signal direction) or "Opposed by" (conflicting with the signal direction) in the natural language summary. This provides immediate clarity on decision tension.
+**Strategic Confluence**: The system automatically maps technical driver clusters against regime-specific strategic reasoning (e.g., momentum velocity in trending regimes). It categorizes feature impacts as "Strategic Confluence: High alignment from" or "Opposed by", providing immediate clarity on decision tension and strategic rationale.
 
 ### 4. Market Regime Context
 Provides the environmental background for the signal.
 - **Detected Regime**: (e.g., Trending, Ranging, News Shock).
 - **Regime Confidence**: Reliability of the regime classification.
 - **Favorable Check**: Explicitly flags whether the strategy is optimized for the current state (e.g., "Market state is considered favorable" vs "Market state is UNFAVORABLE/CAUTIONARY").
+- **Regime Alignment Score**: A quantitative measure (0.0 to 1.0) of strategy suitability for the detected market state.
 
 ### 5. Risk Assessment
 The final gate where signals are validated against institutional risk constraints.
@@ -100,6 +102,8 @@ The `machine_attribution` field provides high-fidelity metrics for post-trade an
 - **`risk_reward_ratio`**: The realized R:R for the trade.
 - **`risk_rejection_reasons`**: Structured list of reasons if a signal was blocked by the risk engine.
 - **`failed_execution_filters`**: Identification of specific execution gates (e.g., Spread, Timing) that prevented a trade.
+- **`regime_alignment_score`**: Quantified suitability of the market environment.
+- **`model_dominance_ratios`**: Per-model influence metrics for ensemble attribution.
 - **`feature_impacts`**: Aggregated cluster-level scores for automated alpha decay analysis.
 
 ## Institutional Analysis

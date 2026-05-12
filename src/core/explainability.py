@@ -84,6 +84,9 @@ class ModelAttribution(BaseModel):
         ..., ge=0.0, le=1.0, description="Weight of this model in the ensemble (0.0 to 1.0)."
     )
     is_dominant: bool = Field(False, description="Whether this model drove the final decision")
+    dominance_ratio: float = Field(
+        0.0, ge=0.0, le=1.0, description="Relative influence of this model in the decision."
+    )
 
 
 class RiskAssessment(BaseModel):
@@ -130,6 +133,9 @@ class RegimeContext(BaseModel):
         "Normal", description="Current volatility level (Low, Normal, High, Extreme)"
     )
     is_favorable: bool = Field(True, description="Whether the regime is favorable for the strategy")
+    regime_alignment_score: float = Field(
+        0.0, ge=0.0, le=1.0, description="Quantitative strategy suitability for this regime."
+    )
     summary: str = Field(
         "Market state stable", description="Contextual summary of the market state"
     )
@@ -376,6 +382,10 @@ class SignalExplainer:
         max_weighted_conf = -1.0
         model_confidences = model_confidences or {}
 
+        # First pass: Calculate weighted confidences and identify dominance
+        total_weighted_conf = 0.0
+        temp_attributions = []
+
         for name, vote_idx in model_votes.items():
             try:
                 vote_dir = ModelAction(int(vote_idx)).to_direction()
@@ -386,15 +396,12 @@ class SignalExplainer:
                 vote_dir = SignalDirection.HOLD
 
             weight = model_weights.get(name, 0.0)
-
-            # Individual model confidence: use provided value, or fallback to ensemble
-            # confidence (if aligned) or neutral 0.5 (if not aligned).
             model_conf = model_confidences.get(name)
             if model_conf is None:
                 model_conf = confidence if vote_dir.value == direction else 0.5
 
-            # Only models aligned with the final direction can be dominant
             weighted_conf = weight * model_conf if vote_dir.value == direction else 0.0
+            total_weighted_conf += weighted_conf
 
             if weighted_conf > max_weighted_conf:
                 max_weighted_conf = weighted_conf
@@ -402,22 +409,32 @@ class SignalExplainer:
             elif abs(weighted_conf - max_weighted_conf) < 1e-6 and max_weighted_conf > 0:
                 dominant_models.append(name)
 
-            attributions.append(
-                {
-                    "model_name": name,
-                    "vote": vote_dir,
-                    "confidence": model_conf,
-                    "weight": weight,
-                    "is_dominant": False,  # Set in second pass
-                }
-            )
+            temp_attributions.append({
+                "model_name": name,
+                "vote": vote_dir,
+                "confidence": model_conf,
+                "weight": weight,
+                "weighted_conf": weighted_conf,
+            })
 
-        # Finalize dominant models and convert to objects
+        # Second pass: Calculate dominance ratio and finalize attribution objects
         final_attributions = []
-        for attr_dict in attributions:
-            if attr_dict["model_name"] in dominant_models:
-                attr_dict["is_dominant"] = True
-            final_attributions.append(ModelAttribution(**attr_dict))
+        for attr_dict in temp_attributions:
+            dom_ratio = (
+                attr_dict["weighted_conf"] / total_weighted_conf
+                if total_weighted_conf > 0
+                else 0.0
+            )
+            final_attributions.append(
+                ModelAttribution(
+                    model_name=attr_dict["model_name"],
+                    vote=attr_dict["vote"],
+                    confidence=attr_dict["confidence"],
+                    weight=attr_dict["weight"],
+                    is_dominant=attr_dict["model_name"] in dominant_models,
+                    dominance_ratio=dom_ratio,
+                )
+            )
 
         # 3. Risk Assessment
         risk_assessment = RiskAssessment(
@@ -437,14 +454,18 @@ class SignalExplainer:
                 confidence=0.0,
                 volatility_state="Normal",
                 is_favorable=True,
+                regime_alignment_score=0.5,
                 summary="No market regime context available.",
             )
         elif hasattr(regime_info, "label"):  # RegimeInfo pydantic model
+            label_val = str(regime_info.label.value).lower()
+            alignment = regime_info.confidence if regime_info.confidence > 0.6 else 0.4
             regime_context = RegimeContext(
                 regime_name=str(regime_info.label.value).title(),
                 confidence=regime_info.confidence,
                 volatility_state="High" if regime_info.volatility_index > 1.5 else "Normal",
                 is_favorable=regime_info.confidence > 0.6,
+                regime_alignment_score=alignment,
                 summary=f"Market in {regime_info.label.value} state with {regime_info.confidence:.1%} confidence.",
             )
         elif isinstance(regime_info, dict):
@@ -453,6 +474,7 @@ class SignalExplainer:
                 confidence=regime_info.get("confidence", 0.0),
                 volatility_state=regime_info.get("volatility", "Normal"),
                 is_favorable=regime_info.get("is_favorable", True),
+                regime_alignment_score=regime_info.get("alignment_score", 0.5),
                 summary=regime_info.get("summary", "Market state stable"),
             )
         else:
@@ -511,15 +533,27 @@ class SignalExplainer:
                     )
                 )
 
-        # 6. Generate Human Readable Summary with Confluence Logic
+        # 6. Generate Human Readable Summary with Strategic Reasoning
         dir_str = SignalDirection(direction).name
         reasoning = f"Ensemble generated a {dir_str} signal with {confidence:.1%} confidence. "
         if dominant_models:
             reasoning += f"Primary driver(s): {', '.join(dominant_models)}. "
 
-        reasoning += f"Market is currently in a {regime_context.regime_name} regime. "
+        # Strategic Context Mapping
+        regime_lower = regime_context.regime_name.lower()
+        strategic_edge = ""
+        if "trending" in regime_lower:
+            strategic_edge = "Trending regimes provide high-velocity environments for our momentum models."
+        elif "ranging" in regime_lower:
+            strategic_edge = "Mean-reversion setups are prioritized in ranging regimes to capture cyclical price action."
+        elif "volatile" in regime_lower:
+            strategic_edge = "Elevated volatility requires tighter execution gates and confluence between technical clusters."
+        else:
+            strategic_edge = "Market state stable, following base ensemble consensus."
+
+        reasoning += f"Market is currently in a {regime_context.regime_name} regime. {strategic_edge} "
         if regime_context.is_favorable:
-            reasoning += "Market state is considered favorable for this strategy. "
+            reasoning += "Market state is considered favorable for this strategy setup. "
         else:
             reasoning += "Market state is UNFAVORABLE/CAUTIONARY for this strategy. "
 
@@ -527,9 +561,6 @@ class SignalExplainer:
         supporting = []
         opposing = []
         for c in contributions:
-            # BUY (1) and score > 0 -> Supporting
-            # SELL (-1) and score < 0 -> Supporting
-            # Score 0 -> Neutral (Ignore)
             if c.contribution_score == 0:
                 continue
 
@@ -544,7 +575,7 @@ class SignalExplainer:
                 opposing.append(entry)
 
         if supporting:
-            reasoning += f"Supported by: {', '.join(supporting)}. "
+            reasoning += f"Strategic Confluence: High alignment from {', '.join(supporting)}. "
         if opposing:
             reasoning += f"Opposed by: {', '.join(opposing)}. "
 
@@ -567,7 +598,11 @@ class SignalExplainer:
                 f.filter_name for f in execution_summary.filters if not f.passed
             ],
             "regime_confluence": regime_context.confidence,
+            "regime_alignment_score": regime_context.regime_alignment_score,
             "dominant_models": dominant_models,
+            "model_dominance_ratios": {
+                attr.model_name: attr.dominance_ratio for attr in final_attributions
+            },
             "feature_impacts": {c.cluster_name: c.contribution_score for c in contributions},
         }
 

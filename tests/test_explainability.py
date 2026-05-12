@@ -258,8 +258,8 @@ def test_signal_explainer_feature_contributions():
     assert trend.contribution_score == 0.8
     assert trend.impact_level == "High"
 
-    # Check that high impact feature is in summary (now via Confluence Logic)
-    assert "Supported by: Trend (+0.80)" in explanation.human_readable_summary
+    # Check that high impact feature is in summary (now via Strategic Confluence)
+    assert "Strategic Confluence: High alignment from Trend (+0.80)" in explanation.human_readable_summary
 
     # Check machine attribution for features
     assert "feature_impacts" in explanation.machine_attribution
@@ -578,7 +578,7 @@ def test_human_readable_summary_confluence():
     )
 
     summary = explanation.human_readable_summary
-    assert "Supported by:" in summary
+    assert "Strategic Confluence: High alignment from" in summary
     assert "Momentum (+0.80)" in summary
     assert "Volume (+0.50)" in summary
     assert "Opposed by:" in summary
@@ -662,3 +662,77 @@ def test_terminal_formatting_icons_and_markers():
     assert "●●○" in formatted
     assert "High" in formatted
     assert "Medium" in formatted
+
+
+def test_strategic_confluence_summary():
+    """Verify the accuracy and depth of the generated natural language summaries."""
+    explainer = SignalExplainer()
+
+    # Case 1: Trending Regime
+    exp_trending = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.85,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending", "is_favorable": True},
+        feature_impacts={"rsi": 0.8},
+    )
+    summary = exp_trending.human_readable_summary
+    assert "Trending regimes provide high-velocity environments" in summary
+    assert "Strategic Confluence: High alignment from Momentum (+0.80)" in summary
+
+    # Case 2: Ranging Regime
+    exp_ranging = explainer.explain(
+        symbol="XAUUSD",
+        direction=-1,
+        confidence=0.75,
+        model_votes={"ppo": 2},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Ranging", "is_favorable": True},
+        feature_impacts={"slope": -0.6},
+    )
+    assert "Mean-reversion setups are prioritized in ranging regimes" in exp_ranging.human_readable_summary
+    assert "Strategic Confluence: High alignment from Trend (-0.60)" in exp_ranging.human_readable_summary
+
+
+def test_advanced_metrics_calculation():
+    """Ensure dominance_ratio and regime_alignment_score are correctly derived."""
+    explainer = SignalExplainer()
+
+    # Setup ensemble with different confidences
+    model_votes = {"ppo": 1, "lstm": 1}
+    model_weights = {"ppo": 0.7, "lstm": 0.3}
+    model_confidences = {"ppo": 0.9, "lstm": 0.7}
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes=model_votes,
+        model_weights=model_weights,
+        risk_data={"passed": True},
+        regime_info={"name": "Trending", "confidence": 0.95, "alignment_score": 0.9},
+        model_confidences=model_confidences,
+    )
+
+    ppo_attr = next(a for a in explanation.model_attributions if a.model_name == "ppo")
+    lstm_attr = next(a for a in explanation.model_attributions if a.model_name == "lstm")
+
+    # Weighted confidences:
+    # ppo: 0.7 * 0.9 = 0.63
+    # lstm: 0.3 * 0.7 = 0.21
+    # total: 0.84
+    # ppo ratio: 0.63 / 0.84 = 0.75
+    # lstm ratio: 0.21 / 0.84 = 0.25
+
+    assert abs(ppo_attr.dominance_ratio - 0.75) < 1e-6
+    assert abs(lstm_attr.dominance_ratio - 0.25) < 1e-6
+    assert explanation.regime_context.regime_alignment_score == 0.9
+
+    # Check machine attribution
+    attr = explanation.machine_attribution
+    assert attr["model_dominance_ratios"]["ppo"] == ppo_attr.dominance_ratio
+    assert attr["regime_alignment_score"] == 0.9
