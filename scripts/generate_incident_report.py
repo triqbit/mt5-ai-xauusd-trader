@@ -51,13 +51,23 @@ def analyze_audit_logs(conn):
     if not conn or not table_exists(conn, "audit_log"):
         return []
     cursor = conn.cursor()
-    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
-    actions = ('risk_decision', 'trade_blocked', 'operator_action', 'deployment', 'mt5_connection_status')
-    placeholders = ', '.join(['?'] * len(actions))
+    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+    # Capture specific system actions AND all operator-prefixed actions
+    actions = (
+        "risk_decision",
+        "trade_blocked",
+        "operator_action",
+        "deployment",
+        "mt5_connection_status",
+        "circuit_breaker_triggered",
+        "system_restored",
+    )
+    placeholders = ", ".join(["?"] * len(actions))
     cursor.execute(
         f"SELECT action, details, created_at FROM audit_log "
-        f"WHERE action IN ({placeholders}) AND created_at > ? ORDER BY created_at DESC",
-        (*actions, yesterday)
+        f"WHERE (action IN ({placeholders}) OR action LIKE 'operator_%') "
+        f"AND created_at > ? ORDER BY created_at DESC",
+        (*actions, yesterday),
     )
     return cursor.fetchall()
 

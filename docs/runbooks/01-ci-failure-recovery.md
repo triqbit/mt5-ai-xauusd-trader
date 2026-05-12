@@ -45,7 +45,7 @@ python scripts/generate_triage_report.py
 ## Expected Outcomes
 - All GitHub Actions workflows return a "Success" status.
 - Code matches the repository's excellence standards (PEP8, Type Safety).
-- Production deployment gates (11-gate policy) are unlocked.
+- Production deployment gates (12-gate policy) are unlocked.
 
 ## Escalation Path
 1. **P2/P3 Failures:** Core Maintainer (@maintainer-quality).

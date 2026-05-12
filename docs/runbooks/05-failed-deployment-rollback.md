@@ -26,7 +26,7 @@ Identify the last known stable version (e.g., `v1.1.0-rc3`) from the deployment 
    ```
 - **Audit Manual Action:**
   ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'rollback_initiated', 'Rolling back to version v1.1.0-rc3 due to deployment failure', datetime('now'));"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_rollback_initiated', 'Rolling back to version v1.1.0-rc3 due to deployment failure', datetime('now'));"
   ```
 
 ### 3. Downgrade Database Schema (If Necessary)
@@ -50,7 +50,7 @@ If the failed release included database migrations (Alembic), you must downgrade
    *Note: Ensure you have a database backup (Runbook 04) before performing downgrades.*
 - **Audit Manual Action:**
   ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_migration_downgrade', 'Downgraded database schema to revision <previous_revision_id>', datetime('now'));"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_db_migration_downgrade', 'Downgraded database schema to revision <previous_revision_id>', datetime('now'));"
   ```
 
 ### 4. Restoration of Configuration
@@ -75,7 +75,7 @@ If the release failure was due to invalid environment variables:
 - Monitor the audit trail for "System Startup" events.
 - **Audit Manual Action:**
   ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'rollback_verified', 'Rollback to v1.1.0-rc3 verified and stable', datetime('now'));"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_rollback_verified', 'Rollback to v1.1.0-rc3 verified and stable', datetime('now'));"
   ```
 
 ## Expected Outcomes

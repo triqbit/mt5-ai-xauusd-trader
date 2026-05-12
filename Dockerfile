@@ -50,6 +50,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # --- Stage 2: runtime ------------------------------------------
 FROM python:3.12-slim AS runtime
 
+LABEL version="1.1.0-rc7"
 WORKDIR /app
 
 # Runtime system dependencies
