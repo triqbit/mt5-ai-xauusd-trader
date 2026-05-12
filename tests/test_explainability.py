@@ -627,3 +627,38 @@ def test_explain_invalid_model_votes():
     # Invalid votes should fallback to HOLD (0)
     for attr in explanation.model_attributions:
         assert attr.vote == SignalDirection.HOLD
+
+
+def test_terminal_formatting_icons_and_markers():
+    """Test that terminal formatting includes new directional icons and density markers."""
+    explainer = SignalExplainer()
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.85,
+        model_votes={"ppo": 1, "lstm": 2},  # PPO: BUY, LSTM: SELL
+        model_weights={"ppo": 0.6, "lstm": 0.4},
+        risk_data={"passed": True, "risk_reward": 2.5},
+        regime_info={"name": "Trending"},
+        feature_impacts=[
+            {"cluster": "Trend", "score": 0.8, "impact": "High", "summary": "Strong trend"},
+            {"cluster": "Volatility", "score": -0.4, "impact": "Medium", "summary": "Elevated"},
+        ],
+    )
+
+    formatted = explainer.format_for_terminal(explanation)
+
+    # Check for directional icons in model votes and features
+    # Use separate checks to be robust against ANSI escape codes
+    assert "📈" in formatted
+    assert "📉" in formatted
+    assert "BUY" in formatted
+    assert "SELL" in formatted
+    assert "+0.80" in formatted
+    assert "-0.40" in formatted
+
+    # Check for impact density markers
+    assert "●●●" in formatted
+    assert "●●○" in formatted
+    assert "High" in formatted
+    assert "Medium" in formatted

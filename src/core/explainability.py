@@ -51,7 +51,9 @@ class FeatureContribution(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    cluster_name: str = Field(..., description="Name of the feature cluster (e.g., Trend, Volatility)")
+    cluster_name: str = Field(
+        ..., description="Name of the feature cluster (e.g., Trend, Volatility)"
+    )
     contribution_score: float = Field(
         ...,
         ge=-1.0,
@@ -251,6 +253,22 @@ class SignalExplainer:
     def __init__(self) -> None:
         pass
 
+    def _get_direction_icon(self, direction: SignalDirection | int) -> str:
+        """Utility to get directional icon for UX consistency."""
+        if isinstance(direction, int):
+            return "📈" if direction > 0 else "📉" if direction < 0 else "⏸️"
+        return (
+            "📈"
+            if direction == SignalDirection.BUY
+            else "📉"
+            if direction == SignalDirection.SELL
+            else "⏸️"
+        )
+
+    def _get_impact_marker(self, level: str) -> str:
+        """Utility to get visual density markers for impact levels."""
+        return "●●●" if level == "High" else "●●○" if level == "Medium" else "●○○"
+
     def explain(
         self,
         symbol: str,
@@ -343,7 +361,9 @@ class SignalExplainer:
                 summary=execution_data.get("summary", "No execution data"),
             )
         else:
-            logger.error(f"Malformed execution_data of type {type(execution_data)}. Using defaults.")
+            logger.error(
+                f"Malformed execution_data of type {type(execution_data)}. Using defaults."
+            )
             execution_summary = ExecutionSummary(
                 passed=False,
                 filters=[],
@@ -360,7 +380,9 @@ class SignalExplainer:
             try:
                 vote_dir = ModelAction(int(vote_idx)).to_direction()
             except (ValueError, TypeError):
-                logger.warning(f"Invalid vote index '{vote_idx}' for model '{name}'. Falling back to HOLD.")
+                logger.warning(
+                    f"Invalid vote index '{vote_idx}' for model '{name}'. Falling back to HOLD."
+                )
                 vote_dir = SignalDirection.HOLD
 
             weight = model_weights.get(name, 0.0)
@@ -614,9 +636,10 @@ class SignalExplainer:
                     if attr.vote == SignalDirection.SELL
                     else "white"
                 )
+                vote_icon = self._get_direction_icon(attr.vote)
                 model_table.add_row(
                     attr.model_name,
-                    f"[{vote_color}]{attr.vote.name}[/{vote_color}]",
+                    f"{vote_icon} [{vote_color}]{attr.vote.name}[/{vote_color}]",
                     f"{attr.weight:.1%}",
                     f"{attr.confidence:.1%}",
                     "⭐" if attr.is_dominant else "",
@@ -637,16 +660,21 @@ class SignalExplainer:
                     if cont.impact_level == "Medium"
                     else "dim"
                 )
+                impact_marker = self._get_impact_marker(cont.impact_level)
                 # Confluence-aware coloring: Green if the contribution aligns with the signal direction
                 is_confluent = (
-                    (explanation.direction == SignalDirection.BUY and cont.contribution_score > 0) or
-                    (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
+                    explanation.direction == SignalDirection.BUY and cont.contribution_score > 0
+                ) or (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
+                score_color = (
+                    "green" if is_confluent else "red" if cont.contribution_score != 0 else "white"
                 )
-                score_color = "green" if is_confluent else "red" if cont.contribution_score != 0 else "white"
+                score_icon = self._get_direction_icon(
+                    1 if cont.contribution_score > 0 else -1 if cont.contribution_score < 0 else 0
+                )
                 feature_table.add_row(
                     cont.cluster_name,
-                    f"[{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
-                    f"[{impact_color}]{cont.impact_level}[/{impact_color}]",
+                    f"{score_icon} [{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
+                    f"[{impact_color}]{impact_marker} {cont.impact_level}[/{impact_color}]",
                     cont.summary,
                 )
 
@@ -734,9 +762,10 @@ class SignalExplainer:
                     if attr.vote == SignalDirection.SELL
                     else "white"
                 )
+                vote_icon = self._get_direction_icon(attr.vote)
                 model_table.add_row(
                     attr.model_name,
-                    f"[{vote_color}]{attr.vote.name}[/{vote_color}]",
+                    f"{vote_icon} [{vote_color}]{attr.vote.name}[/{vote_color}]",
                     f"{attr.weight:.1%}",
                     f"{attr.confidence:.1%}",
                     "⭐" if attr.is_dominant else "",
@@ -757,16 +786,21 @@ class SignalExplainer:
                     if cont.impact_level == "Medium"
                     else "dim"
                 )
+                impact_marker = self._get_impact_marker(cont.impact_level)
                 # Confluence-aware coloring: Green if the contribution aligns with the signal direction
                 is_confluent = (
-                    (explanation.direction == SignalDirection.BUY and cont.contribution_score > 0) or
-                    (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
+                    explanation.direction == SignalDirection.BUY and cont.contribution_score > 0
+                ) or (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
+                score_color = (
+                    "green" if is_confluent else "red" if cont.contribution_score != 0 else "white"
                 )
-                score_color = "green" if is_confluent else "red" if cont.contribution_score != 0 else "white"
+                score_icon = self._get_direction_icon(
+                    1 if cont.contribution_score > 0 else -1 if cont.contribution_score < 0 else 0
+                )
                 feature_table.add_row(
                     cont.cluster_name,
-                    f"[{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
-                    f"[{impact_color}]{cont.impact_level}[/{impact_color}]",
+                    f"{score_icon} [{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
+                    f"[{impact_color}]{impact_marker} {cont.impact_level}[/{impact_color}]",
                     cont.summary,
                 )
 

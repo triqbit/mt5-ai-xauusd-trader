@@ -77,7 +77,11 @@ explanation = explainer.explain(
 
 ### Visualizing in Terminal
 
-The `SignalExplainer` utilizes the `rich` library to produce formatted dashboards:
+The `SignalExplainer` utilizes the `rich` library to produce formatted dashboards with enhanced visual cues:
+
+- **Directional Icons**: Instant visual identification of signal direction (📈 BUY, 📉 SELL, ⏸️ HOLD) for model votes and feature scores.
+- **Impact Density Markers**: Qualitative visualization of impact levels using visual density (●●● High, ●●○ Medium, ●○○ Low).
+- **Accessibility**: Redundant encoding via icons and markers ensures scannability for users with color-blindness.
 
 ```python
 print(explainer.format_for_terminal(explanation))
