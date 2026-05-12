@@ -7,15 +7,13 @@ Demonstration script for the StressLab resilience testing framework.
 from __future__ import annotations
 
 import os
-from datetime import datetime
 
-import pandas as pd
 from rich.console import Console
 
-from src.research.benchmarks import EMACrossoverStrategy, BenchmarkEvaluator
+from src.research.benchmarks import BenchmarkEvaluator, EMACrossoverStrategy
 from src.research.rare_event_simulator import RareEventConfig, RareEventSimulator, RareEventType
 from src.research.reporting import ResearchOrchestrator, ResearchReporter
-from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
+from src.research.stress_lab import StressLab, StressTestMetrics
 
 
 def run_stress_test_demo():
@@ -30,10 +28,12 @@ def run_stress_test_demo():
         event_type=RareEventType.NEWS_SHOCK,
         n_steps=1000,
         event_magnitude=1.5,
-        base_volatility=0.001
+        base_volatility=0.001,
     )
     df, event_result = simulator.generate_scenario(config)
-    console.print(f"Generated {len(df)} bars of synthetic data with a [bold red]{event_result.event_type}[/] event.")
+    console.print(
+        f"Generated {len(df)} bars of synthetic data with a [bold red]{event_result.event_type}[/] event."
+    )
 
     # 2. Select Strategy
     strategy = EMACrossoverStrategy(fast_window=10, slow_window=30)
@@ -54,9 +54,11 @@ def run_stress_test_demo():
         profit_factor=float(s_metrics["Profit Factor"]),
         execution_quality_score=1.0,
         latency_impact=0.0,
-        sortino_ratio=float(s_metrics["Sortino Ratio"])
+        sortino_ratio=float(s_metrics["Sortino Ratio"]),
     )
-    console.print(f"Baseline Calculated: Return={baseline_metrics.total_return:.2%}, Sharpe={baseline_metrics.sharpe_ratio:.2f}")
+    console.print(
+        f"Baseline Calculated: Return={baseline_metrics.total_return:.2%}, Sharpe={baseline_metrics.sharpe_ratio:.2f}"
+    )
 
     # 4. Run Stress Lab Suite
     lab = StressLab(strategy, df)
@@ -77,7 +79,7 @@ def run_stress_test_demo():
             "While it handles moderate spread widening, it shows critical fragility during "
             "flash crashes and high-latency environments."
         ),
-        overall_status="PROVISIONAL" if resilience_report.resilience_score < 70 else "VERIFIED"
+        overall_status="PROVISIONAL" if resilience_report.resilience_score < 70 else "VERIFIED",
     )
 
     # Add the stress test section
@@ -90,7 +92,7 @@ def run_stress_test_demo():
     reporter = ResearchReporter()
 
     # Terminal Output
-    console.print("\n" + "="*80)
+    console.print("\n" + "=" * 80)
     reporter.format_for_terminal(report)
 
     # Export Reports
@@ -103,7 +105,7 @@ def run_stress_test_demo():
     reporter.save_markdown(report, md_path)
     reporter.save_html(report, html_path)
 
-    console.print(f"\n[bold green]SUCCESS:[/] Reports generated:")
+    console.print("\n[bold green]SUCCESS:[/] Reports generated:")
     console.print(f" - Markdown: [cyan]{md_path}[/]")
     console.print(f" - HTML:     [cyan]{html_path}[/]")
 
