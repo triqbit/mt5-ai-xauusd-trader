@@ -115,6 +115,7 @@ class HealthChecker:
         self.trade_logger = trade_logger
         self.model = model
         self.audit_logger = audit_logger
+        self.start_time = datetime.now(timezone.utc)
         # Initialize psutil for non-blocking CPU checks (first call returns 0.0)
         psutil.cpu_percent(interval=None)
 
@@ -134,6 +135,16 @@ class HealthChecker:
         """
         res = ComponentStatus(status=HealthStatus.HEALTHY, message="Application heartbeat active")
         self._update_gauge("liveness", res.status)
+        return res
+
+    def check_uptime(self) -> ComponentStatus:
+        """Calculate system uptime since HealthChecker initialization."""
+        delta = datetime.now(timezone.utc) - self.start_time
+        hours, remainder = divmod(int(delta.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        msg = f"Uptime: {hours}h {minutes}m {seconds}s"
+        res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
+        self._update_gauge("uptime", res.status)
         return res
 
     def check_environment(self) -> ComponentStatus:
@@ -465,6 +476,7 @@ class HealthChecker:
         """Aggregate all enterprise health checks into a unified report."""
         components = {
             "liveness": self.check_liveness(),
+            "uptime": self.check_uptime(),
             "environment": self.check_environment(),
             "system_resources": self.check_system_resources(),
             "database": self.check_database(),
