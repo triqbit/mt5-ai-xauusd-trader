@@ -105,3 +105,12 @@
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
 - **Owner**: Jules05
+
+## [2026-05-14] - Risk Management Logic Fragmentation
+
+### 1. Fragmentation between `RiskManager` and `RiskEngine`
+- **Conflict**: Two parallel risk management implementations exist. `RiskManager` is used in `main.py`, but `RiskEngine` contains more advanced institutional logic (ATR sizing, cascading loss limits, exposure checks) defined in `RISK_LIMITS.md`.
+- **Agents**: Jules01, Jules02
+- **Impact**: High. System operates with simplified risk controls despite institutional requirements being defined and partially implemented elsewhere.
+- **Resolution**: Harmonize `RiskManager` by integrating advanced logic from `RiskEngine`, centralize risk schemas in `src/core/schemas.py`, and delete the redundant `RiskEngine`.
+- **Owner**: Jules05
