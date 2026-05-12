@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 import structlog
 
 from src.core.constants import EventCategory, EventImpact
@@ -24,6 +25,7 @@ __all__ = [
     "EventCategory",
     "EventImpact",
     "EventIntelligence",
+    "GeopoliticalEventProvider",
     "JSONEventProvider",
     "MacroEvent",
     "MetaAPIEventProvider",
@@ -93,7 +95,7 @@ class TradingViewEventProvider(BaseEventProvider):
     Generates realistic synthetic events for testing and integration.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._impact_map = {
             "low": EventImpact.LOW,
             "medium": EventImpact.MEDIUM,
@@ -153,10 +155,54 @@ class TradingViewEventProvider(BaseEventProvider):
         return events
 
 
+class GeopoliticalEventProvider(BaseEventProvider):
+    """
+    Provider for manually curated geopolitical risk windows.
+    Loads events from a local JSON file or a list of dictionaries.
+    """
+
+    def __init__(self, source: str | list[dict[str, Any]]):
+        self.source = source
+
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
+        import json
+        import os
+
+        raw_events: list[dict[str, Any]] = []
+        if isinstance(self.source, list):
+            raw_events = self.source
+        elif isinstance(self.source, str):
+            if os.path.exists(self.source):
+                try:
+                    with open(self.source) as f:
+                        raw_events = json.load(f)
+                except Exception as e:
+                    logger.error(f"Error reading Geopolitical JSON: {e}")
+            else:
+                logger.warning(f"Geopolitical source file {self.source} not found.")
+
+        events = []
+        for item in raw_events:
+            try:
+                # Ensure category is set to GEOPOLITICAL if not provided
+                if "category" not in item:
+                    item["category"] = EventCategory.GEOPOLITICAL
+
+                event = MacroEvent(**item)
+                if (
+                    event.end_timestamp or event.timestamp
+                ) >= start_time and event.timestamp <= end_time:
+                    events.append(event)
+            except Exception as e:
+                logger.error(f"Error parsing geopolitical event: {e}", item=item)
+
+        return events
+
+
 class MetaAPIEventProvider(BaseEventProvider):
     """
     Provider that fetches macroeconomic events from MetaAPI.
-    Requires metaapi-cloud-sdk.
+    Uses httpx for high-performance requests.
     """
 
     def __init__(self, token: str):
@@ -167,26 +213,17 @@ class MetaAPIEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH,
             "critical": EventImpact.CRITICAL,
         }
-        self._session = self._init_session()
+        self._client = self._init_client()
 
-    def _init_session(self):
-        import requests
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
-
-        session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET"],
+    def _init_client(self) -> httpx.Client:
+        return httpx.Client(
+            timeout=httpx.Timeout(15.0, connect=5.0),
+            limits=httpx.Limits(max_connections=5, max_keepalive_connections=2),
         )
-        session.mount("https://", HTTPAdapter(max_retries=retry_strategy))
-        return session
 
     def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
         """
-        Fetches events via MetaAPI's REST interface with retries and structured logging.
+        Fetches events via MetaAPI's REST interface with structured logging.
         """
         url = "https://calendar.metaapi.cloud/events"
         params = {
@@ -201,8 +238,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                 start_time=start_time.isoformat(),
                 end_time=end_time.isoformat(),
             )
-            # We use the persistent session for connection pooling and retries.
-            response = self._session.get(url, params=params, headers=headers, timeout=15)
+            response = self._client.get(url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
 
@@ -266,18 +302,31 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "EMPLOYMENT",
                 "JOBLESS",
                 "JOBLESS CLAIMS",
+                "ADP",
             ]
         ):
             return EventCategory.NFP
-        if any(
-            kw in name_upper for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT"]
-        ) and "PHILLY FED" not in name_upper:
+        if (
+            any(
+                kw in name_upper
+                for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT", "BEIGE BOOK"]
+            )
+            and "PHILLY FED" not in name_upper
+        ):
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
             and any(
                 kw in name_upper
-                for kw in ["DECISION", "STATEMENT", "MINUTES", "PRESS CONFERENCE", "TARGET"]
+                for kw in [
+                    "DECISION",
+                    "STATEMENT",
+                    "MINUTES",
+                    "PRESS CONFERENCE",
+                    "TARGET",
+                    "HIKE",
+                    "CUT",
+                ]
             )
         ) or any(kw in name_upper for kw in ["FUNDS RATE", "MONETARY POLICY"]):
             return EventCategory.RATES
@@ -296,6 +345,8 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "SAFE HAVEN",
                 "TERROR",
                 "ATTACK",
+                "COUP",
+                "NUCLEAR",
             ]
         ):
             return EventCategory.GEOPOLITICAL
@@ -319,6 +370,8 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "EMPIRE STATE",
                 "PHILLY FED",
                 "OPEC",
+                "PERSONAL INCOME",
+                "SPENDING",
             ]
         ):
             return EventCategory.USD_MACRO
@@ -408,15 +461,16 @@ class EventIntelligence:
         if any_success:
             # Use a dictionary for merging to preserve uniqueness and prevent data loss
             # from temporarily failing providers.
-            unique_events = {(e.name, e.timestamp): e for e in self._cached_events}
-            for e in new_events:
-                unique_events[(e.name, e.timestamp)] = e
+            unique_events = {(ev.name, ev.timestamp): ev for ev in self._cached_events}
+            for ev in new_events:
+                unique_events[(ev.name, ev.timestamp)] = ev
 
             # Filter out stale events from cache to keep it performant
             stale_threshold = now - timedelta(days=2)
             self._cached_events = [
-                e for e in unique_events.values()
-                if (e.end_timestamp or e.timestamp) >= stale_threshold
+                ev
+                for ev in unique_events.values()
+                if (ev.end_timestamp or ev.timestamp) >= stale_threshold
             ]
             self._last_successful_fetch = now
 
@@ -463,7 +517,10 @@ class EventIntelligence:
         if not events and (all_fetch_failed or self._last_successful_fetch is None):
             # If no data is available and providers failed (or haven't succeeded yet),
             # return status based on fail_safe_blocked setting.
-            reason = "Event data unavailable (no cache)"
+            reason = (
+                "Event data unavailable (no cache). "
+                f"Fail-safe {'BLOCKING' if self.fail_safe_blocked else 'PASSING'}."
+            )
             return RiskStatus(
                 is_blocked=self.fail_safe_blocked,
                 risk_multiplier=0.0 if self.fail_safe_blocked else 1.0,
@@ -573,18 +630,18 @@ class EventIntelligence:
 
                 min_multiplier = min(min_multiplier, event_mult)
 
-        reason = None
+        final_reason: str | None = None
         if is_blocked:
-            reason = f"Blocked by active events: {[e.name for e in blocking_events]}"
+            final_reason = f"Blocked by active events: {[e.name for e in blocking_events]}"
         elif active_events:
-            reason = f"Risk reduced by active events: {[e.name for e in active_events]}"
+            final_reason = f"Risk reduced by active events: {[e.name for e in active_events]}"
 
         return RiskStatus(
             is_blocked=is_blocked,
             risk_multiplier=min_multiplier,
             active_events=active_events,
             blocking_events=blocking_events,
-            reason=reason,
+            reason=final_reason,
         )
 
     def should_block_execution(self, current_time: datetime | None = None) -> bool:
