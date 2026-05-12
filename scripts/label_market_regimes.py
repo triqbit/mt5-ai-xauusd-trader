@@ -12,18 +12,23 @@ Usage:
 import argparse
 import os
 import sys
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from src.models.regime_detector import RegimeDetector
 import structlog
+
+from src.models.regime_detector import RegimeDetector
 
 logger = structlog.get_logger(__name__)
 
-def label_data(input_path: str, output_path: str, window: int, long_window: int, use_gmm: str | None):
+
+def label_data(
+    input_path: str, output_path: str, window: int, long_window: int, use_gmm: str | None
+):
     """
     Labels historical OHLCV data with market regimes.
     """
@@ -36,7 +41,7 @@ def label_data(input_path: str, output_path: str, window: int, long_window: int,
     try:
         df = pd.read_csv(input_path)
         if len(df.columns) < 2:
-            df = pd.read_csv(input_path, sep='\t')
+            df = pd.read_csv(input_path, sep="\t")
     except Exception as e:
         logger.error("data_load_failed", error=str(e))
         return
@@ -75,17 +80,29 @@ def label_data(input_path: str, output_path: str, window: int, long_window: int,
     for label, pct in report.counts_pct.items():
         print(f"  {label:20}: {pct:5.2f}%")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Label historical OHLCV data with market regimes.")
     parser.add_argument("--input", required=True, help="Path to input OHLCV CSV file")
     parser.add_argument("--output", required=True, help="Path to save labeled CSV file")
-    parser.add_argument("--window", type=int, default=20, help="Lookback window for features (default: 20)")
-    parser.add_argument("--long-window", type=int, default=100, help="Long lookback window for ATR ratio (default: 100)")
-    parser.add_argument("--model", help="Optional path to GMM model file. If provided and doesn't exist, a model will be trained and saved.")
+    parser.add_argument(
+        "--window", type=int, default=20, help="Lookback window for features (default: 20)"
+    )
+    parser.add_argument(
+        "--long-window",
+        type=int,
+        default=100,
+        help="Long lookback window for ATR ratio (default: 100)",
+    )
+    parser.add_argument(
+        "--model",
+        help="Optional path to GMM model file. If provided and doesn't exist, a model will be trained and saved.",
+    )
 
     args = parser.parse_args()
 
     label_data(args.input, args.output, args.window, args.long_window, args.model)
+
 
 if __name__ == "__main__":
     main()

@@ -72,10 +72,14 @@ class RegimeAnalysisReport(BaseModel):
 
     timestamp: str = Field(..., description="Time of report generation")
     counts_pct: dict[str, float] = Field(..., description="Percentage frequency of each regime")
-    avg_durations: dict[str, float] = Field(..., description="Average duration of each regime in bars")
+    avg_durations: dict[str, float] = Field(
+        ..., description="Average duration of each regime in bars"
+    )
     transitions: pd.DataFrame = Field(..., description="Regime transition matrix")
     summary_text: str = Field(..., description="Narrative summary of the analysis")
-    regime_list: list[Any] = Field(default_factory=list, description="Detailed list of regime metrics")
+    regime_list: list[Any] = Field(
+        default_factory=list, description="Detailed list of regime metrics"
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -86,7 +90,11 @@ class RegimeAnalysisReport(BaseModel):
         from src.research.reporting import RegimeSection
 
         # Stability is the mean of all average durations
-        stability = sum(self.avg_durations.values()) / len(self.avg_durations) if self.avg_durations else 0.0
+        stability = (
+            sum(self.avg_durations.values()) / len(self.avg_durations)
+            if self.avg_durations
+            else 0.0
+        )
 
         # Transition insights
         top_transitions = []
@@ -131,7 +139,8 @@ class RegimeInfo(BaseModel):
     )
     volatility_index: float = Field(..., description="Normalized volatility metric")
     transition_probabilities: dict[str, float] = Field(
-        default_factory=dict, description="Full distribution of probabilities for potential next regimes"
+        default_factory=dict,
+        description="Full distribution of probabilities for potential next regimes",
     )
     raw_features: dict[str, float] = Field(
         default_factory=dict, description="Underlying statistical features used for detection"
@@ -318,7 +327,9 @@ class RegimeDetector:
             # Map all cluster probabilities to regime labels
             for idx, prob in enumerate(probs):
                 regime_label = self._cluster_to_regime.get(idx, MarketRegime.RANGING).value
-                transition_probabilities[regime_label] = transition_probabilities.get(regime_label, 0.0) + float(prob)
+                transition_probabilities[regime_label] = transition_probabilities.get(
+                    regime_label, 0.0
+                ) + float(prob)
 
             # Transition score based on entropy of cluster probabilities
             # Max entropy for 6 clusters is ln(6) approx 1.79
@@ -329,7 +340,10 @@ class RegimeDetector:
             if self.transition_matrix is not None and self._last_regime != MarketRegime.UNKNOWN:
                 from_regime = self._last_regime.value
                 to_regime = label.value
-                if from_regime in self.transition_matrix.index and to_regime in self.transition_matrix.columns:
+                if (
+                    from_regime in self.transition_matrix.index
+                    and to_regime in self.transition_matrix.columns
+                ):
                     prob = self.transition_matrix.loc[from_regime, to_regime]
                     transition_score = (transition_score + (1.0 - prob)) / 2.0
         else:
@@ -341,9 +355,12 @@ class RegimeDetector:
                 z_score=float(last_row["z_score"]),
                 vc=float(last_row["vol_clustering"]),
                 angle=angle,
-                vov=float(last_row["vol_of_vol"])
+                vov=float(last_row["vol_of_vol"]),
             )
-            transition_probabilities = {label.value: confidence, MarketRegime.UNKNOWN.value: 1.0 - confidence}
+            transition_probabilities = {
+                label.value: confidence,
+                MarketRegime.UNKNOWN.value: 1.0 - confidence,
+            }
 
         regime_info = RegimeInfo(
             label=label,
@@ -360,7 +377,7 @@ class RegimeDetector:
                 previous=str(self._last_regime),
                 current=str(label),
                 confidence=regime_info.confidence,
-                transition_score=regime_info.transition_score
+                transition_score=regime_info.transition_score,
             )
             self._last_regime = label
 
@@ -381,7 +398,11 @@ class RegimeDetector:
         confidence = 0.5
 
         # NEWS_SHOCK: Extreme volatility spike + high efficiency + high vol-of-vol
-        if atr_ratio > self.THRESH_NEWS_SHOCK_ATR and er > self.THRESH_NEWS_SHOCK_ER and vov > self.THRESH_NEWS_SHOCK_VOV:
+        if (
+            atr_ratio > self.THRESH_NEWS_SHOCK_ATR
+            and er > self.THRESH_NEWS_SHOCK_ER
+            and vov > self.THRESH_NEWS_SHOCK_VOV
+        ):
             label = MarketRegime.NEWS_SHOCK
             confidence = min(atr_ratio / 5.0, 1.0)
         # VOLATILE_BREAKOUT: High volatility + high efficiency
@@ -397,7 +418,11 @@ class RegimeDetector:
             label = MarketRegime.MEAN_REVERSION
             confidence = min(abs(z_score) / 4.0, 1.0)
         # LOW_VOLATILITY_DRIFT: Low volatility + steady slope + low vol-of-vol
-        elif atr_ratio < self.THRESH_DRIFT_ATR and abs(angle) > self.THRESH_DRIFT_ANGLE and vov < self.THRESH_DRIFT_VOV:
+        elif (
+            atr_ratio < self.THRESH_DRIFT_ATR
+            and abs(angle) > self.THRESH_DRIFT_ANGLE
+            and vov < self.THRESH_DRIFT_VOV
+        ):
             label = MarketRegime.LOW_VOLATILITY_DRIFT
             confidence = 0.7
         # RANGING: Default state
@@ -407,10 +432,7 @@ class RegimeDetector:
 
         # Transition score heuristic
         transition_score = (
-            abs(atr_ratio - 1.0) * 0.3
-            + abs(er - 0.5) * 0.3
-            + abs(vc) * 0.2
-            + min(vov / 3.0, 0.2)
+            abs(atr_ratio - 1.0) * 0.3 + abs(er - 0.5) * 0.3 + abs(vc) * 0.2 + min(vov / 3.0, 0.2)
         )
         return label, confidence, transition_score
 
@@ -540,11 +562,23 @@ class RegimeDetector:
             confidences = 1.0 - er
 
             # Masks for different regimes (ordered by precedence)
-            news_mask = (atr_ratio > self.THRESH_NEWS_SHOCK_ATR) & (er > self.THRESH_NEWS_SHOCK_ER) & (vov > self.THRESH_NEWS_SHOCK_VOV)
+            news_mask = (
+                (atr_ratio > self.THRESH_NEWS_SHOCK_ATR)
+                & (er > self.THRESH_NEWS_SHOCK_ER)
+                & (vov > self.THRESH_NEWS_SHOCK_VOV)
+            )
             breakout_mask = (atr_ratio > self.THRESH_BREAKOUT_ATR) & (er > self.THRESH_BREAKOUT_ER)
-            trending_mask = (er > self.THRESH_TRENDING_ER) & (np.abs(angle) > self.THRESH_TRENDING_ANGLE)
-            mean_rev_mask = (np.abs(z_score) > self.THRESH_MEAN_REV_Z) & (er < self.THRESH_MEAN_REV_ER)
-            drift_mask = (atr_ratio < self.THRESH_DRIFT_ATR) & (np.abs(angle) > self.THRESH_DRIFT_ANGLE) & (vov < self.THRESH_DRIFT_VOV)
+            trending_mask = (er > self.THRESH_TRENDING_ER) & (
+                np.abs(angle) > self.THRESH_TRENDING_ANGLE
+            )
+            mean_rev_mask = (np.abs(z_score) > self.THRESH_MEAN_REV_Z) & (
+                er < self.THRESH_MEAN_REV_ER
+            )
+            drift_mask = (
+                (atr_ratio < self.THRESH_DRIFT_ATR)
+                & (np.abs(angle) > self.THRESH_DRIFT_ANGLE)
+                & (vov < self.THRESH_DRIFT_VOV)
+            )
 
             # Apply masks in precedence
             regimes[drift_mask] = MarketRegime.LOW_VOLATILITY_DRIFT.value
@@ -601,13 +635,13 @@ class RegimeDetector:
         ).fillna(high - low)
         atr_short = tr.rolling(window=self.window).mean()
         atr_long = tr.rolling(window=self.long_window).mean()
-        atr_ratio = (atr_short / (atr_long + 1e-9))
+        atr_ratio = atr_short / (atr_long + 1e-9)
         atr_ratio = atr_ratio.where(atr_long >= 1e-9, 1.0).fillna(1.0)
 
         # 2. Efficiency Ratio
         net_change = (close - close.shift(self.window - 1)).abs()
         abs_changes = (close - close.shift(1)).abs().rolling(window=self.window - 1).sum()
-        er = (net_change / (abs_changes + 1e-9))
+        er = net_change / (abs_changes + 1e-9)
         er = er.where(abs_changes >= 1e-9, 0.5).fillna(0.5)
 
         # 3. Returns and derived stats
@@ -741,8 +775,7 @@ class RegimeDetector:
         probs = self._gmm.predict_proba(X)
         cluster_indices = np.argmax(probs, axis=1)
         regimes = [
-            self._cluster_to_regime.get(idx, MarketRegime.RANGING).value
-            for idx in cluster_indices
+            self._cluster_to_regime.get(idx, MarketRegime.RANGING).value for idx in cluster_indices
         ]
 
         regime_series = pd.Series(regimes)
@@ -765,7 +798,11 @@ class RegimeDetector:
             angle = self._calculate_angle(slope)
 
             # Thresholds synchronized with _apply_regime_logic
-            if atr_ratio > self.THRESH_NEWS_SHOCK_ATR and er > self.THRESH_NEWS_SHOCK_ER and vov > self.THRESH_NEWS_SHOCK_VOV:
+            if (
+                atr_ratio > self.THRESH_NEWS_SHOCK_ATR
+                and er > self.THRESH_NEWS_SHOCK_ER
+                and vov > self.THRESH_NEWS_SHOCK_VOV
+            ):
                 self._cluster_to_regime[i] = MarketRegime.NEWS_SHOCK
             elif atr_ratio > self.THRESH_BREAKOUT_ATR and er > self.THRESH_BREAKOUT_ER:
                 self._cluster_to_regime[i] = MarketRegime.VOLATILE_BREAKOUT
@@ -773,7 +810,11 @@ class RegimeDetector:
                 self._cluster_to_regime[i] = MarketRegime.TRENDING
             elif abs(z_score) > self.THRESH_MEAN_REV_Z and er < self.THRESH_MEAN_REV_ER:
                 self._cluster_to_regime[i] = MarketRegime.MEAN_REVERSION
-            elif atr_ratio < self.THRESH_DRIFT_ATR and abs(angle) > self.THRESH_DRIFT_ANGLE and vov < self.THRESH_DRIFT_VOV:
+            elif (
+                atr_ratio < self.THRESH_DRIFT_ATR
+                and abs(angle) > self.THRESH_DRIFT_ANGLE
+                and vov < self.THRESH_DRIFT_VOV
+            ):
                 self._cluster_to_regime[i] = MarketRegime.LOW_VOLATILITY_DRIFT
             else:
                 self._cluster_to_regime[i] = MarketRegime.RANGING

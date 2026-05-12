@@ -10,7 +10,7 @@ The XAUUSD trading system utilizes a statistical regime detection layer to adapt
 | `RANGING` | Choppy, sideways movement with no clear direction. | Low Efficiency Ratio, Low Volatility. |
 | `VOLATILE_BREAKOUT` | Sharp directional move with increased volatility. | High ATR Ratio, High Efficiency Ratio. |
 | `LOW_VOLATILITY_DRIFT` | Slow, persistent move on low volume/volatility. | Low ATR Ratio, Persistent Slope. |
-| `NEWS_SHOCK` | Extreme volatility spike, typically news-driven. | Extreme ATR Ratio (> 2.5), High Efficiency. |
+| `NEWS_SHOCK` | Extreme volatility spike, typically news-driven. | Extreme ATR Ratio (> 2.0), High Efficiency. |
 | `MEAN_REVERSION` | Price overextended from average, likely to pull back. | High Z-Score, Low Efficiency Ratio. |
 
 ## Statistical Features
@@ -67,8 +67,10 @@ print(f"Efficiency Ratio: {regime_info.raw_features['efficiency_ratio']}")
 
 ### Historical Labeling (for Backtesting)
 
+The detector supports highly optimized vectorized labeling for research and backtesting:
+
 ```python
-# Highly optimized vectorized labeling
+# Vectorized labeling
 df_with_regimes = detector.label_history(historical_df, use_vectorized=True)
 ```
 
@@ -84,6 +86,18 @@ analysis_report = detector.run_analysis(historical_df)
 report_section = analysis_report.to_report_section()
 ```
 
+### CLI Utility: Batch Labeling
+
+A dedicated script is provided for batch processing of OHLCV CSV files:
+
+```bash
+# Label data using heuristic logic
+python scripts/label_market_regimes.py --input data.csv --output labeled_data.csv
+
+# Train a GMM model and label data
+python scripts/label_market_regimes.py --input data.csv --output labeled_data.csv --model models/gmm_v1.joblib
+```
+
 ## Implementation Details
 
-The implementation is located in `src/models/regime_detector.py` and is fully vectorized to support institutional-grade backtesting. Benchmark tests demonstrate a **~450x speedup** compared to iterative implementations, processing 5000 bars in under 30ms.
+The implementation is located in `src/models/regime_detector.py`. It unifies the logic between real-time inference and historical labeling by using the same vectorized feature extraction path, ensuring "what you test is what you trade."
