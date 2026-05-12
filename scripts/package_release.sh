@@ -50,7 +50,14 @@ echo "Executing Mandatory Validation Gates..."
 # Gate 1: Version Sync
 python3 scripts/verify_version_sync.py
 
-# Gate 1.1: Atlas Governance Audit
+# Gate 1.1: Dockerfile Version ARG Check (Ensures it exists)
+if ! grep -q "ARG VERSION" Dockerfile; then
+    echo "Error: Dockerfile missing ARG VERSION for metadata labeling."
+    exit 1
+fi
+echo "[+] Dockerfile versioning verified."
+
+# Gate 1.2: Atlas Governance Audit
 python3 scripts/atlas_audit.py
 
 # Gate 2: Environment Template Integrity
@@ -79,7 +86,7 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     # Build or check for existing image
     if ! docker image inspect "${IMAGE_NAME}:v${VERSION}" >/dev/null 2>&1; then
         echo "Building Docker Image..."
-        if docker build -t "${IMAGE_NAME}:v${VERSION}" .; then
+        if docker build --build-arg VERSION="${VERSION}" -t "${IMAGE_NAME}:v${VERSION}" .; then
              docker save "${IMAGE_NAME}:v${VERSION}" | gzip > "${RELEASE_PATH}/image.tar.gz"
              DOCKER_AVAILABLE="true"
              IMAGE_TAG="v${VERSION}"
@@ -140,22 +147,28 @@ if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ]; then
 fi
 
 # --- 4. Verification & Integrity ---
-echo "Finalizing Artifact with Checksum Manifest..."
+echo "Executing Final Artifact Validation..."
 
 # Verify all mandatory files exist and are non-empty
 MANDATORY_FILES=("image.tar.gz" "docker_info.json" ".env.example" "CONFIG_REFERENCE.md" "RELEASE_NOTES.md")
 for f in "${MANDATORY_FILES[@]}"; do
-    if [ ! -s "${RELEASE_PATH}/$f" ]; then
-        echo "Error: Mandatory file $f is missing or empty."
+    if [ -s "${RELEASE_PATH}/$f" ]; then
+        echo "   [✓] Verified: $f"
+    else
+        echo "   [✗] Error: Mandatory file $f is missing or empty."
         exit 1
     fi
 done
 
 # Verify mandatory directories
-if [ ! -d "${RELEASE_PATH}/migrations" ]; then
-    echo "Error: Mandatory directory migrations/ is missing."
+if [ -d "${RELEASE_PATH}/migrations" ] && [ "$(ls -A "${RELEASE_PATH}/migrations")" ]; then
+    echo "   [✓] Verified: migrations/ (contains $(ls -1 "${RELEASE_PATH}/migrations" | wc -l) items)"
+else
+    echo "   [✗] Error: Mandatory directory migrations/ is missing or empty."
     exit 1
 fi
+
+echo "Finalizing Artifact with Checksum Manifest..."
 
 # Generate SHA256 checksums
 pushd "${RELEASE_PATH}" > /dev/null
