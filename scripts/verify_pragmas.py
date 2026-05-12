@@ -1,6 +1,6 @@
-import os
-import sqlite3
 import logging
+import os
+
 from src.core.database import get_engine
 
 logging.basicConfig(level=logging.DEBUG)
