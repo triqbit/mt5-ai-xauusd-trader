@@ -16,6 +16,7 @@ The `EventIntelligence` module (located in `src/data/event_intelligence.py`) pro
 ## Data Providers
 The system utilizes a multi-provider architecture for redundancy and enhanced coverage:
 - **`MetaAPIEventProvider`:** Primary source fetching real-time economic calendar data from MetaAPI, covering USD and major global economies (EU, GB, JP, CH, CN).
+- **`GeopoliticalEventProvider`:** Specialized provider for manually curated geopolitical risk windows, supporting both local JSON files and in-memory configurations.
 - **`TradingViewEventProvider`:** Secondary (mocked) provider for cross-verification.
 - **`JSONEventProvider`:** Allows for local manual event ingestion or overrides via a JSON file.
 - **`MockEventProvider`:** Used for testing and simulation.
