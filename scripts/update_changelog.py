@@ -52,6 +52,9 @@ def categorize_commits(commits, labels=None):
         "chore": "Changed",
         "ci": "Changed",
         "test": "Changed",
+        "revert": "Changed",
+        "deprecate": "Deprecated",
+        "remove": "Removed",
     }
 
     # If PR labels are provided, they influence categorization
@@ -95,9 +98,10 @@ def categorize_commits(commits, labels=None):
             continue
 
         # Try to parse conventional commit from subject
-        match = re.match(r"^(\w+)(?:\(.+\))?(!?): (.+)$", subject)
+        # Pattern: ^(\w+)(?:\(([^)]+)\))?(!?): (.+)$
+        match = re.match(r"^(\w+)(?:\(([^)]+)\))?(!?): (.+)$", subject)
         if match:
-            ctype, breaking, message = match.groups()
+            ctype, scope, breaking, message = match.groups()
             category = mapping.get(ctype, "Changed")
 
             # Capitalize first letter of message
@@ -106,8 +110,13 @@ def categorize_commits(commits, labels=None):
             is_breaking = breaking == "!" or "BREAKING CHANGE:" in body or "BREAKING-CHANGE:" in body
 
             entry = f"- {message}"
+            if scope:
+                entry = f"- **{scope}**: {message}"
+
             if is_breaking:
                 entry = f"- **BREAKING CHANGE**: {message}"
+                if scope:
+                    entry = f"- **BREAKING CHANGE** ({scope}): {message}"
 
             if entry not in categories[category]:
                 categories[category].append(entry)
@@ -169,8 +178,7 @@ def update_changelog(categories):
     for category, entries in sorted_categories:
         header = f"### {category}"
         if header not in unreleased_content:
-            # If category doesn't exist, we need to find the right place to insert it or append
-            # For simplicity, we append to the end of the unreleased section
+            # If category doesn't exist, append to the end of the unreleased section
             unreleased_content = unreleased_content.rstrip() + f"\n\n{header}\n" + "\n".join(entries) + "\n"
         else:
             # If category exists, append only new entries
@@ -189,10 +197,13 @@ def update_changelog(categories):
                         end_index = i
                         break
 
+                # Backtrack to avoid inserting before empty lines
+                while end_index > category_index + 1 and not lines[end_index-1].strip():
+                    end_index -= 1
+
                 existing_entries = [line.strip() for line in lines[category_index+1:end_index] if line.strip().startswith("- ")]
                 for entry in entries:
                     if entry not in existing_entries:
-                        # Find the correct insertion point to maintain readability (before next header or at end)
                         lines.insert(end_index, entry)
                         end_index += 1
 

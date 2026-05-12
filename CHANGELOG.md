@@ -6,22 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- feat: implement institutional-grade feature engineering pipeline with 140+ features and multi-timeframe analysis.
-- fix: resolve undefined name `batch_idx` in LSTMModel training loop.
-- feat: implement production-ready stubs for PPO, LSTM, and Dreamer agents.
-- feat: optimize PPOAgent with robust observation reshaping and strict Signal return typing.
-- feat: enhance LSTMModel with functional training loop stubs and multi-architecture support.
-- feat: update DreamerAgent with flexible parameter propagation via `**kwargs` for ensemble compatibility.
-- feat: implement configurable transaction cost penalties and cleanup logic in TradingEnv.
-- feat: ⚙️ Jules02: Performance and runtime analysis — optimize feature engineering and backtest profiling.
-- feat: refine institutional feature engineering and unit tests.
-- feat: implement 6-layer execution filter cascade strictly following README.md.
-- fix: resolve starlette and fastapi version conflicts in requirements files.
-- fix: resolve security vulnerabilities in starlette dependency (upgrade to 0.52.1).
-- perf: Optimized `FeatureEngineer` technical analysis pipeline, achieving ~17% reduction in latency.
-- feat: Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
-- fix: Refined validation scripts with explicit remediation messages.
-- docs: Integrated PREPROD_CHECKLIST.md validation into release gates.
+
 ### Added
 - **Comprehensive Monitoring System:** Implemented full monitoring and alerting system in `src/core/monitor.py` including equity curve tracking, Prometheus metrics, and granular Telegram alerts.
 - **Institutional Feature Engineering:** Implemented a scalable pipeline for 140+ technical indicators with multi-timeframe support (M1-D1) and no look-ahead bias in `src/core/feature_engineering.py`.
@@ -29,40 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **6-Layer Execution Filter Cascade:** Implemented a streamlined validation system for trading signals (ATR, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown).
 - **Structured Execution Decisions:** Introduced a typed `ExecutionDecision` dataclass for granular audit tracing and clear rejection reasons.
 - **Enhanced Filter Unit Tests:** Added 27 comprehensive tests covering edge cases for all 6 validation layers.
+- Implement institutional-grade feature engineering pipeline with 140+ features and multi-timeframe analysis.
+- Implement production-ready stubs for PPO, LSTM, and Dreamer agents.
+- Optimize PPOAgent with robust observation reshaping and strict Signal return typing.
+- Enhance LSTMModel with functional training loop stubs and multi-architecture support.
+- Update DreamerAgent with flexible parameter propagation via `**kwargs` for ensemble compatibility.
+- Implement configurable transaction cost penalties and cleanup logic in TradingEnv.
+- ⚙️ Jules02: Performance and runtime analysis — optimize feature engineering and backtest profiling.
+- Refine institutional feature engineering and unit tests.
+- Implement 6-layer execution filter cascade strictly following README.md.
+- Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
 - Implement monitoring system and Telegram alerting (#962)
+- Implement Institutional Decision Support System (#1086)
 
-* feat: implement comprehensive monitoring and alerting system
+### Changed
+- Optimized `FeatureEngineer` technical analysis pipeline, achieving ~17% reduction in latency.
+- Integrated PREPROD_CHECKLIST.md validation into release gates.
 
-Implemented the monitoring system described in MONITORING_ALERTING.md.
-- Added `execution_latency_threshold` to `TradingConfig`.
-- Enhanced `Monitor` in `src/core/monitor.py` with:
-    - High execution latency Telegram alerts (>1000ms by default).
-    - Granular rejection tracking via Prometheus labels (`reason`).
-    - New gauges for monthly returns and average trade duration.
-    - Partial fill counter.
-    - Dedicated model health alerts: inference timeout, missing features, stale model, and training failures.
-- Updated `tests/test_monitor.py` with 30 unit tests mocking Telegram API.
-- Ensured thread-safe async Telegram bot calls for both sync and async contexts.
-
-Verified all changes with `pytest`.
-
-Co-authored-by: triqbit <242833443+triqbit@users.noreply.github.com>
-
-* feat: implement monitoring system and resolve CI issues
-
-- Implemented comprehensive monitoring and alerting system in `src/core/monitor.py`.
-- Resolved dependency vulnerabilities by upgrading `pytest` to 9.0.3 and `pytest-asyncio` to 1.3.0.
-- Synchronized dependencies in `requirements.txt` and `requirements-ci.txt`.
-- Added `execution_latency_threshold` to `TradingConfig`.
-- Updated `CHANGELOG.md` with the new monitoring system entry.
-- Verified all 30 monitoring unit tests pass.
-
-Co-authored-by: triqbit <242833443+triqbit@users.noreply.github.com>
-
----------
-
-Co-authored-by: google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>
-Co-authored-by: triqbit <242833443+triqbit@users.noreply.github.com>
+### Fixed
+- Resolve undefined name `batch_idx` in LSTMModel training loop.
+- Resolve starlette and fastapi version conflicts in requirements files.
+- Resolve security vulnerabilities in starlette dependency (upgrade to 0.52.1).
+- Refined validation scripts with explicit remediation messages.
 
 ## [1.1.0-rc7] - 2026-05-09
 
@@ -91,7 +64,7 @@ Co-authored-by: triqbit <242833443+triqbit@users.noreply.github.com>
 ### Fixed
 - **CI Pipeline Stabilization:** Resolved Ruff linting violations and standardized import sorting.
 - **Enterprise Health Monitoring:** Refined system with robust liveness/readiness probes and mandatory startup gate.
-- **Deployment Validation Gates:** Implemented robust pre-deployment validation workflow.
+- **Deployment Validation Gates:** Implemented robust pre-deployment workflow.
 
 ### Security
 - **Safe PyTorch Deserialization:** Enforced `weights_only=True` in all `torch.load` calls to prevent RCE.
