@@ -16,7 +16,8 @@ License: MIT
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import datetime
+from datetime import UTC
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -60,8 +61,8 @@ class TradeSignal(BaseModel):
         le=1.0,
         description="The model's confidence score (0.0 to 1.0). Higher means more certainty.",
     )
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+    timestamp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(UTC),
         description="The UTC timestamp when the signal was generated",
     )
 
@@ -157,3 +158,36 @@ class ExecutionDecision(BaseModel):
             if self.blocked_by:
                 raise ValueError("An approved decision cannot have a 'blocked_by' reason.")
         return self
+
+
+class RiskDecision(BaseModel):
+    """
+    Structured result of the risk engine validation cascade.
+    Provides transparency into which risk layer approved or blocked a trade.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="Final risk approval status")
+    reason: str = Field("", description="Primary reason for rejection, if any")
+    adjusted_lot_size: float = Field(
+        0.0, ge=0.0, description="The lot size as adjusted by volatility and daily loss limits"
+    )
+    trace: dict[str, bool] = Field(
+        default_factory=dict, description="Audit trace of all 8 risk layers"
+    )
+
+
+class DailyStats(BaseModel):
+    """
+    Intraday PnL and activity tracker.
+    Reset at the start of each trading day (00:00 UTC).
+    """
+
+    model_config = ConfigDict(frozen=False)  # Mutable as it tracks intraday changes
+
+    date: datetime.date = Field(default_factory=datetime.date.today)
+    realised_pnl: float = 0.0
+    trade_count: int = 0
+    peak_equity: float = 0.0
+    consecutive_losses: int = 0

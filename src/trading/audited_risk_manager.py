@@ -9,10 +9,12 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.audit_log import get_audit_logger
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.trading.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
@@ -27,26 +29,23 @@ class AuditedRiskManager(RiskManager):
     def approve(
         self,
         signal: TradeSignal,
+        market_data: pd.DataFrame,
+        open_positions: List[Dict[str, Any]],
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision containing approval status and adjusted lot size.
         Logs the full decision chain to the audit log.
         """
-        decision_chain = {
-            "circuit_breaker": self._check_circuit_breaker(),
-            "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
-            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
-            "min_confidence": self._check_minimum_confidence(signal.confidence),
-            "risk_reward": self._check_risk_reward(signal),
-            "consecutive_losses": self._check_consecutive_losses(),
-            "model_health": self._check_model_health(model_health),
-        }
-
-        passed = all(decision_chain.values())
+        decision = super().approve(
+            signal=signal,
+            market_data=market_data,
+            open_positions=open_positions,
+            signal_id=signal_id,
+            model_health=model_health,
+        )
 
         # Log to Audit Trail
         try:
@@ -54,47 +53,34 @@ class AuditedRiskManager(RiskManager):
             audit.log_risk_decision(
                 symbol=signal.symbol,
                 direction=signal.direction,
-                decision_chain=decision_chain,
-                passed=passed,
+                decision_chain=decision.trace,
+                passed=decision.is_approved,
             )
 
             # Log high-severity circuit breaker events specifically
-            if not decision_chain.get("circuit_breaker", True):
+            if not decision.trace.get("circuit_breaker", True):
                 audit.log_operator_action(
                     operator="system",
                     action="circuit_breaker_triggered",
                     reason=f"Hard drawdown limit hit during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
+                    metadata={"symbol": signal.symbol, "decision_chain": decision.trace},
                 )
 
-            if not decision_chain.get("daily_loss", True):
+            if not decision.trace.get("daily_loss", True):
                 audit.log_operator_action(
                     operator="system",
                     action="daily_loss_limit_triggered",
                     reason=f"Daily loss limit reached during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
+                    metadata={"symbol": signal.symbol, "decision_chain": decision.trace},
                 )
 
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 
-        if not passed:
-            rejection_reasons = [k for k, v in decision_chain.items() if not v]
-            reason_str = ", ".join(rejection_reasons)
-            logger.warning(
-                "Signal REJECTED | %s %s | Failed: %s",
-                signal.symbol,
-                signal.direction,
-                reason_str,
-            )
+        if not decision.is_approved:
             if self.monitor:
+                rejection_reasons = [k for k, v in decision.trace.items() if not v]
                 for reason in rejection_reasons:
                     self.monitor.record_internal_rejection("risk_manager", reason.upper())
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=f"Failed filters: {reason_str}",
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
-        return passed
+
+        return decision
