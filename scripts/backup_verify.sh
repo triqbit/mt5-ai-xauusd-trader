@@ -109,24 +109,27 @@ for DB_FILE in "${DB_FILES[@]}"; do
 
         # 2.2 Data Access Test (Restore Dry-run)
         log_message "Performing Data Access Test for ${BACKUP_FILE}..."
-        TEST_TABLE=""
-        if [ "${DB_BASE}" == "trades" ]; then TEST_TABLE="trades"; fi
-        if [ "${DB_BASE}" == "audit" ]; then TEST_TABLE="audit_log"; fi
-
-        if [ -n "${TEST_TABLE}" ]; then
-            # Attempt to count rows in the primary table to ensure the database is actually functional
-            ROW_COUNT=$(sqlite3 "${BACKUP_FILE}" "SELECT count(*) FROM ${TEST_TABLE};" 2>/dev/null || echo "ERROR")
+        for table in "${REQUIRED_TABLES[@]}"; do
+            ROW_COUNT=$(sqlite3 "${BACKUP_FILE}" "SELECT count(*) FROM ${table};" 2>/dev/null || echo "ERROR")
             if [[ "${ROW_COUNT}" =~ ^[0-9]+$ ]]; then
-                log_message "SUCCESS: Data Access Test passed for ${BACKUP_FILE} (${ROW_COUNT} rows in ${TEST_TABLE})."
+                log_message "SUCCESS: Data Access Test passed for ${BACKUP_FILE} table '${table}' (${ROW_COUNT} rows)."
             else
-                log_message "FAILURE: Data Access Test failed for ${BACKUP_FILE}. Could not read from ${TEST_TABLE}."
+                log_message "FAILURE: Data Access Test failed for ${BACKUP_FILE} table '${table}'. Could not read data."
                 exit 1
             fi
-        fi
+        done
 
-        # 3. Checksum Generation
+        # 3. Checksum Generation and Verification
         log_message "Generating SHA256 checksum for ${BACKUP_FILE}..."
         (cd "${DB_BACKUP_DIR}" && sha256sum "$(basename "${BACKUP_FILE}")" > "$(basename "${BACKUP_FILE}").sha256")
+
+        log_message "Verifying SHA256 checksum for ${BACKUP_FILE}..."
+        if (cd "${DB_BACKUP_DIR}" && sha256sum -c "$(basename "${BACKUP_FILE}").sha256" > /dev/null); then
+            log_message "SUCCESS: Checksum verification passed for ${BACKUP_FILE}."
+        else
+            log_message "FAILURE: Checksum verification failed for ${BACKUP_FILE}."
+            exit 1
+        fi
     else
         log_message "INFO: ${DB_FILE} not found. Skipping backup for this database."
     fi
@@ -148,6 +151,14 @@ if [ -d "${LOGS_DIR}" ] && [ "$(ls -A ${LOGS_DIR})" ]; then
     fi
 
     (cd "${LOGS_BACKUP_DIR}" && sha256sum "$(basename "${LOGS_ARCHIVE}")" > "$(basename "${LOGS_ARCHIVE}").sha256")
+
+    log_message "Verifying SHA256 checksum for ${LOGS_ARCHIVE}..."
+    if (cd "${LOGS_BACKUP_DIR}" && sha256sum -c "$(basename "${LOGS_ARCHIVE}").sha256" > /dev/null); then
+        log_message "SUCCESS: Checksum verification passed for ${LOGS_ARCHIVE}."
+    else
+        log_message "FAILURE: Checksum verification failed for ${LOGS_ARCHIVE}."
+        exit 1
+    fi
 else
     log_message "INFO: Logs directory empty or not found. Skipping log archival."
 fi
@@ -168,6 +179,14 @@ if [ -d "${REPORTS_DIR}" ] && [ "$(ls -A ${REPORTS_DIR})" ]; then
     fi
 
     (cd "${REPORTS_BACKUP_DIR}" && sha256sum "$(basename "${REPORTS_ARCHIVE}")" > "$(basename "${REPORTS_ARCHIVE}").sha256")
+
+    log_message "Verifying SHA256 checksum for ${REPORTS_ARCHIVE}..."
+    if (cd "${REPORTS_BACKUP_DIR}" && sha256sum -c "$(basename "${REPORTS_ARCHIVE}").sha256" > /dev/null); then
+        log_message "SUCCESS: Checksum verification passed for ${REPORTS_ARCHIVE}."
+    else
+        log_message "FAILURE: Checksum verification failed for ${REPORTS_ARCHIVE}."
+        exit 1
+    fi
 else
     log_message "INFO: Reports directory empty or not found. Skipping report archival."
 fi
@@ -188,6 +207,14 @@ if [ -d "${MODELS_DIR}" ] && [ "$(ls -A ${MODELS_DIR})" ]; then
     fi
 
     (cd "${MODELS_BACKUP_DIR}" && sha256sum "$(basename "${MODELS_ARCHIVE}")" > "$(basename "${MODELS_ARCHIVE}").sha256")
+
+    log_message "Verifying SHA256 checksum for ${MODELS_ARCHIVE}..."
+    if (cd "${MODELS_BACKUP_DIR}" && sha256sum -c "$(basename "${MODELS_ARCHIVE}").sha256" > /dev/null); then
+        log_message "SUCCESS: Checksum verification passed for ${MODELS_ARCHIVE}."
+    else
+        log_message "FAILURE: Checksum verification failed for ${MODELS_ARCHIVE}."
+        exit 1
+    fi
 else
     log_message "INFO: Models directory empty or not found. Skipping model archival."
 fi
