@@ -6,23 +6,27 @@ Automated institutional-grade research report generation demonstration.
 
 import os
 import sys
-from datetime import datetime, timezone
-import pandas as pd
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pandas as pd
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.research.reporting import ResearchOrchestrator, ResearchReporter, RareEventSection
-from src.models.regime_detector import RegimeDetector
-from src.research.stress_lab import StressLab, StressTestMetrics
-from src.research.benchmarks import EMACrossoverStrategy
-from src.research.hyperopt_walkforward import WalkForwardOptimizer, WalkForwardConfig
-from src.analytics.journal_mining import JournalMiner
 from src.analytics.drift_analyzer import DriftAnalyzer
+from src.analytics.execution_quality import ExecutionAnalyzer
+from src.analytics.journal_mining import JournalMiner
+from src.core.trade_logger import TradeLogger
+from src.models.regime_detector import RegimeDetector
+from src.research.benchmarks import EMACrossoverStrategy
+from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
+from src.research.rare_event_simulator import RareEventConfig, RareEventSimulator, RareEventType
+from src.research.reporting import RareEventSection, ResearchOrchestrator, ResearchReporter
+from src.research.stress_lab import StressLab, StressTestMetrics
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.research.rare_event_simulator import RareEventSimulator, RareEventConfig, RareEventType
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade, RiskEvent
+
 
 def generate_synthetic_data(n=1000):
     """Generate professional synthetic XAUUSD data."""
@@ -67,7 +71,18 @@ def setup_mock_journal_db(db_url="sqlite:///mock_trades.db"):
         pnl = 50.0 if i < 7 else -100.0 # mostly wins, then some losses for clusters
         logger.update_trade(ticket=1000 + i, exit_price=2300.0 + i + (pnl/100), pnl=pnl)
 
-    # Add risk events
+    # Add risk events for blocked signal analysis
+    for _ in range(3):
+        sig_id = logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 1,
+            "entry_price": 2300.0,
+            "algorithm": "RL_Agent",
+            "confidence": 0.5,
+            "timestamp": datetime.now(timezone.utc) - timedelta(days=1)
+        })
+        logger.log_risk_event("SIGNAL_REJECTED", "Low confidence score", "XAUUSD", signal_id=sig_id)
+
     logger.log_risk_event("SPREAD_WIDENING", "Spread too wide during news", "XAUUSD")
 
     return db_url
@@ -151,8 +166,12 @@ def main():
     # 8. Rare Event Simulations
     print("☄️  Simulating Rare Events...")
     simulator = RareEventSimulator(seed=123)
-    flash_crash_df, flash_crash_res = simulator.generate_scenario(RareEventConfig(event_type=RareEventType.FLASH_CRASH))
-    vacuum_df, vacuum_res = simulator.generate_scenario(RareEventConfig(event_type=RareEventType.LIQUIDITY_VACUUM))
+    _, flash_crash_res = simulator.generate_scenario(
+        RareEventConfig(event_type=RareEventType.FLASH_CRASH)
+    )
+    _, vacuum_res = simulator.generate_scenario(
+        RareEventConfig(event_type=RareEventType.LIQUIDITY_VACUUM)
+    )
 
     rare_event_section = RareEventSection(
         scenarios=[flash_crash_res.to_report_summary(), vacuum_res.to_report_summary()],
@@ -160,7 +179,32 @@ def main():
     )
     orchestrator.add_section(rare_event_section)
 
-    # 9. Build & Export
+    # 9. Execution Quality Analysis
+    print("⚡ Analyzing Execution Quality...")
+    # Mock connector for analyzer
+    mock_connector = MagicMock()
+    mock_connector.get_symbol_properties.return_value = {"digits": 2, "contract_size": 100.0}
+    mock_connector.get_rates_range.return_value = pd.DataFrame()
+    mock_connector.get_ticks_range.return_value = pd.DataFrame()
+
+    exec_analyzer = ExecutionAnalyzer(db_url=db_url, connector=mock_connector)
+    # We need to ensure we don't try to fetch from MT5 since it's not connected
+    # In a real scenario, this would use a live connector.
+    with patch.object(exec_analyzer, 'analyze_trade', return_value=None):
+        exec_summary = exec_analyzer.generate_summary_report(days=7)
+        # Manually fill some metrics for the demo if it came back empty
+        if exec_summary.executed_trade_count == 0:
+            exec_summary.avg_slippage = 0.5
+            exec_summary.avg_broker_slippage = 0.2
+            exec_summary.avg_latency_ms = 120.0
+            exec_summary.avg_fill_quality = 0.92
+            exec_summary.avg_edge_capture = 0.78
+            exec_summary.execution_efficiency_score = 0.88
+            exec_summary.executed_trade_count = 10
+
+        orchestrator.add_section(exec_summary.to_report_section())
+
+    # 10. Build & Export
     print("📝 Finalizing Report...")
     report = orchestrator.build()
     reporter = ResearchReporter()
@@ -171,7 +215,7 @@ def main():
     reporter.save_markdown(report, md_path)
     reporter.save_html(report, html_path)
 
-    print(f"\n✅ Report generated successfully!")
+    print("\n✅ Report generated successfully!")
     print(f"   - Markdown: {os.path.abspath(md_path)}")
     print(f"   - HTML:     {os.path.abspath(html_path)}")
 
