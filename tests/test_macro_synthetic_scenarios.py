@@ -2,10 +2,7 @@
 Tests for MacroScenarioBuilder and SystemContextBuilder in synthetic_data.py.
 """
 
-from datetime import UTC, datetime
-
 import pandas as pd
-import pytest
 
 from src.core.constants import EventCategory, EventImpact
 from src.data.event_models import MacroEvent, RiskStatus
