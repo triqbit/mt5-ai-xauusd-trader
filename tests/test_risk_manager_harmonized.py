@@ -3,13 +3,15 @@ Unified risk management harmonization tests.
 Verifies the 8-layer safety cascade and ATR-based position sizing.
 """
 
-import pytest
-import pandas as pd
-import numpy as np
 from unittest.mock import MagicMock
-from src.trading.risk_manager import RiskManager
-from src.core.schemas import TradeSignal, SignalDirection
+
+import pandas as pd
+import pytest
+
 from src.core.config import TradingConfig
+from src.core.schemas import SignalDirection, TradeSignal
+from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def mock_config():
