@@ -63,9 +63,9 @@ Archives themselves are subject to a retention policy to prevent indefinite stor
 - **Cleanup**: The `scripts/data_cleanup.py` script is responsible for purging expired archives.
 
 ### 4.3 Automated Purging Schedule
-The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a regular schedule.
-- **Recommended Schedule**: Weekly (Sundays at 00:00).
-- **Automation**: Managed via cron or CI/CD scheduled workflows.
+The automated cleanup script (`scripts/data_cleanup.py`) is executed on a regular schedule to ensure continuous compliance and storage hygiene.
+- **Schedule**: Weekly (Sundays at 00:00 UTC).
+- **Automation**: Managed via the `.github/workflows/data-cleanup.yml` GitHub Action.
 
 ### 4.4 Safe Deletion Logic
 - **Foreign Key Integrity**: The cleanup script ensures that `model_signals` linked to `trades` or `risk_events` are NOT deleted if the parent record is still within its retention window.
@@ -76,6 +76,6 @@ The automated cleanup script (`scripts/data_cleanup.py`) should be executed on a
 The primary mechanism for enforcement is the `scripts/data_cleanup.py` tool. It uses the `database_url` and `logs_dir` from the system configuration to target the correct data stores.
 
 ---
-**Version**: 1.4.0
-**Effective Date**: 2024-05-22
+**Version**: 1.4.1
+**Effective Date**: 2024-06-10
 **Owner**: Release Reliability & Governance (Jules03)
