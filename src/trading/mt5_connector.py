@@ -14,9 +14,12 @@ import asyncio
 import sys
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import nest_asyncio
+
+if TYPE_CHECKING:
+    from src.core.monitor import Monitor
 import pandas as pd
 import structlog
 
@@ -90,14 +93,18 @@ class MT5Connector:
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
     """
 
-    def __init__(self, config: TradingConfig) -> None:
+    def __init__(
+        self, config: TradingConfig, monitor: Optional["Monitor"] = None
+    ) -> None:
         """
         Initialize the connector with configuration.
 
         Args:
             config: TradingConfig object containing credentials and settings.
+            monitor: Optional Monitor instance for observability.
         """
         self.cfg = config
+        self.monitor = monitor
         self.use_metaapi: bool = False
         self.metaapi: Any | None = None
         self.metaapi_account: Any | None = None
@@ -105,12 +112,13 @@ class MT5Connector:
         self._is_initialized: bool = False
         self._background_tasks: set[asyncio.Task] = set()
 
-        # Circuit Breaker for connection and data retrieval
+        # Circuit Breaker for connection, data retrieval and execution
         self.breaker = CircuitBreaker(
             name="MT5Connector",
             failure_threshold=5,
             recovery_timeout=60.0,
             expected_exceptions=(MT5ConnectionError, MT5DataError),
+            monitor=self.monitor,
         )
 
     @property
@@ -516,9 +524,14 @@ class MT5Connector:
             Optional[int]: Order ticket ID if successful.
 
         Raises:
-            MT5ConnectionError: If not initialized.
+            MT5ConnectionError: If not initialized or blocked by breaker.
             MT5ExecutionError: If order is rejected.
+            CircuitBreakerError: If the circuit is OPEN.
         """
+        return self.breaker(self._place_order_logic)(signal)
+
+    def _place_order_logic(self, signal: TradeSignal) -> Optional[int]:
+        """Internal order placement logic wrapped by circuit breaker."""
         if not self._is_initialized:
             self.initialize()
 
@@ -533,6 +546,7 @@ class MT5Connector:
         order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
 
         if not self.use_metaapi:
+            # Note: get_tick is also wrapped by the breaker
             tick = self.get_tick(signal.symbol)
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
@@ -561,6 +575,8 @@ class MT5Connector:
                     code=err_code,
                     symbol=signal.symbol,
                 )
+                # We don't necessarily want execution errors to trip the connection breaker
+                # unless they are connection related retcodes.
                 raise MT5ExecutionError(
                     f"Order send failed (None result): {err_desc} (code: {err_code})"
                 )
@@ -614,6 +630,11 @@ class MT5Connector:
                     symbol=signal.symbol,
                     error=str(e),
                 )
+                # Check if it is a connection error for MetaAPI
+                if "connection" in str(e).lower() or "timeout" in str(e).lower():
+                    self._is_initialized = False
+                    raise MT5ConnectionError(f"MetaAPI connection lost during order: {e}") from e
+
                 raise MT5ExecutionError(f"MetaAPI order placement failed: {e}") from e
 
     def get_account_balance(self) -> float:

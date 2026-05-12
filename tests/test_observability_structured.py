@@ -4,11 +4,11 @@ Verification tests for structured observability improvements.
 
 import unittest
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone
-import structlog
-from src.core.resilience import CircuitBreaker, CircuitState
-from src.trading.mt5_connector import MT5Connector
+
 from src.core.monitor import Monitor
+from src.core.resilience import CircuitBreaker
+from src.trading.mt5_connector import MT5Connector
+
 
 class TestStructuredObservability(unittest.TestCase):
     def test_circuit_breaker_logging(self):
@@ -29,6 +29,7 @@ class TestStructuredObservability(unittest.TestCase):
                 "circuit_breaker_tripped",
                 name="TestBreaker",
                 state="OPEN",
+                from_state="CLOSED",
                 failure_count=1,
                 error="Test Error"
             )
@@ -42,11 +43,13 @@ class TestStructuredObservability(unittest.TestCase):
 
         connector = MT5Connector(mock_cfg)
 
-        with patch("src.trading.mt5_connector.logger") as mock_log:
-            with patch("src.trading.mt5_connector.MT5_AVAILABLE", False):
-                with patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False):
-                    with self.assertRaises(Exception):
-                        connector.initialize()
+        from src.core.exceptions import MT5ConnectionError
+
+        with patch("src.trading.mt5_connector.logger") as mock_log, \
+             patch("src.trading.mt5_connector.MT5_AVAILABLE", False), \
+             patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False):
+            with self.assertRaises(MT5ConnectionError):
+                connector.initialize()
 
             # Verify structured log call for start
             mock_log.info.assert_any_call(

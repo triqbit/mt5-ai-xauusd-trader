@@ -61,6 +61,11 @@ PARTIAL_FILL_COUNTER = Counter("trading_partial_fills_total", "Total number of p
 CPU_USAGE_GAUGE = Gauge("system_cpu_usage_percent", "System CPU utilization percentage")
 MEMORY_USAGE_GAUGE = Gauge("system_memory_usage_percent", "System memory usage percentage")
 DISK_USAGE_GAUGE = Gauge("system_disk_usage_percent", "System disk usage percentage")
+CIRCUIT_BREAKER_STATE_GAUGE = Gauge(
+    "trading_circuit_breaker_state",
+    "Current state of the circuit breaker (0=CLOSED, 1=HALF_OPEN, 2=OPEN)",
+    ["name"],
+)
 SYSTEM_ERROR_COUNTER = Counter(
     "trading_system_errors", "Total count of system errors", ["component"]
 )
@@ -245,6 +250,16 @@ class Monitor:
     def record_trade(self) -> None:
         """Increment the total trade counter."""
         TRADE_COUNTER.inc()
+
+    def update_circuit_breaker_state(self, name: str, state: str) -> None:
+        """
+        Update the circuit breaker state metric.
+        0 = CLOSED, 1 = HALF_OPEN, 2 = OPEN
+        """
+        state_map = {"CLOSED": 0, "HALF_OPEN": 1, "OPEN": 2}
+        val = state_map.get(state, 2)  # Default to OPEN if unknown
+        CIRCUIT_BREAKER_STATE_GAUGE.labels(name=name).set(val)
+        logger.info("circuit_breaker_state_updated", name=name, state=state, value=val)
 
     def log_system_error(self, component: str, error_message: str) -> None:
         """Log system errors to Prometheus and send a Telegram alert."""

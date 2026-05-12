@@ -7,11 +7,14 @@ Robust Circuit Breaker pattern for graceful failure and self-healing.
 import functools
 import time
 from enum import Enum
-from typing import Any, Callable, Optional, Type
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type
 
 import structlog
 
 from src.core.exceptions import CircuitBreakerError
+
+if TYPE_CHECKING:
+    from src.core.monitor import Monitor
 
 logger = structlog.get_logger(__name__)
 
@@ -38,15 +41,20 @@ class CircuitBreaker:
         failure_threshold: int = 5,
         recovery_timeout: float = 60.0,
         expected_exceptions: Optional[tuple[Type[Exception], ...]] = None,
+        monitor: Optional["Monitor"] = None,
     ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.expected_exceptions = expected_exceptions or (Exception,)
+        self.monitor = monitor
 
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._last_failure_time: Optional[float] = None
+
+        # Report initial state
+        self._report_state(self._state)
 
     @property
     def state(self) -> CircuitState:
@@ -56,27 +64,32 @@ class CircuitBreaker:
             and self._last_failure_time
             and (time.time() - self._last_failure_time) > self.recovery_timeout
         ):
+            previous_state = self._state
+            self._state = CircuitState.HALF_OPEN
             logger.info(
                 "circuit_breaker_transition",
                 name=self.name,
-                from_state=self._state.value,
-                to_state=CircuitState.HALF_OPEN.value,
+                from_state=previous_state.value,
+                to_state=self._state.value,
                 reason="recovery_timeout_reached",
             )
-            self._state = CircuitState.HALF_OPEN
+            self._report_state(self._state)
         return self._state
 
     def _handle_success(self) -> None:
         """Reset the breaker on success."""
-        if self._state == CircuitState.HALF_OPEN:
+        if self._state != CircuitState.CLOSED:
+            previous_state = self._state
+            self._state = CircuitState.CLOSED
             logger.info(
                 "circuit_breaker_transition",
                 name=self.name,
-                from_state=self._state.value,
-                to_state=CircuitState.CLOSED.value,
+                from_state=previous_state.value,
+                to_state=self._state.value,
                 reason="test_success",
             )
-        self._state = CircuitState.CLOSED
+            self._report_state(self._state)
+
         self._failure_count = 0
         self._last_failure_time = None
 
@@ -85,16 +98,26 @@ class CircuitBreaker:
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if self._state == CircuitState.HALF_OPEN or self._failure_count >= self.failure_threshold:
-            if self._state != CircuitState.OPEN:
+        if (self._state == CircuitState.HALF_OPEN or self._failure_count >= self.failure_threshold) and self._state != CircuitState.OPEN:
+                previous_state = self._state
+                self._state = CircuitState.OPEN
                 logger.error(
                     "circuit_breaker_tripped",
                     name=self.name,
-                    state=CircuitState.OPEN.value,
+                    state=self._state.value,
+                    from_state=previous_state.value,
                     failure_count=self._failure_count,
                     error=str(exception),
                 )
-            self._state = CircuitState.OPEN
+                self._report_state(self._state)
+
+    def _report_state(self, state: CircuitState) -> None:
+        """Report current state to the monitor."""
+        if self.monitor:
+            try:
+                self.monitor.update_circuit_breaker_state(self.name, state.value)
+            except Exception as e:
+                logger.error("failed_to_report_circuit_breaker_state", name=self.name, error=str(e))
 
     def __call__(self, func: Callable):
         """Decorator for circuit breaker integration."""
