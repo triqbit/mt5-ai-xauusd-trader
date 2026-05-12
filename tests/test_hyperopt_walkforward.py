@@ -495,3 +495,45 @@ def test_wfe_calculation(sample_data):
 
     # WFE = OOS_Mean / IS_Mean = 1.0 / 2.0 = 0.5
     assert result.metrics.walk_forward_efficiency == pytest.approx(0.5)
+
+
+def test_json_export(sample_data, tmp_path):
+    """Verifies that WalkForwardResult can be exported to JSON."""
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 20}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, param_space, config)
+    result = optimizer.run_optimization()
+
+    json_file = tmp_path / "result.json"
+    result.save_json(str(json_file))
+
+    assert json_file.exists()
+    content = json_file.read_text()
+    assert '"best_params"' in content
+    assert '"metrics"' in content
+
+
+def test_strict_fragility_penalty(sample_data):
+    """Verifies that the stability penalty correctly identifies and penalizes fragility."""
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 20}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, param_space, config)
+
+    eval_calls = 0
+    def mock_eval(data, params):
+        nonlocal eval_calls
+        eval_calls += 1
+        # Base case (1st call): Sharpe = 1.0
+        # Perturbation (subsequent calls): Sharpe = -0.5 (Catastrophic drop)
+        return {"Sharpe Ratio": 1.0 if eval_calls == 1 else -0.5}
+
+    optimizer._evaluate_strategy = mock_eval
+    params = {"fast_window": 10, "slow_window": 20}
+    penalty = optimizer._calculate_stability_penalty(params, sample_data)
+
+    # Should return the maximum penalty of 10.0 due to fragility (positive to negative flip)
+    assert penalty == 10.0

@@ -100,7 +100,17 @@ class WalkForwardResult(BaseModel):
     metrics: RobustnessMetrics
     window_results: list[WindowResult]
     oos_returns: list[float] = Field(default_factory=list, description="Aggregated OOS returns")
-    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    def save_json(self, filepath: str) -> None:
+        """
+        Save result to a JSON file for auditability.
+
+        Args:
+            filepath: Path to save the JSON file.
+        """
+        with open(filepath, "w") as f:
+            f.write(self.model_dump_json(indent=4))
 
     def to_report_section(self) -> Any:
         """
@@ -278,9 +288,15 @@ class WalkForwardOptimizer:
                             p_sharpe = p_metrics.get("Sharpe Ratio", 0.0)
                             if not np.isnan(p_sharpe):
                                 perturbations.append(float(p_sharpe))
+                                # Strict Fragility: if small change causes a catastrophic drop, penalize heavily
+                                if p_sharpe < 0 and base_sharpe > 0:
+                                    logger.warning("Fragility detected for %s=%s", key, new_val)
+                                    return 10.0
+                            else:
+                                return 10.0  # Fragility safeguard
                         except Exception as e:
                             logger.debug("Perturbation failed for %s=%s: %s", key, new_val, e)
-                            continue
+                            return 10.0  # Conservative penalty for failure
         except Exception as e:
             logger.warning("Stability calculation failed: %s", e)
             return 10.0  # Fragility safeguard
