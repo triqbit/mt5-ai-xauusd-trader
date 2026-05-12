@@ -19,6 +19,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -69,11 +70,13 @@ class ModelSignal(Base, AuditMixin):
     stop_loss: Mapped[float | None] = mapped_column(Float)
     take_profit: Mapped[float | None] = mapped_column(Float)
     lot_size: Mapped[float | None] = mapped_column(Float)
-    algorithm: Mapped[str | None] = mapped_column(String(50))
+    algorithm: Mapped[str | None] = mapped_column(String(50), index=True)
     confidence: Mapped[float | None] = mapped_column(Float)
     volatility: Mapped[float | None] = mapped_column(Float)
     trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), index=True
+    )
 
     # Relationship
     trade: Mapped["Trade"] = relationship("Trade", back_populates="signal", uselist=False)
@@ -84,6 +87,7 @@ class ModelSignal(Base, AuditMixin):
     __table_args__ = (
         CheckConstraint("entry_price > 0", name="check_signal_entry_price_positive"),
         CheckConstraint("lot_size >= 0", name="check_signal_lot_size_non_negative"),
+        Index("ix_model_signals_symbol_timestamp", "symbol", "timestamp"),
     )
 
 
@@ -117,6 +121,7 @@ class Trade(Base, AuditMixin):
     __table_args__ = (
         CheckConstraint("entry_price > 0", name="check_trade_entry_price_positive"),
         CheckConstraint("lot_size > 0", name="check_trade_lot_size_positive"),
+        Index("ix_trades_perf_lookup", "status", "is_deleted", "created_at"),
     )
 
 
@@ -126,7 +131,9 @@ class BlockedSignalAnalysis(Base, AuditMixin):
     __tablename__ = "blocked_signal_analysis"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    signal_id: Mapped[int] = mapped_column(ForeignKey("model_signals.id"), nullable=False, unique=True)
+    signal_id: Mapped[int] = mapped_column(
+        ForeignKey("model_signals.id"), nullable=False, unique=True
+    )
 
     opportunity_cost_pnl: Mapped[float] = mapped_column(Float, nullable=False)
     max_favorable_excursion: Mapped[float] = mapped_column(Float, nullable=False)
@@ -183,7 +190,9 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), index=True
+    )
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
     max_drawdown: Mapped[float | None] = mapped_column(Float)
