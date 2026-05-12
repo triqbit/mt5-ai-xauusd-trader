@@ -36,7 +36,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor.execute("PRAGMA journal_mode=WAL")
         # Prevent "database is locked" errors by waiting up to 5 seconds
         cursor.execute("PRAGMA busy_timeout=5000")
-        # Synchronous NORMAL is recommended for WAL mode: it's safe and faster.
+        # Synchronous NORMAL is recommended for WAL mode: it is safe and faster.
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
         logger.debug("SQLite pragmas (foreign_keys, WAL, busy_timeout, synchronous) enabled.")
@@ -94,7 +94,8 @@ def get_engine(db_url: str) -> Engine:
     engine = create_engine(db_url, **engine_kwargs)
 
     logger.info(
-        "Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url
+        "Database engine initialized for: %s",
+        db_url.split("@")[-1] if "@" in db_url else db_url,
     )
     return engine
 

@@ -387,6 +387,7 @@ The trade logging system has been implemented in `src/core/trade_logger.py` usin
 To ensure enterprise-grade reliability when using SQLite:
 - **Foreign Key Enforcement**: Enabled via SQLAlchemy event listeners (`PRAGMA foreign_keys=ON`). This ensures relational integrity that is disabled by default in SQLite.
 - **Write-Ahead Logging (WAL)**: Enabled via `PRAGMA journal_mode=WAL` to improve concurrency (allowing multiple readers and one writer) and provide better durability and performance.
+
 - **Busy Timeout**: Increased to 5000ms (`PRAGMA busy_timeout=5000`) to significantly reduce "database is locked" errors during concurrent read/write operations.
 - **Synchronous Mode**: Set to `NORMAL` (`PRAGMA synchronous=NORMAL`) when in WAL mode, providing an optimal balance between write performance and durability.
 - **Slow Query Logging**: Instrumentation added to log any database query exceeding a 1.0s threshold as a WARNING for production observability.
