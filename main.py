@@ -662,7 +662,8 @@ def get_system_version() -> str:
         return "unknown"
 
 
-def parse_args() -> argparse.Namespace:
+def get_parser() -> argparse.ArgumentParser:
+    """Construct the main CLI argument parser."""
     p = argparse.ArgumentParser(
         description="MT5 AI/ML Trading Bot - Enterprise Edition",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -763,7 +764,7 @@ Usage Examples:
         action="store_true",
         help="Explicitly acknowledge and confirm LIVE trading execution",
     )
-    return p.parse_args()
+    return p
 
 
 def run_backtest(
@@ -868,7 +869,8 @@ def main() -> int:
     # 1. Guided Setup: Detect missing .env and offer to initialize it
     env_file = Path(".env")
     example_file = Path(".env.example")
-    if not is_diagnostic and not env_file.exists() and example_file.exists() and sys.stdin.isatty():
+    if not is_diagnostic and not env_file.exists() and example_file.exists():
+        if sys.stdin.isatty():
             print("\n[!] Configuration file (.env) is missing.")
             try:
                 choice = (
@@ -877,12 +879,26 @@ def main() -> int:
                     .lower()
                 )
                 if choice in ["", "y", "yes"]:
+                    import contextlib
                     import shutil
 
                     shutil.copy(".env.example", ".env")
-                    print("✅ Created .env from template. Please edit it with your credentials.\n")
+                    # Apply restrictive permissions immediately
+                    with contextlib.suppress(Exception):
+                        os.chmod(env_file, 0o600)
+
+                    # Ensure required directories exist
+                    for d in ["data", "logs", "models/trained"]:
+                        Path(d).mkdir(parents=True, exist_ok=True)
+
+                    print("✅ Created .env with secure permissions and initialized directories.")
+                    print("👉 Please edit .env with your credentials before proceeding.\n")
             except (KeyboardInterrupt, EOFError):
                 print("\nSetup skipped.")
+        else:
+            # Non-interactive environment: auto-initialize directories if .env exists
+            # (If .env doesn't exist, we can't do much in non-interactive mode anyway)
+            pass
 
     # 2. Handle missing dependencies gracefully for diagnostic flags
     if not HAS_DEPENDENCIES and not is_diagnostic:
@@ -903,7 +919,8 @@ def main() -> int:
         print("-" * 70)
         return 1
 
-    args = parse_args()
+    parser = get_parser()
+    args = parser.parse_args()
 
     # 0. Immediate Diagnostic Handlers
     if args.doctor:
@@ -918,19 +935,13 @@ def main() -> int:
 
     # 1. Dynamic CLI Override Mapping
     # Identify explicitly provided arguments to avoid defaults overriding ENV/.env.
+    # Also tracked for source attribution in --show-config and summary panel.
     provided_dest = set()
-    temp_p = argparse.ArgumentParser(add_help=False)
-    temp_p.add_argument("--mode")
-    temp_p.add_argument("--algo", dest="algorithm")
-    temp_p.add_argument("--symbol")
-    temp_p.add_argument("--timeframe")
-    temp_p.add_argument("--confirm-live", dest="confirm_live_trading", action="store_true")
-    temp_p.add_argument("--log-level", dest="log_level")
-
-    for action in temp_p._actions:
+    for action in parser._actions:
         for opt in action.option_strings:
             if opt in sys.argv:
                 provided_dest.add(action.dest)
+                break
 
     # Sync CLI overrides to environment variables for Pydantic to pick up
     for dest in provided_dest:
@@ -997,6 +1008,12 @@ def main() -> int:
         config_table = Table(title="[bold blue]Current System Configuration (Sanitized)[/]", box=None)
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="white")
+        config_table.add_column("Source", style="dim")
+
+        # Dynamic discovery of field origins
+        # 1. Check CLI overrides (provided_dest)
+        # 2. Check ENV (os.environ)
+        # 3. Default
 
         # Dynamic exclusion of all SecretStr/SecretBytes fields
         secret_fields = {
@@ -1011,7 +1028,18 @@ def main() -> int:
         )
 
         for key, value in sorted(sanitized_cfg.items()):
-            config_table.add_row(key, str(value))
+            # Determine source
+            source = "[dim]DEFAULT[/]"
+            if key in provided_dest:
+                source = "[bold cyan]CLI[/]"
+            else:
+                # Check aliases and env vars
+                field_info = cfg.__class__.model_fields.get(key)
+                alias = field_info.validation_alias if field_info else None
+                if (alias and alias in os.environ) or (key.upper() in os.environ):
+                    source = "[bold green]ENV[/]"
+
+            config_table.add_row(key, str(value), source)
 
         console.print(
             Panel(
@@ -1077,10 +1105,18 @@ def main() -> int:
 
     # Configuration Group
     summary.add_row("[bold underline]Configuration[/]", "")
-    summary.add_row("Mode:  ", f"[bold]{cfg.mode.upper()}[/]")
-    summary.add_row("Symbol:  ", f"[bold]{cfg.symbol}[/]")
-    summary.add_row("Timeframe:  ", cfg.timeframe)
-    summary.add_row("Algorithm:  ", cfg.algorithm)
+
+    mode_tag = " [bold cyan](CLI OVERRIDE)[/]" if "mode" in provided_dest else ""
+    summary.add_row("Mode:  ", f"[bold]{cfg.mode.upper()}[/]{mode_tag}")
+
+    symbol_tag = " [bold cyan](CLI OVERRIDE)[/]" if "symbol" in provided_dest else ""
+    summary.add_row("Symbol:  ", f"[bold]{cfg.symbol}[/]{symbol_tag}")
+
+    tf_tag = " [bold cyan](CLI OVERRIDE)[/]" if "timeframe" in provided_dest else ""
+    summary.add_row("Timeframe:  ", f"{cfg.timeframe}{tf_tag}")
+
+    algo_tag = " [bold cyan](CLI OVERRIDE)[/]" if "algorithm" in provided_dest else ""
+    summary.add_row("Algorithm:  ", f"{cfg.algorithm}{algo_tag}")
     summary.add_row(
         "Database:  ",
         "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite",
