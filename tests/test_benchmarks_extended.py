@@ -2,14 +2,20 @@
 Extended tests for the benchmarking framework, focusing on slippage and new baselines.
 """
 
+import sys
+from unittest.mock import MagicMock
+
 import numpy as np
 import pandas as pd
 import pytest
+
 from src.research.benchmarks import (
-    BenchmarkEvaluator,
     ADXStrategy,
-    EMACrossoverStrategy
+    BenchmarkEvaluator,
+    EMACrossoverStrategy,
+    EnsembleAdapter,
 )
+
 
 @pytest.fixture
 def sample_data():
@@ -28,11 +34,13 @@ def sample_data():
     )
     return df
 
+
 def test_adx_strategy_signals(sample_data):
     strategy = ADXStrategy(window=14, adx_threshold=20.0)
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
+
 
 def test_slippage_impact(sample_data):
     """Test that slippage correctly reduces total return."""
@@ -45,7 +53,8 @@ def test_slippage_impact(sample_data):
     return_no_slip = eval_no_slip.results[strategy.name]["Total Return"]
 
     # 2. Evaluate with slippage
-    eval_with_slip = BenchmarkEvaluator(sample_data, commission=0.0001, slippage=0.01) # 1% slippage is huge, should be visible
+    # 1% slippage is huge, should be visible
+    eval_with_slip = BenchmarkEvaluator(sample_data, commission=0.0001, slippage=0.01)
     eval_with_slip.evaluate_all([strategy])
     return_with_slip = eval_with_slip.results[strategy.name]["Total Return"]
 
@@ -56,11 +65,13 @@ def test_slippage_impact(sample_data):
     else:
         pytest.skip("No trades made by the strategy in sample data")
 
+
 def test_evaluator_slippage_parameter():
     """Test that BenchmarkEvaluator correctly stores the slippage parameter."""
     df = pd.DataFrame({"close": [100, 101]})
     evaluator = BenchmarkEvaluator(df, slippage=0.0005)
     assert evaluator.slippage == 0.0005
+
 
 def test_adx_strategy_fallback(sample_data):
     """Test ADXStrategy fallback logic when talib is unavailable."""
@@ -71,12 +82,9 @@ def test_adx_strategy_fallback(sample_data):
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
 
+
 def test_adapter_robustness_short_df():
     """Test that adapters handle DataFrames shorter than window_size."""
-    from src.research.benchmarks import EnsembleAdapter
-    from unittest.mock import MagicMock
-    import sys
-
     # Mock torch for this test if it's not present
     if "torch" not in sys.modules:
         sys.modules["torch"] = MagicMock()
