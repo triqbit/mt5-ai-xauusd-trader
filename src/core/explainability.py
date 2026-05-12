@@ -377,7 +377,6 @@ class SignalExplainer:
             )
 
         # 2. Model Attribution
-        attributions = []
         dominant_models = []
         max_weighted_conf = -1.0
         model_confidences = model_confidences or {}
@@ -458,7 +457,6 @@ class SignalExplainer:
                 summary="No market regime context available.",
             )
         elif hasattr(regime_info, "label"):  # RegimeInfo pydantic model
-            label_val = str(regime_info.label.value).lower()
             alignment = regime_info.confidence if regime_info.confidence > 0.6 else 0.4
             regime_context = RegimeContext(
                 regime_name=str(regime_info.label.value).title(),
