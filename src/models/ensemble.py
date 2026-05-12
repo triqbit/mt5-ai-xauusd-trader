@@ -30,6 +30,7 @@ from src.models.base_model import BaseModel, Signal
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
+    from src.models.regime_detector import RegimeInfo
 from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMModel
@@ -132,7 +133,12 @@ class EnsembleModel(BaseModel):
             "calibration": total_cal,
         }
 
-    def observe_outcome(self, actual_direction: SignalDirection) -> None:
+    def observe_outcome(
+        self,
+        actual_direction: SignalDirection,
+        regime_info: Optional[RegimeInfo] = None,
+        volatility_context: Optional[float] = None,
+    ) -> None:
         """
         Record market outcome and update dynamic weights.
         This enables autonomous drift monitoring and adaptive rebalancing.
@@ -141,7 +147,9 @@ class EnsembleModel(BaseModel):
             self.dynamic_ensemble.record_outcome(name, actual_direction)
 
         # Update weights based on the new history
-        self.dynamic_ensemble.update_weights()
+        self.dynamic_ensemble.update_weights(
+            regime_info=regime_info, volatility_context=volatility_context
+        )
         logger.info(
             "Ensemble outcome observed | actual=%s | new_weights=%s",
             actual_direction.name,
