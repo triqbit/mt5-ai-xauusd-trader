@@ -284,6 +284,15 @@ class SignalExplainer:
         Returns:
             A structured SignalExplanation object.
         """
+        # 0. Robustness: Validate core inputs and provide defaults
+        if not symbol:
+            logger.warning("Empty symbol provided to SignalExplainer. Falling back to XAUUSD.")
+            symbol = "XAUUSD"
+
+        model_votes = model_votes or {}
+        model_weights = model_weights or {}
+        risk_data = risk_data or {}
+
         # 1. Execution Summary
         if execution_data is None:
             execution_summary = ExecutionSummary(
@@ -315,22 +324,30 @@ class SignalExplainer:
                 if execution_data.blocked_by
                 else "Passed all execution filters",
             )
-        else:  # dict
+        elif isinstance(execution_data, dict):
             execution_filters = [
                 FilterResult(
-                    filter_name=f["name"],
-                    passed=f["passed"],
+                    filter_name=f.get("name", "Unknown"),
+                    passed=f.get("passed", False),
                     value=f.get("value"),
                     threshold=f.get("threshold"),
                     message=f.get("message"),
                 )
                 for f in execution_data.get("filters", [])
+                if isinstance(f, dict)
             ]
 
             execution_summary = ExecutionSummary(
                 passed=execution_data.get("passed", False),
                 filters=execution_filters,
                 summary=execution_data.get("summary", "No execution data"),
+            )
+        else:
+            logger.error(f"Malformed execution_data of type {type(execution_data)}. Using defaults.")
+            execution_summary = ExecutionSummary(
+                passed=False,
+                filters=[],
+                summary="Malformed execution data detected",
             )
 
         # 2. Model Attribution
@@ -340,7 +357,12 @@ class SignalExplainer:
         model_confidences = model_confidences or {}
 
         for name, vote_idx in model_votes.items():
-            vote_dir = ModelAction(int(vote_idx)).to_direction()
+            try:
+                vote_dir = ModelAction(int(vote_idx)).to_direction()
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid vote index '{vote_idx}' for model '{name}'. Falling back to HOLD.")
+                vote_dir = SignalDirection.HOLD
+
             weight = model_weights.get(name, 0.0)
 
             # Individual model confidence: use provided value, or fallback to ensemble
@@ -386,7 +408,16 @@ class SignalExplainer:
         )
 
         # 4. Regime Context
-        if hasattr(regime_info, "label"):  # RegimeInfo pydantic model
+        if regime_info is None:
+            logger.warning("No regime_info provided to SignalExplainer. Using defaults.")
+            regime_context = RegimeContext(
+                regime_name="Unknown",
+                confidence=0.0,
+                volatility_state="Normal",
+                is_favorable=True,
+                summary="No market regime context available.",
+            )
+        elif hasattr(regime_info, "label"):  # RegimeInfo pydantic model
             regime_context = RegimeContext(
                 regime_name=str(regime_info.label.value).title(),
                 confidence=regime_info.confidence,
@@ -394,7 +425,7 @@ class SignalExplainer:
                 is_favorable=regime_info.confidence > 0.6,
                 summary=f"Market in {regime_info.label.value} state with {regime_info.confidence:.1%} confidence.",
             )
-        else:  # dict
+        elif isinstance(regime_info, dict):
             regime_context = RegimeContext(
                 regime_name=regime_info.get("name", "Unknown"),
                 confidence=regime_info.get("confidence", 0.0),
@@ -402,18 +433,30 @@ class SignalExplainer:
                 is_favorable=regime_info.get("is_favorable", True),
                 summary=regime_info.get("summary", "Market state stable"),
             )
+        else:
+            logger.error(f"Malformed regime_info of type {type(regime_info)}. Using defaults.")
+            regime_context = RegimeContext(
+                regime_name="Error",
+                confidence=0.0,
+                volatility_state="Normal",
+                is_favorable=False,
+                summary="Malformed regime context detected.",
+            )
 
         # 5. Feature Contributions (with clustering logic)
         contributions = []
-        if isinstance(feature_impacts, list):
+        if feature_impacts is None:
+            contributions = []
+        elif isinstance(feature_impacts, list):
             contributions = [
                 FeatureContribution(
-                    cluster_name=fi["cluster"],
-                    contribution_score=fi["score"],
-                    impact_level=fi["impact"],
-                    summary=fi["summary"],
+                    cluster_name=fi.get("cluster", "Unknown"),
+                    contribution_score=fi.get("score", 0.0),
+                    impact_level=fi.get("impact", "Low"),
+                    summary=fi.get("summary", "No feature summary"),
                 )
                 for fi in feature_impacts
+                if isinstance(fi, dict)
             ]
         elif isinstance(feature_impacts, dict):
             # Individual feature scores -> Aggregate into clusters
@@ -446,27 +489,48 @@ class SignalExplainer:
                     )
                 )
 
-        # 6. Generate Human Readable Summary
+        # 6. Generate Human Readable Summary with Confluence Logic
         dir_str = SignalDirection(direction).name
         reasoning = f"Ensemble generated a {dir_str} signal with {confidence:.1%} confidence. "
         if dominant_models:
             reasoning += f"Primary driver(s): {', '.join(dominant_models)}. "
+
         reasoning += f"Market is currently in a {regime_context.regime_name} regime. "
         if regime_context.is_favorable:
             reasoning += "Market state is considered favorable for this strategy. "
         else:
             reasoning += "Market state is UNFAVORABLE/CAUTIONARY for this strategy. "
 
-        # Add key feature impacts if available
-        high_impact_features = [c for c in contributions if c.impact_level == "High"]
-        if high_impact_features:
-            impact_summaries = [f"{c.cluster_name}: {c.summary}" for c in high_impact_features]
-            reasoning += f"Key impacts: {'; '.join(impact_summaries)}. "
+        # Categorize feature confluence (supporting vs opposing)
+        supporting = []
+        opposing = []
+        for c in contributions:
+            # BUY (1) and score > 0 -> Supporting
+            # SELL (-1) and score < 0 -> Supporting
+            # Score 0 -> Neutral (Ignore)
+            if c.contribution_score == 0:
+                continue
+
+            is_supporting = (direction > 0 and c.contribution_score > 0) or (
+                direction < 0 and c.contribution_score < 0
+            )
+            entry = f"{c.cluster_name} ({c.contribution_score:+.2f})"
+
+            if is_supporting:
+                supporting.append(entry)
+            else:
+                opposing.append(entry)
+
+        if supporting:
+            reasoning += f"Supported by: {', '.join(supporting)}. "
+        if opposing:
+            reasoning += f"Opposed by: {', '.join(opposing)}. "
 
         if not execution_summary.passed:
             reasoning += f"EXECUTION BLOCKED: {execution_summary.summary}. "
         elif not risk_assessment.passed:
-            reasoning += f"Risk REJECTED: {', '.join(risk_assessment.rejection_reasons)}. "
+            reasons = ", ".join(risk_assessment.rejection_reasons) or "Unknown risk violation"
+            reasoning += f"Risk REJECTED: {reasons}. "
         else:
             reasoning += f"Passed all filters with R:R of {risk_assessment.risk_reward_ratio:.2f}."
 
