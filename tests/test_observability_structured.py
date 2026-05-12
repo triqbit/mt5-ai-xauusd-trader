@@ -29,6 +29,7 @@ class TestStructuredObservability(unittest.TestCase):
                 "circuit_breaker_tripped",
                 name="TestBreaker",
                 state="OPEN",
+                from_state="CLOSED",
                 failure_count=1,
                 error="Test Error"
             )

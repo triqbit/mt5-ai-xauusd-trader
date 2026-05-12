@@ -1175,10 +1175,17 @@ def main() -> int:
     )
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
+    from src.core.monitor import Monitor
+    monitor = Monitor(cfg)
+    # Note: Monitor's start_metrics_server is legacy;
+    # Enterprise deployments use the FastAPI health app which includes /metrics.
+    # However, we keep it for backward compatibility or individual component runs.
+    monitor.start_metrics_server()
+
     from src.core.exceptions import MT5ConnectionError
     from src.trading.mt5_connector import MT5Connector
 
-    connector = MT5Connector(cfg)
+    connector = MT5Connector(cfg, monitor=monitor)
     with console.status("[bold green]Connecting to MT5 terminal..."):
         try:
             connector.connect()
@@ -1212,7 +1219,6 @@ def main() -> int:
     from src.core.decision_support import DecisionSupportSystem
     from src.core.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
-    from src.core.monitor import Monitor
     from src.core.trade_logger import TradeLogger
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
@@ -1227,11 +1233,7 @@ def main() -> int:
     trade_logger = TradeLogger(
         db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
     )
-    monitor = Monitor(cfg)
-    # Note: Monitor's start_metrics_server is legacy;
-    # Enterprise deployments use the FastAPI health app which includes /metrics.
-    # However, we keep it for backward compatibility or individual component runs.
-    monitor.start_metrics_server()
+
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
