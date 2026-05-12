@@ -157,6 +157,9 @@ jobs:
       - name: Verify Version Synchronization
         run: python scripts/verify_version_sync.py
 
+      - name: Reliability SLO Audit
+        run: python scripts/verify_slos.py
+
       - name: Automated Pre-Prod Checklist Verification
         run: |
           CHECKLIST="docs/PREPROD_CHECKLIST.md"
