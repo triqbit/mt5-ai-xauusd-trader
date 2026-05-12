@@ -212,7 +212,9 @@ class RiskManager:
                 # and increase accuracy floor by 10%.
                 drift_threshold *= 0.5
                 accuracy_floor = min(0.9, accuracy_floor + 0.10)
-                logger.debug("Regime NEWS_SHOCK: health thresholds hardened (+50%% drift, +10%% acc)")
+                logger.debug(
+                    "Regime NEWS_SHOCK: health thresholds hardened (+50%% drift, +10%% acc)"
+                )
             elif regime in (MarketRegime.VOLATILE_BREAKOUT, MarketRegime.MEAN_REVERSION):
                 # Volatile states require consistent model performance; tighten drift by 25%.
                 drift_threshold *= 0.75

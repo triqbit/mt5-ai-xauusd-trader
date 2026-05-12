@@ -27,9 +27,11 @@ def mock_config():
     cfg.risk_per_trade = 0.01
     return cfg
 
+
 @pytest.fixture
 def risk_manager(mock_config):
     return RiskManager(mock_config, account_balance=10000.0)
+
 
 @pytest.fixture
 def base_signal():
@@ -42,16 +44,14 @@ def base_signal():
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.7,
-        timestamp=datetime.now(timezone.utc)
+        timestamp=datetime.now(timezone.utc),
     )
+
 
 def test_check_model_health_ranging(risk_manager):
     """Verifies that base thresholds are used in RANGING regime."""
     regime_info = RegimeInfo(
-        label=MarketRegime.RANGING,
-        confidence=0.9,
-        transition_score=0.1,
-        volatility_index=1.0
+        label=MarketRegime.RANGING, confidence=0.9, transition_score=0.1, volatility_index=1.0
     )
 
     # Moderate drift (0.25) is below base threshold (0.3)
@@ -62,13 +62,11 @@ def test_check_model_health_ranging(risk_manager):
     health = {"drift": 0.35, "accuracy": 0.55, "calibration": 0.1}
     assert risk_manager._check_model_health(health, regime_info=regime_info) is False
 
+
 def test_check_model_health_news_shock(risk_manager):
     """Verifies that thresholds are tightened during NEWS_SHOCK."""
     regime_info = RegimeInfo(
-        label=MarketRegime.NEWS_SHOCK,
-        confidence=0.9,
-        transition_score=0.1,
-        volatility_index=3.0
+        label=MarketRegime.NEWS_SHOCK, confidence=0.9, transition_score=0.1, volatility_index=3.0
     )
 
     # Moderate drift (0.25) was OK in RANGING, but should be REJECTED in NEWS_SHOCK
@@ -85,13 +83,14 @@ def test_check_model_health_news_shock(risk_manager):
     health = {"drift": 0.1, "accuracy": 0.55, "calibration": 0.1}
     assert risk_manager._check_model_health(health, regime_info=regime_info) is False
 
+
 def test_check_model_health_volatile_breakout(risk_manager):
     """Verifies that drift threshold is tightened during VOLATILE_BREAKOUT."""
     regime_info = RegimeInfo(
         label=MarketRegime.VOLATILE_BREAKOUT,
         confidence=0.9,
         transition_score=0.1,
-        volatility_index=1.8
+        volatility_index=1.8,
     )
 
     # Moderate drift (0.25) was OK in RANGING, but should be REJECTED in VOLATILE_BREAKOUT
@@ -103,13 +102,11 @@ def test_check_model_health_volatile_breakout(risk_manager):
     health = {"drift": 0.2, "accuracy": 0.55, "calibration": 0.1}
     assert risk_manager._check_model_health(health, regime_info=regime_info) is True
 
+
 def test_approve_cascade_with_regime(risk_manager, base_signal):
     """Verifies that the full approve() cascade respects the regime-adaptive health."""
     regime_info = RegimeInfo(
-        label=MarketRegime.NEWS_SHOCK,
-        confidence=0.9,
-        transition_score=0.1,
-        volatility_index=3.0
+        label=MarketRegime.NEWS_SHOCK, confidence=0.9, transition_score=0.1, volatility_index=3.0
     )
 
     # Case 1: Health is OK for RANGING but not for NEWS_SHOCK
@@ -128,5 +125,7 @@ def test_approve_cascade_with_regime(risk_manager, base_signal):
     assert risk_manager.approve(base_signal, model_health=health, regime_info=regime_info) is False
 
     # Should be approved if we change to RANGING
-    ranging_info = RegimeInfo(label=MarketRegime.RANGING, confidence=0.9, transition_score=0.1, volatility_index=1.0)
+    ranging_info = RegimeInfo(
+        label=MarketRegime.RANGING, confidence=0.9, transition_score=0.1, volatility_index=1.0
+    )
     assert risk_manager.approve(base_signal, model_health=health, regime_info=ranging_info) is True
