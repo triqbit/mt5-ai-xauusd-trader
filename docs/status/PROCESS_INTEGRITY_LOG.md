@@ -436,3 +436,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **PR Purge:** Jules05 must urgently close the 464 stale PRs to restore project coherence.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - Thirteenth Consecutive Day of History Destruction).
+
+## 2026-05-12 17:45 GMT+4
+
+**Summary:** Second total system swap of the day. Governance breakdown continues to accelerate.
+
+**Suspected Process Issues:**
+- **Double Monolithic Graft:** For the second time in 24 hours, the `main` branch has been reset with a single monolithic graft commit (`a3a9218`), following PR #1108 earlier today. This represents an unprecedented frequency of history destruction.
+- **Extreme Labeling Drift (PR #1111):** Commit `a3a9218` is titled "docs: daily PR triage and project health update [2026-05-12] (#1111)", yet it replaces all 457 files and ~72,700 lines of code. This is the most severe instance of labeling drift to date, masking a total repository replacement under a "docs" label.
+- **Total Loss of Forensics:** The acceleration to multiple system-wide swaps per day has completely extinguished any possibility of Git-based forensic audit or regression analysis.
+- **Critical PR Backlog Fragmentation:** The 464 open PRs are now triple-decoupled from the current baseline, creating a massive technical and governance debt.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `a3a9218` (replaces `8eca496` and all prior history).
+- PR #1111: Vehicle for the second system-wide swap of the day.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1111 used).
+- [ ] CI must pass before merge (Unverifiable due to history destruction).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped multiple times per day with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **CRITICAL — Immediate Human Intervention Required:** The autonomous workflow is now performing total system swaps multiple times per day under misleading documentation labels. This is a complete failure of the established engineering process.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `a3a9218` is mandatory.
+- **Halt All Grafts:** All automated merge and history-resetting logic must be disabled immediately until a linear, traceable history can be restored and a human audit completed.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - Accelerated History Destruction & Severe Labeling Drift).
