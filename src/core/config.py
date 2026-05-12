@@ -11,12 +11,18 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.core.constants import SYMBOL_PATTERN, VALID_TIMEFRAMES
+from src.core.constants import (
+    ALGORITHM_TYPE,
+    DEVICE_TYPE,
+    EXECUTION_MODE,
+    LOG_LEVEL_TYPE,
+    SYMBOL_PATTERN,
+    VALID_TIMEFRAMES,
+)
 
 ROOT = Path(__file__).resolve().parents[2]  # repo root
 
@@ -64,7 +70,7 @@ class TradingConfig(BaseSettings):
     timeframe: VALID_TIMEFRAMES = Field(
         default="M5", description="The chart timeframe for analysis (e.g., M5, H1)"
     )
-    mode: Literal["demo", "live", "backtest"] = Field(
+    mode: EXECUTION_MODE = Field(
         default="demo",
         description="Execution mode: demo, live, or backtest",
         validation_alias="MODE",
@@ -156,7 +162,7 @@ class TradingConfig(BaseSettings):
     )
 
     # ── Model ──────────────────────────────────────────────────────────────────
-    algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
+    algorithm: ALGORITHM_TYPE = Field(
         default="ensemble", description="The ML algorithm architecture to use for signal generation"
     )
     model_path: Path = Field(
@@ -166,7 +172,7 @@ class TradingConfig(BaseSettings):
     train_steps: int = Field(
         default=1_000_000, ge=100_000, description="Number of environment steps for model training"
     )
-    device: Literal["cpu", "cuda", "mps", "auto"] = Field(
+    device: DEVICE_TYPE = Field(
         default="auto",
         description="Hardware accelerator for model inference (cpu, cuda, mps, auto)",
     )
@@ -188,7 +194,7 @@ class TradingConfig(BaseSettings):
     dashboard_port: int = Field(
         default=8050, description="Network port for the interactive monitoring dashboard"
     )
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+    log_level: LOG_LEVEL_TYPE = Field(
         default="INFO", description="Granularity of application logs (DEBUG, INFO, WARNING, ERROR)"
     )
     telegram_token: SecretStr = Field(

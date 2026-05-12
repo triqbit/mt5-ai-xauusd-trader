@@ -203,7 +203,7 @@ class EnsembleModel(BaseModel):
             },
             "weights": self.weights,
             "per_algo_votes": {k: s.direction for k, s in signals.items()},
-            "per_algo_signals": {k: s._asdict() for k, s in signals.items()},
+            "per_algo_signals": {k: s.model_dump() for k, s in signals.items()},
         }
 
         # 3. Consensus Determination
