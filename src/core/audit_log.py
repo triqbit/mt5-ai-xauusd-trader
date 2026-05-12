@@ -144,6 +144,28 @@ class AuditLogger:
             },
         )
 
+    def log_prediction_outcome(
+        self,
+        symbol: str,
+        predicted_direction: int,
+        actual_direction: int,
+        is_correct: bool,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
+        """Log the outcome of a prediction (correctness/drift)."""
+        return self.log(
+            actor="model",
+            action="prediction_outcome",
+            details=f"Prediction outcome for {symbol}: {'CORRECT' if is_correct else 'INCORRECT'} (Pred: {predicted_direction}, Actual: {actual_direction})",
+            metadata={
+                "symbol": symbol,
+                "predicted": predicted_direction,
+                "actual": actual_direction,
+                "is_correct": is_correct,
+                "context": metadata,
+            },
+        )
+
     def log_risk_decision(
         self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool
     ) -> int:

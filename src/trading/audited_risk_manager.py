@@ -47,16 +47,34 @@ class AuditedRiskManager(RiskManager):
         }
 
         passed = all(decision_chain.values())
+        rejection_reasons = [k for k, v in decision_chain.items() if not v]
+        reason_str = ", ".join(rejection_reasons)
 
         # Log to Audit Trail
         try:
             audit = get_audit_logger()
-            audit.log_risk_decision(
-                symbol=signal.symbol,
-                direction=signal.direction,
-                decision_chain=decision_chain,
-                passed=passed,
+            details = f"Risk decision for {signal.symbol} {signal.direction}: {'PASSED' if passed else 'FAILED'}"
+            if not passed:
+                details += f" | Failed: {reason_str}"
+
+            audit.log(
+                actor="risk_engine",
+                action="risk_decision",
+                details=details,
+                metadata={
+                    "symbol": signal.symbol,
+                    "direction": signal.direction,
+                    "decision_chain": decision_chain,
+                    "passed": passed,
+                },
             )
+
+            if not passed:
+                audit.log_blocked_trade(
+                    symbol=signal.symbol,
+                    reason=f"Risk validation failed: {reason_str}",
+                    context={"decision_chain": decision_chain},
+                )
 
             # Log high-severity circuit breaker events specifically
             if not decision_chain.get("circuit_breaker", True):
@@ -79,8 +97,6 @@ class AuditedRiskManager(RiskManager):
             logger.debug("AuditLogger not available for risk decision logging")
 
         if not passed:
-            rejection_reasons = [k for k, v in decision_chain.items() if not v]
-            reason_str = ", ".join(rejection_reasons)
             logger.warning(
                 "Signal REJECTED | %s %s | Failed: %s",
                 signal.symbol,
