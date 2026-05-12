@@ -11,6 +11,9 @@ The `RareEventSimulator` is an institutional-grade tool designed to generate syn
 - **Dislocation**: Sudden price shift followed by a permanent regime change in volatility and drift.
 - **Volatility Cluster**: Abnormal clusters of high volatility driven by multiple decaying GARCH-like shocks.
 - **Multi-Session Dislocation**: A sequence of regime shifts across multiple trading sessions to test long-term strategy adaptability.
+- **News Shock**: Violent directional moves followed by sustained high volatility, calibrated to trigger institutional regime detection thresholds.
+- **Fat Finger**: Extreme single-tick outlier wicks with immediate recovery and spread widening to test stop-loss resilience.
+- **Bull/Bear Trap**: Fake breakouts past consolidation ranges followed by violent reversals to test trend-following strategy robustness.
 
 ## Key Features
 - **Standardized Metrics**: `peak_impact_pct` represents the maximum percentage price deviation from the event start, providing a consistent measure across all scenario types.
