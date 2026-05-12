@@ -97,6 +97,26 @@ Located in `src/utils/synthetic_data.py`, the `RiskScenarioBuilder` generates de
 - **drawdown_circuit_breaker(symbol, price)** (New):
   Generates an extreme losing scenario designed to trigger the system-wide 15% drawdown circuit breaker, ensuring all execution is blocked until manual intervention.
 
+## MacroScenarioBuilder
+
+Located in `src/utils/synthetic_data.py`, the `MacroScenarioBuilder` generates deterministic `MacroEvent` objects for risk testing.
+
+### Key Scenarios
+
+- **nfp_shock**: High impact Non-Farm Payrolls event.
+- **fomc_meeting**: Critical impact FOMC Rate Decision event.
+- **geopolitical_crisis**: High impact geopolitical tension event.
+
+## SystemContextBuilder
+
+Located in `src/utils/synthetic_data.py`, the `SystemContextBuilder` generates integrated test contexts combining price action, macro events, and risk status.
+
+### Key Contexts
+
+- **normal_trading**: Context for standard, low-risk trading.
+- **high_impact_macro_event**: Context during a High-Impact news release (NFP), including a defensive `RiskStatus`.
+- **extreme_volatility_with_risk_block**: Context with extreme price action (Flash Crash) and a defensive `RiskStatus` (FOMC news block).
+
 ## Usage in Tests
 
 These tools are designed to make tests deterministic and broad. See `tests/test_risk_scenarios.py` and `tests/test_synthetic_data.py` for implementation examples.
