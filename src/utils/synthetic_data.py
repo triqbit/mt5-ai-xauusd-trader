@@ -12,7 +12,9 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 
+from src.core.constants import EventCategory, EventImpact
 from src.core.schemas import TradeSignal
+from src.data.event_models import MacroEvent, RiskStatus
 from src.trading.capital_allocator import AllocationRequest, StrategyConfig
 
 
@@ -780,3 +782,103 @@ class PortfolioScenarioBuilder:
                 capital_cap=100000,
             ),
         ]
+
+
+class MacroScenarioBuilder:
+    """
+    Generates deterministic MacroEvent objects for risk testing.
+    """
+
+    @staticmethod
+    def nfp_shock(timestamp: datetime | None = None) -> MacroEvent:
+        """Non-Farm Payrolls high impact event."""
+        if timestamp is None:
+            timestamp = datetime(2024, 5, 22, 12, 30, tzinfo=UTC)
+        return MacroEvent(
+            name="Non-Farm Payrolls",
+            category=EventCategory.NFP,
+            impact=EventImpact.HIGH,
+            timestamp=timestamp,
+            symbol_impact=["XAUUSD", "USD"],
+            description="Major employment data release.",
+        )
+
+    @staticmethod
+    def fomc_meeting(timestamp: datetime | None = None) -> MacroEvent:
+        """FOMC Rate Decision critical impact event."""
+        if timestamp is None:
+            timestamp = datetime(2024, 5, 22, 18, 0, tzinfo=UTC)
+        return MacroEvent(
+            name="FOMC Rate Decision",
+            category=EventCategory.FOMC,
+            impact=EventImpact.CRITICAL,
+            timestamp=timestamp,
+            symbol_impact=["XAUUSD", "USD"],
+            description="Federal Reserve interest rate decision.",
+        )
+
+    @staticmethod
+    def geopolitical_crisis(timestamp: datetime | None = None) -> MacroEvent:
+        """Geopolitical event with persistent risk."""
+        if timestamp is None:
+            timestamp = datetime(2024, 5, 22, 0, 0, tzinfo=UTC)
+        return MacroEvent(
+            name="Geopolitical Tension",
+            category=EventCategory.GEOPOLITICAL,
+            impact=EventImpact.HIGH,
+            timestamp=timestamp,
+            symbol_impact=["XAUUSD"],
+            description="Sudden escalation in regional conflict.",
+        )
+
+
+class SystemContextBuilder:
+    """
+    Generates integrated test contexts: (OHLCV, list[MacroEvent], RiskStatus).
+    """
+
+    def __init__(self, seed: int = 42):
+        self.price_gen = ScenarioGenerator(seed=seed)
+        self.macro_gen = MacroScenarioBuilder()
+
+    def normal_trading(self) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
+        """Context for standard, low-risk trading."""
+        # Use a fixed Wednesday to avoid weekend sessions
+        start_date = datetime(2024, 5, 22, 8, 0, tzinfo=UTC)
+        df = self.price_gen.generate(n_steps=200, regime="ranging", start_date=start_date)
+
+        return df, [], RiskStatus(is_blocked=False, risk_multiplier=1.0)
+
+    def high_impact_macro_event(self) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
+        """Context during a High-Impact news release (NFP)."""
+        start_date = datetime(2024, 5, 22, 11, 0, tzinfo=UTC)
+        df = self.price_gen.generate(n_steps=200, regime="news_shock", start_date=start_date)
+
+        # NFP happens at 12:30 UTC, which is during our data window
+        event = self.macro_gen.nfp_shock(timestamp=datetime(2024, 5, 22, 12, 30, tzinfo=UTC))
+
+        # RiskStatus should reflect the news block
+        risk = RiskStatus(
+            is_blocked=True,
+            risk_multiplier=0.0,
+            active_events=[event],
+            blocking_events=[event],
+            reason="High impact NFP news block.",
+        )
+        return df, [event], risk
+
+    def extreme_volatility_with_risk_block(self) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
+        """Context with extreme price action and defensive risk positioning."""
+        start_date = datetime(2024, 5, 22, 16, 0, tzinfo=UTC)
+        df = self.price_gen.generate(n_steps=200, regime="flash_crash", start_date=start_date)
+
+        event = self.macro_gen.fomc_meeting(timestamp=datetime(2024, 5, 22, 18, 0, tzinfo=UTC))
+
+        risk = RiskStatus(
+            is_blocked=True,
+            risk_multiplier=0.0,
+            active_events=[event],
+            blocking_events=[event],
+            reason="Critical FOMC meeting in progress.",
+        )
+        return df, [event], risk
