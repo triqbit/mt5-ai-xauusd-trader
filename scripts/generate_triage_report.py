@@ -7,7 +7,7 @@ import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
-BIG_BANG_DATE = datetime.datetime(2026, 5, 11, tzinfo=datetime.timezone.utc)
+BIG_BANG_DATE = datetime.datetime(2026, 5, 12, tzinfo=datetime.timezone.utc)
 
 
 def api_call(url):
