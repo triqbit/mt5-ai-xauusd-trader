@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pip-licenses
+          pip install pip-licenses==5.5.5
 
           # Install torch/torchvision from CPU index to save time/space
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
