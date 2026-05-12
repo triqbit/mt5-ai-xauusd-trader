@@ -1,11 +1,20 @@
 # Disaster Recovery Plan (DRP)
 
+**Version:** 1.1.0-rc7
+**Last Updated:** 2024-06-10
+**Status:** PROD-READY
+
 ## 1. Overview
 This document outlines the disaster recovery procedures for the MT5 AI/ML Trading Bot, focusing on the preservation and restoration of the trading database (`trades.db`), operational logs, and critical performance data. This plan is designed to ensure business continuity and regulatory compliance in the event of system failure, data corruption, or site-level disasters.
 
 ## 2. Recovery Objectives
-- **Recovery Point Objective (RPO):** 1 hour (Maximum data loss allowed).
-- **Recovery Time Objective (RTO):** 15 minutes (Maximum time to restore service after a disaster).
+
+The following targets are established for system recovery to ensure business continuity:
+
+| Metric | Target | Description |
+| :--- | :--- | :--- |
+| **Recovery Point Objective (RPO)** | **1 Hour** | Maximum acceptable data loss duration. |
+| **Recovery Time Objective (RTO)** | **15 Minutes** | Maximum time to restore services after disaster declaration. |
 
 ## 3. Data Classification and Retention
 The following table summarizes the backup and retention strategy for all critical system components, aligned with the [Data Retention Policy](DATA_RETENTION_POLICY.md).
