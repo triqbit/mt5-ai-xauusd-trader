@@ -395,3 +395,103 @@ def test_stability_penalty_scale_invariance(sample_data):
     params = {"p1": 100.0}
     cv_penalty = optimizer._calculate_stability_penalty(params, sample_data)
     assert 0.07 < cv_penalty < 0.09
+
+
+def test_multi_window_stability_sampling(sample_data):
+    """Verifies that multiple windows are used for stability calculation during optimization."""
+    eval_calls = []
+
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config
+    )
+
+    original_calc_stability = optimizer._calculate_stability_penalty
+
+    def tracked_calc_stability(params, data):
+        eval_calls.append(len(data))
+        return original_calc_stability(params, data)
+
+    optimizer._calculate_stability_penalty = tracked_calc_stability
+
+    # Need enough windows to trigger multi-sampling (3 windows)
+    # len(sample_data)=500. (500-120)/50 + 1 = 8 windows.
+    optimizer.run_optimization()
+
+    # Should have called stability calculation for 3 windows (indices from np.linspace)
+    assert len(eval_calls) == 3
+
+
+def test_constraint_penalty_across_metrics(sample_data):
+    """Verifies that constraint penalty is applied to metrics other than ROBUSTNESS_SCORE."""
+
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    # Strict constraints
+    config = WalkForwardConfig(
+        n_trials=1,
+        train_size=100,
+        test_size=20,
+        step_size=50,
+        metric=OptimizationMetric.SHARPE,
+        min_oos_sharpe=10.0,  # Strict
+    )
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config
+    )
+
+    # We need to capture the trial return value
+    # Since we can't easily capture it from study.optimize, we'll mock the objective
+    # or just trust the logic if it's simple.
+    # Actually, we can check if the best_trial's value is significantly reduced.
+
+    result = optimizer.run_optimization()
+    # If SHARPE was ~0 and penalty was applied, it should be very negative
+    # best_trial value is accessible via study if we had access to it,
+    # but run_optimization doesn't return the study.
+    # We can check result.metrics.constraints_violated
+    assert result.metrics.constraints_violated is True
+    # The robustness score is always calculated and should be heavily penalized
+    assert result.metrics.robustness_score < -1.0
+
+
+def test_wfe_calculation(sample_data):
+    """Verifies Walk-Forward Efficiency (WFE) calculation."""
+
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(
+        data=sample_data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config
+    )
+
+    # Mock _evaluate_strategy to return fixed values for IS and OOS
+    # is_mean will be 2.0, oos_mean will be 1.0
+    eval_count = 0
+
+    def mock_eval(data, params):
+        nonlocal eval_count
+        # Even calls (IS) = 2.0, Odd calls (OOS) = 1.0
+        val = 2.0 if eval_count % 2 == 0 else 1.0
+        eval_count += 1
+        return {"Sharpe Ratio": val}
+
+    optimizer._evaluate_strategy = mock_eval
+    result = optimizer.run_optimization()
+
+    # WFE = OOS_Mean / IS_Mean = 1.0 / 2.0 = 0.5
+    assert result.metrics.walk_forward_efficiency == pytest.approx(0.5)

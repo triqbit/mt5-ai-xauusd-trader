@@ -427,10 +427,13 @@ class WalkForwardOptimizer:
             gap = max(0, is_mean - oos_mean)
 
             # Performance Stability (Parameter Sensitivity)
-            # We evaluate stability on a representative training window.
-            # Middle window is often more representative than the first.
-            stability_window_idx = len(windows) // 2
-            stability = self._calculate_stability_penalty(params, windows[stability_window_idx][0])
+            # Average stability over 2-3 windows for better representativeness
+            n_stability_windows = min(3, len(windows))
+            indices = np.linspace(0, len(windows) - 1, n_stability_windows, dtype=int)
+            stability_scores = []
+            for idx in indices:
+                stability_scores.append(self._calculate_stability_penalty(params, windows[idx][0]))
+            stability = float(np.mean(stability_scores))
 
             # Average regime consistency across all windows
             regime_cons = float(np.mean(regime_cons_list))
@@ -464,23 +467,28 @@ class WalkForwardOptimizer:
             trial.set_user_attr("wfe", float(wfe))
             trial.set_user_attr("robustness_score", float(robustness))
 
-            # Select return value based on config
+            # Select base score based on config
+            base_score = 0.0
             if self.config.metric == OptimizationMetric.ROBUSTNESS_SCORE:
-                return float(robustness)
-            if self.config.metric == OptimizationMetric.SHARPE:
-                return float(oos_mean)
-            if self.config.metric == OptimizationMetric.SORTINO:
-                return float(np.mean(oos_sortinos))
-            if self.config.metric == OptimizationMetric.PROFIT_FACTOR:
-                return float(np.mean(oos_pfs))
-            if self.config.metric == OptimizationMetric.TOTAL_RETURN:
-                return float(np.mean(oos_returns))
-            if self.config.metric == OptimizationMetric.CALMAR:
-                return float(np.mean(oos_calmars))
-            if self.config.metric == OptimizationMetric.WIN_RATE:
-                return float(np.mean(oos_win_rates))
+                return float(robustness)  # Already includes constraint_penalty
+            elif self.config.metric == OptimizationMetric.SHARPE:
+                base_score = float(oos_mean)
+            elif self.config.metric == OptimizationMetric.SORTINO:
+                base_score = float(np.mean(oos_sortinos))
+            elif self.config.metric == OptimizationMetric.PROFIT_FACTOR:
+                base_score = float(np.mean(oos_pfs))
+            elif self.config.metric == OptimizationMetric.TOTAL_RETURN:
+                base_score = float(np.mean(oos_returns))
+            elif self.config.metric == OptimizationMetric.CALMAR:
+                base_score = float(np.mean(oos_calmars))
+            elif self.config.metric == OptimizationMetric.WIN_RATE:
+                base_score = float(np.mean(oos_win_rates))
+            else:
+                base_score = float(robustness)
+                return base_score
 
-            return float(robustness)
+            # For standard metrics, we still apply the constraint penalty
+            return float(base_score - constraint_penalty)
 
         study.optimize(objective, n_trials=self.config.n_trials)
 
