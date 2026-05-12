@@ -248,7 +248,9 @@ class JournalReport(BaseModel):
             )
 
         # Rejection Quality Risks
-        poor_rejections = [r for r in self.rejection_quality if r.accuracy < 0.4 and r.total_blocked >= 3]
+        poor_rejections = [
+            r for r in self.rejection_quality if r.accuracy < 0.4 and r.total_blocked >= 3
+        ]
         if poor_rejections:
             r = poor_rejections[0]
             risks.append(
@@ -308,7 +310,9 @@ class JournalMiner:
         hour = dt.hour
         active = []
         for name, (start, end) in self.sessions.items():
-            if (start < end and start <= hour < end) or (start >= end and (hour >= start or hour < end)):
+            if (start < end and start <= hour < end) or (
+                start >= end and (hour >= start or hour < end)
+            ):
                 active.append(name)
         return active
 
@@ -486,9 +490,7 @@ class JournalMiner:
             prev_trade = df.iloc[i - 1]
             curr_trade = df.iloc[i]
 
-            time_diff = (
-                curr_trade["created_at"] - prev_trade["created_at"]
-            ).total_seconds() / 60.0
+            time_diff = (curr_trade["created_at"] - prev_trade["created_at"]).total_seconds() / 60.0
             if prev_trade["pnl"] < 0 and 0 < time_diff <= window_minutes:
                 # Check for lot size increase if available
                 lot_increase = False

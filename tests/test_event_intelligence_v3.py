@@ -1,18 +1,22 @@
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
 import pytest
-from datetime import datetime, timedelta, UTC
-from unittest.mock import patch, MagicMock
+
 from src.data.event_intelligence import (
-    EventIntelligence,
-    MetaAPIEventProvider,
-    MacroEvent,
+    BaseEventProvider,
     EventCategory,
     EventImpact,
-    BaseEventProvider
+    EventIntelligence,
+    MacroEvent,
+    MetaAPIEventProvider,
 )
+
 
 @pytest.fixture
 def now():
     return datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
+
 
 @patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
 def test_metaapi_provider_extra_fields(mock_init_session, now):
@@ -31,7 +35,7 @@ def test_metaapi_provider_extra_fields(mock_init_session, now):
             "country": "US",
             "actual": 0.3,
             "forecast": 0.2,
-            "previous": 0.1
+            "previous": 0.1,
         }
     ]
     mock_get.return_value = mock_response
@@ -44,19 +48,20 @@ def test_metaapi_provider_extra_fields(mock_init_session, now):
     assert events[0].forecast == 0.2
     assert events[0].previous == 0.1
 
+
 def test_event_intelligence_cache_merging(now):
     """Test that EventIntelligence merges events instead of overwriting."""
     event1 = MacroEvent(
         name="Event 1",
         category=EventCategory.USD,
         impact=EventImpact.LOW,
-        timestamp=now + timedelta(minutes=5)
+        timestamp=now + timedelta(minutes=5),
     )
     event2 = MacroEvent(
         name="Event 2",
         category=EventCategory.USD,
         impact=EventImpact.LOW,
-        timestamp=now + timedelta(minutes=10)
+        timestamp=now + timedelta(minutes=10),
     )
 
     class MockProvider(BaseEventProvider):
@@ -83,6 +88,7 @@ def test_event_intelligence_cache_merging(now):
     names = [e.name for e in intel._cached_events]
     assert "Event 1" in names
     assert "Event 2" in names
+
 
 def test_guess_category_enhanced_keywords():
     provider = MetaAPIEventProvider(token="fake")

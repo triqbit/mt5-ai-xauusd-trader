@@ -205,7 +205,8 @@ def run_live(
         if loop_count % 100 == 0 and audit_logger:
             # Dynamic exclusion of all SecretStr/SecretBytes fields
             secret_fields = {
-                f for f, info in cfg.__class__.model_fields.items()
+                f
+                for f, info in cfg.__class__.model_fields.items()
                 if "Secret" in str(info.annotation)
             }
             audit_logger.log_config_snapshot(
@@ -869,20 +870,18 @@ def main() -> int:
     env_file = Path(".env")
     example_file = Path(".env.example")
     if not is_diagnostic and not env_file.exists() and example_file.exists() and sys.stdin.isatty():
-            print("\n[!] Configuration file (.env) is missing.")
-            try:
-                choice = (
-                    input("Would you like to initialize it from .env.example? [Y/n]: ")
-                    .strip()
-                    .lower()
-                )
-                if choice in ["", "y", "yes"]:
-                    import shutil
+        print("\n[!] Configuration file (.env) is missing.")
+        try:
+            choice = (
+                input("Would you like to initialize it from .env.example? [Y/n]: ").strip().lower()
+            )
+            if choice in ["", "y", "yes"]:
+                import shutil
 
-                    shutil.copy(".env.example", ".env")
-                    print("✅ Created .env from template. Please edit it with your credentials.\n")
-            except (KeyboardInterrupt, EOFError):
-                print("\nSetup skipped.")
+                shutil.copy(".env.example", ".env")
+                print("✅ Created .env from template. Please edit it with your credentials.\n")
+        except (KeyboardInterrupt, EOFError):
+            print("\nSetup skipped.")
 
     # 2. Handle missing dependencies gracefully for diagnostic flags
     if not HAS_DEPENDENCIES and not is_diagnostic:
@@ -994,14 +993,15 @@ def main() -> int:
 
     # 3.1 Handle --show-config
     if args.show_config:
-        config_table = Table(title="[bold blue]Current System Configuration (Sanitized)[/]", box=None)
+        config_table = Table(
+            title="[bold blue]Current System Configuration (Sanitized)[/]", box=None
+        )
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="white")
 
         # Dynamic exclusion of all SecretStr/SecretBytes fields
         secret_fields = {
-            f for f, info in cfg.__class__.model_fields.items()
-            if "Secret" in str(info.annotation)
+            f for f, info in cfg.__class__.model_fields.items() if "Secret" in str(info.annotation)
         }
 
         # Get sanitized dump
@@ -1126,8 +1126,7 @@ def main() -> int:
 
     # Dynamic exclusion of all SecretStr/SecretBytes fields for audit snapshot
     secret_fields = {
-        f for f, info in cfg.__class__.model_fields.items()
-        if "Secret" in str(info.annotation)
+        f for f, info in cfg.__class__.model_fields.items() if "Secret" in str(info.annotation)
     }
 
     # Log sanitized configuration snapshot

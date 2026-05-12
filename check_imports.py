@@ -1,14 +1,16 @@
-import sys
 import os
 import pkgutil
+import sys
 
 # Add current directory to sys.path
 sys.path.insert(0, os.path.abspath("."))
 
+
 def check_imports():
     import src
+
     errors = []
-    for loader, name, is_pkg in pkgutil.walk_packages(src.__path__, src.__name__ + "."):
+    for _loader, name, _is_pkg in pkgutil.walk_packages(src.__path__, src.__name__ + "."):
         try:
             # Skip modules that might fail due to missing environment (like MT5 on Linux)
             # but we want to see if there are actual syntax/import errors.
@@ -21,6 +23,7 @@ def check_imports():
 
     if not errors:
         print("All modules in src imported successfully!")
+
 
 if __name__ == "__main__":
     check_imports()

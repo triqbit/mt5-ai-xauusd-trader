@@ -123,7 +123,9 @@ def generate_full_audit():
     hyper_section = HyperparameterSection(
         stability_score=92.0,
         parameters=[
-            ParameterRobustness(name="fast_ema_window", range="5-25", optimal="12", sensitivity="Low"),
+            ParameterRobustness(
+                name="fast_ema_window", range="5-25", optimal="12", sensitivity="Low"
+            ),
             ParameterRobustness(
                 name="confidence_threshold", range="0.5-0.9", optimal="0.65", sensitivity="Medium"
             ),

@@ -3,16 +3,16 @@ Tests for Decision Funnel Metrics.
 Ensures that signal rejections across RiskManager, ExecutionFilter, and CapitalAllocator
 are correctly recorded in Prometheus metrics.
 """
+
 import unittest
 from unittest.mock import MagicMock, patch
-from datetime import datetime, UTC
 
-from src.core.monitor import Monitor, INTERNAL_REJECTION_COUNTER
-from src.trading.risk_manager import RiskManager
-from src.trading.audited_risk_manager import AuditedRiskManager
-from src.trading.execution_filter import ExecutionFilter
-from src.trading.capital_allocator import CapitalAllocator, RejectionCode
+from src.core.monitor import INTERNAL_REJECTION_COUNTER, Monitor
 from src.core.schemas import TradeSignal
+from src.trading.audited_risk_manager import AuditedRiskManager
+from src.trading.capital_allocator import CapitalAllocator, RejectionCode
+from src.trading.execution_filter import ExecutionFilter
+
 
 class TestDecisionFunnelMetrics(unittest.TestCase):
     def setUp(self):
@@ -29,7 +29,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
         self.config.signal_flicker_window = 6
         self.config.max_signal_changes = 3
 
-        with patch('telegram.Bot'):
+        with patch("telegram.Bot"):
             self.monitor = Monitor(self.config)
 
     def test_audited_risk_manager_rejection_metrics_symbol(self):
@@ -46,7 +46,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             take_profit=2100.0,
             lot_size=0.1,
             algorithm="test",
-            confidence=0.8
+            confidence=0.8,
         )
 
         with patch.object(INTERNAL_REJECTION_COUNTER, "labels") as mock_labels:
@@ -71,7 +71,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             take_profit=2100.0,
             lot_size=0.1,
             algorithm="test",
-            confidence=0.1
+            confidence=0.1,
         )
 
         with patch.object(INTERNAL_REJECTION_COUNTER, "labels") as mock_labels:
@@ -98,7 +98,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             take_profit=2100.0,
             lot_size=0.1,
             algorithm="test",
-            confidence=0.4 # Low confidence to trigger block
+            confidence=0.4,  # Low confidence to trigger block
         )
 
         # Configure thresholds to trigger block
@@ -125,8 +125,11 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
 
             allocator.request_allocation("STRAT_1", 0.02)
 
-            mock_labels.assert_any_call(component="capital_allocator", reason=RejectionCode.NO_BUDGET.value)
+            mock_labels.assert_any_call(
+                component="capital_allocator", reason=RejectionCode.NO_BUDGET.value
+            )
             mock_counter.inc.assert_called()
+
 
 if __name__ == "__main__":
     unittest.main()
