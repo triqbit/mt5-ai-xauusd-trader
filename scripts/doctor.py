@@ -87,6 +87,17 @@ CORE_DEPENDENCIES = {
     "structlog": ("structlog", "25.5.0"),
     "rich": ("rich", "13.9.4"),
     "python-dotenv": ("dotenv", "1.2.2"),
+    "requests": ("requests", "2.33.1"),
+    "aiohttp": ("aiohttp", "3.13.4"),
+    "httpx": ("httpx", "0.28.1"),
+    "uvicorn": ("uvicorn", "0.34.0"),
+    "gymnasium": ("gymnasium", "1.0.0"),
+    "stable-baselines3": ("stable_baselines3", "2.8.0"),
+    "jinja2": ("jinja2", "3.1.6"),
+    "tqdm": ("tqdm", "4.67.1"),
+    "scipy": ("scipy", "1.15.2"),
+    "scikit-learn": ("sklearn", "1.6.1"),
+    "yfinance": ("yfinance", "0.2.54"),
 }
 
 def check_dependencies(dependencies=None):
