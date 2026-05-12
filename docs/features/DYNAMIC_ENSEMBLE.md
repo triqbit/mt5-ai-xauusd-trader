@@ -6,8 +6,8 @@ The `DynamicEnsemble` class implements an adaptive weighting engine that adjusts
 
 - **Adaptive Scoring**: Model weights are adjusted based on a composite score of:
     - **Accuracy**: Recent Sharpe ratio or win-rate.
-    - **Calibration Error**: How well the model's confidence aligns with realized outcomes.
-    - **Drift Score**: Detection of performance degradation or concept drift.
+    - **Calibration Error**: Uses **Brier Score** (squared error) to quantify alignment between confidence and realized outcomes.
+    - **Drift Score**: Uses a **sensitivity-ratio approach** `(acc - recent_acc) / (acc + 1e-9) * 2.0` for proactive detection of performance degradation.
 - **Stability Controls**:
     - **EMA Smoothing**: Prevents erratic jumps in weights.
     - **Weight Swing Caps**: Limits the maximum change in any single update.
