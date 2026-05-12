@@ -7,7 +7,7 @@ import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
-BIG_BANG_DATE = datetime.datetime(2026, 5, 11, tzinfo=datetime.timezone.utc)
+BIG_BANG_DATE = datetime.datetime(2026, 5, 12, tzinfo=datetime.timezone.utc)
 
 
 def api_call(url):
@@ -261,18 +261,30 @@ def generate_report():
     medium_risk = [pr for pr in new_prs if pr["risk"] == "Medium Risk"]
     high_risk = [pr for pr in new_prs if pr["risk"] == "High Risk"]
 
-    if safe_surface:
-        top_3_items.append(
-            f"**Quick Win:** Review Safe PR #{safe_surface[0]['number']} ({safe_surface[0]['title']})"
-        )
-    if medium_risk:
-        top_3_items.append(
-            f"**Core Progress:** Review Medium Risk PR #{medium_risk[0]['number']} ({medium_risk[0]['title']})"
-        )
-    elif high_risk:
-        top_3_items.append(
-            f"**Critical Path:** High Risk PR #{high_risk[0]['number']} needs expert review."
-        )
+    # Fill slots with prioritized new PRs
+    potential_prs = safe_surface + medium_risk + high_risk
+    added_numbers = set()
+
+    # Slot 1: Turbulence already handled if exists, else first good PR
+    if not top_3_items and potential_prs:
+        p = potential_prs[0]
+        top_3_items.append(f"**Review Priority:** PR #{p['number']} ({p['title']}) - {p['risk']}")
+        added_numbers.add(p['number'])
+
+    # Slot 2 & 3: Remaining PRs
+    for p in potential_prs:
+        if len(top_3_items) >= 3:
+            break
+        if p['number'] not in added_numbers:
+            prefix = "**Quick Win:**" if p['risk'] == "Safe Surface" else "**Core Progress:**"
+            top_3_items.append(f"{prefix} Review PR #{p['number']} ({p['title']})")
+            added_numbers.add(p['number'])
+
+    # Emergency slot if still empty but we have stale PRs
+    if len(top_3_items) < 3:
+        stale_prs = [pr for pr in classified_prs if "Stale" in pr["flag"]]
+        if stale_prs:
+            top_3_items.append("**Address Backlog:** 450+ stale PRs require closing or rebase.")
 
     top_3_section = ""
     for idx, item in enumerate(top_3_items[:3]):
