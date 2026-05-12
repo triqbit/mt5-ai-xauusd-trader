@@ -323,7 +323,9 @@ def test_analyze_trade_durations(miner):
 
 
 def test_detect_pre_drawdown_motifs(miner):
-    now = datetime(2024, 5, 12, 10, 0, tzinfo=timezone.utc)
+    # Use a time that falls solidly into one session set (London/NY overlap)
+    # 15:00 UTC is hour 15. London (8-17) and NY (13-22) are active.
+    now = datetime(2024, 5, 12, 15, 0, tzinfo=timezone.utc)
     trades = pd.DataFrame(
         [
             {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
@@ -340,7 +342,7 @@ def test_detect_pre_drawdown_motifs(miner):
                 "volatility": 0.1,
                 "confidence": 0.8,
                 "pnl": -5,
-                "created_at": now - pd.Timedelta(hours=1),
+                "created_at": now - pd.Timedelta(minutes=10),
             },
             {
                 "id": 11,
@@ -349,14 +351,23 @@ def test_detect_pre_drawdown_motifs(miner):
                 "volatility": 0.1,
                 "confidence": 0.8,
                 "pnl": -5,
-                "created_at": now - pd.Timedelta(hours=1, minutes=1),
+                "created_at": now - pd.Timedelta(minutes=11),
+            },
+            {
+                "id": 12,
+                "algorithm": "ensemble",
+                "direction": 1,
+                "volatility": 0.1,
+                "confidence": 0.8,
+                "pnl": -5,
+                "created_at": now - pd.Timedelta(minutes=12),
             },
         ]
     )
     motifs = miner.detect_pre_drawdown_motifs(signals, trades)
     assert len(motifs) == 1
     assert motifs[0].algorithm == "ensemble"
-    assert motifs[0].frequency == 2
+    assert motifs[0].frequency == 3
 
 
 def test_find_combination_motifs(miner):
