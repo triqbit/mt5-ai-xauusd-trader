@@ -8,6 +8,7 @@
 FROM python:3.12-slim AS builder
 
 ARG TARGETARCH
+ARG VERSION=1.1.0-rc7
 WORKDIR /app
 
 # System dependencies for building TA-Lib and Python packages
@@ -70,6 +71,8 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source and assets
+ARG VERSION
+LABEL version="${VERSION}"
 COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY main.py .
