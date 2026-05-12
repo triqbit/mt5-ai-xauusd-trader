@@ -185,6 +185,53 @@ def test_slippage_spike_logic(sample_data):
     assert metrics.max_slippage_experienced == 105.0
 
 
+def test_spread_spike_logic(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # 1. Normal run
+    normal_scenario = StressScenario(name="Normal", description="test", spread_multiplier=1.0)
+    normal_metrics = lab.run_scenario(normal_scenario)
+
+    # 2. Spread spike run
+    spike_scenario = StressScenario(
+        name="Spike",
+        description="Testing spread spikes",
+        spread_multiplier=1.0,
+        spread_spike_prob=1.0,  # Force spike every step
+        spread_spike_magnitude=10.0,
+    )
+    spike_metrics = lab.run_scenario(spike_scenario)
+
+    if normal_metrics.num_trades > 0:
+        assert spike_metrics.total_return < normal_metrics.total_return
+
+
+def test_execution_delay_jitter(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # Fixed delay
+    fixed_scenario = StressScenario(
+        name="Fixed", description="test", execution_delay_steps=5, seed=42
+    )
+    fixed_metrics = lab.run_scenario(fixed_scenario)
+
+    # Jittered delay
+    jitter_scenario = StressScenario(
+        name="Jitter",
+        description="test",
+        execution_delay_steps=5,
+        execution_delay_jitter=2,
+        seed=42,
+    )
+    jitter_metrics = lab.run_scenario(jitter_scenario)
+
+    # They should differ if trades were made
+    if fixed_metrics.num_trades > 0:
+        assert fixed_metrics.total_return != jitter_metrics.total_return
+
+
 def test_factory_methods():
     hell = StressLab.create_execution_hell_scenario()
     assert hell.name == "Execution Hell"

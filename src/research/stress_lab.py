@@ -41,10 +41,13 @@ class StressScenario(BaseModel):
 
     # Execution stress
     spread_multiplier: float = 1.0  # 1.0 = normal
+    spread_spike_prob: float = 0.0  # Probability of a sudden spread explosion
+    spread_spike_magnitude: float = 0.0  # Magnitude of the spread spike
     slippage_bps: float = 0.0  # Basis points
     slippage_spike_prob: float = 0.0  # Probability of an extreme slippage event
     slippage_spike_magnitude_bps: float = 0.0  # Magnitude of the spike in bps
     execution_delay_steps: int = 0  # Number of steps to delay execution
+    execution_delay_jitter: int = 0  # Max +/- steps of random jitter
 
     # Data stress
     missing_tick_prob: float = 0.0  # Probability of missing a price update
@@ -63,6 +66,7 @@ class StressScenario(BaseModel):
 
     # Configuration overrides
     lot_size: float = 0.1
+    seed: int = 42
 
 
 class StressTestMetrics(BaseModel):
@@ -161,10 +165,13 @@ class StressLab:
             description="Extreme execution friction: wide spreads, slippage spikes, and delays.",
             severity=StressSeverity.CRITICAL,
             spread_multiplier=3.0,
+            spread_spike_prob=0.1,
+            spread_spike_magnitude=2.0,
             slippage_bps=5.0,
             slippage_spike_prob=0.1,
             slippage_spike_magnitude_bps=50.0,
             execution_delay_steps=3,
+            execution_delay_jitter=2,
             service_failure_prob=0.05,
         )
 
@@ -179,6 +186,8 @@ class StressLab:
             price_noise_sigma=1.0,
             choppy_breakout_prob=0.15,
             spread_multiplier=2.5,
+            spread_spike_prob=0.05,
+            spread_spike_magnitude=1.0,
         )
 
     @staticmethod
@@ -387,7 +396,7 @@ class StressLab:
     def _apply_perturbations(self, df: pd.DataFrame, scenario: StressScenario) -> pd.DataFrame:
         """Apply data-level perturbations using adversarial logic."""
         df = df.copy()
-        rng = np.random.default_rng(42)
+        rng = np.random.default_rng(scenario.seed)
 
         # Calculate a rolling ATR for relative perturbations
         high_low = df["high"] - df["low"]
@@ -428,25 +437,27 @@ class StressLab:
 
                     if direction == 1:
                         # Spike up, trap longs
-                        df.at[idx, "high"] = max(
-                            df.at[idx, "high"], df.at[idx, "open"] + spike_size
+                        df.at[idx, "high"] = np.float32(
+                            max(df.at[idx, "high"], df.at[idx, "open"] + spike_size)
                         )
-                        df.at[idx, "close"] = df.at[idx, "open"] + (spike_size * 0.2)
+                        df.at[idx, "close"] = np.float32(df.at[idx, "open"] + (spike_size * 0.2))
                         # Violent reversal
-                        df.at[next_idx, "open"] = df.at[idx, "close"]
-                        df.at[next_idx, "close"] = df.at[idx, "open"] - (spike_size * 0.4)
-                        df.at[next_idx, "low"] = min(
-                            df.at[next_idx, "low"], df.at[next_idx, "close"] - 0.5
+                        df.at[next_idx, "open"] = np.float32(df.at[idx, "close"])
+                        df.at[next_idx, "close"] = np.float32(df.at[idx, "open"] - (spike_size * 0.4))
+                        df.at[next_idx, "low"] = np.float32(
+                            min(df.at[next_idx, "low"], df.at[next_idx, "close"] - 0.5)
                         )
                     else:
                         # Spike down, trap shorts
-                        df.at[idx, "low"] = min(df.at[idx, "low"], df.at[idx, "open"] - spike_size)
-                        df.at[idx, "close"] = df.at[idx, "open"] - (spike_size * 0.2)
+                        df.at[idx, "low"] = np.float32(
+                            min(df.at[idx, "low"], df.at[idx, "open"] - spike_size)
+                        )
+                        df.at[idx, "close"] = np.float32(df.at[idx, "open"] - (spike_size * 0.2))
                         # Violent reversal
-                        df.at[next_idx, "open"] = df.at[idx, "close"]
-                        df.at[next_idx, "close"] = df.at[idx, "open"] + (spike_size * 0.4)
-                        df.at[next_idx, "high"] = max(
-                            df.at[next_idx, "high"], df.at[next_idx, "close"] + 0.5
+                        df.at[next_idx, "open"] = np.float32(df.at[idx, "close"])
+                        df.at[next_idx, "close"] = np.float32(df.at[idx, "open"] + (spike_size * 0.4))
+                        df.at[next_idx, "high"] = np.float32(
+                            max(df.at[next_idx, "high"], df.at[next_idx, "close"] + 0.5)
                         )
 
                     # Ensure continuity for the bar after reversal
@@ -473,15 +484,15 @@ class StressLab:
                         for j in range(window):
                             idx = df.index[i + j]
                             if j > 0:
-                                df.at[idx, "open"] = df.at[df.index[i + j - 1], "close"]
+                                df.at[idx, "open"] = np.float32(df.at[df.index[i + j - 1], "close"])
                             # Linear reversal
-                            df.at[idx, "close"] = base_price + (
-                                reversal_magnitude * (j + 1) / window
+                            df.at[idx, "close"] = np.float32(
+                                base_price + (reversal_magnitude * (j + 1) / window)
                             )
-                            df.at[idx, "high"] = (
+                            df.at[idx, "high"] = np.float32(
                                 max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i + j]
                             )
-                            df.at[idx, "low"] = (
+                            df.at[idx, "low"] = np.float32(
                                 min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i + j]
                             )
                     else:
@@ -489,20 +500,22 @@ class StressLab:
                         for j in range(window):
                             idx = df.index[i + j]
                             if j > 0:
-                                df.at[idx, "open"] = df.at[df.index[i + j - 1], "close"]
+                                df.at[idx, "open"] = np.float32(
+                                    df.at[df.index[i + j - 1], "close"]
+                                )
                             noise = rng.normal(0, atr.iloc[i + j] * 2.0)
-                            df.at[idx, "close"] += noise
-                            df.at[idx, "high"] = (
+                            df.at[idx, "close"] = np.float32(df.at[idx, "close"] + noise)
+                            df.at[idx, "high"] = np.float32(
                                 max(df.at[idx, "open"], df.at[idx, "close"]) + atr.iloc[i + j] * 2
                             )
-                            df.at[idx, "low"] = (
+                            df.at[idx, "low"] = np.float32(
                                 min(df.at[idx, "open"], df.at[idx, "close"]) - atr.iloc[i + j] * 2
                             )
 
                     if i + window < len(df):
-                        df.at[df.index[i + window], "open"] = df.at[
-                            df.index[i + window - 1], "close"
-                        ]
+                        df.at[df.index[i + window], "open"] = np.float32(
+                            df.at[df.index[i + window - 1], "close"]
+                        )
                     i += window
                 else:
                     i += 1
@@ -514,22 +527,26 @@ class StressLab:
                 if rng.random() < scenario.flash_crash_prob:
                     # Deep drop: 5-10 ATRs
                     drop_size = atr.iloc[i] * rng.uniform(5.0, 10.0)
-                    df.at[df.index[i], "low"] -= drop_size
-                    df.at[df.index[i], "close"] -= drop_size * 0.8
+                    df.at[df.index[i], "low"] = np.float32(df.at[df.index[i], "low"] - drop_size)
+                    df.at[df.index[i], "close"] = np.float32(
+                        df.at[df.index[i], "close"] - drop_size * 0.8
+                    )
 
                     if i + 1 < len(df):
-                        df.at[df.index[i + 1], "open"] = df.at[df.index[i], "close"]
+                        df.at[df.index[i + 1], "open"] = np.float32(df.at[df.index[i], "close"])
 
                     # Partial recovery in next 3 candles
                     for j in range(1, 4):
                         curr_idx = df.index[i + j]
                         recovery = drop_size * rng.uniform(0.1, 0.2)
-                        df.at[curr_idx, "close"] += recovery
-                        df.at[curr_idx, "high"] = max(
-                            df.at[curr_idx, "high"], df.at[curr_idx, "close"] + 1.0
+                        df.at[curr_idx, "close"] = np.float32(df.at[curr_idx, "close"] + recovery)
+                        df.at[curr_idx, "high"] = np.float32(
+                            max(df.at[curr_idx, "high"], df.at[curr_idx, "close"] + 1.0)
                         )
                         if i + j + 1 < len(df):
-                            df.at[df.index[i + j + 1], "open"] = df.at[curr_idx, "close"]
+                            df.at[df.index[i + j + 1], "open"] = np.float32(
+                                df.at[curr_idx, "close"]
+                            )
 
                     i += 5  # Skip ahead
                 else:
@@ -571,41 +588,47 @@ class StressLab:
         # Predict signals on potentially perturbed data
         raw_signals = self.strategy.predict(df)
 
-        # Apply execution delay
-        if scenario.execution_delay_steps > 0:
-            signals = np.zeros_like(raw_signals)
-            signals[scenario.execution_delay_steps :] = raw_signals[
-                : -scenario.execution_delay_steps
-            ]
-        else:
-            signals = raw_signals
-
         position = 0
         entry_price = 0.0
 
         # Base spread for XAUUSD if not present
         base_spread = 0.25
         if "_real_spread" in df.columns:
-            spreads = df["_real_spread"].values * scenario.spread_multiplier
+            base_spreads = df["_real_spread"].values * scenario.spread_multiplier
         else:
-            spreads = (
+            base_spreads = (
                 df["spread"].values if "spread" in df.columns else np.ones(n) * base_spread
             ) * scenario.spread_multiplier
 
-        rng = np.random.default_rng(42)
+        rng = np.random.default_rng(scenario.seed)
         latency_hits = 0
         max_slippage = 0.0
 
         for i in range(1, n):
-            current_sig = signals[i - 1]
+            # 1. Determine signal with delay and jitter
+            delay = scenario.execution_delay_steps
+            if scenario.execution_delay_jitter > 0:
+                delay += rng.integers(
+                    -scenario.execution_delay_jitter, scenario.execution_delay_jitter + 1
+                )
+            delay = max(0, delay)
+
+            # Signal from 'delay' steps ago
+            sig_idx = max(0, i - 1 - delay)
+            current_sig = raw_signals[sig_idx]
+
             current_price = close[i]
 
-            # Service failure
+            # 2. Apply service failure
             if scenario.service_failure_prob > 0 and rng.random() < scenario.service_failure_prob:
-                current_sig = 0  # Blocked
+                current_sig = 0  # Signal blocked by infrastructure failure
                 latency_hits += 1
 
-            # Calculate slippage
+            # 3. Calculate dynamic spread and slippage
+            current_spread = base_spreads[i]
+            if scenario.spread_spike_prob > 0 and rng.random() < scenario.spread_spike_prob:
+                current_spread += scenario.spread_spike_magnitude
+
             current_slippage_bps = scenario.slippage_bps
             if scenario.slippage_spike_prob > 0 and rng.random() < scenario.slippage_spike_prob:
                 current_slippage_bps += scenario.slippage_spike_magnitude_bps
@@ -613,28 +636,28 @@ class StressLab:
             max_slippage = max(max_slippage, current_slippage_bps)
             slippage = current_price * (current_slippage_bps / 10000.0)
 
-            # Execution Logic
+            # 4. Execution Logic
             if current_sig == 1 and position == 0:  # Buy
                 position = 1
-                entry_price = current_price + (spreads[i] / 2) + slippage
+                entry_price = current_price + (current_spread / 2) + slippage
             elif current_sig == -1 and position == 1:  # Close Long
-                exit_price = current_price - (spreads[i] / 2) - slippage
+                exit_price = current_price - (current_spread / 2) - slippage
                 pnl = (exit_price - entry_price) * lot_size * contract_multiplier
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
             elif current_sig == -1 and position == 0:  # Short
                 position = -1
-                entry_price = current_price - (spreads[i] / 2) - slippage
+                entry_price = current_price - (current_spread / 2) - slippage
             elif current_sig == 1 and position == -1:  # Close Short
-                exit_price = current_price + (spreads[i] / 2) + slippage
+                exit_price = current_price + (current_spread / 2) + slippage
                 pnl = (entry_price - exit_price) * lot_size * contract_multiplier
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
 
             # Update Equity (Mark-to-Market including potential exit cost)
-            exit_cost = (spreads[i] / 2) + slippage
+            exit_cost = (current_spread / 2) + slippage
             if position == 1:
                 unrealized = (
                     ((current_price - exit_cost) - entry_price) * lot_size * contract_multiplier
