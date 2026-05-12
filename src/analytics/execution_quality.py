@@ -9,12 +9,13 @@ License: MIT
 from __future__ import annotations
 
 import json
-import logging
 from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
 import numpy as np
+import structlog
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from src.core.database import get_engine, get_session_factory
 from src.core.trade_logger import (
@@ -27,7 +28,7 @@ from src.core.trade_logger import (
 )
 from src.trading.mt5_connector import MT5Connector
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TradeExecutionQuality(BaseModel):
@@ -169,37 +170,66 @@ class ExecutionAnalyzer:
         self.connector = connector
 
     def _get_pip_size(self, symbol: str) -> float:
-        """Utility to get pip size for a symbol."""
-        if self.connector:
-            props = self.connector.get_symbol_properties(symbol)
-            if props:
-                if props.get("pip_size"):
-                    return float(props["pip_size"])
-                if "digits" in props:
-                    digits = props["digits"]
-                    # For XAUUSD, digits is usually 2 or 3. Pip is 0.1 (digits-1)
-                    # For EURUSD, digits is 5. Pip is 0.0001 (digits-1)
-                    # Heuristic: 10 ^ -(digits - 1)
-                    return 10 ** -(digits - 1)
-
-        if any(x in symbol for x in ["XAUUSD", "GOLD"]):
+        """
+        Utility to get pip size for a symbol.
+        Leverages connector properties with institutional-standard fallbacks.
+        """
+        # Static overrides for common institutional symbols (prioritize these)
+        symbol_upper = symbol.upper()
+        if any(x in symbol_upper for x in ["XAU", "GOLD"]):
             return 0.1
-        if any(x in symbol for x in ["JPY", "HUF"]):
+        if any(x in symbol_upper for x in ["JPY", "HUF"]):
             return 0.01
+        if any(x in symbol_upper for x in ["BTC", "ETH", "USDT"]):
+            return 1.0
+
+        if self.connector:
+            try:
+                props = self.connector.get_symbol_properties(symbol)
+                if props:
+                    if props.get("pip_size"):
+                        return float(props["pip_size"])
+                    if "digits" in props:
+                        digits = int(props["digits"])
+                        # Standard Forex: 5 digits -> 0.0001 pip, 3 digits -> 0.01 pip
+                        return 10 ** -(digits - 1) if digits > 0 else 1.0
+            except Exception as e:
+                logger.debug("failed_to_get_pip_size_from_connector", symbol=symbol, error=str(e))
+
+        # Static fallbacks for common institutional symbols
+        symbol_upper = symbol.upper()
+        if any(x in symbol_upper for x in ["XAU", "GOLD"]):
+            return 0.1
+        if any(x in symbol_upper for x in ["JPY", "HUF"]):
+            return 0.01
+        if any(x in symbol_upper for x in ["BTC", "ETH", "USDT"]):
+            return 1.0
         return 0.0001
 
     def _get_contract_size(self, symbol: str) -> float:
-        """Utility to get contract size for a symbol."""
+        """
+        Utility to get contract size for a symbol.
+        Leverages connector properties with institutional-standard fallbacks.
+        """
         if self.connector:
-            props = self.connector.get_symbol_properties(symbol)
-            if props:
-                if props.get("trade_contract_size"):
-                    return float(props["trade_contract_size"])
-                if props.get("contract_size"):
-                    return float(props["contract_size"])
+            try:
+                props = self.connector.get_symbol_properties(symbol)
+                if props:
+                    if props.get("trade_contract_size"):
+                        return float(props["trade_contract_size"])
+                    if props.get("contract_size"):
+                        return float(props["contract_size"])
+            except Exception as e:
+                logger.debug(
+                    "failed_to_get_contract_size_from_connector", symbol=symbol, error=str(e)
+                )
 
-        if any(x in symbol for x in ["XAUUSD", "GOLD"]):
+        # Static fallbacks for common institutional symbols
+        symbol_upper = symbol.upper()
+        if any(x in symbol_upper for x in ["XAU", "GOLD"]):
             return 100.0
+        if any(x in symbol_upper for x in ["BTC", "ETH"]):
+            return 1.0
         return 100000.0
 
     def analyze_trade(self, trade_id: int, persist: bool = False) -> TradeExecutionQuality | None:
@@ -208,9 +238,12 @@ class ExecutionAnalyzer:
         Compares requested signal price vs actual execution price.
         """
         with self.Session() as session:
-            trade = session.query(Trade).filter(Trade.id == trade_id).first()
+            trade = session.execute(
+                select(Trade).where(Trade.id == trade_id)
+            ).scalar_one_or_none()
+
             if not trade or not trade.signal:
-                logger.warning("Trade %s or its signal not found for analysis", trade_id)
+                logger.warning("trade_or_signal_not_found", trade_id=trade_id)
                 return None
 
             signal = trade.signal
@@ -440,11 +473,11 @@ class ExecutionAnalyzer:
     def save_blocked_analysis(self, analysis: BlockedSignalQuality) -> None:
         """Persist blocked signal analysis."""
         with self.Session() as session:
-            existing = (
-                session.query(BlockedSignalAnalysis)
-                .filter(BlockedSignalAnalysis.signal_id == analysis.signal_id)
-                .first()
-            )
+            existing = session.execute(
+                select(BlockedSignalAnalysis).where(
+                    BlockedSignalAnalysis.signal_id == analysis.signal_id
+                )
+            ).scalar_one_or_none()
             if existing:
                 existing.opportunity_cost_pnl = analysis.opportunity_cost_pnl
                 existing.max_favorable_excursion = analysis.max_favorable_excursion
@@ -466,11 +499,9 @@ class ExecutionAnalyzer:
     def save_execution_quality(self, quality: TradeExecutionQuality) -> None:
         """Persist execution quality metrics."""
         with self.Session() as session:
-            existing = (
-                session.query(ExecutionQuality)
-                .filter(ExecutionQuality.trade_id == quality.trade_id)
-                .first()
-            )
+            existing = session.execute(
+                select(ExecutionQuality).where(ExecutionQuality.trade_id == quality.trade_id)
+            ).scalar_one_or_none()
             if existing:
                 existing.slippage_pips = quality.slippage_pips
                 existing.execution_latency_ms = quality.execution_latency_ms
@@ -502,7 +533,10 @@ class ExecutionAnalyzer:
             session.commit()
 
     def _calculate_timing_efficiency(self, trade: Trade) -> float:
-        """Determine if entry was at a local extreme of the entry candle."""
+        """
+        Determine if entry was at a local extreme of the execution candle.
+        Higher score means better timing (buying near low, selling near high).
+        """
         if not self.connector:
             return 0.5
         t_created = (
@@ -510,11 +544,22 @@ class ExecutionAnalyzer:
             if trade.created_at.tzinfo is None
             else trade.created_at
         )
+        # Normalize to start of minute to ensure we fetch the correct candle
+        start_of_min = t_created.replace(second=0, microsecond=0)
+
         df = self.connector.get_rates_range(
-            trade.symbol, "M1", t_created, t_created + timedelta(seconds=59)
+            trade.symbol, "M1", start_of_min, start_of_min + timedelta(seconds=59)
         )
         if df.empty:
+            # Fallback: try to find the candle containing the timestamp
+            df = self.connector.get_rates_range(
+                trade.symbol, "M1", t_created - timedelta(minutes=1), t_created
+            )
+
+        if df.empty:
             return 0.5
+
+        # Use the candle that actually contains or is closest to our execution time
         row = df.iloc[0]
         high, low = row["high"], row["low"]
         range_val = high - low
@@ -532,17 +577,19 @@ class ExecutionAnalyzer:
         """Evaluate opportunity cost of rejected signals."""
         results = []
         with self.Session() as session:
-            blocked_events = (
-                session.query(RiskEvent)
-                .filter(
+            blocked_events = session.execute(
+                select(RiskEvent).where(
                     RiskEvent.created_at >= start_time,
                     RiskEvent.event_type == "SIGNAL_REJECTED",
                     RiskEvent.signal_id.isnot(None),
                 )
-                .all()
-            )
+            ).scalars().all()
+
             for event in blocked_events:
-                signal = session.query(ModelSignal).filter(ModelSignal.id == event.signal_id).first()
+                signal = session.execute(
+                    select(ModelSignal).where(ModelSignal.id == event.signal_id)
+                ).scalar_one_or_none()
+
                 if not signal or signal.trade:
                     continue
                 analysis = self._evaluate_opportunity_cost(signal, event.description)
@@ -575,9 +622,7 @@ class ExecutionAnalyzer:
             df = self.connector.get_rates(signal.symbol, "M5", 500)
 
         if df.empty:
-            logger.warning(
-                "Could not fetch historical data for signal %s opportunity cost", signal.id
-            )
+            logger.warning("historical_data_not_found_for_opportunity_cost", signal_id=signal.id)
             return None
 
         # 3. Standardize timezone and filter
@@ -635,17 +680,14 @@ class ExecutionAnalyzer:
         start_time = datetime.now(UTC) - timedelta(days=days)
         count = 0
         with self.Session() as session:
-            trades = (
-                session.query(Trade)
-                .filter(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
-                .all()
-            )
+            trades = session.execute(
+                select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
+            ).scalars().all()
+
             for trade in trades:
-                existing = (
-                    session.query(ExecutionQuality)
-                    .filter(ExecutionQuality.trade_id == trade.id)
-                    .first()
-                )
+                existing = session.execute(
+                    select(ExecutionQuality).where(ExecutionQuality.trade_id == trade.id)
+                ).scalar_one_or_none()
                 if not existing and self.analyze_trade(trade.id, persist=persist):
                     count += 1
         return count
@@ -654,11 +696,9 @@ class ExecutionAnalyzer:
         """Aggregate execution quality metrics into a summary report."""
         start_time = datetime.now(UTC) - timedelta(days=days)
         with self.Session() as session:
-            trades = (
-                session.query(Trade)
-                .filter(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
-                .all()
-            )
+            trades = session.execute(
+                select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
+            ).scalars().all()
             qualities = [self.analyze_trade(t.id, persist=persist) for t in trades]
             qualities = [q for q in qualities if q]
             blocked = self.analyze_blocked_signals(start_time, persist=persist)
