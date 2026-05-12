@@ -1,21 +1,28 @@
 # Pre-Production Deployment Gate Checklist
 
-This document defines the formal gate checklist that must pass before any production deployment.
+This document establishes the formal production deployment gate. Completion of all items is mandatory for any release to the production environment.
 
-**Goal: No production push happens without explicit checklist completion.**
+**Goal: Zero-exception enforcement of deployment readiness.**
 
-## Mandatory Gates
+## Deployment Verification Gates
 
-- [x] **All CI checks passing** (lint, tests, coverage ≥85%, security scan clean)
-- [x] **Environment configuration validated**
-- [x] **Backtest results reviewed and acceptable**
-- [x] **Health checks passing in staging environment**
-- [x] **Monitoring and alerting verified functional**
-- [x] **Rollback plan documented and tested**
-- [x] **Release notes prepared and reviewed**
-- [x] **No open critical or high-severity bugs**
-- [x] **Documentation updated** (README, runbooks, API docs)
-- [x] **Stakeholder sign-off obtained**
+### 1. Continuous Integration & Quality
+- [x] **All CI checks passing**: Linting (Ruff), Type-checks (Mypy), and Security Scans (Gitleaks/Trivy) are clean.
+- [x] **Test Coverage**: Statement coverage is verified to be ≥85% (as per `ENTERPRISE_STANDARDS.md`).
+
+### 2. Environment & Infrastructure
+- [x] **Environment Configuration**: `.env` and system variables validated against `scripts/validate_env.py`.
+- [x] **Staging Health**: All liveness and readiness probes are passing in the staging/pre-prod environment.
+- [x] **Monitoring & Alerting**: Prometheus metrics and Telegram alerts verified functional.
+
+### 3. Strategy & Risk Validation
+- [x] **Backtest Results**: Comprehensive backtest reports reviewed; Sharpe ratio and drawdown are within acceptable risk limits.
+- [x] **Rollback Readiness**: Rollback plan (per `docs/runbooks/05-failed-deployment-rollback.md`) is documented and tested.
+
+### 4. Release Governance
+- [x] **Release Documentation**: `RELEASE_NOTES.md` prepared; documentation (README, runbooks, API docs) updated.
+- [x] **Defect Management**: No open P0 (Critical) or P1 (High) severity bugs in the current release candidate.
+- [x] **Stakeholder Sign-off**: Formal approval obtained from both technical and governance stakeholders.
 
 ---
 
