@@ -98,8 +98,7 @@ class CircuitBreaker:
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if self._state == CircuitState.HALF_OPEN or self._failure_count >= self.failure_threshold:
-            if self._state != CircuitState.OPEN:
+        if (self._state == CircuitState.HALF_OPEN or self._failure_count >= self.failure_threshold) and self._state != CircuitState.OPEN:
                 previous_state = self._state
                 self._state = CircuitState.OPEN
                 logger.error(
