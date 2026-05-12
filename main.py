@@ -400,7 +400,12 @@ def run_live(
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
                     risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                        risk.approve(
+                            signal,
+                            signal_id=signal_id,
+                            model_health=health,
+                            regime_info=regime_info,
+                        )
                         if direction != 0
                         else False
                     )

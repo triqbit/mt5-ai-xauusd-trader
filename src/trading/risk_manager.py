@@ -26,6 +26,7 @@ from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
+from src.models.regime_detector import MarketRegime, RegimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,7 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        regime_info: Optional[RegimeInfo] = None,
     ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
@@ -101,7 +103,7 @@ class RiskManager:
             rejection_reason = "Risk-Reward ratio too low"
         elif not self._check_consecutive_losses():
             rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
+        elif not self._check_model_health(model_health, regime_info=regime_info):
             rejection_reason = "Model health metrics below threshold"
 
         passed = rejection_reason == ""
@@ -183,7 +185,13 @@ class RiskManager:
             return False
         return True
 
-    def _check_model_health(self, health: Optional[dict]) -> bool:
+    def _check_model_health(
+        self, health: Optional[dict], regime_info: Optional[RegimeInfo] = None
+    ) -> bool:
+        """
+        Institutional health gate for models.
+        Implements regime-adaptive thresholds to harden safety during unstable states.
+        """
         if health is None:
             return True
 
@@ -191,21 +199,36 @@ class RiskManager:
         accuracy = float(health.get("accuracy", 1.0))
         calibration = float(health.get("calibration", 0.0))
 
-        if drift > self.cfg.model_drift_threshold:
-            logger.warning(
-                "Model drift too high: %.2f > %.2f", drift, self.cfg.model_drift_threshold
-            )
+        # Base thresholds from config
+        drift_threshold = self.cfg.model_drift_threshold
+        accuracy_floor = self.cfg.model_accuracy_floor
+        calibration_threshold = self.cfg.model_calibration_threshold
+
+        # Regime-Adaptive Hardening (Harden safety during unstable market states)
+        if regime_info:
+            regime = regime_info.label
+            if regime == MarketRegime.NEWS_SHOCK:
+                # News shocks are extremely dangerous; tighten drift tolerance by 50%
+                # and increase accuracy floor by 10%.
+                drift_threshold *= 0.5
+                accuracy_floor = min(0.9, accuracy_floor + 0.10)
+                logger.debug("Regime NEWS_SHOCK: health thresholds hardened (+50%% drift, +10%% acc)")
+            elif regime in (MarketRegime.VOLATILE_BREAKOUT, MarketRegime.MEAN_REVERSION):
+                # Volatile states require consistent model performance; tighten drift by 25%.
+                drift_threshold *= 0.75
+                logger.debug("Regime %s: health thresholds hardened (+25%% drift)", regime.value)
+
+        if drift > drift_threshold:
+            logger.warning("Model drift too high: %.2f > %.2f", drift, drift_threshold)
             return False
-        if accuracy < self.cfg.model_accuracy_floor:
-            logger.warning(
-                "Model accuracy too low: %.2f < %.2f", accuracy, self.cfg.model_accuracy_floor
-            )
+        if accuracy < accuracy_floor:
+            logger.warning("Model accuracy too low: %.2f < %.2f", accuracy, accuracy_floor)
             return False
-        if calibration > self.cfg.model_calibration_threshold:
+        if calibration > calibration_threshold:
             logger.warning(
                 "Model calibration error too high: %.2f > %.2f",
                 calibration,
-                self.cfg.model_calibration_threshold,
+                calibration_threshold,
             )
             return False
 

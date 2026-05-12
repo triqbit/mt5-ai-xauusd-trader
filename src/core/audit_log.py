@@ -145,18 +145,24 @@ class AuditLogger:
         )
 
     def log_risk_decision(
-        self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool
+        self,
+        symbol: str,
+        direction: int,
+        decision_chain: dict[str, Any],
+        passed: bool,
+        regime: str = "unknown",
     ) -> int:
         """Log the full risk engine decision chain."""
         return self.log(
             actor="risk_engine",
             action="risk_decision",
-            details=f"Risk decision for {symbol} {direction}: {'PASSED' if passed else 'FAILED'}",
+            details=f"Risk decision for {symbol} {direction} in {regime}: {'PASSED' if passed else 'FAILED'}",
             metadata={
                 "symbol": symbol,
                 "direction": direction,
                 "decision_chain": decision_chain,
                 "passed": passed,
+                "regime": regime,
             },
         )
 

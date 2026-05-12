@@ -9,10 +9,11 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
+from src.models.regime_detector import RegimeInfo
 from src.trading.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        regime_info: Optional[RegimeInfo] = None,
     ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
@@ -43,7 +45,7 @@ class AuditedRiskManager(RiskManager):
             "min_confidence": self._check_minimum_confidence(signal.confidence),
             "risk_reward": self._check_risk_reward(signal),
             "consecutive_losses": self._check_consecutive_losses(),
-            "model_health": self._check_model_health(model_health),
+            "model_health": self._check_model_health(model_health, regime_info=regime_info),
         }
 
         passed = all(decision_chain.values())
@@ -56,6 +58,7 @@ class AuditedRiskManager(RiskManager):
                 direction=signal.direction,
                 decision_chain=decision_chain,
                 passed=passed,
+                regime=regime_info.label.value if regime_info else "unknown",
             )
 
             # Log high-severity circuit breaker events specifically
