@@ -220,6 +220,68 @@ class RandomStrategy:
         return rng.choice([-1, 0, 1], size=len(df))
 
 
+class ADXStrategy:
+    """Trend-following strategy based on the Average Directional Index (ADX)."""
+
+    def __init__(self, window: int = 14, adx_threshold: float = 25.0):
+        self.window = window
+        self.adx_threshold = adx_threshold
+
+    @property
+    def name(self) -> str:
+        return f"ADX_Trend_{self.window}_T{self.adx_threshold}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using ADX and Directional Indicators.
+        Buy if ADX > threshold and +DI > -DI.
+        Sell if ADX > threshold and -DI > +DI.
+        """
+        try:
+            import talib
+
+            high, low, close = (
+                df["high"].values.astype(float),
+                df["low"].values.astype(float),
+                df["close"].values.astype(float),
+            )
+            adx = talib.ADX(high, low, close, timeperiod=self.window)
+            plus_di = talib.PLUS_DI(high, low, close, timeperiod=self.window)
+            minus_di = talib.MINUS_DI(high, low, close, timeperiod=self.window)
+        except (ImportError, Exception):
+            # Fallback: Simple EMA-based trend strength proxy if TA-Lib is missing
+            # This is a heuristic for benchmarking consistency when TA-Lib is absent.
+            diff = df["close"].diff()
+            plus_dm = diff.where(diff > 0, 0.0).rolling(self.window).mean()
+            minus_dm = (-diff.where(diff < 0, 0.0)).rolling(self.window).mean()
+            tr = (
+                pd.concat(
+                    [
+                        df["high"] - df["low"],
+                        (df["high"] - df["close"].shift(1)).abs(),
+                        (df["low"] - df["close"].shift(1)).abs(),
+                    ],
+                    axis=1,
+                )
+                .max(axis=1)
+                .rolling(self.window)
+                .mean()
+            )
+
+            plus_di = 100 * (plus_dm / tr)
+            minus_di = 100 * (minus_dm / tr)
+            dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di + 1e-9)
+            adx = dx.rolling(self.window).mean().values
+            plus_di = plus_di.values
+            minus_di = minus_di.values
+
+        signals = np.zeros(len(df))
+        strong_trend = adx > self.adx_threshold
+        signals[strong_trend & (plus_di > minus_di)] = 1
+        signals[strong_trend & (minus_di > plus_di)] = -1
+        return signals
+
+
 class BenchmarkEvaluator:
     """Evaluates multiple strategies and generates comparative reports."""
 
@@ -228,11 +290,23 @@ class BenchmarkEvaluator:
         df: pd.DataFrame,
         initial_balance: float = 10000.0,
         commission: float = 0.0002,
+        slippage: float = 0.0001,
         bars_per_year: int = 252,
     ):
+        """
+        Initialize the BenchmarkEvaluator.
+
+        Args:
+            df: DataFrame containing OHLCV data.
+            initial_balance: Starting account balance.
+            commission: Transaction fee as a decimal (e.g., 0.0002 for 2 bps).
+            slippage: Execution slippage as a decimal per trade (e.g., 0.0001 for 1 bp).
+            bars_per_year: Number of bars in a trading year (for Sharpe/Sortino scaling).
+        """
         self.df = df
         self.initial_balance = initial_balance
         self.commission = commission
+        self.slippage = slippage
         self.bars_per_year = bars_per_year
         self.results: dict[str, Any] = {}
 
@@ -266,14 +340,17 @@ class BenchmarkEvaluator:
 
             # Handle transitions (Closures / Reversals / Entries)
             if target_pos != position:
+                # Total cost for the transition: Commission + Slippage
+                transition_cost = self.commission + self.slippage
+
                 # If closing an existing position
                 if position != 0:
-                    current_equity *= 1 - self.commission
+                    current_equity *= 1 - transition_cost
                     trade_pnls.append(current_equity - entry_equity)
 
                 # If opening a new position
                 if target_pos != 0:
-                    current_equity *= 1 - self.commission
+                    current_equity *= 1 - transition_cost
                     entry_equity = current_equity
 
                 position = target_pos
@@ -568,6 +645,9 @@ class EnsembleAdapter(AdapterBase):
         import torch
 
         signals = np.zeros(len(df))
+        if len(df) < self.window_size:
+            return signals
+
         feature_cols = self._get_feature_cols(df)
 
         for i in range(self.window_size - 1, len(df)):
@@ -643,6 +723,9 @@ class TransformerAdapter(AdapterBase):
 
         self.model.eval()
         signals = np.zeros(len(df))
+        if len(df) < self.window_size:
+            return signals
+
         feature_cols = self._get_feature_cols(df)
 
         with torch.no_grad():
@@ -696,6 +779,9 @@ class LSTMAdapter(AdapterBase):
 
         self.model.eval()
         signals = np.zeros(len(df))
+        if len(df) < self.window_size:
+            return signals
+
         feature_cols = self._get_feature_cols(df)
 
         with torch.no_grad():
