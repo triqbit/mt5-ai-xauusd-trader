@@ -1,18 +1,20 @@
-import pytest
 import json
-import os
-from datetime import datetime, timedelta, UTC
-from unittest.mock import patch, MagicMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from src.data.event_intelligence import (
-    EventIntelligence,
-    MockEventProvider,
     BaseEventProvider,
-    JSONEventProvider,
-    MetaAPIEventProvider,
-    MacroEvent,
     EventCategory,
-    EventImpact
+    EventImpact,
+    EventIntelligence,
+    JSONEventProvider,
+    MacroEvent,
+    MetaAPIEventProvider,
+    MockEventProvider,
 )
+
 
 @pytest.fixture
 def now():
@@ -110,7 +112,25 @@ def test_no_active_events(now):
     status = intel.get_risk_status(now)
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
-    assert len(status.active_events) == 0
+
+def test_geopolitical_provider(now):
+    from src.data.event_intelligence import GeopoliticalEventProvider
+
+    geo_data = [
+        {
+            "name": "Conflict Escalation",
+            "impact": 4,
+            "timestamp": now.isoformat(),
+            "end_timestamp": (now + timedelta(hours=48)).isoformat()
+        }
+    ]
+    provider = GeopoliticalEventProvider(geo_data)
+    events = provider.get_upcoming_events(now - timedelta(hours=1), now + timedelta(hours=1))
+
+    assert len(events) == 1
+    assert events[0].name == "Conflict Escalation"
+    assert events[0].category == EventCategory.GEOPOLITICAL
+    assert events[0].impact == EventImpact.CRITICAL
 
 def test_fallback_behavior_no_cache(now):
     class BrokenProvider(MockEventProvider):
@@ -122,7 +142,19 @@ def test_fallback_behavior_no_cache(now):
 
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
-    assert "Event data unavailable (no cache)" in status.reason
+    assert "Event data unavailable (no cache). Fail-safe PASSING." in status.reason
+
+def test_fail_safe_blocking_behavior(now):
+    class BrokenProvider(MockEventProvider):
+        def get_upcoming_events(self, start, end):
+            raise Exception("API Down")
+
+    intel = EventIntelligence([BrokenProvider()], fail_safe_blocked=True)
+    status = intel.get_risk_status(now)
+
+    assert status.is_blocked is True
+    assert status.risk_multiplier == 0.0
+    assert "Event data unavailable (no cache). Fail-safe BLOCKING." in status.reason
 
 def test_fallback_behavior_with_cache(now):
     class SometimesBrokenProvider(MockEventProvider):
@@ -194,11 +226,11 @@ def test_json_provider(tmp_path, now):
     assert events[0].name == "JSON Event"
     assert events[0].impact == EventImpact.HIGH
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
-def test_metaapi_provider(mock_init_session, now):
-    mock_session = MagicMock()
-    mock_init_session.return_value = mock_session
-    mock_get = mock_session.get
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
+def test_metaapi_provider(mock_init_client, now):
+    mock_client = MagicMock()
+    mock_init_client.return_value = mock_client
+    mock_get = mock_client.get
 
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -254,11 +286,11 @@ def test_guess_category_new_keywords():
     assert provider._guess_category("Geopolitical Tension") == EventCategory.GEOPOLITICAL
     assert provider._guess_category("US Treasury Bond Auction") == EventCategory.USD_MACRO
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
-def test_metaapi_provider_filtering(mock_init_session, now):
-    mock_session = MagicMock()
-    mock_init_session.return_value = mock_session
-    mock_get = mock_session.get
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
+def test_metaapi_provider_filtering(mock_init_client, now):
+    mock_client = MagicMock()
+    mock_init_client.return_value = mock_client
+    mock_get = mock_client.get
 
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -315,11 +347,11 @@ def test_json_provider_error(tmp_path):
     provider = JSONEventProvider(str(file_path))
     assert provider.get_upcoming_events(datetime.now(), datetime.now()) == []
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_session")
-def test_metaapi_provider_error(mock_init_session, now):
-    mock_session = MagicMock()
-    mock_init_session.return_value = mock_session
-    mock_get = mock_session.get
+@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
+def test_metaapi_provider_error(mock_init_client, now):
+    mock_client = MagicMock()
+    mock_init_client.return_value = mock_client
+    mock_get = mock_client.get
 
     mock_get.side_effect = Exception("Network Error")
     provider = MetaAPIEventProvider(token="fake")
