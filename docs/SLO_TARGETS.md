@@ -61,7 +61,7 @@ The Error Budget is the maximum allowable unreliability. If the budget is exhaus
 
 | Component | SLO | Error Budget | "Acceptable" Failure / Month |
 |-----------|-----|--------------|-----------------------------|
-| **Availability** | 99.5% | 0.5% | 144 Minutes (during market) |
+| **Availability** | 99.5% | 0.5% | 216 Minutes (3.6 Hours) |
 | **CI Stability** | 95.0% | 5.0% | 5 failures per 100 commits |
 | **Trade Execution** | 99.9% | 0.1% | 1 failure per 1,000 signals |
 | **Data Integrity** | 100% | 0.0% | **Zero** unrecoverable data loss |

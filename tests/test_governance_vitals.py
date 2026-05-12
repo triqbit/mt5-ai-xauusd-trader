@@ -15,6 +15,7 @@ def test_governance_files_exist():
         "docs/ENTERPRISE_STANDARDS.md",
         "docs/LICENSE_COMPLIANCE.md",
         "docs/DEPENDENCY_LICENSES.md",
+        "docs/SLO_TARGETS.md",
         "SECURITY.md",
     ]
 
