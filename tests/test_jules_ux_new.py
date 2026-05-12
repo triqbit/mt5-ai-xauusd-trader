@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-from main import main, parse_args
+from main import main, get_parser
 from src.core.config import get_config
 from src.trading.backtester import BacktestEngine, PerformanceReport
 
