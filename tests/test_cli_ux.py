@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import SecretStr
 
-from main import main, parse_args
+from main import main, get_parser
 from src.core.config import get_config
 
 
@@ -29,8 +29,9 @@ def test_cli_argument_precedence():
         # We need to clear the lru_cache of get_config
         get_config.cache_clear()
 
-        # Run parse_args and manually apply overrides as in main()
-        args = parse_args()
+        # Run get_parser and manually apply overrides as in main()
+        parser = get_parser()
+        args = parser.parse_args()
         if args.mode:
             os.environ["MODE"] = args.mode
         if args.symbol:
