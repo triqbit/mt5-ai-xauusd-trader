@@ -519,7 +519,9 @@ class StressLab:
                         df.at[idx, "close"] = np.float32(df.at[idx, "open"] + (spike_size * 0.2))
                         # Violent reversal
                         df.at[next_idx, "open"] = np.float32(df.at[idx, "close"])
-                        df.at[next_idx, "close"] = np.float32(df.at[idx, "open"] - (spike_size * 0.4))
+                        df.at[next_idx, "close"] = np.float32(
+                            df.at[idx, "open"] - (spike_size * 0.4)
+                        )
                         df.at[next_idx, "low"] = np.float32(
                             min(df.at[next_idx, "low"], df.at[next_idx, "close"] - 0.5)
                         )
@@ -531,7 +533,9 @@ class StressLab:
                         df.at[idx, "close"] = np.float32(df.at[idx, "open"] - (spike_size * 0.2))
                         # Violent reversal
                         df.at[next_idx, "open"] = np.float32(df.at[idx, "close"])
-                        df.at[next_idx, "close"] = np.float32(df.at[idx, "open"] + (spike_size * 0.4))
+                        df.at[next_idx, "close"] = np.float32(
+                            df.at[idx, "open"] + (spike_size * 0.4)
+                        )
                         df.at[next_idx, "high"] = np.float32(
                             max(df.at[next_idx, "high"], df.at[next_idx, "close"] + 0.5)
                         )
@@ -576,9 +580,7 @@ class StressLab:
                         for j in range(window):
                             idx = df.index[i + j]
                             if j > 0:
-                                df.at[idx, "open"] = np.float32(
-                                    df.at[df.index[i + j - 1], "close"]
-                                )
+                                df.at[idx, "open"] = np.float32(df.at[df.index[i + j - 1], "close"])
                             noise = rng.normal(0, atr.iloc[i + j] * 2.0)
                             df.at[idx, "close"] = np.float32(df.at[idx, "close"] + noise)
                             df.at[idx, "high"] = np.float32(

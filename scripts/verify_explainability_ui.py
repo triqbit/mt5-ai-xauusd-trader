@@ -1,23 +1,23 @@
-
-import sys
 import os
-from datetime import datetime, UTC
+import sys
+
 from rich.console import Console
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.core.explainability import SignalExplainer, SignalDirection
-from src.core.schemas import TradeSignal, ExecutionDecision
+from src.core.explainability import SignalExplainer
+from src.core.schemas import ExecutionDecision, TradeSignal
 from src.models.regime_detector import MarketRegime, RegimeInfo
+
 
 def verify_ui():
     console = Console(force_terminal=True, width=100)
     explainer = SignalExplainer()
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("SCENARIO 1: HIGH-CONFIDENCE APPROVED BUY SIGNAL")
-    print("="*80)
+    print("=" * 80)
 
     regime = RegimeInfo(
         label=MarketRegime.TRENDING,
@@ -50,7 +50,7 @@ def verify_ui():
         "risk_reward": 2.8,
         "drawdown_impact": 0.02,
         "kelly_fraction": 0.15,
-        "summary": "Risk profile aligned with institutional standards."
+        "summary": "Risk profile aligned with institutional standards.",
     }
 
     execution_data = ExecutionDecision(
@@ -61,7 +61,7 @@ def verify_ui():
             "spread": {"passed": True, "value": 0.3, "threshold": 1.0},
             "momentum": {"passed": True, "rsi": 62},
             "trend": {"passed": True, "slope": 0.4},
-        }
+        },
     )
 
     explanation = explainer.explain(
@@ -79,9 +79,9 @@ def verify_ui():
 
     explainer.format_for_terminal(explanation, console=console)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("SCENARIO 2: BLOCKED SIGNAL (EXECUTION FILTER)")
-    print("="*80)
+    print("=" * 80)
 
     execution_data_blocked = ExecutionDecision(
         signal=signal,
@@ -91,7 +91,7 @@ def verify_ui():
         trace={
             "atr_volatility": {"passed": False, "ratio": 3.5, "threshold": 3.0},
             "spread": {"passed": True, "value": 0.5},
-        }
+        },
     )
 
     explanation_blocked = explainer.explain(
@@ -106,6 +106,7 @@ def verify_ui():
     )
 
     explainer.format_for_terminal(explanation_blocked, console=console)
+
 
 if __name__ == "__main__":
     verify_ui()

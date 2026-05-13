@@ -125,9 +125,9 @@ class EventCategory(Enum):
     FOMC = "FOMC"  # Federal Reserve meetings
     RATES = "RATES"  # Interest rate decisions
     USD = "USD"  # General USD macro releases
-    USD_MACRO = "USD_MACRO" # Broad US economic indicators
-    GEOPOLITICAL = "GEOPOLITICAL" # Political events, wars, or sanctions
-    OTHER = "OTHER" # Miscellaneous events
+    USD_MACRO = "USD_MACRO"  # Broad US economic indicators
+    GEOPOLITICAL = "GEOPOLITICAL"  # Political events, wars, or sanctions
+    OTHER = "OTHER"  # Miscellaneous events
 
 
 class ModelAction(IntEnum):
