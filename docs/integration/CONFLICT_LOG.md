@@ -105,3 +105,26 @@
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
 - **Owner**: Jules05
+
+## [2026-05-15] - Risk & Macro Intelligence Harmonization
+
+### 1. Redundant Risk Implementations (RiskManager vs RiskEngine)
+- **Conflict**: Two competing risk management implementations exist: `RiskManager` (base/audited) and `RiskEngine`. `RiskEngine` implements a superior 8-layer cascade and ATR-based sizing defined in `RISK_LIMITS.md`, but `main.py` uses `AuditedRiskManager`.
+- **Agents**: Jules01, Jules02, Jules05
+- **Impact**: High. Fragmented risk logic leads to inconsistent safety enforcement and technical debt.
+- **Resolution**: Port `RiskEngine`'s 8-layer cascade and ATR-based sizing to `RiskManager`. Update `main.py` to handle the `RiskDecision` object and provide necessary market context. Delete `RiskEngine`.
+- **Owner**: Jules05
+
+### 2. Orphaned Macro Intelligence (Stubbed RiskStatus)
+- **Conflict**: `EventIntelligence` is fully implemented but `main.py` still uses a hardcoded `RiskStatus` stub for macro risk detection.
+- **Agents**: Jules01, Jules04
+- **Impact**: Medium. The bot is blind to real-world macro events (NFP, CPI, etc.) despite the infrastructure being ready.
+- **Resolution**: Integrate `EventIntelligence` into the `main.py` live loop.
+- **Owner**: Jules05
+
+### 3. Disconnected Execution Analytics
+- **Conflict**: `ExecutionAnalyzer` exists but is not integrated into the `main.py` trade closure logic, preventing real-time alpha decay and slippage analysis.
+- **Agents**: Jules02
+- **Impact**: Low (Institutional Readiness). Missing automated feedback loop for execution quality.
+- **Resolution**: Integrate `ExecutionAnalyzer` into `main.py`'s `closed_positions_check` logic.
+- **Owner**: Jules05

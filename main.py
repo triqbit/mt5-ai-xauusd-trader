@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from structlog import BoundLogger
 
+    from src.analytics.execution_quality import ExecutionAnalyzer
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
     from src.core.feature_engineering import FeatureEngineer
@@ -171,7 +172,9 @@ def run_live(
     feature_engineer: "FeatureEngineer",
     regime_detector: "RegimeDetector",
     allocator: "CapitalAllocator",
+    event_intelligence: "EventIntelligence",
     dss: "DecisionSupportSystem",
+    execution_analyzer: Optional["ExecutionAnalyzer"] = None,
     trade_logger: Optional["TradeLogger"] = None,
     monitor: Optional["Monitor"] = None,
     console: Optional["Console"] = None,
@@ -399,15 +402,26 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                    current_positions = connector.get_positions(cfg.symbol)
+                    risk_decision = (
+                        risk.approve(
+                            signal,
+                            market_data=df_raw,
+                            open_positions=current_positions,
+                            signal_id=signal_id,
+                            model_health=health,
+                        )
                         if direction != 0
-                        else False
+                        else None
                     )
+                    risk_approved = risk_decision.is_approved if risk_decision else False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
-                if risk_approved:
+                if risk_approved and risk_decision:
+                    # Update lot size from risk-adjusted decision
+                    signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
+
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
                         # Model health retrieved in step 6
@@ -447,14 +461,14 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": [k for k, v in risk_decision.trace.items() if not v]
+                            if risk_decision
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason if risk_decision else "Hold",
                         }
 
                         regime_data = {
@@ -512,10 +526,8 @@ def run_live(
                                 },
                             )
 
-                        # Use a stub for macro risk since we don't have a live feed in this loop yet
-                        macro_risk = RiskStatus(
-                            is_blocked=False, active_events=[], reason="No active data"
-                        )
+                        # Get real-time macro risk status
+                        macro_risk = event_intelligence.get_risk_status()
 
                         # Optimization: Use real performance metrics from TradeLogger
                         if trade_logger:
@@ -596,10 +608,16 @@ def run_live(
                                     )
                                     # P&L will be calculated automatically by update_trade
                                     # This also logs to audit trail internally now
-                                    trade_logger.update_trade(
+                                    trade_record = trade_logger.update_trade(
                                         ticket=ticket,
                                         exit_price=exit_price,
                                     )
+                                    # 7. Post-trade execution quality analysis
+                                    if trade_record and execution_analyzer:
+                                        with profile("execution_quality_analysis"):
+                                            execution_analyzer.analyze_trade(
+                                                trade_record.id, persist=True
+                                            )
                             closed_tickets.append(symbol)
 
                     if closed_tickets and trade_logger:
@@ -1401,7 +1419,14 @@ def main() -> int:
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent
+    from src.data.event_intelligence import (
+        EventIntelligence,
+        JSONEventProvider,
+        MetaAPIEventProvider,
+        TradingViewEventProvider,
+    )
     from src.models.regime_detector import RegimeDetector
+    from src.analytics.execution_quality import ExecutionAnalyzer
     from src.models.transformer_model import TimeSeriesTransformer
     from src.trading.audited_risk_manager import AuditedRiskManager
     from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
@@ -1420,6 +1445,21 @@ def main() -> int:
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
     regime_detector = RegimeDetector()
+
+    # Event Intelligence (Macro Risk)
+    providers = []
+    if cfg.metaapi_token:
+        providers.append(MetaAPIEventProvider(token=cfg.metaapi_token.get_secret_value()))
+
+    # Always include synthetic/curated providers for robustness
+    providers.append(TradingViewEventProvider())
+    if os.path.exists("data/curated_events.json"):
+        providers.append(JSONEventProvider("data/curated_events.json"))
+
+    event_intelligence = EventIntelligence(providers=providers, config=cfg)
+
+    execution_analyzer = ExecutionAnalyzer(db_url=database_url, connector=connector)
+
     # Use balance for allocator; if balance is 0, CapitalAllocator will handle it (or fail validation)
     allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
@@ -1551,7 +1591,9 @@ def main() -> int:
                 feature_engineer,
                 regime_detector,
                 allocator,
+                event_intelligence,
                 dss,
+                execution_analyzer=execution_analyzer,
                 trade_logger=trade_logger,
                 monitor=monitor,
                 console=console,
