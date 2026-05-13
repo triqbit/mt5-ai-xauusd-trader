@@ -6,6 +6,7 @@ Deterministic scenario generator for testing system robustness across market reg
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -90,30 +91,149 @@ class ScenarioGenerator:
         raise ValueError(f"Unknown regime: {regime}")
 
     def _generate_base(self, n_steps: int, start_price: float, returns: np.ndarray) -> pd.DataFrame:
-        """Helper to convert returns to OHLCV."""
-        prices = start_price * np.exp(np.cumsum(returns))
+        """Helper to convert returns to OHLCV with price continuity."""
+        # Calculate close prices from cumulative returns
+        close_prices = start_price * np.exp(np.cumsum(returns))
 
-        # Simple OHLC approximation from a single price series
-        noise = self.rng.normal(0, 0.0005, (n_steps, 4))
+        # Open price of bar i is the close of bar i-1 (Price Continuity)
+        open_prices = np.zeros(n_steps)
+        open_prices[0] = start_price
+        if n_steps > 1:
+            open_prices[1:] = close_prices[:-1]
+
+        # Generate realistic intraday noise for High/Low
+        # High must be >= max(open, close)
+        # Low must be <= min(open, close)
+        vol = np.abs(returns) + 0.0005  # Ensure some minimum range
+        high_noise = self.rng.exponential(vol * 0.5, n_steps)
+        low_noise = self.rng.exponential(vol * 0.5, n_steps)
+
+        high_prices = np.maximum(open_prices, close_prices) + high_noise
+        low_prices = np.minimum(open_prices, close_prices) - low_noise
+
         df = pd.DataFrame(
             {
-                "open": prices * (1 + noise[:, 0]),
-                "high": prices * (1 + np.abs(noise[:, 1])),
-                "low": prices * (1 - np.abs(noise[:, 2])),
-                "close": prices,
+                "open": open_prices,
+                "high": high_prices,
+                "low": low_prices,
+                "close": close_prices,
                 "tick_volume": self.rng.integers(100, 1000, n_steps),
             }
         )
 
-        # Ensure high is actually the highest and low is the lowest
-        df["high"] = df[["open", "close", "high"]].max(axis=1)
-        df["low"] = df[["open", "close", "low"]].min(axis=1)
-
         # Apply datetime index if provided
-        if hasattr(self, "_current_start_date") and self._current_start_date:
+        start_date = getattr(self, "_current_start_date", None)
+        if start_date:
             df.index = pd.date_range(
-                start=self._current_start_date, periods=n_steps, freq=self._current_freq
+                start=start_date, periods=n_steps, freq=self._current_freq
             )
+
+        return df
+
+    def generate_multi_timeframe(
+        self,
+        n_steps_base: int = 1000,
+        base_freq: str = "1min",
+        timeframes: list[str] = ["M5", "M15", "H1"],
+        regime: str = "trending",
+        start_date: datetime | str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, pd.DataFrame]:
+        """
+        Generates consistent OHLC data across multiple timeframes by resampling.
+        Ensures that high-TF bars are perfectly aligned with low-TF bars.
+        """
+        if start_date is None:
+            start_date = datetime(2024, 5, 22, 0, 0, tzinfo=UTC)
+
+        # 1. Generate base high-resolution data (e.g., M1)
+        df_base = self.generate(
+            n_steps=n_steps_base, regime=regime, freq=base_freq, start_date=start_date, **kwargs
+        )
+
+        results = {base_freq: df_base}
+
+        # 2. Resample for each requested timeframe
+        for tf in timeframes:
+            # Map MT5 timeframe codes to pandas freq
+            # M5 -> 5min, H1 -> 1h, etc.
+            match = re.match(r"([A-Z]+)(\d+)", tf)
+            if match:
+                unit_code, value = match.groups()
+                unit = {
+                    "M": "min",
+                    "H": "h",
+                    "D": "D",
+                    "W": "W",
+                    "MN": "ME"
+                }.get(unit_code, "min")
+                resample_freq = f"{value}{unit}"
+            else:
+                # Fallback for single letter codes if any
+                resample_freq = (
+                    tf.replace("M", "min")
+                    .replace("H", "h")
+                    .replace("D", "D")
+                    .replace("W", "W")
+                )
+
+            resampled = (
+                df_base.resample(resample_freq)
+                .agg(
+                    {
+                        "open": "first",
+                        "high": "max",
+                        "low": "min",
+                        "close": "last",
+                        "tick_volume": "sum",
+                    }
+                )
+                .dropna()
+            )
+
+            results[tf] = resampled
+
+        return results
+
+    def inject_faults(
+        self,
+        df: pd.DataFrame,
+        fault_type: Literal["stale", "outliers", "zero_volume", "gaps"],
+        prob: float = 0.05,
+    ) -> pd.DataFrame:
+        """Injects operational faults into an existing dataset."""
+        df = df.copy()
+        n = len(df)
+        if n < 2:
+            return df
+
+        indices = self.rng.choice(n, size=max(1, int(n * prob)), replace=False)
+
+        if fault_type == "stale":
+            # Bar matches previous bar exactly (frozen data)
+            for idx in indices:
+                if idx > 0:
+                    df.iloc[idx] = df.iloc[idx - 1]
+        elif fault_type == "outliers":
+            # Ghost ticks / extreme price spikes (e.g. fat finger or bad feed)
+            for idx in indices:
+                side = self.rng.choice([-1, 1])
+                multiplier = 1 + (0.1 * side)  # 10% outlier
+                df.iloc[idx, df.columns.get_loc("high")] *= multiplier
+                df.iloc[idx, df.columns.get_loc("low")] *= multiplier
+                df.iloc[idx, df.columns.get_loc("close")] *= multiplier
+        elif fault_type == "zero_volume":
+            # Price moves but volume is reported as zero
+            df.iloc[indices, df.columns.get_loc("tick_volume")] = 0
+        elif fault_type == "gaps":
+            # Price jump without continuity (slippage or weekend gap)
+            for idx in sorted(indices):
+                if idx < n - 1:
+                    gap = self.rng.normal(0, 0.01) * df.iloc[idx]["close"]
+                    df.iloc[idx + 1 :, df.columns.get_loc("open")] += gap
+                    df.iloc[idx + 1 :, df.columns.get_loc("high")] += gap
+                    df.iloc[idx + 1 :, df.columns.get_loc("low")] += gap
+                    df.iloc[idx + 1 :, df.columns.get_loc("close")] += gap
 
         return df
 
