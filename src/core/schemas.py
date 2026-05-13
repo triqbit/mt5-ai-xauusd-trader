@@ -157,3 +157,30 @@ class ExecutionDecision(BaseModel):
             if self.blocked_by:
                 raise ValueError("An approved decision cannot have a 'blocked_by' reason.")
         return self
+
+
+class RiskDecision(BaseModel):
+    """
+    Structured result of the institutional risk cascade.
+    Enforces technical trust by ensuring every risk decision is traceable.
+
+    This model is immutable (frozen) and forbids extra fields.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="Final risk decision: True if passed all layers")
+    reason: str = Field(..., description="The primary reason for the decision (e.g., 'Approved')")
+    adjusted_lot_size: float = Field(
+        0.0, ge=0.0, description="The risk-adjusted lot size calculated by the engine"
+    )
+    trace: dict[str, Any] = Field(
+        default_factory=dict, description="Detailed audit trace of all 8 risk layers"
+    )
+
+    @model_validator(mode="after")
+    def validate_adjusted_lot(self) -> "RiskDecision":
+        """Ensure adjusted_lot_size is provided if approved."""
+        if self.is_approved and self.adjusted_lot_size <= 0:
+            raise ValueError("An approved risk decision must provide a positive adjusted_lot_size.")
+        return self
