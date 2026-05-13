@@ -2,9 +2,9 @@
 Unit tests for the CapitalAllocator system.
 """
 
-import pytest
-
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.core.config import TradingConfig
 from src.trading.capital_allocator import (
@@ -679,7 +679,7 @@ def test_audit_logging(mock_get_audit_logger, allocator):
     allocator.request_allocation("s1", 0.01)
 
     assert mock_audit.log_allocation_decision.called
-    args, kwargs = mock_audit.log_allocation_decision.call_args
+    _args, kwargs = mock_audit.log_allocation_decision.call_args
     assert kwargs["strategy_id"] == "s1"
     assert kwargs["requested_risk"] == 0.01
 

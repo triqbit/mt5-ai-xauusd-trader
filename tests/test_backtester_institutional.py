@@ -4,12 +4,10 @@ Institutional unit tests for the BacktestEngine.
 
 from __future__ import annotations
 
-from datetime import datetime
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock
-
 import pytest
 
 from src.trading.backtester import BacktestEngine
@@ -97,7 +95,7 @@ def test_institutional_cost_calculation(institutional_data):
     model = InstitutionalMockModel()
 
     # Run a small slice
-    report = engine.run_walk_forward(
+    engine.run_walk_forward(
         institutional_data.iloc[:500],
         model,
         train_window=100,

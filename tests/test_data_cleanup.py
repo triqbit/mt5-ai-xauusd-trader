@@ -212,8 +212,6 @@ class TestDataCleanup(unittest.TestCase):
             new_unlinked_id = new_unlinked.id
             old_linked_id = old_linked.id
             old_unlinked_id = old_unlinked.id
-            old_eq_id = old_eq.id
-            old_bsa_id = old_bsa.id
 
         # Run cleanup on the in-memory DB
         # We need to monkeypatch create_engine or pass the engine

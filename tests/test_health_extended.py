@@ -1,9 +1,11 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
+
+from src.core.config import TradingConfig
 from src.core.health import HealthChecker, HealthStatus
 from src.trading.mt5_connector import MT5Connector
-from src.core.config import TradingConfig
+
 
 class TestHealthExtended(unittest.TestCase):
     def setUp(self):

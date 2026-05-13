@@ -6,10 +6,13 @@ Verifies that unexpected component failures (exceptions) are correctly caught
 by the system loop and do not lead to silent execution or system crashes.
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import MagicMock, patch
+
 from src.core.schemas import TradeSignal
 from src.trading.execution_filter import ExecutionFilter
+
 
 def test_execution_filter_exception_handling():
     """
@@ -38,8 +41,9 @@ def test_main_loop_error_handling_structure():
     Verifies the existence of error handling logic in main.py by inspecting its source.
     This is a meta-test to ensure the safety net is present.
     """
-    import main
     import inspect
+
+    import main
 
     source = inspect.getsource(main.run_live)
     assert "except Exception as exc:" in source

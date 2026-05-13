@@ -11,9 +11,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from src import __version__
-from pydantic import SecretStr
 from src.core.config import TradingConfig
 from src.core.health import (
     ComponentStatus,

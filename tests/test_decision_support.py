@@ -2,20 +2,26 @@
 Unit tests for the Decision Support System.
 """
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-from src.core.decision_support import (
-    DecisionSupportSystem,
-    DecisionPacket,
-    PerformanceContext,
-    DecisionStatus,
-)
-from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment, ModelAttribution
+import pytest
+
 from src.core.constants import SignalDirection
-from src.models.regime_detector import RegimeInfo, MarketRegime
-from src.data.event_intelligence import RiskStatus, MacroEvent, EventCategory, EventImpact
+from src.core.decision_support import (
+    DecisionPacket,
+    DecisionStatus,
+    DecisionSupportSystem,
+    PerformanceContext,
+)
+from src.core.explainability import (
+    ExecutionSummary,
+    ModelAttribution,
+    RiskAssessment,
+    SignalExplanation,
+)
+from src.data.event_intelligence import RiskStatus
+from src.models.regime_detector import MarketRegime, RegimeInfo
 
 
 @pytest.fixture
@@ -284,7 +290,6 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
     dashboard = mock_console.print.call_args[0][0]
 
     # Find perf_panel in the dashboard Group
-    perf_panel = None
     for r in dashboard.renderables:
         # overview_table is a Table, which contains Panels in its rows
         if hasattr(r, "columns"): # Likely the Table
@@ -358,7 +363,7 @@ def test_high_conviction_labeling(mock_explanation, mock_regime, mock_macro_risk
     label_found = False
     for call in mock_panel_cls.call_args_list:
         if call.kwargs.get("title") == "🎯 Augmentation Metrics":
-            content = call.args[0]
+            call.args[0]
             # content is now a Table. We check the renderables in its columns.
             # Since we can't easily inspect Table internals after addition,
             # we check if any call to score_text (the Text object) contained the label.

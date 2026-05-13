@@ -5,12 +5,14 @@ tests/test_schemas_governance.py
 Tests for Pydantic schema validation and governance.
 """
 
+
 import pytest
 from pydantic import ValidationError
-from datetime import datetime, UTC
-from src.core.schemas import TradeSignal, ExecutionDecision
-from src.core.constants import SignalDirection
+
 from src.core.config import TradingConfig
+from src.core.constants import SignalDirection
+from src.core.schemas import ExecutionDecision, TradeSignal
+
 
 def test_trade_signal_valid():
     """Verify valid TradeSignal instantiation."""
@@ -165,3 +167,18 @@ def test_trading_config_validation(monkeypatch):
     cfg = TradingConfig(SYMBOL="XAUUSD", timeframe="H1")
     assert cfg.symbol == "XAUUSD"
     assert cfg.timeframe == "H1"
+
+
+def test_trade_signal_invalid_lot_size_high():
+    """Verify lot_size <= 5.0 enforcement for enterprise safety."""
+    with pytest.raises(ValidationError):
+        TradeSignal(
+            symbol="XAUUSD",
+            direction=SignalDirection.BUY,
+            entry_price=2300.0,
+            stop_loss=2280.0,
+            take_profit=2350.0,
+            lot_size=6.0,  # Above 5.0 limit
+            algorithm="ensemble",
+            confidence=0.85,
+        )

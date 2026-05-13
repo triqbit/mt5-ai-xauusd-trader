@@ -1,7 +1,9 @@
 import os
 import unittest
 from pathlib import Path
+
 from scripts.update_changelog import categorize_commits, update_changelog
+
 
 class TestChangelogAutomation(unittest.TestCase):
     def test_categorize_commits(self):
@@ -89,7 +91,7 @@ class TestChangelogAutomation(unittest.TestCase):
 
             # Run again to check for duplicates
             update_changelog(categories)
-            new_content_2 = changelog_path.read_text()
+            changelog_path.read_text()
             self.assertEqual(new_content.count("- New feature"), 1)
 
         finally:

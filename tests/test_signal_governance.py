@@ -4,8 +4,10 @@ Tests for Signal governance and validation.
 
 import pytest
 from pydantic import ValidationError
-from src.models.base_model import Signal
+
 from src.core.constants import SignalDirection
+from src.models.base_model import Signal
+
 
 def test_signal_valid():
     """Verify valid Signal instantiation."""
