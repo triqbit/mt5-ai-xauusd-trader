@@ -336,9 +336,47 @@ def test_run_standard_suite(sample_data):
     )
 
     report = lab.run_standard_suite(baseline)
-    assert len(report.scenario_results) == 4
+    # 4 standard scenarios + (5 spread sensitivity + 5 slippage sensitivity) = 14
+    assert len(report.scenario_results) == 14
     assert "Flash Crash" in report.scenario_results
+    assert "spread_multiplier" in report.sensitivity_results
     assert report.resilience_score >= 0
+
+
+def test_analyze_sensitivity(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    lab.analyze_sensitivity("spread_multiplier", [1.0, 2.0, 3.0])
+
+    assert "spread_multiplier" in lab.sensitivity_data
+    assert len(lab.sensitivity_data["spread_multiplier"]) == 3
+    # Check if results are tuples of (value, return)
+    val, ret = lab.sensitivity_data["spread_multiplier"][0]
+    assert val == 1.0
+    assert isinstance(ret, float)
+
+
+def test_generate_summary_with_sensitivity(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    # Mock sensitivity data to trigger breaking point message
+    lab.sensitivity_data["spread_multiplier"] = [(1.0, 0.1), (2.0, 0.05), (3.0, -0.01)]
+
+    report = lab.generate_report(baseline)
+    assert "Breaking point for spread_multiplier detected at 3.00" in report.degradation_summary
+    assert "50% performance decay for spread_multiplier at 2.00" in report.degradation_summary
 
 
 def test_metrics_new_fields(sample_data):
