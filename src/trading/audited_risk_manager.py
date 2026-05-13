@@ -56,6 +56,7 @@ class AuditedRiskManager(RiskManager):
                 direction=signal.direction,
                 decision_chain=decision_chain,
                 passed=passed,
+                confidence=signal.confidence,
             )
 
             # Log high-severity circuit breaker events specifically
