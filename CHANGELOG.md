@@ -7,40 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0-rc8] - 2026-05-13
+
 ### Added
+- **Harmonized Risk Management:** Unified risk logic into `AuditedRiskManager`, deleting redundant `risk_engine.py` and implementing an 8-layer cascading safety system with ATR-based sizing.
+- **Institutional Decision Cockpit:** Integrated `DecisionSupportSystem` and `SignalExplainer` into the `main.py` live loop for real-time "Glass Box" transparency and signal attribution.
+- **Market Intelligence Integration:** Fully integrated `EventIntelligence` (Macro Risk) and `ExecutionAnalyzer` (Analytics) into the primary execution loop.
 - **Interactive Setup Wizard:** Introduced a guided CLI configuration wizard (`python main.py --setup`) to simplify `.env` initialization and MT5 credential management.
 - **Improved CLI Ergonomics:** Refactored argument parsing into logical groups (Execution, Backtesting, Setup, Logging) and enhanced `--help` readability.
 - **Enhanced Startup Visibility:** Updated the configuration summary panel to include masked MT5 account details and server information for operator verification.
 - **Comprehensive Monitoring System:** Implemented full monitoring and alerting system in `src/core/monitor.py` including equity curve tracking, Prometheus metrics, and granular Telegram alerts.
-- **Institutional Feature Engineering:** Implemented a scalable pipeline for 140+ technical indicators with multi-timeframe support (M1-D1) and no look-ahead bias in `src/core/feature_engineering.py`.
-- **Stateful Feature Normalization:** Added production-ready Z-score and Min-Max normalization with persistence support for consistent inference.
-- **6-Layer Execution Filter Cascade:** Implemented a streamlined validation system for trading signals (ATR, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown).
-- **Structured Execution Decisions:** Introduced a typed `ExecutionDecision` dataclass for granular audit tracing and clear rejection reasons.
-- **Enhanced Filter Unit Tests:** Added 27 comprehensive tests covering edge cases for all 6 validation layers.
-- Implement institutional-grade feature engineering pipeline with 140+ features and multi-timeframe analysis.
-- Implement production-ready stubs for PPO, LSTM, and Dreamer agents.
-- Optimize PPOAgent with robust observation reshaping and strict Signal return typing.
-- Enhance LSTMModel with functional training loop stubs and multi-architecture support.
-- Update DreamerAgent with flexible parameter propagation via `**kwargs` for ensemble compatibility.
-- Implement configurable transaction cost penalties and cleanup logic in TradingEnv.
-- ⚙️ Jules02: Performance and runtime analysis — optimize feature engineering and backtest profiling.
-- Refine institutional feature engineering and unit tests.
-- Implement 6-layer execution filter cascade strictly following README.md.
-- Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
-- Implement monitoring system and Telegram alerting (#962)
-- Implement Institutional Decision Support System (#1086)
-- Enhance Walk-Forward Optimizer with Strict Fragility Safeguards (#1135)
+- **Institutional Feature Engineering:** Implemented a scalable pipeline for 140+ technical indicators with multi-timeframe support (M1-D1) and stateful Z-score/Min-Max normalization.
+- **6-Layer Execution Filter Cascade:** Implemented a streamlined validation system for trading signals (ATR, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown) with typed `ExecutionDecision` audit traces.
+- **Production-Ready AI Model Stubs:** Enhanced `PPOAgent`, `LSTMModel`, and `DreamerAgent` with robust interfaces, observation reshaping, and ensemble compatibility.
+- **Enhanced Walk-Forward Optimization:** Optimized the WFO framework with strict fragility safeguards and robustness scoring (#1135).
+- **Strategic Feature Roadmap:** Updated roadmap with maturity assessment and 5-point scoring rubric in `docs/product/FEATURE_ROADMAP.md`.
+- **Product Coherence Audit:** Conducted formal audit resolving logic fragmentation and naming inconsistencies across the repository.
 
 ### Changed
 - Optimized `FeatureEngineer` technical analysis pipeline, achieving ~17% reduction in latency.
-- Integrated PREPROD_CHECKLIST.md validation into release gates.
-- Implement Institutional Decision Support System (#1086)
+- Integrated `PREPROD_CHECKLIST.md` validation into release gates.
+- Refined `main.py` live loop to pass comprehensive market context (ATR, Current Price, Contract Size) to risk modules.
 
 ### Fixed
+- **Risk Logic Fragmentation:** Resolved duplication by porting ATR-based sizing and the 8-layer cascade to a unified `RiskManager`.
+- **Pydantic Field Collisions:** Resolved schema conflicts (e.g., `date: date`) using fully qualified types in `src/core/schemas.py`.
 - Resolve undefined name `batch_idx` in LSTMModel training loop.
 - Resolve starlette and fastapi version conflicts in requirements files.
 - Resolve security vulnerabilities in starlette dependency (upgrade to 0.52.1).
-- Refined validation scripts with explicit remediation messages.
 
 ## [1.1.0-rc7] - 2026-05-09
 
