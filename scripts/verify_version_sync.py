@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MT5 AI/ML Trading Bot - Version Synchronization Guard
+MT5 AI/ML Trading Bot - CI Version Synchronization Guard
 scripts/verify_version_sync.py
 
 Ensures version consistency across:
