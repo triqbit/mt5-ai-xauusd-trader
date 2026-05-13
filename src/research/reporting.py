@@ -85,7 +85,21 @@ class SignalMotif(BaseModel):
     session: str = "Unknown"
     frequency: int
     win_rate: float
+    expectancy: float = 0.0
+    efficiency_ratio: float = 0.0
     cluster_frequency: int = 0
+
+
+class CombinationMotif(BaseModel):
+    patterns: list[str]
+    frequency: int
+    avg_pnl_after: float
+    is_toxic: bool = False
+    is_golden: bool = False
+    expectancy: float = 0.0
+    efficiency_ratio: float = 0.0
+    session: str = "Mixed"
+    volatility_bucket: str = "Mixed"
 
 
 class TradePatternSection(BaseModel):
@@ -93,6 +107,7 @@ class TradePatternSection(BaseModel):
     concentrations: list[PatternConcentration]
     behavioral_risks: list[BehavioralRisk]
     motifs: list[SignalMotif] = Field(default_factory=list)
+    combinations: list[CombinationMotif] = Field(default_factory=list)
     avg_win_duration: float = 0.0
     avg_loss_duration: float = 0.0
 
@@ -423,22 +438,42 @@ class ResearchReporter:
             self.console.print(table)
 
             if report.trade_patterns.motifs:
-                self.console.print("[dim]Signal Motifs (Losing Combinations):[/]")
+                self.console.print("[dim]Signal Motifs (Performance clusters):[/]")
                 m_table = Table(box=None)
                 m_table.add_column("Algo")
                 m_table.add_column("Vol")
                 m_table.add_column("Conf")
                 m_table.add_column("WR")
+                m_table.add_column("Exp")
                 for m in report.trade_patterns.motifs:
-                    if m.win_rate < 0.5:
-                        wr_color = self._get_color_for_metric(m.win_rate, "win_rate")
-                        m_table.add_row(
-                            m.algorithm,
-                            m.volatility_bucket,
-                            m.confidence_bucket,
-                            f"[{wr_color}]{m.win_rate:.1%}[/]",
-                        )
+                    wr_color = self._get_color_for_metric(m.win_rate, "win_rate")
+                    exp_color = "green" if m.expectancy > 0 else "red"
+                    m_table.add_row(
+                        m.algorithm,
+                        m.volatility_bucket,
+                        m.confidence_bucket,
+                        f"[{wr_color}]{m.win_rate:.1%}[/]",
+                        f"[{exp_color}]{m.expectancy:.2f}[/]",
+                    )
                 self.console.print(m_table)
+
+            if report.trade_patterns.combinations:
+                self.console.print("[dim]Signal Combinations (Toxic vs Golden):[/]")
+                c_table = Table(box=None)
+                c_table.add_column("Pattern")
+                c_table.add_column("Type")
+                c_table.add_column("Freq")
+                c_table.add_column("Exp")
+                for comb in report.trade_patterns.combinations:
+                    type_str = "[red]TOXIC[/]" if comb.is_toxic else "[green]GOLDEN[/]"
+                    exp_color = "green" if comb.expectancy > 0 else "red"
+                    c_table.add_row(
+                        ", ".join(comb.patterns),
+                        type_str,
+                        str(comb.frequency),
+                        f"[{exp_color}]{comb.expectancy:.2f}[/]",
+                    )
+                self.console.print(c_table)
 
         if report.model_drift:
             self.console.print(f"\n[bold blue]{section_idx}. Model Drift Observations[/]")

@@ -313,6 +313,53 @@ def test_find_combination_motifs(miner):
     assert motifs[0].frequency == 2
     assert motifs[0].is_toxic is True
 
+    # Test Golden motifs
+    # Use a fixed start time to control sessions
+    start_golden = datetime(2024, 1, 1, 14, 0, tzinfo=timezone.utc) # London/NY
+    golden_signals = pd.DataFrame(
+        [
+            {
+                "id": 100,
+                "algorithm": "ensemble",
+                "direction": 1,
+                "volatility": 0.1,
+                "pnl": 100.0,
+                "created_at": start_golden,
+            },
+            {
+                "id": 101,
+                "algorithm": "ppo",
+                "direction": 1,
+                "volatility": 0.1,
+                "pnl": 50.0,
+                "created_at": start_golden + pd.Timedelta(minutes=1),
+            },
+            {
+                "id": 102,
+                "algorithm": "ensemble",
+                "direction": 1,
+                "volatility": 0.1,
+                "pnl": 80.0,
+                "created_at": start_golden + pd.Timedelta(hours=2),
+            },
+            {
+                "id": 103,
+                "algorithm": "ppo",
+                "direction": 1,
+                "volatility": 0.1,
+                "pnl": 60.0,
+                "created_at": start_golden + pd.Timedelta(hours=2, minutes=1),
+            },
+        ]
+    )
+    all_signals_plus_golden = pd.concat([all_signals, golden_signals])
+    motifs = miner.find_combination_motifs(all_signals_plus_golden, all_trades)
+    golden = [m for m in motifs if m.is_golden]
+    assert len(golden) >= 1
+    assert "ensemble:1" in golden[0].patterns
+    assert "ppo:1" in golden[0].patterns
+    assert golden[0].expectancy > 0
+
 def test_find_frequent_motifs_with_clusters(miner):
     now = datetime.now(timezone.utc)
     trades = pd.DataFrame([
@@ -523,19 +570,19 @@ def test_run_mining_enhanced(miner):
     from src.core.trade_logger import BlockedSignalAnalysis, ModelSignal, Trade
 
     with miner.Session() as session:
-        sig = ModelSignal(
-            symbol="XAUUSD",
-            direction=1,
-            entry_price=2000.0,
-            algorithm="ppo",
-            confidence=0.8,
-            volatility=0.1,
-        )
-        session.add(sig)
-        session.commit()
-
         # Closed trade for overconfidence detection (need 4 trades)
         for i in range(4):
+            sig = ModelSignal(
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=2000.0,
+                algorithm="ppo",
+                confidence=0.8,
+                volatility=0.1,
+            )
+            session.add(sig)
+            session.commit()
+
             t = Trade(
                 ticket=1000 + i,
                 symbol="XAUUSD",
