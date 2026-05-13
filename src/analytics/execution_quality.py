@@ -232,6 +232,25 @@ class ExecutionAnalyzer:
             return 1.0
         return 100000.0
 
+    def _get_point_size(self, symbol: str) -> float:
+        """Utility to get point size (minimal price change) for a symbol."""
+        if self.connector:
+            try:
+                props = self.connector.get_symbol_properties(symbol)
+                if props and props.get("point"):
+                    return float(props["point"])
+            except Exception:
+                pass
+
+        symbol_upper = symbol.upper()
+        if any(x in symbol_upper for x in ["XAU", "GOLD"]):
+            return 0.01
+        if any(x in symbol_upper for x in ["JPY", "HUF"]):
+            return 0.001
+        if any(x in symbol_upper for x in ["BTC", "ETH"]):
+            return 0.01
+        return 0.00001
+
     def analyze_trade(self, trade_id: int, persist: bool = False) -> TradeExecutionQuality | None:
         """
         Analyze execution quality for a specific trade.
@@ -271,14 +290,19 @@ class ExecutionAnalyzer:
             # 3. Spread calculation
             spread_info = self._get_execution_spread(trade)
             spread_pips = spread_info["spread_pips"]
+            mid_price = spread_info.get("mid_price", trade.entry_price)
 
-            # 4. Alpha Decay calculation
+            # 4. Effective Spread (Institutional standard: 2 * |execution - mid|)
+            effective_spread = 2.0 * abs(trade.entry_price - mid_price)
+            effective_spread_pips = effective_spread / pip_size
+
+            # 5. Alpha Decay calculation
             alpha_decay = self.calculate_alpha_decay(trade, signal)
 
-            # 5. Broker Slippage (Isolated execution mechanic drag)
+            # 6. Broker Slippage (Isolated execution mechanic drag)
             broker_slippage = slippage_pips - alpha_decay
 
-            # 6. Fill quality (0.0 to 1.0)
+            # 7. Fill quality (0.0 to 1.0)
             # Use broker slippage for a more accurate mechanic evaluation
             slippage_ratio = (
                 abs(broker_slippage) / spread_pips if spread_pips > 0.1 else abs(broker_slippage)
@@ -286,19 +310,19 @@ class ExecutionAnalyzer:
             fill_quality = 1.0 / (1.0 + np.exp(slippage_ratio - 2.0))
             fill_quality *= max(0.0, 1.0 - (latency_ms / 10000.0))
 
-            # 7. Drift and Edge Capture
+            # 8. Drift and Edge Capture
             markout_horizons = [1, 5, 15, 30, 60]
             markouts = self.calculate_markouts(
                 symbol, trade.created_at, trade.entry_price, trade.direction, markout_horizons
             )
             edge_capture = self.calculate_edge_capture(trade, signal)
 
-            # 8. Timing Efficiency and Session
+            # 9. Timing Efficiency and Session
             timing_eff = self._calculate_timing_efficiency(trade)
             market_session = self._get_market_session(trade.created_at)
 
-            # 9. Total Execution Cost
-            execution_cost = abs(slippage_pips) + (spread_pips / 2.0)
+            # 10. Total Execution Cost (Slippage + Half effective spread)
+            execution_cost = abs(slippage_pips) + (effective_spread_pips / 2.0)
 
             quality = TradeExecutionQuality(
                 trade_id=trade.id,
@@ -342,6 +366,7 @@ class ExecutionAnalyzer:
             entry_time = entry_time.replace(tzinfo=UTC)
 
         pip_size = self._get_pip_size(symbol)
+        point_size = self._get_point_size(symbol)
         max_horizon = max(horizons)
         end_time = entry_time + timedelta(minutes=max_horizon + 2)
         df = self.connector.get_rates_range(symbol, "M1", entry_time, end_time)
@@ -356,12 +381,15 @@ class ExecutionAnalyzer:
         for h in horizons:
             target_time = entry_time + timedelta(minutes=h)
             mask = df["time"] >= target_time
-            if mask.any():
-                later_price = df[mask].iloc[0]["close"]
-            else:
-                later_price = df.iloc[-1]["close"]
+            row = df[mask].iloc[0] if mask.any() else df.iloc[-1]
 
-            drift = (later_price - entry_price) * direction
+            # Use mid-price for markout to avoid spread bias
+            # MT5 rates usually provide the bid price as 'close'
+            price = row["close"]
+            if "spread" in row and row["spread"] > 0:
+                price += (row["spread"] * point_size) / 2.0
+
+            drift = (price - entry_price) * direction
             results[f"{h}m"] = float(drift / pip_size)
 
         return results
@@ -394,10 +422,30 @@ class ExecutionAnalyzer:
             logger.debug("Tick data fallback to M1 for alpha decay")
 
         df = self.connector.get_rates_range(trade.symbol, "M1", s_timestamp, t_created)
-        if df.empty or len(df) < 2:
+        if df.empty:
             return 0.0
 
-        market_move = (df.iloc[-1]["close"] - df.iloc[0]["open"]) * signal.direction
+        point_size = self._get_point_size(trade.symbol)
+
+        def get_mid(row):
+            price = row["close"]
+            if "spread" in row and row["spread"] > 0:
+                return price + (row["spread"] * point_size) / 2.0
+            return price
+
+        if len(df) >= 2:
+            # Use open of first bar to capture movement from the start of the window
+            first_bar = df.iloc[0]
+            start_price = first_bar["open"]
+            if "spread" in first_bar and first_bar["spread"] > 0:
+                start_price += (first_bar["spread"] * point_size) / 2.0
+
+            end_mid = get_mid(df.iloc[-1])
+            market_move = (end_mid - start_price) * signal.direction
+        else:
+            # Single bar fallback
+            market_move = (df.iloc[0]["close"] - df.iloc[0]["open"]) * signal.direction
+
         return float(market_move / pip_size)
 
     def calculate_edge_capture(self, trade: Trade, signal: ModelSignal) -> float:
@@ -421,11 +469,17 @@ class ExecutionAnalyzer:
         return float(np.clip(adjusted_realized / theoretical_pips, 0.0, 1.2))
 
     def _get_execution_spread(self, trade: Trade) -> dict[str, float]:
-        """Estimate spread at the time of execution."""
+        """Estimate spread and mid-price at the time of execution."""
         if not self.connector:
-            return {"spread_pips": 0.0}
+            # Methodological fallback: assume entry was at bid/ask edge
+            # For a BUY, entry is usually at ASK. Mid = ASK - half_spread
+            pip_size = self._get_pip_size(trade.symbol)
+            spread_pips = 2.0
+            mid_price = trade.entry_price - (trade.direction * (spread_pips * pip_size) / 2.0)
+            return {"spread_pips": spread_pips, "mid_price": float(mid_price)}
 
         pip_size = self._get_pip_size(trade.symbol)
+        point_size = self._get_point_size(trade.symbol)
         t_created = (
             trade.created_at.replace(tzinfo=UTC)
             if trade.created_at.tzinfo is None
@@ -438,7 +492,11 @@ class ExecutionAnalyzer:
             )
             if not ticks.empty:
                 avg_spread = (ticks["ask"] - ticks["bid"]).mean()
-                return {"spread_pips": float(avg_spread / pip_size)}
+                mid_price = ((ticks["ask"] + ticks["bid"]) / 2.0).mean()
+                return {
+                    "spread_pips": float(avg_spread / pip_size),
+                    "mid_price": float(mid_price),
+                }
         except Exception:
             pass
 
@@ -446,14 +504,13 @@ class ExecutionAnalyzer:
             trade.symbol, "M1", t_created - timedelta(minutes=1), t_created
         )
         if df.empty:
-            return {"spread_pips": 2.0}
+            return {"spread_pips": 2.0, "mid_price": trade.entry_price}
 
-        props = self.connector.get_symbol_properties(trade.symbol)
-        point_size = props.get("point") if props else 0.01 if "XAUUSD" in trade.symbol else 0.00001
         avg_spread_points = df["spread"].mean()
         spread_pips = (avg_spread_points * point_size) / pip_size
+        mid_price = df["close"].iloc[-1] + (avg_spread_points * point_size / 2.0)
 
-        return {"spread_pips": float(spread_pips)}
+        return {"spread_pips": float(spread_pips), "mid_price": float(mid_price)}
 
     def _get_market_session(self, dt: datetime) -> str:
         """Identify market session."""
@@ -639,31 +696,38 @@ class ExecutionAnalyzer:
         prices, highs, lows = df["close"].values, df["high"].values, df["low"].values
         pip_size = self._get_pip_size(signal.symbol)
 
+        exit_price = prices[-1]
         would_win = False
-        if signal.direction > 0: # BUY
-            mfe_price, mae_price = np.max(highs) - signal.entry_price, signal.entry_price - np.min(lows)
+        if signal.direction > 0:  # BUY
+            mfe_price = np.max(highs) - signal.entry_price
+            mae_price = signal.entry_price - np.min(lows)
             mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
-                if h_val >= (signal.take_profit or float("inf")):
+                if signal.take_profit and h_val >= signal.take_profit:
                     would_win = True
+                    exit_price = signal.take_profit
                     break
-                if l_val <= (signal.stop_loss or float("-inf")):
+                if signal.stop_loss and l_val <= signal.stop_loss:
                     would_win = False
+                    exit_price = signal.stop_loss
                     break
             contract_size = self._get_contract_size(signal.symbol)
-            opp_cost = (prices[-1] - signal.entry_price) * signal.lot_size * contract_size
-        else: # SELL
-            mfe_price, mae_price = signal.entry_price - np.min(lows), np.max(highs) - signal.entry_price
+            opp_cost = (exit_price - signal.entry_price) * (signal.lot_size or 0.0) * contract_size
+        else:  # SELL
+            mfe_price = signal.entry_price - np.min(lows)
+            mae_price = np.max(highs) - signal.entry_price
             mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
-                if l_val <= (signal.take_profit or float("-inf")):
+                if signal.take_profit and l_val <= signal.take_profit:
                     would_win = True
+                    exit_price = signal.take_profit
                     break
-                if h_val >= (signal.stop_loss or float("inf")):
+                if signal.stop_loss and h_val >= signal.stop_loss:
                     would_win = False
+                    exit_price = signal.stop_loss
                     break
             contract_size = self._get_contract_size(signal.symbol)
-            opp_cost = (signal.entry_price - prices[-1]) * signal.lot_size * contract_size
+            opp_cost = (signal.entry_price - exit_price) * (signal.lot_size or 0.0) * contract_size
 
         return BlockedSignalQuality(
             signal_id=signal.id,
