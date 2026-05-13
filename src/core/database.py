@@ -9,10 +9,14 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import os
+import stat
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 logger = logging.getLogger(__name__)
@@ -38,6 +42,32 @@ def get_engine(db_url: str) -> Engine:
     Aligned with DATABASE_STANDARDS.md for connection pooling and resilience.
     """
     is_sqlite = db_url.startswith("sqlite")
+
+    # Security: Enforce restrictive file permissions for SQLite databases
+    if is_sqlite and ":memory:" not in db_url and db_url != "sqlite://":
+        try:
+            url = make_url(db_url)
+            if url.database:
+                db_path = Path(url.database)
+                # Ensure parent directory exists
+                if not db_path.parent.exists():
+                    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Pre-create or harden existing file permissions
+                if not db_path.exists():
+                    # Create with 0o600 (owner read/write only)
+                    fd = os.open(db_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                    os.close(fd)
+                    logger.info("Initialized secure SQLite database file: %s", db_path)
+                else:
+                    # Enforce 0o600 on existing file if supported by platform
+                    if os.name != "nt":
+                        current_mode = stat.S_IMODE(os.stat(db_path).st_mode)
+                        if current_mode != 0o600:
+                            os.chmod(db_path, 0o600)
+                            logger.debug("Hardened permissions on existing database: %s", db_path)
+        except Exception as e:
+            logger.warning("Failed to enforce secure SQLite permissions: %s", e)
 
     connect_args: dict[str, Any] = {}
     if is_sqlite:
