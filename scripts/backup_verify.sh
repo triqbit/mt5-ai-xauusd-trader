@@ -72,7 +72,9 @@ for DB_FILE in "${DB_FILES[@]}"; do
         sqlite3 "${DB_FILE}" ".backup '${BACKUP_FILE}'"
 
         # 2. Automated Verification (Restoration Dry-run)
-        log_message "Verifying backup integrity for ${BACKUP_FILE} (SQLite dry-run)..."
+        log_message "PHASE: Restoration Dry-run for ${BACKUP_FILE}..."
+
+        log_message "STEP 2.0: Verifying backup integrity for ${BACKUP_FILE} (SQLite dry-run)..."
         INTEGRITY=$(sqlite3 "${BACKUP_FILE}" "PRAGMA integrity_check;")
         if [ "${INTEGRITY}" == "ok" ]; then
             log_message "SUCCESS: ${DB_FILE} backup integrity verified."
@@ -82,7 +84,7 @@ for DB_FILE in "${DB_FILES[@]}"; do
         fi
 
         # 2.1 Schema Validation (Enhanced Restore Test)
-        log_message "Validating schema for ${BACKUP_FILE}..."
+        log_message "STEP 2.1: Validating schema for ${BACKUP_FILE}..."
         REQUIRED_TABLES=()
         if [ "${DB_BASE}" == "trades" ]; then
             REQUIRED_TABLES=("trades" "risk_events" "performance_metrics" "model_signals" "blocked_signal_analysis" "execution_qualities")
@@ -108,7 +110,7 @@ for DB_FILE in "${DB_FILES[@]}"; do
         fi
 
         # 2.2 Data Access Test (Restore Dry-run)
-        log_message "Performing Data Access Test for ${BACKUP_FILE}..."
+        log_message "STEP 2.2: Performing Data Access Test for ${BACKUP_FILE}..."
         for table in "${REQUIRED_TABLES[@]}"; do
             ROW_COUNT=$(sqlite3 "${BACKUP_FILE}" "SELECT count(*) FROM ${table};" 2>/dev/null || echo "ERROR")
             if [[ "${ROW_COUNT}" =~ ^[0-9]+$ ]]; then
@@ -120,7 +122,8 @@ for DB_FILE in "${DB_FILES[@]}"; do
         done
 
         # 3. Checksum Generation and Verification
-        log_message "Generating SHA256 checksum for ${BACKUP_FILE}..."
+        log_message "PHASE: Checksum Generation and Verification for ${BACKUP_FILE}..."
+        log_message "STEP 3.0: Generating SHA256 checksum for ${BACKUP_FILE}..."
         (cd "${DB_BACKUP_DIR}" && sha256sum "$(basename "${BACKUP_FILE}")" > "$(basename "${BACKUP_FILE}").sha256")
 
         log_message "Verifying SHA256 checksum for ${BACKUP_FILE}..."
@@ -136,7 +139,8 @@ for DB_FILE in "${DB_FILES[@]}"; do
 done
 
 # 4. Logs Archival
-if [ -d "${LOGS_DIR}" ] && [ "$(ls -A ${LOGS_DIR})" ]; then
+log_message "PHASE: Logs Archival..."
+if [ -d "${LOGS_DIR}" ] && [ "$(ls -A ${LOGS_DIR} 2>/dev/null)" ]; then
     LOGS_ARCHIVE="${LOGS_BACKUP_DIR}/logs_${TIMESTAMP}.tar.gz"
     log_message "Archiving logs to ${LOGS_ARCHIVE}..."
     tar -czf "${LOGS_ARCHIVE}" -C "${LOGS_DIR}" .
@@ -164,7 +168,8 @@ else
 fi
 
 # 5. Reports Archival
-if [ -d "${REPORTS_DIR}" ] && [ "$(ls -A ${REPORTS_DIR})" ]; then
+log_message "PHASE: Reports Archival..."
+if [ -d "${REPORTS_DIR}" ] && [ "$(ls -A ${REPORTS_DIR} 2>/dev/null)" ]; then
     REPORTS_ARCHIVE="${REPORTS_BACKUP_DIR}/reports_${TIMESTAMP}.tar.gz"
     log_message "Archiving reports to ${REPORTS_ARCHIVE}..."
     tar -czf "${REPORTS_ARCHIVE}" -C "${REPORTS_DIR}" .
@@ -192,7 +197,8 @@ else
 fi
 
 # 6. Models Archival
-if [ -d "${MODELS_DIR}" ] && [ "$(ls -A ${MODELS_DIR})" ]; then
+log_message "PHASE: Models Archival..."
+if [ -d "${MODELS_DIR}" ] && [ "$(ls -A ${MODELS_DIR} 2>/dev/null)" ]; then
     MODELS_ARCHIVE="${MODELS_BACKUP_DIR}/models_${TIMESTAMP}.tar.gz"
     log_message "Archiving models to ${MODELS_ARCHIVE}..."
     tar -czf "${MODELS_ARCHIVE}" -C "${MODELS_DIR}" .
