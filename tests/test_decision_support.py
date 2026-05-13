@@ -44,6 +44,7 @@ def mock_explanation():
     explanation.regime_context.regime_name = "Trending"
     explanation.regime_context.volatility_state = "Normal"
     explanation.regime_context.is_favorable = True
+    explanation.regime_context.regime_alignment_score = 0.85
     explanation.human_readable_summary = "Test summary"
     explanation.signal_id = 123
 
@@ -105,6 +106,7 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
     assert packet.performance.recovery_factor == 3.2
     assert packet.performance.win_loss_ratio == 1.8
     assert packet.performance.total_trades == 100
+    assert packet.performance.calmar_ratio == 0.0  # Default if not in metrics
 
     # Verification of Augmented Fields
     assert packet.status_level == DecisionStatus.EXECUTE
@@ -277,7 +279,12 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
         explanation=mock_explanation,
         regime_info=mock_regime,
         macro_risk=mock_macro_risk,
-        performance_metrics={"sharpe_ratio": 2.5, "profit_factor": 2.2, "recovery_factor": 2.1}
+        performance_metrics={
+            "sharpe_ratio": 2.5,
+            "profit_factor": 2.2,
+            "recovery_factor": 3.5,
+            "calmar_ratio": 4.0
+        }
     )
 
     dss.format_for_operator(packet_high, console=mock_console)
@@ -307,7 +314,8 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
 
     assert "[bold green]2.50" in perf_text
     assert "[bold green]2.20" in perf_text
-    assert "[bold yellow]2.10" in perf_text
+    assert "[bold green]3.50" in perf_text
+    assert "[bold green]4.00" in perf_text
 
     # 2. Test Low Performance (Should be Red)
     packet_low = dss.assemble_packet(
@@ -315,7 +323,12 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
         explanation=mock_explanation,
         regime_info=mock_regime,
         macro_risk=mock_macro_risk,
-        performance_metrics={"sharpe_ratio": 0.5, "profit_factor": 0.8, "recovery_factor": 0.2}
+        performance_metrics={
+            "sharpe_ratio": 0.5,
+            "profit_factor": 0.8,
+            "recovery_factor": 0.2,
+            "calmar_ratio": 0.1
+        }
     )
 
     mock_panel_cls.reset_mock()
@@ -330,6 +343,50 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
     assert "[bold red]0.50" in perf_text_low
     assert "[bold red]0.80" in perf_text_low
     assert "[bold red]0.20" in perf_text_low
+    assert "[bold red]0.10" in perf_text_low
+
+
+def test_strategic_confluence_summary(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that executive summary includes strategic alignment details."""
+    dss = DecisionSupportSystem()
+
+    # 1. Exceptional Alignment
+    mock_explanation.regime_context.regime_alignment_score = 0.9
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert "Strategic alignment is EXCEPTIONAL" in packet.executive_summary
+
+    # 2. Strong Alignment
+    mock_explanation.regime_context.regime_alignment_score = 0.65
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert "Strategic alignment is strong" in packet.executive_summary
+
+    # 3. Weak Alignment
+    mock_explanation.regime_context.regime_alignment_score = 0.3
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert "Strategic alignment is weak/divergent" in packet.executive_summary
+
+
+def test_regime_alignment_display(mock_explanation, mock_regime, mock_macro_risk, mocker):
+    """Verify that regime alignment score is displayed in the dashboard."""
+    from rich.panel import Panel
+    dss = DecisionSupportSystem()
+    mock_console = MagicMock()
+
+    mock_explanation.regime_context.regime_alignment_score = 0.85
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+
+    mock_panel_cls = mocker.patch("rich.panel.Panel", side_effect=Panel)
+    dss.format_for_operator(packet, console=mock_console)
+
+    # Find the regime panel call
+    regime_text = ""
+    for call in mock_panel_cls.call_args_list:
+        if call.kwargs.get("title") == "🌐 Market Regime":
+            regime_text = call.args[0]
+            break
+
+    assert "Alignment:" in regime_text
+    assert "[bold green]85.0%" in regime_text
 
 
 def test_high_conviction_labeling(mock_explanation, mock_regime, mock_macro_risk, mocker):

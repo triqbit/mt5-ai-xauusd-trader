@@ -59,6 +59,9 @@ def test_performance_report(logger):
     assert report["profit_factor"] == 2.0
     assert report["sharpe_ratio"] != 0
     assert report["max_drawdown"] == 50.0
+    assert "calmar_ratio" in report
+    assert "expectancy" in report
+    assert report["expectancy"] == 25.0 # (0.5 * 100) - (0.5 * 50)
 
 def test_log_risk_event(logger):
     logger.log_risk_event("CIRCUIT_BREAKER", "Drawdown limit hit")

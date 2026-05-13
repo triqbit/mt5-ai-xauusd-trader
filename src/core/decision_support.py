@@ -80,11 +80,20 @@ class PerformanceContext(BaseModel):
     win_loss_ratio: float = Field(
         0.0, ge=0.0, description="Average Win / Average Loss."
     )
+    calmar_ratio: float = Field(
+        0.0,
+        ge=-10.0,
+        le=100.0,
+        description="Annualized Return / Max Drawdown. Target > 3.0 per standards.",
+    )
+    expectancy: float = Field(
+        0.0,
+        description="Expected value per trade in pips or currency units.",
+    )
     max_drawdown: float = Field(
         0.0,
         ge=0.0,
-        le=1.0,
-        description="Maximum observed equity drawdown from peak to trough.",
+        description="Maximum observed equity drawdown.",
     )
     total_trades: int = Field(0, ge=0, description="Count of trades analyzed in this window.")
 
@@ -226,6 +235,8 @@ class DecisionSupportSystem:
             sharpe_ratio=performance_metrics.get("sharpe_ratio", 0.0),
             profit_factor=performance_metrics.get("profit_factor", 0.0),
             recovery_factor=performance_metrics.get("recovery_factor", 0.0),
+            calmar_ratio=performance_metrics.get("calmar_ratio", 0.0),
+            expectancy=performance_metrics.get("expectancy", 0.0),
             win_rate=performance_metrics.get("win_rate", 0.0),
             win_loss_ratio=performance_metrics.get("win_loss_ratio", 0.0),
             max_drawdown=performance_metrics.get("max_drawdown", 0.0),
@@ -275,6 +286,15 @@ class DecisionSupportSystem:
             f"Institutional {dir_str} signal for {symbol} with a decision score of {score:.1f}/100. "
         )
         summary += f"Current market state is {regime.label.value} (Confidence: {regime.confidence:.1%}). "
+
+        # Strategic Confluence Enrichment
+        alignment = explanation.regime_context.regime_alignment_score
+        if alignment >= 0.8:
+            summary += "Strategic alignment is EXCEPTIONAL. "
+        elif alignment >= 0.6:
+            summary += "Strategic alignment is strong. "
+        else:
+            summary += "Strategic alignment is weak/divergent. "
 
         if status == DecisionStatus.EXECUTE:
             summary += "Signal shows strong confluence and satisfies all institutional guardrails."
@@ -500,11 +520,19 @@ class DecisionSupportSystem:
             overview_table.add_column(ratio=1)
 
             # Left Column: Regime
+            alignment_color = (
+                "green"
+                if packet.explanation.regime_context.regime_alignment_score >= 0.7
+                else "yellow"
+                if packet.explanation.regime_context.regime_alignment_score >= 0.5
+                else "red"
+            )
             regime_content = (
                 f"🏷️ Label: [bold cyan]{packet.regime.label.value.upper()}[/bold cyan]\n"
                 f"🎯 Confidence: [bold]{packet.regime.confidence:.1%}[/bold]\n"
                 f"🌪️ Volatility: [bold]{packet.regime.volatility_index:.2f}[/bold]\n"
-                f"🔄 Transition: {packet.regime.transition_score:.2f}"
+                f"🔄 Transition: {packet.regime.transition_score:.2f}\n"
+                f"⚖️ Alignment: [bold {alignment_color}]{packet.explanation.regime_context.regime_alignment_score:.1%}[/bold {alignment_color}]"
             )
             regime_panel = Panel(regime_content, title="🌐 Market Regime", border_style="cyan")
 
@@ -519,6 +547,7 @@ class DecisionSupportSystem:
             sharpe_color = get_color(packet.performance.sharpe_ratio, 2.0, 1.0)
             pf_color = get_color(packet.performance.profit_factor, 2.0, 1.5)
             rf_color = get_color(packet.performance.recovery_factor, 3.0, 2.0)
+            calmar_color = get_color(packet.performance.calmar_ratio, 3.0, 1.5)
             wr_color = get_color(packet.performance.win_rate, 0.55, 0.45)
             wl_color = get_color(packet.performance.win_loss_ratio, 2.0, 1.2)
 
@@ -526,6 +555,7 @@ class DecisionSupportSystem:
                 f"📈 Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
                 f"💰 Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
                 f"🛡️ Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
+                f"🌊 Calmar Ratio: [bold {calmar_color}]{packet.performance.calmar_ratio:.2f}[/]\n"
                 f"🎯 Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]\n"
                 f"⚖️ W/L Ratio:     [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
                 f"🔢 Total Trades:  {packet.performance.total_trades}"
