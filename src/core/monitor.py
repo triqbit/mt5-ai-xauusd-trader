@@ -88,6 +88,20 @@ DATA_FRESHNESS_GAUGE = Gauge(
     "trading_data_freshness_seconds", "Age of latest data point in seconds"
 )
 
+# 6. Portfolio & Market Regime Metrics
+MARKET_REGIME_GAUGE = Gauge(
+    "trading_market_regime", "Numeric mapping of current market regime"
+)
+REGIME_CONFIDENCE_GAUGE = Gauge(
+    "trading_regime_confidence", "Model confidence in the detected regime"
+)
+PORTFOLIO_HEAT_TOTAL_GAUGE = Gauge(
+    "trading_portfolio_heat_total", "Total portfolio risk commitment (0.0 to 1.0)"
+)
+PORTFOLIO_HEAT_SYMBOL_GAUGE = Gauge(
+    "trading_portfolio_heat_symbol", "Risk commitment per symbol (0.0 to 1.0)", ["symbol"]
+)
+
 
 class Monitor:
     """
@@ -430,6 +444,34 @@ class Monitor:
             msg = f"⚠️ WARNING: Data Stale!\nLast Data Point: {age / 60:.1f} minutes ago."
             self.send_message(msg)
             logger.warning("stale_data_alert", age_seconds=age)
+
+    def update_market_regime(self, regime_label: str, confidence: float) -> None:
+        """Update market regime metrics."""
+        # Mapping: ranging=0, trending=1, volatile_breakout=2, low_volatility_drift=3, news_shock=4, mean_reversion=5
+        mapping = {
+            "ranging": 0,
+            "trending": 1,
+            "volatile_breakout": 2,
+            "low_volatility_drift": 3,
+            "news_shock": 4,
+            "mean_reversion": 5,
+        }
+        val = mapping.get(regime_label.lower(), -1)
+        MARKET_REGIME_GAUGE.set(val)
+        REGIME_CONFIDENCE_GAUGE.set(confidence)
+        logger.debug("market_regime_metrics_updated", label=regime_label, val=val, conf=confidence)
+
+    def update_portfolio_heat(self, total_heat: float, symbol_heats: dict[str, float]) -> None:
+        """Update portfolio heat metrics."""
+        PORTFOLIO_HEAT_TOTAL_GAUGE.set(total_heat)
+        for symbol, heat in symbol_heats.items():
+            PORTFOLIO_HEAT_SYMBOL_GAUGE.labels(symbol=symbol).set(heat)
+        logger.debug("portfolio_heat_metrics_updated", total=total_heat)
+
+    def log_drawdown(self, drawdown_pct: float) -> None:
+        """Update drawdown metric."""
+        DRAWDOWN_GAUGE.set(drawdown_pct)
+        logger.debug("drawdown_logged", drawdown_pct=drawdown_pct)
 
     def alert_inference_timeout(self, latency_ms: float, threshold_ms: float) -> None:
         """Send warning for model inference timeout."""

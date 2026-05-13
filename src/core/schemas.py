@@ -64,6 +64,9 @@ class TradeSignal(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="The UTC timestamp when the signal was generated",
     )
+    trace_id: str | None = Field(
+        None, description="The unique trace ID for correlation across system components"
+    )
 
     @field_validator("direction", mode="before")
     @classmethod
