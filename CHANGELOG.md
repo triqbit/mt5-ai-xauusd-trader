@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Interactive Setup Wizard:** Introduced a guided CLI configuration wizard (`python main.py --setup`) to simplify `.env` initialization and MT5 credential management.
+- **Improved CLI Ergonomics:** Refactored argument parsing into logical groups (Execution, Backtesting, Setup, Logging) and enhanced `--help` readability.
+- **Enhanced Startup Visibility:** Updated the configuration summary panel to include masked MT5 account details and server information for operator verification.
 - **Comprehensive Monitoring System:** Implemented full monitoring and alerting system in `src/core/monitor.py` including equity curve tracking, Prometheus metrics, and granular Telegram alerts.
 - **Institutional Feature Engineering:** Implemented a scalable pipeline for 140+ technical indicators with multi-timeframe support (M1-D1) and no look-ahead bias in `src/core/feature_engineering.py`.
 - **Stateful Feature Normalization:** Added production-ready Z-score and Min-Max normalization with persistence support for consistent inference.
