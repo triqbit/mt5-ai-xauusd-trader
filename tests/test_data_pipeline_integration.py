@@ -65,8 +65,8 @@ def mock_ensemble():
          patch.object(ensemble, "LSTMModel", MagicMock()):
         model = EnsembleModel(device="cpu")
         model.ppo_agent = MagicMock()
-        from src.models.base_model import Signal
         from src.core.constants import SignalDirection
+        from src.models.base_model import Signal
         model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
         return model
 

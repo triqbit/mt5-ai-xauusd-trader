@@ -1,0 +1,979 @@
+E712 Avoid equality comparisons to `False`; use `not Trade.is_deleted:` for false checks
+  --> scripts/benchmark_db.py:46:72
+   |
+44 |     start = time.perf_counter()
+45 |     with Session() as session:
+46 |         trades = session.query(Trade).filter(Trade.status == "CLOSED", Trade.is_deleted == False).all()
+   |                                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+47 |         pnls = np.array([t.pnl for t in trades])
+48 |         # Simulate some processing
+   |
+help: Replace with `not Trade.is_deleted`
+
+E712 Avoid equality comparisons to `False`; use `not Trade.is_deleted:` for false checks
+  --> scripts/benchmark_db.py:57:91
+   |
+55 |     start = time.perf_counter()
+56 |     with Session() as session:
+57 |         pnls = np.array(session.execute(select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted == False)).scalars().all())
+   |                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+58 |         # Simulate same processing
+59 |         avg = np.mean(pnls)
+   |
+help: Replace with `not Trade.is_deleted`
+
+F841 Local variable `avg` is assigned to but never used
+  --> scripts/benchmark_db.py:59:9
+   |
+57 |         pnls = np.array(session.execute(select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted == False)).scalars().all())
+58 |         # Simulate same processing
+59 |         avg = np.mean(pnls)
+   |         ^^^
+60 |         std = np.std(pnls)
+61 |     duration2 = time.perf_counter() - start
+   |
+help: Remove assignment to unused variable `avg`
+
+F841 Local variable `std` is assigned to but never used
+  --> scripts/benchmark_db.py:60:9
+   |
+58 |         # Simulate same processing
+59 |         avg = np.mean(pnls)
+60 |         std = np.std(pnls)
+   |         ^^^
+61 |     duration2 = time.perf_counter() - start
+62 |     print(f"Scalar Select:   {duration2:.4f}s")
+   |
+help: Remove assignment to unused variable `std`
+
+SIM102 Use a single `if` statement instead of nested `if` statements
+  --> scripts/check_release_notes.py:39:9
+   |
+37 |       for line in lines:
+38 |           stripped = line.strip()
+39 | /         if stripped and not stripped.startswith("###") and not stripped.startswith("##"):
+40 | |              # If it's not a header and not empty, it's likely content
+41 | |              if any(c.isalnum() for c in stripped):
+   | |___________________________________________________^
+42 |                    has_content = True
+43 |                    break
+   |
+help: Combine `if` statements using `and`
+
+RUF013 PEP 484 prohibits implicit `Optional`
+   --> scripts/data_cleanup.py:275:32
+    |
+274 | def cleanup_database(
+275 |     db_url: str, audit_db_url: str = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR
+    |                                ^^^
+276 | ) -> dict:
+277 |     """Purge old records from the database according to the retention policy."""
+    |
+help: Convert to `T | None`
+
+E402 Module level import not at top of file
+  --> scripts/generate_incident_report.py:14:1
+   |
+12 | UTC = timezone.utc
+13 |
+14 | from dotenv import load_dotenv
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+E701 Multiple statements on one line (colon)
+   --> scripts/generate_incident_report.py:111:19
+    |
+109 |         print("\nNo significant operational events detected in the last 24 hours.")
+110 |
+111 |     if trades_conn: trades_conn.close()
+    |                   ^
+112 |     if audit_conn: audit_conn.close()
+    |
+
+E701 Multiple statements on one line (colon)
+   --> scripts/generate_incident_report.py:112:18
+    |
+111 |     if trades_conn: trades_conn.close()
+112 |     if audit_conn: audit_conn.close()
+    |                  ^
+113 |
+114 | if __name__ == "__main__":
+    |
+
+E741 Ambiguous variable name: `l`
+  --> scripts/update_changelog.py:91:19
+   |
+89 |         # Filter out metadata lines from body (Co-authored-by, etc.)
+90 |         body_lines = [
+91 |             l for l in lines[1:]
+   |                   ^
+92 |             if not any(marker in l for marker in ["Co-authored-by:", "Signed-off-by:", "PR-URL:", "---------"])
+93 |         ]
+   |
+
+RUF015 Prefer `next(iter(label_to_cat.values()))` over single element slice
+   --> scripts/update_changelog.py:138:32
+    |
+136 |                 if label_to_cat:
+137 |                     # Use the first matching label as category
+138 |                     category = list(label_to_cat.values())[0]
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+139 |
+140 |                 if entry not in categories[category]:
+    |
+help: Replace with `next(iter(label_to_cat.values()))`
+
+SIM102 Use a single `if` statement instead of nested `if` statements
+  --> scripts/validate_env.py:38:13
+   |
+36 |           for line in f:
+37 |               line = line.strip()
+38 | /             if line and not line.startswith("#"):
+39 | |                 if "=" in line:
+   | |_______________________________^
+40 |                       var = line.split("=")[0].strip()
+41 |                       vars.add(var.lower())
+   |
+help: Combine `if` statements using `and`
+
+F841 Local variable `algos` is assigned to but never used
+  --> scripts/verify_journal_mining.py:30:9
+   |
+28 |     with Session() as session:
+29 |         # 1. Generate normal signals and trades
+30 |         algos = ["Ensemble_V2", "PPO_Agent", "Dreamer_V3"]
+   |         ^^^^^
+31 |         symbols = ["XAUUSD", "EURUSD"]
+   |
+help: Remove assignment to unused variable `algos`
+
+F841 Local variable `symbols` is assigned to but never used
+  --> scripts/verify_journal_mining.py:31:9
+   |
+29 |         # 1. Generate normal signals and trades
+30 |         algos = ["Ensemble_V2", "PPO_Agent", "Dreamer_V3"]
+31 |         symbols = ["XAUUSD", "EURUSD"]
+   |         ^^^^^^^
+32 |
+33 |         now = datetime.now(UTC)
+   |
+help: Remove assignment to unused variable `symbols`
+
+RUF059 Unpacked variable `df` is never used
+  --> scripts/verify_rare_event_reporting.py:17:5
+   |
+15 |     simulator = RareEventSimulator(seed=42)
+16 |     config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=200)
+17 |     df, result = simulator.generate_scenario(config)
+   |     ^^
+18 |
+19 |     # 1. Test to_report_summary conversion
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `trade_logger` is never used
+  --> tests/test_adaptive_feedback_loop.py:87:24
+   |
+85 |     5. Audit trail records the entire degradation.
+86 |     """
+87 |     cfg, audit_logger, trade_logger = system_env
+   |                        ^^^^^^^^^^^^
+88 |
+89 |     # Mock market data for ExecutionFilter (Trend matching BUY)
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `audit_logger` is never used
+   --> tests/test_adaptive_feedback_loop.py:220:10
+    |
+218 | def test_recovery_after_stabilization(system_env, ensemble, execution_filter):
+219 |     """Verifies that if outcomes improve, the system recovers and allows trading again."""
+220 |     cfg, audit_logger, _ = system_env
+    |          ^^^^^^^^^^^^
+221 |     # Increasing price for TREND_ANGLE
+222 |     df = pd.DataFrame({
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+F841 Local variable `report` is assigned to but never used
+   --> tests/test_backtester.py:119:5
+    |
+117 |     step_size = 50
+118 |
+119 |     report = engine.run_walk_forward(
+    |     ^^^^^^
+120 |         sample_data,
+121 |         model,
+    |
+help: Remove assignment to unused variable `report`
+
+F841 Local variable `raw_row` is assigned to but never used
+   --> tests/test_backtester.py:144:5
+    |
+142 |     # Verify it's not the same as any raw feature row in a naive way
+143 |     # (Normalization should change the values significantly)
+144 |     raw_row = raw_features.iloc[train_window]
+    |     ^^^^^^^
+145 |
+146 |     # Excluding OHLCV columns from comparison as BacktestEngine does
+    |
+help: Remove assignment to unused variable `raw_row`
+
+F841 Local variable `report` is assigned to but never used
+   --> tests/test_backtester_institutional.py:98:5
+    |
+ 97 |     # Run a small slice
+ 98 |     report = engine.run_walk_forward(
+    |     ^^^^^^
+ 99 |         institutional_data.iloc[:500],
+100 |         model,
+    |
+help: Remove assignment to unused variable `report`
+
+F841 Local variable `report` is assigned to but never used
+  --> tests/test_backtester_new.py:47:5
+   |
+46 |     # Train 500, Test 100, Step 50
+47 |     report = engine.run_walk_forward(
+   |     ^^^^^^
+48 |         test_data,
+49 |         model,
+   |
+help: Remove assignment to unused variable `report`
+
+F841 Local variable `report` is assigned to but never used
+  --> tests/test_backtester_new.py:81:5
+   |
+80 |     # Run a small slice where we expect one trade
+81 |     report = engine.run_walk_forward(
+   |     ^^^^^^
+82 |         test_data.iloc[:650],
+83 |         model,
+   |
+help: Remove assignment to unused variable `report`
+
+RUF059 Unpacked variable `args` is never used
+   --> tests/test_capital_allocator.py:682:5
+    |
+681 |     assert mock_audit.log_allocation_decision.called
+682 |     args, kwargs = mock_audit.log_allocation_decision.call_args
+    |     ^^^^
+683 |     assert kwargs["strategy_id"] == "s1"
+684 |     assert kwargs["requested_risk"] == 0.01
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+F841 Local variable `new_content_2` is assigned to but never used
+  --> tests/test_changelog_automation.py:94:13
+   |
+92 |             # Run again to check for duplicates
+93 |             update_changelog(categories)
+94 |             new_content_2 = changelog_path.read_text()
+   |             ^^^^^^^^^^^^^
+95 |             self.assertEqual(new_content.count("- New feature"), 1)
+   |
+help: Remove assignment to unused variable `new_content_2`
+
+F841 Local variable `old_eq_id` is assigned to but never used
+   --> tests/test_data_cleanup.py:215:13
+    |
+213 |             old_linked_id = old_linked.id
+214 |             old_unlinked_id = old_unlinked.id
+215 |             old_eq_id = old_eq.id
+    |             ^^^^^^^^^
+216 |             old_bsa_id = old_bsa.id
+    |
+help: Remove assignment to unused variable `old_eq_id`
+
+F841 Local variable `old_bsa_id` is assigned to but never used
+   --> tests/test_data_cleanup.py:216:13
+    |
+214 |             old_unlinked_id = old_unlinked.id
+215 |             old_eq_id = old_eq.id
+216 |             old_bsa_id = old_bsa.id
+    |             ^^^^^^^^^^
+217 |
+218 |         # Run cleanup on the in-memory DB
+    |
+help: Remove assignment to unused variable `old_bsa_id`
+
+E712 Avoid equality comparisons to `True`; use `check_disk_space(archive_dir, min_mb=1):` for truth checks
+   --> tests/test_data_cleanup_system.py:215:12
+    |
+214 |     # Should pass on normal systems
+215 |     assert check_disk_space(archive_dir, min_mb=1) == True
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+216 |
+217 |     # Should fail if we ask for an impossible amount (e.g. 1000 TB)
+    |
+help: Replace with `check_disk_space(archive_dir, min_mb=1)`
+
+E712 Avoid equality comparisons to `False`; use `not ...:` for false checks
+   --> tests/test_data_cleanup_system.py:218:12
+    |
+217 |     # Should fail if we ask for an impossible amount (e.g. 1000 TB)
+218 |     assert check_disk_space(archive_dir, min_mb=1000 * 1024 * 1024) == False
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace comparison
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:28:40
+   |
+26 | mock_talib.RSI.side_effect = default_talib_effect
+27 | mock_talib.MACD.side_effect = lambda d, *a, **k: (np.random.rand(len(d)), np.random.rand(len(d)), np.random.rand(len(d)))
+28 | mock_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                        ^
+29 | mock_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
+30 | mock_talib.EMA.side_effect = default_talib_effect
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:31:40
+   |
+29 | mock_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
+30 | mock_talib.EMA.side_effect = default_talib_effect
+31 | mock_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                        ^
+32 | mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+33 | mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:32:42
+   |
+30 | mock_talib.EMA.side_effect = default_talib_effect
+31 | mock_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+32 | mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+   |                                          ^
+33 | mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+34 | mock_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:34:40
+   |
+32 | mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+33 | mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+34 | mock_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+   |                                        ^
+35 | mock_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+36 | mock_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:35:40
+   |
+33 | mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+34 | mock_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+35 | mock_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                        ^
+36 | mock_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
+37 | mock_talib.get_function_groups.return_value = {"Pattern Recognition": []}
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:77:41
+   |
+75 |     m_talib.RSI.side_effect = lambda data, *a, **k: np.random.rand(len(data))
+76 |     m_talib.MACD.side_effect = lambda data, *a, **k: (np.random.rand(len(data)), np.random.rand(len(data)), np.random.rand(len(data)))
+77 |     m_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                         ^
+78 |     m_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
+79 |     m_talib.EMA.side_effect = lambda data, *a, **k: np.random.rand(len(data))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:80:41
+   |
+78 |     m_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
+79 |     m_talib.EMA.side_effect = lambda data, *a, **k: np.random.rand(len(data))
+80 |     m_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                         ^
+81 |     m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+82 |     m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:81:43
+   |
+79 |     m_talib.EMA.side_effect = lambda data, *a, **k: np.random.rand(len(data))
+80 |     m_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+81 |     m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+   |                                           ^
+82 |     m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+83 |     m_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:83:41
+   |
+81 |     m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+82 |     m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+83 |     m_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+   |                                         ^
+84 |     m_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+85 |     m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:84:41
+   |
+82 |     m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+83 |     m_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+84 |     m_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                         ^
+85 |     m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
+86 |     m_talib.WILLR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:86:43
+   |
+84 |     m_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+85 |     m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
+86 |     m_talib.WILLR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                           ^
+87 |     m_talib.ULTOSC.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+88 |     m_talib.LINEARREG_SLOPE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+   |
+
+E741 Ambiguous variable name: `l`
+  --> tests/test_data_pipeline_integration.py:87:44
+   |
+85 |     m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
+86 |     m_talib.WILLR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+87 |     m_talib.ULTOSC.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+   |                                            ^
+88 |     m_talib.LINEARREG_SLOPE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+89 |     m_talib.HT_TRENDLINE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
+   |
+
+RUF059 Unpacked variable `confidence` is never used
+   --> tests/test_data_pipeline_integration.py:140:20
+    |
+138 |     if not features.empty:
+139 |         obs = features.iloc[-1].values
+140 |         direction, confidence, _ = mock_ensemble.predict(obs)
+    |                    ^^^^^^^^^^
+141 |         assert direction in SignalDirection
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+E701 Multiple statements on one line (colon)
+  --> tests/test_decision_pipeline_integration.py:21:17
+   |
+19 | # Scipy's array_api_compat checks issubclass(cls, torch.Tensor)
+20 | # We need to provide a real class to avoid TypeError
+21 | class MockTensor: pass
+   |                 ^
+22 | mock_torch.Tensor = MockTensor
+   |
+
+F841 Local variable `df` is assigned to but never used
+   --> tests/test_decision_pipeline_integration.py:191:5
+    |
+189 | ):
+190 |     """Case 2: Risk Rejection - Rejected due to low R:R."""
+191 |     df = data_generator.generate(n_steps=10)
+    |     ^^
+192 |     price = 2300.0
+    |
+help: Remove assignment to unused variable `df`
+
+F841 Local variable `perf_panel` is assigned to but never used
+   --> tests/test_decision_support.py:293:5
+    |
+292 |     # Find perf_panel in the dashboard Group
+293 |     perf_panel = None
+    |     ^^^^^^^^^^
+294 |     for r in dashboard.renderables:
+295 |         # overview_table is a Table, which contains Panels in its rows
+    |
+help: Remove assignment to unused variable `perf_panel`
+
+F841 Local variable `content` is assigned to but never used
+   --> tests/test_decision_support.py:367:13
+    |
+365 |     for call in mock_panel_cls.call_args_list:
+366 |         if call.kwargs.get("title") == "🎯 Augmentation Metrics":
+367 |             content = call.args[0]
+    |             ^^^^^^^
+368 |             # content is now a Table. We check the renderables in its columns.
+369 |             # Since we can't easily inspect Table internals after addition,
+    |
+help: Remove assignment to unused variable `content`
+
+B017 Do not assert blind exception: `Exception`
+   --> tests/test_decision_support.py:384:10
+    |
+382 | def test_packet_immutability():
+383 |     """Verify that DecisionPacket and PerformanceContext are frozen (immutable)."""
+384 |     with pytest.raises(Exception):
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^
+385 |         packet = DecisionPacket(
+386 |             symbol="XAUUSD",
+    |
+
+E402 Module level import not at top of file
+  --> tests/test_doctor_diagnostics.py:15:1
+   |
+13 | sys.path.append(str(root))
+14 |
+15 | import scripts.doctor as doctor
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+  --> tests/test_doctor_diagnostics.py:55:5
+   |
+53 |       """Verify .env check warns about placeholders."""
+54 |       mock_content = "MT5_PASSWORD=YOUR_PASSWORD_HERE\nMT5_SERVER=test"
+55 | /     with patch("scripts.doctor.Path.exists", return_value=True):
+56 | |         with patch("builtins.open", MagicMock(return_value=MagicMock(__enter__=MagicMock(return_value=MagicMock(read=MagicMock(return_value=mock_content)))))):
+   | |_______________________________________________________________________________________________________________________________________________________________^
+57 |               res = doctor.check_env_file()
+58 |               assert res.status == "WARNING"
+   |
+help: Combine `with` statements
+
+SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+  --> tests/test_doctor_diagnostics.py:77:5
+   |
+75 |       mock_stat.st_mode = 0o666 # Insecure
+76 |
+77 | /     with patch("scripts.doctor.Path.exists", return_value=True):
+78 | |         with patch("scripts.doctor.os.stat", return_value=mock_stat):
+   | |_____________________________________________________________________^
+79 |               res = doctor.check_file_permissions()
+80 |               assert res.status == "WARNING"
+   |
+help: Combine `with` statements
+
+E701 Multiple statements on one line (colon)
+  --> tests/test_enterprise_audit_integration.py:22:17
+   |
+20 | # Standardize mocks for use across all tests and imports
+21 | mock_torch = MagicMock()
+22 | class MockTensor: pass
+   |                 ^
+23 | mock_torch.Tensor = MockTensor
+24 | mock_sb3 = MagicMock()
+   |
+
+F841 Local variable `status` is assigned to but never used
+   --> tests/test_event_intelligence_extended.py:109:5
+    |
+108 |     intel = EventIntelligence([provider1, provider2])
+109 |     status = intel.get_risk_status(now)
+    |     ^^^^^^
+110 |
+111 |     assert len(intel._cached_events) == 2
+    |
+help: Remove assignment to unused variable `status`
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:9:1
+   |
+ 7 | pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
+ 8 |
+ 9 | from unittest.mock import MagicMock, patch
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | import numpy as np
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:11:1
+   |
+ 9 | from unittest.mock import MagicMock, patch
+10 |
+11 | import numpy as np
+   | ^^^^^^^^^^^^^^^^^^
+12 | import pandas as pd
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:12:1
+   |
+11 | import numpy as np
+12 | import pandas as pd
+   | ^^^^^^^^^^^^^^^^^^^
+13 |
+14 | from src.core.schemas import TradeSignal
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:14:1
+   |
+12 | import pandas as pd
+13 |
+14 | from src.core.schemas import TradeSignal
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 | from src.core.trade_logger import TradeLogger
+16 | from src.models.ensemble import EnsembleModel
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:15:1
+   |
+14 | from src.core.schemas import TradeSignal
+15 | from src.core.trade_logger import TradeLogger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 | from src.models.ensemble import EnsembleModel
+17 | from src.models.regime_detector import MarketRegime, RegimeDetector
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:16:1
+   |
+14 | from src.core.schemas import TradeSignal
+15 | from src.core.trade_logger import TradeLogger
+16 | from src.models.ensemble import EnsembleModel
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 | from src.models.regime_detector import MarketRegime, RegimeDetector
+18 | from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:17:1
+   |
+15 | from src.core.trade_logger import TradeLogger
+16 | from src.models.ensemble import EnsembleModel
+17 | from src.models.regime_detector import MarketRegime, RegimeDetector
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 | from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+19 | from src.trading.risk_manager import RiskManager
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:18:1
+   |
+16 | from src.models.ensemble import EnsembleModel
+17 | from src.models.regime_detector import MarketRegime, RegimeDetector
+18 | from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+19 | from src.trading.risk_manager import RiskManager
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_institutional_integration.py:19:1
+   |
+17 | from src.models.regime_detector import MarketRegime, RegimeDetector
+18 | from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+19 | from src.trading.risk_manager import RiskManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+F841 Local variable `signal_out` is assigned to but never used
+  --> tests/test_integration_flow.py:87:9
+   |
+85 |         # 2. Inference
+86 |         obs = mock_ohlcv[-1]
+87 |         signal_out = model.predict(obs)
+   |         ^^^^^^^^^^
+88 |
+89 |         # 3. Log Signal
+   |
+help: Remove assignment to unused variable `signal_out`
+
+F841 Local variable `trade_id` is assigned to but never used
+   --> tests/test_integration_flow.py:117:9
+    |
+115 |         assert ticket == 123456
+116 |
+117 |         trade_id = trade_logger.log_trade(
+    |         ^^^^^^^^
+118 |             ticket=ticket,
+119 |             symbol="XAUUSD",
+    |
+help: Remove assignment to unused variable `trade_id`
+
+F841 Local variable `risk` is assigned to but never used
+   --> tests/test_integration_flow.py:260:5
+    |
+259 | def test_performance_latency(mock_cfg, trade_logger, mock_monitor):
+260 |     risk = RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
+    |     ^^^^
+261 |     model = EnsembleModel(device="cpu")
+    |
+help: Remove assignment to unused variable `risk`
+
+B017 Do not assert blind exception: `Exception`
+  --> tests/test_jules05_stability.py:36:10
+   |
+35 |     # This should fail validation
+36 |     with pytest.raises(Exception):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^
+37 |         StrategyConfig(
+38 |             strategy_id="TEST",
+   |
+
+RUF059 Unpacked variable `obs` is never used
+   --> tests/test_models_stubs.py:155:5
+    |
+154 |     # 2. Step with HOLD (action 0) should close the position in our implementation
+155 |     obs, reward, terminated, truncated, info = env.step(0)
+    |     ^^^
+156 |     assert env.position == 0
+157 |     assert info["position"] == 0
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `reward` is never used
+   --> tests/test_models_stubs.py:155:10
+    |
+154 |     # 2. Step with HOLD (action 0) should close the position in our implementation
+155 |     obs, reward, terminated, truncated, info = env.step(0)
+    |          ^^^^^^
+156 |     assert env.position == 0
+157 |     assert info["position"] == 0
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `terminated` is never used
+   --> tests/test_models_stubs.py:155:18
+    |
+154 |     # 2. Step with HOLD (action 0) should close the position in our implementation
+155 |     obs, reward, terminated, truncated, info = env.step(0)
+    |                  ^^^^^^^^^^
+156 |     assert env.position == 0
+157 |     assert info["position"] == 0
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `truncated` is never used
+   --> tests/test_models_stubs.py:155:30
+    |
+154 |     # 2. Step with HOLD (action 0) should close the position in our implementation
+155 |     obs, reward, terminated, truncated, info = env.step(0)
+    |                              ^^^^^^^^^
+156 |     assert env.position == 0
+157 |     assert info["position"] == 0
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `obs` is never used
+   --> tests/test_models_stubs.py:194:5
+    |
+192 |     # current_step starts at 1. step(1) increments to 2.
+193 |     # index 2 of Close is 1.2
+194 |     obs, reward, terminated, truncated, info = env.step(1)
+    |     ^^^
+195 |     assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `reward` is never used
+   --> tests/test_models_stubs.py:194:10
+    |
+192 |     # current_step starts at 1. step(1) increments to 2.
+193 |     # index 2 of Close is 1.2
+194 |     obs, reward, terminated, truncated, info = env.step(1)
+    |          ^^^^^^
+195 |     assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `terminated` is never used
+   --> tests/test_models_stubs.py:194:18
+    |
+192 |     # current_step starts at 1. step(1) increments to 2.
+193 |     # index 2 of Close is 1.2
+194 |     obs, reward, terminated, truncated, info = env.step(1)
+    |                  ^^^^^^^^^^
+195 |     assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `truncated` is never used
+   --> tests/test_models_stubs.py:194:30
+    |
+192 |     # current_step starts at 1. step(1) increments to 2.
+193 |     # index 2 of Close is 1.2
+194 |     obs, reward, terminated, truncated, info = env.step(1)
+    |                              ^^^^^^^^^
+195 |     assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+SIM105 Use `contextlib.suppress(asyncio.CancelledError)` instead of `try`-`except`-`pass`
+   --> tests/test_monitor.py:200:13
+    |
+198 |                patch.object(MEMORY_USAGE_GAUGE, "set") as mock_mem_set, \
+199 |                patch.object(DISK_USAGE_GAUGE, "set") as mock_disk_set:
+200 | /             try:
+201 | |                 asyncio.run(self.monitor._collect_system_metrics(interval=1))
+202 | |             except asyncio.CancelledError:
+203 | |                 pass
+    | |____________________^
+204 |
+205 |               mock_cpu_set.assert_called_with(10.0)
+    |
+help: Replace `try`-`except`-`pass` with `with contextlib.suppress(asyncio.CancelledError): ...`
+
+F841 Local variable `mock_run` is assigned to but never used
+  --> tests/test_mt5_connector_new.py:40:34
+   |
+38 |     mock_metaapi_instance.metatrader_account_api.get_account = MagicMock()
+39 |
+40 |     with patch("asyncio.run") as mock_run:
+   |                                  ^^^^^^^^
+41 |         connector = MT5Connector(mock_config)
+42 |         assert connector.initialize()
+   |
+help: Remove assignment to unused variable `mock_run`
+
+F841 Local variable `fe` is assigned to but never used
+  --> tests/test_performance_instrumentation.py:59:5
+   |
+57 | def test_feature_engineer_fallback_logic():
+58 |     """Verify that compute_features doesn't return empty DF if MTF data is short."""
+59 |     fe = FeatureEngineer(base_timeframe="M5", timeframes=["H1"]) # MTF H1 needs 12 bars
+   |     ^^
+60 |     # Provide only 5 bars
+61 |     df = pd.DataFrame({
+   |
+help: Remove assignment to unused variable `fe`
+
+E701 Multiple statements on one line (colon)
+   --> tests/test_rl_evaluation.py:277:27
+    |
+275 |     class MultiAgent:
+276 |         def predict(self, obs):
+277 |             if obs[0] == 1: return (np.array([1]), {"info": "sb3"})
+    |                           ^
+278 |             if obs[0] == 2: return [2, 0]
+279 |             if obs[0] == 3:
+    |
+
+E701 Multiple statements on one line (colon)
+   --> tests/test_rl_evaluation.py:278:27
+    |
+276 |         def predict(self, obs):
+277 |             if obs[0] == 1: return (np.array([1]), {"info": "sb3"})
+278 |             if obs[0] == 2: return [2, 0]
+    |                           ^
+279 |             if obs[0] == 3:
+280 |                 from src.core.constants import SignalDirection
+    |
+
+E701 Multiple statements on one line (colon)
+   --> tests/test_rl_evaluation.py:287:27
+    |
+285 |                     value = 1
+286 |                 return MockEnum()
+287 |             if obs[0] == 5: return -1 # Test explicit SELL mapping
+    |                           ^
+288 |             return 0
+    |
+
+F841 Local variable `evaluator` is assigned to but never used
+   --> tests/test_rl_evaluation.py:333:5
+    |
+332 |     env = TradingEnv(data=data6, window_size=10)
+333 |     evaluator = RLEvaluator(env=env, close_idx=4, n_features=6)
+    |     ^^^^^^^^^
+334 |
+335 |     # Momentum baseline should also use these
+    |
+help: Remove assignment to unused variable `evaluator`
+
+RUF059 Unpacked variable `reward` is never used
+  --> tests/test_trading_env_optimization.py:32:10
+   |
+31 |     # 3. Step forward and check observation
+32 |     obs, reward, terminated, truncated, info = env.step(1)
+   |          ^^^^^^
+33 |     # After 1 step, current_step = window_size + 1
+34 |     # observation window should be [1 : window_size + 1]
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `terminated` is never used
+  --> tests/test_trading_env_optimization.py:32:18
+   |
+31 |     # 3. Step forward and check observation
+32 |     obs, reward, terminated, truncated, info = env.step(1)
+   |                  ^^^^^^^^^^
+33 |     # After 1 step, current_step = window_size + 1
+34 |     # observation window should be [1 : window_size + 1]
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `truncated` is never used
+  --> tests/test_trading_env_optimization.py:32:30
+   |
+31 |     # 3. Step forward and check observation
+32 |     obs, reward, terminated, truncated, info = env.step(1)
+   |                              ^^^^^^^^^
+33 |     # After 1 step, current_step = window_size + 1
+34 |     # observation window should be [1 : window_size + 1]
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `info` is never used
+  --> tests/test_trading_env_optimization.py:32:41
+   |
+31 |     # 3. Step forward and check observation
+32 |     obs, reward, terminated, truncated, info = env.step(1)
+   |                                         ^^^^
+33 |     # After 1 step, current_step = window_size + 1
+34 |     # observation window should be [1 : window_size + 1]
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+E402 Module level import not at top of file
+  --> tests/verify_db.py:9:1
+   |
+ 7 | sys.modules["MetaTrader5"] = MagicMock()
+ 8 |
+ 9 | from sqlalchemy import create_engine
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 | from sqlalchemy.orm import sessionmaker
+   |
+
+E402 Module level import not at top of file
+  --> tests/verify_db.py:10:1
+   |
+ 9 | from sqlalchemy import create_engine
+10 | from sqlalchemy.orm import sessionmaker
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
+   |
+
+E402 Module level import not at top of file
+  --> tests/verify_db.py:12:1
+   |
+10 | from sqlalchemy.orm import sessionmaker
+11 |
+12 | from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+F841 Local variable `trade_id` is assigned to but never used
+   --> tests/verify_integration.py:147:9
+    |
+145 |         assert ticket == 999888
+146 |
+147 |         trade_id = trade_logger.log_trade(
+    |         ^^^^^^^^
+148 |             ticket=ticket,
+149 |             symbol="XAUUSD",
+    |
+help: Remove assignment to unused variable `trade_id`
+
+F841 Local variable `signal_obj` is assigned to but never used
+   --> tests/verify_integration.py:348:9
+    |
+347 |         # Full stack logic (Inference + Filter)
+348 |         signal_obj = model.predict(obs)
+    |         ^^^^^^^^^^
+349 |         signal = TradeSignal(
+350 |             symbol="XAUUSD",
+    |
+help: Remove assignment to unused variable `signal_obj`
+
+Found 88 errors.
+No fixes available (49 hidden fixes can be enabled with the `--unsafe-fixes` option).

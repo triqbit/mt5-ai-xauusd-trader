@@ -1,0 +1,14 @@
+SIM102 Use a single `if` statement instead of nested `if` statements
+   --> scripts/doctor.py:134:17
+    |
+132 |                   actual_version = get_version(meta_name)
+133 |
+134 | /                 if actual_version != "unknown":
+135 | |                     if parse_version(actual_version) < parse_version(min_version):
+    | |__________________________________________________________________________________^
+136 |                           outdated.append(
+137 |                               f"{display_name} (found {actual_version}, need {min_version})"
+    |
+help: Combine `if` statements using `and`
+
+Found 1 error.

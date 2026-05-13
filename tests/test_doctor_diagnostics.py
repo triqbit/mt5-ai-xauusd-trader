@@ -3,16 +3,17 @@ Unit tests for the enhanced diagnostic tool (scripts/doctor.py).
 """
 
 import sys
-import os
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add root to sys.path to allow importing scripts.doctor
 root = Path(__file__).resolve().parents[1]
 sys.path.append(str(root))
 
 import scripts.doctor as doctor
+
 
 def test_check_python_version():
     """Verify python version check logic."""
