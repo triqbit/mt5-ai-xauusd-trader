@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.trading.backtester import BacktestEngine, PerformanceReport
 from src.trading.capital_allocator import (
     AllocationRequest,
@@ -12,7 +12,6 @@ from src.trading.capital_allocator import (
     StrategyConfig,
 )
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_engine import RiskDecision, RiskEngine
 
 __all__ = [
     "AllocationRequest",
@@ -23,7 +22,6 @@ __all__ = [
     "PerformanceReport",
     "RejectionCode",
     "RiskDecision",
-    "RiskEngine",
     "StrategyConfig",
     "TradeSignal",
 ]
