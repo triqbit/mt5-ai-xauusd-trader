@@ -1,10 +1,11 @@
-
 import os
 import stat
 import sys
-from pathlib import Path
+
 import pytest
+
 from src.core.database import get_engine
+
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission check only on Linux/Mac")
 def test_sqlite_file_permissions_hardening(tmp_path):
@@ -18,7 +19,7 @@ def test_sqlite_file_permissions_hardening(tmp_path):
     get_engine.cache_clear()
 
     # 1. Test creation of new file
-    engine = get_engine(db_url)
+    get_engine(db_url)
 
     assert db_file.exists()
     mode = stat.S_IMODE(db_file.stat().st_mode)
@@ -33,6 +34,7 @@ def test_sqlite_file_permissions_hardening(tmp_path):
 
     mode = stat.S_IMODE(db_file.stat().st_mode)
     assert mode == 0o600, f"Expected hardening to 0o600, got {oct(mode)}"
+
 
 def test_sqlite_in_memory_no_file_creation():
     """

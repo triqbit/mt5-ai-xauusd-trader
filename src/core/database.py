@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 logger = logging.getLogger(__name__)
 
+
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     """
@@ -28,12 +29,14 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     Only applied to SQLite connections.
     """
     import sqlite3
+
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.close()
         logger.debug("SQLite pragmas (foreign_keys, WAL) enabled.")
+
 
 @lru_cache(maxsize=16)
 def get_engine(db_url: str) -> Engine:
@@ -78,10 +81,10 @@ def get_engine(db_url: str) -> Engine:
     from sqlalchemy.pool import NullPool, QueuePool, StaticPool
 
     engine_kwargs: dict[str, Any] = {
-        "pool_pre_ping": True,    # Verify connections are alive
-        "pool_recycle": 3600,     # Recycle connections every hour
+        "pool_pre_ping": True,  # Verify connections are alive
+        "pool_recycle": 3600,  # Recycle connections every hour
         "connect_args": connect_args,
-        "echo": False
+        "echo": False,
     }
 
     if is_sqlite:
@@ -98,12 +101,16 @@ def get_engine(db_url: str) -> Engine:
 
     engine = create_engine(db_url, **engine_kwargs)
 
-    logger.info("Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url)
+    logger.info(
+        "Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url
+    )
     return engine
+
 
 def get_session_factory(engine: Engine) -> sessionmaker[Session]:
     """Return a session factory for the provided engine."""
     return sessionmaker(bind=engine, expire_on_commit=False)
+
 
 def verify_engine(engine: Engine) -> bool:
     """Perform a low-level ping to verify database connectivity."""
