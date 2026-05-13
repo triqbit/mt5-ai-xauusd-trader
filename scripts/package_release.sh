@@ -145,6 +145,7 @@ if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ]; then
 fi
 
 # Component G: Research Reports (Optional in packaging, mandatory in workflow)
+# This section handles research_*.md/html
 echo "   [+] Component: Research Reports (optional collect)"
 REPORT_FILES=("research_audit_report.md" "research_verification_report.md" "research_audit_report.html" "research_verification_report.html")
 for r in "${REPORT_FILES[@]}"; do
@@ -166,8 +167,8 @@ for f in "${MANDATORY_FILES[@]}"; do
 done
 
 # Verify mandatory directories
-if [ ! -d "${RELEASE_PATH}/migrations" ]; then
-    echo "Error: Mandatory directory migrations/ is missing."
+if [ ! -d "${RELEASE_PATH}/migrations" ] || [ -z "$(ls -A "${RELEASE_PATH}/migrations")" ]; then
+    echo "Error: Mandatory directory migrations/ is missing or empty."
     exit 1
 fi
 
