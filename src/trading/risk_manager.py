@@ -180,8 +180,7 @@ class RiskManager:
         if total_multiplier <= 0:
             return 0.0
 
-        # Fractional Kelly or Standard Risk sizing
-        # For simplicity in harmonization, we use the 1% risk per trade logic from RiskEngine
+        # Sizing: risk 1% (cfg.risk_per_trade) of balance
         risk_amount = self.balance * self.cfg.risk_per_trade
         # ATR * 100 converts gold ATR to $ per lot (approx)
         lot_size = (risk_amount / (current_atr * 100)) * total_multiplier
