@@ -31,8 +31,11 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         market_data: pd.DataFrame,
         open_positions: List[Dict[str, Any]],
+        current_price: float,
+        atr: float,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        contract_size: float = 100.0,
     ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
@@ -44,8 +47,11 @@ class AuditedRiskManager(RiskManager):
             signal=signal,
             market_data=market_data,
             open_positions=open_positions,
+            current_price=current_price,
+            atr=atr,
             signal_id=signal_id,
             model_health=model_health,
+            contract_size=contract_size,
         )
 
         # Log to Audit Trail
@@ -78,10 +84,9 @@ class AuditedRiskManager(RiskManager):
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 
-        if not decision.is_approved:
-            if self.monitor:
-                rejection_reasons = [k for k, v in decision.trace.items() if not v]
-                for reason in rejection_reasons:
-                    self.monitor.record_internal_rejection("risk_manager", reason.upper())
+        if not decision.is_approved and self.monitor:
+            rejection_reasons = [k for k, v in decision.trace.items() if not v]
+            for reason in rejection_reasons:
+                self.monitor.record_internal_rejection("risk_manager", reason.upper())
 
         return decision

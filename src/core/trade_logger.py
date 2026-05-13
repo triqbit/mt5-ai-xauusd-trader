@@ -126,7 +126,9 @@ class BlockedSignalAnalysis(Base, AuditMixin):
     __tablename__ = "blocked_signal_analysis"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    signal_id: Mapped[int] = mapped_column(ForeignKey("model_signals.id"), nullable=False, unique=True)
+    signal_id: Mapped[int] = mapped_column(
+        ForeignKey("model_signals.id"), nullable=False, unique=True
+    )
 
     opportunity_cost_pnl: Mapped[float] = mapped_column(Float, nullable=False)
     max_favorable_excursion: Mapped[float] = mapped_column(Float, nullable=False)
@@ -183,7 +185,9 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), index=True
+    )
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
     max_drawdown: Mapped[float | None] = mapped_column(Float)
@@ -271,7 +275,7 @@ class TradeLogger:
         exit_price: float,
         pnl: float | None = None,
         drawdown_impact: float = 0.0,
-    ) -> Trade | None:
+    ) -> None:
         """Update a trade when it is closed. Calculates P&L if not provided."""
         # Invalidate cache since a trade is being closed
         self._perf_cache = None
@@ -297,7 +301,6 @@ class TradeLogger:
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
                 session.commit()
-                session.refresh(trade)
 
                 # Audit the outcome
                 try:
@@ -315,10 +318,8 @@ class TradeLogger:
                     )
                 except (RuntimeError, ImportError):
                     pass
-                return trade
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
-                return None
 
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""

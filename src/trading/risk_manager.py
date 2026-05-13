@@ -83,8 +83,11 @@ class RiskManager:
         signal: TradeSignal,
         market_data: pd.DataFrame,
         open_positions: List[Dict[str, Any]],
+        current_price: float,
+        atr: float,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        contract_size: float = 100.0,
     ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
@@ -107,33 +110,46 @@ class RiskManager:
         if not trace["max_daily_trades"]:
             return self._create_rejection("Max daily trades reached", trace)
 
-        trace["consecutive_losses"] = self.daily.consecutive_losses < self.cfg.max_losing_streak
+        trace["consecutive_losses"] = (
+            self.daily.consecutive_losses < self.cfg.max_losing_streak
+        )
         if not trace["consecutive_losses"]:
             return self._create_rejection("Max consecutive losses reached", trace)
 
         # Layer 4: Exposure Limits
-        trace["max_concurrent_positions"] = len(open_positions) < self.cfg.max_positions
+        trace["max_concurrent_positions"] = (
+            len(open_positions) < self.cfg.max_positions
+        )
         if not trace["max_concurrent_positions"]:
             return self._create_rejection("Max concurrent positions reached", trace)
 
-        trace["directional_exposure"] = self._check_directional_exposure(signal, open_positions)
+        trace["directional_exposure"] = self._check_directional_exposure(
+            signal, open_positions, current_price, contract_size
+        )
         if not trace["directional_exposure"]:
-            return self._create_rejection("Max directional exposure reached (30%)", trace)
+            return self._create_rejection(
+                "Max directional exposure reached (30%)", trace
+            )
 
-        trace["total_notional"] = self._check_total_notional(signal, open_positions, market_data)
+        trace["total_notional"] = self._check_total_notional(
+            signal, open_positions, current_price, contract_size
+        )
         if not trace["total_notional"]:
             return self._create_rejection("Total notional exposure exceeds equity", trace)
 
         # Layer 5: Symbol Allocation
         trace["symbol_allocation"] = self._check_symbol_allocation(signal.symbol)
         if not trace["symbol_allocation"]:
-            return self._create_rejection(f"Symbol {signal.symbol} not in approved list", trace)
+            return self._create_rejection(
+                f"Symbol {signal.symbol} not in approved list", trace
+            )
 
         # Layer 6: Prediction Limits
         trace["min_confidence"] = signal.confidence >= self.cfg.min_confidence
         if not trace["min_confidence"]:
             return self._create_rejection(
-                f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}", trace
+                f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}",
+                trace,
             )
 
         # Layer 7: Risk-Reward Validation (Min 1.5 R:R)
@@ -147,7 +163,9 @@ class RiskManager:
             return self._create_rejection("Model health metrics below threshold", trace)
 
         # Calculate final lot size using ATR-based sizing
-        adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
+        adjusted_lots = self.calculate_position_size(
+            signal.symbol, market_data, current_price, atr, contract_size
+        )
 
         if adjusted_lots < self.cfg.min_lot_size:
             return self._create_rejection(
@@ -185,7 +203,14 @@ class RiskManager:
             )
         return decision
 
-    def calculate_position_size(self, symbol: str, market_data: pd.DataFrame) -> float:
+    def calculate_position_size(
+        self,
+        symbol: str,
+        market_data: pd.DataFrame,
+        current_price: float,
+        current_atr: float,
+        contract_size: float = 100.0,
+    ) -> float:
         """
         ATR-based position sizing according to RISK_LIMITS.md.
 
@@ -202,17 +227,23 @@ class RiskManager:
 
         Args:
             symbol: Trading symbol.
-            market_data: DataFrame with 'atr' and 'close'.
+            market_data: DataFrame with historical 'atr' or OHLCV.
+            current_price: Current market mid-price.
+            current_atr: Latest 14-period ATR.
+            contract_size: Standard contract size (100 for Gold, 100k for Forex).
 
         Returns:
             float: Calculated lot size.
         """
-        if market_data.empty or "atr" not in market_data.columns:
-            return self.cfg.min_lot_size
-
-        current_atr = market_data["atr"].iloc[-1]
-        # Approx 30 days of M5 (8640 bars)
-        avg_atr = market_data["atr"].tail(8640).mean()
+        # Calculate historical average ATR for volatility context
+        if "atr" in market_data.columns:
+            avg_atr = market_data["atr"].tail(8640).mean()
+        elif "high" in market_data.columns and "low" in market_data.columns:
+            # Fallback calculate ATR if not provided
+            temp_atr = (market_data["high"] - market_data["low"]).rolling(14).mean()
+            avg_atr = temp_atr.tail(8640).mean()
+        else:
+            avg_atr = current_atr
 
         vol_multiplier = 1.0
         ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
@@ -232,13 +263,13 @@ class RiskManager:
 
         # Sizing: risk 1% (cfg.risk_per_trade) of balance
         risk_amount = self.balance * self.cfg.risk_per_trade
-        # ATR * 100 converts gold ATR to $ per lot
-        lot_size = (risk_amount / (current_atr * 100)) * total_multiplier
+        # ATR * contract_size converts ATR to $ per lot
+        # e.g., Gold ATR 5.0 * 100 = 00 risk per lot
+        lot_size = (risk_amount / (current_atr * contract_size)) * total_multiplier
 
         # Cap at Max Position Size (10% of equity)
         max_notional = self.balance * self.cfg.max_position_size_pct
-        price = market_data["close"].iloc[-1]
-        max_lots = max_notional / (price * 100)
+        max_lots = max_notional / (current_price * contract_size)
 
         final_lots = min(lot_size, max_lots)
         final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
@@ -265,7 +296,9 @@ class RiskManager:
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
-            self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
+            self.monitor.send_daily_summary(
+                self.daily.realised_pnl, self.daily.trade_count
+            )
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
@@ -301,7 +334,11 @@ class RiskManager:
         return 0
 
     def _check_directional_exposure(
-        self, signal: TradeSignal, open_positions: List[Dict[str, Any]]
+        self,
+        signal: TradeSignal,
+        open_positions: List[Dict[str, Any]],
+        current_price: float,
+        contract_size: float = 100.0,
     ) -> bool:
         """Layer 4: 30% net directional exposure."""
         net_lots = 0.0
@@ -312,20 +349,26 @@ class RiskManager:
             else:  # SELL
                 net_lots -= vol
 
-        net_lots += self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
-        price_estimate = 2300.0  # Gold estimate
-        notional = abs(net_lots) * price_estimate * 100
+        net_lots += (
+            self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
+        )
+        notional = abs(net_lots) * current_price * contract_size
         exposure_pct = notional / self.balance if self.balance > 0 else 1.0
 
         return exposure_pct <= self.cfg.max_single_direction_pct
 
     def _check_total_notional(
-        self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
+        self,
+        signal: TradeSignal,
+        open_positions: List[Dict[str, Any]],
+        current_price: float,
+        contract_size: float = 100.0,
     ) -> bool:
         """Layer 4: Total notional < 100% equity."""
-        total_lots = sum(pos.get("volume", 0.0) for pos in open_positions) + self.cfg.min_lot_size
-        price = market_data["close"].iloc[-1] if not market_data.empty else 2300.0
-        total_notional = total_lots * price * 100
+        total_lots = (
+            sum(pos.get("volume", 0.0) for pos in open_positions) + self.cfg.min_lot_size
+        )
+        total_notional = total_lots * current_price * contract_size
         return total_notional < (self.balance * self.cfg.max_total_notional_pct)
 
     def _check_symbol_allocation(self, symbol: str) -> bool:

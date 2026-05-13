@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
+    from src.data.event_intelligence import EventIntelligence
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
@@ -140,16 +141,9 @@ def _prepare_trade_signal(
         approved_risk = alloc_result.allocated_risk_pct
 
     # 3. Lot Sizing
-    lot_size = (
-        risk.size_position(
-            cfg.symbol,
-            win_rate=0.58,
-            avg_win=4 * atr,
-            avg_loss=2 * atr,
-        )
-        if approved_risk > 0
-        else 0.0
-    )
+    # Note: size_position is now handled in risk.approve for better cascade integration.
+    # We provide a placeholder or use the basic sizing here for TradeSignal initialization.
+    lot_size = approved_risk  # Simplified initial size
 
     return TradeSignal(
         symbol=cfg.symbol,
@@ -157,7 +151,7 @@ def _prepare_trade_signal(
         entry_price=price,
         stop_loss=stop_loss,
         take_profit=take_profit,
-        lot_size=lot_size,
+        lot_size=max(0.01, lot_size),
         algorithm=cfg.algorithm,
         confidence=confidence,
     )
@@ -190,7 +184,6 @@ def run_live(
         MT5DataError,
     )
     from src.core.explainability import SignalExplainer
-    from src.data.event_intelligence import RiskStatus
 
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
@@ -208,7 +201,8 @@ def run_live(
         if loop_count % 100 == 0 and audit_logger:
             # Dynamic exclusion of all SecretStr/SecretBytes fields
             secret_fields = {
-                f for f, info in cfg.__class__.model_fields.items()
+                f
+                for f, info in cfg.__class__.model_fields.items()
                 if "Secret" in str(info.annotation)
             }
             audit_logger.log_config_snapshot(
@@ -284,11 +278,15 @@ def run_live(
                             # We use a robust mapping or derivation
                             point = props["point"]
                             pip_size = point * 10 if "XAUUSD" in cfg.symbol else point
-                            spread_pips = raw_spread / pip_size if pip_size > 0 else raw_spread
+                            spread_pips = (
+                                raw_spread / pip_size if pip_size > 0 else raw_spread
+                            )
                         else:
                             # Fallback for XAUUSD
                             spread_pips = (
-                                raw_spread * 10.0 if "XAUUSD" in cfg.symbol else raw_spread
+                                raw_spread * 10.0
+                                if "XAUUSD" in cfg.symbol
+                                else raw_spread
                             )
 
                         if monitor and spread_pips > cfg.spread_halt_pips:
@@ -366,7 +364,9 @@ def run_live(
                             else None,
                         )
 
-                log.debug("Model signal received", direction=direction, confidence=confidence)
+                log.debug(
+                    "Model signal received", direction=direction, confidence=confidence
+                )
 
                 signal_id = None
                 if trade_logger:
@@ -374,7 +374,9 @@ def run_live(
                         {
                             "symbol": cfg.symbol,
                             "direction": direction,
-                            "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
+                            "entry_price": tick["ask"]
+                            if direction >= 0
+                            else tick["bid"],
                             "algorithm": cfg.algorithm,
                             "confidence": confidence,
                             "volatility": volatility,
@@ -384,7 +386,9 @@ def run_live(
 
                 # 4. Signal Preparation & Institutional Risk
                 price = tick["ask"] if direction == 1 else tick["bid"]
-                atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
+                atr = float(
+                    (df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1]
+                )
 
                 with profile("signal_preparation"):
                     signal = _prepare_trade_signal(
@@ -397,30 +401,42 @@ def run_live(
                         allocator=allocator,
                         audit_logger=audit_logger,
                     )
-                lot_size = signal.lot_size
 
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
                     current_positions = connector.get_positions(cfg.symbol)
+                    props = connector.get_symbol_properties(cfg.symbol)
+                    contract_size = (
+                        float(props.get("trade_contract_size", 100.0)) if props else 100.0
+                    )
+
                     risk_decision = (
                         risk.approve(
                             signal,
                             market_data=df_raw,
                             open_positions=current_positions,
+                            current_price=price,
+                            atr=atr,
                             signal_id=signal_id,
                             model_health=health,
+                            contract_size=contract_size,
                         )
                         if direction != 0
                         else None
                     )
-                    risk_approved = risk_decision.is_approved if risk_decision else False
+                    risk_approved = (
+                        risk_decision.is_approved if risk_decision else False
+                    )
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
                 if risk_approved and risk_decision:
                     # Update lot size from risk-adjusted decision
-                    signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
+                    signal = signal.model_copy(
+                        update={"lot_size": risk_decision.adjusted_lot_size}
+                    )
+                    lot_size = signal.lot_size
 
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
@@ -455,13 +471,23 @@ def run_live(
                         # Prepare data for explainer
                         model_votes = signal_obj.metadata.get(
                             "per_algo_votes",
-                            {cfg.algorithm: 1 if direction == 1 else 2 if direction == -1 else 0},
+                            {
+                                cfg.algorithm: 1
+                                if direction == 1
+                                else 2
+                                if direction == -1
+                                else 0
+                            },
                         )
-                        model_weights = signal_obj.metadata.get("weights", {cfg.algorithm: 1.0})
+                        model_weights = signal_obj.metadata.get(
+                            "weights", {cfg.algorithm: 1.0}
+                        )
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [k for k, v in risk_decision.trace.items() if not v]
+                            "rejection_reasons": [
+                                k for k, v in risk_decision.trace.items() if not v
+                            ]
                             if risk_decision
                             else [],
                             "risk_reward": abs(signal.take_profit - price)
@@ -541,7 +567,11 @@ def run_live(
                             }
 
                         packet = dss.assemble_packet(
-                            cfg.symbol, explanation, regime_info, macro_risk, perf_metrics
+                            cfg.symbol,
+                            explanation,
+                            regime_info,
+                            macro_risk,
+                            perf_metrics,
                         )
                         # Render the institutional decision cockpit
                         if console:
@@ -563,15 +593,24 @@ def run_live(
                                 audit_logger.log_blocked_trade(
                                     symbol=cfg.symbol,
                                     reason=f"Order execution failure: {e!s}",
-                                    context={"direction": direction, "lot_size": lot_size},
+                                    context={
+                                        "direction": direction,
+                                        "lot_size": lot_size,
+                                    },
                                 )
                             ticket = None
 
-                        execution_latency_ms = (time.perf_counter() - execution_start) * 1000
+                        execution_latency_ms = (
+                            time.perf_counter() - execution_start
+                        ) * 1000
 
                         if ticket:
                             risk.open_positions[cfg.symbol] = ticket
-                            log.info("Order placed", ticket=ticket, latency_ms=execution_latency_ms)
+                            log.info(
+                                "Order placed",
+                                ticket=ticket,
+                                latency_ms=execution_latency_ms,
+                            )
                             if monitor:
                                 # We don't have slippage here yet, so we pass 0.0
                                 monitor.log_execution_quality(
@@ -604,7 +643,9 @@ def run_live(
                                 if trade_info:
                                     # For a BUY, exit at BID. For a SELL, exit at ASK.
                                     exit_price = (
-                                        tick["bid"] if trade_info.direction == 1 else tick["ask"]
+                                        tick["bid"]
+                                        if trade_info.direction == 1
+                                        else tick["ask"]
                                     )
                                     # P&L will be calculated automatically by update_trade
                                     # This also logs to audit trail internally now
@@ -708,10 +749,14 @@ def run_setup_wizard() -> int:
 
     # 1. Basic Info
     console.print("\n[bold]1. Execution Environment[/]")
-    mode = Prompt.ask("Select execution mode", choices=["demo", "live", "backtest"], default="demo")
+    mode = Prompt.ask(
+        "Select execution mode", choices=["demo", "live", "backtest"], default="demo"
+    )
     symbol = Prompt.ask("Default trading symbol", default="XAUUSD").upper()
     timeframe = Prompt.ask(
-        "Default timeframe", choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"], default="M5"
+        "Default timeframe",
+        choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"],
+        default="M5",
     )
 
     # 2. MT5 Credentials
@@ -732,12 +777,16 @@ def run_setup_wizard() -> int:
         if not password:
             console.print("[red]Password cannot be empty.[/]")
 
-    server = Prompt.ask("MT5 Broker Server (e.g., IC-Markets-Demo)", default="YOUR_SERVER_HERE")
+    server = Prompt.ask(
+        "MT5 Broker Server (e.g., IC-Markets-Demo)", default="YOUR_SERVER_HERE"
+    )
 
     # 3. MetaAPI (Optional but recommended for Linux/Mac)
     console.print("\n[bold]3. MetaAPI Cloud Fallback (Optional)[/]")
     console.print("[dim]Required for non-Windows environments or cloud failover.[/]")
-    use_meta = Prompt.ask("Do you want to configure MetaAPI?", choices=["y", "n"], default="n")
+    use_meta = Prompt.ask(
+        "Do you want to configure MetaAPI?", choices=["y", "n"], default="n"
+    )
     meta_token = ""
     meta_id = ""
     if use_meta == "y":
@@ -746,7 +795,12 @@ def run_setup_wizard() -> int:
 
     # 4. Confirm and Save
     console.print("\n[bold]4. Review & Save[/]")
-    if Prompt.ask("Ready to save configuration to .env?", choices=["y", "n"], default="y") != "y":
+    if (
+        Prompt.ask(
+            "Ready to save configuration to .env?", choices=["y", "n"], default="y"
+        )
+        != "y"
+    ):
         console.print("[yellow]Setup aborted. No changes made.[/]")
         return 0
 
@@ -794,10 +848,13 @@ def run_setup_wizard() -> int:
 
     # Secure permissions
     import contextlib
+
     with contextlib.suppress(Exception):
         os.chmod(env_path, 0o600)
 
-    console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
+    console.print(
+        "[bold green]✅ Configuration saved to .env with secure permissions.[/]"
+    )
     console.print(
         "You can now run the bot with [cyan]python main.py --check[/] to verify connectivity.\n"
     )
@@ -827,7 +884,9 @@ Usage Examples:
   python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
         """,
     )
-    p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
+    p.add_argument(
+        "--version", action="version", version=f"%(prog)s {get_system_version()}"
+    )
 
     # -- Execution Group
     execution = p.add_argument_group("Execution Options")
@@ -842,8 +901,12 @@ Usage Examples:
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
         help="AI algorithm architecture to use for signal generation.",
     )
-    execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
-    execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
+    execution.add_argument(
+        "--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD)."
+    )
+    execution.add_argument(
+        "--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1)."
+    )
     execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",
@@ -886,7 +949,10 @@ Usage Examples:
         help="Fixed simulated spread (as decimal, e.g. 0.0001).",
     )
     backtest.add_argument(
-        "--commission", type=float, default=7.0, help="Commission cost per round-turn lot."
+        "--commission",
+        type=float,
+        default=7.0,
+        help="Commission cost per round-turn lot.",
     )
 
     # -- Setup & Diagnostics Group
@@ -959,13 +1025,20 @@ def run_backtest(
     start_date = datetime.strptime(args.start, "%Y-%m-%d")
     end_date = datetime.strptime(args.end, "%Y-%m-%d")
 
-    log.info("Starting Backtest", symbol=cfg.symbol, start=start_date.date(), end=end_date.date())
+    log.info(
+        "Starting Backtest",
+        symbol=cfg.symbol,
+        start=start_date.date(),
+        end=end_date.date(),
+    )
 
     connector = MT5Connector(cfg)
     try:
         with console.status("[bold green]Connecting to MT5 for historical data..."):
             connector.connect()
-            df_raw = connector.get_rates_range(cfg.symbol, cfg.timeframe, start_date, end_date)
+            df_raw = connector.get_rates_range(
+                cfg.symbol, cfg.timeframe, start_date, end_date
+            )
 
         if df_raw.empty:
             log.error("No data found for the specified range.")
@@ -1004,10 +1077,16 @@ def run_backtest(
         rf_color = get_color("rf", bt_report.recovery_factor)
 
         perf_table.add_row("Annualized Return", f"{bt_report.annualized_return:.2%}")
-        perf_table.add_row("Sharpe Ratio", f"[{s_color}]{bt_report.sharpe_ratio:.2f}[/]")
+        perf_table.add_row(
+            "Sharpe Ratio", f"[{s_color}]{bt_report.sharpe_ratio:.2f}[/]"
+        )
         perf_table.add_row("Max Drawdown", f"{bt_report.max_drawdown:.2%}")
-        perf_table.add_row("Profit Factor", f"[{pf_color}]{bt_report.profit_factor:.2f}[/]")
-        perf_table.add_row("Recovery Factor", f"[{rf_color}]{bt_report.recovery_factor:.2f}[/]")
+        perf_table.add_row(
+            "Profit Factor", f"[{pf_color}]{bt_report.profit_factor:.2f}[/]"
+        )
+        perf_table.add_row(
+            "Recovery Factor", f"[{rf_color}]{bt_report.recovery_factor:.2f}[/]"
+        )
         perf_table.add_row("Win Rate", f"[{wr_color}]{bt_report.win_rate:.2%}[/]")
         perf_table.add_row("Total Trades", str(bt_report.total_trades))
         perf_table.add_row("MAE Avg", f"{bt_report.mae_avg:.2f}")
@@ -1016,7 +1095,9 @@ def run_backtest(
 
         console.print(
             Panel(
-                perf_table, title="[bold]Institutional Performance Summary[/]", border_style="green"
+                perf_table,
+                title="[bold]Institutional Performance Summary[/]",
+                border_style="green",
             )
         )
         return 0
@@ -1055,7 +1136,9 @@ def main() -> int:
                         Path(d).mkdir(parents=True, exist_ok=True)
                     return run_setup_wizard()
                 else:
-                    print("\n[!] Manual setup required. You can run 'python main.py --setup' later.")
+                    print(
+                        "\n[!] Manual setup required. You can run 'python main.py --setup' later."
+                    )
             except ImportError:
                 print("\n[!] Configuration file (.env) is missing.")
                 choice = (
@@ -1076,7 +1159,9 @@ def main() -> int:
                     for d in ["data", "logs", "models/trained"]:
                         Path(d).mkdir(parents=True, exist_ok=True)
 
-                    print("✅ Created .env with secure permissions and initialized directories.")
+                    print(
+                        "✅ Created .env with secure permissions and initialized directories."
+                    )
                     print("👉 Please edit .env with your credentials before proceeding.\n")
             except (KeyboardInterrupt, EOFError):
                 print("\nSetup skipped.")
@@ -1096,10 +1181,16 @@ def main() -> int:
         print(f"Platform: {platform.system()} {platform.release()}")
         print(f"Python:   {sys.version.split()[0]}")
         print("\nREMEDIATION STEPS:")
-        print("1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics.")
-        print("2. Run 'pip install -r requirements.txt' to install all required libraries.")
+        print(
+            "1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics."
+        )
+        print(
+            "2. Run 'pip install -r requirements.txt' to install all required libraries."
+        )
         if platform.system() == "Linux":
-            print("3. On Linux, if TA-Lib is missing, ensure the C-library is installed:")
+            print(
+                "3. On Linux, if TA-Lib is missing, ensure the C-library is installed:"
+            )
             print("   'sudo apt-get install libta-lib0' or equivalent.")
         print("-" * 70)
         return 1
@@ -1138,7 +1229,9 @@ def main() -> int:
             env_var = dest.upper()
             if isinstance(val, bool):
                 if val:  # Only set if True for flags
-                    os.environ[env_var] = "YES" if dest == "confirm_live_trading" else "TRUE"
+                    os.environ[env_var] = (
+                        "YES" if dest == "confirm_live_trading" else "TRUE"
+                    )
             else:
                 os.environ[env_var] = str(val)
 
@@ -1192,12 +1285,15 @@ def main() -> int:
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
+
     log, console = structlog.get_logger("main"), Console()
     get_masking_processor().update_secrets(cfg)
 
     # 3.1 Handle --show-config
     if args.show_config:
-        config_table = Table(title="[bold blue]Current System Configuration (Sanitized)[/]", box=None)
+        config_table = Table(
+            title="[bold blue]Current System Configuration (Sanitized)[/]", box=None
+        )
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="white")
         config_table.add_column("Source", style="dim")
@@ -1209,7 +1305,8 @@ def main() -> int:
 
         # Dynamic exclusion of all SecretStr/SecretBytes fields
         secret_fields = {
-            f for f, info in cfg.__class__.model_fields.items()
+            f
+            for f, info in cfg.__class__.model_fields.items()
             if "Secret" in str(info.annotation)
         }
 
@@ -1254,14 +1351,18 @@ def main() -> int:
     result = validator.validate()
 
     if result.errors:
-        validation_table = Table(title="[bold yellow]Startup Configuration Validation[/]", box=None)
+        validation_table = Table(
+            title="[bold yellow]Startup Configuration Validation[/]", box=None
+        )
         validation_table.add_column("Field", style="cyan")
         validation_table.add_column("Status", justify="center")
         validation_table.add_column("Message")
         validation_table.add_column("Suggested Fix", style="green")
 
         for err in result.errors:
-            status = "[bold red]CRITICAL[/]" if err.critical else "[bold yellow]WARNING[/]"
+            status = (
+                "[bold red]CRITICAL[/]" if err.critical else "[bold yellow]WARNING[/]"
+            )
             validation_table.add_row(err.field, status, err.message, err.remedy)
 
         console.print(validation_table)
@@ -1311,7 +1412,9 @@ def main() -> int:
     summary.add_row("Algorithm:  ", f"{cfg.algorithm}{algo_tag}")
 
     # Account info for visibility
-    masked_login = f"{str(cfg.mt5_login)[:3]}****" if len(str(cfg.mt5_login)) > 3 else "****"
+    masked_login = (
+        f"{str(cfg.mt5_login)[:3]}****" if len(str(cfg.mt5_login)) > 3 else "****"
+    )
     summary.add_row("Account:  ", f"{masked_login} @ {cfg.mt5_server}")
     summary.add_row(
         "Database:  ",
@@ -1322,20 +1425,34 @@ def main() -> int:
     # Risk summary row
     summary.add_row("[bold underline]Risk Controls[/]", "")
     risk_color = (
-        "red" if cfg.risk_per_trade > 0.02 else "yellow" if cfg.risk_per_trade > 0.01 else "green"
+        "red"
+        if cfg.risk_per_trade > 0.02
+        else "yellow"
+        if cfg.risk_per_trade > 0.01
+        else "green"
     )
     summary.add_row("Risk/Trade:  ", f"[{risk_color}]{cfg.risk_per_trade:.1%}[/]")
 
     daily_loss_color = (
-        "red" if cfg.max_daily_loss > 0.06 else "yellow" if cfg.max_daily_loss > 0.05 else "green"
+        "red"
+        if cfg.max_daily_loss > 0.06
+        else "yellow"
+        if cfg.max_daily_loss > 0.05
+        else "green"
     )
     summary.add_row("Daily Stop:  ", f"[{daily_loss_color}]{cfg.max_daily_loss:.1%}[/]")
 
-    pos_color = "red" if cfg.max_positions > 10 else "yellow" if cfg.max_positions > 5 else "green"
+    pos_color = (
+        "red" if cfg.max_positions > 10 else "yellow" if cfg.max_positions > 5 else "green"
+    )
     summary.add_row("Max Positions:  ", f"[{pos_color}]{cfg.max_positions}[/]")
 
     conf_color = (
-        "red" if cfg.min_confidence < 0.50 else "yellow" if cfg.min_confidence < 0.55 else "green"
+        "red"
+        if cfg.min_confidence < 0.50
+        else "yellow"
+        if cfg.min_confidence < 0.55
+        else "green"
     )
     summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
 
@@ -1358,7 +1475,8 @@ def main() -> int:
 
     # Dynamic exclusion of all SecretStr/SecretBytes fields for audit snapshot
     secret_fields = {
-        f for f, info in cfg.__class__.model_fields.items()
+        f
+        for f, info in cfg.__class__.model_fields.items()
         if "Secret" in str(info.annotation)
     }
 
@@ -1369,9 +1487,12 @@ def main() -> int:
             exclude=secret_fields,
         )
     )
-    audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
+    audit_logger.log(
+        "system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}"
+    )
 
     from src.core.monitor import Monitor
+
     monitor = Monitor(cfg)
     # Note: Monitor's start_metrics_server is legacy;
     # Enterprise deployments use the FastAPI health app which includes /metrics.
@@ -1416,17 +1537,16 @@ def main() -> int:
     from src.core.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
-    from src.models.ensemble import EnsembleModel
-    from src.models.lstm_model import LSTMModel
-    from src.models.ppo_agent import PPOAgent
     from src.data.event_intelligence import (
         EventIntelligence,
         JSONEventProvider,
         MetaAPIEventProvider,
         TradingViewEventProvider,
     )
+    from src.models.ensemble import EnsembleModel
+    from src.models.lstm_model import LSTMModel
+    from src.models.ppo_agent import PPOAgent
     from src.models.regime_detector import RegimeDetector
-    from src.analytics.execution_quality import ExecutionAnalyzer
     from src.models.transformer_model import TimeSeriesTransformer
     from src.trading.audited_risk_manager import AuditedRiskManager
     from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
@@ -1437,7 +1557,9 @@ def main() -> int:
         db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
     )
 
-    risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    risk = AuditedRiskManager(
+        cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor
+    )
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
@@ -1449,7 +1571,9 @@ def main() -> int:
     # Event Intelligence (Macro Risk)
     providers = []
     if cfg.metaapi_token:
-        providers.append(MetaAPIEventProvider(token=cfg.metaapi_token.get_secret_value()))
+        providers.append(
+            MetaAPIEventProvider(token=cfg.metaapi_token.get_secret_value())
+        )
 
     # Always include synthetic/curated providers for robustness
     providers.append(TradingViewEventProvider())
@@ -1457,6 +1581,8 @@ def main() -> int:
         providers.append(JSONEventProvider("data/curated_events.json"))
 
     event_intelligence = EventIntelligence(providers=providers, config=cfg)
+
+    from src.analytics.execution_quality import ExecutionAnalyzer
 
     execution_analyzer = ExecutionAnalyzer(db_url=database_url, connector=connector)
 
@@ -1530,7 +1656,9 @@ def main() -> int:
             if comp.status == HealthStatus.DEGRADED
             else "red"
         )
-        table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy)
+        table.add_row(
+            name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy
+        )
     console.print(table)
 
     if report.status == HealthStatus.FAILED:
@@ -1544,9 +1672,12 @@ def main() -> int:
         next_steps.add_column(style="cyan", justify="right")
         next_steps.add_column(style="white", justify="left")
 
-        next_steps.add_row("Demo Trading:  ", f"python main.py --mode demo --algo {cfg.algorithm}")
         next_steps.add_row(
-            "Live Trading:  ", f"python main.py --mode live --algo {cfg.algorithm} --confirm-live"
+            "Demo Trading:  ", f"python main.py --mode demo --algo {cfg.algorithm}"
+        )
+        next_steps.add_row(
+            "Live Trading:  ",
+            f"python main.py --mode live --algo {cfg.algorithm} --confirm-live",
         )
         next_steps.add_row(
             "Backtesting:   ",
@@ -1601,7 +1732,9 @@ def main() -> int:
             )
         elif cfg.mode == "backtest":
             connector.disconnect()  # Already connected in run_backtest bridge
-            return run_backtest(args, cfg, feature_engineer, execution_filter, model, console, log)
+            return run_backtest(
+                args, cfg, feature_engineer, execution_filter, model, console, log
+            )
     finally:
         if audit_logger:
             audit_logger.log_operator_action(

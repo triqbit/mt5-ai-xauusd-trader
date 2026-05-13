@@ -47,7 +47,9 @@ class TradeSignal(BaseModel):
         ..., gt=0, description="The target entry price for the trade (must be positive)"
     )
     stop_loss: float = Field(
-        ..., gt=0, description="The mandatory protective stop loss price (must be positive)"
+        ...,
+        gt=0,
+        description="The mandatory protective stop loss price (must be positive)",
     )
     take_profit: float = Field(
         ..., gt=0, description="The target profit taking price (must be positive)"
@@ -140,7 +142,8 @@ class ExecutionDecision(BaseModel):
         None, description="The name of the filter that blocked execution, if any"
     )
     trace: dict[str, Any] = Field(
-        default_factory=dict, description="Detailed audit trace of all filter evaluations"
+        default_factory=dict,
+        description="Detailed audit trace of all filter evaluations",
     )
 
     @model_validator(mode="after")
