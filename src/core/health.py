@@ -323,50 +323,96 @@ class HealthChecker:
         return res
 
     def check_models(self) -> ComponentStatus:
-        """Verify AI models are loaded and healthy."""
+        """
+        Verify AI models are loaded and healthy.
+        Ensures the loaded model matches the configured algorithm.
+        """
         if not self.model:
             res = ComponentStatus(
-                status=HealthStatus.FAILED, message="Model orchestrator not initialized"
+                status=HealthStatus.FAILED,
+                message="Model orchestrator not initialized",
+                remedy="Initialization failure. Check model weight paths and ALGORITHM in .env",
             )
             self._update_gauge("models", res.status)
             return res
 
+        algo = self.cfg.algorithm.lower()
         loaded = []
-        # 1. Check EnsembleModel components (Standard attributes)
+        status = HealthStatus.HEALTHY
+        remedy = "N/A"
+
+        # 1. Discover loaded components
         if getattr(self.model, "ppo_agent", None) is not None:
-            loaded.append("PPO")
+            loaded.append("ppo")
         if getattr(self.model, "lstm_model", None) is not None:
-            loaded.append("LSTM")
+            loaded.append("lstm")
         if getattr(self.model, "dreamer_agent", None) is not None:
-            loaded.append("Dreamer")
+            loaded.append("dreamer")
 
-        # 2. Check for Transformer component
-        if getattr(self.model, "transformer_model", None) is not None or self.model.__class__.__name__ == "TimeSeriesTransformer":
-            loaded.append("Transformer")
-
-        # 3. Check for individual model wrapper/direct instance
-        if not loaded and (
-            getattr(self.model, "model", None) is not None or hasattr(self.model, "predict")
+        # Check for Transformer
+        if (
+            getattr(self.model, "transformer_model", None) is not None
+            or self.model.__class__.__name__ == "TimeSeriesTransformer"
         ):
-            loaded.append(self.model.__class__.__name__)
+            loaded.append("transformer")
 
+        # Fallback for individual wrappers
         if not loaded:
-            res = ComponentStatus(
-                status=HealthStatus.FAILED,
-                message="No models loaded in memory",
-                remedy="Ensure model weight files exist in models/trained/ and ALGORITHM in .env is correct",
-            )
-        else:
-            msg = f"Models loaded: {', '.join(loaded)}"
-            # Integration with model performance tracking if available
-            if hasattr(self.model, "get_health_metrics"):
-                with contextlib.suppress(Exception):
-                    m = self.model.get_health_metrics()
-                    msg += (
-                        f" | Health: acc={m.get('accuracy', 0):.2f}, drift={m.get('drift', 0):.2f}"
-                    )
-            res = ComponentStatus(status=HealthStatus.HEALTHY, message=msg)
+            class_name = self.model.__class__.__name__.lower()
+            if "ppo" in class_name:
+                loaded.append("ppo")
+            elif "lstm" in class_name:
+                loaded.append("lstm")
+            elif "transformer" in class_name:
+                loaded.append("transformer")
+            elif "dreamer" in class_name:
+                loaded.append("dreamer")
+            elif hasattr(self.model, "predict"):
+                loaded.append(class_name)
 
+        # 2. Validate against configuration
+        if algo == "ensemble":
+            # Ensemble requires at least two of (ppo, lstm, dreamer) for full health
+            # If some are missing but at least one is present, it's DEGRADED
+            essential = {"ppo", "lstm", "dreamer"}
+            present = essential.intersection(set(loaded))
+
+            if not present:
+                status = HealthStatus.FAILED
+                msg = f"Ensemble algorithm configured but no base models ({', '.join(essential)}) loaded"
+                remedy = f"Ensure model files for {', '.join(essential)} exist in models/trained/"
+            elif len(present) < len(essential):
+                status = HealthStatus.DEGRADED
+                missing = essential - present
+                msg = f"Ensemble DEGRADED: {', '.join(present)} active | Missing {', '.join(missing)}"
+                remedy = f"Load missing components: {', '.join(missing)}"
+            else:
+                msg = f"Ensemble HEALTHY: All components ({', '.join(present)}) active"
+        else:
+            # Single algorithm check
+            if algo not in loaded:
+                status = HealthStatus.FAILED
+                msg = f"Algorithm mismatch: Configured for '{algo}' but loaded '{', '.join(loaded) or 'None'}'"
+                remedy = f"Update ALGORITHM in .env to match loaded model or provide weights for '{algo}'"
+            else:
+                msg = f"Model '{algo}' loaded and active"
+
+        # 3. Performance Metrics Integration
+        if status != HealthStatus.FAILED and hasattr(self.model, "get_health_metrics"):
+            with contextlib.suppress(Exception):
+                m = self.model.get_health_metrics()
+                if m:
+                    msg += f" | Performance: acc={m.get('accuracy', 0):.2f}, drift={m.get('drift', 0):.2f}"
+                    # Check against thresholds if available in config
+                    drift_limit = getattr(self.cfg, "model_drift_threshold", 0.3)
+                    acc_floor = getattr(self.cfg, "model_accuracy_floor", 0.5)
+
+                    if m.get("drift", 0) > drift_limit or m.get("accuracy", 1.0) < acc_floor:
+                        status = HealthStatus.DEGRADED
+                        msg += " (Threshold violation)"
+                        remedy = "Retrain model or check for data drift in feature engineering"
+
+        res = ComponentStatus(status=status, message=msg, remedy=remedy)
         self._update_gauge("models", res.status)
         return res
 
@@ -592,12 +638,12 @@ def create_health_app() -> FastAPI:
 
 
 __all__ = [
-    "HealthStatus",
     "ComponentStatus",
-    "HealthReport",
     "HealthChecker",
-    "init_health_checker",
-    "get_health_checker",
-    "router",
+    "HealthReport",
+    "HealthStatus",
     "create_health_app",
+    "get_health_checker",
+    "init_health_checker",
+    "router",
 ]

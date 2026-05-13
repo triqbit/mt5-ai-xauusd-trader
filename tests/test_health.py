@@ -45,6 +45,7 @@ def mock_config():
     cfg.risk_per_trade = 0.01
     cfg.max_daily_loss = 0.05
     cfg.max_positions = 3
+    cfg.algorithm = "ensemble"
     return cfg
 
 @pytest.fixture
@@ -138,17 +139,20 @@ def test_check_mt5_metaapi_success(health_checker, mock_connector):
 def test_check_models_success(health_checker):
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
-    assert "PPO" in status.message
-    assert "LSTM" in status.message
-    assert "Dreamer" in status.message
+    assert "ppo" in status.message.lower()
+    assert "lstm" in status.message.lower()
+    assert "dreamer" in status.message.lower()
 
-def test_check_models_partial(health_checker, mock_model):
+def test_check_models_partial_ensemble(health_checker, mock_model):
+    # Ensemble with missing components should be DEGRADED
     mock_model.lstm_model = None
     mock_model.dreamer_agent = None
     status = health_checker.check_models()
-    assert status.status == HealthStatus.HEALTHY
-    assert "PPO" in status.message
-    assert "LSTM" not in status.message
+    assert status.status == HealthStatus.DEGRADED
+    assert "ppo" in status.message.lower()
+    assert "Missing" in status.message
+    assert "lstm" in status.message.lower()
+    assert "dreamer" in status.message.lower()
 
 def test_check_models_failed(health_checker, mock_model):
     mock_model.ppo_agent = None
@@ -163,16 +167,18 @@ def test_check_models_failed(health_checker, mock_model):
     status = health_checker.check_models()
     assert status.status == HealthStatus.FAILED
 
-def test_check_models_transformer(health_checker, mock_model):
+def test_check_models_transformer(health_checker, mock_config, mock_model):
+    mock_config.algorithm = "transformer"
     mock_model.ppo_agent = None
     mock_model.lstm_model = None
     mock_model.dreamer_agent = None
     mock_model.transformer_model = MagicMock()
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
-    assert "Transformer" in status.message
+    assert "transformer" in status.message.lower()
 
-def test_check_models_individual_wrapper(health_checker, mock_model):
+def test_check_models_individual_wrapper(health_checker, mock_config, mock_model):
+    mock_config.algorithm = "ppo"
     mock_model.ppo_agent = None
     mock_model.lstm_model = None
     mock_model.dreamer_agent = None
@@ -187,7 +193,17 @@ def test_check_models_individual_wrapper(health_checker, mock_model):
 
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
-    assert "PPOAgentWrapper" in status.message
+    assert "ppo" in status.message.lower()
+
+def test_check_models_algorithm_mismatch(health_checker, mock_config, mock_model):
+    mock_config.algorithm = "ppo"
+    mock_model.ppo_agent = None
+    mock_model.lstm_model = MagicMock()
+    mock_model.dreamer_agent = None
+
+    status = health_checker.check_models()
+    assert status.status == HealthStatus.FAILED
+    assert "Algorithm mismatch" in status.message
 
 def test_startup_gate_success(health_checker, mock_audit_logger):
     with patch.object(HealthChecker, 'get_full_report') as mock_report:
