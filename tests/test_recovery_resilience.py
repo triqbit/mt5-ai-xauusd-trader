@@ -1,12 +1,13 @@
-
-import pytest
-from unittest.mock import MagicMock, patch
-from src.core.trade_logger import TradeLogger, Trade
-from src.trading.risk_manager import RiskManager
-from src.core.config import TradingConfig
-from main import main
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from main import main
+from src.core.config import TradingConfig
+from src.core.trade_logger import Trade, TradeLogger
+
 
 @pytest.fixture
 def mock_db(tmp_path):
@@ -14,18 +15,14 @@ def mock_db(tmp_path):
     logger = TradeLogger(db_url)
     return logger
 
+
 def test_position_reconciliation_logic(mock_db):
     """
     Test that the reconciliation logic correctly populates RiskManager state.
     """
     # 1. Setup an "OPEN" trade in the database
     mock_db.log_trade(
-        ticket=12345,
-        symbol="XAUUSD",
-        direction=1,
-        entry_price=2300.0,
-        lot_size=0.1,
-        status="OPEN"
+        ticket=12345, symbol="XAUUSD", direction=1, entry_price=2300.0, lot_size=0.1, status="OPEN"
     )
 
     # 2. Mock configuration and dependencies
@@ -45,27 +42,27 @@ def test_position_reconciliation_logic(mock_db):
     # 4. Verify state was recovered
     assert risk.open_positions["XAUUSD"] == 12345
 
+
 @patch("main.Console")
-def test_main_startup_reconciliation(
-    mock_console_class
-):
+def test_main_startup_reconciliation(mock_console_class):
     """
     Verify that main() calls get_open_trades and updates risk manager.
     """
     # Patch components that are imported inside main()
-    with patch("src.core.config.get_config") as mock_get_config, \
-         patch("src.core.health.init_health_checker") as mock_health_init, \
-         patch("src.core.audit_log.AuditLogger") as mock_audit_logger_class, \
-         patch("src.core.trade_logger.TradeLogger") as mock_trade_logger_class, \
-         patch("src.trading.audited_risk_manager.AuditedRiskManager") as mock_risk_class, \
-         patch("src.trading.mt5_connector.MT5Connector") as mock_connector_class, \
-         patch("src.models.ensemble.EnsembleModel"), \
-         patch("src.models.ppo_agent.PPOAgent"), \
-         patch("src.models.lstm_model.LSTMModel"), \
-         patch("src.models.transformer_model.TimeSeriesTransformer"), \
-         patch("src.core.config_validator.ConfigValidator") as mock_validator_class, \
-         patch("src.core.monitor.Monitor") as mock_monitor_class:
-
+    with (
+        patch("src.core.config.get_config") as mock_get_config,
+        patch("src.core.health.init_health_checker") as mock_health_init,
+        patch("src.core.audit_log.AuditLogger"),
+        patch("src.core.trade_logger.TradeLogger") as mock_trade_logger_class,
+        patch("src.trading.audited_risk_manager.AuditedRiskManager") as mock_risk_class,
+        patch("src.trading.mt5_connector.MT5Connector") as mock_connector_class,
+        patch("src.models.ensemble.EnsembleModel"),
+        patch("src.models.ppo_agent.PPOAgent"),
+        patch("src.models.lstm_model.LSTMModel"),
+        patch("src.models.transformer_model.TimeSeriesTransformer"),
+        patch("src.core.config_validator.ConfigValidator") as mock_validator_class,
+        patch("src.core.monitor.Monitor"),
+    ):
         # Setup Mocks
         class MockConfig:
             model_fields = TradingConfig.model_fields
@@ -81,7 +78,9 @@ def test_main_startup_reconciliation(
             max_drawdown = 0.15
             logs_dir = Path("/tmp/logs")
             database_url = MagicMock()
-            def model_dump(self, **kwargs): return {}
+
+            def model_dump(self, **kwargs):
+                return {}
 
         mock_cfg = MockConfig()
         mock_cfg.database_url.get_secret_value.return_value = "sqlite:///test.db"
@@ -110,7 +109,7 @@ def test_main_startup_reconciliation(
         mock_health_checker.startup_gate.return_value = MagicMock(status="healthy")
 
         # Mock sys.argv to avoid reading real args and trigger --check to exit early after setup
-        with patch.object(sys, 'argv', ['main.py', '--check']):
+        with patch.object(sys, "argv", ["main.py", "--check"]):
             # Execute main (should exit 0 because of --check)
             try:
                 main()
