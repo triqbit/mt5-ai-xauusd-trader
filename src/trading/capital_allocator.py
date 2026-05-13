@@ -683,6 +683,15 @@ class CapitalAllocator:
                 amount=result.allocated_amount,
                 risk=result.allocated_risk_pct,
             )
+            # Update internal allocation record so heat calculation includes this new commitment
+            self.update_allocation(result.strategy_id, result.allocated_amount)
+
+            if self.monitor:
+                symbol = self.strategies[result.strategy_id].symbol
+                self.monitor.update_portfolio_heat(
+                    total_heat=self.get_total_heat(),
+                    symbol_heats={symbol: self.get_symbol_heat(symbol)},
+                )
         else:
             logger.warning(
                 "allocation_rejected",

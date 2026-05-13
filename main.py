@@ -150,6 +150,10 @@ def _prepare_trade_signal(
         else 0.0
     )
 
+    # 4. Extract trace ID for correlation
+    import structlog.contextvars
+    trace_id = structlog.contextvars.get_contextvars().get("trace_id")
+
     return TradeSignal(
         symbol=cfg.symbol,
         direction=direction,
@@ -159,6 +163,7 @@ def _prepare_trade_signal(
         lot_size=lot_size,
         algorithm=cfg.algorithm,
         confidence=confidence,
+        trace_id=trace_id,
     )
 
 
@@ -327,6 +332,11 @@ def run_live(
                     df_features = feature_engineer.compute_features(df_raw)
                     obs = df_features.values[-1]  # Full 140+ features
                     regime_info = regime_detector.detect(df_raw)
+
+                    if monitor:
+                        monitor.update_market_regime(
+                            regime_info.label.value, regime_info.confidence
+                        )
 
                     volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
 

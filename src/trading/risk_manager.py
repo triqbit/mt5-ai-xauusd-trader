@@ -156,6 +156,10 @@ class RiskManager:
         if current_equity > self.daily.peak_equity:
             self.daily.peak_equity = current_equity
 
+        if self.monitor:
+            drawdown = (self.peak_equity - current_equity) / self.peak_equity if self.peak_equity > 0 else 0.0
+            self.monitor.log_drawdown(drawdown * 100)
+
     def record_pnl(self, pnl: float) -> None:
         """Accumulate intraday realised PnL."""
         self.daily.realised_pnl += pnl
