@@ -15,14 +15,15 @@ import pandas as pd
 import pytest
 from sqlalchemy import select
 
-from src.core.audit_log import AuditLogger, AuditEntry
+from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.config import get_config
 from src.core.constants import SignalDirection
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
 from src.models.base_model import Signal
+from src.models.ensemble import EnsembleModel
 from src.trading.execution_filter import ExecutionFilter
+
 
 @pytest.fixture
 def system_env(tmp_path):

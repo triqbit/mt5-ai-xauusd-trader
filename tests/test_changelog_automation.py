@@ -1,7 +1,9 @@
 import os
 import unittest
 from pathlib import Path
+
 from scripts.update_changelog import categorize_commits, update_changelog
+
 
 class TestChangelogAutomation(unittest.TestCase):
     def test_categorize_commits(self):

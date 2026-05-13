@@ -3,16 +3,13 @@ MT5 AI/ML Trading Bot - Jules UX Enhancements Tests
 tests/test_jules_ux_new.py
 """
 import os
-import sys
-from unittest.mock import MagicMock, patch
-import pytest
-import pandas as pd
-import numpy as np
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-from main import main, get_parser
+from main import main
 from src.core.config import get_config
-from src.trading.backtester import BacktestEngine, PerformanceReport
+from src.trading.backtester import BacktestEngine
+
 
 def test_doctor_flag_invokes_doctor():
     """Verify that --doctor flag calls scripts.doctor.main()."""

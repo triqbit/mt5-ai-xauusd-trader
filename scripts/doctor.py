@@ -4,12 +4,12 @@ scripts/doctor.py
 Performs environment, dependency, and connectivity checks to ensure system readiness.
 """
 
+import logging
 import os
 import platform
-import sys
 import stat
+import sys
 from pathlib import Path
-import logging
 
 # Configure minimal logging for the doctor
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -18,8 +18,8 @@ logger = logging.getLogger("doctor")
 # Try to import rich for beautiful output, fallback to plain text if missing
 try:
     from rich.console import Console
-    from rich.table import Table
     from rich.panel import Panel
+    from rich.table import Table
     from rich.text import Text
     HAS_RICH = True
     console = Console()

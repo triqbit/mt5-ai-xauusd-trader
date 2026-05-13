@@ -366,8 +366,8 @@ def test_turnover_metrics():
 
 
 def test_regime_stability_metric():
-    from src.research.rl_evaluation import RegimePerformance
     from src.models.regime_detector import MarketRegime
+    from src.research.rl_evaluation import RegimePerformance
     evaluator = RLEvaluator(env=MagicMock())
 
     # High consistency

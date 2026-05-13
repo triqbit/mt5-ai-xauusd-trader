@@ -2,8 +2,10 @@
 Unit tests for RiskScenarioBuilder.
 """
 import pytest
-from src.utils.synthetic_data import RiskScenarioBuilder
+
 from src.core.schemas import TradeSignal
+from src.utils.synthetic_data import RiskScenarioBuilder
+
 
 @pytest.fixture
 def risk_builder():

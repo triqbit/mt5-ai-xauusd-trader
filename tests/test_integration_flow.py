@@ -20,9 +20,9 @@ from pydantic import ValidationError
 
 from src.core.config import get_config
 from src.core.monitor import Monitor
+from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
 from src.trading.mt5_connector import MT5Connector
-from src.core.schemas import TradeSignal
 from src.trading.risk_manager import RiskManager
 
 if torch:
@@ -156,9 +156,10 @@ def test_backtest_initialization():
     """Backtest initialization -> walk-forward validation -> performance reporting"""
     # Based on audit, backtest.py is missing or stubbed.
     # We verify if the entry point in main.py correctly handles the missing component.
-    from main import main
     # Mock data for get_rates_range
     import pandas as pd
+
+    from main import main
     mock_data = pd.DataFrame({
         "time": [datetime.now()],
         "open": [2000.0],
@@ -245,8 +246,8 @@ def test_intelligence_ensemble_adaptation():
     # Predict with new weights
     obs = np.random.rand(140)
     # Mock models to ensure they participate
-    from src.models.base_model import Signal
     from src.core.constants import SignalDirection
+    from src.models.base_model import Signal
     model.ppo_agent = MagicMock()
     model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
 
