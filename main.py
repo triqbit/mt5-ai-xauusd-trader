@@ -132,7 +132,12 @@ def _prepare_trade_signal(
             audit_logger.log_blocked_trade(
                 symbol=cfg.symbol,
                 reason=f"Capital allocation rejected: {alloc_result.rejection_reason}",
-                context={"strategy_id": strat_id},
+                context={
+                    "strategy_id": strat_id,
+                    "rejection_code": alloc_result.rejection_code.value
+                    if alloc_result.rejection_code
+                    else None,
+                },
             )
         approved_risk = 0.0
     else:
@@ -299,14 +304,32 @@ def run_live(
                         log.warning("Connection lost. Attempting reconnection...")
                         if monitor:
                             monitor.alert_broker_connection_lost()
+                        if audit_logger:
+                            audit_logger.log_operator_action(
+                                operator="system",
+                                action="connection_lost",
+                                reason="MT5ConnectionError during data fetch",
+                            )
                         try:
                             connector.connect()
                             log.info("Reconnection successful.")
                             if monitor:
                                 monitor.alert_broker_connection_restored()
+                            if audit_logger:
+                                audit_logger.log(
+                                    actor="system",
+                                    action="reconnection_success",
+                                    details="MT5 reconnection successful",
+                                )
                             continue
                         except MT5ConnectionError as reconnect_exc:
                             log.critical("Reconnection failed", error=str(reconnect_exc))
+                            if audit_logger:
+                                audit_logger.log_operator_action(
+                                    operator="system",
+                                    action="reconnection_failed",
+                                    reason=str(reconnect_exc),
+                                )
                             time.sleep(poll_interval)
                             continue
                     except CircuitBreakerError as e:
@@ -318,6 +341,13 @@ def run_live(
                         )
                         if monitor:
                             monitor.log_system_error("MT5Connector", f"Circuit OPEN: {e}")
+                        if audit_logger:
+                            audit_logger.log_operator_action(
+                                operator="system",
+                                action="circuit_breaker_blocked",
+                                reason=str(e),
+                                metadata={"wait_time": wait_time, "state": connector.circuit_state},
+                            )
                         time.sleep(poll_interval)
                         continue
 
@@ -1189,7 +1219,20 @@ def main() -> int:
     with console.status("[bold green]Connecting to MT5 terminal..."):
         try:
             connector.connect()
+            if audit_logger:
+                audit_logger.log(
+                    actor="system",
+                    action="connection_success",
+                    details=f"Initial connection to MT5 server {cfg.mt5_server} successful",
+                )
         except MT5ConnectionError as exc:
+            if audit_logger:
+                audit_logger.log_operator_action(
+                    operator="system",
+                    action="initial_connection_failed",
+                    reason=str(exc),
+                    metadata={"server": cfg.mt5_server, "login": cfg.mt5_login},
+                )
             # Enhanced connection diagnostics
             diag = Table.grid(expand=True)
             diag.add_column(style="cyan", justify="right")
@@ -1348,8 +1391,17 @@ def main() -> int:
 
     # Record successful deployment/startup
     from src import __version__
+    import platform
 
-    audit_logger.log_deployment(version=__version__, environment=cfg.mode)
+    audit_logger.log_deployment(
+        version=__version__,
+        environment=cfg.mode,
+        metadata={
+            "os": f"{platform.system()} {platform.release()}",
+            "python": platform.python_version(),
+            "hardware": hw,
+        },
+    )
     audit_logger.log_operator_action(
         operator="system",
         action="trading_engine_started",

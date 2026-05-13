@@ -134,6 +134,14 @@ class CapitalAllocator:
         """Dynamically update the total budget."""
         old_budget = self.total_budget
         self.total_budget = max(0.0, new_budget)
+
+        with contextlib.suppress(RuntimeError, ImportError):
+            get_audit_logger().log_config_change(
+                old_config={"total_budget": old_budget},
+                new_config={"total_budget": self.total_budget},
+                reason="Manual budget update",
+            )
+
         logger.info("budget_updated", old_budget=old_budget, new_budget=self.total_budget)
 
     def update_allocation(self, strategy_id: str, amount: float) -> None:

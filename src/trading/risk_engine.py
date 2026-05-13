@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from src.core.audit_log import get_audit_logger
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
@@ -106,45 +107,56 @@ class RiskEngine:
         Returns:
             RiskDecision: Approval status, reason, and adjusted lot size.
         """
-        # Layer 1: Circuit Breakers (Equity Drawdown)
-        if not self._check_drawdown_breaker():
-            return RiskDecision(False, "Hard drawdown limit reached")
+        decision_chain = {
+            "circuit_breaker": self._check_drawdown_breaker(),
+            "daily_loss_limit": self.get_daily_loss_level() < 4,
+            "max_daily_trades": self.daily.trade_count < self.cfg.max_trades_per_day,
+            "consecutive_losses": self.daily.consecutive_losses < self.cfg.max_losing_streak,
+            "max_positions": len(open_positions) < self.cfg.max_positions,
+            "directional_exposure": self._check_directional_exposure(signal, open_positions),
+            "total_notional": self._check_total_notional(signal, open_positions, market_data),
+            "symbol_allocation": signal.symbol == self.cfg.symbol,
+            "min_confidence": signal.confidence >= self.cfg.min_confidence,
+            "risk_reward": self._check_risk_reward(signal),
+            "model_health": self._check_model_health(model_health),
+        }
 
-        # Layer 2: Daily Loss Limits (Level 4)
-        if self.get_daily_loss_level() >= 4:
-            return RiskDecision(False, "Daily loss limit reached (Level 4)")
+        passed = all(decision_chain.values())
 
-        # Layer 3: Activity Limits
-        if self.daily.trade_count >= self.cfg.max_trades_per_day:
-            return RiskDecision(False, "Max daily trades reached")
-        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
-            return RiskDecision(False, "Max consecutive losses reached")
-
-        # Layer 4: Exposure Limits
-        if len(open_positions) >= self.cfg.max_positions:
-            return RiskDecision(False, "Max concurrent positions reached")
-        if not self._check_directional_exposure(signal, open_positions):
-            return RiskDecision(False, "Max directional exposure reached (30%)")
-        if not self._check_total_notional(signal, open_positions, market_data):
-            return RiskDecision(False, "Total notional exposure exceeds equity")
-
-        # Layer 5: Symbol Allocation (Simplified for XAUUSD focus)
-        if signal.symbol != self.cfg.symbol:
-            return RiskDecision(False, f"Symbol {signal.symbol} not in approved list")
-
-        # Layer 6: Prediction Limits
-        if signal.confidence < self.cfg.min_confidence:
-            return RiskDecision(
-                False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
+        # Log to Audit Trail
+        try:
+            audit = get_audit_logger()
+            audit.log_risk_decision(
+                symbol=signal.symbol,
+                direction=signal.direction,
+                decision_chain=decision_chain,
+                passed=passed,
+                confidence=signal.confidence,
             )
 
-        # Layer 7: Risk-Reward Validation (Min 1.5 R:R)
-        if not self._check_risk_reward(signal):
-            return RiskDecision(False, "Risk-Reward ratio below 1.5")
+            # Log high-severity triggers specifically
+            if not decision_chain.get("circuit_breaker", True):
+                audit.log_operator_action(
+                    operator="system",
+                    action="circuit_breaker_triggered",
+                    reason=f"Hard drawdown limit hit during signal validation for {signal.symbol}",
+                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
+                )
 
-        # Layer 8: Model Health
-        if not self._check_model_health(model_health):
-            return RiskDecision(False, "Model health metrics below threshold")
+            if not decision_chain.get("daily_loss_limit", True):
+                audit.log_operator_action(
+                    operator="system",
+                    action="daily_loss_limit_triggered",
+                    reason=f"Daily loss limit (Level 4) reached during signal validation for {signal.symbol}",
+                    metadata={"symbol": signal.symbol, "decision_chain": decision_chain},
+                )
+        except (RuntimeError, ImportError):
+            logger.debug("AuditLogger not available for risk decision logging")
+
+        if not passed:
+            rejection_reasons = [k for k, v in decision_chain.items() if not v]
+            reason_str = ", ".join(rejection_reasons)
+            return RiskDecision(False, f"Risk rejected: {reason_str}")
 
         # Calculate final lot size using ATR-based sizing
         adjusted_lots = self.calculate_position_size(signal.symbol, market_data)

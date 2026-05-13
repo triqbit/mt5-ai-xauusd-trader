@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     DateTime,
     String,
     Text,
@@ -42,13 +43,18 @@ class AuditEntry(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), index=True
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
+    created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
     actor: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100), index=True)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -110,6 +116,7 @@ class AuditLogger:
                 details=details,
                 trace_id=trace_id,
                 metadata_json=redacted_metadata,
+                created_by=actor,
             )
             session.add(entry)
             session.commit()
@@ -145,7 +152,12 @@ class AuditLogger:
         )
 
     def log_risk_decision(
-        self, symbol: str, direction: int, decision_chain: dict[str, Any], passed: bool
+        self,
+        symbol: str,
+        direction: int,
+        decision_chain: dict[str, Any],
+        passed: bool,
+        confidence: float | None = None,
     ) -> int:
         """Log the full risk engine decision chain."""
         return self.log(
@@ -157,6 +169,7 @@ class AuditLogger:
                 "direction": direction,
                 "decision_chain": decision_chain,
                 "passed": passed,
+                "confidence": confidence,
             },
         )
 
@@ -242,13 +255,23 @@ class AuditLogger:
             metadata=combined_metadata,
         )
 
-    def log_deployment(self, version: str, environment: str, status: str = "success") -> int:
+    def log_deployment(
+        self,
+        version: str,
+        environment: str,
+        status: str = "success",
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
         """Log a deployment event."""
+        combined_metadata = {"version": version, "environment": environment, "status": status}
+        if metadata:
+            combined_metadata.update(metadata)
+
         return self.log(
             actor="system",
             action="deployment",
             details=f"Deployment {version} to {environment}: {status}",
-            metadata={"version": version, "environment": environment, "status": status},
+            metadata=combined_metadata,
         )
 
     def log_system_restored(self, incident_id: str | None = None, details: str | None = None) -> int:
