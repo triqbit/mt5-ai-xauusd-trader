@@ -2,7 +2,7 @@
 MT5 AI/ML Trading Bot - Enterprise Edition
 scripts/label_market_regimes.py
 
-Institutional-grade CLI utility for historical market regime labeling.
+Institutional-grade (Validated) CLI utility for historical market regime labeling.
 Processes OHLCV data and adds regime-based annotations for research and model training.
 
 Usage:

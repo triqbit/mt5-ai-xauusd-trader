@@ -17,7 +17,7 @@ Usage:
 Regime data structures are immutable (frozen) and enforce strict confidence
 and transition score validation to ensure technical trust in market analysis.
 
-Author : triqbit
+Author : triqbit (Institutional Research Suite)
 License: MIT
 """
 
