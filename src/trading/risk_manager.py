@@ -22,8 +22,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, Optional
 
-from sqlalchemy import select
-
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
@@ -89,19 +87,12 @@ class RiskManager:
         logger.info("Reconciling RiskManager state with database...")
 
         # 1. Recover Peak Equity from performance history
-        with self.trade_logger.Session() as session:
-            from src.core.trade_logger import PerformanceMetric, Trade
-            from sqlalchemy import func
+        # To be precise, we ensure peak_equity is at least current balance.
+        self.peak_equity = max(self.peak_equity, self.balance)
 
-            # Get historical max equity from PerformanceMetric snapshots
-            # In our schema, peak_equity = balance + max_drawdown_amount
-            # But we can also approximate it from the last known balance + historical max drawdown
-            # To be precise, we should just ensure peak_equity is at least current balance.
-            self.peak_equity = max(self.peak_equity, self.balance)
-
-            # 2. Recover Active Positions
-            open_trades = self.trade_logger.get_open_trades()
-            for trade in open_trades:
+        # 2. Recover Active Positions
+        open_trades = self.trade_logger.get_open_trades()
+        for trade in open_trades:
                 self.open_positions[trade.symbol] = trade.ticket
                 logger.info(
                     "Recovered open position | symbol=%s ticket=%d", trade.symbol, trade.ticket

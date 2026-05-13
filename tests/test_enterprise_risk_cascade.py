@@ -7,14 +7,16 @@ Verifies the high-value system paths:
 2. Database Persistence -> Risk State Recovery (Reconciliation Cascade)
 """
 
-import os
+from unittest.mock import MagicMock
+
 import pytest
-from unittest.mock import MagicMock, patch
+
+from src.core.audit_log import AuditLogger
+from src.core.schemas import TradeSignal
+from src.core.trade_logger import TradeLogger
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.core.trade_logger import TradeLogger
-from src.core.schemas import TradeSignal
-from src.core.audit_log import AuditLogger
+
 
 @pytest.fixture
 def system_paths(tmp_path):
