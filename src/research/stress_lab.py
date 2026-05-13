@@ -97,6 +97,7 @@ class ResilienceReport(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     baseline_metrics: StressTestMetrics
     scenario_results: dict[str, StressTestMetrics]
+    sensitivity_results: dict[str, list[tuple[float, float]]] = Field(default_factory=dict)
     resilience_score: float  # Composite score 0-100
     sharpe_decay: float = 0.0
     sortino_decay: float = 0.0
@@ -120,10 +121,17 @@ class ResilienceReport(BaseModel):
                 outcome="FAIL" if m.total_return < 0 else "PASS",
             )
 
+        # Exclude sensitivity runs from the main scenarios table for readability
+        main_scenarios = [
+            _map_metric(name, res)
+            for name, res in self.scenario_results.items()
+            if not name.startswith("Sensitivity_")
+        ]
+
         return StressTestSection(
             resilience_score=self.resilience_score,
             baseline=_map_metric("Baseline", self.baseline_metrics),
-            scenarios=[_map_metric(name, res) for name, res in self.scenario_results.items()],
+            scenarios=main_scenarios,
             fragility_indicators=self.fragility_indicators,
             failure_points=self.failure_points,
         )
@@ -156,6 +164,7 @@ class StressLab:
         self.initial_balance = initial_balance
         self.contract_multiplier = contract_multiplier
         self.results: dict[str, StressTestMetrics] = {}
+        self.sensitivity_data: dict[str, list[tuple[float, float]]] = {}
 
     @staticmethod
     def create_execution_hell_scenario() -> StressScenario:
@@ -217,13 +226,14 @@ class StressLab:
 
     def run_standard_suite(self, baseline_metrics: StressTestMetrics) -> ResilienceReport:
         """
-        Executes the standard suite of adversarial stress scenarios.
+        Executes the standard suite of adversarial stress scenarios and sensitivity analysis.
 
         This suite covers:
         - Execution Hell: High friction and latency.
         - Liquidity Crisis: Data gaps and choppy price action.
         - Regime Shock: Structural market instability.
         - Flash Crash: Extreme tail risk events.
+        - Sensitivity Analysis: Spread and slippage breaking point detection.
 
         Args:
             baseline_metrics: Metrics from a neutral/normal run for comparison.
@@ -241,7 +251,37 @@ class StressLab:
         for scenario in scenarios:
             self.run_scenario(scenario)
 
+        # Run sensitivity analysis for key friction parameters
+        self.analyze_sensitivity("spread_multiplier", np.linspace(1.0, 5.0, 5))
+        self.analyze_sensitivity("slippage_bps", np.linspace(0.0, 20.0, 5))
+
         return self.generate_report(baseline_metrics)
+
+    def analyze_sensitivity(self, parameter: str, values: np.ndarray | list[float]) -> None:
+        """
+        Performs sensitivity analysis for a specific stress parameter.
+
+        Runs multiple simulations with varying levels of the specified parameter
+        to identify non-linear performance decay and 'breaking points'.
+
+        Args:
+            parameter: The attribute name in StressScenario to vary.
+            values: A list or array of values to test for the parameter.
+        """
+        logger.info(f"Analyzing sensitivity for {parameter}...")
+        results = []
+
+        for val in values:
+            val_str = f"{val:.2f}"
+            scenario = StressScenario(
+                name=f"Sensitivity_{parameter}_{val_str}",
+                description=f"Sensitivity test for {parameter} at {val_str}",
+            )
+            setattr(scenario, parameter, val)
+            metrics = self.run_scenario(scenario)
+            results.append((float(val), float(metrics.total_return)))
+
+        self.sensitivity_data[parameter] = results
 
     def run_scenario(self, scenario: StressScenario) -> StressTestMetrics:
         """
@@ -352,17 +392,23 @@ class StressLab:
             strategy_name=self.strategy.name,
             baseline_metrics=baseline_metrics,
             scenario_results=scenario_results,
+            sensitivity_results=self.sensitivity_data,
             resilience_score=resilience_score,
             sharpe_decay=avg_sharpe_decay,
             sortino_decay=avg_sortino_decay,
             win_rate_decay=avg_win_rate_decay,
             fragility_indicators=fragility,
             failure_points=failure_points,
-            degradation_summary=self._generate_summary(baseline_metrics, scenario_results),
+            degradation_summary=self._generate_summary(
+                baseline_metrics, scenario_results, self.sensitivity_data
+            ),
         )
 
     def _generate_summary(
-        self, baseline: StressTestMetrics, results: dict[str, StressTestMetrics]
+        self,
+        baseline: StressTestMetrics,
+        results: dict[str, StressTestMetrics],
+        sensitivity: dict[str, list[tuple[float, float]]],
     ) -> str:
         """
         Generates a human-readable summary of the strategy's overall robustness.
@@ -370,26 +416,56 @@ class StressLab:
         Args:
             baseline: Baseline performance metrics.
             results: Dictionary of scenario names to their respective metrics.
+            sensitivity: Sensitivity analysis results.
 
         Returns:
             str: A multi-line summary with return comparisons and status labels.
         """
-        stressed_scenarios = [m.total_return for name, m in results.items() if name != "Baseline"]
-        num_stressed = len(stressed_scenarios)
+        # Exclude sensitivity-specific runs and the baseline/normal runs from the general scenario count for clarity
+        excluded_prefixes = ("Sensitivity_", "Baseline", "Normal", "Neutral")
+        scenario_keys = [k for k in results if not any(k.startswith(p) for p in excluded_prefixes)]
+        stressed_returns = [results[k].total_return for k in scenario_keys]
+
+        num_stressed = len(stressed_returns)
         summary = (
             f"Strategy '{self.strategy.name}' evaluated against {num_stressed} stress scenarios.\n"
         )
-        avg_return = np.mean(stressed_scenarios) if stressed_scenarios else 0.0
+        avg_return = np.mean(stressed_returns) if stressed_returns else 0.0
         summary += (
             f"Baseline Return: {baseline.total_return:.2%}, Avg Stressed Return: {avg_return:.2%}\n"
         )
 
         if avg_return < 0:
-            summary += "CRITICAL: Strategy is generally not robust to adverse conditions."
+            summary += "CRITICAL: Strategy is generally not robust to adverse conditions.\n"
         elif avg_return < baseline.total_return * 0.5:
-            summary += "WARNING: Strategy shows significant performance degradation under stress."
+            summary += "WARNING: Strategy shows significant performance degradation under stress.\n"
         else:
-            summary += "OK: Strategy shows reasonable resilience."
+            summary += "OK: Strategy shows reasonable resilience.\n"
+
+        # Add quantitative sensitivity insights
+        if sensitivity:
+            summary += "\nSensitivity Analysis Insights:"
+            for param, data in sensitivity.items():
+                breaking_point = None
+                fifty_pct_decay = None
+
+                for val, ret in data:
+                    # Detect breaking point (unprofitable)
+                    if ret < 0 and breaking_point is None:
+                        breaking_point = val
+
+                    # Detect 50% performance decay
+                    if (
+                        baseline.total_return > 0
+                        and ret <= baseline.total_return * 0.5
+                        and fifty_pct_decay is None
+                    ):
+                        fifty_pct_decay = val
+
+                if breaking_point is not None:
+                    summary += f"\n- Breaking point for {param} detected at {breaking_point:.2f}."
+                if fifty_pct_decay is not None:
+                    summary += f"\n- 50% performance decay for {param} at {fifty_pct_decay:.2f}."
 
         return summary
 

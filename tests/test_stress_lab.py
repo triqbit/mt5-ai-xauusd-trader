@@ -299,7 +299,7 @@ def test_backtest_pnl_accuracy(sample_data):
         name="Fixed Cost",
         description="test",
         spread_multiplier=1.0,
-        slippage_bps=10.0 # 0.1%
+        slippage_bps=10.0,  # 0.1%
     )
 
     # We want to manually trace one trade if possible
@@ -336,9 +336,47 @@ def test_run_standard_suite(sample_data):
     )
 
     report = lab.run_standard_suite(baseline)
-    assert len(report.scenario_results) == 4
+    # 4 standard scenarios + (5 spread sensitivity + 5 slippage sensitivity) = 14
+    assert len(report.scenario_results) == 14
     assert "Flash Crash" in report.scenario_results
+    assert "spread_multiplier" in report.sensitivity_results
     assert report.resilience_score >= 0
+
+
+def test_analyze_sensitivity(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    lab.analyze_sensitivity("spread_multiplier", [1.0, 2.0, 3.0])
+
+    assert "spread_multiplier" in lab.sensitivity_data
+    assert len(lab.sensitivity_data["spread_multiplier"]) == 3
+    # Check if results are tuples of (value, return)
+    val, ret = lab.sensitivity_data["spread_multiplier"][0]
+    assert val == 1.0
+    assert isinstance(ret, float)
+
+
+def test_generate_summary_with_sensitivity(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    # Mock sensitivity data to trigger breaking point message
+    lab.sensitivity_data["spread_multiplier"] = [(1.0, 0.1), (2.0, 0.05), (3.0, -0.01)]
+
+    report = lab.generate_report(baseline)
+    assert "Breaking point for spread_multiplier detected at 3.00" in report.degradation_summary
+    assert "50% performance decay for spread_multiplier at 2.00" in report.degradation_summary
 
 
 def test_metrics_new_fields(sample_data):
@@ -361,7 +399,7 @@ def test_stale_data_simulation(sample_data):
     scenario = StressScenario(
         name="Stale",
         description="High stale data probability",
-        stale_data_prob=1.0 # Force stale data for all steps after first
+        stale_data_prob=1.0,  # Force stale data for all steps after first
     )
 
     perturbed = lab._apply_perturbations(sample_data, scenario)
@@ -409,7 +447,7 @@ def test_report_decay_metrics_negative_baseline(sample_data):
         num_trades=10,
         execution_quality_score=1.0,
         latency_impact=0.0,
-        sortino_ratio=-1.2
+        sortino_ratio=-1.2,
     )
 
     # Mock a result that is even worse
@@ -421,7 +459,7 @@ def test_report_decay_metrics_negative_baseline(sample_data):
         num_trades=10,
         execution_quality_score=1.0,
         latency_impact=0.0,
-        sortino_ratio=-2.4
+        sortino_ratio=-2.4,
     )
 
     report = lab.generate_report(baseline)
@@ -445,7 +483,7 @@ def test_report_decay_metrics_positive_baseline(sample_data):
         num_trades=10,
         execution_quality_score=1.0,
         latency_impact=0.0,
-        sortino_ratio=2.5
+        sortino_ratio=2.5,
     )
 
     # Run a scenario that degrades performance
@@ -488,7 +526,9 @@ def test_fragility_detection_negative_edge(sample_data):
     )
 
     report = lab.generate_report(baseline)
-    assert any("Negative edge (PF < 1.0) in NegativeEdge" in fi for fi in report.fragility_indicators)
+    assert any(
+        "Negative edge (PF < 1.0) in NegativeEdge" in fi for fi in report.fragility_indicators
+    )
 
 
 def test_fragility_detection_overtrading(sample_data):
