@@ -339,13 +339,13 @@ def test_macro_event_properties(now):
 
 def test_json_provider_missing_file():
     provider = JSONEventProvider("non_existent.json")
-    assert provider.get_upcoming_events(datetime.now(), datetime.now()) == []
+    assert provider.get_upcoming_events(datetime.now(), datetime.now()) is None
 
 def test_json_provider_error(tmp_path):
     file_path = tmp_path / "corrupt.json"
     file_path.write_text("invalid json")
     provider = JSONEventProvider(str(file_path))
-    assert provider.get_upcoming_events(datetime.now(), datetime.now()) == []
+    assert provider.get_upcoming_events(datetime.now(), datetime.now()) is None
 
 @patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
 def test_metaapi_provider_error(mock_init_client, now):
@@ -355,7 +355,7 @@ def test_metaapi_provider_error(mock_init_client, now):
 
     mock_get.side_effect = Exception("Network Error")
     provider = MetaAPIEventProvider(token="fake")
-    assert provider.get_upcoming_events(now, now) == []
+    assert provider.get_upcoming_events(now, now) is None
 
 def test_guess_category_more_keywords():
     provider = MetaAPIEventProvider(token="fake")

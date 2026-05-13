@@ -55,6 +55,32 @@ class MacroEvent(BaseModel):
         """True if the event is rated HIGH or CRITICAL."""
         return self.impact >= EventImpact.HIGH
 
+    @property
+    def severity_score(self) -> float:
+        """
+        Normalized score (0.0 to 1.0) representing the event's severity.
+        Derived from impact level and functional category.
+        """
+        # Base score from impact (1-4)
+        base_score = float(self.impact.value) / 4.0
+
+        # Category-based adjustment
+        # Major market-moving events and geopolitical risks maintain full severity
+        if self.category in [
+            EventCategory.FOMC,
+            EventCategory.NFP,
+            EventCategory.RATES,
+            EventCategory.CPI,
+            EventCategory.GEOPOLITICAL,
+        ]:
+            category_mult = 1.0
+        elif self.category in [EventCategory.USD, EventCategory.USD_MACRO]:
+            category_mult = 0.9
+        else:
+            category_mult = 0.8
+
+        return round(min(1.0, base_score * category_mult), 2)
+
     def is_ongoing(self, now: datetime) -> bool:
         """Checks if the event is currently happening (within its duration)."""
         if self.end_timestamp:
