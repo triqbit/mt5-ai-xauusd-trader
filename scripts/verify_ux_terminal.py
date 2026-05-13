@@ -65,7 +65,7 @@ def create_mock_explanation(direction=SignalDirection.BUY):
     )
     return explanation
 
-def verify_dash():
+def verify_ux():
     dss = DecisionSupportSystem()
 
     regime = RegimeInfo(
@@ -121,4 +121,4 @@ def verify_dash():
     print(dss.format_for_operator(packet_sell))
 
 if __name__ == "__main__":
-    verify_dash()
+    verify_ux()

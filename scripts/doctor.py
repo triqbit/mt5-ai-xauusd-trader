@@ -95,9 +95,8 @@ CORE_DEPENDENCIES = {
     "stable-baselines3": ("stable_baselines3", "2.8.0"),
     "jinja2": ("jinja2", "3.1.6"),
     "tqdm": ("tqdm", "4.67.1"),
-    "scipy": ("scipy", "1.15.2"),
+    "scipy": ("scipy", "1.15.3"),
     "scikit-learn": ("sklearn", "1.6.1"),
-    "yfinance": ("yfinance", "0.2.54"),
 }
 
 def check_dependencies(dependencies=None):
