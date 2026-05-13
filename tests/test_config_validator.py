@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from src.core.config import TradingConfig
 from src.core.config_validator import ConfigValidator
@@ -184,18 +185,18 @@ def test_validator_market_parameters(monkeypatch, tmp_path):
 
     # 1. Empty Symbol
     monkeypatch.setenv("SYMBOL", "")
-    with pytest.raises(Exception):
+    with pytest.raises(PydanticValidationError):
         TradingConfig()
 
     # 2. Lowercase Symbol
     monkeypatch.setenv("SYMBOL", "xauusd")
-    with pytest.raises(Exception):
+    with pytest.raises(PydanticValidationError):
         TradingConfig()
 
     # 3. Invalid Timeframe
     monkeypatch.setenv("SYMBOL", "XAUUSD")
     monkeypatch.setenv("TIMEFRAME", "M7")
-    with pytest.raises(Exception):
+    with pytest.raises(PydanticValidationError):
         TradingConfig()
 
     # 4. Valid

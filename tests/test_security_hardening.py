@@ -1,5 +1,4 @@
 import os
-import stat
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -60,6 +59,7 @@ def test_audit_logger_redaction(tmp_path):
 
     # Check the database
     from sqlalchemy import create_engine, select
+
     from src.core.audit_log import AuditEntry
     engine = create_engine(db_url)
     with engine.connect() as conn:
@@ -81,6 +81,11 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     config = MagicMock(spec=TradingConfig)
     config.model_config = {"env_file": env_file}
     config.mt5_login = 12345
+    config.max_slippage_pips = 0.5
+    config.execution_latency_threshold = 1.0
+    config.daily_win_cap = 0.05
+    config.max_losing_streak = 3
+    config.max_winning_streak = 5
     config.mt5_server = "TestServer"
     config.mt5_password = SecretStr("test")
     config.database_url = SecretStr("sqlite:///test.db")
