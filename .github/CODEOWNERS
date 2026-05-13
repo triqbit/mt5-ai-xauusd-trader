@@ -9,7 +9,7 @@
 * @andonly1348 @maintainer-quality
 
 # 🔴 SENSITIVE ZONE: Core Infrastructure & Configuration
-# Multi-signature required for any change affecting system-wide invariants.
+# Approval required: @andonly1348 (Governance) AND @maintainer-quality (Quality)
 /src/core/ @andonly1348 @maintainer-quality
 /main.py @andonly1348 @maintainer-quality
 /pyproject.toml @andonly1348 @maintainer-quality
@@ -17,13 +17,13 @@
 /.env.example @andonly1348 @xnessom
 
 # 🔴 SENSITIVE ZONE: Trading & Risk Management
-# Highest sensitivity. Multi-signature mandatory for risk/execution logic.
+# Approval required: @maintainer-trading (Trading Lead) AND @andonly1348 (Governance)
 /src/trading/ @maintainer-trading @andonly1348
 /src/analytics/ @maintainer-trading @andonly1348
 /src/data/ @maintainer-trading @maintainer-models @andonly1348
 
 # 🔴 SENSITIVE ZONE: AI/ML Model Architectures & Research
-# Multi-signature required for changes to model logic or research environment.
+# Approval required: @maintainer-models (ML Lead) AND @andonly1348 (Governance)
 /src/models/ @maintainer-models @andonly1348
 /src/research/ @maintainer-models @andonly1348
 /src/environment/ @maintainer-models @andonly1348
