@@ -6,7 +6,16 @@ Comprehensive real-time monitoring and intelligent alerting system providing 24/
 
 ## 1. Monitoring Architecture
 
-### 1.1 Monitoring Stack
+### 1.1 Health Check Endpoints (Enterprise)
+
+The system provides specialized HTTP endpoints for automated health monitoring and container orchestration:
+
+- **`/health/liveness`**: Lightweight probe for process heartbeat. Returns `200 OK` if the FastAPI server is responsive.
+- **`/health/readiness`**: Deep dependency check. Verifies connectivity to MT5, Database, and ensures AI Models are correctly loaded. Returns `503 Service Unavailable` if critical dependencies are unreachable.
+- **`/health/full`**: Comprehensive diagnostic report including hardware stats, configuration validity, and individual component health.
+- **`/metrics`**: Standard Prometheus metrics scrape target.
+
+### 1.2 Monitoring Stack
 - **Metrics Collection**: Prometheus for time-series metrics
 - **Log Aggregation**: ELK Stack (Elasticsearch, Logstash, Kibana)
 - **Tracing**: Jaeger for distributed tracing and internal end-to-end trace correlation using UUIDs
