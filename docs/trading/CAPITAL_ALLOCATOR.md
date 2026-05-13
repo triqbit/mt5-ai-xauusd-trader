@@ -10,6 +10,8 @@ The `CapitalAllocator` system (src/trading/capital_allocator.py) provides instit
 - **Concentration Limits:** Enforces hard safety limits on a per-symbol and per-model-family basis.
 - **Dynamic Budgeting:** Supports real-time updates to the total trading budget via `update_budget`.
 - **Granular Rejection Tracking:** Provides detailed feedback through typed `AllocationResult` and programmatic `RejectionCode` (e.g., `SCALED_TO_ZERO`, `TOTAL_HEAT_LIMIT`, `NO_BUDGET`).
+- **Risk Scaling Cascade:** Integrates with the `RiskManager` to ensure that Kelly-based position sizing respects the scaled risk results from the allocator.
+- **State Reconciliation:** Supports recovery of active positions and peak equity from the `TradeLogger` database upon system restart, ensuring continuous risk enforcement.
 
 ## Technical Components
 
