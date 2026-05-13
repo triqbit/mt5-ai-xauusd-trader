@@ -1,10 +1,7 @@
 import logging
-import sqlite3
-import time
 from unittest.mock import patch
 
-import pytest
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, text
 
 from src.core.database import SLOW_QUERY_THRESHOLD, get_engine
 

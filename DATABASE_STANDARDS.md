@@ -388,3 +388,8 @@ To ensure enterprise-grade reliability when using SQLite:
 - **Foreign Key Enforcement**: Enabled via SQLAlchemy event listeners (`PRAGMA foreign_keys=ON`). This ensures relational integrity that is disabled by default in SQLite.
 - **Write-Ahead Logging (WAL)**: Enabled via `PRAGMA journal_mode=WAL` to improve concurrency (allowing multiple readers and one writer) and provide better durability and performance.
 - **File Permissions**: Enforced `0o600` (owner read/write only) on file-based SQLite databases to prevent unauthorized local access to sensitive trade and audit data.
+- **Lock Contention**: `PRAGMA busy_timeout=5000` is used to allow connections to wait up to 5 seconds for a lock to clear, reducing "database is locked" errors.
+- **Optimized Durability**: `PRAGMA synchronous=NORMAL` is used in WAL mode to provide high performance for writes while maintaining excellent durability.
+
+### Implementation Note (v1.3) - Observability
+- **Slow Query Logging**: The system implements automated slow query detection via SQLAlchemy event listeners. Queries exceeding `SLOW_QUERY_THRESHOLD` (default: 1.0s) are logged as warnings for performance monitoring.

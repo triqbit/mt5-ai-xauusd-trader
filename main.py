@@ -728,7 +728,7 @@ def run_setup_wizard() -> int:
 
     # 4. Confirm and Save
     console.print("\n[bold]4. Review & Save[/]")
-    if not Prompt.ask("Ready to save configuration to .env?", choices=["y", "n"], default="y") == "y":
+    if Prompt.ask("Ready to save configuration to .env?", choices=["y", "n"], default="y") != "y":
         console.print("[yellow]Setup aborted. No changes made.[/]")
         return 0
 
@@ -775,10 +775,10 @@ def run_setup_wizard() -> int:
         f.writelines(lines)
 
     # Secure permissions
-    try:
+    import contextlib
+
+    with contextlib.suppress(Exception):
         os.chmod(env_path, 0o600)
-    except Exception:
-        pass
 
     console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
     console.print(
