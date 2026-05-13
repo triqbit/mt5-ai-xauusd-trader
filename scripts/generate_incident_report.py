@@ -52,7 +52,13 @@ def analyze_audit_logs(conn):
         return []
     cursor = conn.cursor()
     yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
-    actions = ('risk_decision', 'trade_blocked', 'operator_action', 'deployment', 'mt5_connection_status')
+    actions = (
+        'risk_decision', 'trade_blocked', 'operator_action', 'deployment', 'mt5_connection_status',
+        'circuit_breaker_triggered', 'daily_loss_limit_triggered', 'system_restored', 'config_change',
+        'operator_circuit_breaker_triggered', 'operator_db_repair_attempt', 'operator_db_restoration',
+        'operator_db_incident_resolved', 'operator_rollback_initiated', 'operator_db_migration_downgrade',
+        'operator_rollback_verified', 'operator_secret_rotation_initiated', 'operator_secret_rotation_completed'
+    )
     placeholders = ', '.join(['?'] * len(actions))
     cursor.execute(
         f"SELECT action, details, created_at FROM audit_log "

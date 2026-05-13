@@ -1,5 +1,5 @@
 # Runbook 07: Secret Rotation Procedure
-**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
+**Version:** 1.1.0-rc8 | **Last Updated:** 2024-06-12
 
 ## Overview
 Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Telegram Bot Token) safely to maintain system security and compliance.
@@ -28,7 +28,7 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
    ```
 - **Audit Manual Action:**
   ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'secret_rotation_initiated', 'Starting rotation of <SECRET_NAME>', datetime('now'));"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_secret_rotation_initiated', 'Starting rotation of <SECRET_NAME>', datetime('now'));"
   ```
 
 ### 3. Apply & Verify
@@ -59,7 +59,7 @@ Procedures for rotating sensitive credentials (MT5 Password, MetaAPI Token, Tele
 2. **Audit:** Verify the `audit.db` contains a record of the system restart following the credential change.
 - **Audit Manual Action:**
   ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'secret_rotation_completed', 'Successfully rotated <SECRET_NAME> and verified connectivity', datetime('now'));"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_secret_rotation_completed', 'Successfully rotated <SECRET_NAME> and verified connectivity', datetime('now'));"
   ```
 
 ## Expected Outcomes

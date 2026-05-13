@@ -1,5 +1,5 @@
 # Runbook 04: Database Corruption Recovery
-**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
+**Version:** 1.1.0-rc8 | **Last Updated:** 2024-06-12
 
 ## Overview
 Procedures for recovering from SQLite corruption in `trades.db` or `audit.db`. This runbook leverages the built-in backup and verification framework defined in `docs/DISASTER_RECOVERY.md`.
@@ -22,7 +22,7 @@ sqlite3 trades_recovered.db "PRAGMA integrity_check;"
   ```
 - **Audit Manual Action:**
   ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_repair_attempt', 'Attempted in-place repair of trades.db', datetime('now'));"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_db_repair_attempt', 'Attempted in-place repair of trades.db', datetime('now'));"
   ```
 
 ### 2. Backup Restoration (Major Corruption)
@@ -48,7 +48,7 @@ If in-place repair fails or the file is physically corrupted/missing:
    ```
 - **Audit Manual Action:** Record the restoration:
   ```bash
-  sqlite3 ../../audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_restoration', 'Restored trades.db from backup trades_YYYYMMDD_HHMMSS.db', datetime('now'));"
+  sqlite3 ../../audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_db_restoration', 'Restored trades.db from backup trades_YYYYMMDD_HHMMSS.db', datetime('now'));"
   ```
 
 ### 3. Proactive Verification
@@ -70,7 +70,7 @@ bash scripts/backup_verify.sh
 - Once verified, restart the bot: `docker start xauusd_trader`.
 - **Audit Manual Action:**
   ```bash
-  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'db_incident_resolved', 'Database corruption resolved and service resumed', datetime('now'));"
+  sqlite3 audit.db "INSERT INTO audit_log (actor, action, details, created_at) VALUES ('operator', 'operator_db_incident_resolved', 'Database corruption resolved and service resumed', datetime('now'));"
   ```
 
 ## Expected Outcomes

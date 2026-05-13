@@ -1,5 +1,5 @@
 # Runbook 01: CI Failure Recovery
-**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
+**Version:** 1.1.0-rc8 | **Last Updated:** 2024-06-12
 
 ## Overview
 Standardized procedures for recovering from failures in GitHub Actions workflows (CI, Release, Pre-Deployment Validation). These gates are mandatory "Quality Gates" and must pass before any merge to `main`.
