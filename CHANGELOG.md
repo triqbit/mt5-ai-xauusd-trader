@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added comprehensive deployment validation gates in .github/workflows/pre-deploy-validation.yml.
 - Implement monitoring system and Telegram alerting (#962)
 - Implement Institutional Decision Support System (#1086)
+- Enhance Walk-Forward Optimizer with Strict Fragility Safeguards (#1135)
 
 ### Changed
 - Optimized `FeatureEngineer` technical analysis pipeline, achieving ~17% reduction in latency.
