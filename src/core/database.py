@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import stat
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,28 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 logger = logging.getLogger(__name__)
+
+# Slow query logging threshold (seconds) as per DATABASE_STANDARDS.md
+SLOW_QUERY_THRESHOLD = 1.0
+
+
+@event.listens_for(Engine, "before_cursor_execute")
+def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    """Record the start time of a query."""
+    context._query_start_time = time.perf_counter()
+
+
+@event.listens_for(Engine, "after_cursor_execute")
+def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    """Log a warning if the query execution time exceeds the threshold."""
+    total_time = time.perf_counter() - context._query_start_time
+    if total_time > SLOW_QUERY_THRESHOLD:
+        logger.warning(
+            "Slow query detected: %s (%.2f seconds)",
+            statement,
+            total_time,
+            extra={"duration": total_time, "statement": statement},
+        )
 
 
 @event.listens_for(Engine, "connect")
@@ -34,8 +57,10 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
-        logger.debug("SQLite pragmas (foreign_keys, WAL) enabled.")
+        logger.debug("SQLite pragmas (foreign_keys, WAL, busy_timeout, synchronous) enabled.")
 
 
 @lru_cache(maxsize=16)
