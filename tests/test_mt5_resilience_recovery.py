@@ -1,11 +1,11 @@
 
-import pytest
-from unittest.mock import MagicMock, patch
-from src.trading.mt5_connector import MT5Connector
-from src.core.config import TradingConfig
-from src.core.exceptions import MT5ConnectionError, MT5DataError
-import pandas as pd
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.trading.mt5_connector import MT5Connector
+
 
 @pytest.fixture
 def mock_config():

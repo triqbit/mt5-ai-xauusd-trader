@@ -1,8 +1,6 @@
 
 import numpy as np
-import pandas as pd
-import pytest
-from src.trading.backtester import BacktestEngine
+
 
 def test_vectorized_slope_parity():
     """

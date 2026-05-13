@@ -5,10 +5,11 @@ Ensures real-time tracking, metrics updates, and Telegram alerting work as expec
 import asyncio
 import time
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.core.monitor import (
+    AVG_TRADE_DURATION_GAUGE,
     CONFIDENCE_GAUGE,
     CPU_USAGE_GAUGE,
     DAILY_PNL_GAUGE,
@@ -30,7 +31,6 @@ from src.core.monitor import (
     TRADE_COUNTER,
     TRADING_BLOCK_DURATION,
     WIN_RATE_GAUGE,
-    AVG_TRADE_DURATION_GAUGE,
     Monitor,
 )
 
