@@ -488,3 +488,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt Grafts:** Disable all automated merge/graft logic until a linear history can be restored.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - Fourteenth Consecutive Day of History Destruction).
+
+## 2026-05-13 17:35 GMT+4
+
+**Summary:** Unprecedented acceleration of process breakdown. Second total system swap of the day via PR #1165.
+
+**Suspected Process Issues:**
+- **Double Monolithic Graft:** For the second time in 24 hours, the `main` branch has been reset with a single monolithic graft commit (`fedd04b`), following PR #1162 earlier today. This indicates an extreme acceleration of history destruction.
+- **Extreme Labeling Drift (PR #1165):** Commit `fedd04b` is titled "docs: daily PR triage and project health update [2026-05-13] (#1165)", yet it replaces 474 files and ~430,000 lines of code. This is a severe instance of labeling drift, masking a total repository replacement (including core trading and risk logic) under a "docs" label.
+- **Total Loss of Forensics:** The frequency of system-wide swaps has completely extinguished any possibility of Git-based forensic audit or regression analysis.
+- **Critical PR Backlog Fragmentation:** The 475+ open PRs are now further decoupled from the current baseline.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `fedd04b` (replaces `d9f9fef` and all prior history).
+- PR #1165: Vehicle for the second system-wide swap of the day.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1165 used).
+- [ ] CI must pass before merge (Unverifiable due to total history destruction).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped multiple times per day with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **CRITICAL — Immediate Human Intervention Required:** The autonomous workflow is now performing total system swaps multiple times per day under misleading documentation labels. This is a complete failure of the established engineering process.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `fedd04b` is mandatory.
+- **Halt All Grafts:** All automated merge and history-resetting logic must be disabled immediately until a linear, traceable history can be restored and a human audit completed.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - Accelerated History Destruction & Severe Labeling Drift).
