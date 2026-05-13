@@ -205,7 +205,8 @@ def run_live(
         if loop_count % 100 == 0 and audit_logger:
             # Dynamic exclusion of all SecretStr/SecretBytes fields
             secret_fields = {
-                f for f, info in cfg.__class__.model_fields.items()
+                f
+                for f, info in cfg.__class__.model_fields.items()
                 if "Secret" in str(info.annotation)
             }
             audit_logger.log_config_snapshot(
@@ -1005,7 +1006,9 @@ def main() -> int:
 
     # 3.1 Handle --show-config
     if args.show_config:
-        config_table = Table(title="[bold blue]Current System Configuration (Sanitized)[/]", box=None)
+        config_table = Table(
+            title="[bold blue]Current System Configuration (Sanitized)[/]", box=None
+        )
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="white")
         config_table.add_column("Source", style="dim")
@@ -1017,8 +1020,7 @@ def main() -> int:
 
         # Dynamic exclusion of all SecretStr/SecretBytes fields
         secret_fields = {
-            f for f, info in cfg.__class__.model_fields.items()
-            if "Secret" in str(info.annotation)
+            f for f, info in cfg.__class__.model_fields.items() if "Secret" in str(info.annotation)
         }
 
         # Get sanitized dump
@@ -1162,8 +1164,7 @@ def main() -> int:
 
     # Dynamic exclusion of all SecretStr/SecretBytes fields for audit snapshot
     secret_fields = {
-        f for f, info in cfg.__class__.model_fields.items()
-        if "Secret" in str(info.annotation)
+        f for f, info in cfg.__class__.model_fields.items() if "Secret" in str(info.annotation)
     }
 
     # Log sanitized configuration snapshot
@@ -1176,6 +1177,7 @@ def main() -> int:
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
     from src.core.monitor import Monitor
+
     monitor = Monitor(cfg)
     # Note: Monitor's start_metrics_server is legacy;
     # Enterprise deployments use the FastAPI health app which includes /metrics.

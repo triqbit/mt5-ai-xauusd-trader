@@ -306,10 +306,13 @@ class MetaAPIEventProvider(BaseEventProvider):
             ]
         ):
             return EventCategory.NFP
-        if any(
-            kw in name_upper
-            for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT", "BEIGE BOOK"]
-        ) and "PHILLY FED" not in name_upper:
+        if (
+            any(
+                kw in name_upper
+                for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT", "BEIGE BOOK"]
+            )
+            and "PHILLY FED" not in name_upper
+        ):
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])

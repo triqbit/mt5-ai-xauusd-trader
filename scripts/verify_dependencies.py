@@ -1,4 +1,12 @@
 
+#!/usr/bin/env python3
+"""
+MT5 AI/ML Trading Bot - Dependency Harmonization Guard
+scripts/verify_dependencies.py
+
+Ensures all requirements*.txt files share the same versions for overlapping packages.
+"""
+
 import sys
 from pathlib import Path
 import re

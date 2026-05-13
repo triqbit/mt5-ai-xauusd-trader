@@ -16,6 +16,7 @@ import pandas as pd
 
 try:
     import talib
+
     HAS_TALIB = True
 except ImportError:
     HAS_TALIB = False
@@ -145,7 +146,9 @@ class FeatureEngineer:
             features_only[feature_cols] = features_only[feature_cols].ffill().fillna(0.0)
 
             if features_only.empty:
-                logger.error("Feature engineering resulted in an empty DataFrame. Ensure input data has sufficient history.")
+                logger.error(
+                    "Feature engineering resulted in an empty DataFrame. Ensure input data has sufficient history."
+                )
                 return pd.DataFrame()
 
             # Remove original OHLCV columns if requested
@@ -328,12 +331,9 @@ class FeatureEngineer:
         try:
             # We use a rolling weighted average of price as a POC proxy
             # This is more accurate than a simple median as it incorporates volume
-            rolling_poc = (
-                (pd.Series(close) * pd.Series(volume))
-                .rolling(window)
-                .sum()
-                / pd.Series(volume).rolling(window).sum()
-            )
+            rolling_poc = (pd.Series(close) * pd.Series(volume)).rolling(window).sum() / pd.Series(
+                volume
+            ).rolling(window).sum()
             vol["vp_poc"] = rolling_poc.values
 
             # Simple quantiles for VAH/VAL
@@ -364,9 +364,19 @@ class FeatureEngineer:
         freq = tf_map.get(tf, tf)
 
         # Resample to the target timeframe
-        resampled = df.resample(freq).agg({
-            "open": "first", "high": "max", "low": "min", "close": "last", "tick_volume": "sum"
-        }).dropna()
+        resampled = (
+            df.resample(freq)
+            .agg(
+                {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "tick_volume": "sum",
+                }
+            )
+            .dropna()
+        )
 
         if resampled.empty:
             return pd.DataFrame()
@@ -413,7 +423,7 @@ class FeatureEngineer:
             if self.mins is None:
                 self.mins = np.nanmin(vals, axis=0)
                 self.maxs = np.nanmax(vals, axis=0)
-            denom = (self.maxs - self.mins)
+            denom = self.maxs - self.mins
             denom[denom == 0] = 1.0
             norm_vals = (vals - self.mins) / denom
             return pd.DataFrame(norm_vals, index=df.index, columns=df.columns)

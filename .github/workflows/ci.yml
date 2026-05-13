@@ -33,12 +33,14 @@ jobs:
         run: pip install ruff==0.4.3 mypy==1.10.0
       - name: Ruff lint (auto-fixable violations fail the build)
         run: ruff check src/ main.py
-      - name: Ruff format (apply formatting)
-        run: ruff format src/ main.py
       - name: Ruff format check (formatting enforced)
         run: ruff format --check src/ main.py
       - name: Import sort check (isort via ruff I-rules)
         run: ruff check --select I src/ main.py
+      - name: Verify dependency harmonization
+        run: python scripts/verify_dependencies.py
+      - name: Verify version synchronization
+        run: python scripts/verify_version_sync.py
 
   # -----------------------------------------------------------
   # JOB 2: Dependency Security - pip-audit CVE scan
