@@ -26,6 +26,13 @@ The system analyzes signals that were rejected by risk management (e.g., due to 
 - **MFE/MAE**: Maximum Favorable Excursion and Maximum Adverse Excursion for the rejected signal.
 - **Would-Have-Won**: A boolean indicating if the signal would have reached its Take Profit before its Stop Loss.
 
+## Institutional Refinements
+
+The analyzer incorporates institutional-standard methodologies to ensure precise evaluation:
+- **Mid-Price Benchmarking**: Alpha decay and post-trade drift are calculated against estimated mid-prices (Bid + Spread/2) to eliminate the "bid-ask bounce" effect and isolate true signal quality.
+- **Effective Spread**: Measures execution cost relative to the mid-price at the time of trade: `2 * |execution_price - mid_price|`.
+- **Hypothetical Outcome Evaluation**: Blocked signal opportunity cost is calculated by replaying market data against the signal's TP/SL levels, providing a more realistic P&L impact of risk rejections.
+
 ## Integration
 
 Analytics are automatically calculated for every trade and stored in the `execution_qualities` and `blocked_signal_analysis` database tables. Results are summarized in the Institutional Research Report.
