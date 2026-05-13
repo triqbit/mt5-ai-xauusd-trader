@@ -25,14 +25,21 @@ def default_talib_effect(data, *args, **kwargs):
 
 mock_talib.RSI.side_effect = default_talib_effect
 mock_talib.MACD.side_effect = lambda d, *a, **k: (np.random.rand(len(d)), np.random.rand(len(d)), np.random.rand(len(d)))
-mock_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-mock_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
+mock_talib.ATR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+mock_talib.BBANDS.side_effect = lambda c, *a, **k: (
+    np.random.rand(len(c)),
+    np.random.rand(len(c)),
+    np.random.rand(len(c)),
+)
 mock_talib.EMA.side_effect = default_talib_effect
-mock_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+mock_talib.ADX.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+mock_talib.STOCH.side_effect = lambda h, low, c, *a, **k: (
+    np.random.rand(len(c)),
+    np.random.rand(len(c)),
+)
 mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
-mock_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
-mock_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.MFI.side_effect = lambda h, low, c, v, *a, **k: np.random.rand(len(c))
+mock_talib.CCI.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
 mock_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
 mock_talib.get_function_groups.return_value = {"Pattern Recognition": []}
 
@@ -65,8 +72,8 @@ def mock_ensemble():
          patch.object(ensemble, "LSTMModel", MagicMock()):
         model = EnsembleModel(device="cpu")
         model.ppo_agent = MagicMock()
-        from src.models.base_model import Signal
         from src.core.constants import SignalDirection
+        from src.models.base_model import Signal
         model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
         return model
 
@@ -74,17 +81,24 @@ def setup_mock_talib(m_talib):
     """Refined helper to ensure mock talib doesn't cause unpacking errors."""
     m_talib.RSI.side_effect = lambda data, *a, **k: np.random.rand(len(data))
     m_talib.MACD.side_effect = lambda data, *a, **k: (np.random.rand(len(data)), np.random.rand(len(data)), np.random.rand(len(data)))
-    m_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-    m_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
+    m_talib.ATR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+    m_talib.BBANDS.side_effect = lambda c, *a, **k: (
+        np.random.rand(len(c)),
+        np.random.rand(len(c)),
+        np.random.rand(len(c)),
+    )
     m_talib.EMA.side_effect = lambda data, *a, **k: np.random.rand(len(data))
-    m_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-    m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+    m_talib.ADX.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+    m_talib.STOCH.side_effect = lambda h, low, c, *a, **k: (
+        np.random.rand(len(c)),
+        np.random.rand(len(c)),
+    )
     m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
-    m_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
-    m_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.MFI.side_effect = lambda h, low, c, v, *a, **k: np.random.rand(len(c))
+    m_talib.CCI.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
     m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
-    m_talib.WILLR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-    m_talib.ULTOSC.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.WILLR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+    m_talib.ULTOSC.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
     m_talib.LINEARREG_SLOPE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_TRENDLINE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_DCPERIOD.side_effect = lambda x, *a, **k: np.random.rand(len(x))
@@ -137,8 +151,8 @@ def test_pipeline_resilience_to_malformed_data(data_generator, feature_engineer,
 
     if not features.empty:
         obs = features.iloc[-1].values
-        direction, confidence, _ = mock_ensemble.predict(obs)
-        assert direction in SignalDirection
+        signal = mock_ensemble.predict(obs)
+        assert signal.direction in SignalDirection
 
 def test_pipeline_insufficient_history(data_generator, feature_engineer):
     """Verifies behavior when data is too short for technical indicators."""

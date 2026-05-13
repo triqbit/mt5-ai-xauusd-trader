@@ -1,12 +1,14 @@
+
 import numpy as np
 import pytest
-from pathlib import Path
+
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
 from src.models.dreamer_agent import DreamerAgent
-from src.models.lstm_model import LSTMModel, LSTMAttentionModel, LSTMPricePredictor
+from src.models.lstm_model import LSTMAttentionModel, LSTMModel, LSTMPricePredictor
 from src.models.ppo_agent import PPOAgent
 from src.trading.trading_env import TradingEnv
+
 
 def test_ppo_agent_stub():
     """Test PPOAgent initialization and prediction behavior."""
@@ -51,7 +53,6 @@ def test_agent_save_directory_creation(tmp_path):
     if lstm_agent.model is not None:
         lstm_path = save_dir / "lstm_model.pt"
         # We need to mock torch.save to avoid actual file write errors
-        import torch
         from unittest.mock import patch
         with patch("torch.save") as mock_save:
             lstm_agent.save(lstm_path)
@@ -151,7 +152,7 @@ def test_trading_env_hold_action():
     assert env.position == 1
 
     # 2. Step with HOLD (action 0) should close the position in our implementation
-    obs, reward, terminated, truncated, info = env.step(0)
+    _obs, _reward, _terminated, _truncated, info = env.step(0)
     assert env.position == 0
     assert info["position"] == 0
 
@@ -190,7 +191,7 @@ def test_trading_env_column_mapping():
     # Step should use index 2 for price
     # current_step starts at 1. step(1) increments to 2.
     # index 2 of Close is 1.2
-    obs, reward, terminated, truncated, info = env.step(1)
+    _obs, _reward, _terminated, _truncated, info = env.step(1)
     assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage
 
 

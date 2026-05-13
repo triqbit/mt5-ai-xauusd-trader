@@ -6,19 +6,24 @@ Verifies the high-value integration path:
 Signal Decision (Rejection/Approval) -> Risk Event / Trade Logging -> Execution Quality Analysis -> Reporting
 """
 
-import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 from sqlalchemy import select
 
 from src.analytics.execution_quality import ExecutionAnalyzer
 from src.core.schemas import TradeSignal
-from src.core.trade_logger import TradeLogger, Trade, RiskEvent, BlockedSignalAnalysis, ExecutionQuality
+from src.core.trade_logger import (
+    BlockedSignalAnalysis,
+    ExecutionQuality,
+    RiskEvent,
+    Trade,
+    TradeLogger,
+)
 from src.trading.audited_risk_manager import AuditedRiskManager
+
 
 @pytest.fixture
 def test_db(tmp_path):

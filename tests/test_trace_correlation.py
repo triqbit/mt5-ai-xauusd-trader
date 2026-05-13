@@ -3,11 +3,13 @@ Unit tests for trace correlation across logging and database layers.
 """
 
 import uuid
-import structlog
+
 import pytest
 from sqlalchemy import select
-from src.core.audit_log import AuditLogger, AuditEntry
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade
+
+from src.core.audit_log import AuditEntry, AuditLogger
+from src.core.trade_logger import ModelSignal, Trade, TradeLogger
+
 
 @pytest.fixture
 def audit_logger(tmp_path):

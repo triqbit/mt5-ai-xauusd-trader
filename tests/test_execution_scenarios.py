@@ -1,9 +1,9 @@
 """
 Tests for ExecutionFilter using synthetic scenarios.
 """
-import pytest
-
 from datetime import UTC, datetime
+
+import pytest
 
 from src.core.config import TradingConfig
 from src.trading.execution_filter import ExecutionFilter
