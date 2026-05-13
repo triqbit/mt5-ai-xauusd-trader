@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
@@ -66,6 +66,9 @@ class CombinationMotif(BaseModel):
     frequency: int
     avg_pnl_after: float
     is_toxic: bool = False
+    is_golden: bool = False
+    expectancy: float = 0.0
+    efficiency_ratio: float = 0.0
     session: str = "Mixed"
     volatility_bucket: str = "Mixed"
 
@@ -111,6 +114,8 @@ class SignalMotif(BaseModel):
     session: str = "Unknown"
     frequency: int
     win_rate: float
+    expectancy: float = 0.0
+    efficiency_ratio: float = 0.0
     cluster_frequency: int = 0
 
 
@@ -146,6 +151,7 @@ class JournalReport(BaseModel):
         """Convert results to TradePatternSection for ResearchReporter."""
         from src.research.reporting import (
             BehavioralRisk,
+            CombinationMotif as ReportingCombination,
             PatternConcentration as ReportingPattern,
             SignalMotif as ReportingMotif,
             TradePatternSection,
@@ -217,12 +223,13 @@ class JournalReport(BaseModel):
 
         # Toxic Combinations
         for motif in self.combination_motifs[:3]:
-            risks.append(
-                BehavioralRisk(
-                    type="Toxic Combination",
-                    description=f"Signals {motif.patterns} occurred {motif.frequency} times before drawdowns in {motif.session} session.",
+            if motif.is_toxic:
+                risks.append(
+                    BehavioralRisk(
+                        type="Toxic Combination",
+                        description=f"Signals {motif.patterns} occurred {motif.frequency} times before drawdowns in {motif.session} session.",
+                    )
                 )
-            )
 
         # Revenge Trading Risks
         if self.revenge_trades:
@@ -248,13 +255,25 @@ class JournalReport(BaseModel):
             )
 
         # Rejection Quality Risks
-        poor_rejections = [r for r in self.rejection_quality if r.accuracy < 0.4 and r.total_blocked >= 3]
+        poor_rejections = [
+            r for r in self.rejection_quality if r.accuracy < 0.4 and r.total_blocked >= 3
+        ]
         if poor_rejections:
             r = poor_rejections[0]
             risks.append(
                 BehavioralRisk(
                     type="Poor Rejection Quality",
                     description=f"Risk block '{r.reason}' has low accuracy ({r.accuracy:.1%}) and missed {r.profit_opportunity_cost:.2f} in profit.",
+                )
+            )
+
+        # Block Reasons linked to weak strategy states
+        weak_state_blocks = [b for b in self.risk_block_summary if b.weak_state_correlation > 0.6]
+        for block in weak_state_blocks:
+            risks.append(
+                BehavioralRisk(
+                    type="Cluster Warning",
+                    description=f"Block reason '{block.reason}' is highly correlated with weak strategy states ({block.weak_state_correlation:.1%}).",
                 )
             )
 
@@ -275,7 +294,26 @@ class JournalReport(BaseModel):
                     session=m.session,
                     frequency=m.frequency,
                     win_rate=m.win_rate,
+                    expectancy=m.expectancy,
+                    efficiency_ratio=m.efficiency_ratio,
                     cluster_frequency=m.cluster_frequency,
+                )
+            )
+
+        # Convert CombinationMotif internal models to Reporting CombinationMotif
+        reporting_combinations = []
+        for c in self.combination_motifs[:5]:
+            reporting_combinations.append(
+                ReportingCombination(
+                    patterns=c.patterns,
+                    frequency=c.frequency,
+                    avg_pnl_after=c.avg_pnl_after,
+                    is_toxic=c.is_toxic,
+                    is_golden=c.is_golden,
+                    expectancy=c.expectancy,
+                    efficiency_ratio=c.efficiency_ratio,
+                    session=c.session,
+                    volatility_bucket=c.volatility_bucket,
                 )
             )
 
@@ -284,6 +322,7 @@ class JournalReport(BaseModel):
             concentrations=concentrations[:5],  # Top 5 for clarity
             behavioral_risks=risks,
             motifs=reporting_motifs,
+            combinations=reporting_combinations,
             avg_win_duration=self.avg_win_duration,
             avg_loss_duration=self.avg_loss_duration,
         )
@@ -308,7 +347,9 @@ class JournalMiner:
         hour = dt.hour
         active = []
         for name, (start, end) in self.sessions.items():
-            if (start < end and start <= hour < end) or (start >= end and (hour >= start or hour < end)):
+            if (start < end and start <= hour < end) or (
+                start >= end and (hour >= start or hour < end)
+            ):
                 active.append(name)
         return active
 
@@ -486,9 +527,7 @@ class JournalMiner:
             prev_trade = df.iloc[i - 1]
             curr_trade = df.iloc[i]
 
-            time_diff = (
-                curr_trade["created_at"] - prev_trade["created_at"]
-            ).total_seconds() / 60.0
+            time_diff = (curr_trade["created_at"] - prev_trade["created_at"]).total_seconds() / 60.0
             if prev_trade["pnl"] < 0 and 0 < time_diff <= window_minutes:
                 # Check for lot size increase if available
                 lot_increase = False
@@ -803,6 +842,7 @@ class JournalMiner:
         signals_df: pd.DataFrame,
         trades_df: pd.DataFrame = None,
         blocked_df: pd.DataFrame = None,
+        weak_state_window_hours: int = 24,
     ) -> list[BlockReasonSummary]:
         """Summarize recurring risk block reasons with weak state correlation and efficiency."""
         if risk_events_df.empty:
@@ -814,7 +854,9 @@ class JournalMiner:
         # Calculate weak state correlation if trades are provided
         correlations = {}
         if trades_df is not None and not trades_df.empty:
-            correlations = self.analyze_strategy_state_correlation(risk_events_df, trades_df)
+            correlations = self.analyze_strategy_state_correlation(
+                risk_events_df, trades_df, window_hours=weak_state_window_hours
+            )
 
         # Rejection quality metrics
         rejection_metrics = {}
@@ -1001,6 +1043,20 @@ class JournalMiner:
 
             win_rate = group["win"].mean()
             cluster_freq = group["is_in_cluster"].sum()
+
+            # Expectancy and Efficiency calculations
+            pnls = group["pnl"].dropna()
+            if not pnls.empty:
+                avg_win = pnls[pnls > 0].mean() if (pnls > 0).any() else 0.0
+                avg_loss = abs(pnls[pnls < 0].mean()) if (pnls < 0).any() else 0.0
+                expectancy = (win_rate * avg_win) - ((1.0 - win_rate) * avg_loss)
+                avg_pnl = pnls.mean()
+                avg_abs_pnl = pnls.abs().mean()
+                efficiency = avg_pnl / avg_abs_pnl if avg_abs_pnl > 0 else 0.0
+            else:
+                expectancy = 0.0
+                efficiency = 0.0
+
             results.append(
                 SignalMotif(
                     algorithm=str(algo),
@@ -1010,6 +1066,8 @@ class JournalMiner:
                     session=str(sess),
                     frequency=int(freq),
                     win_rate=float(win_rate),
+                    expectancy=float(expectancy),
+                    efficiency_ratio=float(efficiency),
                     cluster_frequency=int(cluster_freq),
                 )
             )
@@ -1043,17 +1101,21 @@ class JournalMiner:
         }
 
     def analyze_strategy_state_correlation(
-        self, risk_events_df: pd.DataFrame, trades_df: pd.DataFrame
+        self,
+        risk_events_df: pd.DataFrame,
+        trades_df: pd.DataFrame,
+        window_hours: int = 24,
     ) -> dict[str, float]:
         """
         Detect if risk blocks increase during 'weak strategy states'.
 
-        Weak state is defined as the 24-hour window preceding a drawdown cluster
+        Weak state is defined as the window preceding a drawdown cluster
         plus the duration of the drawdown cluster itself.
 
         Args:
             risk_events_df: DataFrame of risk management events (rejections).
             trades_df: DataFrame of executed trades.
+            window_hours: Hours preceding a cluster to consider 'weak'.
 
         Returns:
             Dictionary mapping event type to the percentage of occurrences in weak states.
@@ -1065,11 +1127,19 @@ class JournalMiner:
         if not clusters:
             return dict.fromkeys(risk_events_df["event_type"].unique(), 0.0)
 
-        # Mark 'weak' time windows: 24h before any drawdown cluster PLUS cluster period
+        # Mark 'weak' time windows: window_hours before any drawdown cluster PLUS cluster period
         weak_windows = []
         for cluster in clusters:
-            start_time = cluster.start_time - pd.Timedelta(hours=24)
-            weak_windows.append((start_time, cluster.end_time))
+            # Ensure cluster start/end are UTC
+            c_start = cluster.start_time
+            if c_start.tzinfo is None:
+                c_start = c_start.replace(tzinfo=UTC)
+            c_end = cluster.end_time
+            if c_end.tzinfo is None:
+                c_end = c_end.replace(tzinfo=UTC)
+
+            start_time = c_start - pd.Timedelta(hours=window_hours)
+            weak_windows.append((start_time, c_end))
 
         def is_weak(dt: datetime) -> bool:
             # Ensure dt is timezone-aware
@@ -1187,18 +1257,30 @@ class JournalMiner:
 
         return sorted(results, key=lambda x: x.frequency, reverse=True)
 
-    def run_mining(self) -> JournalReport:
+    def run_mining(self, weak_state_window_hours: int = 24) -> JournalReport:
         """Execute full mining suite and return typed report."""
         from src.core.trade_logger import BlockedSignalAnalysis
 
         with self.Session() as session:
             # Fetch data
-            trades_raw = session.query(Trade).filter(Trade.is_deleted.is_(False)).all()
-            signals_raw = session.query(ModelSignal).filter(ModelSignal.is_deleted.is_(False)).all()
-            risk_raw = session.query(RiskEvent).filter(RiskEvent.is_deleted.is_(False)).all()
+            trades_raw = (
+                session.execute(select(Trade).where(Trade.is_deleted.is_(False))).scalars().all()
+            )
+            signals_raw = (
+                session.execute(select(ModelSignal).where(ModelSignal.is_deleted.is_(False)))
+                .scalars()
+                .all()
+            )
+            risk_raw = (
+                session.execute(select(RiskEvent).where(RiskEvent.is_deleted.is_(False)))
+                .scalars()
+                .all()
+            )
             blocked_raw = (
-                session.query(BlockedSignalAnalysis)
-                .filter(BlockedSignalAnalysis.is_deleted.is_(False))
+                session.execute(
+                    select(BlockedSignalAnalysis).where(BlockedSignalAnalysis.is_deleted.is_(False))
+                )
+                .scalars()
                 .all()
             )
 
@@ -1270,7 +1352,11 @@ class JournalMiner:
                 drawdown_clusters=self.detect_drawdown_clusters(trades_df),
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
                 risk_block_summary=self.analyze_risk_blocks(
-                    risk_df, signals_df, trades_df, blocked_df
+                    risk_df,
+                    signals_df,
+                    trades_df,
+                    blocked_df,
+                    weak_state_window_hours=weak_state_window_hours,
                 ),
                 rejection_quality=self.analyze_rejection_quality(blocked_df),
                 overconfidence_events=self.detect_overconfidence(trades_df),
