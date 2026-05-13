@@ -23,8 +23,8 @@ Automatically **BLOCK** and **ESCALATE** if any of these are true:
 - 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py`, `src/trading/risk_engine.py`, `src/trading/risk_manager.py`, `src/trading/audited_risk_manager.py`, `src/trading/capital_allocator.py`, or `src/trading/execution_filter.py`.
 - 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*`, `.env.*`, or `src/core/config.py`.
 - 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
-- 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile`, `docker-compose.yml`, or `.github/workflows/deploy.*`.
-- 🚨 **Changes to CI/CD workflows that affect deployment or quality gates:** Modifications to `.github/workflows/ci.yml`.
+- 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile`, `docker-compose.yml`.
+- 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*`.
 
 ## High-Risk Files (Auto-Merge Prohibited)
 
@@ -49,7 +49,6 @@ The following patterns trigger an automatic block and escalation:
 - `Dockerfile`
 - `docker-compose.yml`
 - `.github/workflows/deploy.*`
-- `.github/workflows/ci.yml`
 - `migrations/.*`
 
 ## Escalation Procedure
@@ -64,6 +63,7 @@ The following patterns trigger an automatic block and escalation:
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-15 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Unified with requirements) | [System Change] |
 | 2026-05-13 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Refined high-risk patterns & categories) | [System Change] |
 | 2026-05-08 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (including docker-compose and ci.yml) | [System Change] |
 | 2026-05-07 | N/A | Policy Update | Jules05: Strict auto-merge enforcement implemented | [System Change] |

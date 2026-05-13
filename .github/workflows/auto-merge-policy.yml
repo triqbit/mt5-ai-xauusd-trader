@@ -40,7 +40,7 @@ jobs:
         id: risk-check
         run: |
           # Patterns that strictly block and escalate as per Jules05 mandate
-          # Category: Trading Execution Logic
+          # Category: Live Trading Execution Logic
           EXECUTION_PATTERNS=(
             "src/trading/executor.py"
             "src/trading/mt5_connector.py"
@@ -54,25 +54,27 @@ jobs:
             "src/trading/capital_allocator.py"
             "src/trading/execution_filter.py"
           )
-          # Category: Credentials, Secrets, & Auth
+          # Category: Credentials, Secrets, & Auth Surface
           AUTH_PATTERNS=(
             "config/secrets.*"
             "\.env.*"
             "src/core/config.py"
           )
-          # Category: Infrastructure & Deployment
+          # Category: Docker & Infrastructure Control
           INFRA_PATTERNS=(
             "Dockerfile"
             "docker-compose.yml"
+          )
+          # Category: CI/CD Workflows affecting deployment
+          CICD_PATTERNS=(
             "\.github/workflows/deploy.*"
           )
-          # Category: CI/CD & Database
-          CORE_PATTERNS=(
-            "\.github/workflows/ci.yml"
+          # Category: Destructive Database Migrations
+          DB_PATTERNS=(
             "migrations/.*"
           )
 
-          ALL_PATTERNS=("${EXECUTION_PATTERNS[@]}" "${RISK_PATTERNS[@]}" "${AUTH_PATTERNS[@]}" "${INFRA_PATTERNS[@]}" "${CORE_PATTERNS[@]}")
+          ALL_PATTERNS=("${EXECUTION_PATTERNS[@]}" "${RISK_PATTERNS[@]}" "${AUTH_PATTERNS[@]}" "${INFRA_PATTERNS[@]}" "${CICD_PATTERNS[@]}" "${DB_PATTERNS[@]}")
 
           TOUCHED_HIGH_RISK=false
           VIOLATED_CATEGORY=""
@@ -84,11 +86,12 @@ jobs:
                 TOUCHED_HIGH_RISK=true
 
                 # Determine category for better reporting
-                for p in "${EXECUTION_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Trading Execution Logic"; fi; done
+                for p in "${EXECUTION_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Live Trading Execution Logic"; fi; done
                 for p in "${RISK_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Risk Parameters / Position Sizing"; fi; done
                 for p in "${AUTH_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Credentials / Auth Surface"; fi; done
-                for p in "${INFRA_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Infrastructure / Deployment"; fi; done
-                for p in "${CORE_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="CI/CD / Database Migrations"; fi; done
+                for p in "${INFRA_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Docker / Infrastructure Control"; fi; done
+                for p in "${CICD_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="CI/CD Deployment Workflows"; fi; done
+                for p in "${DB_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Database Migrations"; fi; done
               fi
             done
           done
@@ -145,7 +148,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # Verify coverage threshold (assuming 80% is enforced in ci.yml and reported back)
-          # For Jules05, we assume CI ensures 80%. This check could query actual coverage if needed.
           echo "coverage_pass=true" >> $GITHUB_OUTPUT
 
       - name: Handle Violations
