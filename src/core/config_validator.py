@@ -296,7 +296,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds 1% hard limit.",
+                    f"Risk per trade {self.config.risk_per_trade * 100}% exceeds 1% hard limit.",
                     True,
                     "Reduce RISK_PER_TRADE to 0.01 (1%) or less.",
                 )
@@ -308,7 +308,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% limit.",
+                    f"Max daily loss {self.config.max_daily_loss * 100}% exceeds 5% limit.",
                     True,
                     "Reduce MAX_DAILY_LOSS to 0.05 or less.",
                 )
@@ -329,7 +329,7 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         levels[i + 1][0],
-                        f"{levels[i+1][0]} ({levels[i+1][1]}) must be greater than {levels[i][0]} ({levels[i][1]}).",
+                        f"{levels[i + 1][0]} ({levels[i + 1][1]}) must be greater than {levels[i][0]} ({levels[i][1]}).",
                         True,
                         "Correct the daily loss hierarchy in .env.",
                     )
@@ -340,7 +340,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_WEEKLY_LOSS",
-                    f"Max weekly loss {self.config.max_weekly_loss*100}% exceeds 10% safety limit.",
+                    f"Max weekly loss {self.config.max_weekly_loss * 100}% exceeds 10% safety limit.",
                     True,
                     "Reduce MAX_WEEKLY_LOSS to 0.10 or less.",
                 )
@@ -350,7 +350,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_MONTHLY_LOSS",
-                    f"Max monthly loss {self.config.max_monthly_loss*100}% exceeds 15% safety limit.",
+                    f"Max monthly loss {self.config.max_monthly_loss * 100}% exceeds 15% safety limit.",
                     True,
                     "Reduce MAX_MONTHLY_LOSS to 0.15 or less.",
                 )
@@ -404,7 +404,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITION_SIZE_PCT",
-                    f"Max position size {self.config.max_position_size_pct*100}% exceeds 10% limit.",
+                    f"Max position size {self.config.max_position_size_pct * 100}% exceeds 10% limit.",
                     True,
                     "Set MAX_POSITION_SIZE_PCT to 0.10 for compliance.",
                 )
@@ -415,7 +415,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_DRAWDOWN",
-                    f"Max drawdown {self.config.max_drawdown*100}% exceeds 30% policy limit.",
+                    f"Max drawdown {self.config.max_drawdown * 100}% exceeds 30% policy limit.",
                     True,
                     "Set MAX_DRAWDOWN to 0.30 for enterprise standards.",
                 )
@@ -469,7 +469,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_SINGLE_DIRECTION_PCT",
-                    f"Max single direction exposure {self.config.max_single_direction_pct*100}% exceeds 30% policy.",
+                    f"Max single direction exposure {self.config.max_single_direction_pct * 100}% exceeds 30% policy.",
                     True,
                     "Set MAX_SINGLE_DIRECTION_PCT to 0.30 for compliance.",
                 )
@@ -479,7 +479,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "MAX_TOTAL_NOTIONAL_PCT",
-                    f"Max total notional {self.config.max_total_notional_pct*100}% exceeds 100% equity.",
+                    f"Max total notional {self.config.max_total_notional_pct * 100}% exceeds 100% equity.",
                     True,
                     "Set MAX_TOTAL_NOTIONAL_PCT to 1.00 for enterprise safety.",
                 )
@@ -522,7 +522,7 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         margin_levels[i + 1][0],
-                        f"{margin_levels[i+1][0]} ({margin_levels[i+1][1]}) must be greater than {margin_levels[i][0]} ({margin_levels[i][1]}).",
+                        f"{margin_levels[i + 1][0]} ({margin_levels[i + 1][1]}) must be greater than {margin_levels[i][0]} ({margin_levels[i][1]}).",
                         True,
                         "Correct the margin limit hierarchy in .env.",
                     )
@@ -540,7 +540,7 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         vol_levels[i + 1][0],
-                        f"{vol_levels[i+1][0]} ({vol_levels[i+1][1]}) must be greater than {vol_levels[i][0]} ({vol_levels[i][1]}).",
+                        f"{vol_levels[i + 1][0]} ({vol_levels[i + 1][1]}) must be greater than {vol_levels[i][0]} ({vol_levels[i][1]}).",
                         True,
                         "Correct the volatility threshold hierarchy in .env.",
                     )
@@ -559,7 +559,7 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         spread_levels[i + 1][0],
-                        f"{spread_levels[i+1][0]} ({spread_levels[i+1][1]}) must be greater than {spread_levels[i][0]} ({spread_levels[i][1]}).",
+                        f"{spread_levels[i + 1][0]} ({spread_levels[i + 1][1]}) must be greater than {spread_levels[i][0]} ({spread_levels[i][1]}).",
                         True,
                         "Correct the spread limit hierarchy in .env.",
                     )
@@ -596,7 +596,7 @@ class ConfigValidator:
             self.errors.append(
                 ValidationError(
                     "DAILY_WIN_CAP",
-                    f"Daily win cap {self.config.daily_win_cap*100}% exceeds 10% limit.",
+                    f"Daily win cap {self.config.daily_win_cap * 100}% exceeds 10% limit.",
                     True,
                     "Reduce DAILY_WIN_CAP to 0.10 (10%) or less.",
                 )
