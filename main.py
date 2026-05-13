@@ -662,14 +662,142 @@ def get_system_version() -> str:
         return "unknown"
 
 
+def run_setup_wizard() -> int:
+    """
+    Interactive guided setup wizard for initial configuration.
+    Helps users configure .env without manual text editing.
+    """
+    import getpass
+    import platform
+
+    try:
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.prompt import IntPrompt, Prompt
+    except ImportError:
+        print("Error: 'rich' library is required for the setup wizard.")
+        print("Please run 'pip install rich' first.")
+        return 1
+
+    console = Console()
+    console.print(
+        Panel(
+            "[bold blue]MT5 AI/ML Trading Bot - Interactive Setup Wizard[/]\n"
+            "[dim]This wizard will help you configure your .env file with essential credentials.[/]",
+            border_style="blue",
+        )
+    )
+
+    # 1. Basic Info
+    console.print("\n[bold]1. Execution Environment[/]")
+    mode = Prompt.ask("Select execution mode", choices=["demo", "live", "backtest"], default="demo")
+    symbol = Prompt.ask("Default trading symbol", default="XAUUSD").upper()
+    timeframe = Prompt.ask(
+        "Default timeframe", choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"], default="M5"
+    )
+
+    # 2. MT5 Credentials
+    console.print("\n[bold]2. MetaTrader 5 Credentials[/]")
+
+    if platform.system() != "Windows":
+        console.print("[yellow]Notice: You are on a non-Windows platform.[/]")
+        console.print(
+            "[yellow]Native MT5 SDK requires Windows. You will likely need MetaAPI credentials for Linux/Mac.[/]\n"
+        )
+
+    login = IntPrompt.ask("MT5 Account Login (Number)", default=0)
+
+    # Use getpass for password to avoid echoing
+    password = ""
+    while not password:
+        password = getpass.getpass("MT5 Account Password: ")
+        if not password:
+            console.print("[red]Password cannot be empty.[/]")
+
+    server = Prompt.ask("MT5 Broker Server (e.g., IC-Markets-Demo)", default="YOUR_SERVER_HERE")
+
+    # 3. MetaAPI (Optional but recommended for Linux/Mac)
+    console.print("\n[bold]3. MetaAPI Cloud Fallback (Optional)[/]")
+    console.print("[dim]Required for non-Windows environments or cloud failover.[/]")
+    use_meta = Prompt.ask("Do you want to configure MetaAPI?", choices=["y", "n"], default="n")
+    meta_token = ""
+    meta_id = ""
+    if use_meta == "y":
+        meta_token = Prompt.ask("MetaAPI Token")
+        meta_id = Prompt.ask("MetaAPI Account ID")
+
+    # 4. Confirm and Save
+    console.print("\n[bold]4. Review & Save[/]")
+    if not Prompt.ask("Ready to save configuration to .env?", choices=["y", "n"], default="y") == "y":
+        console.print("[yellow]Setup aborted. No changes made.[/]")
+        return 0
+
+    # Write to .env
+    env_path = Path(".env")
+    example_path = Path(".env.example")
+
+    lines = []
+    if example_path.exists():
+        with open(example_path, "r") as f:
+            for line in f:
+                if line.startswith("MT5_LOGIN="):
+                    lines.append(f"MT5_LOGIN={login}\n")
+                elif line.startswith("MT5_PASSWORD="):
+                    lines.append(f"MT5_PASSWORD={password}\n")
+                elif line.startswith("MT5_SERVER="):
+                    lines.append(f"MT5_SERVER={server}\n")
+                elif line.startswith("SYMBOL="):
+                    lines.append(f"SYMBOL={symbol}\n")
+                elif line.startswith("TIMEFRAME="):
+                    lines.append(f"TIMEFRAME={timeframe}\n")
+                elif line.startswith("MODE="):
+                    lines.append(f"MODE={mode}\n")
+                elif line.startswith("METAAPI_TOKEN=") and meta_token:
+                    lines.append(f"METAAPI_TOKEN={meta_token}\n")
+                elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
+                    lines.append(f"METAAPI_ACCOUNT_ID={meta_id}\n")
+                else:
+                    lines.append(line)
+    else:
+        # Fallback if .env.example is missing
+        lines = [
+            f"MT5_LOGIN={login}\n",
+            f"MT5_PASSWORD={password}\n",
+            f"MT5_SERVER={server}\n",
+            f"SYMBOL={symbol}\n",
+            f"TIMEFRAME={timeframe}\n",
+            f"MODE={mode}\n",
+            f"METAAPI_TOKEN={meta_token}\n",
+            f"METAAPI_ACCOUNT_ID={meta_id}\n",
+        ]
+
+    with open(env_path, "w") as f:
+        f.writelines(lines)
+
+    # Secure permissions
+    try:
+        os.chmod(env_path, 0o600)
+    except Exception:
+        pass
+
+    console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
+    console.print(
+        "You can now run the bot with [cyan]python main.py --check[/] to verify connectivity.\n"
+    )
+    return 0
+
+
 def get_parser() -> argparse.ArgumentParser:
-    """Construct the main CLI argument parser."""
+    """Construct the main CLI argument parser with grouped options."""
     p = argparse.ArgumentParser(
         description="MT5 AI/ML Trading Bot - Enterprise Edition",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Usage Examples:
-  # Perform a pre-flight health check (recommended before starting)
+  # Interactive guided setup (Recommended for first-time use)
+  python main.py --setup
+
+  # Perform a pre-flight health check
   python main.py --check
 
   # Start trading in DEMO mode with Ensemble algorithm
@@ -683,87 +811,105 @@ Usage Examples:
         """,
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
-    p.add_argument(
+
+    # -- Execution Group
+    execution = p.add_argument_group("Execution Options")
+    execution.add_argument(
         "--mode",
         choices=["demo", "live", "backtest"],
-        help="Execution mode: 'demo' for paper trading, 'live' for real execution, or 'backtest' for historical simulation.",
+        help="Execution mode: 'demo' (paper), 'live' (real money), or 'backtest' (simulation).",
     )
-    p.add_argument(
+    execution.add_argument(
         "--algo",
         dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
-        help="Machine Learning algorithm architecture to use for signal generation.",
+        help="AI algorithm architecture to use for signal generation.",
     )
-    p.add_argument(
-        "--start", help="Historical start date for backtest (YYYY-MM-DD)", default="2017-01-01"
-    )
-    p.add_argument(
-        "--end",
-        help="Historical end date for backtest (YYYY-MM-DD)",
-        default="2026-03-30",
-    )
-    p.add_argument(
-        "--train-window",
-        type=int,
-        default=500,
-        help="Number of bars for walk-forward training window",
-    )
-    p.add_argument(
-        "--test-window",
-        type=int,
-        default=100,
-        help="Number of bars for walk-forward testing window",
-    )
-    p.add_argument(
-        "--step-size",
-        type=int,
-        default=100,
-        help="Number of bars to slide the window per iteration",
-    )
-    p.add_argument(
-        "--spread",
-        type=float,
-        default=0.0001,
-        help="Fixed simulated spread for backtest environment",
-    )
-    p.add_argument(
-        "--commission", type=float, default=7.0, help="Commission cost per round-turn lot"
-    )
-    p.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD)")
-    p.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1)")
-    p.add_argument(
-        "--model-dir",
-        type=Path,
-        default=Path("models/trained"),
-        help="Local directory containing trained model weight files",
-    )
-    p.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        default="INFO",
-        help="Granularity of output logging",
-    )
-    p.add_argument(
-        "--check",
-        action="store_true",
-        help="Perform comprehensive pre-flight health checks and exit",
-    )
-    p.add_argument(
-        "--doctor",
-        action="store_true",
-        help="Run the system diagnostic tool to verify environment and dependencies",
-    )
-    p.add_argument(
-        "--show-config",
-        action="store_true",
-        help="Display the current sanitized configuration and exit",
-    )
-    p.add_argument(
+    execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
+    execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
+    execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",
         action="store_true",
-        help="Explicitly acknowledge and confirm LIVE trading execution",
+        help="Explicitly acknowledge and confirm LIVE trading execution.",
     )
+
+    # -- Backtest Group
+    backtest = p.add_argument_group("Backtesting & Simulation")
+    backtest.add_argument(
+        "--start", help="Historical start date (YYYY-MM-DD).", default="2017-01-01"
+    )
+    backtest.add_argument(
+        "--end",
+        help="Historical end date (YYYY-MM-DD).",
+        default="2026-03-30",
+    )
+    backtest.add_argument(
+        "--train-window",
+        type=int,
+        default=500,
+        help="Number of bars for walk-forward training window.",
+    )
+    backtest.add_argument(
+        "--test-window",
+        type=int,
+        default=100,
+        help="Number of bars for walk-forward testing window.",
+    )
+    backtest.add_argument(
+        "--step-size",
+        type=int,
+        default=100,
+        help="Number of bars to slide the window per iteration.",
+    )
+    backtest.add_argument(
+        "--spread",
+        type=float,
+        default=0.0001,
+        help="Fixed simulated spread (as decimal, e.g. 0.0001).",
+    )
+    backtest.add_argument(
+        "--commission", type=float, default=7.0, help="Commission cost per round-turn lot."
+    )
+
+    # -- Setup & Diagnostics Group
+    setup = p.add_argument_group("Setup & Diagnostics")
+    setup.add_argument(
+        "--setup",
+        action="store_true",
+        help="Run the interactive configuration wizard to setup .env and credentials.",
+    )
+    setup.add_argument(
+        "--check",
+        action="store_true",
+        help="Perform comprehensive pre-flight health checks and exit.",
+    )
+    setup.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run the system diagnostic tool to verify environment and dependencies.",
+    )
+    setup.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Display the current sanitized configuration and exit.",
+    )
+    setup.add_argument(
+        "--model-dir",
+        type=Path,
+        default=Path("models/trained"),
+        help="Local directory containing trained model weight files.",
+    )
+
+    # -- Logging Group
+    logging = p.add_argument_group("Logging & Observability")
+    logging.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Granularity of output logging.",
+    )
+
     return p
 
 
@@ -863,7 +1009,7 @@ def run_backtest(
 
 def main() -> int:
     # 0. Identify diagnostic commands that can proceed without full setup
-    diagnostic_flags = ["--help", "-h", "--version", "--doctor"]
+    diagnostic_flags = ["--help", "-h", "--version", "--doctor", "--setup"]
     is_diagnostic = any(arg in sys.argv for arg in diagnostic_flags)
 
     # 1. Guided Setup: Detect missing .env and offer to initialize it
@@ -871,8 +1017,30 @@ def main() -> int:
     example_file = Path(".env.example")
     if not is_diagnostic and not env_file.exists() and example_file.exists():
         if sys.stdin.isatty():
-            print("\n[!] Configuration file (.env) is missing.")
             try:
+                from rich.console import Console
+                from rich.panel import Panel
+
+                console = Console()
+                console.print(
+                    Panel(
+                        "[bold yellow]Configuration file (.env) is missing![/]\n\n"
+                        "The system requires a .env file to store credentials and settings.\n"
+                        "Would you like to run the [cyan]Interactive Setup Wizard[/] now?",
+                        title="[bold red]First-Time Setup[/]",
+                        border_style="yellow",
+                    )
+                )
+                choice = input("\nRun Setup Wizard? [Y/n]: ").strip().lower()
+                if choice in ["", "y", "yes"]:
+                    # Create basic directories first
+                    for d in ["data", "logs", "models/trained"]:
+                        Path(d).mkdir(parents=True, exist_ok=True)
+                    return run_setup_wizard()
+                else:
+                    print("\n[!] Manual setup required. You can run 'python main.py --setup' later.")
+            except ImportError:
+                print("\n[!] Configuration file (.env) is missing.")
                 choice = (
                     input("Would you like to initialize it from .env.example? [Y/n]: ")
                     .strip()
@@ -923,6 +1091,9 @@ def main() -> int:
     args = parser.parse_args()
 
     # 0. Immediate Diagnostic Handlers
+    if args.setup:
+        return run_setup_wizard()
+
     if args.doctor:
         try:
             from scripts import doctor
@@ -1000,6 +1171,10 @@ def main() -> int:
     from src.core.log_config import get_masking_processor
 
     configure_logging(cfg.log_level)
+
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
     log, console = structlog.get_logger("main"), Console()
     get_masking_processor().update_secrets(cfg)
 
@@ -1117,6 +1292,10 @@ def main() -> int:
 
     algo_tag = " [bold cyan](CLI OVERRIDE)[/]" if "algorithm" in provided_dest else ""
     summary.add_row("Algorithm:  ", f"{cfg.algorithm}{algo_tag}")
+
+    # Account info for visibility
+    masked_login = f"{str(cfg.mt5_login)[:3]}****" if len(str(cfg.mt5_login)) > 3 else "****"
+    summary.add_row("Account:  ", f"{masked_login} @ {cfg.mt5_server}")
     summary.add_row(
         "Database:  ",
         "PostgreSQL" if "postgres" in cfg.database_url.get_secret_value() else "SQLite",

@@ -101,12 +101,15 @@ pip install -r requirements.txt
 # [CRITICAL] Verify environment and dependencies
 python main.py --doctor
 
+# Run interactive setup wizard (Recommended)
+python main.py --setup
+
 # Perform a pre-flight health check (verifies .env and connectivity)
 python main.py --check
 ```
 
 ### 2. Configuration
-The system features a **Guided Setup**. Simply run the bot, and it will offer to initialize your configuration:
+The system features an **Interactive Setup Wizard**. Simply run the bot, and it will offer to guide you through the configuration:
 ```bash
 python main.py
 ```
