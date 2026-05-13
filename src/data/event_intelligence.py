@@ -39,8 +39,12 @@ class BaseEventProvider(ABC):
     """Abstract base class for event data providers."""
 
     @abstractmethod
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
-        """Fetch events within a time range."""
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
+        """
+        Fetch events within a time range.
+        Returns None if the fetch operation failed (e.g., network error, file not found).
+        Returns an empty list if the fetch succeeded but no events were found.
+        """
         pass
 
 
@@ -50,7 +54,7 @@ class MockEventProvider(BaseEventProvider):
     def __init__(self, mock_events: list[MacroEvent] | None = None):
         self.events = mock_events or []
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
         return [
             e
             for e in self.events
@@ -64,13 +68,13 @@ class JSONEventProvider(BaseEventProvider):
     def __init__(self, file_path: str):
         self.file_path = file_path
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
         import json
         import os
 
         if not os.path.exists(self.file_path):
             logger.warning(f"Event file {self.file_path} not found.")
-            return []
+            return None
 
         try:
             with open(self.file_path) as f:
@@ -86,7 +90,7 @@ class JSONEventProvider(BaseEventProvider):
             return events
         except Exception as e:
             logger.error(f"Error reading JSON events: {e}")
-            return []
+            return None
 
 
 class TradingViewEventProvider(BaseEventProvider):
@@ -102,7 +106,7 @@ class TradingViewEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH,
         }
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
         """
         Generates synthetic macro events based on deterministic patterns.
         Useful for pipeline verification without external API dependencies.
@@ -164,7 +168,7 @@ class GeopoliticalEventProvider(BaseEventProvider):
     def __init__(self, source: str | list[dict[str, Any]]):
         self.source = source
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
         import json
         import os
 
@@ -178,8 +182,10 @@ class GeopoliticalEventProvider(BaseEventProvider):
                         raw_events = json.load(f)
                 except Exception as e:
                     logger.error(f"Error reading Geopolitical JSON: {e}")
+                    return None
             else:
                 logger.warning(f"Geopolitical source file {self.source} not found.")
+                return None
 
         events = []
         for item in raw_events:
@@ -195,6 +201,9 @@ class GeopoliticalEventProvider(BaseEventProvider):
                     events.append(event)
             except Exception as e:
                 logger.error(f"Error parsing geopolitical event: {e}", item=item)
+                # Keep going if one event fails to parse?
+                # For consistency with "failure return None", maybe if it fails to parse the whole source is suspect.
+                return None
 
         return events
 
@@ -221,7 +230,7 @@ class MetaAPIEventProvider(BaseEventProvider):
             limits=httpx.Limits(max_connections=5, max_keepalive_connections=2),
         )
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent]:
+    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
         """
         Fetches events via MetaAPI's REST interface with structured logging.
         """
@@ -286,7 +295,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                 url=url,
                 start_time=start_time.isoformat(),
             )
-            return []
+            return None
 
     def _guess_category(self, name: str) -> EventCategory:
         """Guesses the event category based on the event name."""
@@ -530,18 +539,21 @@ class EventIntelligence:
         min_multiplier = 1.0
 
         for event in events:
+            # Base windows from impact
             pre_window = self.pre_event_minutes.get(event.impact, 0)
             post_window = self.post_event_minutes.get(event.impact, 0)
 
-            # Adjust windows based on category
-            if event.category in [
+            # Explicit category-specific overrides for major market movers
+            major_categories = [
                 EventCategory.FOMC,
                 EventCategory.NFP,
                 EventCategory.RATES,
                 EventCategory.CPI,
-            ]:
-                pre_window = max(pre_window, 120)  # At least 2 hours for major events
-                post_window = max(post_window, 180)  # At least 3 hours for major events
+            ]
+            if event.category in major_categories:
+                # Major events require significantly larger windows for institutional safety
+                pre_window = max(pre_window, 120)  # 2h lead time
+                post_window = max(post_window, 180)  # 3h digestion time
 
             is_active = False
             is_event_blocking = False
@@ -555,43 +567,28 @@ class EventIntelligence:
             # Check pre-event window
             elif event.timestamp > now and (event.timestamp - now) <= timedelta(minutes=pre_window):
                 is_active = True
-                # Stricter blocking for HIGH impact major events
-                if (
-                    event.impact == EventImpact.CRITICAL
-                    or (
-                        event.impact == EventImpact.HIGH
-                        and event.category
-                        in [
-                            EventCategory.FOMC,
-                            EventCategory.NFP,
-                            EventCategory.RATES,
-                            EventCategory.CPI,
-                        ]
-                        and (event.timestamp - now) <= timedelta(minutes=60)
-                    )
-                    or (
-                        event.impact == EventImpact.HIGH
-                        and (event.timestamp - now) <= timedelta(minutes=30)
-                    )
-                ):
+                # Stricter blocking for HIGH impact major events and all CRITICAL events
+                if event.impact == EventImpact.CRITICAL:
                     is_event_blocking = True
+                elif event.impact == EventImpact.HIGH:
+                    # Block 60 mins before major events, 30 mins before others
+                    threshold = 60 if event.category in major_categories else 30
+                    if (event.timestamp - now) <= timedelta(minutes=threshold):
+                        is_event_blocking = True
 
             # Check post-event window
             elif (event.end_timestamp or event.timestamp) <= now and (
                 now - (event.end_timestamp or event.timestamp)
             ) <= timedelta(minutes=post_window):
                 is_active = True
-                # Critical events always block during cooldown
-                if event.impact == EventImpact.CRITICAL or (
-                    event.impact == EventImpact.HIGH
-                    and event.category
-                    in [
-                        EventCategory.FOMC,
-                        EventCategory.NFP,
-                        EventCategory.RATES,
-                        EventCategory.CPI,
-                    ]
-                    and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
+                # Critical events always block during cooldown; HIGH impact majors block for first 60 mins
+                if (
+                    event.impact == EventImpact.CRITICAL
+                    or (
+                        event.impact == EventImpact.HIGH
+                        and event.category in major_categories
+                        and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
+                    )
                 ):
                     is_event_blocking = True
 
@@ -601,29 +598,18 @@ class EventIntelligence:
                     is_blocked = True
                     blocking_events.append(event)
 
-                # Update multiplier
-                event_mult = 1.0
+                # Calculate multiplier using severity_score (1.0 - severity_score)
+                # But we apply stricter caps for institutional safety
+                event_mult = max(0.0, round(1.0 - event.severity_score, 2))
+
+                # Extra institutional guardrails for major events
+                if event.category in major_categories and event.impact >= EventImpact.HIGH:
+                    # Major high-impact events should never have more than 0.25 multiplier
+                    event_mult = min(event_mult, 0.25)
+
+                # CRITICAL events always zero the multiplier
                 if event.impact == EventImpact.CRITICAL:
                     event_mult = 0.0
-                elif event.impact == EventImpact.HIGH:
-                    event_mult = 0.5
-                elif event.impact == EventImpact.MEDIUM:
-                    event_mult = 0.75
-
-                # Stricter multiplier for major events
-                if (
-                    event.category
-                    in [
-                        EventCategory.FOMC,
-                        EventCategory.NFP,
-                        EventCategory.RATES,
-                        EventCategory.CPI,
-                    ]
-                    and event.impact >= EventImpact.HIGH
-                ):
-                    event_mult = min(
-                        event_mult, 0.0 if event.impact == EventImpact.CRITICAL else 0.25
-                    )
 
                 min_multiplier = min(min_multiplier, event_mult)
 

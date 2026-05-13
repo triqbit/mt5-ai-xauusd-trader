@@ -5,6 +5,7 @@ The `EventIntelligence` module (located in `src/data/event_intelligence.py`) pro
 
 ## Key Features
 - **Sophisticated Event Modeling:** Uses `MacroEvent` Pydantic models to represent economic releases, rate decisions, and geopolitical windows. Ingests richer data including `actual`, `forecast`, and `previous` values for enhanced signal attribution.
+- **Dynamic Severity Scoring:** The `MacroEvent` model includes a `severity_score` property (0.0 to 1.0) derived from impact level and functional category, enabling granular risk-adjusted execution and position sizing.
 - **Duration-Based Events:** Supports ongoing events (e.g., FOMC press conferences) via `end_timestamp`.
 - **Category-Specific Windows:** Implements specialized risk windows for major events (FOMC, NFP, RATES), providing wider pre-event and post-event (cooldown) coverage.
 - **Risk Multipliers:** Calculates a `risk_multiplier` to reduce position sizes during elevated risk periods.
@@ -35,9 +36,9 @@ If these parameters are not provided in the configuration, the system falls back
 The module is integrated into the `DecisionSupportSystem` to provide macro context in the pre-trade briefing dashboard.
 
 ### Risk Windows and Multipliers
-The system implements tiered risk management based on event impact:
+The system implements tiered risk management based on event impact and the calculated `severity_score`:
 - **Critical Impact:** Blocks execution (`is_blocked=True`) and sets `risk_multiplier=0.0`.
-- **High Impact (Major):** For FOMC, NFP, Interest Rate decisions, and **CPI**, a stricter `risk_multiplier=0.25` is applied, with a minimum 2-hour pre-event window and 3-hour cooldown.
+- **High Impact (Major):** For FOMC, NFP, Interest Rate decisions, and **CPI**, a stricter `risk_multiplier=0.25` is applied (capping the severity-derived multiplier), with a minimum 2-hour pre-event window and 3-hour cooldown.
 - **High Impact (Generic):** Applies a `risk_multiplier=0.5`.
 - **Medium Impact:** Applies a `risk_multiplier=0.75`.
 The internal `RiskStatus` model provides structured output for downstream components:
