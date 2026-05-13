@@ -15,6 +15,17 @@ body:
       description: Description of the security vulnerability.
     validations:
       required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Estimated Severity
+      options:
+        - Critical (Immediate capital/data risk)
+        - High (Serious vulnerability)
+        - Moderate (Limited impact)
+        - Low (Minor issue)
+    validations:
+      required: true
   - type: textarea
     id: impact
     attributes:

@@ -19,29 +19,27 @@ We use a role-based governance model where specific leads oversee different doma
 
 ## 🚀 Contributor Workflow
 
-### 1. Preparation
-- **Fork and Clone:** Create your own fork and clone it locally.
-- **Setup Environment:** Use Python 3.11+. Follow the [Setup Guide](../SETUP_GUIDE.md).
-- **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models, core).
+### 1. Contribution Lifecycle
+We follow a structured lifecycle for all changes to ensure maximum reliability:
 
-### 2. Implementation
-- **Branching Strategy:** We enforce a strict branching strategy to ensure traceability. All development must occur on branches prefixed by type:
-  - `feature/`: New capabilities or enhancements (e.g., `feature/ppo-optim-v2`)
-  - `bugfix/`: Fixes for identified issues (e.g., `bugfix/mt5-conn-leak`)
-  - `hotfix/`: Emergency production patches directly against `main`
-  - `docs/`: Documentation-only improvements
-  - `refactor/`: Code reorganization without functional changes
-- **Conventional Commits:** All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`, `security:`). This enables automated changelog generation and versioning.
-- **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
+1.  **Issue Identification:** Every contribution must start with an issue (Bug, Feature, or Security).
+2.  **Triage:** A maintainer will triage the issue and assign a priority (P0-P3).
+3.  **Branching:** Create a branch from `main` using the appropriate prefix:
+    - `feature/`: New capabilities or enhancements (e.g., `feature/ppo-optim-v2`)
+    - `bugfix/`: Fixes for identified issues (e.g., `bugfix/mt5-conn-leak`)
+    - `hotfix/`: Emergency production patches
+    - `docs/`: Documentation-only improvements
+    - `refactor/`: Code reorganization without functional changes
+4.  **Implementation:** Develop your changes, adhering to [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md).
+5.  **Pull Request:** Open a PR using the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md).
+6.  **Review & Multi-Signature:**
+    - Changes to **Sensitive Zones** (Trading, Models, Core) require **multi-signature approval** from both the domain lead and the Release/Governance lead (@andonly1348).
+7.  **Merge:** Once all checks pass and approvals are received, the PR is merged into `main`.
 
-### 3. Pull Request Lifecycle
-1.  **Draft PR:** Open a Draft PR early to get feedback on architectural direction.
-2.  **Mandatory Checks:** Ensure your PR passes all automated CI gates (Lint, Type, Security, Tests).
-3.  **Governance Template:** Complete the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) in full.
-4.  **Evidence:** Attach test logs, coverage reports, and backtest evidence.
-5.  **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required.
-6.  **Multi-Signature Sign-off:** Changes to **Sensitive Zones** (Trading, Models, Core) require mandatory multi-signature approval from both the relevant domain lead and the Release/Governance lead (@andonly1348).
-7.  **Merge:** Once all criteria are met, the branch is merged into `main` (or `develop` if applicable).
+### 2. Implementation Standards
+- **Conventional Commits:** All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+- **Testing:** We practice Test-Driven Development (TDD). New code MUST have corresponding tests.
+- **Type Safety:** All Python code must be fully type-hinted and pass `mypy`.
 
 ---
 
@@ -60,11 +58,6 @@ Every Pull Request must pass the following gates before merge:
 ---
 
 ## 🧪 Testing & Governance Verification
-
-We practice Test-Driven Development (TDD) where possible.
-- **Unit Tests:** Mandatory for all new functions and classes.
-- **Integration Tests:** Required for changes touching MT5 connectors or database schemas.
-- **Resilience Tests:** Mandatory for risk-management logic.
 
 Run the full suite and governance checks locally:
 ```bash
@@ -86,7 +79,7 @@ python3 scripts/doctor.py
 ## 🛡️ Security First
 
 If you discover a security vulnerability, please **do NOT open a public issue**.
-- Follow the [Security Policy](../SECURITY.md).
+- Follow the [SECURITY.md](../SECURITY.md).
 - Report via **GitHub Private Vulnerability Reporting**.
 - For critical issues, contact the leads listed in `SECURITY.md`.
 

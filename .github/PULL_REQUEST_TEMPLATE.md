@@ -29,6 +29,7 @@ These checks are required before the PR can be merged:
 ## 💥 Breaking Changes & Compatibility
 - [ ] Does this PR introduce breaking changes?
 - [ ] If yes, describe the impact and migration path.
+- [ ] **Backward Compatibility:** Verified that existing configurations and database schemas remain functional.
 
 ## 🛡️ Security & Risk Impact
 - [ ] Does this PR touch any financial/trading logic? (If so, explain the risk mitigation)

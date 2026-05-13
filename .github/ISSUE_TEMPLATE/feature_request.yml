@@ -49,6 +49,14 @@ body:
         - Infrastructure / Reliability
     validations:
       required: true
+  - type: input
+    id: system-version
+    attributes:
+      label: System Version (Target or Current)
+      description: What version is this feature targeting or what is the current version?
+      placeholder: e.g., v1.3.0
+    validations:
+      required: true
   - type: textarea
     id: use-cases
     attributes:
