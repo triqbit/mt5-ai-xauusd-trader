@@ -34,3 +34,7 @@ def test_research_report_template_rendering_sanity():
         content = f.read()
     assert "focus-visible" in content
     assert "fill-up" in content
+    # Verify UX enhancements added by Palette
+    assert "progress-bar-scroll" in content
+    assert "scrollBar" in content
+    assert "kpi-card:hover" in content

@@ -13,6 +13,8 @@
         h1 { margin: 0; font-size: 2.75rem; letter-spacing: -0.025em; }
         .metadata { margin-top: 1rem; font-size: 1rem; opacity: 0.9; display: flex; gap: 20px; }
         .sticky-nav { position: fixed; top: 0; left: 0; right: 0; background: rgba(44, 62, 80, 0.95); backdrop-filter: blur(8px); color: white; padding: 10px 0; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .progress-container { width: 100%; height: 4px; background: rgba(255,255,255,0.1); position: absolute; top: 0; left: 0; }
+        .progress-bar-scroll { height: 4px; background: var(--secondary); width: 0%; transition: width 0.1s ease; }
         .sticky-nav-container { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
         .sticky-nav a { color: white; text-decoration: none; font-size: 0.9rem; font-weight: 500; margin-left: 20px; transition: color 0.2s; }
         .sticky-nav a:hover { color: var(--secondary); }
@@ -46,7 +48,8 @@
         .badge-critical { background: #fde8e8; color: #9b1c1c; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         .kpi-dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 2.5rem; }
-        .kpi-card { background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid var(--secondary); }
+        .kpi-card { background: var(--white); padding: 1rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; border-top: 4px solid var(--secondary); transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: default; }
+        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
         .kpi-value { font-size: 1.5rem; font-weight: 800; color: var(--primary); display: block; }
         .kpi-label { font-size: 0.85rem; font-weight: 600; color: #718096; text-transform: uppercase; letter-spacing: 0.025em; }
         .status-badge { padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; }
@@ -78,6 +81,7 @@
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <div class="sticky-nav" role="banner">
+        <div class="progress-container"><div class="progress-bar-scroll" id="scrollBar"></div></div>
         <div class="sticky-nav-container">
             <span style="font-weight: 800; font-size: 1.1rem;">triqbit | Research</span>
             <nav aria-label="Main Navigation">
@@ -149,31 +153,31 @@
 
     <div class="kpi-dashboard">
         {% if stress_tests %}
-        <div class="kpi-card" style="border-top-color: var(--danger);">
+        <div class="kpi-card" style="border-top-color: var(--danger);" title="Composite score of strategy resilience across all adversarial scenarios.">
             <span class="kpi-value">{{ stress_tests.resilience_score }}</span>
             <span class="kpi-label">Resilience Score</span>
         </div>
         {% endif %}
         {% if hyperparameter_robustness %}
-        <div class="kpi-card" style="border-top-color: var(--warning);">
+        <div class="kpi-card" style="border-top-color: var(--warning);" title="Measures parameter stability. High scores indicate the strategy is not overfitted to specific settings.">
             <span class="kpi-value">{{ hyperparameter_robustness.stability_score }}</span>
             <span class="kpi-label">Stability Score</span>
         </div>
         {% endif %}
         {% if execution_quality %}
-        <div class="kpi-card" style="border-top-color: var(--secondary);">
+        <div class="kpi-card" style="border-top-color: var(--secondary);" title="Measures how much of the theoretical alpha was captured after slippage and spreads.">
             <span class="kpi-value">{{ execution_quality.efficiency_score|round(1) }}</span>
             <span class="kpi-label">Execution Efficiency</span>
         </div>
         {% endif %}
         {% if calibration_analysis %}
-        <div class="kpi-card" style="border-top-color: var(--primary);">
+        <div class="kpi-card" style="border-top-color: var(--primary);" title="Expected Calibration Error: Difference between model confidence and actual accuracy. Lower is better.">
             <span class="kpi-value">{{ calibration_analysis.ece|round(3) }}</span>
             <span class="kpi-label">Expected Calib. Error</span>
         </div>
         {% endif %}
         {% if allocation_insights %}
-        <div class="kpi-card" style="border-top-color: var(--success);">
+        <div class="kpi-card" style="border-top-color: var(--success);" title="HHI-based diversification score. 1.0 indicates perfect balance across strategies.">
             <span class="kpi-value">{{ allocation_insights.diversification_score|round(2) }}</span>
             <span class="kpi-label">Diversification</span>
         </div>
@@ -254,8 +258,8 @@
                 <tr>
                     <th scope="col">Scenario</th>
                     <th scope="col">Total Return</th>
-                    <th scope="col">Max Drawdown</th>
-                    <th scope="col">Sharpe</th>
+                    <th scope="col" title="Maximum observed equity loss from peak to trough.">Max Drawdown</th>
+                    <th scope="col" title="Risk-adjusted return. Ratio of excess return to volatility. Target > 2.0.">Sharpe</th>
                     <th scope="col">Outcome</th>
                 </tr>
             </thead>
@@ -484,14 +488,14 @@
             <tr>
                 <th scope="col">Strategy</th>
                 <th scope="col">Return</th>
-                <th scope="col">Sharpe</th>
-                <th scope="col">MaxDD</th>
-                <th scope="col">CVaR</th>
-                <th scope="col">PF</th>
-                <th scope="col">SQN</th>
-                <th scope="col">Recovery</th>
-                <th scope="col">Calmar</th>
-                <th scope="col">P-Value</th>
+                <th scope="col" title="Sharpe Ratio: Risk-adjusted return.">Sharpe</th>
+                <th scope="col" title="Max Drawdown: Largest peak-to-trough decline.">MaxDD</th>
+                <th scope="col" title="Conditional Value at Risk: Expected loss in the worst 5% of cases.">CVaR</th>
+                <th scope="col" title="Profit Factor: Gross Profit / Gross Loss.">PF</th>
+                <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
+                <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recovery</th>
+                <th scope="col" title="Calmar Ratio: Annualized Return / Max Drawdown.">Calmar</th>
+                <th scope="col" title="Statistical significance. p < 0.05 indicates the result is likely not due to luck.">P-Value</th>
             </tr>
         </thead>
         <tbody>
@@ -524,15 +528,15 @@
             <thead>
                 <tr>
                     <th scope="col">Agent</th>
-                    <th scope="col">Sharpe</th>
+                    <th scope="col" title="Sharpe Ratio: Risk-adjusted return.">Sharpe</th>
                     <th scope="col">Sortino</th>
                     <th scope="col">PF</th>
-                    <th scope="col">MaxDD</th>
+                    <th scope="col" title="Max Drawdown: Largest peak-to-trough decline.">MaxDD</th>
                     <th scope="col">Recov</th>
                     <th scope="col">VaR(95)</th>
                     <th scope="col">Tail</th>
                     <th scope="col">Lake</th>
-                    <th scope="col">SQN</th>
+                    <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
                 </tr>
             </thead>
             <tbody>
@@ -699,10 +703,21 @@
     <script>
         window.addEventListener('scroll', () => {
             const backToTop = document.querySelector('.back-to-top');
+            const scrollBar = document.getElementById('scrollBar');
+
+            // Back to top visibility
             if (window.scrollY > 300) {
                 backToTop.classList.add('visible');
             } else {
                 backToTop.classList.remove('visible');
+            }
+
+            // Scroll progress bar
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            if (scrollBar) {
+                scrollBar.style.width = scrolled + "%";
             }
         });
     </script>
