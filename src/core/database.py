@@ -9,13 +9,18 @@ License: MIT
 from __future__ import annotations
 
 import logging
+import os
+import stat
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 logger = logging.getLogger(__name__)
+
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -24,12 +29,14 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     Only applied to SQLite connections.
     """
     import sqlite3
+
     if isinstance(dbapi_connection, sqlite3.Connection):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.close()
         logger.debug("SQLite pragmas (foreign_keys, WAL) enabled.")
+
 
 @lru_cache(maxsize=16)
 def get_engine(db_url: str) -> Engine:
@@ -38,6 +45,32 @@ def get_engine(db_url: str) -> Engine:
     Aligned with DATABASE_STANDARDS.md for connection pooling and resilience.
     """
     is_sqlite = db_url.startswith("sqlite")
+
+    # Security: Enforce restrictive file permissions for SQLite databases
+    if is_sqlite and ":memory:" not in db_url and db_url != "sqlite://":
+        try:
+            url = make_url(db_url)
+            if url.database:
+                db_path = Path(url.database)
+                # Ensure parent directory exists
+                if not db_path.parent.exists():
+                    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Pre-create or harden existing file permissions
+                if not db_path.exists():
+                    # Create with 0o600 (owner read/write only)
+                    fd = os.open(db_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                    os.close(fd)
+                    logger.info("Initialized secure SQLite database file: %s", db_path)
+                else:
+                    # Enforce 0o600 on existing file if supported by platform
+                    if os.name != "nt":
+                        current_mode = stat.S_IMODE(os.stat(db_path).st_mode)
+                        if current_mode != 0o600:
+                            os.chmod(db_path, 0o600)
+                            logger.debug("Hardened permissions on existing database: %s", db_path)
+        except Exception as e:
+            logger.warning("Failed to enforce secure SQLite permissions: %s", e)
 
     connect_args: dict[str, Any] = {}
     if is_sqlite:
@@ -48,10 +81,10 @@ def get_engine(db_url: str) -> Engine:
     from sqlalchemy.pool import NullPool, QueuePool, StaticPool
 
     engine_kwargs: dict[str, Any] = {
-        "pool_pre_ping": True,    # Verify connections are alive
-        "pool_recycle": 3600,     # Recycle connections every hour
+        "pool_pre_ping": True,  # Verify connections are alive
+        "pool_recycle": 3600,  # Recycle connections every hour
         "connect_args": connect_args,
-        "echo": False
+        "echo": False,
     }
 
     if is_sqlite:
@@ -68,12 +101,16 @@ def get_engine(db_url: str) -> Engine:
 
     engine = create_engine(db_url, **engine_kwargs)
 
-    logger.info("Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url)
+    logger.info(
+        "Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url
+    )
     return engine
+
 
 def get_session_factory(engine: Engine) -> sessionmaker[Session]:
     """Return a session factory for the provided engine."""
     return sessionmaker(bind=engine, expire_on_commit=False)
+
 
 def verify_engine(engine: Engine) -> bool:
     """Perform a low-level ping to verify database connectivity."""
