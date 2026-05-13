@@ -297,3 +297,22 @@ def test_start_date_config(simulator):
     df, _ = simulator.generate_scenario(config)
 
     assert df.index[0].strftime("%Y-%m-%d") == start_date
+
+
+def test_feature_engineer_compatibility(simulator):
+    """Verify that generated rare events are compatible with the FeatureEngineer pipeline."""
+    from src.core.feature_engineering import FeatureEngineer
+
+    # Use a large enough number of steps for indicators (e.g. EMA 200)
+    config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=500)
+    df, _ = simulator.generate_scenario(config)
+
+    fe = FeatureEngineer(normalize=True)
+    features = fe.compute_features(df)
+
+    assert isinstance(features, pd.DataFrame)
+    assert not features.empty
+    assert len(features) > 0
+    # Ensure it produces a significant number of features
+    assert features.shape[1] > 20
+    assert not features.isnull().values.any()
