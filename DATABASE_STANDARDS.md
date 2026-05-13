@@ -387,3 +387,4 @@ The trade logging system has been implemented in `src/core/trade_logger.py` usin
 To ensure enterprise-grade reliability when using SQLite:
 - **Foreign Key Enforcement**: Enabled via SQLAlchemy event listeners (`PRAGMA foreign_keys=ON`). This ensures relational integrity that is disabled by default in SQLite.
 - **Write-Ahead Logging (WAL)**: Enabled via `PRAGMA journal_mode=WAL` to improve concurrency (allowing multiple readers and one writer) and provide better durability and performance.
+- **File Permissions**: Enforced `0o600` (owner read/write only) on file-based SQLite databases to prevent unauthorized local access to sensitive trade and audit data.
