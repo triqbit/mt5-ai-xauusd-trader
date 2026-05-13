@@ -134,7 +134,6 @@ class ResilienceReport(BaseModel):
             scenarios=main_scenarios,
             fragility_indicators=self.fragility_indicators,
             failure_points=self.failure_points,
-            insights=self.degradation_summary,
         )
 
 
@@ -255,7 +254,6 @@ class StressLab:
         # Run sensitivity analysis for key friction parameters
         self.analyze_sensitivity("spread_multiplier", np.linspace(1.0, 5.0, 5))
         self.analyze_sensitivity("slippage_bps", np.linspace(0.0, 20.0, 5))
-        self.analyze_sensitivity("execution_delay_steps", [0, 1, 2, 3, 5])
 
         return self.generate_report(baseline_metrics)
 
@@ -389,8 +387,6 @@ class StressLab:
                 fragility.append(f"Over-trading spike in {scenario_name}")
             if metrics.profit_factor < 1.0 and baseline_metrics.profit_factor >= 1.0:
                 fragility.append(f"Negative edge (PF < 1.0) in {scenario_name}")
-            if metrics.recovery_factor < baseline_metrics.recovery_factor * 0.3:
-                fragility.append(f"Recovery factor collapse in {scenario_name}")
 
         return ResilienceReport(
             strategy_name=self.strategy.name,

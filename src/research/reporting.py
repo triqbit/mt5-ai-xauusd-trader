@@ -49,7 +49,6 @@ class StressTestSection(BaseModel):
     scenarios: list[StressedMetric]
     fragility_indicators: list[str]
     failure_points: list[str]
-    insights: str = ""
 
 
 class ParameterRobustness(BaseModel):

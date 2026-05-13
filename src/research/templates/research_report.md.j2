@@ -64,17 +64,12 @@
 ## {{ ns.count }}. Stress Test Outcomes
 **Resilience Score:** {{ stress_tests.resilience_score }}/100
 
-| Scenario | Total Return | Max Drawdown | Sharpe | PF | Recov | Outcome |
-|----------|--------------|--------------|--------|----|-------|---------|
-| **Baseline** | {{ stress_tests.baseline.total_return }} | {{ stress_tests.baseline.max_drawdown }} | {{ stress_tests.baseline.sharpe }} | {{ stress_tests.baseline.profit_factor }} | {{ stress_tests.baseline.recovery_factor }} | - |
+| Scenario | Total Return | Max Drawdown | Sharpe | Outcome |
+|----------|--------------|--------------|--------|---------|
+| **Baseline** | {{ stress_tests.baseline.total_return }} | {{ stress_tests.baseline.max_drawdown }} | {{ stress_tests.baseline.sharpe }} | - |
 {% for s in stress_tests.scenarios %}
-| {{ s.name }} | {{ s.total_return }} | {{ s.max_drawdown }} | {{ s.sharpe }} | {{ s.profit_factor }} | {{ s.recovery_factor }} | {{ s.outcome }} |
+| {{ s.name }} | {{ s.total_return }} | {{ s.max_drawdown }} | {{ s.sharpe }} | {{ s.outcome }} |
 {% endfor %}
-
-{% if stress_tests.insights %}
-**Institutional Insights:**
-{{ stress_tests.insights }}
-{% endif %}
 
 **Fragility Indicators:**
 {% for indicator in stress_tests.fragility_indicators %}

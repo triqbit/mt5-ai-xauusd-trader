@@ -336,10 +336,9 @@ def test_run_standard_suite(sample_data):
     )
 
     report = lab.run_standard_suite(baseline)
-    # 4 standard scenarios + (5 spread + 5 slippage + 5 delay sensitivity) = 19
-    assert len(report.scenario_results) == 19
+    # 4 standard scenarios + (5 spread sensitivity + 5 slippage sensitivity) = 14
+    assert len(report.scenario_results) == 14
     assert "Flash Crash" in report.scenario_results
-    assert "execution_delay_steps" in report.sensitivity_results
     assert "spread_multiplier" in report.sensitivity_results
     assert report.resilience_score >= 0
 
