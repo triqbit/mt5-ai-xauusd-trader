@@ -1,5 +1,4 @@
 import os
-import stat
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -19,12 +18,9 @@ def test_deep_redaction():
 
     data = {
         "msg": "Connected with SUPER_SECRET_123",
-        "nested": {
-            "token": "SUPER_SECRET_123",
-            "safe": "data"
-        },
+        "nested": {"token": "SUPER_SECRET_123", "safe": "data"},
         "list": ["SUPER_SECRET_123", "safe"],
-        "password_field": "some_value"  # Should be redacted by key name
+        "password_field": "some_value",  # Should be redacted by key name
     }
 
     redacted = processor.redact_any(data)
@@ -46,6 +42,7 @@ def test_audit_logger_redaction(tmp_path):
 
     # Setup masking processor with a secret
     from src.core.log_config import get_masking_processor
+
     processor = get_masking_processor()
     processor.secrets.add("API_KEY_HIDDEN")
 
@@ -55,12 +52,14 @@ def test_audit_logger_redaction(tmp_path):
     logger.log(
         actor="test",
         action="sensitive_action",
-        metadata={"key": "API_KEY_HIDDEN", "nested": {"password": "secret_pass"}}
+        metadata={"key": "API_KEY_HIDDEN", "nested": {"password": "secret_pass"}},
     )
 
     # Check the database
     from sqlalchemy import create_engine, select
+
     from src.core.audit_log import AuditEntry
+
     engine = create_engine(db_url)
     with engine.connect() as conn:
         result = conn.execute(select(AuditEntry.metadata_json)).fetchone()
@@ -140,6 +139,7 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     assert len(permission_errors) > 0
     assert "Insecure permissions" in permission_errors[0].message
 
+
 def test_safe_pytorch_loading():
     """
     Statically analyze the codebase to ensure all torch.load calls
@@ -165,9 +165,11 @@ def test_safe_pytorch_loading():
                     # Check for torch.load(...)
                     is_torch_load = False
                     if isinstance(node.func, ast.Attribute):
-                        if (isinstance(node.func.value, ast.Name) and
-                            node.func.value.id == "torch" and
-                            node.func.attr == "load"):
+                        if (
+                            isinstance(node.func.value, ast.Name)
+                            and node.func.value.id == "torch"
+                            and node.func.attr == "load"
+                        ):
                             is_torch_load = True
                     elif isinstance(node.func, ast.Name) and node.func.id == "load":
                         # Could be 'from torch import load'
@@ -179,15 +181,21 @@ def test_safe_pytorch_loading():
                         has_weights_only = False
                         for keyword in node.keywords:
                             if keyword.arg == "weights_only":
-                                if (isinstance(keyword.value, ast.Constant) and
-                                    keyword.value.value is True):
+                                if (
+                                    isinstance(keyword.value, ast.Constant)
+                                    and keyword.value.value is True
+                                ):
                                     has_weights_only = True
-                                elif (isinstance(keyword.value, ast.NameConstant) and
-                                      keyword.value.value is True):
+                                elif (
+                                    isinstance(keyword.value, ast.NameConstant)
+                                    and keyword.value.value is True
+                                ):
                                     # For older python versions
                                     has_weights_only = True
 
                         if not has_weights_only:
                             violations.append(f"{path.relative_to(root_dir)}:{node.lineno}")
 
-    assert not violations, f"Unsafe torch.load calls found in: {violations}. Always use weights_only=True."
+    assert not violations, (
+        f"Unsafe torch.load calls found in: {violations}. Always use weights_only=True."
+    )

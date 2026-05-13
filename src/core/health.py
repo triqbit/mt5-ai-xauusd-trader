@@ -285,14 +285,18 @@ class HealthChecker:
 
             if not account_trade_allowed:
                 messages.append("Trading is DISABLED for this account by broker")
-                remedies.append("Contact broker or check if account is read-only or has limited permissions")
+                remedies.append(
+                    "Contact broker or check if account is read-only or has limited permissions"
+                )
                 overall_status = HealthStatus.FAILED
 
             if not symbol_props:
                 similar = self.connector.find_symbols(symbol[:3]) if len(symbol) >= 3 else []
                 suggestion = f" (Did you mean: {', '.join(similar[:3])}?)" if similar else ""
                 messages.append(f"Symbol '{symbol}' not found on server{suggestion}")
-                remedies.append(f"Check SYMBOL in .env is exactly as it appears in MT5 Market Watch{suggestion}")
+                remedies.append(
+                    f"Check SYMBOL in .env is exactly as it appears in MT5 Market Watch{suggestion}"
+                )
                 overall_status = HealthStatus.FAILED
             elif not symbol_props.get("tradable", True):
                 messages.append(f"Symbol '{symbol}' is not tradable (Market closed)")
@@ -341,7 +345,10 @@ class HealthChecker:
             loaded.append("Dreamer")
 
         # 2. Check for Transformer component
-        if getattr(self.model, "transformer_model", None) is not None or self.model.__class__.__name__ == "TimeSeriesTransformer":
+        if (
+            getattr(self.model, "transformer_model", None) is not None
+            or self.model.__class__.__name__ == "TimeSeriesTransformer"
+        ):
             loaded.append("Transformer")
 
         # 3. Check for individual model wrapper/direct instance
@@ -592,12 +599,12 @@ def create_health_app() -> FastAPI:
 
 
 __all__ = [
-    "HealthStatus",
     "ComponentStatus",
-    "HealthReport",
     "HealthChecker",
-    "init_health_checker",
-    "get_health_checker",
-    "router",
+    "HealthReport",
+    "HealthStatus",
     "create_health_app",
+    "get_health_checker",
+    "init_health_checker",
+    "router",
 ]
