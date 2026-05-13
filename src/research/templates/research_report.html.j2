@@ -260,6 +260,8 @@
                     <th scope="col">Total Return</th>
                     <th scope="col" title="Maximum observed equity loss from peak to trough.">Max Drawdown</th>
                     <th scope="col" title="Risk-adjusted return. Ratio of excess return to volatility. Target > 2.0.">Sharpe</th>
+                    <th scope="col" title="Profit Factor: Gross Profit / Gross Loss.">PF</th>
+                    <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recov</th>
                     <th scope="col">Outcome</th>
                 </tr>
             </thead>
@@ -269,6 +271,8 @@
                     <td>{{ stress_tests.baseline.total_return }}</td>
                     <td>{{ stress_tests.baseline.max_drawdown }}</td>
                     <td>{{ stress_tests.baseline.sharpe }}</td>
+                    <td>{{ stress_tests.baseline.profit_factor }}</td>
+                    <td>{{ stress_tests.baseline.recovery_factor }}</td>
                     <td>-</td>
                 </tr>
                 {% for s in stress_tests.scenarios %}
@@ -277,11 +281,20 @@
                     <td>{{ s.total_return }}</td>
                     <td>{{ s.max_drawdown }}</td>
                     <td>{{ s.sharpe }}</td>
+                    <td>{{ s.profit_factor }}</td>
+                    <td>{{ s.recovery_factor }}</td>
                     <td class="{{ s.outcome.lower() }}">{{ s.outcome }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if stress_tests.insights %}
+        <div class="insight-box" style="margin-bottom: 2rem;">
+            <strong>Institutional Insights:</strong><br>
+            {{ stress_tests.insights }}
+        </div>
+        {% endif %}
 
         <div style="display: flex; gap: 20px;">
             <div style="flex: 1;">
