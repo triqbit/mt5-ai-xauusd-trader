@@ -582,12 +582,13 @@ class EventIntelligence:
             ) <= timedelta(minutes=post_window):
                 is_active = True
                 # Critical events always block during cooldown; HIGH impact majors block for first 60 mins
-                if event.impact == EventImpact.CRITICAL:
-                    is_event_blocking = True
-                elif (
-                    event.impact == EventImpact.HIGH
-                    and event.category in major_categories
-                    and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
+                if (
+                    event.impact == EventImpact.CRITICAL
+                    or (
+                        event.impact == EventImpact.HIGH
+                        and event.category in major_categories
+                        and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
+                    )
                 ):
                     is_event_blocking = True
 
