@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -384,10 +383,14 @@ class ExecutionFilter:
     ) -> tuple[bool, dict[str, Any]]:
         """Blocks if drift is too high or accuracy is too low."""
         drift_threshold = (
-            self.cfg.model_drift_threshold if self.cfg and hasattr(self.cfg, "model_drift_threshold") else 0.3
+            self.cfg.model_drift_threshold
+            if self.cfg and hasattr(self.cfg, "model_drift_threshold")
+            else 0.3
         )
         accuracy_floor = (
-            self.cfg.model_accuracy_floor if self.cfg and hasattr(self.cfg, "model_accuracy_floor") else 0.45
+            self.cfg.model_accuracy_floor
+            if self.cfg and hasattr(self.cfg, "model_accuracy_floor")
+            else 0.45
         )
 
         drift = model_health.get("drift", 0.0)
@@ -401,7 +404,9 @@ class ExecutionFilter:
             "accuracy_floor": accuracy_floor,
         }
 
-    def _check_performance_guard_with_metrics(self, trade_logger: Any) -> tuple[bool, dict[str, Any]]:
+    def _check_performance_guard_with_metrics(
+        self, trade_logger: Any
+    ) -> tuple[bool, dict[str, Any]]:
         """Blocks if historical win rate is dangerously low."""
         report = trade_logger.read_performance_report()
         win_rate = report.get("win_rate", 1.0)
@@ -409,7 +414,11 @@ class ExecutionFilter:
 
         # Only apply guard after a statistically significant number of trades
         if total_trades < 20:
-            return True, {"win_rate": win_rate, "total_trades": total_trades, "status": "insufficient_data"}
+            return True, {
+                "win_rate": win_rate,
+                "total_trades": total_trades,
+                "status": "insufficient_data",
+            }
 
         floor = 0.45
         passed = win_rate >= floor

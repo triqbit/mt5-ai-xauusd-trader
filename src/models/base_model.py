@@ -10,8 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
-from pydantic import BaseModel as PydanticBaseModel
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field
 
 from src.core.constants import SignalDirection
 
