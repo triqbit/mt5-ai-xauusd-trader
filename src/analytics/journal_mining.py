@@ -255,7 +255,9 @@ class JournalReport(BaseModel):
             )
 
         # Rejection Quality Risks
-        poor_rejections = [r for r in self.rejection_quality if r.accuracy < 0.4 and r.total_blocked >= 3]
+        poor_rejections = [
+            r for r in self.rejection_quality if r.accuracy < 0.4 and r.total_blocked >= 3
+        ]
         if poor_rejections:
             r = poor_rejections[0]
             risks.append(
@@ -345,7 +347,9 @@ class JournalMiner:
         hour = dt.hour
         active = []
         for name, (start, end) in self.sessions.items():
-            if (start < end and start <= hour < end) or (start >= end and (hour >= start or hour < end)):
+            if (start < end and start <= hour < end) or (
+                start >= end and (hour >= start or hour < end)
+            ):
                 active.append(name)
         return active
 
@@ -523,9 +527,7 @@ class JournalMiner:
             prev_trade = df.iloc[i - 1]
             curr_trade = df.iloc[i]
 
-            time_diff = (
-                curr_trade["created_at"] - prev_trade["created_at"]
-            ).total_seconds() / 60.0
+            time_diff = (curr_trade["created_at"] - prev_trade["created_at"]).total_seconds() / 60.0
             if prev_trade["pnl"] < 0 and 0 < time_diff <= window_minutes:
                 # Check for lot size increase if available
                 lot_increase = False
@@ -1194,7 +1196,7 @@ class JournalMiner:
         if not clusters:
             return []
 
-        toxic_combinations = []
+        combinations = []
         for cluster in clusters:
             # Ensure cluster start_time is timezone-aware and UTC
             cluster_start = cluster.start_time
@@ -1231,106 +1233,27 @@ class JournalMiner:
                 vol_buckets = pre_cluster["vol_bucket"].unique()
                 dom_vol = vol_buckets[0] if len(vol_buckets) == 1 else "Mixed"
 
-                toxic_combinations.append((tuple(pattern), dom_session, dom_vol))
+                combinations.append((tuple(pattern), dom_session, dom_vol))
 
-        # Also find "Golden" combinations (all signals in window were profitable)
-        golden_combinations = []
-        if "pnl" in sigs.columns:
-            sigs_with_pnl = sigs.dropna(subset=["pnl"])
-        else:
-            sigs_with_pnl = pd.DataFrame()
+        if not combinations:
+            return []
 
-        if not sigs_with_pnl.empty:
-            # Group signals by time windows of window_minutes
-            sigs_with_pnl = sigs_with_pnl.sort_values("created_at")
-            # Simple windowing: for each signal, look at window_minutes following it
-            for i in range(len(sigs_with_pnl)):
-                start_time = sigs_with_pnl.iloc[i]["created_at"]
-                end_time = start_time + pd.Timedelta(minutes=window_minutes)
-                window_sigs = sigs_with_pnl[
-                    (sigs_with_pnl["created_at"] >= start_time)
-                    & (sigs_with_pnl["created_at"] <= end_time)
-                ]
-
-                if len(window_sigs) >= 2:
-                    pattern = sorted(
-                        [
-                            f"{row['algorithm']}:{row['direction']}"
-                            for _, row in window_sigs.iterrows()
-                        ]
-                    )
-                    avg_pnl = window_sigs["pnl"].mean()
-                    win_rate = (window_sigs["pnl"] > 0).mean()
-
-                    if win_rate >= 0.8 and avg_pnl > 0:
-                        window_sigs = window_sigs.copy()
-                        window_sigs["session"] = window_sigs["created_at"].apply(
-                            lambda x: (self._get_session(x) or ["Unknown"])[0]
-                        )
-                        window_sigs["vol_bucket"] = window_sigs["volatility"].apply(
-                            self._extract_volatility_bucket
-                        )
-
-                        sessions = window_sigs["session"].unique()
-                        dom_session = sessions[0] if len(sessions) == 1 else "Mixed"
-                        vol_buckets = window_sigs["vol_bucket"].unique()
-                        dom_vol = vol_buckets[0] if len(vol_buckets) == 1 else "Mixed"
-
-                        # Calculate expectancy for this window
-                        pnls = window_sigs["pnl"]
-                        avg_win = pnls[pnls > 0].mean() if (pnls > 0).any() else 0.0
-                        avg_loss = abs(pnls[pnls < 0].mean()) if (pnls < 0).any() else 0.0
-                        expectancy = (win_rate * avg_win) - ((1.0 - win_rate) * avg_loss)
-
-                        golden_combinations.append(
-                            (tuple(pattern), dom_session, dom_vol, float(avg_pnl), float(expectancy))
-                        )
-
+        counts = Counter(combinations)
         results = []
 
-        # Process Toxic Combinations
-        if toxic_combinations:
-            toxic_counts = Counter(toxic_combinations)
-            for (pattern_tuple, sess, vol), count in toxic_counts.items():
-                if count >= 2:
-                    results.append(
-                        CombinationMotif(
-                            patterns=list(pattern_tuple),
-                            frequency=count,
-                            avg_pnl_after=-1.0,  # Negative by definition
-                            is_toxic=True,
-                            is_golden=False,
-                            expectancy=-0.5,  # Heuristic
-                            session=sess,
-                            volatility_bucket=vol,
-                        )
+        for (pattern_tuple, sess, vol), count in counts.items():
+            if count >= 2:
+                # Heuristic: these combinations precede clusters, so they are toxic by definition
+                results.append(
+                    CombinationMotif(
+                        patterns=list(pattern_tuple),
+                        frequency=count,
+                        avg_pnl_after=0.0,  # Could be calculated if needed
+                        is_toxic=True,
+                        session=sess,
+                        volatility_bucket=vol,
                     )
-
-        # Process Golden Combinations
-        if golden_combinations:
-            # Group by pattern and session/vol to get frequency
-            golden_df = pd.DataFrame(
-                golden_combinations, columns=["pattern", "sess", "vol", "avg_pnl", "expectancy"]
-            )
-            # Use unique patterns to avoid overlaps from sliding window
-            for (pattern, sess, vol), group in golden_df.groupby(["pattern", "sess", "vol"]):
-                freq = len(group)
-                if freq >= 2:
-                    avg_pnl = group["avg_pnl"].mean()
-                    avg_expectancy = group["expectancy"].mean()
-                    results.append(
-                        CombinationMotif(
-                            patterns=list(pattern),
-                            frequency=freq,
-                            avg_pnl_after=float(avg_pnl),
-                            is_toxic=False,
-                            is_golden=True,
-                            expectancy=float(avg_expectancy),
-                            efficiency_ratio=1.0,  # High win rate
-                            session=sess,
-                            volatility_bucket=vol,
-                        )
-                    )
+                )
 
         return sorted(results, key=lambda x: x.frequency, reverse=True)
 
