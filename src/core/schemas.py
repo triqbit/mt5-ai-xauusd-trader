@@ -52,7 +52,12 @@ class TradeSignal(BaseModel):
     take_profit: float = Field(
         ..., gt=0, description="The target profit taking price (must be positive)"
     )
-    lot_size: float = Field(..., ge=0.01, description="The position size in lots (minimum 0.01)")
+    lot_size: float = Field(
+        ...,
+        ge=0.01,
+        le=5.0,
+        description="The position size in lots (minimum 0.01, capped at 5.0 for enterprise safety)",
+    )
     algorithm: str = Field(..., description="The name of the algorithm that generated this signal")
     confidence: float = Field(
         ...,
