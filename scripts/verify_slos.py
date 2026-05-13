@@ -1,7 +1,9 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Reliability Verification Tool
 scripts/verify_slos.py
+Version: 1.1.0
 Calculates current SLO compliance metrics from audit and trade databases.
+Synchronized with docs/SLO_TARGETS.md.
 """
 
 import sqlite3
@@ -19,7 +21,10 @@ TARGETS = {
     "RTO_SECONDS": 900,  # 15 mins
     "BACKTEST_P50": 300, # 5 mins
     "BACKTEST_P95": 480, # 8 mins
-    "BACKTEST_P99": 720  # 12 mins
+    "BACKTEST_P99": 720, # 12 mins
+    "INFERENCE_P50": 0.010, # 10ms
+    "INFERENCE_P95": 0.050, # 50ms
+    "INFERENCE_P99": 0.100  # 100ms
 }
 
 def get_db_connection(path):

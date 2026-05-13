@@ -59,12 +59,12 @@ Defined in the [Disaster Recovery Plan](DISASTER_RECOVERY.md).
 
 The Error Budget is the maximum allowable unreliability. If the budget is exhausted, a "Stability Freeze" is triggered.
 
-| Component | SLO | Error Budget | "Acceptable" Failure / Month |
-|-----------|-----|--------------|-----------------------------|
-| **Availability** | 99.5% | 0.5% | 216 Minutes (3.6 Hours) |
-| **CI Stability** | 95.0% | 5.0% | 5 failures per 100 commits |
-| **Trade Execution** | 99.9% | 0.1% | 1 failure per 1,000 signals |
-| **Data Integrity** | 100% | 0.0% | **Zero** unrecoverable data loss |
+| Component | SLO | Error Budget | "Acceptable" Failure / Month | Description |
+|-----------|-----|--------------|-----------------------------|-------------|
+| **Availability** | 99.5% | 0.5% | 216 Minutes (3.6 Hours) | Total downtime across all market hours (equiv. to ~14 incidents at 15m RTO). |
+| **CI Stability** | 95.0% | 5.0% | 5 failures per 100 commits | Non-transient pipeline failures (excludes infrastructure flakiness). |
+| **Trade Execution** | 99.9% | 0.1% | 1 failure per 1,000 signals | Technical execution failures (e.g., timeout, rejection due to code bug). |
+| **Data Integrity** | 100% | 0.0% | **Zero** incidents | No unrecoverable data loss or permanent database corruption. |
 
 ### 6.1 Stability Freeze Protocol
 
