@@ -24,13 +24,14 @@ The DSS summarizes the following dimensions:
 - **Signal Attribution:** Detailed breakdown of which models drove the signal and which features contributed most (provided by `SignalExplainer`).
 - **Market Regime:** Contextual awareness of the current market state (Trending, Volatile, Ranging) and its favorability.
 - **Macro Risk:** Real-time awareness of macroeconomic events (CPI, FOMC, NFP) and their impact on execution safety.
-- **Performance Context:** Recent strategy performance metrics (Sharpe Ratio, Win Rate, Profit Factor, Recovery Factor, and Win/Loss Ratio) to provide historical perspective.
+- **Performance Context:** Recent strategy performance metrics (Sharpe Ratio, Win Rate, Profit Factor, Recovery Factor, Calmar Ratio, Expectancy, and Win/Loss Ratio) to provide historical perspective.
 
 ### 3. Decision Dashboard
 For human operators, the DSS generates a high-fidelity terminal dashboard using the `rich` library. This dashboard provides:
-- Semantic icons and emojis (📈/📉, ✅/⚠️/🛑, 💎/💪) for rapid scannability and accessibility.
+- Semantic icons and emojis (📈/📉, ✅/⚠️/🛑, 💎/💪, 🌊) for rapid scannability and accessibility.
 - Color-coded status and direction.
-- **Institutional Metric Highlighting:** Sharpe Ratio, Profit Factor, Recovery Factor, Win Rate, and Win/Loss Ratio are color-coded (Green/Yellow/Red) based on institutional health targets (e.g., Green for Win Rate >= 55%).
+- **Institutional Metric Highlighting:** Sharpe Ratio, Profit Factor, Recovery Factor, Calmar Ratio, Win Rate, and Win/Loss Ratio are color-coded (Green/Yellow/Red) based on institutional health targets (e.g., Green for Win Rate >= 55%, Calmar >= 3.0).
+- **Regime Alignment Score:** Visual display of how well the current regime aligns with the strategy setup (Green >= 70%).
 - Structured panels with descriptive icons for market and performance overviews.
 - **High Conviction Badge:** A `[HIGH CONVICTION] 💎` visual indicator for signals with a decision score of 90 or higher.
 - **Conviction Meter:** A visual progress bar showing the decision score conviction at a glance.

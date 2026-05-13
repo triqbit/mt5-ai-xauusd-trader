@@ -126,7 +126,9 @@ class BlockedSignalAnalysis(Base, AuditMixin):
     __tablename__ = "blocked_signal_analysis"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    signal_id: Mapped[int] = mapped_column(ForeignKey("model_signals.id"), nullable=False, unique=True)
+    signal_id: Mapped[int] = mapped_column(
+        ForeignKey("model_signals.id"), nullable=False, unique=True
+    )
 
     opportunity_cost_pnl: Mapped[float] = mapped_column(Float, nullable=False)
     max_favorable_excursion: Mapped[float] = mapped_column(Float, nullable=False)
@@ -183,7 +185,9 @@ class PerformanceMetric(Base, AuditMixin):
     __tablename__ = "performance_metrics"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), index=True
+    )
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
     max_drawdown: Mapped[float | None] = mapped_column(Float)
@@ -394,8 +398,8 @@ class TradeLogger:
             )
 
             # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
+            avg_ret = np.mean(pnls) if len(pnls) > 0 else 0.0
             if len(pnls) > 1:
-                avg_ret = np.mean(pnls)
                 std_ret = np.std(pnls)
                 sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
             else:
@@ -407,10 +411,22 @@ class TradeLogger:
             drawdown = peak - equity_curve
             max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
 
+            # Calmar Ratio (Annualized Return / Max Drawdown)
+            # Rough approximation using mean P&L for annualized return if we don't have clear timeframes
+            # per standard: (mean_pnl * 252) / max_dd
+            calmar = (avg_ret * 252 / max_dd) if max_dd > 0 and len(pnls) > 0 else 0.0
+
+            # Expectancy: (WinRate * AvgWin) - (LossRate * AvgLoss)
+            avg_win = np.mean(pnls[pnls > 0]) if any(pnls > 0) else 0.0
+            avg_loss = abs(np.mean(pnls[pnls < 0])) if any(pnls < 0) else 0.0
+            expectancy = (win_rate * avg_win) - ((1 - win_rate) * avg_loss)
+
             metrics = {
                 "sharpe_ratio": float(sharpe),
                 "profit_factor": float(profit_factor),
                 "max_drawdown": float(max_dd),
+                "calmar_ratio": float(calmar),
+                "expectancy": float(expectancy),
                 "win_rate": float(win_rate),
                 "total_trades": int(total_trades),
             }

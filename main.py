@@ -205,7 +205,8 @@ def run_live(
         if loop_count % 100 == 0 and audit_logger:
             # Dynamic exclusion of all SecretStr/SecretBytes fields
             secret_fields = {
-                f for f, info in cfg.__class__.model_fields.items()
+                f
+                for f, info in cfg.__class__.model_fields.items()
                 if "Secret" in str(info.annotation)
             }
             audit_logger.log_config_snapshot(
@@ -776,6 +777,7 @@ def run_setup_wizard() -> int:
 
     # Secure permissions
     import contextlib
+
     with contextlib.suppress(Exception):
         os.chmod(env_path, 0o600)
 
@@ -922,6 +924,13 @@ def run_backtest(
     log: "BoundLogger",
 ):
     """Bridge for running the walk-forward backtesting engine."""
+    try:
+        from rich.panel import Panel as RichPanel
+        from rich.table import Table as RichTable
+    except ImportError:
+        RichPanel = None
+        RichTable = None
+
     from src.trading.backtester import BacktestEngine
 
     def get_color(metric: str, value: float) -> str:
@@ -975,7 +984,7 @@ def run_backtest(
         )
 
         # Display Report
-        perf_table = Table(title="Backtest Performance Report", box=None)
+        perf_table = RichTable(title="Backtest Performance Report", box=None)
         perf_table.add_column("Metric", style="cyan")
         perf_table.add_column("Value", justify="right")
 
@@ -996,17 +1005,31 @@ def run_backtest(
         perf_table.add_row("MFE Avg", f"{bt_report.mfe_avg:.2f}")
         perf_table.add_row("Period", f"{start_date.date()} to {end_date.date()}")
 
-        console.print(
-            Panel(
-                perf_table, title="[bold]Institutional Performance Summary[/]", border_style="green"
+        if RichPanel:
+            console.print(
+                RichPanel(
+                    perf_table,
+                    title="[bold]Institutional Performance Summary[/]",
+                    border_style="green",
+                )
             )
-        )
         return 0
     finally:
         connector.disconnect()
 
 
 def main() -> int:
+    # Local imports of Rich for the entire main function to avoid UnboundLocalError
+    # when an early exception occurs during bootstrap.
+    try:
+        from rich.console import Console as RichConsole
+        from rich.panel import Panel as RichPanel
+        from rich.table import Table as RichTable
+    except ImportError:
+        RichConsole = None
+        RichPanel = None
+        RichTable = None
+
     # 0. Identify diagnostic commands that can proceed without full setup
     diagnostic_flags = ["--help", "-h", "--version", "--doctor", "--setup"]
     is_diagnostic = any(arg in sys.argv for arg in diagnostic_flags)
@@ -1037,7 +1060,9 @@ def main() -> int:
                         Path(d).mkdir(parents=True, exist_ok=True)
                     return run_setup_wizard()
                 else:
-                    print("\n[!] Manual setup required. You can run 'python main.py --setup' later.")
+                    print(
+                        "\n[!] Manual setup required. You can run 'python main.py --setup' later."
+                    )
             except ImportError:
                 print("\n[!] Configuration file (.env) is missing.")
                 choice = (
@@ -1134,11 +1159,11 @@ def main() -> int:
         cfg = get_config()
     except Exception as exc:
         # Preliminary check for missing required variables before logging is even ready
-        if Console and Panel:
-            console = Console()
+        if RichConsole and RichPanel:
+            console = RichConsole()
             if "validation error" in str(exc).lower():
                 console.print(
-                    Panel(
+                    RichPanel(
                         "[bold red]Configuration Error:[/]\n\n"
                         "One or more required environment variables are missing.\n"
                         "Please ensure you have a [bold].env[/] file in the project root.\n\n"
@@ -1171,15 +1196,14 @@ def main() -> int:
 
     configure_logging(cfg.log_level)
 
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.table import Table
-    log, console = structlog.get_logger("main"), Console()
+    log, console = structlog.get_logger("main"), (RichConsole() if RichConsole else None)
     get_masking_processor().update_secrets(cfg)
 
     # 3.1 Handle --show-config
     if args.show_config:
-        config_table = Table(title="[bold blue]Current System Configuration (Sanitized)[/]", box=None)
+        config_table = RichTable(
+            title="[bold blue]Current System Configuration (Sanitized)[/]", box=None
+        )
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="white")
         config_table.add_column("Source", style="dim")
@@ -1191,8 +1215,7 @@ def main() -> int:
 
         # Dynamic exclusion of all SecretStr/SecretBytes fields
         secret_fields = {
-            f for f, info in cfg.__class__.model_fields.items()
-            if "Secret" in str(info.annotation)
+            f for f, info in cfg.__class__.model_fields.items() if "Secret" in str(info.annotation)
         }
 
         # Get sanitized dump
@@ -1215,14 +1238,15 @@ def main() -> int:
 
             config_table.add_row(key, str(value), source)
 
-        console.print(
-            Panel(
-                config_table,
-                title="[bold blue]System Config[/]",
-                border_style="blue",
-                expand=False,
-            )
-        )
+            if console:
+                console.print(
+                    RichPanel(
+                        config_table,
+                        title="[bold blue]System Config[/]",
+                        border_style="blue",
+                        expand=False,
+                    )
+                )
         return 0
 
     # Re-verify if it was a Pydantic validation error if we somehow got past get_config()
@@ -1236,7 +1260,9 @@ def main() -> int:
     result = validator.validate()
 
     if result.errors:
-        validation_table = Table(title="[bold yellow]Startup Configuration Validation[/]", box=None)
+        validation_table = RichTable(
+            title="[bold yellow]Startup Configuration Validation[/]", box=None
+        )
         validation_table.add_column("Field", style="cyan")
         validation_table.add_column("Status", justify="center")
         validation_table.add_column("Message")
@@ -1246,7 +1272,8 @@ def main() -> int:
             status = "[bold red]CRITICAL[/]" if err.critical else "[bold yellow]WARNING[/]"
             validation_table.add_row(err.field, status, err.message, err.remedy)
 
-        console.print(validation_table)
+        if console:
+            console.print(validation_table)
 
         if not result.success:
             log.critical(
@@ -1259,7 +1286,16 @@ def main() -> int:
     # ── Startup Summary ────────────────────────────────────────────────────────
     import platform
 
-    summary = Table.grid(expand=True, padding=(0, 1))
+    try:
+        from rich.console import Console as RichConsole
+        from rich.panel import Panel as RichPanel
+        from rich.table import Table as RichTable
+    except ImportError:
+        RichConsole = None
+        RichPanel = None
+        RichTable = None
+
+    summary = RichTable.grid(expand=True, padding=(0, 1)) if RichTable else None
     summary.add_column(style="cyan", justify="right")
     summary.add_column(style="white", justify="left")
 
@@ -1321,14 +1357,15 @@ def main() -> int:
     )
     summary.add_row("Min Confidence:  ", f"[{conf_color}]{cfg.min_confidence:.1%}[/]")
 
-    console.print(
-        Panel(
-            summary,
-            title="[bold blue]Trading System Configuration[/]",
-            border_style="blue",
-            expand=False,
+    if console:
+        console.print(
+            RichPanel(
+                summary,
+                title="[bold blue]Trading System Configuration[/]",
+                border_style="blue",
+                expand=False,
+            )
         )
-    )
 
     # Initialise components
     # 1. Audit Logger (Mandatory for enterprise traceability)
@@ -1340,8 +1377,7 @@ def main() -> int:
 
     # Dynamic exclusion of all SecretStr/SecretBytes fields for audit snapshot
     secret_fields = {
-        f for f, info in cfg.__class__.model_fields.items()
-        if "Secret" in str(info.annotation)
+        f for f, info in cfg.__class__.model_fields.items() if "Secret" in str(info.annotation)
     }
 
     # Log sanitized configuration snapshot
@@ -1354,6 +1390,7 @@ def main() -> int:
     audit_logger.log("system", "startup_initiated", f"Mode: {cfg.mode}, Algo: {cfg.algorithm}")
 
     from src.core.monitor import Monitor
+
     monitor = Monitor(cfg)
     # Note: Monitor's start_metrics_server is legacy;
     # Enterprise deployments use the FastAPI health app which includes /metrics.
@@ -1364,12 +1401,18 @@ def main() -> int:
     from src.trading.mt5_connector import MT5Connector
 
     connector = MT5Connector(cfg, monitor=monitor)
-    with console.status("[bold green]Connecting to MT5 terminal..."):
+    status_ctx = (
+        console.status("[bold green]Connecting to MT5 terminal...")
+        if console
+        else contextlib.nullcontext()
+    )
+
+    with status_ctx:
         try:
             connector.connect()
         except MT5ConnectionError as exc:
             # Enhanced connection diagnostics
-            diag = Table.grid(expand=True)
+            diag = RichTable.grid(expand=True)
             diag.add_column(style="cyan", justify="right")
             diag.add_column(style="white", justify="left")
             diag.add_row("Broker Server:  ", cfg.mt5_server)
@@ -1381,14 +1424,15 @@ def main() -> int:
                 "Present" if cfg.metaapi_token and cfg.metaapi_account_id else "Missing",
             )
 
-            console.print(
-                Panel(
-                    diag,
-                    title="[bold red]MT5 Connection Diagnostics[/]",
-                    subtitle="Please verify these settings in your .env file",
-                    border_style="red",
+            if console:
+                console.print(
+                    RichPanel(
+                        diag,
+                        title="[bold red]MT5 Connection Diagnostics[/]",
+                        subtitle="Please verify these settings in your .env file",
+                        border_style="red",
+                    )
                 )
-            )
             log.critical(
                 "FAILED TO CONNECT: The system could not establish a session with MetaTrader 5 or MetaAPI.",
                 error=str(exc),
@@ -1469,7 +1513,13 @@ def main() -> int:
     health_checker = init_health_checker(
         cfg, connector, trade_logger, model, audit_logger=audit_logger
     )
-    with console.status("[bold blue]Running health checks..."):
+    health_status_ctx = (
+        console.status("[bold blue]Running health checks...")
+        if console
+        else contextlib.nullcontext()
+    )
+
+    with health_status_ctx:
         try:
             report = health_checker.startup_gate()
         except RuntimeError as exc:
@@ -1477,7 +1527,7 @@ def main() -> int:
             # Fetch report directly to show failure state in table
             report = health_checker.get_full_report()
 
-    table = Table(title="System Health", box=None)
+    table = RichTable(title="System Health", box=None)
     table.add_column("Component", style="cyan")
     table.add_column("Status", justify="center")
     table.add_column("Message")
@@ -1491,7 +1541,9 @@ def main() -> int:
             else "red"
         )
         table.add_row(name, f"[{color}]{comp.status.value.upper()}[/]", comp.message, comp.remedy)
-    console.print(table)
+
+    if console:
+        console.print(table)
 
     if report.status == HealthStatus.FAILED:
         log.critical("Startup HEALTH CHECK FAILED - Aborting.")
@@ -1500,7 +1552,7 @@ def main() -> int:
     if args.check:
         log.info("Pre-flight check COMPLETE. System is healthy.")
 
-        next_steps = Table.grid(expand=True)
+        next_steps = RichTable.grid(expand=True)
         next_steps.add_column(style="cyan", justify="right")
         next_steps.add_column(style="white", justify="left")
 
@@ -1513,15 +1565,16 @@ def main() -> int:
             f"python main.py --mode backtest --algo {cfg.algorithm} --start 2017-01-01 --end 2026-03-30",
         )
 
-        console.print(
-            Panel(
-                next_steps,
-                title="[bold green]Ready for Execution[/]",
-                subtitle="Use the commands below to start the bot",
-                border_style="green",
-                expand=False,
+        if console:
+            console.print(
+                RichPanel(
+                    next_steps,
+                    title="[bold green]Ready for Execution[/]",
+                    subtitle="Use the commands below to start the bot",
+                    border_style="green",
+                    expand=False,
+                )
             )
-        )
         return 0
 
     # Record successful deployment/startup
