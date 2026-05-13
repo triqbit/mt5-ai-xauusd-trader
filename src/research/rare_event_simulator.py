@@ -224,7 +224,10 @@ class RareEventSimulator:
     def _simulate_flash_crash(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
-        """Simulates a rapid price collapse and partial/full recovery."""
+        """
+        Simulates a rapid price collapse and partial/full recovery.
+        Calibrated to trigger high-volatility regimes.
+        """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
         vols = np.full(n, config.base_volatility)
@@ -233,14 +236,16 @@ class RareEventSimulator:
         crash_duration = int(10 * config.event_magnitude)
         recovery_duration = int(30 * config.event_magnitude)
 
-        impact = -0.04 * config.event_magnitude
+        # Ensure impact is significant enough for RegimeDetector thresholds
+        impact = -0.05 * config.event_magnitude
 
         # Crash phase: acceleration
         for i in range(crash_duration):
             idx = start_idx + i
             if idx < n:
                 returns[idx] += (impact / crash_duration) * (1 + i / crash_duration)
-                vols[idx] *= 2.5 * config.event_magnitude
+                # Significant vol boost to trigger NEWS_SHOCK or VOLATILE_BREAKOUT
+                vols[idx] *= 4.0 * config.event_magnitude
 
         # Recovery phase
         recovered_total_pct = 0.0
@@ -267,7 +272,7 @@ class RareEventSimulator:
 
         # Volume Surge during crash
         crash_mask = (np.arange(n) >= start_idx) & (np.arange(n) < start_idx + crash_duration)
-        df.loc[crash_mask, "tick_volume"] *= int(3 * config.event_magnitude)
+        df.loc[crash_mask, "tick_volume"] *= np.int64(3 * config.event_magnitude)
 
         # Peak impact is the max percentage deviation from the price before the crash
         event_prices = df["close"].iloc[start_idx : start_idx + crash_duration + recovery_duration]
@@ -323,16 +328,20 @@ class RareEventSimulator:
 
         vacuum_mask = (np.arange(n) >= start_idx) & (np.arange(n) < start_idx + duration)
         # Volume drops significantly
-        df.loc[vacuum_mask, "tick_volume"] = self.rng.integers(1, 5, np.sum(vacuum_mask))
+        df.loc[vacuum_mask, "tick_volume"] = self.rng.integers(
+            1, 5, np.sum(vacuum_mask), dtype=np.int64
+        )
 
         # Spreads widen significantly: e.g. for XAUUSD spreads can jump from 0.2 to 2.0+
-        df.loc[vacuum_mask, "spread"] *= 8.0 * config.event_magnitude
+        spread_mult = np.float32(8.0 * config.event_magnitude)
+        df.loc[vacuum_mask, "spread"] *= spread_mult
 
         # In a vacuum, the range (high-low) is much larger than the open-close move
         # We add extra volatility to the high/low of each candle relative to base volatility
         noise_magnitude = (
-            df.loc[vacuum_mask, "open"] * config.base_volatility * 5.0 * config.event_magnitude
-        )
+            df.loc[vacuum_mask, "open"]
+            * np.float32(config.base_volatility * 5.0 * config.event_magnitude)
+        ).astype(np.float32)
         df.loc[vacuum_mask, "high"] += noise_magnitude
         df.loc[vacuum_mask, "low"] -= noise_magnitude
 
@@ -615,15 +624,16 @@ class RareEventSimulator:
 
         shock_idx = n // 3
         # Magnitude needs to be high enough to hit ER > 0.7 and ATR Ratio > 2.0
-        shock_magnitude = 0.025 * config.event_magnitude * self.rng.choice([-1, 1])
+        # XAUUSD often moves 20-40 dollars on major news ($2300 * 0.015 = $34.5)
+        shock_magnitude = 0.03 * config.event_magnitude * self.rng.choice([-1, 1])
 
         # Phase 1: The Shock (multi-bar directional move to keep ER high)
-        shock_len = max(1, int(12 * config.event_magnitude))
+        shock_len = max(1, int(10 * config.event_magnitude))
         for i in range(shock_len):
             idx = shock_idx + i
             if idx < n:
-                returns[idx] = (shock_magnitude / shock_len) * self.rng.uniform(0.8, 1.2)
-                vols[idx] *= 15.0 * config.event_magnitude
+                returns[idx] = (shock_magnitude / shock_len) * self.rng.uniform(0.9, 1.1)
+                vols[idx] *= 20.0 * config.event_magnitude
 
         # Phase 2: Sustained Volatility and erratic follow-through
         shock_duration = int(40 * config.event_magnitude)
@@ -631,9 +641,9 @@ class RareEventSimulator:
             idx = shock_idx + i
             if idx < n:
                 # Decay volatility but keep it high to maintain VoV and ATR Ratio
-                decay_factor = np.exp(-(i - shock_len) / (25 * config.event_magnitude))
+                decay_factor = np.exp(-(i - shock_len) / (30 * config.event_magnitude))
                 vols[idx] = config.base_volatility * (
-                    1 + 10.0 * config.event_magnitude * decay_factor
+                    1 + 15.0 * config.event_magnitude * decay_factor
                 )
                 returns[idx] = self._generate_t_returns(1, config.drift, vols[idx], df=1.2)[0]
 
@@ -691,13 +701,14 @@ class RareEventSimulator:
         # Inject the fat finger into the high/low of a single candle
         # without significantly moving the close (unless it's a huge move)
         target_idx = df.index[shock_idx]
+        wick_impact = np.float32(config.start_price * abs(wick_magnitude))
         if shock_direction == 1:
-            df.loc[target_idx, "high"] += config.start_price * abs(wick_magnitude)
+            df.loc[target_idx, "high"] += wick_impact
         else:
-            df.loc[target_idx, "low"] -= config.start_price * abs(wick_magnitude)
+            df.loc[target_idx, "low"] -= wick_impact
 
         # Widened spread during the fat finger candle
-        df.loc[target_idx, "spread"] *= 15.0 * config.event_magnitude
+        df.loc[target_idx, "spread"] *= np.float32(15.0 * config.event_magnitude)
 
         result = RareEventResult(
             event_type=RareEventType.FAT_FINGER,

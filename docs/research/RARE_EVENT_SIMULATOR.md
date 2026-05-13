@@ -10,19 +10,20 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 
 - **Plausible Scenarios**: Generates flash crashes, liquidity vacuums, gold gaps, and more.
 - **Pipeline Compatible**: Produces DataFrames with standardized lowercase columns (`open`, `high`, `low`, `close`, `tick_volume`, `real_volume`, `spread`). Uses strict `float32` for prices and `int64` for volumes to match `FeatureEngineer` expectations.
+- **Numerical Stability**: Implements explicit casting for all DataFrame modifications to avoid pandas `FutureWarning` issues and ensure numerical consistency during high-fidelity simulations.
 - **Configurable**: Supports adjusting magnitude, duration, recovery factor, and frequency (bars per day).
 - **Reproducible**: Uses `numpy` random generators with optional seeds for deterministic scenario generation.
 
 ## Supported Scenarios
 
-1.  **Flash Crash**: Rapid price collapse followed by a quick partial or full recovery, accompanied by a volume surge.
+1.  **Flash Crash**: Rapid price collapse followed by a quick partial or full recovery, accompanied by a volume surge. Calibrated to trigger institutional volatility regimes (ATR Ratio > 2.0).
 2.  **Liquidity Vacuum**: Period of erratic price jumps, extreme spreads, and significantly dropped volume.
 3.  **Gold Gap**: Discontinuous price jumps (bullish or bearish) with follow-through volatility.
 4.  **Violent Reversal**: A strong trend followed by an abrupt, high-magnitude reversal.
 5.  **Dislocation**: A sudden price shift leading into a completely different market regime (higher volatility, different drift).
 6.  **Volatility Cluster**: An abnormal cluster of high volatility with multiple decaying shocks, approximated using GARCH(1,1) logic.
 7.  **Multi-Session Dislocation**: A sequence of regime shifts across multiple sessions, testing a strategy's multi-day adaptability.
-8.  **News Shock**: A violent directional move followed by sustained high volatility and erratic behavior.
+8.  **News Shock**: A violent directional move followed by sustained high volatility and erratic behavior. Calibrated to trigger the `NEWS_SHOCK` regime in the `RegimeDetector` (ER > 0.7, ATR Ratio > 2.0).
 
 ## Configuration
 
