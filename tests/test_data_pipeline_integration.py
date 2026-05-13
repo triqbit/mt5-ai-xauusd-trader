@@ -137,8 +137,8 @@ def test_pipeline_resilience_to_malformed_data(data_generator, feature_engineer,
 
     if not features.empty:
         obs = features.iloc[-1].values
-        direction, confidence, _ = mock_ensemble.predict(obs)
-        assert direction in SignalDirection
+        signal = mock_ensemble.predict(obs)
+        assert signal.direction in SignalDirection
 
 def test_pipeline_insufficient_history(data_generator, feature_engineer):
     """Verifies behavior when data is too short for technical indicators."""

@@ -101,8 +101,8 @@ def test_ensemble_model_with_gapping_data(mock_cfg):
         for i in range(len(df)):
             obs = df.iloc[i][["open", "high", "low", "close", "tick_volume"]].values
             # Should not crash
-            direction, _, _ = model.predict(obs)
-            assert direction in [-1, 0, 1]
+            signal = model.predict(obs)
+            assert signal.direction in [-1, 0, 1]
 
 
 def test_data_integrity_malformed_scenarios():
