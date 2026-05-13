@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Report a bug to help us improve system reliability.
+description: Report a bug to help us improve system reliability and trading safety.
 labels: ["bug", "triage"]
 body:
   - type: markdown

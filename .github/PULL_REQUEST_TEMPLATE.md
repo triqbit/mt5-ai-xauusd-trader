@@ -23,7 +23,7 @@ These checks are required before the PR can be merged:
 ## 🏗️ Technical Checklist
 - [ ] **Testing Done:** Evidence of local or environment testing provided below.
 - [ ] **Docs Updated:** Any change in logic or config is reflected in documentation.
-- [ ] **Backward Compatibility:** Verified that this change does not break existing deployments.
+- [ ] **Backward Compatibility Verified:** Verified that this change does not break existing deployments.
 - [ ] **Rollback Strategy:** Reversion path identified for database or config changes.
 
 ## 💥 Breaking Changes & Compatibility

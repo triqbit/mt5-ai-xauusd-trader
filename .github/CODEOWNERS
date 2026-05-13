@@ -2,7 +2,7 @@
 # This file defines mandatory reviewers for specific modules.
 # Reviewers are notified automatically when a PR touches their area.
 #
-# NOTE: Changes to "Sensitive Zones" (Trading, Models, Core) require
+# NOTE: Changes to "Sensitive Zones" (Trading, Models, Core) REQUIRE
 # multi-signature approval from both the domain lead and the Release/Governance lead (@andonly1348).
 
 # Global Governance & Quality Oversight
@@ -19,14 +19,14 @@
 # 🔴 SENSITIVE ZONE: Trading & Risk Management
 # Highest sensitivity. Multi-signature mandatory for risk/execution logic.
 /src/trading/ @maintainer-trading @andonly1348
-/src/analytics/ @maintainer-trading
-/src/data/ @maintainer-trading @maintainer-models
+/src/analytics/ @maintainer-trading @andonly1348
+/src/data/ @maintainer-trading @maintainer-models @andonly1348
 
 # 🔴 SENSITIVE ZONE: AI/ML Model Architectures & Research
 # Multi-signature required for changes to model logic or research environment.
 /src/models/ @maintainer-models @andonly1348
-/src/research/ @maintainer-models
-/src/environment/ @maintainer-models
+/src/research/ @maintainer-models @andonly1348
+/src/environment/ @maintainer-models @andonly1348
 
 # 🟡 UTILITY ZONE: Monitoring & Observability
 /src/monitoring/ @maintainer-quality @andonly1348
@@ -38,7 +38,7 @@
 /.github/workflows/ @andonly1348 @xnessom
 /scripts/ @andonly1348 @xnessom
 /Dockerfile @andonly1348 @xnessom
-/requirements*.txt @xnessom
+/requirements*.txt @xnessom @andonly1348
 
 # 📦 RELEASE: Database Migrations & Schemas
 /migrations/ @andonly1348
@@ -50,4 +50,4 @@
 /SECURITY.md @andonly1348 @xnessom
 
 # 🧪 QUALITY: Testing & Quality Assurance
-/tests/ @maintainer-quality
+/tests/ @maintainer-quality @andonly1348

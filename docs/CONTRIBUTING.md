@@ -41,7 +41,7 @@ We use a role-based governance model where specific leads oversee different doma
 4.  **Evidence:** Attach test logs, coverage reports, and backtest evidence.
 5.  **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required.
 6.  **Multi-Signature Sign-off:** Changes to **Sensitive Zones** (Trading, Models, Core) require mandatory multi-signature approval from both the relevant domain lead and the Release/Governance lead (@andonly1348).
-7.  **Merge:** Once all criteria are met, the branch is merged into `develop` (or `main` for hotfixes).
+7.  **Merge:** Once all criteria are met, the branch is merged into `main` (or `develop` if applicable).
 
 ---
 
@@ -59,17 +59,23 @@ Every Pull Request must pass the following gates before merge:
 
 ---
 
-## 🧪 Testing Requirements
+## 🧪 Testing & Governance Verification
 
 We practice Test-Driven Development (TDD) where possible.
 - **Unit Tests:** Mandatory for all new functions and classes.
 - **Integration Tests:** Required for changes touching MT5 connectors or database schemas.
 - **Resilience Tests:** Mandatory for risk-management logic.
 
-Run the full suite locally:
+Run the full suite and governance checks locally:
 ```bash
 # Run tests with coverage
-python3 -m pytest tests/ --cov=src --cov-report=term-missing
+PYTHONPATH=. python3 -m pytest tests/ --cov=src --cov-report=term-missing
+
+# Run governance vitals check
+PYTHONPATH=. python3 -m pytest tests/test_governance_vitals.py --noconftest
+
+# Run Atlas Governance Auditor
+python3 scripts/atlas_audit.py
 
 # Run environment diagnostics
 python3 scripts/doctor.py
