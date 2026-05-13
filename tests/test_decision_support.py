@@ -2,20 +2,26 @@
 Unit tests for the Decision Support System.
 """
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-from src.core.decision_support import (
-    DecisionSupportSystem,
-    DecisionPacket,
-    PerformanceContext,
-    DecisionStatus,
-)
-from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment, ModelAttribution
+import pytest
+
 from src.core.constants import SignalDirection
-from src.models.regime_detector import RegimeInfo, MarketRegime
-from src.data.event_intelligence import RiskStatus, MacroEvent, EventCategory, EventImpact
+from src.core.decision_support import (
+    DecisionPacket,
+    DecisionStatus,
+    DecisionSupportSystem,
+    PerformanceContext,
+)
+from src.core.explainability import (
+    ExecutionSummary,
+    ModelAttribution,
+    RiskAssessment,
+    SignalExplanation,
+)
+from src.data.event_intelligence import RiskStatus
+from src.models.regime_detector import MarketRegime, RegimeInfo
 
 
 @pytest.fixture
@@ -54,20 +60,14 @@ def mock_explanation():
 @pytest.fixture
 def mock_regime():
     return RegimeInfo(
-        label=MarketRegime.TRENDING,
-        confidence=0.85,
-        transition_score=0.1,
-        volatility_index=1.2
+        label=MarketRegime.TRENDING, confidence=0.85, transition_score=0.1, volatility_index=1.2
     )
 
 
 @pytest.fixture
 def mock_macro_risk():
     return RiskStatus(
-        is_blocked=False,
-        risk_multiplier=1.0,
-        active_events=[],
-        reason="No active events"
+        is_blocked=False, risk_multiplier=1.0, active_events=[], reason="No active events"
     )
 
 
@@ -80,13 +80,13 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
         "max_drawdown": 0.05,
         "win_rate": 0.6,
         "win_loss_ratio": 1.8,
-        "total_trades": 100
+        "total_trades": 100,
     }
 
     # Setup some model attributions for consensus
     mock_explanation.model_attributions = [
         ModelAttribution(model_name="PPO", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
-        ModelAttribution(model_name="LSTM", vote=SignalDirection.BUY, confidence=0.7, weight=0.5)
+        ModelAttribution(model_name="LSTM", vote=SignalDirection.BUY, confidence=0.7, weight=0.5),
     ]
 
     packet = dss.assemble_packet(
@@ -94,7 +94,7 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
         explanation=mock_explanation,
         regime_info=mock_regime,
         macro_risk=mock_macro_risk,
-        performance_metrics=performance_metrics
+        performance_metrics=performance_metrics,
     )
 
     assert packet.symbol == "XAUUSD"
@@ -182,7 +182,7 @@ def test_consensus_logic():
     # 1. Unanimous (Weight: 0.5 + 0.5 = 1.0)
     mock_exp.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
-        ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.5)
+        ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.5),
     ]
     assert "Unanimous" in dss._calculate_consensus(mock_exp)
 
@@ -190,21 +190,21 @@ def test_consensus_logic():
     mock_exp.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.4),
         ModelAttribution(model_name="M2", vote=SignalDirection.BUY, confidence=0.8, weight=0.3),
-        ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.3)
+        ModelAttribution(model_name="M3", vote=SignalDirection.HOLD, confidence=0.5, weight=0.3),
     ]
     assert "Strong Majority" in dss._calculate_consensus(mock_exp)
 
     # 3. Mixed Confluence (Weight: 0.51 >= 0.5)
     mock_exp.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.51),
-        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.49)
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.49),
     ]
     assert "Mixed Confluence" in dss._calculate_consensus(mock_exp)
 
     # 4. Divided/Weak (Weight: 0.49 < 0.5)
     mock_exp.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=0.49),
-        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.51)
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.8, weight=0.51),
     ]
     assert "Divided/Weak" in dss._calculate_consensus(mock_exp)
 
@@ -215,17 +215,16 @@ def test_consensus_logic():
 
 def test_assemble_packet_blocked_by_macro(mock_explanation, mock_regime, mock_macro_risk):
     dss = DecisionSupportSystem()
-    mock_macro_risk = mock_macro_risk.model_copy(update={
-        "is_blocked": True,
-        "reason": "Blocked by FOMC"
-    })
+    mock_macro_risk = mock_macro_risk.model_copy(
+        update={"is_blocked": True, "reason": "Blocked by FOMC"}
+    )
 
     packet = dss.assemble_packet(
         symbol="XAUUSD",
         explanation=mock_explanation,
         regime_info=mock_regime,
         macro_risk=mock_macro_risk,
-        performance_metrics={}
+        performance_metrics={},
     )
 
     assert packet.is_executable is False
@@ -242,7 +241,7 @@ def test_assemble_packet_rejected_by_risk(mock_explanation, mock_regime, mock_ma
         explanation=mock_explanation,
         regime_info=mock_regime,
         macro_risk=mock_macro_risk,
-        performance_metrics={}
+        performance_metrics={},
     )
 
     assert packet.is_executable is False
@@ -256,7 +255,7 @@ def test_format_for_operator(mock_explanation, mock_regime, mock_macro_risk):
         explanation=mock_explanation,
         regime_info=mock_regime,
         macro_risk=mock_macro_risk,
-        performance_metrics={"sharpe_ratio": 1.5}
+        performance_metrics={"sharpe_ratio": 1.5},
     )
 
     # Ensure it doesn't crash and returns a string
@@ -283,23 +282,11 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
             "sharpe_ratio": 2.5,
             "profit_factor": 2.2,
             "recovery_factor": 3.5,
-            "calmar_ratio": 4.0
-        }
+            "calmar_ratio": 4.0,
+        },
     )
 
-    dss.format_for_operator(packet_high, console=mock_console)
-    dashboard = mock_console.print.call_args[0][0]
-
-    # Find perf_panel in the dashboard Group
-    perf_panel = None
-    for r in dashboard.renderables:
-        # overview_table is a Table, which contains Panels in its rows
-        if hasattr(r, "columns"): # Likely the Table
-            # Table doesn't directly expose rows easily in a mockable way without deep diving
-            # But we can check all Panels created during the call if we mock Panel
-            pass
-
-    # Alternative: Mock Panel where it's used. Since it's imported locally,
+    # Mock Panel where it's used. Since it's imported locally,
     # we patch the 'rich.panel.Panel' class directly.
     mock_panel_cls = mocker.patch("rich.panel.Panel", side_effect=Panel)
 
@@ -327,8 +314,8 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
             "sharpe_ratio": 0.5,
             "profit_factor": 0.8,
             "recovery_factor": 0.2,
-            "calmar_ratio": 0.1
-        }
+            "calmar_ratio": 0.1,
+        },
     )
 
     mock_panel_cls.reset_mock()
@@ -369,6 +356,7 @@ def test_strategic_confluence_summary(mock_explanation, mock_regime, mock_macro_
 def test_regime_alignment_display(mock_explanation, mock_regime, mock_macro_risk, mocker):
     """Verify that regime alignment score is displayed in the dashboard."""
     from rich.panel import Panel
+
     dss = DecisionSupportSystem()
     mock_console = MagicMock()
 
@@ -415,16 +403,10 @@ def test_high_conviction_labeling(mock_explanation, mock_regime, mock_macro_risk
     label_found = False
     for call in mock_panel_cls.call_args_list:
         if call.kwargs.get("title") == "🎯 Augmentation Metrics":
-            content = call.args[0]
-            # content is now a Table. We check the renderables in its columns.
-            # Since we can't easily inspect Table internals after addition,
-            # we check if any call to score_text (the Text object) contained the label.
-            # However, score_text is local to format_for_operator.
-            # A better way is to check the captured output if we don't mock Panel,
-            # but since we are mocking Panel, let's look at the Table renderables if possible.
-            # In rich, Table.rows is a list of Row objects, but accessing cells is tricky.
-            # Let's try checking the string representation of the Table if it has one.
-            label_found = True # Re-setting to True for now as the logic is tested in verify_ux_dash.py
+            # content = call.args[0]
+            label_found = (
+                True  # Re-setting to True for now as the logic is tested in verify_ux_dash.py
+            )
             break
 
     assert label_found is True
@@ -432,7 +414,9 @@ def test_high_conviction_labeling(mock_explanation, mock_regime, mock_macro_risk
 
 def test_packet_immutability():
     """Verify that DecisionPacket and PerformanceContext are frozen (immutable)."""
-    with pytest.raises(Exception):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
         packet = DecisionPacket(
             symbol="XAUUSD",
             direction=SignalDirection.BUY,
@@ -440,7 +424,7 @@ def test_packet_immutability():
             explanation=MagicMock(),
             regime=MagicMock(),
             macro_risk=MagicMock(),
-            performance=MagicMock()
+            performance=MagicMock(),
         )
         packet.symbol = "GOLD"
 
@@ -453,7 +437,7 @@ def test_decision_packet_field_completeness(mock_explanation, mock_regime, mock_
         explanation=mock_explanation,
         regime_info=mock_regime,
         macro_risk=mock_macro_risk,
-        performance_metrics={"sharpe_ratio": 2.0}
+        performance_metrics={"sharpe_ratio": 2.0},
     )
 
     # Required summary fields

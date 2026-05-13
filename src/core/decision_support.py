@@ -77,9 +77,7 @@ class PerformanceContext(BaseModel):
     win_rate: float = Field(
         0.0, ge=0.0, le=1.0, description="Percentage of winning trades (0.0 to 1.0)."
     )
-    win_loss_ratio: float = Field(
-        0.0, ge=0.0, description="Average Win / Average Loss."
-    )
+    win_loss_ratio: float = Field(0.0, ge=0.0, description="Average Win / Average Loss.")
     calmar_ratio: float = Field(
         0.0,
         ge=-10.0,
@@ -93,7 +91,8 @@ class PerformanceContext(BaseModel):
     max_drawdown: float = Field(
         0.0,
         ge=0.0,
-        description="Maximum observed equity drawdown.",
+        le=1.0,
+        description="Maximum observed equity drawdown from peak to trough (0.0 to 1.0).",
     )
     total_trades: int = Field(0, ge=0, description="Count of trades analyzed in this window.")
 
@@ -282,10 +281,10 @@ class DecisionSupportSystem:
             return f"Trade for {symbol} BLOCKED. Rationale: {reasons}"
 
         dir_str = explanation.direction.name
-        summary = (
-            f"Institutional {dir_str} signal for {symbol} with a decision score of {score:.1f}/100. "
+        summary = f"Institutional {dir_str} signal for {symbol} with a decision score of {score:.1f}/100. "
+        summary += (
+            f"Current market state is {regime.label.value} (Confidence: {regime.confidence:.1%}). "
         )
-        summary += f"Current market state is {regime.label.value} (Confidence: {regime.confidence:.1%}). "
 
         # Strategic Confluence Enrichment
         alignment = explanation.regime_context.regime_alignment_score
@@ -299,7 +298,9 @@ class DecisionSupportSystem:
         if status == DecisionStatus.EXECUTE:
             summary += "Signal shows strong confluence and satisfies all institutional guardrails."
         else:
-            summary += "Signal is valid but carries elevated risk; exercise caution and monitor execution."
+            summary += (
+                "Signal is valid but carries elevated risk; exercise caution and monitor execution."
+            )
 
         return summary
 
@@ -495,12 +496,12 @@ class DecisionSupportSystem:
                 width=40,
                 pulse=False,
                 style="dim",
-                complete_style=score_color
+                complete_style=score_color,
             )
 
             score_content.add_row(
                 score_text,
-                Panel(Group(Text("Conviction Meter", style="dim center"), meter), box=box.SIMPLE)
+                Panel(Group(Text("Conviction Meter", style="dim center"), meter), box=box.SIMPLE),
             )
 
             augmentation_panel = Panel(
@@ -601,15 +602,17 @@ class DecisionSupportSystem:
             if blocking_panel:
                 components.append(blocking_panel)
 
-            components.extend([
-                augmentation_panel,
-                exec_summary_panel,
-                overview_table,
-                macro_panel,
-                attribution_summary,
-                Text("\n[bold]DETAILED ATTRIBUTION BREAKDOWN[/bold]\n"),
-                self.explainer.get_renderable(packet.explanation),
-            ])
+            components.extend(
+                [
+                    augmentation_panel,
+                    exec_summary_panel,
+                    overview_table,
+                    macro_panel,
+                    attribution_summary,
+                    Text("\n[bold]DETAILED ATTRIBUTION BREAKDOWN[/bold]\n"),
+                    self.explainer.get_renderable(packet.explanation),
+                ]
+            )
 
             dashboard = Group(*components)
 
