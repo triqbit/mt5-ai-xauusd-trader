@@ -1,15 +1,17 @@
 """
 Tests for MTF consistency, price continuity, and fault injection in ScenarioGenerator.
 """
-import pytest
-import pandas as pd
+
 import numpy as np
-from datetime import datetime, UTC
+import pytest
+
 from src.utils.synthetic_data import ScenarioGenerator
+
 
 @pytest.fixture
 def gen():
     return ScenarioGenerator(seed=42)
+
 
 def test_price_continuity(gen):
     """Verifies that Open[i] == Close[i-1] for generated data."""
@@ -19,6 +21,7 @@ def test_price_continuity(gen):
     closes = df["close"].values[:-1]
 
     np.testing.assert_array_almost_equal(opens, closes)
+
 
 def test_ohlc_realism(gen):
     """Verifies that High is the highest and Low is the lowest in every bar."""
@@ -30,13 +33,11 @@ def test_ohlc_realism(gen):
     assert (df["low"] <= df["close"]).all()
     assert (df["high"] >= df["low"]).all()
 
+
 def test_mtf_consistency(gen):
     """Verifies that M5 data correctly aggregates M1 data."""
     mtf_data = gen.generate_multi_timeframe(
-        n_steps_base=100,
-        base_freq="1min",
-        timeframes=["M5"],
-        regime="trending"
+        n_steps_base=100, base_freq="1min", timeframes=["M5"], regime="trending"
     )
 
     df_m1 = mtf_data["1min"]
@@ -52,6 +53,7 @@ def test_mtf_consistency(gen):
     assert first_m5_bar["low"] == corresponding_m1_bars["low"].min()
     assert first_m5_bar["tick_volume"] == corresponding_m1_bars["tick_volume"].sum()
 
+
 def test_fault_injection_stale(gen):
     """Verifies stale data injection (repeated bars)."""
     df = gen.generate(n_steps=50, regime="ranging")
@@ -62,13 +64,14 @@ def test_fault_injection_stale(gen):
     is_stale = (df_faulty.diff().dropna() == 0).all(axis=1)
     assert is_stale.any()
 
+
 def test_fault_injection_outliers(gen):
     """Verifies outlier injection (extreme price spikes)."""
     df = gen.generate(n_steps=50, regime="ranging")
     df_faulty = gen.inject_faults(df, fault_type="outliers", prob=0.1)
 
     # Compare with original
-    diff = (df_faulty["close"] != df["close"])
+    diff = df_faulty["close"] != df["close"]
     assert diff.any()
 
     # Check that outliers are significant (around 10%)
@@ -77,12 +80,14 @@ def test_fault_injection_outliers(gen):
         ratio = df_faulty.loc[idx, "close"] / df.loc[idx, "close"]
         assert abs(ratio - 1.0) > 0.05
 
+
 def test_fault_injection_zero_volume(gen):
     """Verifies zero volume injection."""
     df = gen.generate(n_steps=50, regime="ranging")
     df_faulty = gen.inject_faults(df, fault_type="zero_volume", prob=0.2)
 
     assert (df_faulty["tick_volume"] == 0).any()
+
 
 def test_fault_injection_gaps(gen):
     """Verifies gap injection (broken price continuity)."""
@@ -93,5 +98,5 @@ def test_fault_injection_gaps(gen):
     opens = df_faulty["open"].values[1:]
     closes = df_faulty["close"].values[:-1]
 
-    breaks = (opens != closes)
+    breaks = opens != closes
     assert breaks.any()

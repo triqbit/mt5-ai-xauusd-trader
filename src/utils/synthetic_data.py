@@ -124,9 +124,7 @@ class ScenarioGenerator:
         # Apply datetime index if provided
         start_date = getattr(self, "_current_start_date", None)
         if start_date:
-            df.index = pd.date_range(
-                start=start_date, periods=n_steps, freq=self._current_freq
-            )
+            df.index = pd.date_range(start=start_date, periods=n_steps, freq=self._current_freq)
 
         return df
 
@@ -134,7 +132,7 @@ class ScenarioGenerator:
         self,
         n_steps_base: int = 1000,
         base_freq: str = "1min",
-        timeframes: list[str] = ["M5", "M15", "H1"],
+        timeframes: list[str] | None = None,
         regime: str = "trending",
         start_date: datetime | str | None = None,
         **kwargs: Any,
@@ -143,6 +141,8 @@ class ScenarioGenerator:
         Generates consistent OHLC data across multiple timeframes by resampling.
         Ensures that high-TF bars are perfectly aligned with low-TF bars.
         """
+        if timeframes is None:
+            timeframes = ["M5", "M15", "H1"]
         if start_date is None:
             start_date = datetime(2024, 5, 22, 0, 0, tzinfo=UTC)
 
@@ -160,21 +160,12 @@ class ScenarioGenerator:
             match = re.match(r"([A-Z]+)(\d+)", tf)
             if match:
                 unit_code, value = match.groups()
-                unit = {
-                    "M": "min",
-                    "H": "h",
-                    "D": "D",
-                    "W": "W",
-                    "MN": "ME"
-                }.get(unit_code, "min")
+                unit = {"M": "min", "H": "h", "D": "D", "W": "W", "MN": "ME"}.get(unit_code, "min")
                 resample_freq = f"{value}{unit}"
             else:
                 # Fallback for single letter codes if any
                 resample_freq = (
-                    tf.replace("M", "min")
-                    .replace("H", "h")
-                    .replace("D", "D")
-                    .replace("W", "W")
+                    tf.replace("M", "min").replace("H", "h").replace("D", "D").replace("W", "W")
                 )
 
             resampled = (
@@ -393,9 +384,7 @@ class BacktestScenarioBuilder:
     def __init__(self, seed: int = 42):
         self.gen = ScenarioGenerator(seed=seed)
 
-    def drawdown_recovery(
-        self, n_steps: int = 200, start_price: float = 10000.0
-    ) -> pd.DataFrame:
+    def drawdown_recovery(self, n_steps: int = 200, start_price: float = 10000.0) -> pd.DataFrame:
         """
         Creates a 10% drawdown followed by a 20% gain.
         Useful for verifying Max Drawdown and Recovery Factor.
@@ -843,7 +832,9 @@ class PortfolioScenarioBuilder:
         requests = [
             AllocationRequest(strategy_id="gold_rl_1", risk_pct=0.15),
             AllocationRequest(strategy_id="gold_rl_2", risk_pct=0.15),
-            AllocationRequest(strategy_id="gold_rl_3", risk_pct=0.15),  # Should hit XAUUSD 0.4 limit
+            AllocationRequest(
+                strategy_id="gold_rl_3", risk_pct=0.15
+            ),  # Should hit XAUUSD 0.4 limit
             AllocationRequest(strategy_id="eur_rl_1", risk_pct=0.15),  # Should hit RL 0.4 limit
         ]
         return configs, requests
@@ -865,13 +856,15 @@ class PortfolioScenarioBuilder:
         Generates requests that push total portfolio heat toward and past 0.7 limit.
         """
         configs = [
-            StrategyConfig(strategy_id=f"strat_{i}", symbol=f"SYM_{i}", model_family=f"FAM_{i}", capital_cap=100000)
+            StrategyConfig(
+                strategy_id=f"strat_{i}",
+                symbol=f"SYM_{i}",
+                model_family=f"FAM_{i}",
+                capital_cap=100000,
+            )
             for i in range(5)
         ]
-        requests = [
-            AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15)
-            for i in range(5)
-        ]
+        requests = [AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15) for i in range(5)]
         # 5 * 0.15 = 0.75 (> 0.7)
         return configs, requests
 
@@ -987,7 +980,9 @@ class SystemContextBuilder:
         )
         return df, [event], risk
 
-    def extreme_volatility_with_risk_block(self) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
+    def extreme_volatility_with_risk_block(
+        self,
+    ) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
         """Context with extreme price action and defensive risk positioning."""
         start_date = datetime(2024, 5, 22, 16, 0, tzinfo=UTC)
         df = self.price_gen.generate(n_steps=200, regime="flash_crash", start_date=start_date)
