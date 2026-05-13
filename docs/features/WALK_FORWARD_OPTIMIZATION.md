@@ -27,6 +27,9 @@ The Robustness Score is composed of:
 ### 3. Parameter Stability Analysis
 The optimizer performs "sensitivity checks" by slightly perturbing optimized parameters. If a small change in a parameter leads to a large change in performance, the parameter set is deemed unstable and penalized.
 
+#### Strict Fragility Safeguard
+The framework implements a **Strict Fragility** check. If a small parameter perturbation causes the Sharpe Ratio to flip from positive to negative (or return a NaN), the configuration is immediately assigned the maximum stability penalty. This ensures that "edge-of-a-cliff" configurations, which may look good in backtests but are highly sensitive to market noise, are excluded from the final selection.
+
 ## Configuration
 
 The `WalkForwardConfig` model allows for granular control:

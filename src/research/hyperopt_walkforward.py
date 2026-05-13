@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -100,7 +100,7 @@ class WalkForwardResult(BaseModel):
     metrics: RobustnessMetrics
     window_results: list[WindowResult]
     oos_returns: list[float] = Field(default_factory=list, description="Aggregated OOS returns")
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def save_json(self, filepath: str) -> None:
         """
@@ -259,13 +259,14 @@ class WalkForwardOptimizer:
 
             for key, value in params.items():
                 if isinstance(value, (int, float)) and not isinstance(value, bool):
-                    original_val = value
-                    is_int = isinstance(original_val, int)
+                    original_val = float(value)
+                    is_int = isinstance(value, int)
 
                     # Small perturbation (e.g. 5%)
                     # Ensure a minimum delta for small or zero values
+                    delta: float
                     if is_int:
-                        delta = max(1, int(round(abs(original_val) * perturbation_pct)))
+                        delta = float(max(1, round(abs(original_val) * perturbation_pct)))
                     else:
                         # For floats, use a small epsilon if value is 0
                         delta = max(1e-4, abs(original_val) * perturbation_pct)
@@ -275,7 +276,7 @@ class WalkForwardOptimizer:
                         new_val = original_val + (direction * delta)
 
                         if is_int:
-                            new_val = int(round(new_val))
+                            new_val = round(new_val)
 
                         # Skip if no actual change
                         if new_val == original_val:
@@ -339,10 +340,10 @@ class WalkForwardOptimizer:
 
         temp_df = pd.DataFrame({"returns": returns, "regime": data["regime"]})
 
-        def calc_sharpe(x):
+        def calc_sharpe(x: pd.Series) -> float | None:
             if len(x) < 5:  # Minimum observations for a valid regime-specific Sharpe
                 return None
-            std = x.std()
+            std = float(x.std())
             if std < 1e-9:
                 return 0.0
             return float(x.mean() / std * np.sqrt(self.config.bars_per_year))
@@ -572,7 +573,7 @@ if __name__ == "__main__":
         }
     )
 
-    def ema_param_space(trial):
+    def ema_param_space(trial: optuna.Trial) -> dict[str, Any]:
         return {
             "fast_window": trial.suggest_int("fast_window", 5, 20),
             "slow_window": trial.suggest_int("slow_window", 21, 50),
@@ -588,7 +589,9 @@ if __name__ == "__main__":
     result = optimizer.run_optimization()
     logger.info(
         "Optimization complete",
-        best_params=result.best_params,
-        robustness_score=round(result.metrics.robustness_score, 4),
-        oos_sharpe_mean=round(result.metrics.oos_sharpe_mean, 4),
+        extra={
+            "best_params": result.best_params,
+            "robustness_score": round(result.metrics.robustness_score, 4),
+            "oos_sharpe_mean": round(result.metrics.oos_sharpe_mean, 4),
+        },
     )
