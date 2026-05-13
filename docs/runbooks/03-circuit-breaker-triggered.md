@@ -1,5 +1,5 @@
 # Runbook 03: Circuit Breaker Triggered
-**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
+**Version:** 1.1.0-rc8 | **Last Updated:** 2024-06-12
 
 ## Overview
 Procedures for responding to automatic trading halts caused by risk limit breaches or system instability.
@@ -10,7 +10,7 @@ Procedures for responding to automatic trading halts caused by risk limit breach
 Review the Telegram alert or audit log to determine why the circuit breaker tripped:
 ```bash
 # Check audit log for circuit_breaker_triggered event
-sqlite3 audit.db "SELECT * FROM audit_log WHERE action='circuit_breaker_triggered' ORDER BY created_at DESC LIMIT 1;"
+sqlite3 audit.db "SELECT * FROM audit_log WHERE action IN ('circuit_breaker_triggered', 'operator_circuit_breaker_triggered') ORDER BY created_at DESC LIMIT 1;"
 ```
 Triggers include:
 - `MAX_DRAWDOWN` (30%)

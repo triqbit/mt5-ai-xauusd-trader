@@ -1,5 +1,5 @@
 # Runbook 06: Monitoring Alert Triage
-**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
+**Version:** 1.1.0-rc8 | **Last Updated:** 2024-06-12
 
 ## Overview
 Defined process for triaging alerts from Telegram and Prometheus/Grafana. This ensures that the most critical events (P0/P1) are addressed with priority to minimize capital risk.
