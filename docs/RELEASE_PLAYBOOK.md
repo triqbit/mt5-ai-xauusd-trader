@@ -27,6 +27,7 @@ The release process is fully automated via GitHub Actions (`.github/workflows/re
     - **Backtest Audit Traceability** verification.
     - **Journal Mining & Pattern Detection** verification.
     - **Model Explainability & UI** verification.
+    - **UX Terminal & Decision Support** verification.
     - **Consolidated Research Audit Report** generation (`research_audit_report.md`).
     - **Reliability SLO Audit**: Verification of uptime, RTO, and error budget targets.
 
@@ -185,4 +186,4 @@ If the deployment causes unrecoverable database state:
 
 ---
 **Author:** Jules03 (Release Reliability & Governance)
-**Last Updated:** 2024-06-10
+**Last Updated:** 2024-06-15
