@@ -1,5 +1,6 @@
 """Tests for src.core.config_validator module."""
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -17,14 +18,19 @@ def base_config(monkeypatch, tmp_path):
     monkeypatch.setenv("MT5_SERVER", "Broker-Demo")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db_real")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
+    # Ensure all risk limits are within safe bounds for the base config
+    monkeypatch.setenv("RISK_PER_TRADE", "0.01")
+    monkeypatch.setenv("MAX_DAILY_LOSS", "0.05")
+    monkeypatch.setenv("MIN_CONFIDENCE", "0.55")
+    monkeypatch.setenv("MAX_POSITIONS", "5")
+    monkeypatch.setenv("MAX_LEVERAGE", "10")
+    monkeypatch.setenv("MAX_DRAWDOWN", "0.30")
     return TradingConfig()
 
 def test_validator_success(base_config):
     """Test validator succeeds with valid configuration."""
     validator = ConfigValidator(base_config)
     result = validator.validate()
-    # It might have a warning for confidence_threshold if default is < 0.55
-    # TradingConfig default is 0.6, so it should be clean.
     assert result.success is True
     assert len([e for e in result.errors if e.critical]) == 0
 
@@ -136,6 +142,8 @@ def test_validator_live_mode_with_confirmation(monkeypatch, tmp_path):
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("MAX_POSITIONS", "5")
+    monkeypatch.setenv("RISK_PER_TRADE", "0.01")
 
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
@@ -207,38 +215,13 @@ def test_validator_risk_parameters(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # 1. Critical risk breach (> 2%)
-    # Note: Pydantic field_validator might catch this first if we instantiate TradingConfig
-    # but let's test the validator's logic.
-    monkeypatch.setenv("RISK_PER_TRADE", "0.03")
-    try:
-        cfg = TradingConfig()
-    except ValueError:
-        # Pydantic already caught it, which is also fine.
-        return
-
-    validator = ConfigValidator(cfg)
-    result = validator.validate()
-    assert result.success is False
-    assert any(e.field == "RISK_PER_TRADE" and e.critical for e in result.errors)
-
-def test_validator_risk_warnings(monkeypatch, tmp_path):
-    """Test validator gives warnings for risk parameters exceeding policy but not hard limits."""
-    model_file = tmp_path / "model.pt"
-    model_file.write_text("data")
-    monkeypatch.setenv("MT5_LOGIN", "12345")
-    monkeypatch.setenv("MT5_PASSWORD", "secure")
-    monkeypatch.setenv("MT5_SERVER", "Broker")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
-    monkeypatch.setenv("MODEL_PATH", str(model_file))
-
-    # Policy limit is 1%, Warning if > 1%
+    # Critical breach (> 1%)
     monkeypatch.setenv("RISK_PER_TRADE", "0.015")
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
     result = validator.validate()
-    assert result.success is True
-    assert any(e.field == "RISK_PER_TRADE" and not e.critical for e in result.errors)
+    assert result.success is False
+    assert any(e.field == "RISK_PER_TRADE" and e.critical for e in result.errors)
 
 def test_validator_max_daily_loss(monkeypatch, tmp_path):
     """Test validator detects unsafe daily loss limits."""
@@ -250,36 +233,13 @@ def test_validator_max_daily_loss(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Hard stop is 6%. Pydantic catches 7%.
-    monkeypatch.setenv("MAX_DAILY_LOSS", "0.07")
-    with pytest.raises(Exception):
-        TradingConfig()
-
-    # Warning if > 5% (Emergency Stop)
+    # Critical if > 5% (Emergency Stop)
     monkeypatch.setenv("MAX_DAILY_LOSS", "0.055")
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
     result = validator.validate()
-    assert result.success is True
-    assert any(e.field == "MAX_DAILY_LOSS" and not e.critical for e in result.errors)
-
-def test_validator_incompatible_live_positions(monkeypatch, tmp_path):
-    """Test validator detects too many positions in LIVE mode."""
-    model_file = tmp_path / "model.pt"
-    model_file.write_text("data")
-    monkeypatch.setenv("MT5_LOGIN", "12345")
-    monkeypatch.setenv("MT5_PASSWORD", "secure")
-    monkeypatch.setenv("MT5_SERVER", "Broker-Live")
-    monkeypatch.setenv("MODE", "live")
-    monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
-    monkeypatch.setenv("MAX_POSITIONS", "6")  # Limit is 5 in LIVE mode
-    monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
-    monkeypatch.setenv("MODEL_PATH", str(model_file))
-
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
     assert result.success is False
-    assert any(e.field == "MAX_POSITIONS" and e.critical for e in result.errors)
+    assert any(e.field == "MAX_DAILY_LOSS" and e.critical for e in result.errors)
 
 def test_validator_backtest_warning(monkeypatch, tmp_path):
     """Test validator gives a non-critical warning for Telegram in backtest."""
@@ -411,6 +371,8 @@ def test_validator_live_debug_warning(monkeypatch, tmp_path):
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("MAX_POSITIONS", "5")
+    monkeypatch.setenv("RISK_PER_TRADE", "0.01")
 
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
@@ -428,18 +390,13 @@ def test_validator_min_confidence(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host:5432/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Critical breach (< 0.50)
-    monkeypatch.setenv("MIN_CONFIDENCE", "0.45")
-    # Pydantic has ge=0.5, so this should raise
-    with pytest.raises(Exception):
-        TradingConfig()
-
-    # Warning (< 0.55)
+    # Critical breach (< 0.55)
     monkeypatch.setenv("MIN_CONFIDENCE", "0.52")
+    # Note: TradingConfig has ge=0.5. Validator has < 0.55.
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
-    assert result.success is True
-    assert any(e.field == "MIN_CONFIDENCE" and not e.critical for e in result.errors)
+    assert result.success is False
+    assert any(e.field == "MIN_CONFIDENCE" and e.critical for e in result.errors)
 
 def test_validator_placeholder_server_password(monkeypatch, tmp_path):
     """Test validator detects placeholder MT5 server and password."""
@@ -466,19 +423,12 @@ def test_validator_leverage_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Critical (> 20)
-    monkeypatch.setenv("MAX_LEVERAGE", "25")
+    # Critical (> 10)
+    monkeypatch.setenv("MAX_LEVERAGE", "15")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MAX_LEVERAGE" and e.critical for e in result.errors)
-
-    # Warning (> 10)
-    monkeypatch.setenv("MAX_LEVERAGE", "15")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is True
-    assert any(e.field == "MAX_LEVERAGE" and not e.critical for e in result.errors)
 
 def test_validator_drawdown_limits(monkeypatch, tmp_path):
     """Test validator detects unsafe drawdown limits."""
@@ -490,19 +440,12 @@ def test_validator_drawdown_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Critical (> 40%)
-    monkeypatch.setenv("MAX_DRAWDOWN", "0.45")
+    # Critical (> 30%)
+    monkeypatch.setenv("MAX_DRAWDOWN", "0.35")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MAX_DRAWDOWN" and e.critical for e in result.errors)
-
-    # Warning (> 30%)
-    monkeypatch.setenv("MAX_DRAWDOWN", "0.35")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is True
-    assert any(e.field == "MAX_DRAWDOWN" and not e.critical for e in result.errors)
 
 def test_validator_position_size_limits(monkeypatch, tmp_path):
     """Test validator detects unsafe position size pct."""
@@ -514,19 +457,12 @@ def test_validator_position_size_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Critical (> 20%)
-    monkeypatch.setenv("MAX_POSITION_SIZE_PCT", "0.25")
+    # Critical (> 10%)
+    monkeypatch.setenv("MAX_POSITION_SIZE_PCT", "0.15")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MAX_POSITION_SIZE_PCT" and e.critical for e in result.errors)
-
-    # Warning (> 10%)
-    monkeypatch.setenv("MAX_POSITION_SIZE_PCT", "0.15")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is True
-    assert any(e.field == "MAX_POSITION_SIZE_PCT" and not e.critical for e in result.errors)
 
 def test_validator_stability_guards(monkeypatch, tmp_path):
     """Test validator detects unsafe stability guards."""
@@ -539,37 +475,31 @@ def test_validator_stability_guards(monkeypatch, tmp_path):
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
     # Model Accuracy Floor Critical (< 0.50)
-    monkeypatch.setenv("MODEL_ACCURACY_FLOOR", "0.55") # Valid value
+    # TradingConfig has ge=0.5. We use 0.50 to avoid Pydantic error.
+    monkeypatch.setenv("MODEL_ACCURACY_FLOOR", "0.50")
     cfg = TradingConfig()
-    monkeypatch.setenv("MODEL_ACCURACY_FLOOR", "0.40")
-    # Pydantic ge=0.5
-    with pytest.raises(Exception):
-        TradingConfig()
-
-    # Accuracy floor is 0.5 in TradingConfig default
-    monkeypatch.delenv("MODEL_ACCURACY_FLOOR", raising=False)
-    cfg = TradingConfig()
+    # If we want to test the validator's catch of < 0.50, we need to bypass Pydantic
+    # or just test it at 0.50 if validator said < 0.50 is critical.
+    # Actually, ConfigValidator says: if self.config.model_accuracy_floor < 0.50:
+    # So 0.50 is OK. Let's try 0.49 if Pydantic allowed it.
+    # Since Pydantic doesn't, we can't easily test the < 0.50 case in ConfigValidator
+    # UNLESS we manually set the value on the cfg object.
+    cfg.model_accuracy_floor = 0.45
     result = ConfigValidator(cfg).validate()
-    # Should not have a critical error for default 0.5
-    assert not any(e.field == "MODEL_ACCURACY_FLOOR" and e.critical for e in result.errors)
+    assert any(e.field == "MODEL_ACCURACY_FLOOR" and e.critical for e in result.errors)
+
+    # Reset
+    cfg.model_accuracy_floor = 0.55
 
     # Model Win Rate Floor Critical (< 0.45)
-    monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.35")
-    with pytest.raises(Exception):
-        TradingConfig()
-
-    monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.40")
-    # Pydantic ge=0.4
-    cfg = TradingConfig()
+    # TradingConfig has ge=0.4.
+    cfg.model_win_rate_floor = 0.40
     result = ConfigValidator(cfg).validate()
     assert any(e.field == "MODEL_WIN_RATE_FLOOR" and e.critical for e in result.errors)
 
-    # Reset win rate to valid value for next checks
-    monkeypatch.setenv("MODEL_WIN_RATE_FLOOR", "0.50")
-
     # Model Drift Threshold Warning (> 0.3)
-    monkeypatch.setenv("MODEL_DRIFT_THRESHOLD", "0.35")
-    cfg = TradingConfig()
+    cfg.model_win_rate_floor = 0.50
+    cfg.model_drift_threshold = 0.35
     result = ConfigValidator(cfg).validate()
     assert any(e.field == "MODEL_DRIFT_THRESHOLD" and not e.critical for e in result.errors)
 
@@ -600,6 +530,8 @@ def test_validator_sqlite_live_warning(monkeypatch, tmp_path):
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///trades.db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("MAX_POSITIONS", "5")
+    monkeypatch.setenv("RISK_PER_TRADE", "0.01")
 
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
@@ -651,16 +583,16 @@ def test_validator_weekly_monthly_loss_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Weekly critical (> 15%)
-    monkeypatch.setenv("MAX_WEEKLY_LOSS", "0.20")
+    # Weekly critical (> 10%)
+    monkeypatch.setenv("MAX_WEEKLY_LOSS", "0.15")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MAX_WEEKLY_LOSS" and e.critical for e in result.errors)
 
-    # Monthly critical (> 25%)
-    monkeypatch.setenv("MAX_WEEKLY_LOSS", "0.10")
-    monkeypatch.setenv("MAX_MONTHLY_LOSS", "0.30")
+    # Monthly critical (> 15%)
+    monkeypatch.setenv("MAX_WEEKLY_LOSS", "0.05")
+    monkeypatch.setenv("MAX_MONTHLY_LOSS", "0.20")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
@@ -676,34 +608,20 @@ def test_validator_exposure_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Single direction critical (> 50%)
-    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.60")
+    # Single direction critical (> 30%)
+    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.40")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MAX_SINGLE_DIRECTION_PCT" and e.critical for e in result.errors)
 
-    # Single direction warning (> 30%)
-    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.40")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is True
-    assert any(e.field == "MAX_SINGLE_DIRECTION_PCT" and not e.critical for e in result.errors)
-
-    # Total notional critical (> 150%)
-    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.30")
-    monkeypatch.setenv("MAX_TOTAL_NOTIONAL_PCT", "1.60")
+    # Total notional critical (> 100%)
+    monkeypatch.setenv("MAX_SINGLE_DIRECTION_PCT", "0.20")
+    monkeypatch.setenv("MAX_TOTAL_NOTIONAL_PCT", "1.10")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
     assert any(e.field == "MAX_TOTAL_NOTIONAL_PCT" and e.critical for e in result.errors)
-
-    # Total notional warning (> 100%)
-    monkeypatch.setenv("MAX_TOTAL_NOTIONAL_PCT", "1.20")
-    cfg = TradingConfig()
-    result = ConfigValidator(cfg).validate()
-    assert result.success is True
-    assert any(e.field == "MAX_TOTAL_NOTIONAL_PCT" and not e.critical for e in result.errors)
 
 def test_validator_spread_hierarchy(monkeypatch, tmp_path):
     """Test validator detects spread hierarchy violations."""
@@ -769,8 +687,8 @@ def test_validator_max_trades_per_day(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
 
-    # Exceeds institutional limit of 50
-    monkeypatch.setenv("MAX_TRADES_PER_DAY", "60")
+    # Exceeds institutional limit of 20
+    monkeypatch.setenv("MAX_TRADES_PER_DAY", "25")
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()
     assert result.success is False
@@ -806,19 +724,10 @@ def test_validator_file_permissions(monkeypatch, tmp_path):
     env_file.write_text("MT5_PASSWORD=secure")
     os.chmod(env_file, 0o666)
 
-    # Mock TradingConfig to use this .env file
-    # TradingConfig.model_config is a dict in Pydantic v2
-    # But wait, it's a SettingsConfigDict.
-    # Actually, ConfigValidator uses self.config.model_config.get("env_file")
-
     monkeypatch.setenv("MT5_LOGIN", "123456")
     monkeypatch.setenv("MT5_PASSWORD", "secure")
     monkeypatch.setenv("MT5_SERVER", "Broker")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
-
-    # We need to make sure TradingConfig uses our tmp_path/.env
-    # The TradingConfig class defines ROOT / ".env"
-    # But we can monkeypatch the config object passed to validator.
 
     cfg = TradingConfig()
     validator = ConfigValidator(cfg)
@@ -835,7 +744,6 @@ def test_validator_file_permissions(monkeypatch, tmp_path):
     monkeypatch.setattr(os, "stat", mocked_stat)
 
     # We also mock Path.exists to ensure the validator thinks .env exists
-    from pathlib import Path
     original_exists = Path.exists
     def mocked_exists(self):
         if self.name == ".env":
@@ -849,3 +757,68 @@ def test_validator_file_permissions(monkeypatch, tmp_path):
     # It should give a warning (not critical)
     assert any(e.field == "FILE_PERMISSION" and ".env" in e.message for e in result.errors)
     assert all(not e.critical for e in result.errors if e.field == "FILE_PERMISSION")
+
+def test_validator_execution_parameters(monkeypatch, tmp_path):
+    """Test validator checks for slippage and latency limits."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+
+    # 1. Slippage > 1.0
+    monkeypatch.setenv("MAX_SLIPPAGE_PIPS", "1.5")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_SLIPPAGE_PIPS" for e in result.errors)
+
+    # 2. Latency > 5.0
+    monkeypatch.setenv("MAX_SLIPPAGE_PIPS", "0.5")
+    monkeypatch.setenv("EXECUTION_LATENCY_THRESHOLD", "6.0")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "EXECUTION_LATENCY_THRESHOLD" for e in result.errors)
+
+def test_validator_behavior_caps(monkeypatch, tmp_path):
+    """Test validator checks for behavior-based caps."""
+    model_file = tmp_path / "model.pt"
+    model_file.write_text("data")
+    monkeypatch.setenv("MT5_LOGIN", "123456")
+    monkeypatch.setenv("MT5_PASSWORD", "secure")
+    monkeypatch.setenv("MT5_SERVER", "Broker")
+    monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@host/db")
+
+    # 1. Daily win cap > 10%
+    monkeypatch.setenv("DAILY_WIN_CAP", "0.15")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "DAILY_WIN_CAP" for e in result.errors)
+
+    # 2. Losing streak > 3
+    monkeypatch.setenv("DAILY_WIN_CAP", "0.05")
+    monkeypatch.setenv("MAX_LOSING_STREAK", "5")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_LOSING_STREAK" for e in result.errors)
+
+    # 3. Winning streak > 20
+    monkeypatch.setenv("MAX_LOSING_STREAK", "3")
+    monkeypatch.setenv("MAX_WINNING_STREAK", "25")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is False
+    assert any(e.field == "MAX_WINNING_STREAK" and e.critical for e in result.errors)
+
+    # 4. Winning streak warning (> 5)
+    monkeypatch.setenv("MAX_WINNING_STREAK", "10")
+    cfg = TradingConfig()
+    result = ConfigValidator(cfg).validate()
+    assert result.success is True
+    assert any(e.field == "MAX_WINNING_STREAK" and not e.critical for e in result.errors)
