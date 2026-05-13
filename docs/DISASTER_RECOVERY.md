@@ -1,7 +1,7 @@
 # Disaster Recovery Plan (DRP)
 
-**Version:** 1.1.0-rc7
-**Last Updated:** 2024-06-10
+**Version:** 1.1.0
+**Last Updated:** 2024-06-15
 **Status:** PROD-READY
 
 ## 1. Overview
