@@ -7,7 +7,7 @@ import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
-BIG_BANG_DATE = datetime.datetime(2026, 5, 12, tzinfo=datetime.timezone.utc)
+BIG_BANG_DATE = datetime.datetime(2026, 5, 13, tzinfo=datetime.timezone.utc)
 
 
 def api_call(url):
@@ -269,10 +269,13 @@ def generate_report():
         top_3_items.append(
             f"**Core Progress:** Review Medium Risk PR #{medium_risk[0]['number']} ({medium_risk[0]['title']})"
         )
-    elif high_risk:
-        top_3_items.append(
-            f"**Critical Path:** High Risk PR #{high_risk[0]['number']} needs expert review."
-        )
+    if high_risk:
+        for hr in high_risk:
+            if len(top_3_items) >= 3:
+                break
+            top_3_items.append(
+                f"**Critical Path:** High Risk PR #{hr['number']} needs expert review."
+            )
 
     top_3_section = ""
     for idx, item in enumerate(top_3_items[:3]):
@@ -291,19 +294,22 @@ def generate_report():
     ]
 
     report += "\n## 🛡️ Risk Classification Summary\n\n"
-    report += f"- **High Risk (New):** {len(high_risk)} PRs\n"
-    report += f"- **Medium Risk (New):** {len(medium_risk)} PRs\n"
-    report += f"- **Safe Surface (New):** {len(safe_surface)} PRs\n"
-    report += f"- **Triage Required (New):** {len(new_triage_required)} PRs\n"
-    report += (
-        f"- **Stale (Total):** {len([pr for pr in classified_prs if 'Stale' in pr['flag']])} PRs\n"
-    )
+
+    def plural(n):
+        return "" if n == 1 else "s"
+
+    report += f"- **High Risk (New):** {len(high_risk)} PR{plural(len(high_risk))}\n"
+    report += f"- **Medium Risk (New):** {len(medium_risk)} PR{plural(len(medium_risk))}\n"
+    report += f"- **Safe Surface (New):** {len(safe_surface)} PR{plural(len(safe_surface))}\n"
+    report += f"- **Triage Required (New):** {len(new_triage_required)} PR{plural(len(new_triage_required))}\n"
+    stale_count = len([pr for pr in classified_prs if "Stale" in pr["flag"]])
+    report += f"- **Stale (Total):** {stale_count} PR{plural(stale_count)}\n"
 
     report += "\n## ✨ Good Candidates for Review Today\n\n"
-    candidates = (safe_surface + medium_risk)[:4]
+    candidates = (safe_surface + medium_risk + high_risk)[:4]
 
     if not candidates:
-        report += "No new low/medium risk candidates identified today.\n"
+        report += "No new candidates identified today.\n"
     else:
         for c in candidates:
             status_str = f" [CI: {c['ci_status']}]" if c["ci_status"] != "unknown" else ""
@@ -324,9 +330,9 @@ def generate_report():
     checklist += f"Generated on: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
     checklist += "This checklist identifies top promising PRs for immediate review.\n\n"
 
-    top_3 = (safe_surface + medium_risk)[:3]
+    top_3 = (safe_surface + medium_risk + high_risk)[:3]
     if not top_3:
-        checklist += "No new low-risk candidates found for merge-readiness checklist today.\n"
+        checklist += "No new candidates found for merge-readiness checklist today.\n"
     else:
         for i, c in enumerate(top_3):
             checklist += f"## {i + 1}. PR #{c['number']}: {c['title']}\n"
