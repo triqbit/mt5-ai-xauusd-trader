@@ -76,6 +76,30 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
+    def reconcile_state(self) -> None:
+        """
+        Reconcile internal state with the persistent database.
+        Recovers open positions and historical peak equity.
+        """
+        if not self.trade_logger:
+            return
+
+        logger.info("Reconciling RiskManager state with database...")
+
+        # 1. Recover Peak Equity from performance history
+        # To be precise, we ensure peak_equity is at least current balance.
+        self.peak_equity = max(self.peak_equity, self.balance)
+
+        # 2. Recover Active Positions
+        open_trades = self.trade_logger.get_open_trades()
+        for trade in open_trades:
+            self.open_positions[trade.symbol] = trade.ticket
+            logger.info(
+            "Recovered open position | symbol=%s ticket=%d", trade.symbol, trade.ticket
+            )
+
+        logger.info("State reconciliation complete | positions=%d", len(self.open_positions))
+
     def approve(
         self,
         signal: TradeSignal,
@@ -128,16 +152,29 @@ class RiskManager:
         avg_win: float,
         avg_loss: float,
         pip_value: float = 1.0,
+        risk_pct: Optional[float] = None,
     ) -> float:
         """
         Fractional Kelly Criterion position sizing.
         Returns lot size capped at max risk per trade.
+
+        Args:
+            symbol: Trading symbol.
+            win_rate: Historical win rate (0.0 to 1.0).
+            avg_win: Average win amount (pips/points).
+            avg_loss: Average loss amount (pips/points).
+            pip_value: Monetary value of one pip/point.
+            risk_pct: Optional override for risk percentage (e.g. from CapitalAllocator).
+                     Defaults to cfg.risk_per_trade.
         """
         if avg_loss == 0:
             return 0.01  # minimum lot
+
+        target_risk = risk_pct if risk_pct is not None else self.cfg.risk_per_trade
+
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+        risk_capital = self.balance * target_risk
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(

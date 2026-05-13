@@ -145,6 +145,7 @@ def _prepare_trade_signal(
             win_rate=0.58,
             avg_win=4 * atr,
             avg_loss=2 * atr,
+            risk_pct=approved_risk,
         )
         if approved_risk > 0
         else 0.0
@@ -1235,6 +1236,9 @@ def main() -> int:
     )
 
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    # Recover state from database (e.g. after restart)
+    risk.reconcile_state()
+
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,

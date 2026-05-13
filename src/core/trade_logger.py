@@ -324,6 +324,17 @@ class TradeLogger:
                 select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             ).scalar_one_or_none()
 
+    def get_open_trades(self) -> list[Trade]:
+        """Retrieve all active, non-deleted trades from the database."""
+        with self.Session() as session:
+            return (
+                session.execute(
+                    select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
+
     def log_risk_event(
         self,
         event_type: str,
