@@ -143,6 +143,7 @@ def test_check_models_success(health_checker):
     assert "lstm" in status.message.lower()
     assert "dreamer" in status.message.lower()
 
+
 def test_check_models_partial_ensemble(health_checker, mock_model):
     # Ensemble with missing components should be DEGRADED
     mock_model.lstm_model = None
@@ -177,6 +178,7 @@ def test_check_models_transformer(health_checker, mock_config, mock_model):
     assert status.status == HealthStatus.HEALTHY
     assert "transformer" in status.message.lower()
 
+
 def test_check_models_individual_wrapper(health_checker, mock_config, mock_model):
     mock_config.algorithm = "ppo"
     mock_model.ppo_agent = None
@@ -194,6 +196,7 @@ def test_check_models_individual_wrapper(health_checker, mock_config, mock_model
     status = health_checker.check_models()
     assert status.status == HealthStatus.HEALTHY
     assert "ppo" in status.message.lower()
+
 
 def test_check_models_algorithm_mismatch(health_checker, mock_config, mock_model):
     mock_config.algorithm = "ppo"
