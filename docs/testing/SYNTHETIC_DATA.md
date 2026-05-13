@@ -23,6 +23,16 @@ Located in `src/utils/synthetic_data.py`, the `ScenarioGenerator` provides deter
 - **missing_data**: Data with random NaN "holes" in OHLCV columns to test pipeline robustness.
 - **malformed**: Data with intentional errors (NaNs, negative prices, High < Low) to test pipeline resilience.
 
+### Advanced Generation Features
+
+- **generate_multi_timeframe(n_steps_base, base_freq, timeframes, regime)**: Generates consistent OHLC data across multiple timeframes (e.g., M1, M5, H1) via resampling. This ensures that the high-TF "High" is the maximum of the underlying low-TF bars, and "Open" prices align correctly across scales.
+- **inject_faults(df, fault_type, prob)**: Injects operational hazards into an existing dataset:
+    - **stale**: Simulates a frozen data feed where prices don't change.
+    - **outliers**: Ghost ticks or extreme price spikes (e.g., bad feed).
+    - **zero_volume**: Price moves but volume is reported as zero.
+    - **gaps**: Price jumps without continuity (slippage or weekend gaps).
+- **Price Continuity**: The generator ensures `Open[i] == Close[i-1]` for standard regimes, providing realistic price action for backtesting.
+
 ## BacktestScenarioBuilder
 
 Located in `src/utils/synthetic_data.py`, the `BacktestScenarioBuilder` provides deterministic price sequences designed to verify the mathematical correctness of the `BacktestEngine`.
