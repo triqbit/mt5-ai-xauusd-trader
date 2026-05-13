@@ -93,10 +93,10 @@ class RiskManager:
         # 2. Recover Active Positions
         open_trades = self.trade_logger.get_open_trades()
         for trade in open_trades:
-                self.open_positions[trade.symbol] = trade.ticket
-                logger.info(
-                    "Recovered open position | symbol=%s ticket=%d", trade.symbol, trade.ticket
-                )
+            self.open_positions[trade.symbol] = trade.ticket
+            logger.info(
+            "Recovered open position | symbol=%s ticket=%d", trade.symbol, trade.ticket
+            )
 
         logger.info("State reconciliation complete | positions=%d", len(self.open_positions))
 
