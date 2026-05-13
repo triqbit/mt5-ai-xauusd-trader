@@ -140,6 +140,7 @@ jobs:
           python scripts/verify_backtest_audit.py
           python scripts/verify_journal_mining.py
           python scripts/verify_explainability_ui.py
+          python scripts/verify_ux_terminal.py
           # Generate consolidated audit report
           python scripts/generate_research_report.py
 
@@ -168,10 +169,10 @@ jobs:
             exit 1
           fi
 
-          # Fail if there are any unchecked boxes [ ]
-          if grep -q "\[ \]" "$CHECKLIST"; then
+          # Fail if there are any unchecked boxes [ ] (ignoring status choice line)
+          if grep "\[ \]" "$CHECKLIST" | grep -v "\*\*Status:\*\*" | grep -q "\[ \]"; then
             echo "::error::Uncompleted items found in PREPROD_CHECKLIST.md. Release blocked."
-            grep -n "\[ \]" "$CHECKLIST"
+            grep -n "\[ \]" "$CHECKLIST" | grep -v "\*\*Status:\*\*"
             exit 1
           fi
           echo "Pre-prod checklist validation passed."
@@ -325,6 +326,12 @@ jobs:
           name: compliance-report
           path: docs/
 
+      - name: Download Research Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: research-vitals-reports
+          path: .
+
       - name: Package Release Artifacts
         run: |
           chmod +x scripts/package_release.sh
@@ -366,6 +373,10 @@ jobs:
             releases/mt5-ai-xauusd-trader-v${{ steps.version.outputs.VERSION }}.zip
             releases/checksums.txt
             docs/DEPENDENCY_LICENSES.md
+            research_audit_report.md
+            research_verification_report.md
+            research_audit_report.html
+            research_verification_report.html
           draft: false
           prerelease: ${{ github.event.inputs.prerelease || false }}
         env:

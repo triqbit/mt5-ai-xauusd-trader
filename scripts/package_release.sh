@@ -78,13 +78,18 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     echo "   [+] Component: Docker Image (image.tar.gz)"
     # Build or check for existing image
     if ! docker image inspect "${IMAGE_NAME}:v${VERSION}" >/dev/null 2>&1; then
-        echo "Building Docker Image..."
-        if docker build -t "${IMAGE_NAME}:v${VERSION}" .; then
-             docker save "${IMAGE_NAME}:v${VERSION}" | gzip > "${RELEASE_PATH}/image.tar.gz"
-             DOCKER_AVAILABLE="true"
-             IMAGE_TAG="v${VERSION}"
+        if [ "$SKIP_DOCKER_BUILD" = "true" ]; then
+            echo "   [!] SKIP_DOCKER_BUILD=true. Image not found locally and build skipped."
+        else
+            echo "Building Docker Image..."
+            if docker build -t "${IMAGE_NAME}:v${VERSION}" .; then
+                 docker save "${IMAGE_NAME}:v${VERSION}" | gzip > "${RELEASE_PATH}/image.tar.gz"
+                 DOCKER_AVAILABLE="true"
+                 IMAGE_TAG="v${VERSION}"
+            fi
         fi
     else
+        echo "   [*] Using existing local image: ${IMAGE_NAME}:v${VERSION}"
         docker save "${IMAGE_NAME}:v${VERSION}" | gzip > "${RELEASE_PATH}/image.tar.gz"
         DOCKER_AVAILABLE="true"
         IMAGE_TAG="v${VERSION}"
@@ -138,6 +143,15 @@ fi
 if [ ! -s "${RELEASE_PATH}/RELEASE_NOTES.md" ]; then
     echo "Release notes fallback." > "${RELEASE_PATH}/RELEASE_NOTES.md"
 fi
+
+# Component G: Research Reports (Optional in packaging, mandatory in workflow)
+echo "   [+] Component: Research Reports (optional collect)"
+REPORT_FILES=("research_audit_report.md" "research_verification_report.md" "research_audit_report.html" "research_verification_report.html")
+for r in "${REPORT_FILES[@]}"; do
+    if [ -f "$r" ]; then
+        cp "$r" "${RELEASE_PATH}/"
+    fi
+done
 
 # --- 4. Verification & Integrity ---
 echo "Finalizing Artifact with Checksum Manifest..."
