@@ -399,15 +399,23 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                    current_positions = connector.get_positions(cfg.symbol)
+                    risk_decision = (
+                        risk.approve(
+                            signal,
+                            market_data=df_raw,
+                            open_positions=current_positions,
+                            signal_id=signal_id,
+                            model_health=health,
+                        )
                         if direction != 0
-                        else False
+                        else None
                     )
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
-                if risk_approved:
+                is_execution_approved = False
+                if risk_decision and risk_decision.is_approved:
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
                         # Model health retrieved in step 6
@@ -433,10 +441,12 @@ def run_live(
                                 cfg.symbol,
                                 filter_decision.blocked_by,
                             )
-                            risk_approved = False
+                            is_execution_approved = False
+                        else:
+                            is_execution_approved = True
 
                 # 8. Decision Support System (Cockpit)
-                if direction != 0:
+                if direction != 0 and risk_decision:
                     with profile("decision_support"):
                         # Prepare data for explainer
                         model_votes = signal_obj.metadata.get(
@@ -446,15 +456,17 @@ def run_live(
                         model_weights = signal_obj.metadata.get("weights", {cfg.algorithm: 1.0})
 
                         risk_data = {
-                            "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "passed": risk_decision.is_approved,
+                            "rejection_reasons": [risk_decision.reason]
+                            if not risk_decision.is_approved
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": f"Approved ({risk_decision.adjusted_lot_size} lots)"
+                            if risk_decision.is_approved
+                            else f"Risk REJECTED: {risk_decision.reason}",
                         }
 
                         regime_data = {
@@ -538,13 +550,16 @@ def run_live(
                         else:
                             log.info(dss.format_for_operator(packet))
 
-                if risk_approved and direction != 0:
+                if is_execution_approved and direction != 0 and risk_decision:
                     with profile("execution"):
                         from src.core.exceptions import MT5ExecutionError
 
                         execution_start = time.perf_counter()
                         try:
-                            ticket = connector.place_order(signal)
+                            # Use adjusted lot size from RiskDecision
+                            ticket = connector.place_order(
+                                signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
+                            )
                         except MT5ExecutionError as e:
                             log.error("Order execution FAILED", error=str(e))
                             if audit_logger:

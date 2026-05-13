@@ -121,6 +121,26 @@ class TradeSignal(BaseModel):
         return self
 
 
+class RiskDecision(BaseModel):
+    """
+    Structured result of the risk management cascade.
+    Enforces technical trust by ensuring every rejection has an explicit reason.
+
+    This model is immutable (frozen) and forbids extra fields.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="Final decision: True if passed all risk gates")
+    reason: str = Field("", description="The reason for rejection, if any")
+    adjusted_lot_size: float = Field(
+        0.0, ge=0.0, description="The risk-adjusted position size in lots"
+    )
+    trace: dict[str, bool] = Field(
+        default_factory=dict, description="Detailed audit trace of all risk gate evaluations"
+    )
+
+
 class ExecutionDecision(BaseModel):
     """
     Structured result of the execution filter cascade.
