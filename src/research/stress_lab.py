@@ -423,9 +423,7 @@ class StressLab:
         """
         # Exclude sensitivity-specific runs and the baseline/normal runs from the general scenario count for clarity
         excluded_prefixes = ("Sensitivity_", "Baseline", "Normal", "Neutral")
-        scenario_keys = [
-            k for k in results.keys() if not any(k.startswith(p) for p in excluded_prefixes)
-        ]
+        scenario_keys = [k for k in results if not any(k.startswith(p) for p in excluded_prefixes)]
         stressed_returns = [results[k].total_return for k in scenario_keys]
 
         num_stressed = len(stressed_returns)
@@ -457,9 +455,12 @@ class StressLab:
                         breaking_point = val
 
                     # Detect 50% performance decay
-                    if baseline.total_return > 0 and ret <= baseline.total_return * 0.5:
-                        if fifty_pct_decay is None:
-                            fifty_pct_decay = val
+                    if (
+                        baseline.total_return > 0
+                        and ret <= baseline.total_return * 0.5
+                        and fifty_pct_decay is None
+                    ):
+                        fifty_pct_decay = val
 
                 if breaking_point is not None:
                     summary += f"\n- Breaking point for {param} detected at {breaking_point:.2f}."
