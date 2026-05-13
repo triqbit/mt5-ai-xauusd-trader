@@ -5,18 +5,20 @@ Verification script for the journal mining system.
 """
 
 import os
-import sys
-from datetime import datetime, timedelta, UTC
 import random
+import sys
+from datetime import UTC, datetime, timedelta
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.analytics.journal_mining import JournalMiner
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade, RiskEvent, Base
-from src.research.reporting import ResearchReporter, ResearchOrchestrator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from src.analytics.journal_mining import JournalMiner
+from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
+from src.research.reporting import ResearchOrchestrator, ResearchReporter
+
 
 def generate_synthetic_data(db_url):
     engine = create_engine(db_url)

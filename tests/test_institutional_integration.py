@@ -11,11 +11,11 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 
+from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import MarketRegime, RegimeDetector
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.core.schemas import TradeSignal
 from src.trading.risk_manager import RiskManager
 
 
@@ -67,8 +67,8 @@ def test_institutional_intelligence_path(mock_ohlcv_data, trade_logger):
 
     # 3. Model Inference (Jules01)
     # Mock models to simulate votes
-    from src.models.base_model import Signal
     from src.core.constants import SignalDirection
+    from src.models.base_model import Signal
     ensemble.ppo_agent = MagicMock()
     # Mock PPO to return action index 1 (BUY in ModelAction/SignalDirection standard)
     ensemble.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
