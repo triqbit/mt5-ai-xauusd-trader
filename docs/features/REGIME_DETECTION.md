@@ -101,3 +101,11 @@ python scripts/label_market_regimes.py --input data.csv --output labeled_data.cs
 ## Implementation Details
 
 The implementation is located in `src/models/regime_detector.py`. It unifies the logic between real-time inference and historical labeling by using the same vectorized feature extraction path, ensuring "what you test is what you trade."
+
+## Validation Status
+
+- [x] Vectorized feature extraction verified.
+- [x] Heuristic regime transitions validated.
+- [x] GMM clustering and cluster-to-regime mapping tested.
+- [x] Historical labeling CLI utility verified.
+- [x] Integration with institutional reporting suite confirmed.
