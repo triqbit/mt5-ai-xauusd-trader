@@ -8,6 +8,7 @@ The Stress Lab is an adversarial resilience testing framework designed for XAUUS
 - **Realistic Market Stress**: Perturbs price action using ATR-relative shocks to simulate choppy fake breakouts, flash crashes, and sudden regime transitions or trend exhaustion.
 - **Infrastructure Resilience**: Simulates external service failures to test strategy stability under degraded conditions.
 - **Structured Reporting**: Outputs research-grade metrics and resilience reports, identifying failure points and resilience weaknesses. Includes institutional metrics such as **Recovery Factor** and **Profit Factor**.
+- **Sensitivity Analysis**: Performs multi-pass parameter sweeps (e.g., spread and slippage) to identify non-linear performance decay thresholds and strategy breaking points.
 - **Fragility Intelligence**: Automatically detects 'strategy fragility' indicators including over-trading spikes (2x baseline trade count) and negative edge transitions (Profit Factor dropping below 1.0) under stress.
 
 ## Stress Scenarios
