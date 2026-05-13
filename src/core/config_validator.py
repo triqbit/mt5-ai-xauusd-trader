@@ -44,6 +44,8 @@ class ConfigValidator:
         self._check_risk_parameters()
         self._check_exposure_limits()
         self._check_margin_and_volatility_limits()
+        self._check_execution_parameters()
+        self._check_behavior_caps()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -289,44 +291,26 @@ class ConfigValidator:
     def _check_risk_parameters(self) -> None:
         """Verify risk parameters are within safe enterprise bounds (RISK_LIMITS.md)."""
         # 1. Per-trade risk limits (RISK_LIMITS.md 1.3)
-        # Policy limit is 1%, 2% is hard prohibition.
-        if self.config.risk_per_trade > 0.02:
+        # Policy limit is 1%.
+        if self.config.risk_per_trade > 0.01:
             self.errors.append(
                 ValidationError(
                     "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds 2%.",
+                    f"Risk per trade {self.config.risk_per_trade * 100}% exceeds 1% hard limit.",
                     True,
-                    "Reduce RISK_PER_TRADE to 0.02 (2%) or less.",
-                )
-            )
-        elif self.config.risk_per_trade > 0.01:
-            self.errors.append(
-                ValidationError(
-                    "RISK_PER_TRADE",
-                    f"Risk per trade {self.config.risk_per_trade*100}% exceeds policy limit of 1%.",
-                    False,  # Non-critical warning
-                    "Consider reducing RISK_PER_TRADE to 0.01 (1%) for better risk parity.",
+                    "Reduce RISK_PER_TRADE to 0.01 (1%) or less.",
                 )
             )
 
         # 2. Daily loss limits (RISK_LIMITS.md 2.1)
-        # Level 4 (Emergency Stop) is 5%.
-        if self.config.max_daily_loss > 0.06:
+        # Emergency Stop (Level 4) is 5%.
+        if self.config.max_daily_loss > 0.05:
             self.errors.append(
                 ValidationError(
                     "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 6%.",
+                    f"Max daily loss {self.config.max_daily_loss * 100}% exceeds 5% limit.",
                     True,
-                    "Reduce MAX_DAILY_LOSS to 0.06 or less.",
-                )
-            )
-        elif self.config.max_daily_loss > 0.05:
-            self.errors.append(
-                ValidationError(
-                    "MAX_DAILY_LOSS",
-                    f"Max daily loss {self.config.max_daily_loss*100}% exceeds 5% limit.",
-                    False,
-                    "Set MAX_DAILY_LOSS to 0.05 for compliance with enterprise standards.",
+                    "Reduce MAX_DAILY_LOSS to 0.05 or less.",
                 )
             )
 
@@ -345,30 +329,30 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         levels[i + 1][0],
-                        f"{levels[i+1][0]} ({levels[i+1][1]}) must be greater than {levels[i][0]} ({levels[i][1]}).",
+                        f"{levels[i + 1][0]} ({levels[i + 1][1]}) must be greater than {levels[i][0]} ({levels[i][1]}).",
                         True,
                         "Correct the daily loss hierarchy in .env.",
                     )
                 )
 
         # 2.2 Weekly/Monthly Loss Limits (RISK_LIMITS.md 3.1, 3.2)
-        if self.config.max_weekly_loss > 0.15:
+        if self.config.max_weekly_loss > 0.10:
             self.errors.append(
                 ValidationError(
                     "MAX_WEEKLY_LOSS",
-                    f"Max weekly loss {self.config.max_weekly_loss*100}% exceeds 15% safety limit.",
+                    f"Max weekly loss {self.config.max_weekly_loss * 100}% exceeds 10% safety limit.",
                     True,
-                    "Reduce MAX_WEEKLY_LOSS to 0.15 or less.",
+                    "Reduce MAX_WEEKLY_LOSS to 0.10 or less.",
                 )
             )
 
-        if self.config.max_monthly_loss > 0.25:
+        if self.config.max_monthly_loss > 0.15:
             self.errors.append(
                 ValidationError(
                     "MAX_MONTHLY_LOSS",
-                    f"Max monthly loss {self.config.max_monthly_loss*100}% exceeds 25% safety limit.",
+                    f"Max monthly loss {self.config.max_monthly_loss * 100}% exceeds 15% safety limit.",
                     True,
-                    "Reduce MAX_MONTHLY_LOSS to 0.25 or less.",
+                    "Reduce MAX_MONTHLY_LOSS to 0.15 or less.",
                 )
             )
 
@@ -382,121 +366,57 @@ class ConfigValidator:
                 )
             )
 
-        # 2.3 Spread Hierarchy (RISK_LIMITS.md 5.2)
-        spread_levels = [
-            ("MIN_SPREAD_PIPS", self.config.min_spread_pips),
-            ("SPREAD_ALERT_PIPS", self.config.spread_alert_pips),
-            ("SPREAD_REDUCE_PIPS", self.config.spread_reduce_pips),
-            ("SPREAD_HALT_PIPS", self.config.spread_halt_pips),
-        ]
-
-        for i in range(len(spread_levels) - 1):
-            if spread_levels[i][1] >= spread_levels[i + 1][1]:
-                self.errors.append(
-                    ValidationError(
-                        spread_levels[i + 1][0],
-                        f"{spread_levels[i+1][0]} ({spread_levels[i+1][1]}) must be greater than {spread_levels[i][0]} ({spread_levels[i][1]}).",
-                        True,
-                        "Correct the spread limit hierarchy in .env.",
-                    )
-                )
-
         # 3. Confidence Threshold (RISK_LIMITS.md 4.1)
-        if self.config.min_confidence < 0.50:
+        if self.config.min_confidence < 0.55:
             self.errors.append(
                 ValidationError(
                     "MIN_CONFIDENCE",
-                    f"Confidence threshold {self.config.min_confidence} is dangerously low.",
+                    f"Confidence threshold {self.config.min_confidence} is below 0.55 limit.",
                     True,
-                    "Set MIN_CONFIDENCE to at least 0.50.",
-                )
-            )
-        elif self.config.min_confidence < 0.55:
-            self.errors.append(
-                ValidationError(
-                    "MIN_CONFIDENCE",
-                    f"Confidence threshold {self.config.min_confidence} is below recommended 0.55.",
-                    False,
-                    "Increase MIN_CONFIDENCE to 0.55 for better signal quality.",
+                    "Set MIN_CONFIDENCE to at least 0.55.",
                 )
             )
 
         # 4. Position limits (RISK_LIMITS.md 1.1)
         # Maximum 5 open positions is the policy limit.
-        if self.config.max_positions > 10:
-            self.errors.append(
-                ValidationError(
-                    "MAX_POSITIONS",
-                    f"Maximum positions {self.config.max_positions} is prohibited.",
-                    True,
-                    "Set MAX_POSITIONS to 10 or less.",
-                )
-            )
-        elif self.config.max_positions > 5:
+        if self.config.max_positions > 5:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITIONS",
                     f"Maximum positions {self.config.max_positions} exceeds limit of 5.",
-                    False,
+                    True,
                     "Reduce MAX_POSITIONS to 5 or less for production safety.",
                 )
             )
 
         # 5. Leverage and Exposure (RISK_LIMITS.md 1.1)
-        if self.config.max_leverage > 20:
-            self.errors.append(
-                ValidationError(
-                    "MAX_LEVERAGE",
-                    f"Max leverage {self.config.max_leverage} is too high.",
-                    True,
-                    "Reduce MAX_LEVERAGE to 20 or less (Policy is 10:1).",
-                )
-            )
-        elif self.config.max_leverage > 10:
+        if self.config.max_leverage > 10:
             self.errors.append(
                 ValidationError(
                     "MAX_LEVERAGE",
                     f"Max leverage {self.config.max_leverage} exceeds policy limit of 10.",
-                    False,
+                    True,
                     "Set MAX_LEVERAGE to 10 for enterprise compliance.",
                 )
             )
 
-        if self.config.max_position_size_pct > 0.20:
+        if self.config.max_position_size_pct > 0.10:
             self.errors.append(
                 ValidationError(
                     "MAX_POSITION_SIZE_PCT",
-                    f"Max position size {self.config.max_position_size_pct*100}% is dangerously high.",
+                    f"Max position size {self.config.max_position_size_pct * 100}% exceeds 10% limit.",
                     True,
-                    "Reduce MAX_POSITION_SIZE_PCT to 0.20 or less.",
-                )
-            )
-        elif self.config.max_position_size_pct > 0.10:
-            self.errors.append(
-                ValidationError(
-                    "MAX_POSITION_SIZE_PCT",
-                    f"Max position size {self.config.max_position_size_pct*100}% exceeds 10% limit.",
-                    False,
                     "Set MAX_POSITION_SIZE_PCT to 0.10 for compliance.",
                 )
             )
 
         # 6. Drawdown Limits (RISK_LIMITS.md 6.1)
-        if self.config.max_drawdown > 0.40:
+        if self.config.max_drawdown > 0.30:
             self.errors.append(
                 ValidationError(
                     "MAX_DRAWDOWN",
-                    f"Max drawdown {self.config.max_drawdown*100}% is unacceptable.",
+                    f"Max drawdown {self.config.max_drawdown * 100}% exceeds 30% policy limit.",
                     True,
-                    "Reduce MAX_DRAWDOWN to 0.40 or less.",
-                )
-            )
-        elif self.config.max_drawdown > 0.30:
-            self.errors.append(
-                ValidationError(
-                    "MAX_DRAWDOWN",
-                    f"Max drawdown {self.config.max_drawdown*100}% exceeds 30% policy limit.",
-                    False,
                     "Set MAX_DRAWDOWN to 0.30 for enterprise standards.",
                 )
             )
@@ -533,8 +453,6 @@ class ConfigValidator:
             )
 
         # 8. Calibration Threshold (RISK_LIMITS.md 4.2)
-        # Release-readiness gate: Prevents deployment of overconfident/poorly calibrated models.
-        # High ECE (Expected Calibration Error) indicates the model's confidence doesn't match its accuracy.
         if self.config.model_calibration_threshold > 0.25:
             self.errors.append(
                 ValidationError(
@@ -547,56 +465,38 @@ class ConfigValidator:
 
     def _check_exposure_limits(self) -> None:
         """Verify exposure and notional limits (RISK_LIMITS.md 1.2)."""
-        if self.config.max_single_direction_pct > 0.50:
+        if self.config.max_single_direction_pct > 0.30:
             self.errors.append(
                 ValidationError(
                     "MAX_SINGLE_DIRECTION_PCT",
-                    f"Max single direction exposure {self.config.max_single_direction_pct*100}% is too high.",
+                    f"Max single direction exposure {self.config.max_single_direction_pct * 100}% exceeds 30% policy.",
                     True,
-                    "Reduce MAX_SINGLE_DIRECTION_PCT to 0.50 or less (Policy is 0.30).",
-                )
-            )
-        elif self.config.max_single_direction_pct > 0.30:
-            self.errors.append(
-                ValidationError(
-                    "MAX_SINGLE_DIRECTION_PCT",
-                    f"Max single direction exposure {self.config.max_single_direction_pct*100}% exceeds 30% policy.",
-                    False,
                     "Set MAX_SINGLE_DIRECTION_PCT to 0.30 for compliance.",
                 )
             )
 
-        if self.config.max_total_notional_pct > 1.50:
+        if self.config.max_total_notional_pct > 1.00:
             self.errors.append(
                 ValidationError(
                     "MAX_TOTAL_NOTIONAL_PCT",
-                    f"Max total notional {self.config.max_total_notional_pct*100}% is dangerously high.",
+                    f"Max total notional {self.config.max_total_notional_pct * 100}% exceeds 100% equity.",
                     True,
-                    "Reduce MAX_TOTAL_NOTIONAL_PCT to 1.50 or less.",
-                )
-            )
-        elif self.config.max_total_notional_pct > 1.00:
-            self.errors.append(
-                ValidationError(
-                    "MAX_TOTAL_NOTIONAL_PCT",
-                    f"Max total notional {self.config.max_total_notional_pct*100}% exceeds 100% equity.",
-                    False,
                     "Set MAX_TOTAL_NOTIONAL_PCT to 1.00 for enterprise safety.",
                 )
             )
 
-        # Max Trades Per Day validation (Plan requirement)
-        if self.config.max_trades_per_day > 50:
+        # Max Trades Per Day validation (RISK_LIMITS.md 2.3)
+        if self.config.max_trades_per_day > 20:
             self.errors.append(
                 ValidationError(
                     "MAX_TRADES_PER_DAY",
-                    f"Max trades per day ({self.config.max_trades_per_day}) exceeds institutional limit of 50.",
+                    f"Max trades per day ({self.config.max_trades_per_day}) exceeds limit of 20.",
                     True,
-                    "Reduce MAX_TRADES_PER_DAY to 50 or less.",
+                    "Reduce MAX_TRADES_PER_DAY to 20 or less.",
                 )
             )
 
-        # Min Lot Size validation (Plan requirement)
+        # Min Lot Size validation (RISK_LIMITS.md 1.1)
         if self.config.min_lot_size < 0.01:
             self.errors.append(
                 ValidationError(
@@ -609,8 +509,8 @@ class ConfigValidator:
 
     def _check_margin_and_volatility_limits(self) -> None:
         """Verify margin and volatility hierarchy levels (RISK_LIMITS.md 1.2, 5.1)."""
-        # 1. Margin Hierarchy (Note: These are utilization percentages, not MT5 Margin Level %)
-        # As risk increases, utilization grows: Alert (70%) < Halt (80%) < Liquidation (90%)
+        # 1. Margin Hierarchy
+        # Alert (70%) < Halt (80%) < Liquidation (90%)
         margin_levels = [
             ("MARGIN_ALERT_PCT", self.config.margin_alert_pct),
             ("MARGIN_HALT_PCT", self.config.margin_halt_pct),
@@ -622,7 +522,7 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         margin_levels[i + 1][0],
-                        f"{margin_levels[i+1][0]} ({margin_levels[i+1][1]}) must be greater than {margin_levels[i][0]} ({margin_levels[i][1]}).",
+                        f"{margin_levels[i + 1][0]} ({margin_levels[i + 1][1]}) must be greater than {margin_levels[i][0]} ({margin_levels[i][1]}).",
                         True,
                         "Correct the margin limit hierarchy in .env.",
                     )
@@ -640,11 +540,98 @@ class ConfigValidator:
                 self.errors.append(
                     ValidationError(
                         vol_levels[i + 1][0],
-                        f"{vol_levels[i+1][0]} ({vol_levels[i+1][1]}) must be greater than {vol_levels[i][0]} ({vol_levels[i][1]}).",
+                        f"{vol_levels[i + 1][0]} ({vol_levels[i + 1][1]}) must be greater than {vol_levels[i][0]} ({vol_levels[i][1]}).",
                         True,
                         "Correct the volatility threshold hierarchy in .env.",
                     )
                 )
+
+        # 3. Spread Hierarchy (RISK_LIMITS.md 5.2)
+        spread_levels = [
+            ("MIN_SPREAD_PIPS", self.config.min_spread_pips),
+            ("SPREAD_ALERT_PIPS", self.config.spread_alert_pips),
+            ("SPREAD_REDUCE_PIPS", self.config.spread_reduce_pips),
+            ("SPREAD_HALT_PIPS", self.config.spread_halt_pips),
+        ]
+
+        for i in range(len(spread_levels) - 1):
+            if spread_levels[i][1] >= spread_levels[i + 1][1]:
+                self.errors.append(
+                    ValidationError(
+                        spread_levels[i + 1][0],
+                        f"{spread_levels[i + 1][0]} ({spread_levels[i + 1][1]}) must be greater than {spread_levels[i][0]} ({spread_levels[i][1]}).",
+                        True,
+                        "Correct the spread limit hierarchy in .env.",
+                    )
+                )
+
+    def _check_execution_parameters(self) -> None:
+        """Verify execution parameters (Slippage, Latency)."""
+        # 1. Slippage Limits (RISK_LIMITS.md 7.1)
+        if self.config.max_slippage_pips > 1.0:
+            self.errors.append(
+                ValidationError(
+                    "MAX_SLIPPAGE_PIPS",
+                    f"Max slippage {self.config.max_slippage_pips} exceeds 1.0 pip limit.",
+                    True,
+                    "Reduce MAX_SLIPPAGE_PIPS to 1.0 or less.",
+                )
+            )
+
+        # 2. Execution Latency (RISK_LIMITS.md 7.3)
+        if self.config.execution_latency_threshold > 5.0:
+            self.errors.append(
+                ValidationError(
+                    "EXECUTION_LATENCY_THRESHOLD",
+                    f"Execution latency threshold {self.config.execution_latency_threshold}s exceeds 5s limit.",
+                    True,
+                    "Reduce EXECUTION_LATENCY_THRESHOLD to 5.0 or less.",
+                )
+            )
+
+    def _check_behavior_caps(self) -> None:
+        """Verify behavior-based caps (Daily win, streaks)."""
+        # 1. Daily Win Cap (RISK_LIMITS.md 2.2)
+        if self.config.daily_win_cap > 0.10:
+            self.errors.append(
+                ValidationError(
+                    "DAILY_WIN_CAP",
+                    f"Daily win cap {self.config.daily_win_cap * 100}% exceeds 10% limit.",
+                    True,
+                    "Reduce DAILY_WIN_CAP to 0.10 (10%) or less.",
+                )
+            )
+
+        # 2. Losing Streak (RISK_LIMITS.md 2.3)
+        if self.config.max_losing_streak > 3:
+            self.errors.append(
+                ValidationError(
+                    "MAX_LOSING_STREAK",
+                    f"Max losing streak {self.config.max_losing_streak} exceeds 3-trade limit.",
+                    True,
+                    "Reduce MAX_LOSING_STREAK to 3 or less.",
+                )
+            )
+
+        # 3. Winning Streak (RISK_LIMITS.md 2.3)
+        if self.config.max_winning_streak > 20:
+            self.errors.append(
+                ValidationError(
+                    "MAX_WINNING_STREAK",
+                    f"Max winning streak {self.config.max_winning_streak} is excessive.",
+                    True,
+                    "Set MAX_WINNING_STREAK to 20 or less.",
+                )
+            )
+        elif self.config.max_winning_streak > 5:
+            self.errors.append(
+                ValidationError(
+                    "MAX_WINNING_STREAK",
+                    f"Max winning streak {self.config.max_winning_streak} exceeds recommended 5.",
+                    False,
+                    "Consider setting MAX_WINNING_STREAK to 5 as per policy.",
+                )
+            )
 
     def _check_incompatible_settings(self) -> None:
         """Detect incompatible configuration combinations."""
@@ -670,16 +657,6 @@ class ConfigValidator:
                     "DEBUG logging in LIVE mode is discouraged.",
                     False,
                     "Set LOG_LEVEL=INFO for live trading to avoid performance issues.",
-                )
-            )
-
-        if self.config.mode == "live" and self.config.max_positions > 5:
-            self.errors.append(
-                ValidationError(
-                    "MAX_POSITIONS",
-                    "Max positions > 5 is prohibited in LIVE mode.",
-                    True,
-                    "Set MAX_POSITIONS to 5 or less for live mode.",
                 )
             )
 
