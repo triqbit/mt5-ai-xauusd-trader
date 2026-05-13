@@ -1,5 +1,5 @@
 # Runbook 02: MT5 Connection Outage
-**Version:** 1.1.0-rc7 | **Last Updated:** 2024-06-10
+**Version:** 1.1.0-rc8 | **Last Updated:** 2024-06-12
 
 ## Overview
 Procedures for diagnosing and recovering from connection loss between the bot and MetaTrader 5 or MetaAPI.
