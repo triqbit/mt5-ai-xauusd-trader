@@ -1246,6 +1246,24 @@ def main() -> int:
     allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
 
+    # Position State Reconciliation (Enterprise Resilience)
+    # Recover active positions from database to ensure continuity after restart
+    with console.status("[bold blue]Reconciling position state..."):
+        recovered_trades = trade_logger.get_open_trades()
+        if recovered_trades:
+            log.info("Recovered open positions from database", count=len(recovered_trades))
+            for t in recovered_trades:
+                risk.open_positions[t.symbol] = t.ticket
+                if audit_logger:
+                    audit_logger.log(
+                        actor="system",
+                        action="position_reconciled",
+                        details=f"Reconciled position for {t.symbol} (ticket: {t.ticket}) from database",
+                        metadata={"symbol": t.symbol, "ticket": t.ticket, "lot_size": t.lot_size}
+                    )
+        else:
+            log.debug("No open positions found in database for reconciliation")
+
     # Register default strategy in allocator
     # Ensure capital_cap is at least 0.01 to pass Pydantic gt=0 validation if balance is 0
     allocator.add_strategy(
