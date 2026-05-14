@@ -25,6 +25,7 @@ import pandas as pd
 
 from src.core.audit_log import get_audit_logger
 from src.core.feature_engineering import FeatureEngineer
+from src.core.profiler import profile
 from src.core.schemas import TradeSignal
 from src.trading.execution_filter import ExecutionFilter
 
@@ -142,9 +143,8 @@ class BacktestEngine:
         # Ensure we get raw features for proper walk-forward normalization
         original_norm = self.fe.normalize
         self.fe.normalize = False
-        from src.core.profiler import profile as profile_context
 
-        with profile_context("bt_feature_engineering_total"):
+        with profile("bt_feature_engineering_total"):
             df_features = self.fe.compute_features(data, drop_ohlcv=False)
         self.fe.normalize = original_norm
 
@@ -163,7 +163,7 @@ class BacktestEngine:
         # 2. Pre-calculate metrics for the ExecutionFilter to avoid O(N) in loop
         logger.info("Pre-calculating execution filter metrics...")
 
-        with profile_context("bt_ef_precomputation_total"):
+        with profile("bt_ef_precomputation_total"):
             # Calculate ATR for SL/TP and Volatility filter
             high_low = data["high"] - data["low"]
             high_close = (data["high"] - data["close"].shift(1)).abs()
@@ -231,7 +231,7 @@ class BacktestEngine:
         feature_cols = [c for c in df_features.columns if c not in cols_to_exclude]
         feature_vals = df_features[feature_cols].values
 
-        with profile_context("bt_walk_forward_loop_total"):
+        with profile("bt_walk_forward_loop_total"):
             while start + train_window + test_window <= n:
                 test_start_idx = start + train_window
 
@@ -242,90 +242,94 @@ class BacktestEngine:
                 train_std = np.nanstd(train_slice, axis=0)
                 train_std[train_std == 0] = 1.0  # Avoid division by zero
 
-                for i in range(test_window):
-                    abs_idx = test_start_idx + i
+                with profile("bt_test_window_segment"):
+                    for i in range(test_window):
+                        abs_idx = test_start_idx + i
 
-                    # Prevent double-processing bars due to step overlap
-                    if abs_idx <= last_processed_idx or abs_idx >= n:
-                        continue
+                        # Prevent double-processing bars due to step overlap
+                        if abs_idx <= last_processed_idx or abs_idx >= n:
+                            continue
 
-                    bar_time = time_vals[abs_idx]
-                    current_price = close_vals[abs_idx]
+                        bar_time = time_vals[abs_idx]
+                        current_price = close_vals[abs_idx]
 
-                    # 1. Update active trades: Check if any simulated exit is reached
-                    self._update_active_trades(active_trades, abs_idx)
+                        # 1. Update active trades: Check if any simulated exit is reached
+                        with profile("bt_update_active_trades"):
+                            self._update_active_trades(active_trades, abs_idx)
 
-                    # 2. Evaluation Logic: If slot available, check for new signals
-                    if len(active_trades) < self.max_positions:
-                        # Apply train-window normalization to the current observation
-                        with profile_context("bt_observation_normalization"):
-                            obs_raw = feature_vals[abs_idx]
-                            obs = (obs_raw - train_mean) / (train_std + 1e-8)
+                        # 2. Evaluation Logic: If slot available, check for new signals
+                        if len(active_trades) < self.max_positions:
+                            # Apply train-window normalization to the current observation
+                            with profile("bt_observation_normalization"):
+                                obs_raw = feature_vals[abs_idx]
+                                obs = (obs_raw - train_mean) / (train_std + 1e-8)
 
-                        try:
-                            # Standard Signal object or fallback to raw int
-                            with profile_context("bt_model_predict"):
-                                signal_obj = model.predict(obs)
-                                direction = int(signal_obj.direction)
-                                confidence = float(signal_obj.confidence)
-                        except Exception:
-                            direction, confidence = 0, 0.0
+                            try:
+                                # Standard Signal object or fallback to raw int
+                                with profile("bt_model_predict"):
+                                    signal_obj = model.predict(obs)
+                                    direction = int(signal_obj.direction)
+                                    confidence = float(signal_obj.confidence)
+                            except Exception:
+                                direction, confidence = 0, 0.0
 
-                        if direction != 0:
-                            atr = atr_vals[abs_idx]
-                            if not np.isnan(atr) and atr > 0:
-                                # 3. Prepare Signal and Validate with Filter Cascade
-                                signal = TradeSignal(
-                                    symbol=self.symbol,
-                                    direction=direction,
-                                    entry_price=current_price,
-                                    stop_loss=current_price - (direction * 2 * atr),
-                                    take_profit=current_price + (direction * 4 * atr),
-                                    lot_size=0.1,  # Base lot for backtest
-                                    algorithm="backtest",
-                                    confidence=confidence,
-                                    timestamp=bar_time,
-                                )
+                            if direction != 0:
+                                with profile("bt_signal_validation_and_entry"):
+                                    atr = atr_vals[abs_idx]
+                                    if not np.isnan(atr) and atr > 0:
+                                        # 3. Prepare Signal and Validate with Filter Cascade
+                                        signal = TradeSignal(
+                                            symbol=self.symbol,
+                                            direction=direction,
+                                            entry_price=current_price,
+                                            stop_loss=current_price - (direction * 2 * atr),
+                                            take_profit=current_price + (direction * 4 * atr),
+                                            lot_size=0.1,  # Base lot for backtest
+                                            algorithm="backtest",
+                                            confidence=confidence,
+                                            timestamp=bar_time,
+                                        )
 
-                                # Dynamic Drawdown for Layer 6 (O(1) lookup)
-                                current_drawdown = 0.0
-                                if self.equity_curve:
-                                    peak = self.max_equity
-                                    current_equity = self.equity_curve[-1][1]
-                                    current_drawdown = (peak - current_equity) / (peak + 1e-8)
+                                        # Dynamic Drawdown for Layer 6 (O(1) lookup)
+                                        current_drawdown = 0.0
+                                        if self.equity_curve:
+                                            peak = self.max_equity
+                                            current_equity = self.equity_curve[-1][1]
+                                            current_drawdown = (peak - current_equity) / (peak + 1e-8)
 
-                                # Pack precomputed metrics for speed
-                                precomputed = {
-                                    "atr_volatility": {
-                                        "current_atr": atr_current_vals[abs_idx],
-                                        "avg_atr": atr_avg_vals[abs_idx],
-                                    },
-                                    "trend_angle": {"slope": slopes[abs_idx]},
-                                    "ema_sequence": {
-                                        "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
-                                    },
-                                    "momentum": {"rsi": rsi_vals[abs_idx]},
-                                }
+                                        # Pack precomputed metrics for speed
+                                        precomputed = {
+                                            "atr_volatility": {
+                                                "current_atr": atr_current_vals[abs_idx],
+                                                "avg_atr": atr_avg_vals[abs_idx],
+                                            },
+                                            "trend_angle": {"slope": slopes[abs_idx]},
+                                            "ema_sequence": {
+                                                "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
+                                            },
+                                            "momentum": {"rsi": rsi_vals[abs_idx]},
+                                        }
 
-                                # Validate signal through 10-layer filter
-                                # Optimization: market_data=None because we use precomputed_metrics
-                                decision = self.ef.validate(
-                                    signal,
-                                    market_data=None,
-                                    current_drawdown=current_drawdown,
-                                    timestamp=bar_time,
-                                    precomputed_metrics=precomputed,
-                                )
+                                        # Validate signal through 10-layer filter
+                                        # Optimization: market_data=None because we use precomputed_metrics
+                                        decision = self.ef.validate(
+                                            signal,
+                                            market_data=None,
+                                            current_drawdown=current_drawdown,
+                                            timestamp=bar_time,
+                                            precomputed_metrics=precomputed,
+                                        )
 
-                                if decision.is_approved:
-                                    # Vectorized Exit Simulation: Scan future bars for SL/TP hit
-                                    self._open_and_simulate_trade(
-                                        active_trades, signal, abs_idx, high_vals, low_vals, time_vals
-                                    )
+                                        if decision.is_approved:
+                                            # Vectorized Exit Simulation: Scan future bars for SL/TP hit
+                                            self._open_and_simulate_trade(
+                                                active_trades, signal, abs_idx, high_vals, low_vals, time_vals
+                                            )
 
-                    # 4. Record equity at the end of each bar
-                    self._record_equity(bar_time, current_price, active_trades)
-                    last_processed_idx = abs_idx
+                        # 4. Record equity at the end of each bar
+                        with profile("bt_record_equity"):
+                            self._record_equity(bar_time, current_price, active_trades)
+                        last_processed_idx = abs_idx
 
                 start += step_size
 
