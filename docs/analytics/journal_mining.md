@@ -13,9 +13,14 @@ Identifies recurring signal attributes (Algorithm, Volatility, Confidence, Sessi
 ### 2. Combination Discovery
 Detects clusters of multiple signals occurring within short time windows:
 - **Toxic Combinations:** Signal patterns that frequently precede drawdown clusters.
-- **Golden Combinations:** Highly profitable signal clusters that represent high-probability strategic alignment.
+- **Golden Combinations:** Signal patterns that frequently precede profit clusters.
 
-### 3. Behavioral Risk Profiling
+### 3. Missed Opportunity Analysis
+Detects patterns in signals rejected by risk management:
+- **Blocked Golden Motifs:** Highly profitable patterns that are currently being filtered out, suggesting a need for risk limit calibration.
+- **Correct Rejections:** Patterns effectively neutralized by risk filters, validating the defensive logic.
+
+### 4. Behavioral Risk Profiling
 Detects patterns indicative of psychological or systemic fragility:
 - **Overtrading:** Excessive frequency in specific market sessions.
 - **Overconfidence (Greed):** Aggressive lot sizing following winning streaks.
