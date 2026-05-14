@@ -46,5 +46,3 @@ types-requests==2.32.0.20241016
 types-python-dateutil==2.9.0.20260508
 types-setuptools==82.0.0.20260508
 types-PyYAML==6.0.12.20260510
-python-socketio==5.14.0
-python-engineio==4.11.2
