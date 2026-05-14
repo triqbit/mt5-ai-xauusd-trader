@@ -54,6 +54,7 @@ Comprehensive security framework addressing data protection, API security, deplo
 - **No Hardcoding**: All credentials stored in secure vault
 - **Environment Variables**: Use .env with local .gitignore.
 - **Type-safe Secrets**: Use Pydantic `SecretStr` for all credentials (MT5, Redis, MetaAPI) to ensure automatic masking in logs and serialization.
+- **Unified Masking Filter**: A global `logging.Filter` (`SecretMaskingProcessor`) intercepts and redacts secrets from standard library logs and narrative audit trail details.
 - **Secrets Rotation**: Automatic rotation every 30 days
 - **Audit Trail**: Track all credential access attempts
 - **Emergency Access**: Break-glass procedure for critical incidents

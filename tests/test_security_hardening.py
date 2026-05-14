@@ -69,6 +69,84 @@ def test_audit_logger_redaction(tmp_path):
         assert metadata["nested"]["password"] == "[MASKED]"
 
 
+def test_audit_logger_details_redaction(tmp_path):
+    db_file = tmp_path / "test_audit_details.db"
+    db_url = f"sqlite:///{db_file}"
+
+    # Reset singleton for testing
+    AuditLogger._instance = None
+    AuditLogger._initialized = False
+
+    from src.core.log_config import get_masking_processor
+
+    processor = get_masking_processor()
+    processor.secrets.add("SENSITIVE_DETAIL_123")
+
+    logger = AuditLogger(db_url=db_url)
+
+    # Log something sensitive in the narrative details
+    logger.log(
+        actor="test",
+        action="detail_action",
+        details="User accessed SENSITIVE_DETAIL_123 in a narrative",
+    )
+
+    # Check the database
+    from sqlalchemy import create_engine, select
+
+    from src.core.audit_log import AuditEntry
+
+    engine = create_engine(db_url)
+    with engine.connect() as conn:
+        result = conn.execute(select(AuditEntry.details)).fetchone()
+        details_masked = result[0]
+        assert "SENSITIVE_DETAIL_123" not in details_masked
+        assert "[MASKED]" in details_masked
+
+
+def test_standard_logging_masking():
+    import logging
+
+    from src.core.log_config import get_masking_processor
+
+    processor = get_masking_processor()
+    processor.secrets.add("LOG_SECRET_456")
+
+    root_logger = logging.getLogger()
+    # Remove existing filters to avoid duplicates if test runs multiple times
+    for f in root_logger.filters[:]:
+        root_logger.removeFilter(f)
+
+    root_logger.addFilter(processor)
+
+    # Standard logging call
+    logging.warning("Standard log with secret: %s", "LOG_SECRET_456")
+
+    # Capture output if necessary, but here we check the record itself if we used a mock handler
+    # Or just check if the message was modified in a custom handler
+    class TestHandler(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.records = []
+
+        def emit(self, record):
+            self.records.append(record)
+
+    handler = TestHandler()
+    root_logger.addHandler(handler)
+
+    logging.error("Another secret: LOG_SECRET_456")
+
+    found = False
+    for rec in handler.records:
+        if "Another secret" in str(rec.msg):
+            assert "LOG_SECRET_456" not in str(rec.msg)
+            assert "[MASKED]" in str(rec.msg)
+            found = True
+
+    assert found
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission check only on Linux/Mac")
 def test_config_validator_file_permissions(tmp_path, monkeypatch):
     # Create insecure file
