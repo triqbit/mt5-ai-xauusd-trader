@@ -21,6 +21,8 @@ from rich.table import Table
 
 
 class RegimeSummary(BaseModel):
+    """Summary of a single market regime."""
+
     label: str
     frequency_pct: float
     avg_duration_bars: int
@@ -28,12 +30,16 @@ class RegimeSummary(BaseModel):
 
 
 class RegimeSection(BaseModel):
+    """Section for market regime analysis."""
+
     summary: str
     regimes: list[RegimeSummary]
     transition_insights: str
 
 
 class StressedMetric(BaseModel):
+    """Performance metrics under a specific stress scenario."""
+
     name: str
     total_return: str
     max_drawdown: str
@@ -44,6 +50,8 @@ class StressedMetric(BaseModel):
 
 
 class StressTestSection(BaseModel):
+    """Section for stress test outcomes."""
+
     resilience_score: float
     baseline: StressedMetric
     scenarios: list[StressedMetric]
@@ -53,6 +61,8 @@ class StressTestSection(BaseModel):
 
 
 class ParameterRobustness(BaseModel):
+    """Sensitivity analysis for a specific hyperparameter."""
+
     name: str
     range: str
     optimal: str
@@ -60,12 +70,16 @@ class ParameterRobustness(BaseModel):
 
 
 class HyperparameterSection(BaseModel):
+    """Section for hyperparameter robustness and sensitivity analysis."""
+
     stability_score: float
     parameters: list[ParameterRobustness]
     insights: str
 
 
 class PatternConcentration(BaseModel):
+    """Performance metrics for a specific trade attribute cluster."""
+
     attribute: str
     value: str
     win_rate: float
@@ -74,11 +88,15 @@ class PatternConcentration(BaseModel):
 
 
 class BehavioralRisk(BaseModel):
+    """Identified psychological or execution risk patterns."""
+
     type: str
     description: str
 
 
 class SignalMotif(BaseModel):
+    """Performance cluster for specific signal conditions."""
+
     algorithm: str
     direction: int
     volatility_bucket: str
@@ -92,6 +110,8 @@ class SignalMotif(BaseModel):
 
 
 class CombinationMotif(BaseModel):
+    """Performance cluster for combinations of multiple signals."""
+
     patterns: list[str]
     frequency: int
     avg_pnl_after: float
@@ -104,6 +124,8 @@ class CombinationMotif(BaseModel):
 
 
 class TradePatternSection(BaseModel):
+    """Section for trade pattern findings and behavioral risks."""
+
     primary_insight: str
     concentrations: list[PatternConcentration]
     behavioral_risks: list[BehavioralRisk]
@@ -114,19 +136,26 @@ class TradePatternSection(BaseModel):
 
 
 class DriftMetric(BaseModel):
+    """Measurement of model or data drift."""
+
     name: str
     baseline: str
     current: str
     drift_pct: float
+    psi_score: float = 0.0
     status: str
 
 
 class ModelDriftSection(BaseModel):
+    """Section for model drift and feature shift observations."""
+
     metrics: list[DriftMetric]
     feature_shifts: str
 
 
 class AllocationEntry(BaseModel):
+    """Capital allocation for a specific strategy or agent."""
+
     name: str
     amount: str
     heat_pct: float
@@ -134,6 +163,8 @@ class AllocationEntry(BaseModel):
 
 
 class AllocationSection(BaseModel):
+    """Section for capital allocation insights and rejection summaries."""
+
     total_heat_pct: float
     allocations: list[AllocationEntry]
     rejection_summary: dict[str, int]
@@ -141,6 +172,8 @@ class AllocationSection(BaseModel):
 
 
 class BenchmarkComparison(BaseModel):
+    """Statistical comparison against a baseline strategy."""
+
     name: str
     total_return: str
     sharpe: str
@@ -154,11 +187,15 @@ class BenchmarkComparison(BaseModel):
 
 
 class BenchmarkSection(BaseModel):
+    """Section for strategy benchmarking and statistical outperformance."""
+
     comparisons: list[BenchmarkComparison]
     statistical_summary: str
 
 
 class RLMetric(BaseModel):
+    """Detailed performance metrics for Reinforcement Learning agents."""
+
     agent_name: str
     sharpe: float
     sortino: float = 0.0
@@ -180,6 +217,8 @@ class RLMetric(BaseModel):
 
 
 class RLSection(BaseModel):
+    """Section for Reinforcement Learning agent evaluation."""
+
     comparison_summary: str
     best_agent: str
     performance_gap: float
@@ -187,6 +226,8 @@ class RLSection(BaseModel):
 
 
 class RareEventSummary(BaseModel):
+    """Summary of performance during simulated black-swan events."""
+
     event_type: str
     peak_impact_pct: float
     realized_volatility: float
@@ -195,11 +236,15 @@ class RareEventSummary(BaseModel):
 
 
 class RareEventSection(BaseModel):
+    """Section for rare-event and flash-crash simulation outcomes."""
+
     scenarios: list[RareEventSummary]
     insights: str
 
 
 class CalibrationBucket(BaseModel):
+    """Calibration accuracy for a specific confidence interval."""
+
     range: str
     accuracy: float
     confidence: float
@@ -207,6 +252,8 @@ class CalibrationBucket(BaseModel):
 
 
 class CalibrationSection(BaseModel):
+    """Section for confidence calibration and model reliability analysis."""
+
     brier_score: float
     ece: float
     mce: float
@@ -217,17 +264,41 @@ class CalibrationSection(BaseModel):
 
 
 class ExecutionMetric(BaseModel):
+    """Specific metric measuring execution efficiency or alpha decay."""
+
     name: str
     value: str
     status: str
 
 
 class ExecutionQualitySection(BaseModel):
+    """Section for execution quality, slippage, and alpha decay analysis."""
+
     efficiency_score: float
     metrics: list[ExecutionMetric]
     opportunity_cost: str
     trade_count: int
     rejected_count: int
+
+
+class StrategicConfluenceSection(BaseModel):
+    """Section for regime-signal alignment and strategic confluence."""
+
+    confluence_score: float
+    regime_alignment: float
+    session_alignment: float
+    volatility_alignment: float
+    insights: str
+
+
+class MethodologySection(BaseModel):
+    """Transparency section detailing data sources and audit assumptions."""
+
+    data_source: str
+    backtest_engine: str
+    lookback_period: str
+    assumptions: list[str]
+    risk_limits: list[str]
 
 
 # --- Full Report Model ---
@@ -253,6 +324,8 @@ class ResearchReport(BaseModel):
     rare_events: RareEventSection | None = None
     calibration_analysis: CalibrationSection | None = None
     execution_quality: ExecutionQualitySection | None = None
+    strategic_confluence: StrategicConfluenceSection | None = None
+    methodology: MethodologySection | None = None
 
     conclusion: str
     recommendations: list[str] = Field(default_factory=list)
@@ -604,6 +677,26 @@ class ResearchReporter:
                 table.add_row(m.name, m.value, m.status)
             self.console.print(table)
 
+        if report.strategic_confluence:
+            self.console.print(f"\n[bold green]{section_idx}. Strategic Confluence Analysis[/]")
+            section_idx += 1
+            self.console.print(f"Confluence Score: [bold]{report.strategic_confluence.confluence_score:.1%}[/]")
+            table = Table(box=None)
+            table.add_column("Alignment Type")
+            table.add_column("Score")
+            table.add_row("Market Regime", f"{report.strategic_confluence.regime_alignment:.1%}")
+            table.add_row("Trading Session", f"{report.strategic_confluence.session_alignment:.1%}")
+            table.add_row("Volatility State", f"{report.strategic_confluence.volatility_alignment:.1%}")
+            self.console.print(table)
+            self.console.print(f"[dim]Insight: {report.strategic_confluence.insights}[/]")
+
+        if report.methodology:
+            self.console.print(f"\n[bold white]{section_idx}. Methodology & Audit Trail[/]")
+            section_idx += 1
+            self.console.print(f"[dim]Data Source: {report.methodology.data_source}[/]")
+            self.console.print(f"[dim]Backtest Engine: {report.methodology.backtest_engine}[/]")
+            self.console.print(f"[dim]Lookback Period: {report.methodology.lookback_period}[/]")
+
         self.console.print("\n[bold]Conclusion[/]")
         self.console.print(report.conclusion)
 
@@ -660,6 +753,10 @@ class ResearchOrchestrator:
             self.report.calibration_analysis = section
         elif isinstance(section, ExecutionQualitySection):
             self.report.execution_quality = section
+        elif isinstance(section, StrategicConfluenceSection):
+            self.report.strategic_confluence = section
+        elif isinstance(section, MethodologySection):
+            self.report.methodology = section
         else:
             raise ValueError(f"Unknown section type: {type(section)}")
 

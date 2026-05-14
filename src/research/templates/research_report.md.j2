@@ -34,6 +34,10 @@
 {% set ns.count = ns.count + 1 %}{% endif %}
 {% if execution_quality %}{{ ns.count }}. [Execution Quality & Alpha Decay](#{{ ns.count }}-execution-quality--alpha-decay)
 {% set ns.count = ns.count + 1 %}{% endif %}
+{% if strategic_confluence %}{{ ns.count }}. [Strategic Confluence Analysis](#{{ ns.count }}-strategic-confluence-analysis)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if methodology %}{{ ns.count }}. [Methodology & Audit Trail](#{{ ns.count }}-methodology--audit-trail)
+{% set ns.count = ns.count + 1 %}{% endif %}
 {{ ns.count }}. [Conclusion & Recommendations](#conclusion--recommendations)
 
 ---
@@ -141,10 +145,10 @@
 {% if model_drift %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Model Drift Observations
-| Metric | Baseline | Current | Drift | Status |
-|--------|----------|---------|-------|--------|
+| Metric | Baseline | Current | Drift | PSI | Status |
+|--------|----------|---------|-------|-----|--------|
 {% for m in model_drift.metrics %}
-| {{ m.name }} | {{ m.baseline }} | {{ m.current }} | {{ m.drift_pct }}% | {{ m.status }} |
+| {{ m.name }} | {{ m.baseline }} | {{ m.current }} | {{ m.drift_pct }}% | {{ m.psi_score|round(3) }} | {{ m.status }} |
 {% endfor %}
 
 **Feature Importance Shifts:**
@@ -234,6 +238,39 @@
 
 **Opportunity Cost (Blocked Signals):** {{ execution_quality.opportunity_cost }}
 *Analyzed {{ execution_quality.trade_count }} executed trades and {{ execution_quality.rejected_count }} rejected signals.*
+{% endif %}
+
+{% if strategic_confluence %}
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Strategic Confluence Analysis
+**Overall Confluence Score:** {{ (strategic_confluence.confluence_score * 100)|round(1) }}%
+
+| Alignment Category | Score |
+|--------------------|-------|
+| Market Regime | {{ (strategic_confluence.regime_alignment * 100)|round(1) }}% |
+| Trading Session | {{ (strategic_confluence.session_alignment * 100)|round(1) }}% |
+| Volatility State | {{ (strategic_confluence.volatility_alignment * 100)|round(1) }}% |
+
+**Strategic Insights:**
+{{ strategic_confluence.insights }}
+{% endif %}
+
+{% if methodology %}
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Methodology & Audit Trail
+- **Data Source:** {{ methodology.data_source }}
+- **Backtest Engine:** {{ methodology.backtest_engine }}
+- **Lookback Period:** {{ methodology.lookback_period }}
+
+### Core Assumptions
+{% for assumption in methodology.assumptions %}
+- {{ assumption }}
+{% endfor %}
+
+### Risk Limits Applied
+{% for limit in methodology.risk_limits %}
+- {{ limit }}
+{% endfor %}
 {% endif %}
 
 ---

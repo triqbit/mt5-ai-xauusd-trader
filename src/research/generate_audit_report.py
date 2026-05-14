@@ -16,17 +16,25 @@ from src.research.reporting import (
     BehavioralRisk,
     BenchmarkComparison,
     BenchmarkSection,
+    CalibrationBucket,
+    CalibrationSection,
     CombinationMotif,
     DriftMetric,
+    ExecutionMetric,
+    ExecutionQualitySection,
     HyperparameterSection,
+    MethodologySection,
     ModelDriftSection,
     ParameterRobustness,
     PatternConcentration,
+    RareEventSection,
+    RareEventSummary,
     RegimeSection,
     RegimeSummary,
     ResearchOrchestrator,
     ResearchReporter,
     SignalMotif,
+    StrategicConfluenceSection,
     StressedMetric,
     StressTestSection,
     TradePatternSection,
@@ -225,6 +233,7 @@ def generate_full_audit():
                 baseline="2345.50",
                 current="2342.10",
                 drift_pct=2.4,
+                psi_score=0.042,
                 status="STABLE",
             ),
             DriftMetric(
@@ -232,6 +241,7 @@ def generate_full_audit():
                 baseline="0.0012",
                 current="0.0018",
                 drift_pct=25.0,
+                psi_score=0.155,
                 status="WARNING",
             ),
         ],
@@ -318,6 +328,86 @@ def generate_full_audit():
         ],
     )
     orchestrator.add_section(rl_section)
+
+    # 9. Rare Event Simulations
+    rare_event_section = RareEventSection(
+        scenarios=[
+            RareEventSummary(
+                event_type="Flash Crash (Synthetic)",
+                peak_impact_pct=-0.085,
+                realized_volatility=0.12,
+                recovery_attained=0.95,
+                description="Sudden 8.5% drop in XAUUSD with liquidity vacuum simulation.",
+            ),
+            RareEventSummary(
+                event_type="Interest Rate Shock",
+                peak_impact_pct=-0.042,
+                realized_volatility=0.06,
+                recovery_attained=1.0,
+                description="Aggressive 50bps surprise hike impact.",
+            ),
+        ],
+        insights="Strategy exhibits strong recovery capabilities, reclaiming 95% of 'Flash Crash' losses within 120 bars.",
+    )
+    orchestrator.add_section(rare_event_section)
+
+    # 10. Calibration Analysis
+    cal_section = CalibrationSection(
+        brier_score=0.042,
+        ece=0.035,
+        mce=0.078,
+        status="VERIFIED",
+        optimal_threshold=0.68,
+        buckets=[
+            CalibrationBucket(range="0.5-0.6", accuracy=0.52, confidence=0.55, samples=120),
+            CalibrationBucket(range="0.8-0.9", accuracy=0.84, confidence=0.85, samples=85),
+            CalibrationBucket(range="0.9-1.0", accuracy=0.92, confidence=0.94, samples=42),
+        ],
+        reliability_insight="Model confidence is highly reliable above the 0.80 threshold. Recommended execution threshold: 0.68.",
+    )
+    orchestrator.add_section(cal_section)
+
+    # 11. Execution Quality
+    exec_section = ExecutionQualitySection(
+        efficiency_score=94.2,
+        trade_count=245,
+        rejected_count=12,
+        opportunity_cost="+$4,250.00",
+        metrics=[
+            ExecutionMetric(name="Avg Slippage (bps)", value="0.45", status="OK"),
+            ExecutionMetric(name="Effective Spread Capture", value="82.5%", status="OK"),
+            ExecutionMetric(name="Fill Rate", value="99.2%", status="OK"),
+        ],
+    )
+    orchestrator.add_section(exec_section)
+
+    # 12. Strategic Confluence
+    confluence_section = StrategicConfluenceSection(
+        confluence_score=0.86,
+        regime_alignment=0.92,
+        session_alignment=0.78,
+        volatility_alignment=0.88,
+        insights="EXCEPTIONAL: Signals show high alignment with London-NY overlap regimes. Caution in low-volatility drift states.",
+    )
+    orchestrator.add_section(confluence_section)
+
+    # 13. Methodology
+    methodology_section = MethodologySection(
+        data_source="MetaAPI Tick Data / Dukascopy Historical",
+        backtest_engine="High-Fidelity Discrete Event Simulator V4",
+        lookback_period="2022-01-01 to 2024-03-31",
+        assumptions=[
+            "Fixed commission: $3.50 per lot",
+            "Latency: Variable 50ms-250ms (Gamma distribution)",
+            "Dynamic spread: Historical tick-based spreads",
+        ],
+        risk_limits=[
+            "Max drawdown: 15%",
+            "Max daily loss: 3%",
+            "Max leverage: 1:20",
+        ],
+    )
+    orchestrator.add_section(methodology_section)
 
     # Build and Export
     report = orchestrator.build()
