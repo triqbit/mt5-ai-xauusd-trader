@@ -62,9 +62,8 @@ def test_audit_logger_redaction(tmp_path):
 
     engine = create_engine(db_url)
     with engine.connect() as conn:
-        result = conn.execute(select(AuditEntry.metadata_json, AuditEntry.details)).fetchone()
+        result = conn.execute(select(AuditEntry.metadata_json)).fetchone()
         metadata = result[0]
-        details = result[1]
 
         assert metadata["key"] == "[MASKED]"
         assert metadata["nested"]["password"] == "[MASKED]"
@@ -100,9 +99,9 @@ def test_audit_logger_details_redaction(tmp_path):
     engine = create_engine(db_url)
     with engine.connect() as conn:
         result = conn.execute(select(AuditEntry.details)).fetchone()
-        details = result[0]
-        assert "SENSITIVE_DETAIL_123" not in details
-        assert "[MASKED]" in details
+        details_masked = result[0]
+        assert "SENSITIVE_DETAIL_123" not in details_masked
+        assert "[MASKED]" in details_masked
 
 
 def test_standard_logging_masking():
@@ -131,7 +130,7 @@ def test_standard_logging_masking():
             self.records = []
 
         def emit(self, record):
-            self.records.append(record.copy() if hasattr(record, "copy") else record)
+            self.records.append(record)
 
     handler = TestHandler()
     root_logger.addHandler(handler)
