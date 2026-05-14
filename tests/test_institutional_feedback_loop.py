@@ -6,14 +6,16 @@ Verifies the high-value system path:
 Capital Allocation -> Execution Logging -> Performance Feedback -> Risk Adaptation -> Audit Traceability
 """
 
-import os
 import uuid
-import structlog
+
 import pytest
+import structlog
 from sqlalchemy import select
-from src.core.audit_log import AuditLogger, AuditEntry
-from src.core.trade_logger import TradeLogger, Trade
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig, AllocationRequest
+
+from src.core.audit_log import AuditEntry, AuditLogger
+from src.core.trade_logger import TradeLogger
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+
 
 @pytest.fixture
 def system_env(tmp_path):
@@ -38,6 +40,7 @@ def system_env(tmp_path):
 
     yield audit_logger, trade_logger
 
+
 def test_institutional_feedback_loop_end_to_end(system_env):
     """
     Test Path: Allocation -> Trade -> Feedback -> Adaptation -> Audit
@@ -47,17 +50,14 @@ def test_institutional_feedback_loop_end_to_end(system_env):
     # 1. Initialize Allocator
     allocator = CapitalAllocator(
         total_budget=10000.0,
-        performance_step=0.1, # Fast adaptation for testing
-        decay_rate=0.0
+        performance_step=0.1,  # Fast adaptation for testing
+        decay_rate=0.0,
     )
 
     strat_id = "ENSEMBLE_XAUUSD_M5"
     allocator.add_strategy(
         StrategyConfig(
-            strategy_id=strat_id,
-            symbol="XAUUSD",
-            model_family="ENSEMBLE",
-            capital_cap=5000.0
+            strategy_id=strat_id, symbol="XAUUSD", model_family="ENSEMBLE", capital_cap=5000.0
         )
     )
 
@@ -79,7 +79,7 @@ def test_institutional_feedback_loop_end_to_end(system_env):
         direction=1,
         entry_price=2000.0,
         lot_size=0.1,
-        status="OPEN"
+        status="OPEN",
     )
 
     # Close with $200 profit
@@ -99,7 +99,7 @@ def test_institutional_feedback_loop_end_to_end(system_env):
     res2 = allocator.request_allocation(strat_id, risk_pct=0.01)
     assert res2.is_allowed is True
     assert res2.was_scaled is True
-    assert res2.allocated_risk_pct == pytest.approx(0.011) # 0.01 * 1.1
+    assert res2.allocated_risk_pct == pytest.approx(0.011)  # 0.01 * 1.1
     assert res2.allocated_amount == pytest.approx(110.0)
 
     # 5. Simulate Loss Feedback and Cooling-off
@@ -110,12 +110,12 @@ def test_institutional_feedback_loop_end_to_end(system_env):
         direction=1,
         entry_price=2000.0,
         lot_size=0.1,
-        status="OPEN"
+        status="OPEN",
     )
 
     # StrategyConfig default max_consecutive_losses is 5.
     # We'll force consecutive losses.
-    for i in range(5):
+    for _ in range(5):
         allocator.update_strategy_performance(strat_id, -100.0)
 
     # Multiplier should have dropped: 1.1 -> 1.0 -> 0.9 -> 0.8 -> 0.7 -> 0.6
@@ -125,21 +125,29 @@ def test_institutional_feedback_loop_end_to_end(system_env):
 
     # 6. Third Allocation Request (Expect significant reduction)
     res3 = allocator.request_allocation(strat_id, risk_pct=0.01)
-    assert res3.allocated_risk_pct == pytest.approx(0.001) # 0.01 * 0.1
+    assert res3.allocated_risk_pct == pytest.approx(0.001)  # 0.01 * 0.1
 
     # 7. Verify Audit Trail
     with audit_logger.Session() as session:
         # Verify allocation decisions
-        alloc_decisions = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "allocation_decision").order_by(AuditEntry.id)
-        ).scalars().all()
+        alloc_decisions = (
+            session.execute(
+                select(AuditEntry)
+                .where(AuditEntry.action == "allocation_decision")
+                .order_by(AuditEntry.id)
+            )
+            .scalars()
+            .all()
+        )
         assert len(alloc_decisions) >= 3
         assert alloc_decisions[0].trace_id == trace_id_1
         assert alloc_decisions[1].trace_id == trace_id_2
 
         # Verify config changes (performance adjustments)
-        config_changes = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "config_change")
-        ).scalars().all()
+        config_changes = (
+            session.execute(select(AuditEntry).where(AuditEntry.action == "config_change"))
+            .scalars()
+            .all()
+        )
         assert len(config_changes) >= 1
         assert config_changes[0].metadata_json["new"]["multiplier"] == 1.1
