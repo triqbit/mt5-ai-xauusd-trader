@@ -798,6 +798,15 @@ class RegimeScenarioBuilder:
         """Triggers MarketRegime.NEWS_SHOCK."""
         return self.gen.generate(n_steps=150, regime="news_shock")
 
+    def volatile_breakout_sustained(self, n_steps: int = 150) -> pd.DataFrame:
+        """Triggers MarketRegime.VOLATILE_BREAKOUT with a sustained expansion."""
+        mid = n_steps * 2 // 3
+        returns_low = self.gen.rng.normal(0, 0.0001, mid)
+        # Sustained 1% moves for expansion phase
+        returns_high = self.gen.rng.normal(0.01, 0.001, n_steps - mid)
+        returns = np.concatenate([returns_low, returns_high])
+        return self.gen._generate_base(n_steps, 2300.0, returns)
+
 
 class PortfolioScenarioBuilder:
     """
@@ -832,7 +841,9 @@ class PortfolioScenarioBuilder:
         requests = [
             AllocationRequest(strategy_id="gold_rl_1", risk_pct=0.15),
             AllocationRequest(strategy_id="gold_rl_2", risk_pct=0.15),
-            AllocationRequest(strategy_id="gold_rl_3", risk_pct=0.15),  # Should hit XAUUSD 0.4 limit
+            AllocationRequest(
+                strategy_id="gold_rl_3", risk_pct=0.15
+            ),  # Should hit XAUUSD 0.4 limit
             AllocationRequest(strategy_id="eur_rl_1", risk_pct=0.15),  # Should hit RL 0.4 limit
         ]
         return configs, requests
@@ -854,13 +865,15 @@ class PortfolioScenarioBuilder:
         Generates requests that push total portfolio heat toward and past 0.7 limit.
         """
         configs = [
-            StrategyConfig(strategy_id=f"strat_{i}", symbol=f"SYM_{i}", model_family=f"FAM_{i}", capital_cap=100000)
+            StrategyConfig(
+                strategy_id=f"strat_{i}",
+                symbol=f"SYM_{i}",
+                model_family=f"FAM_{i}",
+                capital_cap=100000,
+            )
             for i in range(5)
         ]
-        requests = [
-            AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15)
-            for i in range(5)
-        ]
+        requests = [AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15) for i in range(5)]
         # 5 * 0.15 = 0.75 (> 0.7)
         return configs, requests
 
@@ -976,7 +989,9 @@ class SystemContextBuilder:
         )
         return df, [event], risk
 
-    def extreme_volatility_with_risk_block(self) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
+    def extreme_volatility_with_risk_block(
+        self,
+    ) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
         """Context with extreme price action and defensive risk positioning."""
         start_date = datetime(2024, 5, 22, 16, 0, tzinfo=UTC)
         df = self.price_gen.generate(n_steps=200, regime="flash_crash", start_date=start_date)
@@ -991,3 +1006,104 @@ class SystemContextBuilder:
             reason="Critical FOMC meeting in progress.",
         )
         return df, [event], risk
+
+
+class RegimeTransitionScenarioBuilder:
+    """
+    Generates deterministic price sequences that transition between market regimes.
+    Useful for testing transition_score and adaptive risk logic.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def ranging_to_news_shock(
+        self, n_steps: int = 200, start_price: float = 2300.0
+    ) -> pd.DataFrame:
+        """Stable ranging followed by a sudden extreme news spike."""
+        mid = n_steps // 2
+        # Ranging phase: very low vol
+        returns_ranging = self.gen.rng.normal(0, 0.00001, mid)
+        # News shock phase: massive spike (sustained for a few bars to affect rolling windows)
+        returns_news = self.gen.rng.normal(0, 0.0001, n_steps - mid)
+        returns_news[0:5] = 0.08  # 8% spike sustained for 5 bars to blow up ATR ratio
+
+        returns = np.concatenate([returns_ranging, returns_news])
+        return self.gen._generate_base(n_steps, start_price, returns)
+
+    def trending_to_reversal(self, n_steps: int = 200, start_price: float = 2300.0) -> pd.DataFrame:
+        """Strong bullish trend followed by exhaustion and sharp reversal."""
+        mid = n_steps // 2
+        # Bullish trend: steady growth
+        returns_trend = self.gen.rng.normal(0.001, 0.0002, mid)
+        # Reversal: sharp drop
+        returns_reversal = self.gen.rng.normal(-0.0015, 0.0003, n_steps - mid)
+
+        returns = np.concatenate([returns_trend, returns_reversal])
+        return self.gen._generate_base(n_steps, start_price, returns)
+
+    def volatile_to_ranging(self, n_steps: int = 200, start_price: float = 2300.0) -> pd.DataFrame:
+        """Extreme volatility phase that cools down into stable ranging."""
+        mid = n_steps // 2
+        # Volatile phase: high variance
+        returns_volatile = self.gen.rng.normal(0, 0.01, mid)
+        # Cooling down to ranging: very low variance
+        returns_ranging = self.gen.rng.normal(0, 0.0001, n_steps - mid)
+
+        returns = np.concatenate([returns_volatile, returns_ranging])
+        return self.gen._generate_base(n_steps, start_price, returns)
+
+
+class AdversarialScenarioBuilder:
+    """
+    Generates deterministic price sequences designed to trick filters or trigger edge cases.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def wick_trap_cascade(self, n_steps: int = 50, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Sequence of bars with small bodies but massive alternating wicks.
+        Tests stop-loss sensitivity and noise filtering.
+        """
+        df = self.gen.generate(
+            n_steps, regime="ranging", start_price=start_price, volatility=0.0001
+        )
+        for i in range(10, 20):
+            idx = df.index[i]
+            # Alternate upward and downward wicks
+            if i % 2 == 0:
+                df.at[idx, "high"] = df.at[idx, "close"] + 20.0
+            else:
+                df.at[idx, "low"] = df.at[idx, "close"] - 20.0
+        return df
+
+    def liquidity_void(self, n_steps: int = 50, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Price jumps between bars without continuity (gaps).
+        Tests gap-detection and continuity-enforcement logic.
+        """
+        df = self.gen.generate(
+            n_steps, regime="ranging", start_price=start_price, volatility=0.0005
+        )
+        # Inject major gaps
+        gap_indices = [15, 30, 45]
+        for idx_pos in gap_indices:
+            if idx_pos < len(df):
+                idx = df.index[idx_pos]
+                gap = 50.0 if idx_pos % 2 == 0 else -50.0
+                df.loc[idx:, ["open", "high", "low", "close"]] += gap
+        return df
+
+    def vov_explosion(self, n_steps: int = 150, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Ranging data where the volatility itself is extremely unstable.
+        Tests volatility-of-volatility (VoV) and stability metrics.
+        """
+        returns = np.zeros(n_steps)
+        for i in range(n_steps):
+            # Variance itself oscillates violently between extreme states
+            vol = 0.05 if (i // 10) % 2 == 0 else 0.00001
+            returns[i] = self.gen.rng.normal(0, vol)
+        return self.gen._generate_base(n_steps, start_price, returns)
