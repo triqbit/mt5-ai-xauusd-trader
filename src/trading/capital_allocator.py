@@ -31,6 +31,7 @@ class RejectionCode(str, Enum):
     SYMBOL_CONCENTRATION_LIMIT = "SYMBOL_CONCENTRATION_LIMIT"
     FAMILY_CONCENTRATION_LIMIT = "FAMILY_CONCENTRATION_LIMIT"
     CAPITAL_CAP_REACHED = "CAPITAL_CAP_REACHED"
+    STRATEGY_DRAWDOWN_LIMIT = "STRATEGY_DRAWDOWN_LIMIT"
     SCALED_TO_ZERO = "SCALED_TO_ZERO"
     NO_BUDGET = "NO_BUDGET"
 
@@ -46,6 +47,11 @@ class StrategyConfig(BaseModel):
         default=1.0, ge=0.0, le=2.0, description="Multiplier based on recent performance."
     )
     historical_pnl: float = Field(default=0.0, description="Accumulated PnL for this strategy.")
+    peak_pnl: float = Field(default=0.0, description="Maximum accumulated PnL reached.")
+    current_drawdown: float = Field(default=0.0, description="Current drawdown for this strategy.")
+    max_drawdown_limit: float = Field(
+        default=0.15, ge=0.0, le=1.0, description="Strategy-level circuit breaker threshold."
+    )
     consecutive_losses: int = Field(
         default=0, description="Current streak of consecutive losing trades."
     )
@@ -158,7 +164,11 @@ class CapitalAllocator:
             self.current_allocations[strategy_id] = old_amt
 
     def route_allocation(
-        self, symbol: str, risk_pct: float, allow_scaling: bool = False
+        self,
+        symbol: str,
+        risk_pct: float,
+        allow_scaling: bool = False,
+        regime_multiplier: float = 1.0,
     ) -> AllocationResult | None:
         """
         Diversification-aware routing.
@@ -177,7 +187,13 @@ class CapitalAllocator:
 
         for sid in eligible_strategies:
             # Simulate allocation silently to avoid audit pollution
-            res = self.request_allocation(sid, risk_pct, allow_scaling=allow_scaling, silent=True)
+            res = self.request_allocation(
+                sid,
+                risk_pct,
+                allow_scaling=allow_scaling,
+                silent=True,
+                regime_multiplier=regime_multiplier,
+            )
             if not res.is_allowed:
                 continue
 
@@ -209,6 +225,8 @@ class CapitalAllocator:
             sid: {
                 "performance_multiplier": config.performance_multiplier,
                 "historical_pnl": config.historical_pnl,
+                "peak_pnl": config.peak_pnl,
+                "current_drawdown": config.current_drawdown,
                 "consecutive_losses": config.consecutive_losses,
             }
             for sid, config in self.strategies.items()
@@ -237,6 +255,8 @@ class CapitalAllocator:
                     "performance_multiplier", config.performance_multiplier
                 )
                 config.historical_pnl = data.get("historical_pnl", config.historical_pnl)
+                config.peak_pnl = data.get("peak_pnl", config.peak_pnl)
+                config.current_drawdown = data.get("current_drawdown", config.current_drawdown)
                 config.consecutive_losses = data.get(
                     "consecutive_losses", config.consecutive_losses
                 )
@@ -249,6 +269,7 @@ class CapitalAllocator:
         Adjust performance multiplier based on trade outcome.
         Positive PnL increases multiplier, negative PnL decreases it.
         Implements cooling-off mechanism based on consecutive losses.
+        Tracks strategy-level drawdown and enforces limits.
         """
         if strategy_id not in self.strategies:
             return
@@ -256,6 +277,17 @@ class CapitalAllocator:
         config = self.strategies[strategy_id]
         old_multiplier = config.performance_multiplier
         config.historical_pnl += pnl
+
+        # Track Drawdown
+        if config.historical_pnl > config.peak_pnl:
+            config.peak_pnl = config.historical_pnl
+
+        # Calculate drawdown relative to (cap + peak_pnl)
+        denom = config.capital_cap + config.peak_pnl
+        if denom > 0:
+            config.current_drawdown = (config.peak_pnl - config.historical_pnl) / denom
+        else:
+            config.current_drawdown = 0.0
 
         if pnl > 0:
             config.consecutive_losses = 0
@@ -276,6 +308,16 @@ class CapitalAllocator:
                     consecutive_losses=config.consecutive_losses,
                 )
                 config.performance_multiplier = min(config.performance_multiplier, 0.1)
+
+        # Enforce strategy drawdown limit
+        if config.current_drawdown >= config.max_drawdown_limit:
+            logger.critical(
+                "strategy_circuit_breaker_triggered",
+                strategy_id=strategy_id,
+                drawdown=config.current_drawdown,
+                limit=config.max_drawdown_limit,
+            )
+            config.performance_multiplier = 0.0
 
         if old_multiplier != config.performance_multiplier:
             with contextlib.suppress(RuntimeError, ImportError):
@@ -453,7 +495,12 @@ class CapitalAllocator:
         return results
 
     def request_allocation(
-        self, strategy_id: str, risk_pct: float, allow_scaling: bool = False, silent: bool = False
+        self,
+        strategy_id: str,
+        risk_pct: float,
+        allow_scaling: bool = False,
+        silent: bool = False,
+        regime_multiplier: float = 1.0,
     ) -> AllocationResult:
         """
         Evaluate if a strategy can be allocated the requested risk.
@@ -467,6 +514,7 @@ class CapitalAllocator:
             risk_pct: Requested risk as a percentage of total budget.
             allow_scaling: If True, partial allocations are allowed.
             silent: If True, audit logging and metric recording are skipped (useful for simulations).
+            regime_multiplier: Multiplier based on current market regime (e.g. 0.5 for high risk).
         """
         if self.total_budget <= 0:
             if not silent:
@@ -502,10 +550,27 @@ class CapitalAllocator:
         was_capped = False
         was_scaled = False
 
-        # 1. Apply Performance Multiplier (Adaptive Allocation)
-        # This scales the requested risk based on historical performance.
-        target_risk_pct = risk_pct * config.performance_multiplier
-        if config.performance_multiplier != 1.0:
+        # 0. Check Strategy-Level Drawdown Circuit Breaker
+        if config.current_drawdown >= config.max_drawdown_limit:
+            if not silent:
+                self._record_rejection(RejectionCode.STRATEGY_DRAWDOWN_LIMIT)
+            res = AllocationResult(
+                strategy_id=strategy_id,
+                allocated_amount=0.0,
+                allocated_risk_pct=0.0,
+                requested_risk_pct=risk_pct,
+                is_allowed=False,
+                rejection_reason=f"Strategy drawdown limit reached: {config.current_drawdown:.2%}",
+                rejection_code=RejectionCode.STRATEGY_DRAWDOWN_LIMIT,
+            )
+            self._log_and_audit(res, silent=silent)
+            return res
+
+        # 1. Apply Performance and Regime Multipliers (Adaptive Allocation)
+        # This scales the requested risk based on historical performance and market regime.
+        total_multiplier = config.performance_multiplier * regime_multiplier
+        target_risk_pct = risk_pct * total_multiplier
+        if total_multiplier != 1.0:
             was_scaled = True
         target_amount = self.total_budget * target_risk_pct
 
