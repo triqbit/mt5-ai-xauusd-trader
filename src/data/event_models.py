@@ -41,9 +41,6 @@ class MacroEvent(BaseModel):
     end_timestamp: datetime | None = Field(
         None, description="UTC end time. If missing, a category-based default is applied."
     )
-    source: str | None = Field(
-        None, description="Identifier of the data provider (e.g., 'MetaAPI', 'TradingView')."
-    )
     symbol_impact: list[str] = Field(
         default_factory=lambda: ["XAUUSD", "USD"],
         description="List of symbols or currencies directly impacted by this event.",
@@ -124,8 +121,6 @@ class MacroEvent(BaseModel):
                 duration = timedelta(hours=24)
             elif category in [EventCategory.FOMC, EventCategory.RATES]:
                 duration = timedelta(hours=4)
-            elif category in [EventCategory.NFP, EventCategory.CPI]:
-                duration = timedelta(hours=2)
             else:
                 duration = timedelta(hours=1)
             data["end_timestamp"] = ts + duration
@@ -134,7 +129,11 @@ class MacroEvent(BaseModel):
                 ets = ets.replace(tzinfo=UTC)
             data["end_timestamp"] = ets
 
-        if data.get("end_timestamp") and data.get("timestamp") and data["end_timestamp"] <= data["timestamp"]:
+        if (
+            data.get("end_timestamp")
+            and data.get("timestamp")
+            and data["end_timestamp"] <= data["timestamp"]
+        ):
             raise ValueError(
                 f"end_timestamp ({data['end_timestamp']}) must be after timestamp ({data['timestamp']})"
             )

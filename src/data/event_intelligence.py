@@ -39,7 +39,9 @@ class BaseEventProvider(ABC):
     """Abstract base class for event data providers."""
 
     @abstractmethod
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
+    def get_upcoming_events(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[MacroEvent] | None:
         """
         Fetch events within a time range.
         Returns None if the fetch operation failed (e.g., network error, file not found).
@@ -54,7 +56,9 @@ class MockEventProvider(BaseEventProvider):
     def __init__(self, mock_events: list[MacroEvent] | None = None):
         self.events = mock_events or []
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
+    def get_upcoming_events(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[MacroEvent] | None:
         return [
             e
             for e in self.events
@@ -68,7 +72,9 @@ class JSONEventProvider(BaseEventProvider):
     def __init__(self, file_path: str):
         self.file_path = file_path
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
+    def get_upcoming_events(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[MacroEvent] | None:
         import json
         import os
 
@@ -106,7 +112,9 @@ class TradingViewEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH,
         }
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
+    def get_upcoming_events(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[MacroEvent] | None:
         """
         Generates synthetic macro events based on deterministic patterns.
         Useful for pipeline verification without external API dependencies.
@@ -168,7 +176,9 @@ class GeopoliticalEventProvider(BaseEventProvider):
     def __init__(self, source: str | list[dict[str, Any]]):
         self.source = source
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
+    def get_upcoming_events(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[MacroEvent] | None:
         import json
         import os
 
@@ -222,15 +232,17 @@ class MetaAPIEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH,
             "critical": EventImpact.CRITICAL,
         }
+        self._client = self._init_client()
 
-    def _get_client(self) -> httpx.Client:
-        """Returns a new httpx client instance."""
+    def _init_client(self) -> httpx.Client:
         return httpx.Client(
             timeout=httpx.Timeout(15.0, connect=5.0),
             limits=httpx.Limits(max_connections=5, max_keepalive_connections=2),
         )
 
-    def get_upcoming_events(self, start_time: datetime, end_time: datetime) -> list[MacroEvent] | None:
+    def get_upcoming_events(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[MacroEvent] | None:
         """
         Fetches events via MetaAPI's REST interface with structured logging.
         """
@@ -247,9 +259,8 @@ class MetaAPIEventProvider(BaseEventProvider):
                 start_time=start_time.isoformat(),
                 end_time=end_time.isoformat(),
             )
-            with self._get_client() as client:
-                response = client.get(url, params=params, headers=headers)
-                response.raise_for_status()
+            response = self._client.get(url, params=params, headers=headers)
+            response.raise_for_status()
             data = response.json()
 
             macro_events = []
@@ -282,7 +293,6 @@ class MetaAPIEventProvider(BaseEventProvider):
                         category=category,
                         impact=impact,
                         timestamp=ts,
-                        source="MetaAPI",
                         actual=item.get("actual"),
                         forecast=item.get("forecast"),
                         previous=item.get("previous"),
@@ -317,10 +327,13 @@ class MetaAPIEventProvider(BaseEventProvider):
             ]
         ):
             return EventCategory.NFP
-        if any(
-            kw in name_upper
-            for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT", "BEIGE BOOK"]
-        ) and "PHILLY FED" not in name_upper:
+        if (
+            any(
+                kw in name_upper
+                for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT", "BEIGE BOOK"]
+            )
+            and "PHILLY FED" not in name_upper
+        ):
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
@@ -380,17 +393,6 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "OPEC",
                 "PERSONAL INCOME",
                 "SPENDING",
-                "JOBLESS CLAIMS",
-                "INITIAL CLAIMS",
-                "CONTINUING CLAIMS",
-                "LABOR COSTS",
-                "PRODUCTIVITY",
-                "MICHIGAN CONSUMER SENTIMENT",
-                "CB CONSUMER CONFIDENCE",
-                "PERSONAL SPENDING",
-                "CONSTRUCTION SPENDING",
-                "FACTORY ORDERS",
-                "BUSINESS INVENTORIES",
             ]
         ):
             return EventCategory.USD_MACRO
@@ -562,7 +564,6 @@ class EventIntelligence:
                 EventCategory.NFP,
                 EventCategory.RATES,
                 EventCategory.CPI,
-                EventCategory.GEOPOLITICAL,
             ]
             if event.category in major_categories:
                 # Major events require significantly larger windows for institutional safety
@@ -596,13 +597,10 @@ class EventIntelligence:
             ) <= timedelta(minutes=post_window):
                 is_active = True
                 # Critical events always block during cooldown; HIGH impact majors block for first 60 mins
-                if (
-                    event.impact == EventImpact.CRITICAL
-                    or (
-                        event.impact == EventImpact.HIGH
-                        and event.category in major_categories
-                        and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
-                    )
+                if event.impact == EventImpact.CRITICAL or (
+                    event.impact == EventImpact.HIGH
+                    and event.category in major_categories
+                    and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
                 ):
                     is_event_blocking = True
 

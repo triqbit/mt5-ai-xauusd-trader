@@ -9,8 +9,9 @@ The **Event Intelligence System** is an institutional-grade component designed t
 - **Category-Aware Defaults**:
   - **GEOPOLITICAL**: 24-hour default risk window.
   - **FOMC / RATES**: 4-hour high-impact window.
-  - **Standard Macro (CPI, NFP)**: 1-hour window.
+- **Standard Macro (CPI, NFP)**: 2-hour window (enhanced for persistence).
 - **Fail-Safe Modulation**: Supports a `fail_safe_blocked` mode to automatically halt trading if macro data feeds are unavailable.
+- **Enhanced Provider Attribution**: Includes a `source` field for clear traceability of event origins (e.g., 'MetaAPI').
 - **Smart Caching**: Interval-based refresh mechanism to minimize external API latency and costs.
 
 ## 🛠️ Components
@@ -19,7 +20,7 @@ The **Event Intelligence System** is an institutional-grade component designed t
 The central engine that aggregates events from providers and calculates the current `RiskStatus`. It handles de-duplication, caching, and window logic.
 
 ### 2. `MacroEvent` (Model)
-A Pydantic-powered model that normalizes event data. It enforces UTC timezone-awareness and applies category-based default durations.
+A Pydantic-powered model that normalizes event data. It enforces UTC timezone-awareness, applies category-based default durations, and tracks the `source` provider.
 
 ### 3. `RiskStatus` (Output)
 A structured packet containing:
@@ -31,8 +32,8 @@ A structured packet containing:
 ## 📊 Event Categories & Impact
 | Category | Default Duration | Common Examples |
 | :--- | :--- | :--- |
-| **CPI** | 1 Hour | Core CPI m/m, Inflation Rate |
-| **NFP** | 1 Hour | Non-Farm Payrolls, Unemployment Rate |
+| **CPI** | 2 Hours | Core CPI m/m, Inflation Rate |
+| **NFP** | 2 Hours | Non-Farm Payrolls, Unemployment Rate |
 | **FOMC** | 4 Hours | FOMC Statement, Fed Press Conference |
 | **RATES** | 4 Hours | Interest Rate Decisions, Dot Plot |
 | **GEOPOLITICAL** | 24 Hours | Conflict Escalation, Sanctions, Elections |
