@@ -17,7 +17,7 @@ The research reporting system is a high-fidelity audit framework designed to pro
     - **KPI Dashboard:** High-density visual summaries of core strategy health.
     - **Interactive UX:** Sticky navigation headers with scroll progress indicators, tooltips for institutional metrics, and interactive card hover effects.
     - **Accessibility:** ARIA-hardened accessibility and print-optimized CSS for PDF generation.
-- **Modular Architecture:** Pydantic-based data models for extensible research sections covering Regimes, Stress Tests, Hyperopt, Journal Mining, and more.
+- **Modular Architecture:** Pydantic-based data models for extensible research sections covering Regimes, Stress Tests, Hyperopt, Journal Mining (Trade Patterns), Model Drift (PSI), Capital Allocation, Benchmarking, RL Evaluation, Rare Event Simulations, Confidence Calibration, Execution Quality, Strategic Confluence, and Audit Methodology.
 
 ## Components
 

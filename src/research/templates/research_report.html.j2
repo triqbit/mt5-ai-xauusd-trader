@@ -97,6 +97,8 @@
                 {% if rare_events %}<a href="#rare-events">Rare</a>{% endif %}
                 {% if calibration_analysis %}<a href="#calibration">Calibration</a>{% endif %}
                 {% if execution_quality %}<a href="#execution-quality">Execution</a>{% endif %}
+                {% if strategic_confluence %}<a href="#strategic-confluence">Confluence</a>{% endif %}
+                {% if methodology %}<a href="#methodology">Methodology</a>{% endif %}
                 <a href="#conclusion">Conclusion</a>
                 <button class="print-btn" onclick="window['print']()" aria-label="Print research report">Print PDF</button>
             </nav>
@@ -200,6 +202,8 @@
             {% if rare_events %}<li><a href="#rare-events">{{ ns.count }}. Rare Event Simulations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if calibration_analysis %}<li><a href="#calibration">{{ ns.count }}. Confidence Calibration</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if execution_quality %}<li><a href="#execution-quality">{{ ns.count }}. Execution Quality</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if strategic_confluence %}<li><a href="#strategic-confluence">{{ ns.count }}. Strategic Confluence</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if methodology %}<li><a href="#methodology">{{ ns.count }}. Methodology & Audit Trail</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             <li><a href="#conclusion">{{ ns.count }}. Conclusion & Recommendations</a></li>
         </ul>
     </nav>
@@ -460,6 +464,7 @@
                     <th scope="col">Baseline</th>
                     <th scope="col">Current</th>
                     <th scope="col">Drift</th>
+                    <th scope="col" title="Population Stability Index: measures if the distribution of features has changed. < 0.1 is stable.">PSI</th>
                     <th scope="col">Status</th>
                 </tr>
             </thead>
@@ -470,6 +475,7 @@
                     <td>{{ m.baseline }}</td>
                     <td>{{ m.current }}</td>
                     <td>{{ m.drift_pct|round(2) }}%</td>
+                    <td><code>{{ m.psi_score|round(3) }}</code></td>
                     <td>
                         {% if m.status == 'STABLE' %}<span class="badge badge-stable">{{ m.status }}</span>
                         {% elif m.status == 'WARNING' %}<span class="badge badge-warning">{{ m.status }}</span>
@@ -717,6 +723,80 @@
                     Sample size: {{ execution_quality.trade_count }} trades, {{ execution_quality.rejected_count }} rejections
                 </div>
             </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if strategic_confluence %}
+    {% set ns.count = ns.count + 1 %}
+    <section id="strategic-confluence">
+        <h2>{{ ns.count }}. Strategic Confluence Analysis</h2>
+        <div class="score-container">
+            <span>Overall Confluence:</span>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ strategic_confluence.confluence_score * 100 }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill {% if strategic_confluence.confluence_score < 0.6 %}fill-low{% elif strategic_confluence.confluence_score < 0.8 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ strategic_confluence.confluence_score * 100 }}%;"></div>
+            </div>
+            <span class="score">{{ (strategic_confluence.confluence_score * 100)|round(1) }}%</span>
+        </div>
+
+        <div class="grid-2">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Alignment Category</th>
+                        <th scope="col">Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Market Regime Alignment</td>
+                        <td><strong>{{ (strategic_confluence.regime_alignment * 100)|round(1) }}%</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Trading Session Alignment</td>
+                        <td><strong>{{ (strategic_confluence.session_alignment * 100)|round(1) }}%</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Volatility State Alignment</td>
+                        <td><strong>{{ (strategic_confluence.volatility_alignment * 100)|round(1) }}%</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="insight-box">
+                <strong>Strategic Insights:</strong><br>
+                {{ strategic_confluence.insights }}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if methodology %}
+    {% set ns.count = ns.count + 1 %}
+    <section id="methodology">
+        <h2>{{ ns.count }}. Methodology & Audit Trail</h2>
+        <div class="grid-2">
+            <div>
+                <h3>System Information</h3>
+                <ul>
+                    <li><strong>Data Source:</strong> {{ methodology.data_source }}</li>
+                    <li><strong>Backtest Engine:</strong> {{ methodology.backtest_engine }}</li>
+                    <li><strong>Lookback Period:</strong> {{ methodology.lookback_period }}</li>
+                </ul>
+            </div>
+            <div>
+                <h3>Core Assumptions</h3>
+                <ul>
+                    {% for assumption in methodology.assumptions %}
+                    <li>{{ assumption }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <h3>Risk Limits Applied</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+            {% for limit in methodology.risk_limits %}
+            <span class="badge badge-stable" style="background-color: #ebf8ff; color: #2c5282; border: 1px solid #bee3f8;">{{ limit }}</span>
+            {% endfor %}
         </div>
     </section>
     {% endif %}
