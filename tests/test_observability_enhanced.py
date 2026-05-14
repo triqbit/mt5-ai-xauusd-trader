@@ -5,17 +5,17 @@ Enhanced verification for trace correlation and unified decisions.
 """
 
 import uuid
+
 import pytest
 import structlog
 import structlog.contextvars
-from datetime import datetime, UTC
 from sqlalchemy import select
 
-from src.core.schemas import TradeSignal, ExecutionDecision
-from src.core.trade_logger import TradeLogger, ModelSignal, Trade
+from src.core.schemas import ExecutionDecision, TradeSignal
+from src.core.trade_logger import ModelSignal, Trade, TradeLogger
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.core.config import get_config
+
 
 @pytest.fixture
 def trade_logger(tmp_path):
@@ -107,4 +107,5 @@ def test_mt5_connector_comment_correlation(config):
     # but we can verify the comment generation logic if it was in a separate method.
     # Since it's inline, we'll trust the read_file verification or add a small unit test for the logic if possible.
     # For now, we've verified it via read_file in step 6.
-    pass
+    assert connector is not None
+    assert signal.trace_id == trace_id

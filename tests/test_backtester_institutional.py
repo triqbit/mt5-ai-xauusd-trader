@@ -4,12 +4,10 @@ Institutional unit tests for the BacktestEngine.
 
 from __future__ import annotations
 
-from datetime import datetime
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock
-
 import pytest
 
 from src.trading.backtester import BacktestEngine

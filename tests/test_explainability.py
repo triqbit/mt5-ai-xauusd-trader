@@ -367,7 +367,6 @@ def test_signal_explainer_structured_inputs():
 
     execution = ExecutionDecision(
         signal=signal,
-        is_approved=False,
         confidence_score=0.9,
         blocked_by="ATR_VOLATILITY",
         trace={

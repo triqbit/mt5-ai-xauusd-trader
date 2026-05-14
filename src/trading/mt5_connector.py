@@ -550,11 +550,6 @@ class MT5Connector:
             tick = self.get_tick(signal.symbol)
             price = tick["ask"] if order_type == ORDER_TYPE_BUY else tick["bid"]
 
-            # Embed trace ID for end-to-end correlation
-            comment = f"AI:{signal.algorithm}"
-            if signal.trace_id:
-                comment = f"{comment}:{signal.trace_id[:8]}"
-
             request = {
                 "action": TRADE_ACTION_DEAL,
                 "symbol": signal.symbol,
@@ -562,7 +557,7 @@ class MT5Connector:
                 "type": order_type,
                 "price": price,
                 "magic": 20240419,
-                "comment": comment,
+                "comment": f"AI:{signal.algorithm}",
                 "type_time": ORDER_TIME_GTC,
                 "type_filling": ORDER_FILLING_IOC,
             }
@@ -611,10 +606,6 @@ class MT5Connector:
             return int(result.order)
         else:
             action = "BUY" if signal.direction > 0 else "SELL"
-            comment = f"AI:{signal.algorithm}"
-            if signal.trace_id:
-                comment = f"{comment}:{signal.trace_id[:8]}"
-
             try:
                 result = self._run_async(
                     self.metaapi_connection.create_market_order(
@@ -623,7 +614,7 @@ class MT5Connector:
                         signal.lot_size,
                         signal.stop_loss,
                         signal.take_profit,
-                        {"comment": comment},
+                        {"comment": f"AI:{signal.algorithm}"},
                     )
                 )
                 ticket = int(result["orderId"])

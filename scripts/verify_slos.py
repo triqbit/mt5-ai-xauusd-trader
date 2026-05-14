@@ -6,10 +6,10 @@ Calculates current SLO compliance metrics from audit and trade databases.
 Synchronized with docs/SLO_TARGETS.md.
 """
 
-import sqlite3
-import os
 import json
-from datetime import datetime, timedelta, timezone
+import os
+import sqlite3
+from datetime import datetime, timezone
 
 # Use timezone.utc for compatibility
 UTC = timezone.utc

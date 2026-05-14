@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -18,12 +17,24 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.core.schemas import ExecutionDecision
-
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
 
+
+@dataclass
+class ExecutionDecision:
+    """Result of the 6-layer execution filter cascade."""
+
+    signal: TradeSignal
+    confidence_score: float
+    blocked_by: str | None
+    trace: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_approved(self) -> bool:
+        """Returns True if the signal passed all 6 layers."""
+        return self.blocked_by is None
 
 logger = logging.getLogger(__name__)
 
@@ -213,11 +224,9 @@ class ExecutionFilter:
 
         return ExecutionDecision(
             signal=signal,
-            is_approved=blocked_by is None,
             confidence_score=signal.confidence,
             blocked_by=blocked_by,
             trace=trace,
-            trace_id=signal.trace_id,
         )
 
     def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:

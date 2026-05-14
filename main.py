@@ -108,7 +108,6 @@ def _prepare_trade_signal(
     risk: "RiskManager",
     allocator: "CapitalAllocator",
     audit_logger: Optional["AuditLogger"] = None,
-    trace_id: Optional[str] = None,
 ) -> "TradeSignal":
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -163,7 +162,6 @@ def _prepare_trade_signal(
         lot_size=lot_size,
         algorithm=cfg.algorithm,
         confidence=confidence,
-        trace_id=trace_id,
     )
 
 
@@ -390,7 +388,6 @@ def run_live(
                 atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
                 with profile("signal_preparation"):
-                    current_trace_id = structlog.contextvars.get_contextvars().get("trace_id")
                     signal = _prepare_trade_signal(
                         cfg=cfg,
                         direction=direction,
@@ -400,7 +397,6 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
-                        trace_id=current_trace_id,
                     )
                 lot_size = signal.lot_size
 
@@ -583,7 +579,6 @@ def run_live(
                                     entry_price=price,
                                     lot_size=lot_size,
                                     signal_id=signal_id,
-                                    trace_id=signal.trace_id,
                                 )
                 # 6. Check for closed positions to update logger
                 with profile("closed_positions_check"):

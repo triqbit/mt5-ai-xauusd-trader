@@ -216,10 +216,7 @@ class TradeLogger:
         """Log a new model signal and return its ID."""
         import structlog.contextvars
 
-        # Prefer trace_id from signal_data, fallback to context
-        trace_id = signal_data.get("trace_id") or structlog.contextvars.get_contextvars().get(
-            "trace_id"
-        )
+        trace_id = structlog.contextvars.get_contextvars().get("trace_id")
 
         with self.Session() as session:
             signal = ModelSignal(
@@ -248,7 +245,6 @@ class TradeLogger:
         lot_size: float,
         signal_id: int | None = None,
         status: str = "OPEN",
-        trace_id: str | None = None,
     ) -> int:
         """Log a trade execution."""
         # Invalidate cache if a new closed trade is logged (unlikely to be CLOSED immediately but for safety)
@@ -257,8 +253,7 @@ class TradeLogger:
 
         import structlog.contextvars
 
-        # Prefer provided trace_id, fallback to context
-        effective_trace_id = trace_id or structlog.contextvars.get_contextvars().get("trace_id")
+        trace_id = structlog.contextvars.get_contextvars().get("trace_id")
 
         with self.Session() as session:
             trade = Trade(
@@ -268,7 +263,7 @@ class TradeLogger:
                 entry_price=entry_price,
                 lot_size=lot_size,
                 signal_id=signal_id,
-                trace_id=effective_trace_id,
+                trace_id=trace_id,
                 status=status,
             )
             session.add(trade)

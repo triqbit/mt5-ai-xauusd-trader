@@ -6,8 +6,9 @@ Verification script for the benchmarking framework.
 
 import os
 import sys
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
@@ -17,13 +18,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.research import (
     BenchmarkEvaluator,
     EMACrossoverStrategy,
-    MomentumStrategy,
-    VolatilityBreakoutStrategy,
-    NaiveDirectionalStrategy,
-    RiskFilteredBaseline,
     MeanReversionStrategy,
-    RandomStrategy
+    MomentumStrategy,
+    NaiveDirectionalStrategy,
+    RandomStrategy,
+    RiskFilteredBaseline,
+    VolatilityBreakoutStrategy,
 )
+
 
 def generate_synthetic_data(n=1000):
     """Generate synthetic XAUUSD data."""
