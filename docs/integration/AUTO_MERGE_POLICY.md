@@ -8,9 +8,9 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 
 - ✅ **CI Checks:** All required CI checks must pass (tests, lint, coverage ≥ 80%, security scan clean).
 - ✅ **Approvals:** Required code owners have approved the pull request.
-- ✅ **No Merge Conflicts:** No conflicts with the target branch.
+- ✅ **No Merge Conflicts:** No conflicts with the target branch (`github.event.pull_request.mergeable` must be true).
 - ✅ **Safety:** No high-risk files (as defined below) are touched.
-- ✅ **Test Coverage:** Tests must be added or updated for any new functionality (mandatory if `src/` or `main.py` is touched).
+- ✅ **Test Coverage:** Tests must be added or updated for any new functionality (mandatory if `src/` or `main.py` is touched, and total coverage must be ≥ 80%).
 - ✅ **Documentation:** Documentation must be updated where required by the change (mandatory if `src/` or `main.py` is touched).
 - ✅ **Observability:** Observability and logging must meet project standards (standard `structlog`, no plain `print()` statements in `src/`).
 - ✅ **Architecture:** Changes must fit within existing architectural conventions.
@@ -33,7 +33,7 @@ The following patterns trigger an automatic block and escalation:
 ### Trading & Risk
 - `src/trading/executor.py`
 - `src/trading/mt5_connector.py`
-- `src/core/risk_engine.py`
+- `src/core/risk_engine.py` (Historical)
 - `src/trading/risk_engine.py`
 - `src/trading/risk_manager.py`
 - `src/trading/audited_risk_manager.py`
@@ -63,6 +63,8 @@ The following patterns trigger an automatic block and escalation:
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-15 | N/A | Policy Update | 🤖 Jules05: Auto-merge policy update (Refined high-risk matching & robust mergeability checks) | [System Change] |
+| 2026-05-15 | N/A | Policy Update | 🤖 Jules05: Auto-merge policy update (Added merge conflict & 80% coverage checks) | [System Change] |
 | 2026-05-15 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Unified with requirements) | [System Change] |
 | 2026-05-13 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Refined high-risk patterns & categories) | [System Change] |
 | 2026-05-08 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (including docker-compose and ci.yml) | [System Change] |
