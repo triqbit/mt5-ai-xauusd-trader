@@ -10,12 +10,14 @@ The research reporting system is a high-fidelity audit framework designed to pro
     - Ulcer Index & Lake Ratio
     - Tail Ratio & SQN
     - Common Sense Ratio & Gain-to-Pain Ratio
+    - Recovery Factor & Profit Factor
+    - Timing Efficiency & Spread-adjusted Edge Capture
 - **Automated Risk Triage:** Integrated 'Critical Research Warnings' panel in HTML reports that dynamically highlights FAIL/CRITICAL statuses from stress tests, model drift, and calibration audits.
 - **Professional Visualization:**
-    - High-density KPI dashboards.
-    - Interactive elements (Sticky navigation, TOC, Back-to-top).
-    - ARIA-hardened accessibility and print-optimized CSS for PDF generation.
-- **Modular Architecture:** Pydantic-based data models for extensible research sections.
+    - **KPI Dashboard:** High-density visual summaries of core strategy health.
+    - **Interactive UX:** Sticky navigation headers with scroll progress indicators, tooltips for institutional metrics, and interactive card hover effects.
+    - **Accessibility:** ARIA-hardened accessibility and print-optimized CSS for PDF generation.
+- **Modular Architecture:** Pydantic-based data models for extensible research sections covering Regimes, Stress Tests, Hyperopt, Journal Mining, and more.
 
 ## Components
 

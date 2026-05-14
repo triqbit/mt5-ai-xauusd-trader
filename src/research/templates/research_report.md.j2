@@ -64,11 +64,11 @@
 ## {{ ns.count }}. Stress Test Outcomes
 **Resilience Score:** {{ stress_tests.resilience_score }}/100
 
-| Scenario | Total Return | Max Drawdown | Sharpe | Outcome |
-|----------|--------------|--------------|--------|---------|
-| **Baseline** | {{ stress_tests.baseline.total_return }} | {{ stress_tests.baseline.max_drawdown }} | {{ stress_tests.baseline.sharpe }} | - |
+| Scenario | Total Return | Max Drawdown | Sharpe | Recov | PF | Outcome |
+|----------|--------------|--------------|--------|-------|----|---------|
+| **Baseline** | {{ stress_tests.baseline.total_return }} | {{ stress_tests.baseline.max_drawdown }} | {{ stress_tests.baseline.sharpe }} | {{ stress_tests.baseline.recovery_factor }} | {{ stress_tests.baseline.profit_factor }} | - |
 {% for s in stress_tests.scenarios %}
-| {{ s.name }} | {{ s.total_return }} | {{ s.max_drawdown }} | {{ s.sharpe }} | {{ s.outcome }} |
+| {{ s.name }} | {{ s.total_return }} | {{ s.max_drawdown }} | {{ s.sharpe }} | {{ s.recovery_factor }} | {{ s.profit_factor }} | {{ s.outcome }} |
 {% endfor %}
 
 **Fragility Indicators:**
@@ -80,6 +80,9 @@
 {% for point in stress_tests.failure_points %}
 - {{ point }}
 {% endfor %}
+
+**Analytical Insights:**
+{{ stress_tests.insights }}
 {% endif %}
 
 {% if hyperparameter_robustness %}
@@ -111,12 +114,21 @@
 
 {% if trade_patterns.motifs %}
 ### Signal Motifs (Losing Combinations)
-| Algorithm | Volatility | Confidence | Frequency | Win Rate |
-|-----------|------------|------------|-----------|----------|
+| Algorithm | Volatility | Confidence | Frequency | Win Rate | Exp | Eff |
+|-----------|------------|------------|-----------|----------|-----|-----|
 {% for m in trade_patterns.motifs %}
 {% if m.win_rate < 0.5 %}
-| {{ m.algorithm }} | {{ m.volatility_bucket }} | {{ m.confidence_bucket }} | {{ m.frequency }} | {{ (m.win_rate * 100)|round(1) }}% |
+| {{ m.algorithm }} | {{ m.volatility_bucket }} | {{ m.confidence_bucket }} | {{ m.frequency }} | {{ (m.win_rate * 100)|round(1) }}% | {{ m.expectancy|round(2) }} | {{ m.efficiency_ratio|round(2) }} |
 {% endif %}
+{% endfor %}
+{% endif %}
+
+{% if trade_patterns.combinations %}
+### Signal Combinations (Toxic vs Golden)
+| Pattern | Frequency | Type | Exp | Eff |
+|---------|-----------|------|-----|-----|
+{% for comb in trade_patterns.combinations %}
+| {{ comb.patterns|join(', ') }} | {{ comb.frequency }} | {{ 'TOXIC' if comb.is_toxic else 'GOLDEN' }} | {{ comb.expectancy|round(2) }} | {{ comb.efficiency_ratio|round(2) }} |
 {% endfor %}
 {% endif %}
 
