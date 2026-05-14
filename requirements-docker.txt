@@ -21,6 +21,9 @@ requests==2.33.1
 aiohttp==3.13.4
 httpx==0.28.1
 
+# -- MetaTrader 5 (Cloud Fallback) ---------------------------
+metaapi-cloud-sdk==29.1.1
+
 # -- Database ------------------------------------------------
 psycopg2-binary==2.9.10
 sqlalchemy==2.0.38

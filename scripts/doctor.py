@@ -81,6 +81,7 @@ CORE_DEPENDENCIES = {
     "pydantic": ("pydantic", "2.13.4"),
     "pydantic-settings": ("pydantic_settings", "2.14.1"),
     "sqlalchemy": ("sqlalchemy", "2.0.38"),
+    "metaapi-cloud-sdk": ("metaapi_cloud_sdk", "29.1.1"),
     "torch": ("torch", "2.5.1"),
     "fastapi": ("fastapi", "0.136.1"),
     "talib": ("talib", "0.6.4"),
@@ -97,6 +98,11 @@ CORE_DEPENDENCIES = {
     "tqdm": ("tqdm", "4.67.1"),
     "scipy": ("scipy", "1.15.3"),
     "scikit-learn": ("sklearn", "1.6.1"),
+    "psutil": ("psutil", "7.2.2"),
+    "joblib": ("joblib", "1.4.2"),
+    "redis": ("redis", "7.4.0"),
+    "alembic": ("alembic", "1.14.1"),
+    "prometheus-client": ("prometheus_client", "0.21.1"),
 }
 
 def check_dependencies(dependencies=None):

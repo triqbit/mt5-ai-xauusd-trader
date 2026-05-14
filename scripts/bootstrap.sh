@@ -12,7 +12,11 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 
-# 3. Install dependencies
+# 3. Create required directories
+echo "Creating required directories..."
+mkdir -p data logs models/trained reports
+
+# 4. Install dependencies
 echo "Installing dependencies..."
 # Use venv pip if it exists
 if [ -f "venv/bin/pip" ]; then
