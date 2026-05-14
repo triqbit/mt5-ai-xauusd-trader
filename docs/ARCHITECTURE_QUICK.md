@@ -29,7 +29,8 @@ This map identifies the production readiness of various subsystems to ensure tra
 | **Risk Management** | 🟡 Release Candidate | Hard limits active; complex allocation in final testing. |
 | **Ensemble Models** | 🟡 Release Candidate | Backtest-validated; live edge-case hardening in progress. |
 | **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
-| **Explainability Engine** | 🔵 Experimental | Attribution reporting is functional but lacks full TUI integration. |
+| **Decision Support** | 🟡 Release Candidate | Structured decision packets and operator dashboard active. |
+| **Explainability Engine** | 🟢 Production | Institutional attribution reporting and TUI integration complete. |
 
 ---
 

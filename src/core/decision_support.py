@@ -576,7 +576,13 @@ class DecisionSupportSystem:
             wr_color = get_color(packet.performance.win_rate, 0.55, 0.45)
             wl_color = get_color(packet.performance.win_loss_ratio, 2.0, 1.2)
             sqn_color = get_color(packet.performance.sqn, 3.0, 2.0)
-            cvar_color = "green" if packet.performance.cvar_95 >= -0.02 else "yellow" if packet.performance.cvar_95 >= -0.05 else "red"
+            cvar_color = (
+                "green"
+                if packet.performance.cvar_95 >= -0.02
+                else "yellow"
+                if packet.performance.cvar_95 >= -0.05
+                else "red"
+            )
 
             perf_content = (
                 f"📈 Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]  |  "
