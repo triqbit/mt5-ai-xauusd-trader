@@ -6,7 +6,7 @@
 
 # ── Core ML / RL ────────────────────────────────────────────
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.5.1
+torch==2.7.1+cpu
 stable-baselines3==2.8.0
 gymnasium==1.0.0
 numpy==1.26.4
