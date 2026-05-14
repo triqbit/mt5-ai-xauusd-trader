@@ -220,6 +220,26 @@ class RandomStrategy:
         return rng.choice([-1, 0, 1], size=len(df))
 
 
+class DonchianChannelStrategy:
+    """Donchian Channel breakout baseline."""
+
+    def __init__(self, window: int = 20):
+        self.window = window
+
+    @property
+    def name(self) -> str:
+        return f"Donchian_Breakout_{self.window}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        upper_channel = df["high"].rolling(window=self.window).max()
+        lower_channel = df["low"].rolling(window=self.window).min()
+
+        signals = np.zeros(len(df))
+        signals[df["close"] >= upper_channel.shift(1)] = 1
+        signals[df["close"] <= lower_channel.shift(1)] = -1
+        return signals
+
+
 class ADXStrategy:
     """Trend-following strategy based on the Average Directional Index (ADX)."""
 
@@ -570,6 +590,8 @@ class BenchmarkEvaluator:
                     profit_factor=f"{metrics.get('Profit Factor', 0.0):.2f}",
                     sqn=f"{metrics.get('SQN', 0.0):.2f}",
                     recovery_factor=f"{metrics.get('Recovery Factor', 0.0):.2f}",
+                    calmar_ratio=f"{metrics.get('Calmar Ratio', 0.0):.2f}",
+                    expected_shortfall=f"{metrics.get('CVaR_95', 0.0):.2%}",
                 )
             )
 
