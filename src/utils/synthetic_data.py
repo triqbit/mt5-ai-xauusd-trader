@@ -841,7 +841,9 @@ class PortfolioScenarioBuilder:
         requests = [
             AllocationRequest(strategy_id="gold_rl_1", risk_pct=0.15),
             AllocationRequest(strategy_id="gold_rl_2", risk_pct=0.15),
-            AllocationRequest(strategy_id="gold_rl_3", risk_pct=0.15),  # Should hit XAUUSD 0.4 limit
+            AllocationRequest(
+                strategy_id="gold_rl_3", risk_pct=0.15
+            ),  # Should hit XAUUSD 0.4 limit
             AllocationRequest(strategy_id="eur_rl_1", risk_pct=0.15),  # Should hit RL 0.4 limit
         ]
         return configs, requests
@@ -863,13 +865,15 @@ class PortfolioScenarioBuilder:
         Generates requests that push total portfolio heat toward and past 0.7 limit.
         """
         configs = [
-            StrategyConfig(strategy_id=f"strat_{i}", symbol=f"SYM_{i}", model_family=f"FAM_{i}", capital_cap=100000)
+            StrategyConfig(
+                strategy_id=f"strat_{i}",
+                symbol=f"SYM_{i}",
+                model_family=f"FAM_{i}",
+                capital_cap=100000,
+            )
             for i in range(5)
         ]
-        requests = [
-            AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15)
-            for i in range(5)
-        ]
+        requests = [AllocationRequest(strategy_id=f"strat_{i}", risk_pct=0.15) for i in range(5)]
         # 5 * 0.15 = 0.75 (> 0.7)
         return configs, requests
 
@@ -985,7 +989,9 @@ class SystemContextBuilder:
         )
         return df, [event], risk
 
-    def extreme_volatility_with_risk_block(self) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
+    def extreme_volatility_with_risk_block(
+        self,
+    ) -> tuple[pd.DataFrame, list[MacroEvent], RiskStatus]:
         """Context with extreme price action and defensive risk positioning."""
         start_date = datetime(2024, 5, 22, 16, 0, tzinfo=UTC)
         df = self.price_gen.generate(n_steps=200, regime="flash_crash", start_date=start_date)
@@ -1011,7 +1017,9 @@ class RegimeTransitionScenarioBuilder:
     def __init__(self, seed: int = 42):
         self.gen = ScenarioGenerator(seed=seed)
 
-    def ranging_to_news_shock(self, n_steps: int = 200, start_price: float = 2300.0) -> pd.DataFrame:
+    def ranging_to_news_shock(
+        self, n_steps: int = 200, start_price: float = 2300.0
+    ) -> pd.DataFrame:
         """Stable ranging followed by a sudden extreme news spike."""
         mid = n_steps // 2
         # Ranging phase: very low vol
@@ -1059,7 +1067,9 @@ class AdversarialScenarioBuilder:
         Sequence of bars with small bodies but massive alternating wicks.
         Tests stop-loss sensitivity and noise filtering.
         """
-        df = self.gen.generate(n_steps, regime="ranging", start_price=start_price, volatility=0.0001)
+        df = self.gen.generate(
+            n_steps, regime="ranging", start_price=start_price, volatility=0.0001
+        )
         for i in range(10, 20):
             idx = df.index[i]
             # Alternate upward and downward wicks
@@ -1074,7 +1084,9 @@ class AdversarialScenarioBuilder:
         Price jumps between bars without continuity (gaps).
         Tests gap-detection and continuity-enforcement logic.
         """
-        df = self.gen.generate(n_steps, regime="ranging", start_price=start_price, volatility=0.0005)
+        df = self.gen.generate(
+            n_steps, regime="ranging", start_price=start_price, volatility=0.0005
+        )
         # Inject major gaps
         gap_indices = [15, 30, 45]
         for idx_pos in gap_indices:

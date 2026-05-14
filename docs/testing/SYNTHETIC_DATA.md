@@ -4,7 +4,7 @@ This document outlines the synthetic data generation and risk scenario building 
 
 ## ScenarioGenerator
 
-Located in `src/utils/synthetic_data.py`, the `ScenarioGenerator` provides deterministic OHLCV data for various market regimes.
+Located in , the  provides deterministic OHLCV data for various market regimes.
 
 ### Supported Regimes
 
@@ -31,21 +31,21 @@ Located in `src/utils/synthetic_data.py`, the `ScenarioGenerator` provides deter
     - **outliers**: Ghost ticks or extreme price spikes (e.g., bad feed).
     - **zero_volume**: Price moves but volume is reported as zero.
     - **gaps**: Price jumps without continuity (slippage or weekend gaps).
-- **Price Continuity**: The generator ensures `Open[i] == Close[i-1]` for standard regimes, providing realistic price action for backtesting.
+- **Price Continuity**: The generator ensures  for standard regimes, providing realistic price action for backtesting.
 
 ## BacktestScenarioBuilder
 
-Located in `src/utils/synthetic_data.py`, the `BacktestScenarioBuilder` provides deterministic price sequences designed to verify the mathematical correctness of the `BacktestEngine`.
+Located in , the  provides deterministic price sequences designed to verify the mathematical correctness of the .
 
 ### Key Methods
 
-- **drawdown_recovery(n_steps, start_price)**: Creates a 10% drawdown followed by a 20% gain. Used to verify `max_drawdown` and `recovery_factor` calculations.
+- **drawdown_recovery(n_steps, start_price)**: Creates a 10% drawdown followed by a 20% gain. Used to verify  and  calculations.
 - **wick_traps(n_steps, start_price)**: Creates bars where both SL and TP levels are touched. Verifies the conservative "SL-first" exit policy.
 - **steady_sharpe(n_steps, start_price)**: Near-perfect linear trend with minimal noise to produce high Sharpe and Profit Factor for baseline testing.
 
 ## ExecutionScenarioBuilder
 
-Located in `src/utils/synthetic_data.py`, the `ExecutionScenarioBuilder` generates paired `TradeSignal` and `pd.DataFrame` (market data) designed to test specific layers of the `ExecutionFilter`.
+Located in , the  generates paired  and  (market data) designed to test specific layers of the .
 
 ### Key Scenarios
 
@@ -62,20 +62,20 @@ Located in `src/utils/synthetic_data.py`, the `ExecutionScenarioBuilder` generat
 
 ## RegimeScenarioBuilder
 
-Located in `src/utils/synthetic_data.py`, the `RegimeScenarioBuilder` generates deterministic datasets specifically designed to trigger each `MarketRegime` label in the `RegimeDetector`.
+Located in , the  generates deterministic datasets specifically designed to trigger each  label in the .
 
 ### Key Methods
 
-- **trending()**: Triggers `MarketRegime.TRENDING`.
-- **ranging()**: Triggers `MarketRegime.RANGING`.
-- **mean_reversion()**: Triggers `MarketRegime.MEAN_REVERSION`.
-- **volatile_breakout()**: Triggers `MarketRegime.VOLATILE_BREAKOUT`.
-- **low_volatility_drift()**: Triggers `MarketRegime.LOW_VOLATILITY_DRIFT`.
-- **news_shock()**: Triggers `MarketRegime.NEWS_SHOCK`.
+- **trending()**: Triggers .
+- **ranging()**: Triggers .
+- **mean_reversion()**: Triggers .
+- **volatile_breakout()**: Triggers .
+- **low_volatility_drift()**: Triggers .
+- **news_shock()**: Triggers .
 
 ## ModelHealthGenerator
 
-Located in `src/utils/synthetic_data.py`, the `ModelHealthGenerator` provides deterministic model health metrics for testing stability guards.
+Located in , the  provides deterministic model health metrics for testing stability guards.
 
 ### Supported States
 
@@ -86,12 +86,12 @@ Located in `src/utils/synthetic_data.py`, the `ModelHealthGenerator` provides de
 
 ## RiskScenarioBuilder
 
-Located in `src/utils/synthetic_data.py`, the `RiskScenarioBuilder` generates deterministic sequences of `TradeSignal` objects.
+Located in , the  generates deterministic sequences of  objects.
 
 ### Key Methods
 
 - **consecutive_losses(n_signals, symbol, start_price)**:
-  Generates `n_signals` that are likely to result in losses. This is critical for testing:
+  Generates  that are likely to result in losses. This is critical for testing:
   - Daily loss limits
   - Circuit breakers (drawdown halts)
   - Consecutive loss counters
@@ -102,14 +102,14 @@ Located in `src/utils/synthetic_data.py`, the `RiskScenarioBuilder` generates de
   - Signal validation gate behavior under high uncertainty
 
 - **daily_loss_breach(symbol, price, n_losses)** (New):
-  Generates a sequence of high-impact losing signals. Used to verify that the `RiskManager` correctly halts trading after the daily loss percentage floor is hit.
+  Generates a sequence of high-impact losing signals. Used to verify that the  correctly halts trading after the daily loss percentage floor is hit.
 
 - **drawdown_circuit_breaker(symbol, price)** (New):
   Generates an extreme losing scenario designed to trigger the system-wide 15% drawdown circuit breaker, ensuring all execution is blocked until manual intervention.
 
 ## MacroScenarioBuilder
 
-Located in `src/utils/synthetic_data.py`, the `MacroScenarioBuilder` generates deterministic `MacroEvent` objects for risk testing.
+Located in , the  generates deterministic  objects for risk testing.
 
 ### Key Scenarios
 
@@ -119,14 +119,34 @@ Located in `src/utils/synthetic_data.py`, the `MacroScenarioBuilder` generates d
 
 ## SystemContextBuilder
 
-Located in `src/utils/synthetic_data.py`, the `SystemContextBuilder` generates integrated test contexts combining price action, macro events, and risk status.
+Located in , the  generates integrated test contexts combining price action, macro events, and risk status.
 
 ### Key Contexts
 
 - **normal_trading**: Context for standard, low-risk trading.
-- **high_impact_macro_event**: Context during a High-Impact news release (NFP), including a defensive `RiskStatus`.
-- **extreme_volatility_with_risk_block**: Context with extreme price action (Flash Crash) and a defensive `RiskStatus` (FOMC news block).
+- **high_impact_macro_event**: Context during a High-Impact news release (NFP), including a defensive .
+- **extreme_volatility_with_risk_block**: Context with extreme price action (Flash Crash) and a defensive  (FOMC news block).
+
+## RegimeTransitionScenarioBuilder
+
+Located in , this builder generates sequences that transition between market states to test transition-score sensitivity.
+
+### Key Methods
+
+- **ranging_to_news_shock()**: Stable ranging followed by a sudden extreme news spike.
+- **trending_to_reversal()**: Strong bullish trend followed by exhaustion and sharp reversal.
+- **volatile_to_ranging()**: Extreme volatility phase that cools down into stable ranging.
+
+## AdversarialScenarioBuilder
+
+Located in , this builder creates "trap" scenarios to test technical robustness and noise rejection.
+
+### Key Scenarios
+
+- **wick_trap_cascade()**: Sequence of bars with small bodies but massive alternating wicks to test stop-loss sensitivity.
+- **liquidity_void()**: Price jumps between bars without continuity (gaps) to test gap-detection logic.
+- **vov_explosion()**: Ranging data where the volatility itself is extremely unstable to test VoV filters.
 
 ## Usage in Tests
 
-These tools are designed to make tests deterministic and broad. See `tests/test_risk_scenarios.py` and `tests/test_synthetic_data.py` for implementation examples.
+These tools are designed to make tests deterministic and broad. See  and  for implementation examples.
