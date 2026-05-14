@@ -263,9 +263,17 @@ def test_find_frequent_motifs(miner):
     # Ensemble motif (direction 1, Low vol, High conf) has 0% win rate
     ensemble_motif = next(m for m in motifs if m.algorithm == "ensemble")
     assert ensemble_motif.win_rate == 0.0
+    assert ensemble_motif.is_toxic is True
+    assert ensemble_motif.is_golden is False
     assert ensemble_motif.volatility_bucket == "Low"
     assert ensemble_motif.confidence_bucket == "High"
     assert ensemble_motif.session in ["London", "New York"]
+
+    # PPO motif has 100% win rate
+    ppo_motif = next(m for m in motifs if m.algorithm == "ppo")
+    assert ppo_motif.win_rate == 1.0
+    assert ppo_motif.is_toxic is False
+    assert ppo_motif.is_golden is True
 
 
 def test_strategy_state_correlation(miner):
@@ -316,6 +324,19 @@ def test_to_report_section_with_toxic_motif(miner):
                 session="London",
                 frequency=5,
                 win_rate=0.1,
+                is_toxic=True,
+                expectancy=-10,
+            ),
+            SignalMotif(
+                algorithm="ppo",
+                direction=1,
+                volatility_bucket="Low",
+                confidence_bucket="High",
+                session="New York",
+                frequency=5,
+                win_rate=0.9,
+                is_golden=True,
+                expectancy=50,
             )
         ],
         avg_win_duration=15.5,
@@ -323,10 +344,11 @@ def test_to_report_section_with_toxic_motif(miner):
     )
 
     section = report.to_report_section()
-    # Should detect Strategy Fragility and Toxic Motif
+    # Should detect Strategy Fragility, Toxic Motif and Golden Motif
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Strategy Fragility" in risk_types
     assert "Toxic Motif" in risk_types
+    assert "Golden Motif" in risk_types
     assert section.avg_win_duration == 15.5
     assert section.avg_loss_duration == 45.2
     assert section.motifs[0].session == "London"
@@ -400,77 +422,74 @@ def test_detect_pre_drawdown_motifs(miner):
 
 
 def test_find_combination_motifs(miner):
-    now = datetime.now(timezone.utc)
-    # 3 consecutive losses form a cluster starting at now
-    # We need a non-losing trade to end the cluster
-    trades1 = pd.DataFrame(
-        [
-            {"id": 1, "pnl": -10, "created_at": now, "signal_id": 1},
-            {"id": 2, "pnl": -10, "created_at": now + pd.Timedelta(minutes=1), "signal_id": 2},
-            {"id": 3, "pnl": -10, "created_at": now + pd.Timedelta(minutes=2), "signal_id": 3},
-            {"id": 9, "pnl": 10, "created_at": now + pd.Timedelta(minutes=3), "signal_id": 9},
-        ]
-    )
+    # Use fixed timestamps to avoid session jitter
+    base_time = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
 
-    # Add second cluster
-    later = now + pd.Timedelta(days=1)
-    trades2 = pd.DataFrame(
-        [
-            {"id": 4, "pnl": -10, "created_at": later, "signal_id": 4},
-            {"id": 5, "pnl": -10, "created_at": later + pd.Timedelta(minutes=1), "signal_id": 5},
-            {"id": 6, "pnl": -10, "created_at": later + pd.Timedelta(minutes=2), "signal_id": 6},
-            {"id": 7, "pnl": 10, "created_at": later + pd.Timedelta(minutes=3), "signal_id": 7},
-        ]
-    )
-    all_trades = pd.concat([trades1, trades2])
+    # Toxic Instance 1 (10:00)
+    t1 = base_time
+    trades_toxic1 = pd.DataFrame([
+        {"id": 1, "pnl": -10, "created_at": t1, "signal_id": 1},
+        {"id": 2, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=1), "signal_id": 2},
+        {"id": 3, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=2), "signal_id": 3},
+        {"id": 4, "pnl": 10, "created_at": t1 + pd.Timedelta(minutes=3), "signal_id": 4}, # Win Breaker
+        {"id": 41, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=4), "signal_id": 41}, # Loss Breaker for profit clusters
+    ])
+    sigs_toxic1 = pd.DataFrame([
+        {"id": 10, "algorithm": "A", "direction": 1, "volatility": 0.1, "created_at": t1 - pd.Timedelta(minutes=5)},
+        {"id": 11, "algorithm": "B", "direction": 1, "volatility": 0.1, "created_at": t1 - pd.Timedelta(minutes=4)},
+    ])
 
-    # Multiple signals before cluster 1
-    signals1 = pd.DataFrame(
-        [
-            {
-                "id": 10,
-                "algorithm": "ensemble",
-                "direction": 1,
-                "volatility": 0.1,
-                "created_at": now - pd.Timedelta(minutes=30),
-            },
-            {
-                "id": 11,
-                "algorithm": "ppo",
-                "direction": -1,
-                "volatility": 0.1,
-                "created_at": now - pd.Timedelta(minutes=29),
-            },
-        ]
-    )
+    # Toxic Instance 2 (next day, same hour)
+    t2 = t1 + pd.Timedelta(days=1)
+    trades_toxic2 = pd.DataFrame([
+        {"id": 5, "pnl": -10, "created_at": t2, "signal_id": 5},
+        {"id": 6, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=1), "signal_id": 6},
+        {"id": 7, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=2), "signal_id": 7},
+        {"id": 8, "pnl": 10, "created_at": t2 + pd.Timedelta(minutes=3), "signal_id": 8}, # Win Breaker
+        {"id": 81, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=4), "signal_id": 81}, # Loss Breaker
+    ])
+    sigs_toxic2 = pd.DataFrame([
+        {"id": 20, "algorithm": "A", "direction": 1, "volatility": 0.1, "created_at": t2 - pd.Timedelta(minutes=5)},
+        {"id": 21, "algorithm": "B", "direction": 1, "volatility": 0.1, "created_at": t2 - pd.Timedelta(minutes=4)},
+    ])
 
-    # Multiple signals before cluster 2
-    signals2 = pd.DataFrame(
-        [
-            {
-                "id": 20,
-                "algorithm": "ensemble",
-                "direction": 1,
-                "volatility": 0.1,
-                "created_at": later - pd.Timedelta(minutes=30),
-            },
-            {
-                "id": 21,
-                "algorithm": "ppo",
-                "direction": -1,
-                "volatility": 0.1,
-                "created_at": later - pd.Timedelta(minutes=29),
-            },
-        ]
-    )
-    all_signals = pd.concat([signals1, signals2])
+    # Golden Instance 1 (at 14:00)
+    t3 = base_time + pd.Timedelta(hours=4)
+    trades_golden1 = pd.DataFrame([
+        {"id": 100, "pnl": 50, "created_at": t3, "signal_id": 100},
+        {"id": 101, "pnl": 50, "created_at": t3 + pd.Timedelta(minutes=1), "signal_id": 101},
+        {"id": 102, "pnl": 50, "created_at": t3 + pd.Timedelta(minutes=2), "signal_id": 102},
+        {"id": 103, "pnl": -10, "created_at": t3 + pd.Timedelta(minutes=3), "signal_id": 103}, # Loss Breaker
+        {"id": 104, "pnl": 10, "created_at": t3 + pd.Timedelta(minutes=4), "signal_id": 104}, # Win Breaker for drawdown clusters
+    ])
+    sigs_golden1 = pd.DataFrame([
+        {"id": 110, "algorithm": "X", "direction": 1, "volatility": 0.1, "created_at": t3 - pd.Timedelta(minutes=5)},
+        {"id": 111, "algorithm": "Y", "direction": 1, "volatility": 0.1, "created_at": t3 - pd.Timedelta(minutes=4)},
+    ])
 
-    motifs = miner.find_combination_motifs(all_signals, all_trades)
-    assert len(motifs) == 1
-    assert "ensemble:1" in motifs[0].patterns
-    assert "ppo:-1" in motifs[0].patterns
-    assert motifs[0].frequency == 2
-    assert motifs[0].is_toxic is True
+    # Golden Instance 2 (next day, same hour)
+    t4 = t3 + pd.Timedelta(days=1)
+    trades_golden2 = pd.DataFrame([
+        {"id": 200, "pnl": 50, "created_at": t4, "signal_id": 200},
+        {"id": 201, "pnl": 50, "created_at": t4 + pd.Timedelta(minutes=1), "signal_id": 201},
+        {"id": 202, "pnl": 50, "created_at": t4 + pd.Timedelta(minutes=2), "signal_id": 202},
+        {"id": 203, "pnl": -10, "created_at": t4 + pd.Timedelta(minutes=3), "signal_id": 203}, # Loss Breaker
+        {"id": 204, "pnl": 10, "created_at": t4 + pd.Timedelta(minutes=4), "signal_id": 204}, # Win Breaker
+    ])
+    sigs_golden2 = pd.DataFrame([
+        {"id": 210, "algorithm": "X", "direction": 1, "volatility": 0.1, "created_at": t4 - pd.Timedelta(minutes=5)},
+        {"id": 211, "algorithm": "Y", "direction": 1, "volatility": 0.1, "created_at": t4 - pd.Timedelta(minutes=4)},
+    ])
+
+    all_trades = pd.concat([trades_toxic1, trades_toxic2, trades_golden1, trades_golden2]).sort_values("created_at")
+    all_sigs = pd.concat([sigs_toxic1, sigs_toxic2, sigs_golden1, sigs_golden2])
+
+    motifs = miner.find_combination_motifs(all_sigs, all_trades)
+    assert len(motifs) == 2
+    toxic = next(m for m in motifs if "A:1" in m.patterns)
+    assert toxic.is_toxic is True
+    golden = next(m for m in motifs if "X:1" in m.patterns)
+    assert golden.is_golden is True
 
 
 def test_find_frequent_motifs_with_clusters(miner):
@@ -717,6 +736,40 @@ def test_analyze_rejection_quality(miner):
     assert spread.profit_opportunity_cost == 50.0
 
 
+def test_analyze_blocked_motifs(miner):
+    signals = pd.DataFrame(
+        [
+            {
+                "id": 1,
+                "algorithm": "ensemble",
+                "direction": 1,
+                "volatility": 0.05,
+                "confidence": 0.85,
+                "created_at": datetime(2024, 1, 1, 14, 0, tzinfo=timezone.utc),
+            },
+            {
+                "id": 2,
+                "algorithm": "ensemble",
+                "direction": 1,
+                "volatility": 0.05,
+                "confidence": 0.85,
+                "created_at": datetime(2024, 1, 1, 15, 0, tzinfo=timezone.utc),
+            },
+        ]
+    )
+    blocked = pd.DataFrame(
+        [
+            {"signal_id": 1, "opportunity_cost_pnl": 100.0, "would_have_won": True},
+            {"signal_id": 2, "opportunity_cost_pnl": 50.0, "would_have_won": True},
+        ]
+    )
+
+    motifs = miner.analyze_blocked_motifs(signals, blocked)
+    assert len(motifs) == 1
+    assert motifs[0].algorithm == "ensemble"
+    assert motifs[0].is_golden is True
+
+
 def test_detect_overconfidence(miner):
     now = datetime.now(timezone.utc)
     # 3 consecutive wins followed by a lot increase
@@ -793,7 +846,12 @@ def test_run_mining_enhanced(miner):
 
 
 def test_to_report_section_enhanced_risks(miner):
-    from src.analytics.journal_mining import JournalReport, OverconfidenceEvent, RejectionQuality
+    from src.analytics.journal_mining import (
+        JournalReport,
+        OverconfidenceEvent,
+        RejectionQuality,
+        SignalMotif,
+    )
 
     report = JournalReport(
         session_analysis=[],
@@ -814,10 +872,24 @@ def test_to_report_section_enhanced_risks(miner):
                 profit_opportunity_cost=500.0,
             )
         ],
+        blocked_motifs=[
+            SignalMotif(
+                algorithm="transformer",
+                direction=1,
+                volatility_bucket="Normal",
+                confidence_bucket="High",
+                session="London",
+                frequency=3,
+                win_rate=0.8,
+                is_golden=True,
+                expectancy=100,
+            )
+        ],
     )
 
     section = report.to_report_section()
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Overconfidence" in risk_types
     assert "Poor Rejection Quality" in risk_types
+    assert "Missed Opportunity" in risk_types
     assert "missed 500.00" in section.behavioral_risks[1].description
