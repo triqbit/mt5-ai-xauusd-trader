@@ -92,6 +92,9 @@ def configure_logging(level: str = "INFO") -> None:
         level=getattr(logging, level.upper(), logging.INFO),
     )
 
+    # Apply secret masking to standard logging calls
+    logging.getLogger().addFilter(get_masking_processor())
+
 
 # -- Trading loop ----------------------------------------------------------
 

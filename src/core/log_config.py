@@ -6,19 +6,23 @@ src/core/log_config.py
 from __future__ import annotations
 
 import contextlib
+import logging
 from typing import Any
 
 from src.core.config import TradingConfig
 
 
-class SecretMaskingProcessor:
+class SecretMaskingProcessor(logging.Filter):
     """
-    Structlog processor that masks sensitive values in log events.
+    Unified security processor that masks sensitive values in both
+    structlog events and standard logging records.
+
     Dynamically retrieves secrets from TradingConfig to ensure any
     SecretStr field is never leaked to logs.
     """
 
     def __init__(self, config: TradingConfig | None = None, mask: str = "[MASKED]") -> None:
+        super().__init__()
         self.mask = mask
         self.secrets: set[str] = set()
         self.sensitive_patterns = [
@@ -115,6 +119,22 @@ class SecretMaskingProcessor:
     def __call__(self, logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         """Structlog-compatible processor interface."""
         return self.redact_any(event_dict)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """
+        Standard logging Filter interface.
+        Redacts secrets from the log message and its arguments.
+        """
+        if isinstance(record.msg, str):
+            record.msg = self.redact_any(record.msg)
+
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = self.redact_any(record.args)
+            elif isinstance(record.args, (list, tuple)):
+                record.args = tuple(self.redact_any(arg) for arg in record.args)
+
+        return True
 
 
 _masking_processor = SecretMaskingProcessor()

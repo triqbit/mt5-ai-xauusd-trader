@@ -92,7 +92,11 @@ class AuditLogger:
         """
         Record a new audit entry.
         """
-        # Redact metadata before persisting to database
+        # Redact narrative details and metadata before persisting to database
+        redacted_details = details
+        if details:
+            redacted_details = get_masking_processor().redact_any(details)
+
         redacted_metadata = None
         if metadata:
             redacted_metadata = get_masking_processor().redact_any(metadata)
@@ -107,7 +111,7 @@ class AuditLogger:
             entry = AuditEntry(
                 actor=actor,
                 action=action,
-                details=details,
+                details=redacted_details,
                 trace_id=trace_id,
                 metadata_json=redacted_metadata,
             )
