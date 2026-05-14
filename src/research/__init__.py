@@ -5,6 +5,7 @@ Research and evaluation modules.
 """
 
 from src.research.benchmarks import (
+    ADXStrategy,
     BenchmarkEvaluator,
     BenchmarkStrategy,
     EMACrossoverStrategy,
@@ -37,6 +38,7 @@ from src.research.rl_evaluation import (
 from src.research.stress_lab import StressLab, StressScenario, StressTestMetrics
 
 __all__ = [
+    "ADXStrategy",
     "BenchmarkEvaluator",
     "BenchmarkStrategy",
     "EMACrossoverStrategy",

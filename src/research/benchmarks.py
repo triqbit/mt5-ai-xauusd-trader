@@ -570,6 +570,8 @@ class BenchmarkEvaluator:
                     profit_factor=f"{metrics.get('Profit Factor', 0.0):.2f}",
                     sqn=f"{metrics.get('SQN', 0.0):.2f}",
                     recovery_factor=f"{metrics.get('Recovery Factor', 0.0):.2f}",
+                    calmar_ratio=f"{metrics.get('Calmar Ratio', 0.0):.2f}",
+                    expected_shortfall=f"{metrics.get('CVaR_95', 0.0):.4f}",
                 )
             )
 
@@ -840,7 +842,7 @@ class DreamerAdapter(AdapterBase):
             direction = float(signal.direction)
             signals[i] = direction
 
-            if hasattr(self.agent, "update_state"):
-                self.agent.update_state(obs, action=int(direction), reward=0.0, is_terminal=False)
+            if hasattr(self.agent, "observe"):
+                self.agent.observe(obs, action=int(direction), reward=0.0, is_terminal=False)
 
         return signals

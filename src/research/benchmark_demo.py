@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from src.research.benchmarks import (
     BenchmarkEvaluator,
@@ -82,17 +83,18 @@ def main():
     evaluator = BenchmarkEvaluator(df, initial_balance=10000.0, commission=0.0001)
 
     # 3. Define Strategies
+    # We include a variety of baselines and a mock advanced strategy
     strategies = [
         EMACrossoverStrategy(9, 21),
         MomentumStrategy(14, 0.001),
         VolatilityBreakoutStrategy(20, 2.0),
         RiskFilteredBaseline(9, 21, 0.01),
-        MockAdvancedStrategy(),
+        MockAdvancedStrategy(name="Advanced_Strategy_Alpha"),
     ]
 
     # 4. Run Evaluation
     console.print(f"[yellow]Evaluating {len(strategies)} strategies over {len(df)} bars...[/]")
-    evaluator.evaluate_all(strategies)
+    results = evaluator.evaluate_all(strategies)
 
     # 5. Generate Report using ResearchReporter
     orchestrator = ResearchOrchestrator(
@@ -114,13 +116,40 @@ def main():
     # 6. Detailed statistical comparison for the 'Advanced' strategy vs EMA
     advanced_name = strategies[-1].name
     ema_name = strategies[0].name
+
     console.print(f"\n[bold]Statistical Comparison ({advanced_name} vs {ema_name}):[/]")
     comp = evaluator.compare_to_baseline(advanced_name, ema_name)
+
+    # Display key comparison metrics with formatting
     for key, val in comp.items():
         if isinstance(val, float):
-            console.print(f"  {key}: {val:.6f}")
+            color = "green" if val > 0 and key != "P-Value" and key != "Wilcoxon P-Value" else "white"
+            if "P-Value" in key:
+                color = "cyan" if val < 0.05 else "red"
+            console.print(f"  {key}: [{color}]{val:.6f}[/]")
         else:
             console.print(f"  {key}: {val}")
+
+    # 7. Summary Table of all metrics
+    console.print("\n[bold]Complete Evaluation Results:[/]")
+    table = Table(title="Strategy Benchmark Summary")
+    table.add_column("Strategy", justify="left", style="cyan", no_wrap=True)
+    table.add_column("Return", justify="right")
+    table.add_column("Sharpe", justify="right")
+    table.add_column("MaxDD", justify="right")
+    table.add_column("Trades", justify="right")
+
+    for name, m in evaluator.results.items():
+        if name.endswith("_returns"):
+            continue
+        table.add_row(
+            name,
+            f"{m['Total Return']:.2%}",
+            f"{m['Sharpe Ratio']:.2f}",
+            f"{m['Max Drawdown']:.2%}",
+            str(m["Num Trades"]),
+        )
+    console.print(table)
 
 
 if __name__ == "__main__":

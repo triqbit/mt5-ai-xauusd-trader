@@ -250,6 +250,20 @@ def test_dreamer_adapter(sample_data):
     assert np.all(signals == -1.0)
     assert mock_agent.predict.call_count == len(sample_data)
     assert mock_agent.reset_state.called
+    assert mock_agent.observe.called
+
+
+def test_to_report_section_new_metrics(sample_data):
+    evaluator = BenchmarkEvaluator(sample_data)
+    s1 = EMACrossoverStrategy(5, 10)
+    s2 = MomentumStrategy(5)
+    evaluator.evaluate_all([s1, s2])
+
+    section = evaluator.to_report_section(baseline_name=s2.name)
+    assert len(section.comparisons) == 1
+    # Check that the new fields are populated
+    assert section.comparisons[0].calmar_ratio != "0.00"
+    assert section.comparisons[0].expected_shortfall != "0.00"
 
 
 def test_random_strategy_signals(sample_data):
