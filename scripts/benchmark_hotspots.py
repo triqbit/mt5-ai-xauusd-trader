@@ -1,10 +1,12 @@
-
-import time
-import pandas as pd
-import numpy as np
 import os
+import time
+
+import numpy as np
+import pandas as pd
+
 from src.core.feature_engineering import FeatureEngineer
 from src.core.trade_logger import TradeLogger
+
 
 def benchmark_feature_engineering():
     print("\n--- Benchmarking Feature Engineering ---")
@@ -14,7 +16,7 @@ def benchmark_feature_engineering():
         "high": np.random.randn(n_bars) + 2002,
         "low": np.random.randn(n_bars) + 1998,
         "close": np.random.randn(n_bars) + 2000,
-        "tick_volume": np.random.randint(100, 1000, n_bars)
+        "tick_volume": np.random.randint(100, 1000, n_bars),
     }
     df = pd.DataFrame(data)
     df.index = pd.date_range(start="2020-01-01", periods=n_bars, freq="5min")
@@ -37,6 +39,7 @@ def benchmark_feature_engineering():
 
     print(f"\nImprovement: {((time_on - time_off) / time_on) * 100:.1f}%")
 
+
 def benchmark_trade_logger():
     print("\n--- Benchmarking TradeLogger Performance Report ---")
     db_path = "benchmark_hotspots.db"
@@ -49,6 +52,7 @@ def benchmark_trade_logger():
     print(f"Inserting {n_trades} trades...")
     with logger.Session() as session:
         from src.core.trade_logger import Trade
+
         for i in range(n_trades):
             ticket = 20000 + i
             trade = Trade(
@@ -58,7 +62,7 @@ def benchmark_trade_logger():
                 entry_price=2000.0,
                 lot_size=0.1,
                 pnl=np.random.uniform(-100, 150),
-                status="CLOSED"
+                status="CLOSED",
             )
             session.add(trade)
         session.commit()
@@ -66,7 +70,7 @@ def benchmark_trade_logger():
     print("\nMeasuring Report Latency (instrumented)...")
     durations = []
     iters = 5
-    for i in range(iters):
+    for _i in range(iters):
         # Invalidate cache for accurate DB measurement
         logger._perf_cache = None
 
@@ -76,10 +80,13 @@ def benchmark_trade_logger():
         durations.append((end - start) * 1000)
 
     avg_time = sum(durations) / iters
-    print(f"Average Performance Report time ({n_trades} trades, cache invalidated): {avg_time:.2f}ms")
+    print(
+        f"Average Performance Report time ({n_trades} trades, cache invalidated): {avg_time:.2f}ms"
+    )
 
     if os.path.exists(db_path):
         os.remove(db_path)
+
 
 if __name__ == "__main__":
     benchmark_feature_engineering()

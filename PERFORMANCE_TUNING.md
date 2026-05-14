@@ -160,7 +160,9 @@ Systematic approach to identifying and eliminating performance bottlenecks, achi
 - **TradeLogger Caching**: Implemented an intelligent cache for performance reports in `TradeLogger` that invalidates only on trade closure. This prevents redundant database I/O and $O(N)$ P&L recalculations on every tick evaluation in live mode.
 - **Precomputed Execution Filters**: `ExecutionFilter.validate` now supports a `precomputed_metrics` parameter, enabling it to bypass all internal DataFrame processing when metrics are supplied by an optimized loop (like the backtester).
 - **Optional MTF Patterns**: `FeatureEngineer` now defaults to `include_mtf_patterns=False`. Disabling expensive candle pattern recognition on higher timeframes provides a ~60% speedup for large datasets (e.g., 50,000 bars) and reduces feature matrix dimensionality.
+- **Optional Volume Profile**: `FeatureEngineer` supports `include_volume_profile=False` to skip expensive rolling quantile calculations (POC, VAH, VAL). This provides an additional ~40% latency reduction in the feature engineering pipeline. Schema stability is maintained by padding disabled columns with NaNs.
 - **Resilient NaN Handling**: `FeatureEngineer` now only drops rows missing *base* features and uses forward-filling for MTF gaps, significantly increasing data utilization for short historical windows.
+- **Granular Performance Metrics**: `TradeLogger.read_performance_report` and the `BacktestEngine` loop are now fully instrumented with high-resolution `profile` markers, breaking down latency into database aggregation, PnL sequence fetching, and mathematical metric computation.
 
 ```python
 # Bad: List comprehension with function call

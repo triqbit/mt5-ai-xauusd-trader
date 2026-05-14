@@ -359,9 +359,8 @@ class TradeLogger:
         if self._perf_cache is not None and not persist:
             return self._perf_cache
 
-        with profile("perf_report_total"):
-            with self.Session() as session:
-                # 1. Database-level aggregation for basic metrics
+        with profile("perf_report_total"), self.Session() as session:
+            # 1. Database-level aggregation for basic metrics
                 # Optimized: use func.sum and func.count to reduce application-side processing
                 with profile("perf_report_db_aggregate"):
                     stats = session.execute(

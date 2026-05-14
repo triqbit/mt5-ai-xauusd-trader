@@ -295,7 +295,9 @@ class BacktestEngine:
                                         if self.equity_curve:
                                             peak = self.max_equity
                                             current_equity = self.equity_curve[-1][1]
-                                            current_drawdown = (peak - current_equity) / (peak + 1e-8)
+                                            current_drawdown = (peak - current_equity) / (
+                                                peak + 1e-8
+                                            )
 
                                         # Pack precomputed metrics for speed
                                         precomputed = {
@@ -305,7 +307,10 @@ class BacktestEngine:
                                             },
                                             "trend_angle": {"slope": slopes[abs_idx]},
                                             "ema_sequence": {
-                                                "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
+                                                "emas": {
+                                                    p: ema_vals[p][abs_idx]
+                                                    for p in [8, 21, 50, 200]
+                                                }
                                             },
                                             "momentum": {"rsi": rsi_vals[abs_idx]},
                                         }
@@ -323,7 +328,12 @@ class BacktestEngine:
                                         if decision.is_approved:
                                             # Vectorized Exit Simulation: Scan future bars for SL/TP hit
                                             self._open_and_simulate_trade(
-                                                active_trades, signal, abs_idx, high_vals, low_vals, time_vals
+                                                active_trades,
+                                                signal,
+                                                abs_idx,
+                                                high_vals,
+                                                low_vals,
+                                                time_vals,
                                             )
 
                         # 4. Record equity at the end of each bar
