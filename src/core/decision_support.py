@@ -61,7 +61,6 @@ class PerformanceContext(BaseModel):
     sharpe_ratio: float = Field(
         0.0,
         ge=-10.0,
-        le=10.0,
         description="Risk-adjusted return (Sharpe Ratio). Target > 2.0 per standards.",
     )
     profit_factor: float = Field(
@@ -78,21 +77,36 @@ class PerformanceContext(BaseModel):
         0.0, ge=0.0, le=1.0, description="Percentage of winning trades (0.0 to 1.0)."
     )
     win_loss_ratio: float = Field(0.0, ge=0.0, description="Average Win / Average Loss.")
+    sortino_ratio: float = Field(
+        0.0,
+        ge=-10.0,
+        description="Downside risk-adjusted return. Target > 2.0 per standards.",
+    )
     calmar_ratio: float = Field(
         0.0,
         ge=-10.0,
-        le=100.0,
         description="Annualized Return / Max Drawdown. Target > 3.0 per standards.",
     )
     expectancy: float = Field(
         0.0,
         description="Expected value per trade in pips or currency units.",
     )
+    sqn: float = Field(
+        0.0,
+        ge=-10.0,
+        description="System Quality Number (Van Tharp). Score > 3 is considered excellent.",
+    )
     max_drawdown: float = Field(
         0.0,
         ge=0.0,
         le=1.0,
         description="Maximum observed equity drawdown from peak to trough (0.0 to 1.0).",
+    )
+    cvar_95: float = Field(
+        0.0,
+        ge=-1.0,
+        le=0.0,
+        description="Conditional Value at Risk (Expected Shortfall) at 95% confidence.",
     )
     total_trades: int = Field(0, ge=0, description="Count of trades analyzed in this window.")
 
@@ -219,14 +233,18 @@ class DecisionSupportSystem:
                 DecisionStatus.EXECUTE if decision_score >= 70.0 else DecisionStatus.CAUTION
             )
 
-        # Calculate Sizing Multiplier
-        sizing_multiplier = self._calculate_sizing_multiplier(
-            decision_score, status_level, macro_risk
-        )
-
         # Determine if review is required
         requires_review = status_level == DecisionStatus.CAUTION or (
             is_executable and decision_score < 80.0
+        )
+
+        # Apply REVIEW status if applicable and not blocked
+        if is_executable and requires_review:
+            status_level = DecisionStatus.REVIEW
+
+        # Calculate Sizing Multiplier
+        sizing_multiplier = self._calculate_sizing_multiplier(
+            decision_score, status_level, macro_risk
         )
 
         # Construct Performance Context
@@ -234,11 +252,14 @@ class DecisionSupportSystem:
             sharpe_ratio=performance_metrics.get("sharpe_ratio", 0.0),
             profit_factor=performance_metrics.get("profit_factor", 0.0),
             recovery_factor=performance_metrics.get("recovery_factor", 0.0),
-            calmar_ratio=performance_metrics.get("calmar_ratio", 0.0),
-            expectancy=performance_metrics.get("expectancy", 0.0),
             win_rate=performance_metrics.get("win_rate", 0.0),
             win_loss_ratio=performance_metrics.get("win_loss_ratio", 0.0),
+            sortino_ratio=performance_metrics.get("sortino_ratio", 0.0),
+            calmar_ratio=performance_metrics.get("calmar_ratio", 0.0),
+            expectancy=performance_metrics.get("expectancy", 0.0),
+            sqn=performance_metrics.get("sqn", 0.0),
             max_drawdown=performance_metrics.get("max_drawdown", 0.0),
+            cvar_95=performance_metrics.get("cvar_95", 0.0),
             total_trades=int(performance_metrics.get("total_trades", 0)),
         )
 
@@ -350,8 +371,8 @@ class DecisionSupportSystem:
         # Base multiplier from score
         base_mult = (score / 100.0) ** 1.5  # Non-linear scaling
 
-        # Apply caution penalty
-        if status == DecisionStatus.CAUTION:
+        # Apply caution/review penalty
+        if status in [DecisionStatus.CAUTION, DecisionStatus.REVIEW]:
             base_mult *= 0.5
 
         # Apply macro risk multiplier
@@ -401,11 +422,13 @@ class DecisionSupportSystem:
             # 1. Header with Augmented Status
             status_colors = {
                 DecisionStatus.EXECUTE: "green",
+                DecisionStatus.REVIEW: "cyan",
                 DecisionStatus.CAUTION: "yellow",
                 DecisionStatus.BLOCKED: "red",
             }
             status_icons = {
                 DecisionStatus.EXECUTE: "✅ ",
+                DecisionStatus.REVIEW: "🔍 ",
                 DecisionStatus.CAUTION: "⚠️ ",
                 DecisionStatus.BLOCKED: "🛑 ",
             }
@@ -546,20 +569,32 @@ class DecisionSupportSystem:
                 return "red"
 
             sharpe_color = get_color(packet.performance.sharpe_ratio, 2.0, 1.0)
+            sortino_color = get_color(packet.performance.sortino_ratio, 2.0, 1.0)
             pf_color = get_color(packet.performance.profit_factor, 2.0, 1.5)
             rf_color = get_color(packet.performance.recovery_factor, 3.0, 2.0)
             calmar_color = get_color(packet.performance.calmar_ratio, 3.0, 1.5)
             wr_color = get_color(packet.performance.win_rate, 0.55, 0.45)
             wl_color = get_color(packet.performance.win_loss_ratio, 2.0, 1.2)
+            sqn_color = get_color(packet.performance.sqn, 3.0, 2.0)
+            cvar_color = (
+                "green"
+                if packet.performance.cvar_95 >= -0.02
+                else "yellow"
+                if packet.performance.cvar_95 >= -0.05
+                else "red"
+            )
 
             perf_content = (
-                f"📈 Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]\n"
-                f"💰 Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]\n"
-                f"🛡️ Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]\n"
-                f"🌊 Calmar Ratio: [bold {calmar_color}]{packet.performance.calmar_ratio:.2f}[/]\n"
-                f"🎯 Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]\n"
-                f"⚖️ W/L Ratio:     [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
-                f"🔢 Total Trades:  {packet.performance.total_trades}"
+                f"📈 Sharpe Ratio:  [bold {sharpe_color}]{packet.performance.sharpe_ratio:.2f}[/]  |  "
+                f"🛡️ Sortino: [bold {sortino_color}]{packet.performance.sortino_ratio:.2f}[/]\n"
+                f"💰 Profit Factor: [bold {pf_color}]{packet.performance.profit_factor:.2f}[/]  |  "
+                f"⚖️ W/L Ratio: [bold {wl_color}]{packet.performance.win_loss_ratio:.2f}[/]\n"
+                f"🛡️ Recov. Factor: [bold {rf_color}]{packet.performance.recovery_factor:.2f}[/]  |  "
+                f"🌊 Calmar: [bold {calmar_color}]{packet.performance.calmar_ratio:.2f}[/]\n"
+                f"🎯 Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]  |  "
+                f"🔢 Trades: {packet.performance.total_trades}\n"
+                f"💎 SQN Score:     [bold {sqn_color}]{packet.performance.sqn:.2f}[/]  |  "
+                f"📉 CVaR(95): [bold {cvar_color}]{packet.performance.cvar_95:.2%}[/]"
             )
             perf_panel = Panel(perf_content, title="📊 Recent Performance", border_style="magenta")
 
