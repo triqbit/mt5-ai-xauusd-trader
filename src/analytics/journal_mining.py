@@ -49,6 +49,15 @@ class DrawdownCluster(BaseModel):
     total_loss: float
 
 
+class ProfitCluster(BaseModel):
+    """A cluster of consecutive winning trades."""
+
+    start_time: datetime
+    end_time: datetime
+    trade_count: int
+    total_profit: float
+
+
 class PatternConcentration(BaseModel):
     """Concentration of profitable or losing patterns."""
 
@@ -114,6 +123,8 @@ class SignalMotif(BaseModel):
     session: str = "Unknown"
     frequency: int
     win_rate: float
+    is_toxic: bool = False
+    is_golden: bool = False
     expectancy: float = 0.0
     efficiency_ratio: float = 0.0
     cluster_frequency: int = 0
@@ -136,6 +147,7 @@ class JournalReport(BaseModel):
     session_analysis: list[SessionAnalysis]
     volatility_patterns: list[VolatilityPattern]
     drawdown_clusters: list[DrawdownCluster]
+    profit_clusters: list[ProfitCluster] = Field(default_factory=list)
     profitable_concentrations: list[PatternConcentration]
     risk_block_summary: list[BlockReasonSummary]
     rejection_quality: list[RejectionQuality] = Field(default_factory=list)
@@ -144,6 +156,7 @@ class JournalReport(BaseModel):
     pre_drawdown_motifs: list[SignalMotif] = Field(default_factory=list)
     combination_motifs: list[CombinationMotif] = Field(default_factory=list)
     revenge_trades: list[RevengeTrade] = Field(default_factory=list)
+    blocked_motifs: list[SignalMotif] = Field(default_factory=list)
     avg_win_duration: float = 0.0
     avg_loss_duration: float = 0.0
 
@@ -190,6 +203,15 @@ class JournalReport(BaseModel):
                 )
             )
 
+        if len(self.profit_clusters) > 0:
+            total_profit = sum(c.total_profit for c in self.profit_clusters)
+            risks.append(
+                BehavioralRisk(
+                    type="Profit Clustering",
+                    description=f"Detected {len(self.profit_clusters)} significant profit clusters with total profit of {total_profit:.2f}",
+                )
+            )
+
         # High risk block correlation during weak states
         for block in self.risk_block_summary:
             if block.weak_state_correlation > 0.7:
@@ -201,13 +223,24 @@ class JournalReport(BaseModel):
                 )
 
         # Problematic motifs (recurring losing combinations)
-        losing_motifs = [m for m in self.recurring_motifs if m.win_rate < 0.4 and m.frequency >= 2]
+        losing_motifs = [m for m in self.recurring_motifs if m.is_toxic and m.frequency >= 2]
         if losing_motifs:
             m = losing_motifs[0]
             risks.append(
                 BehavioralRisk(
                     type="Toxic Motif",
                     description=f"Toxic pattern for {m.algorithm} in {m.session} session: {m.volatility_bucket} volatility, {m.confidence_bucket} confidence (WR: {m.win_rate:.1%}, Freq: {m.frequency}).",
+                )
+            )
+
+        # Golden motifs (recurring winning combinations)
+        winning_motifs = [m for m in self.recurring_motifs if m.is_golden and m.frequency >= 2]
+        if winning_motifs:
+            m = winning_motifs[0]
+            risks.append(
+                BehavioralRisk(
+                    type="Golden Motif",
+                    description=f"Exceptional pattern for {m.algorithm} in {m.session} session: {m.volatility_bucket} volatility, {m.confidence_bucket} confidence (WR: {m.win_rate:.1%}, Freq: {m.frequency}).",
                 )
             )
 
@@ -228,6 +261,13 @@ class JournalReport(BaseModel):
                     BehavioralRisk(
                         type="Toxic Combination",
                         description=f"Signals {motif.patterns} occurred {motif.frequency} times before drawdowns in {motif.session} session.",
+                    )
+                )
+            elif motif.is_golden:
+                risks.append(
+                    BehavioralRisk(
+                        type="Golden Combination",
+                        description=f"Signals {motif.patterns} occurred {motif.frequency} times before profit clusters in {motif.session} session.",
                     )
                 )
 
@@ -264,6 +304,17 @@ class JournalReport(BaseModel):
                 BehavioralRisk(
                     type="Poor Rejection Quality",
                     description=f"Risk block '{r.reason}' has low accuracy ({r.accuracy:.1%}) and missed {r.profit_opportunity_cost:.2f} in profit.",
+                )
+            )
+
+        # Blocked Golden Motifs (Missed opportunities)
+        blocked_golden = [m for m in self.blocked_motifs if m.is_golden and m.frequency >= 2]
+        if blocked_golden:
+            m = blocked_golden[0]
+            risks.append(
+                BehavioralRisk(
+                    type="Missed Opportunity",
+                    description=f"Risk management frequently blocks golden pattern for {m.algorithm} in {m.session} session (Detected {m.frequency} times).",
                 )
             )
 
@@ -482,6 +533,7 @@ class JournalMiner:
                     "lot_size" in trade
                     and "lot_size" in prev_trade
                     and trade["lot_size"] > prev_trade["lot_size"]
+                    and prev_trade["lot_size"] > 0
                 ):
                     lot_inc = (trade["lot_size"] - prev_trade["lot_size"]) / prev_trade["lot_size"]
                     events.append(
@@ -591,6 +643,52 @@ class JournalMiner:
                     end_time=current_cluster[-1]["created_at"],
                     trade_count=len(current_cluster),
                     total_loss=sum(t["pnl"] for t in current_cluster),
+                )
+            )
+
+        return clusters
+
+    def detect_profit_clusters(self, trades_df: pd.DataFrame) -> list[ProfitCluster]:
+        """Detect clusters of 3+ consecutive winning trades."""
+        if trades_df.empty:
+            return []
+
+        # Ensure UTC-aware
+        df = trades_df.copy()
+        if df["created_at"].dt.tz is None:
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(UTC)
+        else:
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_convert(UTC)
+
+        trades = df.sort_values("created_at").to_dict("records")
+
+        clusters = []
+        current_cluster = []
+
+        for trade in trades:
+            if trade["pnl"] > 0:
+                current_cluster.append(trade)
+            elif len(current_cluster) >= 3:
+                clusters.append(
+                    ProfitCluster(
+                        start_time=current_cluster[0]["created_at"],
+                        end_time=current_cluster[-1]["created_at"],
+                        trade_count=len(current_cluster),
+                        total_profit=sum(t["pnl"] for t in current_cluster),
+                    )
+                )
+                current_cluster = []
+            else:
+                current_cluster = []
+
+        # Check last cluster
+        if len(current_cluster) >= 3:
+            clusters.append(
+                ProfitCluster(
+                    start_time=current_cluster[0]["created_at"],
+                    end_time=current_cluster[-1]["created_at"],
+                    trade_count=len(current_cluster),
+                    total_profit=sum(t["pnl"] for t in current_cluster),
                 )
             )
 
@@ -805,6 +903,45 @@ class JournalMiner:
                 )
 
         return sorted(results, key=lambda x: x.profit_factor, reverse=True)
+
+    def analyze_blocked_motifs(
+        self, signals_df: pd.DataFrame, blocked_df: pd.DataFrame
+    ) -> list[SignalMotif]:
+        """
+        Identify recurring motifs in blocked signals.
+
+        Helps identify if the system is rejecting profitable patterns (opportunity cost)
+        or successfully filtering out toxic patterns.
+
+        Args:
+            signals_df: DataFrame of all model signals.
+            blocked_df: DataFrame of blocked signal analysis (opportunity cost).
+
+        Returns:
+            Sorted list of motifs found in blocked signals.
+        """
+        if signals_df.empty or blocked_df.empty:
+            return []
+
+        # Join blocked info back to signals to get algo/vol/etc.
+        # Assuming signal_id is the link
+        if "signal_id" not in blocked_df.columns:
+            return []
+
+        df = signals_df.merge(blocked_df, left_on="id", right_on="signal_id")
+        if df.empty:
+            return []
+
+        # Format DF for find_frequent_motifs expectations
+        # Use would_have_won as proxy for 'win' and opportunity_cost_pnl for 'pnl'
+        df["pnl"] = df["opportunity_cost_pnl"]
+        # find_frequent_motifs expects a 'pnl' column and calculates 'win' from it
+        # Actually find_frequent_motifs uses group['win'] = group['pnl'] > 0 if I recall
+        # Let's re-read find_frequent_motifs logic.
+        # It says: df["win"] = df["pnl"] > 0
+        # Wait, I added df["win"] = df["pnl"] > 0 at the beginning of find_frequent_motifs
+
+        return self.find_frequent_motifs(df)
 
     def analyze_rejection_quality(self, blocked_df: pd.DataFrame) -> list[RejectionQuality]:
         """Analyze the effectiveness of signal rejections based on opportunity cost."""
@@ -1057,6 +1194,9 @@ class JournalMiner:
                 expectancy = 0.0
                 efficiency = 0.0
 
+            is_toxic = win_rate < 0.4 and expectancy < 0
+            is_golden = win_rate > 0.6 and expectancy > 0
+
             results.append(
                 SignalMotif(
                     algorithm=str(algo),
@@ -1066,17 +1206,19 @@ class JournalMiner:
                     session=str(sess),
                     frequency=int(freq),
                     win_rate=float(win_rate),
+                    is_toxic=is_toxic,
+                    is_golden=is_golden,
                     expectancy=float(expectancy),
                     efficiency_ratio=float(efficiency),
                     cluster_frequency=int(cluster_freq),
                 )
             )
 
-        # Score motifs by toxic potential: low win rate * high frequency
-        def toxic_score(m: SignalMotif) -> float:
-            return float((1.0 - m.win_rate) * np.log1p(m.frequency))
+        # Score motifs by absolute impact (deviation from 0.5 win rate) * frequency
+        def impact_score(m: SignalMotif) -> float:
+            return float(abs(m.win_rate - 0.5) * np.log1p(m.frequency))
 
-        return sorted(results, key=toxic_score, reverse=True)
+        return sorted(results, key=impact_score, reverse=True)
 
     def analyze_trade_durations(self, trades_raw: list[Trade]) -> dict[str, float]:
         """Calculate average win vs loss holding times in minutes."""
@@ -1172,15 +1314,16 @@ class JournalMiner:
         Detect recurring combinations of multiple signals within a short window.
 
         These motifs are identified by looking at signals from different algorithms
-        occurring within a short window that frequently precede drawdown clusters.
+        occurring within a short window that frequently precede drawdown clusters
+        (Toxic) or profit clusters (Golden).
 
         Args:
             signals_df: DataFrame of model signals.
             trades_df: DataFrame of executed trades.
-            window_minutes: The look-back window in minutes before a drawdown cluster.
+            window_minutes: The look-back window in minutes before a cluster.
 
         Returns:
-            List of CombinationMotif objects identified as preceding drawdowns.
+            List of CombinationMotif objects.
         """
         if signals_df.empty or trades_df.empty:
             return []
@@ -1192,13 +1335,38 @@ class JournalMiner:
         else:
             sigs["created_at"] = sigs["created_at"].dt.tz_convert(UTC)
 
-        clusters = self.detect_drawdown_clusters(trades_df)
+        drawdown_clusters = self.detect_drawdown_clusters(trades_df)
+        profit_clusters = self.detect_profit_clusters(trades_df)
+
+        results = []
+
+        # Process Toxic Combinations
+        toxic_combos = self._find_combos_before_clusters(
+            sigs, drawdown_clusters, window_minutes, is_toxic=True
+        )
+        results.extend(toxic_combos)
+
+        # Process Golden Combinations
+        golden_combos = self._find_combos_before_clusters(
+            sigs, profit_clusters, window_minutes, is_toxic=False
+        )
+        results.extend(golden_combos)
+
+        return sorted(results, key=lambda x: x.frequency, reverse=True)
+
+    def _find_combos_before_clusters(
+        self,
+        sigs: pd.DataFrame,
+        clusters: list[DrawdownCluster] | list[ProfitCluster],
+        window_minutes: int,
+        is_toxic: bool,
+    ) -> list[CombinationMotif]:
+        """Internal helper to find signal combinations preceding clusters."""
         if not clusters:
             return []
 
         combinations = []
         for cluster in clusters:
-            # Ensure cluster start_time is timezone-aware and UTC
             cluster_start = cluster.start_time
             if cluster_start.tzinfo is None:
                 cluster_start = cluster_start.replace(tzinfo=UTC)
@@ -1212,13 +1380,10 @@ class JournalMiner:
             ]
 
             if len(pre_cluster) >= 2:
-                # Create a pattern string: sorted list of algo:direction
                 pattern = sorted(
                     [f"{row['algorithm']}:{row['direction']}" for _, row in pre_cluster.iterrows()]
                 )
 
-                # Determine dominant session and volatility if consistent
-                # First add sessions and buckets if not already there
                 pre_cluster = pre_cluster.copy()
                 pre_cluster["session"] = pre_cluster["created_at"].apply(
                     lambda x: (self._get_session(x) or ["Unknown"])[0]
@@ -1243,19 +1408,18 @@ class JournalMiner:
 
         for (pattern_tuple, sess, vol), count in counts.items():
             if count >= 2:
-                # Heuristic: these combinations precede clusters, so they are toxic by definition
                 results.append(
                     CombinationMotif(
                         patterns=list(pattern_tuple),
                         frequency=count,
-                        avg_pnl_after=0.0,  # Could be calculated if needed
-                        is_toxic=True,
+                        avg_pnl_after=0.0,
+                        is_toxic=is_toxic,
+                        is_golden=not is_toxic,
                         session=sess,
                         volatility_bucket=vol,
                     )
                 )
-
-        return sorted(results, key=lambda x: x.frequency, reverse=True)
+        return results
 
     def run_mining(self, weak_state_window_hours: int = 24) -> JournalReport:
         """Execute full mining suite and return typed report."""
@@ -1350,6 +1514,7 @@ class JournalMiner:
                 session_analysis=self.get_session_stats(trades_df),
                 volatility_patterns=self.analyze_volatility_patterns(signals_df),
                 drawdown_clusters=self.detect_drawdown_clusters(trades_df),
+                profit_clusters=self.detect_profit_clusters(trades_df),
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
                 risk_block_summary=self.analyze_risk_blocks(
                     risk_df,
@@ -1364,6 +1529,7 @@ class JournalMiner:
                 pre_drawdown_motifs=self.detect_pre_drawdown_motifs(signals_df, trades_df),
                 combination_motifs=self.find_combination_motifs(signals_df, trades_df),
                 revenge_trades=self.detect_revenge_trading(trades_df),
+                blocked_motifs=self.analyze_blocked_motifs(signals_df, blocked_df),
                 avg_win_duration=durations["avg_win_duration"],
                 avg_loss_duration=durations["avg_loss_duration"],
             )
