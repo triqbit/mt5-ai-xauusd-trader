@@ -29,7 +29,7 @@ from src.core.trade_logger import TradeLogger, Trade, RiskEvent
 from src.trading.mt5_connector import MT5Connector
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.execution_filter import ExecutionFilter
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.models.base_model import Signal
 from src.core.constants import SignalDirection
 

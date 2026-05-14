@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
@@ -403,11 +403,26 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+
+                    # Harmonized AuditedRiskManager returns a boolean from approve()
+                    # but also supports the new validate_signal() returning RiskDecision.
+                    # We use validate_signal() for richer audit tracing.
+                    open_positions_data = connector.get_positions(cfg.symbol)
+                    risk_decision = (
+                        risk.validate_signal(
+                            signal,
+                            market_data=df_raw,
+                            open_positions=open_positions_data,
+                            model_health=health,
+                            signal_id=signal_id
+                        )
                         if direction != 0
-                        else False
+                        else None
                     )
+
+                    risk_approved = risk_decision.is_approved if risk_decision else False
+                    if risk_decision and risk_decision.adjusted_lot_size > 0:
+                        lot_size = risk_decision.adjusted_lot_size
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -802,40 +817,40 @@ def run_setup_wizard() -> int:
 def get_parser() -> argparse.ArgumentParser:
     """Construct the main CLI argument parser with grouped options."""
     p = argparse.ArgumentParser(
-        description="MT5 AI/ML Trading Bot - Enterprise Edition",
+        description="🏛️ MT5 AI/ML Trading Bot - Institutional Command Center",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Usage Examples:
+Institutional Usage Examples:
   # Interactive guided setup (Recommended for first-time use)
   python main.py --setup
 
-  # Perform a pre-flight health check
+  # Perform a pre-flight health check (Verifies .env and connectivity)
   python main.py --check
 
-  # Start trading in DEMO mode with Ensemble algorithm
+  # Start trading in DEMO mode with the Dynamic Ensemble algorithm
   python main.py --mode demo --symbol XAUUSD --algo ensemble
 
-  # Start LIVE trading (requires explicit confirmation)
+  # Start LIVE trading (Requires explicit --confirm-live flag)
   python main.py --mode live --algo ensemble --confirm-live
 
-  # Run a walk-forward backtest for a specific period
+  # Run a multi-year walk-forward backtest simulation
   python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
         """,
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
 
     # -- Execution Group
-    execution = p.add_argument_group("Execution Options")
+    execution = p.add_argument_group("🚀 Execution Parameters")
     execution.add_argument(
         "--mode",
         choices=["demo", "live", "backtest"],
-        help="Execution mode: 'demo' (paper), 'live' (real money), or 'backtest' (simulation).",
+        help="Operating mode: 'demo' (simulated capital), 'live' (real capital), or 'backtest' (historical simulation).",
     )
     execution.add_argument(
         "--algo",
         dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
-        help="AI algorithm architecture to use for signal generation.",
+        help="AI architecture for signal generation. 'ensemble' is recommended for institutional stability.",
     )
     execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
     execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
@@ -1450,7 +1465,7 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
     from src.models.ensemble import EnsembleModel
@@ -1458,9 +1473,9 @@ def main() -> int:
     from src.models.ppo_agent import PPOAgent
     from src.models.regime_detector import RegimeDetector
     from src.models.transformer_model import TimeSeriesTransformer
-    from src.trading.audited_risk_manager import AuditedRiskManager
     from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
     from src.trading.execution_filter import ExecutionFilter
+    from src.trading.risk_manager import AuditedRiskManager
 
     balance = connector.get_account_balance()
     trade_logger = TradeLogger(

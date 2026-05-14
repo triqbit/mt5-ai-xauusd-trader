@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 sys.path.append(os.getcwd())
 
 from src.core.audit_log import AuditLogger, get_audit_logger
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.trading.backtester import BacktestEngine
 
 def create_synthetic_data(n_bars=3000):

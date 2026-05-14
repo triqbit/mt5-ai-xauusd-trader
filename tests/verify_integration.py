@@ -16,7 +16,7 @@ import psutil
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import RiskEvent, TradeLogger
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import RegimeDetector
 from src.research.benchmarks import EMACrossoverStrategy

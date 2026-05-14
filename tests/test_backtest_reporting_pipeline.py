@@ -18,7 +18,7 @@ from src.research.reporting import ResearchOrchestrator, ResearchReporter
 from src.research.stress_lab import StressLab, StressTestMetrics
 from src.trading.backtester import BacktestEngine
 from src.utils.synthetic_data import ScenarioGenerator
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 
 @pytest.fixture
 def data_generator():

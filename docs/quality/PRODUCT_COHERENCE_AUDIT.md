@@ -3,35 +3,37 @@
 ## 1. Executive Summary
 This audit evaluates the MT5 AI XAUUSD Trader for architectural coherence, naming consistency, and institutional polish. While the system demonstrates high technical maturity, several areas of "fragmentation debt" have been identified that could reduce operator trust and increase maintenance overhead.
 
-**Status Update (May 8, 2026):** Remediation in progress by Jules05 to resolve fragmentation debt in CLI, logging, and model output standardization.
+**Status Update (May 15, 2026):** Systematic remediation initiated by Jules05 to consolidate risk management logic, centralize schemas, and refine module boundaries.
 
 ## 2. Findings
 
 ### A. Naming & Type Consistency
-- **Duplicate Enums:** `SignalDirection` is defined in both `src/core/schemas.py` and `src/core/constants.py`. (RESOLVED)
-- **Mapping Layers:** Multiple layers of mapping exist between `ModelAction` (0,1,2) and `SignalDirection` (1,-1,0). (HARMOMIZING)
-- **Terminology Drift:** Standardizing on "Signal" for raw model outputs and "Decision" for risk-filtered outputs. (IN PROGRESS)
+- **Duplicate Enums:** `SignalDirection` was previously fragmented but is now centralized in `src/core/constants.py`.
+- **Schema Decentralization:** `RiskDecision` is currently defined in `src/trading/risk_engine.py` instead of the central `src/core/schemas.py`.
+- **Mapping Layers:** Multiple layers of mapping exist between `ModelAction` and `SignalDirection`. Standardizing on `SignalDirection` for domain logic.
 
 ### B. Module Boundaries
-- **Core Package bloat:** `src/core` contains diverse logic. Evaluation for future domain separation (e.g., moving FeatureEngineer to `src/data`) is ongoing.
-- **Circular Risk:** Centralizing enums in `constants.py` has reduced circular dependency risks between `schemas` and other modules.
+- **Core Package Bloat:** `src/core` contains `feature_engineering.py`, which is a data-processing concern. Moving it to `src/data/` improves domain separation.
+- **Risk Management Fragmentation:** Logic is split between `RiskEngine` (8-layer cascade) and `RiskManager` (Kelly sizing, All-Weather allocation). Consolidation into `AuditedRiskManager` is required for a single source of truth.
 
 ### C. UX & Institutional Polish
-- **CLI Terminology:** `argparse` help messages are inconsistent. (STANDARDIZING)
-- **Logging:** `main.py` transitions from standard `logging` to `structlog` for system-wide consistency. (IN PROGRESS)
+- **CLI Terminology:** `argparse` help messages and flag naming require professional standardization to meet enterprise expectations.
+- **Logging:** Transitioning the primary execution path to `structlog` for structured, parseable output.
 
 ## 3. Remediation Plan
 
-### Immediate Fixes (PR ✨ Jules05 - Applied May 8, 2026)
-1. **Consolidate Enums:** Move `SignalDirection` and `DecisionStatus` into `src/core/constants.py`. (Verified)
-2. **Harmonize Schemas:** Update `src/core/schemas.py` to import from `constants.py`. (Verified)
-3. **Refactor BaseModel & Subclasses:** Ensure all models return a `Signal` NamedTuple using `SignalDirection`. (Applied to PPO, LSTM, Transformer, Ensemble)
-4. **Main entrypoint cleanup:** Standardize terminology in CLI flags and help text; implement `structlog`. (Applied)
+### Immediate Fixes (PR ✨ Jules05 - May 15, 2026)
+1. **Centralize Risk Schema:** Move `RiskDecision` to `src/core/schemas.py` and enforce Pydantic V2 patterns.
+2. **Harmonize Risk Management:** Consolidate `RiskEngine` and `RiskManager` into a single `AuditedRiskManager`. Implement the 8-layer safety cascade and ATR-based sizing as the primary standard.
+3. **Refactor Module Boundaries:** Move `feature_engineering.py` to `src/data/`.
+4. **Main Entrypoint Cleanup:** Standardize CLI flags and help text; ensure `structlog` consistency.
 
-### Long-term Recommendations
-- **Domain Separation:** Evaluate moving `feature_engineering.py` to `src/data/`.
-- **TUI Dashboard:** Transition the CLI from rich-panels to a full TUI (Decision Cockpit) for better operator experience.
+### Verification Criteria
+- [ ] No circular dependencies between `core`, `data`, and `trading`.
+- [ ] 100% of risk decisions are logged to the audit trail with full trace details.
+- [ ] CLI `--help` output is uniform and professional.
+- [ ] `tests/test_product_coherence.py` passes with no regressions.
 
 ---
-**Audit Status:** ✅ RECOVERING (Remediation active)
+**Audit Status:** 🛠️ REMEDIATING
 **Steward:** Jules05 (yxynoty)
