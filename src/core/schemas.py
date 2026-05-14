@@ -157,3 +157,23 @@ class ExecutionDecision(BaseModel):
             if self.blocked_by:
                 raise ValueError("An approved decision cannot have a 'blocked_by' reason.")
         return self
+
+
+class RiskDecision(BaseModel):
+    """
+    Detailed decision record from the risk management engine.
+    Enforces the 8-layer safety cascade and provides an audit trace.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="Final approval status from the risk engine")
+    reason: str = Field("", description="Primary reason for the decision (especially if rejected)")
+    adjusted_lot_size: float = Field(0.0, ge=0, description="The risk-adjusted lot size for the trade")
+    trace: dict[str, Any] = Field(
+        default_factory=dict, description="Technical audit trace of the 8-layer cascade results"
+    )
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="The UTC timestamp when the risk decision was made",
+    )

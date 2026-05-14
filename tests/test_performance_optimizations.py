@@ -3,7 +3,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from src.trading.backtester import BacktestEngine
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.trading.execution_filter import ExecutionFilter
 from src.core.trade_logger import TradeLogger
 import os
