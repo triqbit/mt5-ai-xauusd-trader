@@ -4,12 +4,12 @@ scripts/doctor.py
 Performs environment, dependency, and connectivity checks to ensure system readiness.
 """
 
+import logging
 import os
 import platform
-import sys
 import stat
+import sys
 from pathlib import Path
-import logging
 
 # Configure minimal logging for the doctor
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -18,8 +18,8 @@ logger = logging.getLogger("doctor")
 # Try to import rich for beautiful output, fallback to plain text if missing
 try:
     from rich.console import Console
-    from rich.table import Table
     from rich.panel import Panel
+    from rich.table import Table
     from rich.text import Text
     HAS_RICH = True
     console = Console()
@@ -81,6 +81,7 @@ CORE_DEPENDENCIES = {
     "pydantic": ("pydantic", "2.13.4"),
     "pydantic-settings": ("pydantic_settings", "2.14.1"),
     "sqlalchemy": ("sqlalchemy", "2.0.38"),
+    "metaapi-cloud-sdk": ("metaapi_cloud_sdk", "29.1.1"),
     "torch": ("torch", "2.5.1"),
     "fastapi": ("fastapi", "0.136.1"),
     "talib": ("talib", "0.6.4"),
@@ -97,6 +98,11 @@ CORE_DEPENDENCIES = {
     "tqdm": ("tqdm", "4.67.1"),
     "scipy": ("scipy", "1.15.3"),
     "scikit-learn": ("sklearn", "1.6.1"),
+    "psutil": ("psutil", "7.2.2"),
+    "joblib": ("joblib", "1.4.2"),
+    "redis": ("redis", "7.4.0"),
+    "alembic": ("alembic", "1.14.1"),
+    "prometheus-client": ("prometheus_client", "0.21.1"),
 }
 
 def check_dependencies(dependencies=None):
@@ -131,9 +137,10 @@ def check_dependencies(dependencies=None):
 
                 actual_version = get_version(meta_name)
 
-                if actual_version != "unknown":
-                    if parse_version(actual_version) < parse_version(min_version):
-                        outdated.append(f"{display_name} (found {actual_version}, need {min_version})")
+                if actual_version != "unknown" and parse_version(actual_version) < parse_version(
+                    min_version
+                ):
+                    outdated.append(f"{display_name} (found {actual_version}, need {min_version})")
 
                 versions.append(f"{display_name} v{actual_version}")
             except Exception:
