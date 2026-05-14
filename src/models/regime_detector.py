@@ -34,6 +34,7 @@ import structlog
 from pydantic import BaseModel, ConfigDict, Field
 from scipy import stats
 from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import StandardScaler
 
 logger = structlog.get_logger(__name__)
 
@@ -191,6 +192,7 @@ class RegimeDetector:
         self.long_window = long_window
         self._last_regime: MarketRegime = MarketRegime.UNKNOWN
         self._gmm: GaussianMixture | None = None
+        self._scaler: StandardScaler | None = None
         self._cluster_to_regime: dict[int, MarketRegime] = {}
         self.transition_matrix: pd.DataFrame | None = None
 
@@ -318,6 +320,9 @@ class RegimeDetector:
             # Clustering-based detection
             X = last_row[self.FEATURE_COLUMNS].values.reshape(1, -1)
             X = np.nan_to_num(X, nan=0.0)
+
+            if self._scaler is not None:
+                X = self._scaler.transform(X)
 
             probs = self._gmm.predict_proba(X)[0]
             cluster_idx = int(np.argmax(probs))
@@ -536,6 +541,9 @@ class RegimeDetector:
             # Handle NaNs in features
             X = np.nan_to_num(X, nan=0.0)
 
+            if self._scaler is not None:
+                X = self._scaler.transform(X)
+
             probs = self._gmm.predict_proba(X)
             cluster_indices = np.argmax(probs, axis=1)
 
@@ -718,13 +726,19 @@ class RegimeDetector:
         X = features.iloc[self.long_window :].values
         X = np.nan_to_num(X, nan=0.0)
 
+        # Initialize and fit scaler
+        self._scaler = StandardScaler()
+        X_scaled = self._scaler.fit_transform(X)
+
         self._gmm = GaussianMixture(
             n_components=n_clusters, covariance_type="full", random_state=42, n_init=5
         )
-        self._gmm.fit(X)
+        self._gmm.fit(X_scaled)
 
         # Automated cluster-to-regime mapping based on centroids
-        self._map_clusters(self._gmm.means_)
+        # centroids are in scaled space, we need them in original space for mapping
+        centroids_orig = self._scaler.inverse_transform(self._gmm.means_)
+        self._map_clusters(centroids_orig)
 
         # Calculate transition matrix from training data
         self._calculate_transition_matrix(features.iloc[self.long_window :])
@@ -741,6 +755,7 @@ class RegimeDetector:
 
         state = {
             "gmm": self._gmm,
+            "scaler": self._scaler,
             "cluster_to_regime": self._cluster_to_regime,
             "transition_matrix": self.transition_matrix,
             "window": self.window,
@@ -759,6 +774,7 @@ class RegimeDetector:
 
         state = joblib.load(filepath)
         self._gmm = state.get("gmm")
+        self._scaler = state.get("scaler")
         self._cluster_to_regime = state.get("cluster_to_regime", {})
         self.transition_matrix = state.get("transition_matrix")
         self.window = state.get("window", self.window)
@@ -772,6 +788,10 @@ class RegimeDetector:
 
         X = features.values
         X = np.nan_to_num(X, nan=0.0)
+
+        if self._scaler is not None:
+            X = self._scaler.transform(X)
+
         probs = self._gmm.predict_proba(X)
         cluster_indices = np.argmax(probs, axis=1)
         regimes = [
@@ -784,7 +804,10 @@ class RegimeDetector:
         )
 
     def _map_clusters(self, centroids: np.ndarray) -> None:
-        """Maps GMM clusters to MarketRegime enum using centroid heuristics."""
+        """
+        Maps GMM clusters to MarketRegime enum using a score-based alignment system.
+        This provides more robust classification than simple threshold cascading.
+        """
         self._cluster_to_regime = {}
         feat_map = {name: i for i, name in enumerate(self.FEATURE_COLUMNS)}
 
@@ -794,27 +817,101 @@ class RegimeDetector:
             slope = center[feat_map["slope"]]
             z_score = center[feat_map["z_score"]]
             vov = center[feat_map["vol_of_vol"]]
-
+            vc = center[feat_map["vol_clustering"]]
             angle = self._calculate_angle(slope)
 
-            # Thresholds synchronized with _apply_regime_logic
-            if (
-                atr_ratio > self.THRESH_NEWS_SHOCK_ATR
-                and er > self.THRESH_NEWS_SHOCK_ER
-                and vov > self.THRESH_NEWS_SHOCK_VOV
-            ):
-                self._cluster_to_regime[i] = MarketRegime.NEWS_SHOCK
-            elif atr_ratio > self.THRESH_BREAKOUT_ATR and er > self.THRESH_BREAKOUT_ER:
-                self._cluster_to_regime[i] = MarketRegime.VOLATILE_BREAKOUT
-            elif er > self.THRESH_TRENDING_ER and abs(angle) > self.THRESH_TRENDING_ANGLE:
-                self._cluster_to_regime[i] = MarketRegime.TRENDING
-            elif abs(z_score) > self.THRESH_MEAN_REV_Z and er < self.THRESH_MEAN_REV_ER:
-                self._cluster_to_regime[i] = MarketRegime.MEAN_REVERSION
-            elif (
-                atr_ratio < self.THRESH_DRIFT_ATR
-                and abs(angle) > self.THRESH_DRIFT_ANGLE
-                and vov < self.THRESH_DRIFT_VOV
-            ):
-                self._cluster_to_regime[i] = MarketRegime.LOW_VOLATILITY_DRIFT
-            else:
-                self._cluster_to_regime[i] = MarketRegime.RANGING
+            scores = {}
+
+            # 1. NEWS_SHOCK: Extreme volatility + Efficiency + Vol-of-vol
+            scores[MarketRegime.NEWS_SHOCK] = (
+                min(atr_ratio / self.THRESH_NEWS_SHOCK_ATR, 3.0) * 0.4
+                + (er / self.THRESH_NEWS_SHOCK_ER) * 0.3
+                + (vov / self.THRESH_NEWS_SHOCK_VOV) * 0.3
+            )
+
+            # 2. VOLATILE_BREAKOUT: High Volatility + High Efficiency
+            scores[MarketRegime.VOLATILE_BREAKOUT] = (
+                min(atr_ratio / self.THRESH_BREAKOUT_ATR, 2.0) * 0.5 + (er / self.THRESH_BREAKOUT_ER) * 0.5
+            )
+
+            # 3. TRENDING: Efficiency + Persistent Direction
+            scores[MarketRegime.TRENDING] = (
+                (er / self.THRESH_TRENDING_ER) * 0.5
+                + min(abs(angle) / self.THRESH_TRENDING_ANGLE, 2.0) * 0.5
+            )
+
+            # 4. MEAN_REVERSION: High Deviation + Low Efficiency
+            scores[MarketRegime.MEAN_REVERSION] = (
+                (abs(z_score) / self.THRESH_MEAN_REV_Z) * 0.6
+                + (1.0 - er) / (1.0 - self.THRESH_MEAN_REV_ER + 1e-9) * 0.4
+            )
+
+            # 5. LOW_VOLATILITY_DRIFT: Low Volatility + Steady Angle + Stability
+            # Penalty for high volatility
+            scores[MarketRegime.LOW_VOLATILITY_DRIFT] = (
+                max(0, 1.2 - atr_ratio) * 0.4
+                + min(abs(angle) / (self.THRESH_DRIFT_ANGLE + 1e-9), 2.0) * 0.4
+                + max(0, 1.2 - vov) * 0.2
+            )
+
+            # 6. RANGING: Low Efficiency + Stable Volatility (Default)
+            scores[MarketRegime.RANGING] = (
+                (1.0 - er) * 0.5 + (1.0 / (atr_ratio + 0.5)) * 0.3 + (1.0 - abs(vc)) * 0.2
+            )
+
+            # Assign regime with the highest alignment score
+            best_regime = max(scores, key=scores.get)
+            self._cluster_to_regime[i] = best_regime
+            logger.info("cluster_scores", cluster=i, scores=scores, winner=best_regime)
+
+        logger.info("cluster_mapping_complete", mapping=self._cluster_to_regime)
+
+    def get_regime_performance(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Analyzes historical return performance partitioned by market regime.
+        Requires a 'returns' column in the input DataFrame.
+
+        Args:
+            df: DataFrame labeled with regimes and containing a 'returns' column.
+
+        Returns:
+            DataFrame containing performance metrics per regime.
+        """
+        if "regime" not in df.columns:
+            df = self.label_history(df)
+
+        if "returns" not in df.columns:
+            logger.warning("No 'returns' column found for performance analysis")
+            return pd.DataFrame()
+
+        # Clean data: remove unknowns and NaNs
+        clean_df = df[df["regime"] != MarketRegime.UNKNOWN.value].dropna(subset=["returns"])
+
+        if clean_df.empty:
+            return pd.DataFrame()
+
+        stats_df = clean_df.groupby("regime")["returns"].agg(
+            [
+                ("count", "count"),
+                ("mean_ret", "mean"),
+                ("std_ret", "std"),
+                ("sum_ret", "sum"),
+                (
+                    "sharpe",
+                    lambda x: (x.mean() / (x.std() + 1e-9)) * np.sqrt(252 * 24 * 12),
+                ),  # Ann. M5
+                ("win_rate", lambda x: (x > 0).mean()),
+            ]
+        )
+
+        # Calculate Profit Factor (vectorized)
+        pf = {}
+        for regime in stats_df.index:
+            r_data = clean_df[clean_df["regime"] == regime]["returns"]
+            pos_sum = r_data[r_data > 0].sum()
+            neg_sum = abs(r_data[r_data < 0].sum())
+            pf[regime] = pos_sum / (neg_sum + 1e-9)
+
+        stats_df["profit_factor"] = pd.Series(pf)
+
+        return stats_df.sort_values("mean_ret", ascending=False)
