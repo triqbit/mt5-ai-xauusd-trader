@@ -16,7 +16,7 @@ License: MIT
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -60,8 +60,8 @@ class TradeSignal(BaseModel):
         le=1.0,
         description="The model's confidence score (0.0 to 1.0). Higher means more certainty.",
     )
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+    timestamp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
         description="The UTC timestamp when the signal was generated",
     )
 
@@ -119,6 +119,32 @@ class TradeSignal(BaseModel):
                     f"SELL Take Profit ({self.take_profit}) must be below Entry Price ({self.entry_price})"
                 )
         return self
+
+
+class RiskDecision(BaseModel):
+    """
+    Decision details from the Risk Manager.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="True if the signal passed all risk filters")
+    reason: str = Field("", description="The reason for rejection, if any")
+    adjusted_lot_size: float = Field(0.0, ge=0.0, description="The risk-adjusted lot size")
+
+
+class DailyStats(BaseModel):
+    """
+    Intraday PnL tracker reset each trading day.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    date: datetime.date = Field(default_factory=datetime.date.today)
+    realised_pnl: float = 0.0
+    trade_count: int = 0
+    peak_equity: float = 0.0
+    consecutive_losses: int = 0
 
 
 class ExecutionDecision(BaseModel):
