@@ -222,9 +222,9 @@ class MetaAPIEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH,
             "critical": EventImpact.CRITICAL,
         }
-        self._client = self._init_client()
 
-    def _init_client(self) -> httpx.Client:
+    def _get_client(self) -> httpx.Client:
+        """Returns a new httpx client instance."""
         return httpx.Client(
             timeout=httpx.Timeout(15.0, connect=5.0),
             limits=httpx.Limits(max_connections=5, max_keepalive_connections=2),
@@ -247,8 +247,9 @@ class MetaAPIEventProvider(BaseEventProvider):
                 start_time=start_time.isoformat(),
                 end_time=end_time.isoformat(),
             )
-            response = self._client.get(url, params=params, headers=headers)
-            response.raise_for_status()
+            with self._get_client() as client:
+                response = client.get(url, params=params, headers=headers)
+                response.raise_for_status()
             data = response.json()
 
             macro_events = []
@@ -281,6 +282,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                         category=category,
                         impact=impact,
                         timestamp=ts,
+                        source="MetaAPI",
                         actual=item.get("actual"),
                         forecast=item.get("forecast"),
                         previous=item.get("previous"),
@@ -378,6 +380,17 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "OPEC",
                 "PERSONAL INCOME",
                 "SPENDING",
+                "JOBLESS CLAIMS",
+                "INITIAL CLAIMS",
+                "CONTINUING CLAIMS",
+                "LABOR COSTS",
+                "PRODUCTIVITY",
+                "MICHIGAN CONSUMER SENTIMENT",
+                "CB CONSUMER CONFIDENCE",
+                "PERSONAL SPENDING",
+                "CONSTRUCTION SPENDING",
+                "FACTORY ORDERS",
+                "BUSINESS INVENTORIES",
             ]
         ):
             return EventCategory.USD_MACRO
@@ -549,6 +562,7 @@ class EventIntelligence:
                 EventCategory.NFP,
                 EventCategory.RATES,
                 EventCategory.CPI,
+                EventCategory.GEOPOLITICAL,
             ]
             if event.category in major_categories:
                 # Major events require significantly larger windows for institutional safety

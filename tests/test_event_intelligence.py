@@ -113,6 +113,103 @@ def test_no_active_events(now):
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
 
+def test_overlapping_events_restrictive_multiplier(now):
+    events = [
+        MacroEvent(
+            name="Minor USD Event",
+            category=EventCategory.USD,
+            impact=EventImpact.LOW,
+            timestamp=now + timedelta(minutes=2)
+        ),
+        MacroEvent(
+            name="Major FOMC",
+            category=EventCategory.FOMC,
+            impact=EventImpact.HIGH,
+            timestamp=now + timedelta(minutes=10)
+        )
+    ]
+    provider = MockEventProvider(events)
+    intel = EventIntelligence([provider])
+
+    status = intel.get_risk_status(now)
+    assert status.is_blocked is True
+    assert status.risk_multiplier == 0.0 # Blocked by HIGH impact FOMC
+
+def test_geopolitical_extended_window(now):
+    # Geopolitical events now have 120m pre-window and 180m post-window
+    event = MacroEvent(
+        name="Geopolitical Conflict",
+        category=EventCategory.GEOPOLITICAL,
+        impact=EventImpact.HIGH,
+        timestamp=now + timedelta(minutes=90)
+    )
+    provider = MockEventProvider([event])
+    intel = EventIntelligence([provider])
+
+    status = intel.get_risk_status(now)
+    assert len(status.active_events) == 1
+    # Should not be blocked yet as it's > 60m away, but multiplier should be reduced
+    assert status.is_blocked is False
+    assert status.risk_multiplier <= 0.25 # Stricter cap for major high impact events
+
+def test_nfp_cpi_default_durations(now):
+    nfp = MacroEvent(
+        name="NFP",
+        category=EventCategory.NFP,
+        impact=EventImpact.HIGH,
+        timestamp=now
+    )
+    # Default duration for NFP/CPI is 2 hours
+    assert nfp.end_timestamp == now + timedelta(hours=2)
+
+    cpi = MacroEvent(
+        name="CPI",
+        category=EventCategory.CPI,
+        impact=EventImpact.HIGH,
+        timestamp=now
+    )
+    assert cpi.end_timestamp == now + timedelta(hours=2)
+
+def test_macro_event_source_field(now):
+    event = MacroEvent(
+        name="Source Test",
+        category=EventCategory.USD,
+        impact=EventImpact.LOW,
+        timestamp=now,
+        source="TestProvider"
+    )
+    assert event.source == "TestProvider"
+
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider_malformed_data(mock_get_client, now):
+    mock_client = MagicMock()
+    mock_get_client.return_value.__enter__.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    # Provide enough data to pass filters, but miss 'time' to trigger internal error
+    mock_response.json.return_value = [
+        {"event": "FOMC", "country": "US", "impact": "high"}
+    ]
+    mock_client.get.return_value = mock_response
+
+    provider = MetaAPIEventProvider(token="fake")
+    # MetaAPIEventProvider catches exceptions and returns None for safety
+    events = provider.get_upcoming_events(now, now + timedelta(hours=1))
+    assert events is None
+
+def test_provider_timeout_handled(now):
+    class TimeoutProvider(BaseEventProvider):
+        def get_upcoming_events(self, start, end):
+            # Simulate a long delay or timeout error
+            raise Exception("Timeout")
+
+    intel = EventIntelligence([TimeoutProvider()])
+    # Should not crash, should return fail-safe status
+    status = intel.get_risk_status(now)
+    assert status.is_blocked is False
+    assert "Event data unavailable" in status.reason
+
 def test_geopolitical_provider(now):
     from src.data.event_intelligence import GeopoliticalEventProvider
 
@@ -226,10 +323,10 @@ def test_json_provider(tmp_path, now):
     assert events[0].name == "JSON Event"
     assert events[0].impact == EventImpact.HIGH
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider(mock_get_client, now):
     mock_client = MagicMock()
-    mock_init_client.return_value = mock_client
+    mock_get_client.return_value.__enter__.return_value = mock_client
     mock_get = mock_client.get
 
     mock_response = MagicMock()
@@ -286,10 +383,10 @@ def test_guess_category_new_keywords():
     assert provider._guess_category("Geopolitical Tension") == EventCategory.GEOPOLITICAL
     assert provider._guess_category("US Treasury Bond Auction") == EventCategory.USD_MACRO
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider_filtering(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider_filtering(mock_get_client, now):
     mock_client = MagicMock()
-    mock_init_client.return_value = mock_client
+    mock_get_client.return_value.__enter__.return_value = mock_client
     mock_get = mock_client.get
 
     mock_response = MagicMock()
@@ -347,10 +444,10 @@ def test_json_provider_error(tmp_path):
     provider = JSONEventProvider(str(file_path))
     assert provider.get_upcoming_events(datetime.now(), datetime.now()) is None
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider_error(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider_error(mock_get_client, now):
     mock_client = MagicMock()
-    mock_init_client.return_value = mock_client
+    mock_get_client.return_value.__enter__.return_value = mock_client
     mock_get = mock_client.get
 
     mock_get.side_effect = Exception("Network Error")
