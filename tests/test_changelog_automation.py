@@ -1,7 +1,9 @@
 import os
 import unittest
 from pathlib import Path
+
 from scripts.update_changelog import categorize_commits, update_changelog
+
 
 class TestChangelogAutomation(unittest.TestCase):
     def test_categorize_commits(self):
@@ -14,7 +16,7 @@ class TestChangelogAutomation(unittest.TestCase):
             "invalid commit",
             "docs: update CHANGELOG.md",
             "chore: release v1.0.0",
-            "Random non-conventional commit"
+            "Random non-conventional commit",
         ]
         categories = categorize_commits(commits)
 
@@ -59,24 +61,34 @@ class TestChangelogAutomation(unittest.TestCase):
         try:
             # Patch update_changelog to use our test file
             import scripts.update_changelog
+
             original_path = scripts.update_changelog.Path
 
             class MockPath:
                 def __init__(self, path):
                     self.path = Path(path) if path != "CHANGELOG.md" else changelog_path
-                def exists(self): return self.path.exists()
-                def read_text(self): return self.path.read_text()
-                def write_text(self, text): self.path.write_text(text)
-                def __truediv__(self, other): return MockPath(self.path / other)
-                def rstrip(self): return self.path.name.rstrip()
-                def lstrip(self): return self.path.name.lstrip()
+
+                def exists(self):
+                    return self.path.exists()
+
+                def read_text(self):
+                    return self.path.read_text()
+
+                def write_text(self, text):
+                    self.path.write_text(text)
+
+                def __truediv__(self, other):
+                    return MockPath(self.path / other)
+
+                def rstrip(self):
+                    return self.path.name.rstrip()
+
+                def lstrip(self):
+                    return self.path.name.lstrip()
 
             scripts.update_changelog.Path = MockPath
 
-            categories = {
-                "Added": ["- New feature"],
-                "Fixed": ["- New fix"]
-            }
+            categories = {"Added": ["- New feature"], "Fixed": ["- New fix"]}
 
             update_changelog(categories)
 
@@ -96,6 +108,7 @@ class TestChangelogAutomation(unittest.TestCase):
             scripts.update_changelog.Path = original_path
             if changelog_path.exists():
                 os.remove(changelog_path)
+
 
 if __name__ == "__main__":
     unittest.main()

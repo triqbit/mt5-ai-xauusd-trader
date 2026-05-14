@@ -6,22 +6,30 @@ Advanced tests for DecisionSupportSystem enhancements, including executive summa
 review flags, and complex decision scenarios.
 """
 
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
 
-from src.core.decision_support import (
-    DecisionSupportSystem,
-    DecisionStatus,
-)
-from src.core.explainability import SignalExplanation, ExecutionSummary, RiskAssessment, ModelAttribution, RegimeContext
+import pytest
+
 from src.core.constants import SignalDirection
-from src.models.regime_detector import RegimeInfo, MarketRegime
+from src.core.decision_support import (
+    DecisionStatus,
+    DecisionSupportSystem,
+)
+from src.core.explainability import (
+    ExecutionSummary,
+    ModelAttribution,
+    RegimeContext,
+    RiskAssessment,
+    SignalExplanation,
+)
 from src.data.event_intelligence import RiskStatus
+from src.models.regime_detector import MarketRegime, RegimeInfo
+
 
 @pytest.fixture
 def dss():
     return DecisionSupportSystem()
+
 
 @pytest.fixture
 def base_explanation():
@@ -39,22 +47,22 @@ def base_explanation():
         risk_assessment=RiskAssessment(passed=True, risk_reward_ratio=2.5, summary="Good R:R"),
         regime_context=RegimeContext(regime_name="Trending", confidence=0.9, is_favorable=True),
         human_readable_summary="Signal shows momentum alignment.",
-        machine_attribution={}
+        machine_attribution={},
     )
     return explanation
+
 
 @pytest.fixture
 def base_regime():
     return RegimeInfo(
-        label=MarketRegime.TRENDING,
-        confidence=0.9,
-        volatility_index=1.1,
-        transition_score=0.05
+        label=MarketRegime.TRENDING, confidence=0.9, volatility_index=1.1, transition_score=0.05
     )
+
 
 @pytest.fixture
 def base_macro():
     return RiskStatus(is_blocked=False, risk_multiplier=1.0)
+
 
 def test_executive_summary_generation(dss, base_explanation, base_regime, base_macro):
     """Verify that executive summaries are generated correctly for different states."""
@@ -68,13 +76,18 @@ def test_executive_summary_generation(dss, base_explanation, base_regime, base_m
 
     # 2. BLOCKED state
     # Create a new explanation with risk failure
-    blocked_explanation = base_explanation.model_copy(update={
-        "risk_assessment": RiskAssessment(passed=False, rejection_reasons=["R:R too low"], risk_reward_ratio=0.5)
-    })
+    blocked_explanation = base_explanation.model_copy(
+        update={
+            "risk_assessment": RiskAssessment(
+                passed=False, rejection_reasons=["R:R too low"], risk_reward_ratio=0.5
+            )
+        }
+    )
     packet_blocked = dss.assemble_packet("XAUUSD", blocked_explanation, base_regime, base_macro, {})
     assert packet_blocked.status_level == DecisionStatus.BLOCKED
     assert "BLOCKED" in packet_blocked.executive_summary
     assert "Risk: R:R too low" in packet_blocked.executive_summary
+
 
 def test_review_flag_logic(dss, base_explanation, base_regime, base_macro):
     """Verify logic for setting the manual review flag."""
@@ -95,9 +108,12 @@ def test_review_flag_logic(dss, base_explanation, base_regime, base_macro):
     # 3. CAUTION status - Always review
     vlow_conf_regime = base_regime.model_copy(update={"confidence": 0.1})
     # Score: 40 + 3 + 16.6 + 10 = 69.6 -> CAUTION
-    packet_caution = dss.assemble_packet("XAUUSD", base_explanation, vlow_conf_regime, base_macro, {})
+    packet_caution = dss.assemble_packet(
+        "XAUUSD", base_explanation, vlow_conf_regime, base_macro, {}
+    )
     assert packet_caution.status_level == DecisionStatus.CAUTION
     assert packet_caution.requires_review is True
+
 
 def test_dashboard_formatting_enhancements(dss, base_explanation, base_regime, base_macro):
     """Verify that new visual elements appear in the dashboard output."""

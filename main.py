@@ -411,9 +411,13 @@ def run_live(
                         market_data = df_raw.copy()
                         if "atr" not in market_data.columns:
                             # Use 14-period ATR for historical context in sizing
-                            market_data["atr"] = (market_data["high"] - market_data["low"]).rolling(14).mean()
+                            market_data["atr"] = (
+                                (market_data["high"] - market_data["low"]).rolling(14).mean()
+                            )
                             # Fill NaNs with high-low as proxy
-                            market_data["atr"] = market_data["atr"].fillna(market_data["high"] - market_data["low"])
+                            market_data["atr"] = market_data["atr"].fillna(
+                                market_data["high"] - market_data["low"]
+                            )
 
                         # Use the precise 14-period ATR calculated for signal preparation
                         market_data.loc[market_data.index[-1], "atr"] = atr
@@ -422,12 +426,14 @@ def run_live(
                             signal,
                             market_data=market_data,
                             open_positions=open_positions,
-                            model_health=health
+                            model_health=health,
                         )
                         risk_approved = risk_decision.is_approved
                         if risk_approved:
                             # Update signal with adjusted lot size from risk engine
-                            signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
+                            signal = signal.model_copy(
+                                update={"lot_size": risk_decision.adjusted_lot_size}
+                            )
                             lot_size = signal.lot_size
 
                 # 7. Execution Filter Cascade

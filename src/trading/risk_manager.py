@@ -366,7 +366,9 @@ class RiskManager:
     def _check_minimum_confidence(self, confidence: float) -> bool:
         """Layer 6: Prediction Limits."""
         if confidence < self.cfg.min_confidence:
-            logger.debug("Confidence %.2f below threshold %.2f", confidence, self.cfg.min_confidence)
+            logger.debug(
+                "Confidence %.2f below threshold %.2f", confidence, self.cfg.min_confidence
+            )
             return False
         return True
 
