@@ -46,6 +46,25 @@ def test_compute_features_shape(synthetic_ohlcv):
         assert col not in features.columns
 
 
+def test_include_volume_profile_toggle(synthetic_ohlcv):
+    """Test that volume profile features can be toggled off and remain stable as NaNs."""
+    # Disabled
+    fe_off = FeatureEngineer(base_timeframe="M1", include_volume_profile=False, normalize=False)
+    features_off = fe_off.compute_features(synthetic_ohlcv)
+
+    vol_cols = ["vp_poc", "vp_vah", "vp_val", "vp_width"]
+    for col in vol_cols:
+        assert col in features_off.columns
+        assert features_off[col].isna().all()
+
+    # Enabled
+    fe_on = FeatureEngineer(base_timeframe="M1", include_volume_profile=True, normalize=False)
+    features_on = fe_on.compute_features(synthetic_ohlcv)
+    for col in vol_cols:
+        assert col in features_on.columns
+        assert not features_on[col].isna().all()
+
+
 def test_normalization_zscore(synthetic_ohlcv):
     """Test Z-score normalization."""
     fe = FeatureEngineer(base_timeframe="M1", timeframes=["M5"], normalize=True, method="zscore")

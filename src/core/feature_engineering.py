@@ -16,12 +16,13 @@ import pandas as pd
 
 try:
     import talib
+
     HAS_TALIB = True
 except ImportError:
     HAS_TALIB = False
     talib = None
 
-from src.core.profiler import profile as profile_context
+from src.core.profiler import profile
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class FeatureEngineer:
         normalize: bool = True,
         method: str = "zscore",
         include_mtf_patterns: bool = False,
+        include_volume_profile: bool = True,
     ):
         """
         Initialize the FeatureEngineer.
@@ -60,12 +62,14 @@ class FeatureEngineer:
             normalize: Whether to normalize the output feature matrix.
             method: Normalization method ('zscore' or 'minmax').
             include_mtf_patterns: Whether to compute candle patterns for MTF data (slow).
+            include_volume_profile: Whether to compute expensive volume profile features.
         """
         self.base_timeframe = base_timeframe
         self.timeframes = timeframes or ["M1", "M5", "M15", "H1", "H4", "D1"]
         self.normalize = normalize
         self.method = method
         self.include_mtf_patterns = include_mtf_patterns
+        self.include_volume_profile = include_volume_profile
         self.feature_columns: list[str] = []
 
         # Normalization stats
@@ -85,7 +89,7 @@ class FeatureEngineer:
         Returns:
             DataFrame containing the engineered features.
         """
-        with profile_context("compute_features_total"):
+        with profile("compute_features_total"):
             if df.empty:
                 return pd.DataFrame()
 
@@ -96,13 +100,13 @@ class FeatureEngineer:
             all_features = {}
             prefix = f"base_{self.base_timeframe}"
 
-            with profile_context("fe_base_technical"):
+            with profile("fe_base_technical"):
                 all_features.update(self._get_technical_indicators(df, prefix=prefix))
-            with profile_context("fe_candle_patterns"):
+            with profile("fe_candle_patterns"):
                 all_features.update(self._get_candle_patterns(df))
-            with profile_context("fe_price_action"):
+            with profile("fe_price_action"):
                 all_features.update(self._get_price_action_features(df))
-            with profile_context("fe_volume"):
+            with profile("fe_volume"):
                 all_features.update(self._get_volume_features(df))
 
             # Convert base features to DataFrame once
@@ -110,11 +114,11 @@ class FeatureEngineer:
 
             # 2. Multi-Timeframe Features
             mtf_blocks = []
-            with profile_context("fe_mtf_all", slow_threshold_ms=100.0):
+            with profile("fe_mtf_all", slow_threshold_ms=100.0):
                 for tf in self.timeframes:
                     if tf == self.base_timeframe:
                         continue
-                    with profile_context(f"fe_mtf_{tf}", slow_threshold_ms=25.0):
+                    with profile(f"fe_mtf_{tf}", slow_threshold_ms=25.0):
                         mtf_features = self._compute_mtf_features(df, tf)
                         if not mtf_features.empty:
                             mtf_blocks.append(mtf_features)
@@ -133,6 +137,11 @@ class FeatureEngineer:
             ohlcv_cols = ["open", "high", "low", "close", "tick_volume", "real_volume"]
             base_feature_cols = [c for c in base_features_df.columns if c not in ohlcv_cols]
 
+            # If volume profile is disabled, these are all NaNs and shouldn't trigger dropna
+            if not self.include_volume_profile:
+                vol_cols = ["vp_poc", "vp_vah", "vp_val", "vp_width"]
+                base_feature_cols = [c for c in base_feature_cols if c not in vol_cols]
+
             # Resilience Improvement: Only drop NaNs from BASE features.
             # MTF features often have huge gaps (e.g. D1 on M5 data).
             # We forward-fill MTF and zero-fill remaining to maximize data utilization.
@@ -142,10 +151,20 @@ class FeatureEngineer:
             feature_cols = [c for c in features_only.columns if c not in ohlcv_cols]
 
             # Forward fill then zero fill MTF gaps
-            features_only[feature_cols] = features_only[feature_cols].ffill().fillna(0.0)
+            if not self.include_volume_profile:
+                # Exclude volume profile from zero-fill to preserve NaNs for schema stability
+                vol_cols = ["vp_poc", "vp_vah", "vp_val", "vp_width"]
+                other_feature_cols = [c for c in feature_cols if c not in vol_cols]
+                features_only[other_feature_cols] = (
+                    features_only[other_feature_cols].ffill().fillna(0.0)
+                )
+            else:
+                features_only[feature_cols] = features_only[feature_cols].ffill().fillna(0.0)
 
             if features_only.empty:
-                logger.error("Feature engineering resulted in an empty DataFrame. Ensure input data has sufficient history.")
+                logger.error(
+                    "Feature engineering resulted in an empty DataFrame. Ensure input data has sufficient history."
+                )
                 return pd.DataFrame()
 
             # Remove original OHLCV columns if requested
@@ -162,7 +181,7 @@ class FeatureEngineer:
                 features_only = features_only.reindex(columns=self.feature_columns).fillna(0.0)
 
             if self.normalize:
-                with profile_context("fe_normalization"):
+                with profile("fe_normalization"):
                     features_only = self._normalize_features(features_only)
 
             return features_only
@@ -324,24 +343,29 @@ class FeatureEngineer:
             vol["dist_vwap_20"] = np.zeros_like(close)
 
         # Volume-Weighted Price Distribution (Volume Profile Proxy)
-        window = 30
-        try:
-            # We use a rolling weighted average of price as a POC proxy
-            # This is more accurate than a simple median as it incorporates volume
-            rolling_poc = (
-                (pd.Series(close) * pd.Series(volume))
-                .rolling(window)
-                .sum()
-                / pd.Series(volume).rolling(window).sum()
-            )
-            vol["vp_poc"] = rolling_poc.values
+        if self.include_volume_profile:
+            window = 30
+            try:
+                # We use a rolling weighted average of price as a POC proxy
+                # This is more accurate than a simple median as it incorporates volume
+                rolling_poc = (pd.Series(close) * pd.Series(volume)).rolling(
+                    window
+                ).sum() / pd.Series(volume).rolling(window).sum()
+                vol["vp_poc"] = rolling_poc.values
 
-            # Simple quantiles for VAH/VAL
-            rolling_close = pd.Series(close)
-            vol["vp_vah"] = rolling_close.rolling(window).quantile(0.7).values
-            vol["vp_val"] = rolling_close.rolling(window).quantile(0.3).values
-            vol["vp_width"] = (vol["vp_vah"] - vol["vp_val"]) / (vol["vp_poc"] + 1e-8)
-        except Exception:
+                # Simple quantiles for VAH/VAL
+                rolling_close = pd.Series(close)
+                vol["vp_vah"] = rolling_close.rolling(window).quantile(0.7).values
+                vol["vp_val"] = rolling_close.rolling(window).quantile(0.3).values
+                vol["vp_width"] = (vol["vp_vah"] - vol["vp_val"]) / (vol["vp_poc"] + 1e-8)
+            except Exception:
+                vol["vp_poc"] = np.full_like(close, np.nan)
+                vol["vp_vah"] = np.full_like(close, np.nan)
+                vol["vp_val"] = np.full_like(close, np.nan)
+                vol["vp_width"] = np.full_like(close, np.nan)
+        else:
+            # Schema Stability: Populate with NaNs to ensure downstream consistency
+            # while maintaining the performance benefit of skipping calculations.
             vol["vp_poc"] = np.full_like(close, np.nan)
             vol["vp_vah"] = np.full_like(close, np.nan)
             vol["vp_val"] = np.full_like(close, np.nan)
@@ -364,9 +388,19 @@ class FeatureEngineer:
         freq = tf_map.get(tf, tf)
 
         # Resample to the target timeframe
-        resampled = df.resample(freq).agg({
-            "open": "first", "high": "max", "low": "min", "close": "last", "tick_volume": "sum"
-        }).dropna()
+        resampled = (
+            df.resample(freq)
+            .agg(
+                {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "tick_volume": "sum",
+                }
+            )
+            .dropna()
+        )
 
         if resampled.empty:
             return pd.DataFrame()
@@ -413,7 +447,7 @@ class FeatureEngineer:
             if self.mins is None:
                 self.mins = np.nanmin(vals, axis=0)
                 self.maxs = np.nanmax(vals, axis=0)
-            denom = (self.maxs - self.mins)
+            denom = self.maxs - self.mins
             denom[denom == 0] = 1.0
             norm_vals = (vals - self.mins) / denom
             return pd.DataFrame(norm_vals, index=df.index, columns=df.columns)
