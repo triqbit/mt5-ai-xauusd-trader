@@ -1,75 +1,49 @@
 # Technical Debt Log
 
-This log tracks architectural drift, code quality degradation, and fragmented logic introduced during multi-agent development.
+This log tracks architectural drift, code quality degradation, and stale abstractions identified during multi-agent development.
 
-## Active Debt Items
+## Resolved Debt (Cleaned up by Jules05)
 
-### Debt Item: Legacy Temporal Markers
-**Category:** Quality
-**Impact:** Medium
-**Effort:** S
-**Resolution plan:** Replace all `datetime.utcnow()` calls with `datetime.now(timezone.utc)` for Python 3.12 compatibility and standardization.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Linting Debt (Ruff/UP)
-**Category:** Quality
-**Impact:** Low
-**Effort:** M
-**Resolution plan:** Systematic application of `ruff --fix` to resolve hundreds of `UP` (Upgrade), `I` (Import), and `F` (Pyflakes) errors.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Raw Print Statements
-**Category:** Quality
-**Impact:** Low
-**Effort:** S
-**Resolution plan:** Replace `print()` with `structlog` or `rich.console` across core modules (main.py, explainability, etc.).
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Fragmented Signal Mapping
-**Category:** Duplication
-**Impact:** Medium
-**Effort:** S
-**Resolution plan:** Replace manual string/integer to SignalDirection mappings with `ModelAction(idx).to_direction()` or `SignalDirection` constants.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Placeholder Secrets in Validator
-**Category:** Quality
-**Impact:** Medium
-**Effort:** S
-**Resolution plan:** Ensure `ConfigValidator` strictly rejects placeholder passwords ("password", "change_me") in production-like environments.
-**Owner:** Jules03 (Governance)
-
-### Debt Item: Fragmented LSTM Architecture
-**Category:** Fragmentation
+### Debt Item: Fragmented Risk Management Logic
+**Category:** Fragmentation | Duplication
 **Impact:** High
 **Effort:** M
-**Resolution plan:** Relocate `LSTMAttentionModel` from `src/models/ensemble.py` to `src/models/lstm_model.py` to centralize sequence modeling logic.
+**Resolution plan:** Consolidated `RiskEngine` (Institutional logic) and `RiskManager` (Legacy logic) into a unified `RiskManager`. Moved `RiskDecision` and `DailyStats` to `src/core/schemas.py`.
 **Owner:** Jules05 (Immediate cleanup)
 
-### Debt Item: Redundant Signal/Action Mapping
-**Category:** Duplication
+### Debt Item: Inconsistent Method Naming (`approve` vs `validate`)
+**Category:** Naming
 **Impact:** Medium
 **Effort:** S
-**Resolution plan:** Replace manual `IntEnum` to index mappings with centralized `ModelAction(idx).to_direction()` calls across the codebase.
+**Resolution plan:** Renamed `RiskManager.approve` to `RiskManager.validate_signal` to match the Execution Filter naming convention.
 **Owner:** Jules05 (Immediate cleanup)
 
-### Debt Item: Placeholder RL Agents (Dreamer/PPO stubs)
-**Category:** Fragmentation
-**Impact:** Medium
-**Effort:** L
-**Resolution plan:** Schedule for Jules04 (Quant Research) to replace placeholders with functional world-model implementations.
-**Owner:** Jules04
-
-### Debt Item: Inconsistent Model Output Permutations
-**Category:** Fragmentation
-**Impact:** High
-**Effort:** M
-**Resolution plan:** Standardize all model outputs to `[HOLD, BUY, SELL]` and remove legacy permutation logic in `EnsembleModel`.
-**Owner:** Jules05 (Immediate cleanup)
-
-### Debt Item: Placeholder Reward Logic in Trading Environment
+### Debt Item: Missing Type Hints and Docstrings in Utilities
 **Category:** Quality
+**Impact:** Low
+**Effort:** S
+**Resolution plan:** Added type hints and docstrings to `ScenarioGenerator` and its internal mock classes.
+**Owner:** Jules05 (Immediate cleanup)
+
+## Pending Debt
+
+### Debt Item: Redundant Indicator Calculations
+**Category:** Duplication
 **Impact:** Medium
 **Effort:** M
-**Resolution plan:** Schedule for Jules01/Jules04 to implement proper reward shaping based on risk-adjusted returns.
-**Owner:** Jules01/Jules04
+**Resolution plan:** Several modules (ExecutionFilter, RegimeDetector) compute EMAs and RSI independently. Centralize indicator computation in `FeatureEngineer` and pass the enriched DataFrame.
+**Owner:** Jules01
+
+### Debt Item: Stale Placeholder implementations ("TODO: improve this")
+**Category:** Quality
+**Impact:** Low
+**Effort:** S
+**Resolution plan:** Search and replace stubs in `EventIntelligence` and `ExecutionAnalyzer` with production-grade logic.
+**Owner:** Jules04 (Macro) / Jules02 (Hardening)
+
+### Debt Item: Lack of formal Interface for Reportable components
+**Category:** Fragmentation
+**Impact:** Low
+**Effort:** S
+**Resolution plan:** `src/core/interfaces.py` was created. Now, existing modules with `to_report_section` should be updated to formally implement the `Reportable` protocol.
+**Owner:** Jules05/Jules01

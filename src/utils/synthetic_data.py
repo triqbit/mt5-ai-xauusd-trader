@@ -25,7 +25,10 @@ class ScenarioGenerator:
     Ensures reproducibility via seeding.
     """
 
-    def __init__(self, seed: int = 42):
+    _current_start_date: datetime | str | None
+    _current_freq: str
+
+    def __init__(self, seed: int = 42) -> None:
         self.seed = seed
         self.rng = np.random.default_rng(seed)
 
@@ -55,7 +58,19 @@ class ScenarioGenerator:
         freq: str = "5min",
     ) -> pd.DataFrame:
         """
-        Main entry point for data generation.
+        Generate synthetic price data for a given regime.
+
+        Args:
+            n_steps: Number of bars to generate.
+            regime: Market regime name.
+            start_price: Initial price.
+            trend_strength: Expected return per bar for trending regime.
+            volatility: Standard deviation of returns.
+            start_date: Optional start timestamp.
+            freq: Pandas frequency string.
+
+        Returns:
+            pd.DataFrame: OHLCV data.
         """
         self._current_start_date = start_date
         self._current_freq = freq
@@ -655,8 +670,13 @@ class ExecutionScenarioBuilder:
 
         # We define a simple dummy class to avoid importing MagicMock at the top level of src
         class DummyLogger:
-            def read_performance_report(self):
-                # win_rate below 0.45 and total_trades >= 20 to trigger Performance Guard
+            """Mock logger for testing performance-based rejection."""
+
+            def read_performance_report(self) -> dict[str, float]:
+                """
+                Returns a report with low win rate to trigger rejection.
+                win_rate below 0.45 and total_trades >= 20 to trigger Performance Guard.
+                """
                 return {"win_rate": 0.3, "total_trades": 25}
 
         return signal, df, DummyLogger()
