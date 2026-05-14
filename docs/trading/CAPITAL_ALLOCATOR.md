@@ -60,3 +60,14 @@ if result.is_allowed:
 allocator.update_strategy_performance("gold_rl_v1", pnl=500.0)
 allocator.release_allocation("gold_rl_v1")
 ```
+
+## Institutional Feedback Loop
+
+The system implements an automated feedback loop between trade execution and capital allocation. When a position is closed in `main.py`, the realized PnL is retrieved from the `TradeLogger` and fed back into the `CapitalAllocator`.
+
+This loop ensures:
+- **Winning strategies** gain increased risk allocation (capped at 2.0x baseline).
+- **Losing strategies** face reduced risk exposure.
+- **Systemic failures** trigger a "Cooling-off" floor (risk reduced to 0.1x) after a streak of consecutive losses.
+
+This behavior is verified by the end-to-end integration test `tests/test_institutional_feedback_loop.py`.
