@@ -230,6 +230,8 @@ def test_lstm_adapter(sample_data):
     mock_model.return_value = torch.tensor([[0.0, 10.0, 0.0]])  # High logit for BUY
 
     window_size = 5
+    # Remove predict to force direct call to __call__
+    del mock_model.predict
     adapter = LSTMAdapter(mock_model, window_size=window_size)
     signals = adapter.predict(sample_data)
 
