@@ -370,11 +370,6 @@ Generic bots either trade fully blindly or send simple "Price Hit" alerts. The M
 
 ---
 
-## Future Differentiators (Candidates)
-- **Sentiment-Driven Order Routing** (Analyzing retail vs. institutional positioning)
-
----
-
 ## 11. Institutional Gold Flow & Physical Demand Proxies
 
 ### What it is and why it matters
@@ -407,3 +402,44 @@ Generic bots are "Physical Blind." They cannot distinguish between a speculative
 ### Dependencies and Constraints
 *   **Dependencies**: Requires reliable access to ETF AUM data (via YFinance or dedicated providers) and SGE price feeds.
 *   **Constraints**: Physical demand data is typically reported with a 24-hour lag; the system must utilize "Flow Momentum" to project intraday impact without look-ahead bias.
+
+---
+
+## 12. Institutional Sentiment & Positioning Intelligence
+
+### What it is and why it matters
+**Institutional Sentiment & Positioning Intelligence** is an advanced analytical layer that monitors the "crowdedness" of the XAUUSD market by aggregating Commitment of Traders (COT) data from the CFTC and retail sentiment indices from major brokers and social signals.
+
+In institutional trading, knowing *who* is on the other side of the trade is as important as the trade itself. If everyone (both retail and institutions) is already long gold, the "crowded trade" becomes vulnerable to a sharp liquidation even on minor news. This feature identifies these extremes, allowing the system to avoid entering late into exhausted trends and instead prepare for high-conviction reversals.
+
+### How it differentiates from generic trading bots
+Generic bots are "Positioning Blind." They follow price momentum without realizing that the momentum might be driven by the last remaining buyers in a crowded market. The MT5 AI Trader differentiates by detecting **Sentiment Extremes and Positioning Divergences**. It can identify when "Smart Money" (Commercial Hedgers) is starting to offset speculative long interest, providing a powerful leading indicator of structural trend changes that purely technical bots completely miss.
+
+### Architecture Outline
+1.  **Positioning Harvester**: A background service in `src/data/sentiment_intelligence.py` that fetches weekly COT reports (Managed Money, Commercials, Non-Commercials) and daily retail sentiment ratios (Long/Short %) from institutional API feeds.
+2.  **Crowdedness Index Engine**: A mathematical module that calculates a normalized "Crowdedness Score" (0-100) by combining net-positioning percentiles and sentiment z-scores.
+3.  **Positioning Overlay Hook**: Logic in the `ExecutionFilter` that applies a "Contrarian Veto" or "Exhaustion Alert" when the Crowdedness Score reaches extreme levels (e.g., >90 or <10).
+4.  **Sentiment Signal Integrator**: Features derived from sentiment velocity (rate of change in retail positioning) are injected into the `EnsembleModel` to improve prediction accuracy during regime shifts.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Automated weekly ingestion and parsing of CFTC COT reports for Gold. |
+| **Functional** | Real-time (daily) tracking of retail sentiment ratios from at least two major liquidity providers. |
+| **Technical** | Calculation of the "Institutional Net Position" and "Speculative Extremes" metrics. |
+| **Operational** | Display "Market Sentiment: [Extremely Bullish/Neutral/Extremely Bearish]" and "Crowdedness: [High/Low]" in the Decision Cockpit. |
+| **Release Readiness** | Backtests must show the system avoiding at least 25% of "Late-Trend" entries during historical sentiment extremes. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on sentiment correlation logic, COT data interpretation, and crowdedness mathematics.
+*   **Jules01 (Core Development)**: Lead on data harvesting infrastructure for CFTC and retail sentiment feeds.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires access to COT data (available via public CFTC records or financial APIs) and broker sentiment feeds.
+*   **Constraints**: COT data is reported with a significant lag (typically released Friday for the previous Tuesday); the engine must use "Positioning Momentum" to estimate current institutional stance.
+
+---
+
+## Future Differentiators (Candidates)
+- **Institutional Fractal Efficiency & Regime Persistence** (Hurst Exponent analysis)
+- **Sentiment-Driven Order Routing** (Analyzing retail vs. institutional positioning)

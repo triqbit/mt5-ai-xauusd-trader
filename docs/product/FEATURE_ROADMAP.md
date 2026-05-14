@@ -57,6 +57,12 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader from a high-perfo
 
 ## 🔭 Future Consideration
 
+- **Institutional Sentiment & Positioning Intelligence** — Score: 8.0/10 | Cost: M | Why: Monitor COT data and retail sentiment to detect crowded trades and structural exhaustion.
+  - *Strategic Importance:* 8.0/10
+  - *Implementation Cost:* M
+  - *Dependency Readiness:* 🟢 High
+  - *End-user Value:* Differentiates via "Crowded Trade Detection" and structural market awareness.
+
 - **Institutional Gold Flow & Physical Demand Proxies** — Score: 7.8/10 | Cost: L | Why: Track ETF flows (GLD/IAU) and Shanghai premiums to detect physical/paper divergences.
   - *Strategic Importance:* 7.8/10
   - *Implementation Cost:* L
