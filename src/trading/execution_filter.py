@@ -422,11 +422,13 @@ class ExecutionFilter:
         )
 
         # Regime-adaptive safety hardening
-        if regime_info:
-            if regime_info.label in (MarketRegime.NEWS_SHOCK, MarketRegime.VOLATILE_BREAKOUT):
-                # Tighten drift threshold by 0.1 and raise accuracy floor by 0.05
-                drift_threshold = max(0.1, drift_threshold - 0.1)
-                accuracy_floor += 0.05
+        if regime_info and regime_info.label in (
+            MarketRegime.NEWS_SHOCK,
+            MarketRegime.VOLATILE_BREAKOUT,
+        ):
+            # Tighten drift threshold by 0.1 and raise accuracy floor by 0.05
+            drift_threshold = max(0.1, drift_threshold - 0.1)
+            accuracy_floor += 0.05
 
         drift = model_health.get("drift", 0.0)
         accuracy = model_health.get("accuracy", 1.0)
@@ -462,11 +464,10 @@ class ExecutionFilter:
         )
 
         # Regime-adaptive safety hardening
-        if regime_info:
-            if regime_info.label == MarketRegime.NEWS_SHOCK:
-                threshold = max(threshold, 0.70)
-            elif regime_info.label == MarketRegime.VOLATILE_BREAKOUT:
-                threshold = max(threshold, 0.65)
+        if regime_info and regime_info.label == MarketRegime.NEWS_SHOCK:
+            threshold = max(threshold, 0.70)
+        elif regime_info and regime_info.label == MarketRegime.VOLATILE_BREAKOUT:
+            threshold = max(threshold, 0.65)
         passed = signal.confidence >= threshold
         return bool(passed), {"confidence": signal.confidence, "threshold": threshold}
 

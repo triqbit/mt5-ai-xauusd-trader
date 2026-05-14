@@ -79,6 +79,8 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 - **Drift Threshold**: If model drift >0.3, retrain immediately
 - **Drift-Aware Confidence Penalty**: Proactively reduce signal confidence if aggregate model drift exceeds 50% of the safety threshold (drift > 0.15). Reduces confidence by up to 20%.
 - **Entropy Guard**: Monitor divergence between sub-model confidences. If internal consensus is weak (std > 0.25), apply a 10% safety penalty to final confidence.
+- **Regime-Adaptive Hardening**: Automatically tightens safety thresholds during `NEWS_SHOCK` and `VOLATILE_BREAKOUT` regimes. Drift limits are reduced by 0.1, accuracy floors increased by 0.05, and minimum confidence requirements raised (to 0.70 for News Shock, 0.65 for Volatile Breakout).
+- **Regime Stability Guard**: Blocks all execution if the market's regime transition score exceeds 0.8, indicating extreme instability and low prediction reliability.
 - **Calibration Threshold**: Halt trading if Expected Calibration Error (ECE) > 0.25
 - **Daily Retraining**: Update model daily with latest data
 
