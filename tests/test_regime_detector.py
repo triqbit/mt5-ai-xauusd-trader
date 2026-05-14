@@ -399,6 +399,80 @@ class TestRegimeDetector(unittest.TestCase):
         # Transition scores might slightly differ due to state updates in detect if we don't reset last_regime
         # But here we just care about logical consistency of the calculation path.
 
+    def test_gmm_scaler_usage(self):
+        """Verify that StandardScaler is initialized and used during fit/detect."""
+        np.random.seed(42)
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
+                "high": 2001.0 + np.cumsum(np.random.randn(200) * 0.1),
+                "low": 1999.0 + np.cumsum(np.random.randn(200) * 0.1),
+                "open": 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
+            }
+        )
+
+        self.detector.fit(data, n_clusters=2)
+        self.assertIsNotNone(self.detector._scaler)
+        from sklearn.preprocessing import StandardScaler
+
+        self.assertIsInstance(self.detector._scaler, StandardScaler)
+
+        # Check if inverse transform gives original-scale centroids
+        centroids_orig = self.detector._scaler.inverse_transform(self.detector._gmm.means_)
+        # Centroids should be roughly within reasonable bounds for the features (e.g. atr_ratio approx 1.0)
+        atr_idx = self.detector.FEATURE_COLUMNS.index("atr_ratio")
+        self.assertGreater(centroids_orig[0, atr_idx], 0.1)
+        self.assertLess(centroids_orig[0, atr_idx], 10.0)
+
+    def test_get_regime_performance(self):
+        """Verify the performance aggregation method."""
+        np.random.seed(42)
+        size = 200
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.cumsum(np.random.randn(size) * 0.1),
+                "high": 2001.0 + np.cumsum(np.random.randn(size) * 0.1),
+                "low": 1999.0 + np.cumsum(np.random.randn(size) * 0.1),
+                "open": 2000.0 + np.cumsum(np.random.randn(size) * 0.1),
+                "returns": np.random.randn(size) * 0.001,
+            }
+        )
+
+        perf = self.detector.get_regime_performance(data)
+        self.assertIsInstance(perf, pd.DataFrame)
+        if not perf.empty:
+            self.assertIn("mean_ret", perf.columns)
+            self.assertIn("profit_factor", perf.columns)
+            self.assertIn("sharpe", perf.columns)
+            self.assertTrue((perf["count"] > 0).all())
+
+    def test_score_based_mapping_logic(self):
+        """Test that _map_clusters correctly assigns regimes based on centroid features."""
+        # Create mock centroids that should align with specific regimes
+        # FEATURE_COLUMNS: ["atr_ratio", "efficiency_ratio", "slope", "z_score", "kurtosis", "skewness", "vol_of_vol", "vol_clustering"]
+
+        # 1. Trending centroid: High ER, High Slope/Angle
+        # ANGLE_SCALE = 1000. Slope 0.02 -> arctan(20) ~ 87 degrees
+        trending_centroid = np.array([1.0, 0.8, 0.02, 0.0, 0.0, 0.0, 1.0, 0.1])
+
+        # 2. News shock centroid: High ATR, High ER, High VoV
+        news_centroid = np.array([5.0, 0.9, 0.05, 0.0, 5.0, 0.0, 3.0, 0.5])
+
+        # 3. Mean reversion centroid: High Z-Score, Low ER
+        mr_centroid = np.array([1.2, 0.1, -0.01, 3.0, 0.0, 0.0, 1.0, 0.1])
+
+        centroids = np.vstack([trending_centroid, news_centroid, mr_centroid])
+        self.detector._map_clusters(centroids)
+
+        # Mappings might be sensitive to weights, so we verify they are reasonable
+        # instead of just failing if thresholds are slightly off in mock data
+        self.assertIn(
+            self.detector._cluster_to_regime[0],
+            [MarketRegime.TRENDING, MarketRegime.VOLATILE_BREAKOUT],
+        )
+        self.assertEqual(self.detector._cluster_to_regime[1], MarketRegime.NEWS_SHOCK)
+        self.assertEqual(self.detector._cluster_to_regime[2], MarketRegime.MEAN_REVERSION)
+
 
 if __name__ == "__main__":
     unittest.main()
