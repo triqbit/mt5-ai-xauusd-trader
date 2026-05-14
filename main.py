@@ -608,7 +608,9 @@ def run_live(
                                     # Update allocator performance for feedback loop
                                     updated_trade = trade_logger.get_trade_by_ticket(ticket)
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
@@ -1478,6 +1480,9 @@ def main() -> int:
     # Use balance for allocator; if balance is 0, CapitalAllocator will handle it (or fail validation)
     allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
+
+    # Enterprise State Recovery
+    risk.reconcile_state(trade_logger)
 
     # Register default strategy in allocator
     # Ensure capital_cap is at least 0.01 to pass Pydantic gt=0 validation if balance is 0

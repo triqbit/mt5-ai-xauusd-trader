@@ -253,6 +253,7 @@ Action: Stop trading, retrain model, run validation before resume
 - [ ] Model performance within expected parameters
 - [ ] Risk metrics within tolerance
 - [ ] Backup systems operational
+- [ ] State reconciliation verified after restart
 
 ### 7.3 Reporting Standards
 - **Daily Report**: Generated automatically, sent to stakeholders
@@ -273,7 +274,8 @@ Action: Stop trading, retrain model, run validation before resume
 2. Convert all pending orders to market orders
 3. Activate backup MT5 connection
 4. Reconnect within 5 minutes
-5. Verify all positions after reconnection
+5. **State Reconciliation**: The system automatically reconciles open positions and restores peak equity from the trade database upon reconnection/restart to maintain risk management continuity.
+6. Verify all positions after reconnection
 
 ### 8.3 Force Stop Procedures
 - **Daily Loss Limit Hit**: Stop all new trades immediately
