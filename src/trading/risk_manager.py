@@ -128,6 +128,7 @@ class RiskManager:
         avg_win: float,
         avg_loss: float,
         pip_value: float = 1.0,
+        risk_pct: float | None = None,
     ) -> float:
         """
         Fractional Kelly Criterion position sizing.
@@ -137,7 +138,8 @@ class RiskManager:
             return 0.01  # minimum lot
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
         kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
+        risk_percentage = risk_pct if risk_pct is not None else self.cfg.risk_per_trade
+        risk_capital = self.balance * risk_percentage
         lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
         lot_size = max(0.01, round(lot_size, 2))
         logger.debug(

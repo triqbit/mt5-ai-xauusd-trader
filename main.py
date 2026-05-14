@@ -108,6 +108,7 @@ def _prepare_trade_signal(
     risk: "RiskManager",
     allocator: "CapitalAllocator",
     audit_logger: Optional["AuditLogger"] = None,
+    regime_multiplier: float = 1.0,
 ) -> "TradeSignal":
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -123,7 +124,9 @@ def _prepare_trade_signal(
 
     # 2. Institutional Capital Allocation
     strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
-    alloc_result = allocator.request_allocation(strat_id, risk_pct=cfg.risk_per_trade)
+    alloc_result = allocator.request_allocation(
+        strat_id, risk_pct=cfg.risk_per_trade, regime_multiplier=regime_multiplier
+    )
 
     if not alloc_result.is_allowed:
         log.warning(
@@ -148,6 +151,7 @@ def _prepare_trade_signal(
             win_rate=0.58,
             avg_win=4 * atr,
             avg_loss=2 * atr,
+            risk_pct=approved_risk,
         )
         if approved_risk > 0
         else 0.0
@@ -388,6 +392,19 @@ def run_live(
                 atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
                 with profile("signal_preparation"):
+                    from src.models.regime_detector import MarketRegime
+
+                    regime_mults = {
+                        MarketRegime.TRENDING: 1.0,
+                        MarketRegime.RANGING: 1.0,
+                        MarketRegime.VOLATILE_BREAKOUT: 0.8,
+                        MarketRegime.LOW_VOLATILITY_DRIFT: 1.2,
+                        MarketRegime.NEWS_SHOCK: 0.2,
+                        MarketRegime.MEAN_REVERSION: 0.7,
+                        MarketRegime.UNKNOWN: 0.5,
+                    }
+                    regime_multiplier = regime_mults.get(regime_info.label, 1.0)
+
                     signal = _prepare_trade_signal(
                         cfg=cfg,
                         direction=direction,
@@ -397,6 +414,7 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
+                        regime_multiplier=regime_multiplier,
                     )
                 lot_size = signal.lot_size
 
@@ -549,6 +567,16 @@ def run_live(
                         execution_start = time.perf_counter()
                         try:
                             ticket = connector.place_order(signal)
+                            if ticket and allocator:
+                                # Update current allocation to reflect committed heat
+                                strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                # Calculate notional heat using symbol properties
+                                props = connector.get_symbol_properties(cfg.symbol)
+                                contract_size = (
+                                    props.get("trade_contract_size", 1.0) if props else 1.0
+                                )
+                                notional_heat = lot_size * price * contract_size
+                                allocator.update_allocation(strat_id, notional_heat)
                         except MT5ExecutionError as e:
                             log.error("Order execution FAILED", error=str(e))
                             if audit_logger:
@@ -612,6 +640,7 @@ def run_live(
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
+                                        allocator.release_allocation(strat_id)
                             closed_tickets.append(symbol)
 
                     if closed_tickets and trade_logger:

@@ -2,9 +2,9 @@
 Unit tests for the CapitalAllocator system.
 """
 
-import pytest
-
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.core.config import TradingConfig
 from src.trading.capital_allocator import (
@@ -679,7 +679,7 @@ def test_audit_logging(mock_get_audit_logger, allocator):
     allocator.request_allocation("s1", 0.01)
 
     assert mock_audit.log_allocation_decision.called
-    args, kwargs = mock_audit.log_allocation_decision.call_args
+    _, kwargs = mock_audit.log_allocation_decision.call_args
     assert kwargs["strategy_id"] == "s1"
     assert kwargs["requested_risk"] == 0.01
 
@@ -734,3 +734,114 @@ def test_diversification_score_multi_factor(allocator):
     assert score_b == pytest.approx(0.4)
 
     assert score_b < score_a
+
+
+def test_strategy_drawdown_limit(allocator):
+    """Verify strategy-level circuit breaker when drawdown limit is reached."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=10000.0,
+        max_drawdown_limit=0.1,  # 10% limit
+    )
+    allocator.add_strategy(config)
+
+    # Initial state: no PnL, no drawdown
+    assert config.current_drawdown == 0.0
+
+    # Simulate some losses
+    # Denom = cap + peak_pnl = 10000 + 0 = 10000
+    # Loss of 1000 -> historical_pnl = -1000, current_drawdown = (0 - (-1000)) / 10000 = 0.1
+    allocator.update_strategy_performance("s1", -1000.0)
+
+    assert config.current_drawdown == 0.1
+    assert config.performance_multiplier == 0.0  # Tripped
+
+    # Request allocation should now be rejected
+    result = allocator.request_allocation("s1", 0.01)
+    assert result.is_allowed is False
+    assert result.rejection_code == RejectionCode.STRATEGY_DRAWDOWN_LIMIT
+
+
+def test_regime_multiplier(allocator):
+    """Verify that regime multipliers correctly scale the requested risk."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=100000.0,
+    )
+    allocator.add_strategy(config)
+
+    # Base request 1% risk
+    # Scenario A: High-risk regime (0.5x multiplier)
+    res_a = allocator.request_allocation("s1", 0.01, regime_multiplier=0.5)
+    assert res_a.allocated_risk_pct == 0.005
+
+    # Scenario B: Low-risk regime (1.2x multiplier)
+    res_b = allocator.request_allocation("s1", 0.01, regime_multiplier=1.2)
+    assert res_b.allocated_risk_pct == 0.012
+
+
+def test_risk_manager_integration(allocator):
+    """Verify that RiskManager can use scaled risk from CapitalAllocator."""
+    from src.trading.risk_manager import RiskManager
+
+    mock_cfg = MagicMock()
+    mock_cfg.risk_per_trade = 0.01
+    risk_manager = RiskManager(mock_cfg, account_balance=100000.0)
+
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+        performance_multiplier=1.5,
+    )
+    allocator.add_strategy(config)
+
+    # 1. Get scaled risk from allocator
+    alloc_res = allocator.request_allocation("s1", 0.01)
+    assert alloc_res.allocated_risk_pct == 0.015
+
+    # 2. Pass it to risk manager for sizing
+    # win_rate=0.5, avg_win=2, avg_loss=1 -> kelly = (0.5*2 - 0.5*1)/2 = 0.25
+    # lots = (100000 * 0.015 * 0.25) / (1 * 1) = 375.0
+    lots = risk_manager.size_position(
+        "XAUUSD", win_rate=0.5, avg_win=2.0, avg_loss=1.0, risk_pct=alloc_res.allocated_risk_pct
+    )
+
+    assert lots == 375.0
+
+
+def test_save_load_state_extended(allocator, tmp_path):
+    """Test extended state persistence including drawdown metrics."""
+    state_file = tmp_path / "allocator_state_ext.json"
+    s1 = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+        max_drawdown_limit=0.2,
+    )
+    allocator.add_strategy(s1)
+
+    # Change some state
+    allocator.update_strategy_performance("s1", 1000.0)  # peak_pnl = 1000, current_pnl = 1000
+    allocator.update_strategy_performance("s1", -500.0)  # peak_pnl = 1000, current_pnl = 500
+    # drawdown = (1000 - 500) / (50000 + 1000) = 500 / 51000 approx 0.0098
+
+    allocator.save_state(state_file)
+
+    # Create new allocator and load state
+    new_allocator = CapitalAllocator(total_budget=100000.0)
+    new_allocator.add_strategy(
+        StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=50000.0)
+    )
+
+    new_allocator.load_state(state_file)
+
+    assert new_allocator.strategies["s1"].peak_pnl == 1000.0
+    assert new_allocator.strategies["s1"].historical_pnl == 500.0
+    assert new_allocator.strategies["s1"].current_drawdown == pytest.approx(500 / 51000)
