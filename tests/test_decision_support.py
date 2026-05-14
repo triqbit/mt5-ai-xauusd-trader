@@ -145,7 +145,7 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     # Total ~ 46.66
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     assert 46.0 < packet.decision_score < 47.0
-    assert packet.status_level == DecisionStatus.CAUTION
+    assert packet.status_level == DecisionStatus.REVIEW
     # Sizing: (0.4666^1.5) * 0.5 (CAUTION penalty) * 0.5 (Macro multiplier)
     expected_sizing = (packet.decision_score / 100.0) ** 1.5 * 0.5 * 0.5
     assert abs(packet.sizing_multiplier - expected_sizing) < 1e-6
@@ -262,7 +262,7 @@ def test_format_for_operator(mock_explanation, mock_regime, mock_macro_risk):
     output = dss.format_for_operator(packet)
     assert isinstance(output, str)
     assert "XAUUSD" in output
-    assert any(s in output for s in ["EXECUTE", "CAUTION", "BLOCKED"])
+    assert any(s in output for s in ["EXECUTE", "REVIEW", "CAUTION", "BLOCKED"])
 
 
 def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_macro_risk, mocker):
@@ -312,9 +312,12 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
         macro_risk=mock_macro_risk,
         performance_metrics={
             "sharpe_ratio": 0.5,
+            "sortino_ratio": 0.5,
             "profit_factor": 0.8,
             "recovery_factor": 0.2,
             "calmar_ratio": 0.1,
+            "sqn": 1.0,
+            "cvar_95": -0.10,
         },
     )
 
@@ -327,10 +330,13 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
             perf_text_low = call.args[0]
             break
 
-    assert "[bold red]0.50" in perf_text_low
-    assert "[bold red]0.80" in perf_text_low
-    assert "[bold red]0.20" in perf_text_low
-    assert "[bold red]0.10" in perf_text_low
+    assert "[bold red]0.50" in perf_text_low  # Sharpe
+    assert "[bold red]0.50" in perf_text_low  # Sortino
+    assert "[bold red]0.80" in perf_text_low  # PF
+    assert "[bold red]0.20" in perf_text_low  # RF
+    assert "[bold red]0.10" in perf_text_low  # Calmar
+    assert "[bold red]1.00" in perf_text_low  # SQN
+    assert "[bold red]-10.00%" in perf_text_low  # CVaR
 
 
 def test_strategic_confluence_summary(mock_explanation, mock_regime, mock_macro_risk):
@@ -410,6 +416,57 @@ def test_high_conviction_labeling(mock_explanation, mock_regime, mock_macro_risk
             break
 
     assert label_found is True
+
+
+def test_review_status_assignment(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that signals requiring review are correctly assigned the REVIEW status."""
+    dss = DecisionSupportSystem()
+
+    # Case: Executable but score < 80 (should be REVIEW)
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.7, weight=1.0)
+    ]
+    # Reduce regime confidence to lower the score
+    mock_regime = mock_regime.model_copy(update={"confidence": 0.4})
+
+    # Score will be around 40*1.0 + 30*0.4 + 23.33 = 40 + 12 + 23.33 = 75.33
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+
+    assert packet.is_executable is True
+    assert packet.requires_review is True
+    assert packet.status_level == DecisionStatus.REVIEW
+
+
+def test_packet_serialization_completeness(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that all new institutional fields are correctly populated in the packet."""
+    dss = DecisionSupportSystem()
+    perf_metrics = {
+        "sharpe_ratio": 2.1,
+        "sortino_ratio": 2.5,
+        "profit_factor": 2.2,
+        "recovery_factor": 3.1,
+        "sqn": 4.2,
+        "cvar_95": -0.015,
+    }
+
+    packet = dss.assemble_packet(
+        symbol="XAUUSD",
+        explanation=mock_explanation,
+        regime_info=mock_regime,
+        macro_risk=mock_macro_risk,
+        performance_metrics=perf_metrics,
+    )
+
+    # Check Pydantic model fields
+    assert packet.performance.sortino_ratio == 2.5
+    assert packet.performance.sqn == 4.2
+    assert packet.performance.cvar_95 == -0.015
+
+    # Check dict export
+    data = packet.model_dump()
+    assert data["performance"]["sortino_ratio"] == 2.5
+    assert data["performance"]["sqn"] == 4.2
+    assert data["performance"]["cvar_95"] == -0.015
 
 
 def test_packet_immutability():

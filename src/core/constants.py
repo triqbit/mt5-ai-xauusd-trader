@@ -86,6 +86,7 @@ class DecisionStatus(str, Enum):
     Augmented status levels for trade execution and operator feedback.
 
     EXECUTE: High-confidence signal passing all filters and risk gates. Ready for immediate execution.
+    REVIEW: Signal is valid but meets criteria for manual operator oversight before execution.
     CAUTION: Valid signal but with elevated risk (e.g., high volatility) or lower confidence.
              May require manual oversight or reduced position sizing.
     BLOCKED: Signal rejected by risk management, execution filters, or macro intelligence.
@@ -93,6 +94,7 @@ class DecisionStatus(str, Enum):
     """
 
     EXECUTE = "execute"
+    REVIEW = "review"
     CAUTION = "caution"
     BLOCKED = "blocked"
 
@@ -125,9 +127,9 @@ class EventCategory(Enum):
     FOMC = "FOMC"  # Federal Reserve meetings
     RATES = "RATES"  # Interest rate decisions
     USD = "USD"  # General USD macro releases
-    USD_MACRO = "USD_MACRO" # Broad US economic indicators
-    GEOPOLITICAL = "GEOPOLITICAL" # Political events, wars, or sanctions
-    OTHER = "OTHER" # Miscellaneous events
+    USD_MACRO = "USD_MACRO"  # Broad US economic indicators
+    GEOPOLITICAL = "GEOPOLITICAL"  # Political events, wars, or sanctions
+    OTHER = "OTHER"  # Miscellaneous events
 
 
 class ModelAction(IntEnum):
