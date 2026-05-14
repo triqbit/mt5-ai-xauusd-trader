@@ -156,7 +156,6 @@ def main():
         is_improvement = improvement > 1e-9
         is_worsening = improvement < -1e-9
 
-        improvement_str = fmt.format(improvement)
         if is_improvement:
             diff_str = f"[green]+{fmt.format(abs(improvement))}[/]"
         elif is_worsening:
