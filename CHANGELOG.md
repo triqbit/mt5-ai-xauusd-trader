@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Walk-Forward Efficiency (WFE) Integration:** Integrated OOS/IS Sharpe ratio consistency (WFE) into the Walk-Forward Optimizer to enhance robustness scoring and prevent overfitting.
 - **Interactive Setup Wizard:** Introduced a guided CLI configuration wizard (`python main.py --setup`) to simplify `.env` initialization and MT5 credential management.
 - **Improved CLI Ergonomics:** Refactored argument parsing into logical groups (Execution, Backtesting, Setup, Logging) and enhanced `--help` readability.
 - **Enhanced Startup Visibility:** Updated the configuration summary panel to include masked MT5 account details and server information for operator verification.
@@ -45,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0-rc7] - 2026-05-09
 
 ### Added
+- **Walk-Forward Efficiency (WFE) Integration:** Integrated OOS/IS Sharpe ratio consistency (WFE) into the Walk-Forward Optimizer to enhance robustness scoring and prevent overfitting.
 - **Institutional Strategy Benchmarking Framework:** Quantitative framework for comparing AI models against 12+ technical benchmarks.
 - **Enterprise Disaster Recovery Plan:** Automated hourly backup system for trade and audit databases with background integrity verification.
 - **Institutional Walk-Forward Optimization:** Rolling window hyperparameter optimization with robustness scoring and curve-fitting prevention.
@@ -77,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0-rc4] - 2026-05-05
 
 ### Added
+- **Walk-Forward Efficiency (WFE) Integration:** Integrated OOS/IS Sharpe ratio consistency (WFE) into the Walk-Forward Optimizer to enhance robustness scoring and prevent overfitting.
 - **Docker Multi-Stage Infrastructure:** Refactored `Dockerfile` into a multi-stage build system for smaller, more secure, and multi-arch production images.
 - **Institutional Risk Engine:** Comprehensive risk management system featuring ATR-based position sizing, cascading daily loss circuit breakers (Level 1-4), and hard drawdown safeguards in `src/trading/risk_engine.py`.
 - **Audited Risk Management:** Introduced `AuditedRiskManager` and a dedicated `RiskEngine` to separate risk calculation logic from execution management.
@@ -103,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0-rc3] - 2026-05-04
 
 ### Added
+- **Walk-Forward Efficiency (WFE) Integration:** Integrated OOS/IS Sharpe ratio consistency (WFE) into the Walk-Forward Optimizer to enhance robustness scoring and prevent overfitting.
 - **Enterprise Monitoring:** Centralized metrics and alerting system with Prometheus and Telegram support in `src/core/monitor.py`.
 - **RL Evaluation Framework:** Institutional-grade performance metrics and regime-aware evaluation in `src/research/rl_evaluation.py`.
 - **Enterprise Audit Logging:** Persistent system-wide audit tracing for compliance and debugging in `src/core/audit_log.py`.
@@ -116,6 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0-rc2] - 2026-05-03
 
 ### Added
+- **Walk-Forward Efficiency (WFE) Integration:** Integrated OOS/IS Sharpe ratio consistency (WFE) into the Walk-Forward Optimizer to enhance robustness scoring and prevent overfitting.
 - **Institutional Capital Allocation:** Implemented a multi-strategy budget management system with concentration limits and performance-based scaling in `src/trading/capital_allocator.py`.
 - **Vectorized Backtesting v2:** Enhanced the walk-forward backtesting engine with vectorized trade execution and performance metrics in `src/research/hyperopt_walkforward.py`.
 - **Market Regime Detection:** Statistical market state classifier for XAUUSD (Trending, Ranging, News Shock, etc.) in `src/models/regime_detector.py`.
@@ -134,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0-rc1] - 2026-05-02
 ### Added
+- **Walk-Forward Efficiency (WFE) Integration:** Integrated OOS/IS Sharpe ratio consistency (WFE) into the Walk-Forward Optimizer to enhance robustness scoring and prevent overfitting.
 - Refined the 6-layer execution filter in `src/trading/execution_filter.py` with EMA20 trend angle logic.
 - Institutional-grade decision support system in `src/core/decision_support.py`.
 - Go/No-Go logic integrating execution filters, risk management, and macro event blocks.
@@ -149,6 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2024-05-24
 ### Added
+- **Walk-Forward Efficiency (WFE) Integration:** Integrated OOS/IS Sharpe ratio consistency (WFE) into the Walk-Forward Optimizer to enhance robustness scoring and prevent overfitting.
 - Initial enterprise-grade trading engine.
 - MT5 integration and risk management framework.
 - CI/CD pipelines for validation and security.

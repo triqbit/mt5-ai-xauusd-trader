@@ -36,7 +36,10 @@ class OptimizationMetric(str, Enum):
 
 
 class RobustnessWeights(BaseModel):
-    """Weights for the robustness score calculation."""
+    """
+    Weights for the institutional robustness score calculation.
+    Defines the relative importance of consistency, stability, and efficiency.
+    """
 
     oos_mean: float = Field(0.4, description="Weight for mean OOS Sharpe Ratio")
     worst_oos: float = Field(0.3, description="Weight for worst window OOS Sharpe Ratio")
@@ -48,10 +51,16 @@ class RobustnessWeights(BaseModel):
     is_oos_gap: float = Field(0.3, description="Penalty weight for IS-OOS Sharpe gap")
     stability: float = Field(0.4, description="Penalty weight for parameter instability")
     regime_consistency: float = Field(0.2, description="Weight for consistency across regimes")
+    walk_forward_efficiency: float = Field(
+        0.3, description="Weight for Walk-Forward Efficiency (OOS / IS Sharpe)"
+    )
 
 
 class WalkForwardConfig(BaseModel):
-    """Configuration for Walk-Forward Optimization."""
+    """
+    Configuration for disciplined Walk-Forward Optimization.
+    Enforces rolling window constraints and institutional performance thresholds.
+    """
 
     train_size: int = Field(250, description="Number of candles for training/optimization")
     test_size: int = Field(50, description="Number of candles for out-of-sample testing")
@@ -70,7 +79,10 @@ class WalkForwardConfig(BaseModel):
 
 
 class RobustnessMetrics(BaseModel):
-    """Structured robustness metrics."""
+    """
+    Structured metrics for institutional strategy robustness evaluation.
+    Provides transparency into out-of-sample performance consistency and parameter stability.
+    """
 
     oos_sharpe_mean: float
     oos_sharpe_std: float
@@ -94,7 +106,10 @@ class WindowResult(BaseModel):
 
 
 class WalkForwardResult(BaseModel):
-    """Result of a Walk-Forward Optimization run."""
+    """
+    Comprehensive result of a Walk-Forward Optimization run.
+    Stores optimal parameters, aggregated metrics, and window-level performance for auditing.
+    """
 
     best_params: dict[str, Any]
     metrics: RobustnessMetrics
@@ -264,15 +279,18 @@ class WalkForwardOptimizer:
 
                     # Small perturbation (e.g. 5%)
                     # Ensure a minimum delta for small or zero values
+                    # Use a smaller epsilon for floats to be more scale-robust
                     delta: float
                     if is_int:
                         delta = float(max(1, round(abs(original_val) * perturbation_pct)))
                     else:
-                        # For floats, use a small epsilon if value is 0
-                        delta = max(1e-4, abs(original_val) * perturbation_pct)
+                        # For floats, use a robust epsilon that scales with the value
+                        # but provides a sensible floor for near-zero values.
+                        delta = max(1e-5, abs(original_val) * perturbation_pct)
 
                     for direction in [-1, 1]:
                         perturbed_params = params.copy()
+                        # Ensure we don't accidentally introduce floats for integer parameters
                         new_val = original_val + (direction * delta)
 
                         if is_int:
@@ -352,8 +370,13 @@ class WalkForwardOptimizer:
         # Filter out regimes with None Sharpe
         valid_stats = regime_stats.dropna(subset=["calc_sharpe"])
 
+        if len(valid_stats) == 0:
+            return 0.0
         if len(valid_stats) < 2:
-            return 1.0  # Not enough valid regimes to judge consistency
+            # Only one regime present: we cannot determine consistency.
+            # Return a neutral-to-low score (0.5) to avoid over-weighting
+            # configurations that only trade in a single environment.
+            return 0.5
 
         # Frequency-weighted Mean and Std
         weights = valid_stats["count"] / valid_stats["count"].sum()
@@ -456,14 +479,16 @@ class WalkForwardOptimizer:
             regime_cons = float(np.mean(regime_cons_list))
 
             # Calculate Robustness Score
-            # Reward: high OOS Sharpe, worst-case Sharpe, consistency
+            # Reward: high OOS Sharpe, worst-case Sharpe, consistency, high WFE
             # Penalize: high OOS Variance, high IS/OOS Gap, High parameter sensitivity, Low regime consistency, Constraints violated
+            wfe_val = oos_mean / (is_mean + 1e-9)
             w = self.config.robustness_weights
             robustness = (
                 (w.oos_mean * oos_mean)
                 + (w.worst_oos * worst_oos)
                 + (w.win_rate_consistency * wr_cons)
                 + (w.drawdown_consistency * dd_cons)
+                + (w.walk_forward_efficiency * np.clip(wfe_val, 0, 1.2))  # Reward WFE
                 - (w.oos_std * oos_std)
                 - (w.is_oos_gap * gap)
                 - (w.stability * stability)
@@ -480,8 +505,7 @@ class WalkForwardOptimizer:
             trial.set_user_attr("stability", float(stability))
             trial.set_user_attr("regime_cons", float(regime_cons))
             trial.set_user_attr("violated", bool(violated))
-            wfe = oos_mean / (is_mean + 1e-9)
-            trial.set_user_attr("wfe", float(wfe))
+            trial.set_user_attr("walk_forward_efficiency", float(wfe_val))
             trial.set_user_attr("robustness_score", float(robustness))
 
             # Select base score based on config
@@ -522,7 +546,7 @@ class WalkForwardOptimizer:
             is_oos_gap=best_trial.user_attrs["gap"],
             stability_penalty=best_trial.user_attrs["stability"],
             regime_consistency=best_trial.user_attrs["regime_cons"],
-            walk_forward_efficiency=best_trial.user_attrs["wfe"],
+            walk_forward_efficiency=best_trial.user_attrs["walk_forward_efficiency"],
             robustness_score=best_trial.user_attrs["robustness_score"],
             constraints_violated=best_trial.user_attrs["violated"],
         )

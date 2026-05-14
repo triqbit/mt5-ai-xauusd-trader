@@ -547,3 +547,99 @@ def test_strict_fragility_penalty(sample_data):
 
     # Should return the maximum penalty of 10.0 due to fragility (positive to negative flip)
     assert penalty == 10.0
+
+
+def test_wfe_integration_in_robustness(sample_data):
+    """Verifies that WFE is integrated into the robustness score."""
+
+    def param_space(trial):
+        return {"fast_window": 10, "slow_window": 30}
+
+    # Weights with high WFE importance
+    weights = RobustnessWeights(walk_forward_efficiency=1.0, oos_mean=0.0, worst_oos=0.0)
+    config = WalkForwardConfig(
+        n_trials=1, train_size=100, test_size=20, step_size=50, robustness_weights=weights
+    )
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, param_space, config)
+
+    # Mock IS = 2.0, OOS = 1.0 -> WFE = 0.5
+    eval_count = 0
+
+    def mock_eval(data, params):
+        nonlocal eval_count
+        val = 2.0 if eval_count % 2 == 0 else 1.0
+        eval_count += 1
+        return {"Sharpe Ratio": val}
+
+    optimizer._evaluate_strategy = mock_eval
+    result = optimizer.run_optimization()
+
+    # Robustness should be dominated by WFE (0.5)
+    # Other components might contribute small amounts (stability, regime cons)
+    # but we check if it's in a sensible range.
+    assert result.metrics.walk_forward_efficiency == pytest.approx(0.5)
+    assert result.metrics.robustness_score > 0.4
+
+
+def test_stability_penalty_zero_value_robustness(sample_data):
+    """Verifies that stability penalty handles zero-valued float parameters gracefully."""
+
+    def param_space(trial):
+        return {"param": 0.0}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, param_space, config)
+
+    # Ensure delta is at least 1e-5 for 0.0
+    params = {"param": 0.0}
+
+    # Track delta used
+    captured_deltas = []
+    original_eval = optimizer._evaluate_strategy
+
+    def mock_eval(data, p):
+        if p["param"] != 0.0:
+            captured_deltas.append(abs(p["param"]))
+        return original_eval(data, p)
+
+    optimizer._evaluate_strategy = mock_eval
+    optimizer._calculate_stability_penalty(params, sample_data)
+
+    assert all(d >= 1e-5 for d in captured_deltas)
+
+
+def test_regime_consistency_single_regime_fallback(sample_data):
+    """Verifies that regime consistency returns 0.5 when only one regime is present."""
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, lambda t: {}, config)
+
+    data = sample_data.copy()
+    data["regime"] = "ranging"  # Only one regime
+
+    params = {"fast_window": 10, "slow_window": 30}
+    consistency = optimizer._calculate_regime_consistency(data, params)
+
+    assert consistency == 0.5
+
+
+def test_window_alignment_and_no_gaps(sample_data):
+    """Verifies that generated windows are properly aligned and have no gaps."""
+    train_size = 100
+    test_size = 20
+    step_size = 20
+    config = WalkForwardConfig(train_size=train_size, test_size=test_size, step_size=step_size)
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, lambda t: {}, config)
+
+    windows = optimizer.generate_windows()
+
+    for i in range(len(windows) - 1):
+        train_curr, test_curr = windows[i]
+        train_next, test_next = windows[i + 1]
+
+        # In this config (step_size == test_size), the next train_start should be prev_train_start + step_size
+        assert train_next.index[0] == train_curr.index[0] + step_size
+        # Next OOS should start exactly where previous OOS ended if step_size == test_size
+        assert test_next.index[0] == test_curr.index[0] + step_size
+
+        # OOS must follow IS
+        assert test_curr.index[0] == train_curr.index[-1] + 1
