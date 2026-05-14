@@ -294,7 +294,7 @@ class WalkForwardOptimizer:
                         new_val = original_val + (direction * delta)
 
                         if is_int:
-                            new_val = int(round(new_val))
+                            new_val = round(new_val)
 
                         # Skip if no actual change
                         if new_val == original_val:
