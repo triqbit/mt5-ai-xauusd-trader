@@ -2,16 +2,16 @@
 Tests for the enhanced research reporting system v3.
 """
 
-import pytest
 from src.research.reporting import (
+    DriftMetric,
+    MethodologySection,
+    ModelDriftSection,
+    ResearchOrchestrator,
     ResearchReport,
     ResearchReporter,
-    ResearchOrchestrator,
-    DriftMetric,
-    ModelDriftSection,
     StrategicConfluenceSection,
-    MethodologySection
 )
+
 
 def test_enhanced_sections_integration():
     """Verify that new sections integrate correctly with the orchestrator and reporter."""
