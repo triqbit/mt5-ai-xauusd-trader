@@ -46,3 +46,10 @@ types-requests==2.32.0.20241016
 types-python-dateutil==2.9.0.20260508
 types-setuptools==82.0.0.20260508
 types-PyYAML==6.0.12.20260510
+
+# -- Secure Websocket dependencies (Fixes GHSA-g8c6-8fjj-2r4m) ------
+python-engineio==4.11.2
+python-socketio==5.14.0
+bidict==0.23.1
+simple-websocket==1.1.0
+wsproto==1.3.2
