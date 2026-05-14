@@ -38,7 +38,7 @@ The module is integrated into the `DecisionSupportSystem` to provide macro conte
 ### Risk Windows and Multipliers
 The system implements tiered risk management based on event impact and the calculated `severity_score`:
 - **Critical Impact:** Blocks execution (`is_blocked=True`) and sets `risk_multiplier=0.0`.
-- **High Impact (Major):** For FOMC, NFP, Interest Rate decisions, and **CPI**, a stricter `risk_multiplier=0.25` is applied (capping the severity-derived multiplier), with a minimum 2-hour pre-event window and 3-hour cooldown.
+- **High Impact (Major):** For FOMC, NFP, Interest Rate decisions, **CPI**, and **GEOPOLITICAL** events, a stricter `risk_multiplier=0.25` is applied (capping the severity-derived multiplier), with a minimum 2-hour pre-event window and 3-hour cooldown.
 - **High Impact (Generic):** Applies a `risk_multiplier=0.5`.
 - **Medium Impact:** Applies a `risk_multiplier=0.75`.
 The internal `RiskStatus` model provides structured output for downstream components:
