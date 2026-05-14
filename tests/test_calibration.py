@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
-from src.models.calibration import CalibrationEngine, CalibrationResult, ConfidenceBucket
+
+from src.models.calibration import CalibrationEngine, CalibrationResult
+
 
 def test_calibration_engine_perfect():
     """Verify metrics for a perfectly calibrated model."""
@@ -8,7 +10,7 @@ def test_calibration_engine_perfect():
     confidences = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
     # For a perfectly calibrated model, outcomes should match confidence probabilities.
     # In a deterministic test, we can use outcomes that match the bins.
-    outcomes = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1]) # Rough approximation
+    outcomes = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])  # Rough approximation
 
     result = engine.analyze(confidences, outcomes)
 
@@ -16,6 +18,7 @@ def test_calibration_engine_perfect():
     assert result.brier_score >= 0.0
     assert result.ece >= 0.0
     assert len(result.buckets) > 0
+
 
 def test_calibration_engine_empty():
     """Verify behavior with empty data."""
@@ -25,6 +28,7 @@ def test_calibration_engine_empty():
     assert result.brier_score == 0.0
     assert result.ece == 0.0
     assert result.buckets == []
+
 
 def test_calibration_engine_overconfident():
     """Verify metrics for an overconfident model."""
@@ -39,6 +43,7 @@ def test_calibration_engine_overconfident():
     assert result.ece == pytest.approx(0.4)
     assert result.status == "CRITICAL"
 
+
 def test_threshold_tuning():
     """Verify optimal threshold finding."""
     engine = CalibrationEngine()
@@ -49,6 +54,7 @@ def test_threshold_tuning():
     # At 0.7 threshold, we get 3/3 correct (Precision 1.0, Recall 1.0)
     opt_t = engine.tune_thresholds(confidences, outcomes, metric="f1")
     assert opt_t >= 0.7
+
 
 def test_temperature_scaling():
     """Verify temperature scaling adjustment."""
@@ -63,6 +69,7 @@ def test_temperature_scaling():
     # T < 1 should push towards extremes
     scaled_low = engine.apply_temperature_scaling(confidences, temperature=0.5)
     assert np.all(scaled_low > confidences)
+
 
 def test_overconfidence_mitigation():
     """Verify overconfidence mitigation heuristic."""

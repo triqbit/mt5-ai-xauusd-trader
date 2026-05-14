@@ -680,13 +680,17 @@ class ResearchReporter:
         if report.strategic_confluence:
             self.console.print(f"\n[bold green]{section_idx}. Strategic Confluence Analysis[/]")
             section_idx += 1
-            self.console.print(f"Confluence Score: [bold]{report.strategic_confluence.confluence_score:.1%}[/]")
+            self.console.print(
+                f"Confluence Score: [bold]{report.strategic_confluence.confluence_score:.1%}[/]"
+            )
             table = Table(box=None)
             table.add_column("Alignment Type")
             table.add_column("Score")
             table.add_row("Market Regime", f"{report.strategic_confluence.regime_alignment:.1%}")
             table.add_row("Trading Session", f"{report.strategic_confluence.session_alignment:.1%}")
-            table.add_row("Volatility State", f"{report.strategic_confluence.volatility_alignment:.1%}")
+            table.add_row(
+                "Volatility State", f"{report.strategic_confluence.volatility_alignment:.1%}"
+            )
             self.console.print(table)
             self.console.print(f"[dim]Insight: {report.strategic_confluence.insights}[/]")
 

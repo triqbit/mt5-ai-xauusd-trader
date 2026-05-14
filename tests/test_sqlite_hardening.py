@@ -1,21 +1,24 @@
-
 import os
-import sqlite3
+
 import pytest
-from sqlalchemy import Column, Integer, ForeignKey, select
+from sqlalchemy import Column, ForeignKey, Integer
 from sqlalchemy.orm import declarative_base
+
 from src.core.database import get_engine, get_session_factory
 
 Base = declarative_base()
 
+
 class Parent(Base):
-    __tablename__ = 'test_parents'
+    __tablename__ = "test_parents"
     id = Column(Integer, primary_key=True)
 
+
 class Child(Base):
-    __tablename__ = 'test_children'
+    __tablename__ = "test_children"
     id = Column(Integer, primary_key=True)
-    parent_id = Column(Integer, ForeignKey('test_parents.id'))
+    parent_id = Column(Integer, ForeignKey("test_parents.id"))
+
 
 @pytest.fixture
 def sqlite_engine():
@@ -34,6 +37,7 @@ def sqlite_engine():
         if os.path.exists(db_path + suffix):
             os.remove(db_path + suffix)
 
+
 def test_sqlite_pragmas(sqlite_engine):
     """Verify that WAL mode and Foreign Keys are enabled."""
     with sqlite_engine.connect() as conn:
@@ -43,12 +47,14 @@ def test_sqlite_pragmas(sqlite_engine):
         foreign_keys = conn.exec_driver_sql("PRAGMA foreign_keys").scalar()
         assert foreign_keys == 1
 
+
 def test_foreign_key_enforcement(sqlite_engine):
     """Verify that Foreign Key constraints are actually enforced by SQLite."""
     Base.metadata.create_all(sqlite_engine)
     Session = get_session_factory(sqlite_engine)
 
     from sqlalchemy.exc import IntegrityError
+
     with Session() as session:
         # Attempt to insert a child with a non-existent parent
         child = Child(id=1, parent_id=999)
