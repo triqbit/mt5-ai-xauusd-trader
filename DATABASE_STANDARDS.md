@@ -393,3 +393,6 @@ To ensure enterprise-grade reliability when using SQLite:
 
 ### Implementation Note (v1.3) - Observability
 - **Slow Query Logging**: The system implements automated slow query detection via SQLAlchemy event listeners. Queries exceeding `SLOW_QUERY_THRESHOLD` (default: 1.0s) are logged as warnings for performance monitoring.
+
+### Implementation Note (v1.4) - Feedback Loops
+- **Institutional Feedback**: Position closures in `main.py` trigger performance updates in the `CapitalAllocator`. This ensures that strategy risk is adjusted based on realized outcomes, closing the loop between execution and allocation. This path is verified by end-to-end integration tests.
