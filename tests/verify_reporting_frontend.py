@@ -1,5 +1,7 @@
 import os
+
 from playwright.sync_api import sync_playwright
+
 
 def verify_report_html():
     # Use absolute path for the generated HTML report
@@ -32,6 +34,7 @@ def verify_report_html():
         print(f"Screenshot saved to {screenshot_path}")
 
         browser.close()
+
 
 if __name__ == "__main__":
     verify_report_html()
