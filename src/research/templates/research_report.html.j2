@@ -260,6 +260,8 @@
                     <th scope="col">Total Return</th>
                     <th scope="col" title="Maximum observed equity loss from peak to trough.">Max Drawdown</th>
                     <th scope="col" title="Risk-adjusted return. Ratio of excess return to volatility. Target > 2.0.">Sharpe</th>
+                    <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown. Measures efficiency of recovering from losses.">Recov</th>
+                    <th scope="col" title="Profit Factor: Gross Profit / Gross Loss. Fundamental profitability metric.">PF</th>
                     <th scope="col">Outcome</th>
                 </tr>
             </thead>
@@ -269,6 +271,8 @@
                     <td>{{ stress_tests.baseline.total_return }}</td>
                     <td>{{ stress_tests.baseline.max_drawdown }}</td>
                     <td>{{ stress_tests.baseline.sharpe }}</td>
+                    <td>{{ stress_tests.baseline.recovery_factor }}</td>
+                    <td>{{ stress_tests.baseline.profit_factor }}</td>
                     <td>-</td>
                 </tr>
                 {% for s in stress_tests.scenarios %}
@@ -277,11 +281,18 @@
                     <td>{{ s.total_return }}</td>
                     <td>{{ s.max_drawdown }}</td>
                     <td>{{ s.sharpe }}</td>
+                    <td>{{ s.recovery_factor }}</td>
+                    <td>{{ s.profit_factor }}</td>
                     <td class="{{ s.outcome.lower() }}">{{ s.outcome }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        <div class="insight-box" style="margin-bottom: 2rem;">
+            <strong>Analytical Insights:</strong><br>
+            {{ stress_tests.insights }}
+        </div>
 
         <div style="display: flex; gap: 20px;">
             <div style="flex: 1;">
@@ -379,6 +390,8 @@
                     <th scope="col">Volatility</th>
                     <th scope="col">Confidence</th>
                     <th scope="col">Win Rate</th>
+                    <th scope="col" title="Mathematical expectancy: expected PnL per trade.">Exp</th>
+                    <th scope="col" title="Efficiency Ratio: measures quality of the capture relative to risk taken.">Eff</th>
                 </tr>
             </thead>
             <tbody>
@@ -389,8 +402,39 @@
                     <td>{{ m.volatility_bucket }}</td>
                     <td>{{ m.confidence_bucket }}</td>
                     <td>{{ (m.win_rate * 100)|round(1) }}%</td>
+                    <td>{{ m.expectancy|round(2) }}</td>
+                    <td>{{ m.efficiency_ratio|round(2) }}</td>
                 </tr>
                 {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if trade_patterns.combinations %}
+        <h3>Signal Combinations (Toxic vs Golden)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Pattern</th>
+                    <th scope="col">Frequency</th>
+                    <th scope="col">Type</th>
+                    <th scope="col" title="Mathematical expectancy: expected PnL per trade.">Exp</th>
+                    <th scope="col" title="Efficiency Ratio: measures quality of the capture relative to risk taken.">Eff</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for comb in trade_patterns.combinations %}
+                <tr>
+                    <td><code>{{ comb.patterns|join(', ') }}</code></td>
+                    <td>{{ comb.frequency }}</td>
+                    <td>
+                        {% if comb.is_toxic %}<span class="badge badge-critical">TOXIC</span>
+                        {% else %}<span class="badge badge-stable">GOLDEN</span>{% endif %}
+                    </td>
+                    <td>{{ comb.expectancy|round(2) }}</td>
+                    <td>{{ comb.efficiency_ratio|round(2) }}</td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -528,15 +572,15 @@
             <thead>
                 <tr>
                     <th scope="col">Agent</th>
-                    <th scope="col">Sharpe</th>
-                    <th scope="col">Sortino</th>
-                    <th scope="col">PF</th>
-                    <th scope="col">MaxDD</th>
-                    <th scope="col">Recov</th>
-                    <th scope="col">VaR(95)</th>
-                    <th scope="col">Tail</th>
-                    <th scope="col">Lake</th>
-                    <th scope="col">SQN</th>
+                    <th scope="col" title="Sharpe Ratio: Risk-adjusted return.">Sharpe</th>
+                    <th scope="col" title="Sortino Ratio: Risk-adjusted return focusing on downside volatility.">Sortino</th>
+                    <th scope="col" title="Profit Factor: Gross Profit / Gross Loss.">PF</th>
+                    <th scope="col" title="Maximum Drawdown: Largest peak-to-trough decline.">MaxDD</th>
+                    <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recov</th>
+                    <th scope="col" title="Value at Risk (95%): Maximum expected loss at 95% confidence level.">VaR(95)</th>
+                    <th scope="col" title="Tail Ratio: Ratio of 95th percentile return to 5th percentile absolute return.">Tail</th>
+                    <th scope="col" title="Lake Ratio: Ratio of time in drawdown to total time.">Lake</th>
+                    <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
                 </tr>
             </thead>
             <tbody>

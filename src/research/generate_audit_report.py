@@ -16,6 +16,7 @@ from src.research.reporting import (
     BehavioralRisk,
     BenchmarkComparison,
     BenchmarkSection,
+    CombinationMotif,
     DriftMetric,
     HyperparameterSection,
     ModelDriftSection,
@@ -25,6 +26,7 @@ from src.research.reporting import (
     RegimeSummary,
     ResearchOrchestrator,
     ResearchReporter,
+    SignalMotif,
     StressedMetric,
     StressTestSection,
     TradePatternSection,
@@ -83,6 +85,8 @@ def generate_full_audit():
             total_return="14.2%",
             max_drawdown="5.1%",
             sharpe="2.45",
+            recovery_factor="2.78",
+            profit_factor="1.95",
             outcome="PASS",
         ),
         scenarios=[
@@ -91,6 +95,8 @@ def generate_full_audit():
                 total_return="11.8%",
                 max_drawdown="6.4%",
                 sharpe="2.10",
+                recovery_factor="1.84",
+                profit_factor="1.62",
                 outcome="PASS",
             ),
             StressedMetric(
@@ -98,6 +104,8 @@ def generate_full_audit():
                 total_return="8.5%",
                 max_drawdown="9.2%",
                 sharpe="1.65",
+                recovery_factor="0.92",
+                profit_factor="1.35",
                 outcome="PASS",
             ),
             StressedMetric(
@@ -105,6 +113,8 @@ def generate_full_audit():
                 total_return="-2.1%",
                 max_drawdown="18.5%",
                 sharpe="-0.45",
+                recovery_factor="-0.11",
+                profit_factor="0.82",
                 outcome="FAIL",
             ),
         ],
@@ -116,6 +126,9 @@ def generate_full_audit():
             "Sudden 2% price gap in < 1 minute",
             "Service failure during peak London volume",
         ],
+        insights="The strategy shows exceptional resilience to execution delays and spread widening, "
+        "maintaining a Profit Factor > 1.3 even in 'Execution Hell'. However, the Flash Crash "
+        "scenario reveals a hard failure point where recovery factor collapses to negative levels.",
     )
     orchestrator.add_section(stress_section)
 
@@ -154,6 +167,39 @@ def generate_full_audit():
                 win_rate=0.58,
                 profit_factor=2.10,
                 total_trades=210,
+            ),
+        ],
+        motifs=[
+            SignalMotif(
+                algorithm="Ensemble",
+                direction=1,
+                volatility_bucket="Extreme",
+                confidence_bucket="Low",
+                session="New York",
+                frequency=12,
+                win_rate=0.25,
+                expectancy=-1.45,
+                efficiency_ratio=-0.32,
+            )
+        ],
+        combinations=[
+            CombinationMotif(
+                patterns=["LSTM:1", "PPO:1"],
+                frequency=8,
+                avg_pnl_after=42.5,
+                is_golden=True,
+                expectancy=2.15,
+                efficiency_ratio=0.65,
+                session="London",
+            ),
+            CombinationMotif(
+                patterns=["Transformer:-1", "PPO:1"],
+                frequency=5,
+                avg_pnl_after=-18.2,
+                is_toxic=True,
+                expectancy=-1.85,
+                efficiency_ratio=-0.45,
+                session="New York",
             ),
         ],
         behavioral_risks=[

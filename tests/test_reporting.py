@@ -9,6 +9,7 @@ import pytest
 from src.research.reporting import (
     AllocationEntry,
     AllocationSection,
+    CombinationMotif,
     RareEventSection,
     RareEventSummary,
     RegimeSection,
@@ -80,6 +81,10 @@ def sample_report():
 
 
 def test_markdown_generation(sample_report):
+    sample_report.stress_tests.insights = "Tested with high fidelity."
+    sample_report.stress_tests.baseline.recovery_factor = "2.5"
+    sample_report.stress_tests.baseline.profit_factor = "1.8"
+
     reporter = ResearchReporter()
     markdown = reporter.generate_markdown(sample_report)
 
@@ -96,6 +101,12 @@ def test_markdown_generation(sample_report):
     assert "XAUUSD_PPO" in markdown
     assert "$45,000" in markdown
     assert "Recommend deploying" in markdown
+
+    # New fields
+    assert "Analytical Insights:" in markdown
+    assert "Tested with high fidelity." in markdown
+    assert "2.5" in markdown
+    assert "1.8" in markdown
 
 
 def test_terminal_formatting(sample_report, capsys):
@@ -347,6 +358,18 @@ def test_trade_pattern_motifs():
                 confidence_bucket="Low",
                 frequency=5,
                 win_rate=0.2,
+                expectancy=-1.5,
+                efficiency_ratio=-0.4,
+            )
+        ],
+        combinations=[
+            CombinationMotif(
+                patterns=["Algo1:1", "Algo2:-1"],
+                frequency=3,
+                avg_pnl_after=-10.0,
+                is_toxic=True,
+                expectancy=-2.0,
+                efficiency_ratio=-0.5,
             )
         ],
     )
@@ -360,10 +383,27 @@ def test_trade_pattern_motifs():
 
     reporter = ResearchReporter()
     md = reporter.generate_markdown(report)
+    html = reporter.generate_html(report)
 
+    # Markdown checks
     assert "### Signal Motifs (Losing Combinations)" in md
     assert "PPO" in md
     assert "20.0%" in md
+    assert "-1.5" in md
+    assert "-0.4" in md
+    assert "### Signal Combinations (Toxic vs Golden)" in md
+    assert "Algo1:1, Algo2:-1" in md
+    assert "TOXIC" in md
+    assert "-2.0" in md
+
+    # HTML checks
+    assert "Signal Motifs (Losing Combinations)" in html
+    assert "PPO" in html
+    assert "20.0%" in html
+    assert "-1.5" in html
+    assert "Signal Combinations (Toxic vs Golden)" in html
+    assert "Algo1:1, Algo2:-1" in html
+    assert "TOXIC" in html
 
 
 def test_rl_evaluation_reporting():
