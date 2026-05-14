@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from src.research.benchmarks import (
     BenchmarkEvaluator,
@@ -111,16 +112,75 @@ def main():
     reporter = ResearchReporter()
     reporter.format_for_terminal(report)
 
-    # 6. Detailed statistical comparison for the 'Advanced' strategy vs EMA
+    # 6. Detailed statistical comparison for the 'Advanced' strategy vs Risk-Filtered Baseline
     advanced_name = strategies[-1].name
-    ema_name = strategies[0].name
-    console.print(f"\n[bold]Statistical Comparison ({advanced_name} vs {ema_name}):[/]")
-    comp = evaluator.compare_to_baseline(advanced_name, ema_name)
-    for key, val in comp.items():
-        if isinstance(val, float):
-            console.print(f"  {key}: {val:.6f}")
+    risk_filtered_name = strategies[-2].name
+    console.print(
+        f"\n[bold green]Institutional Comparative Summary: {advanced_name} vs {risk_filtered_name}[/]"
+    )
+
+    comp = evaluator.compare_to_baseline(advanced_name, risk_filtered_name)
+
+    table = Table(title="Strategy Comparison Metrics")
+    table.add_column("Metric", style="cyan")
+    table.add_column(risk_filtered_name, justify="right")
+    table.add_column(advanced_name, justify="right")
+    table.add_column("Improvement", justify="right")
+
+    s_metrics = evaluator.results[advanced_name]
+    b_metrics = evaluator.results[risk_filtered_name]
+
+    metrics_to_show = [
+        ("Total Return", "{:.2%}", True),
+        ("Sharpe Ratio", "{:.2f}", True),
+        ("Sortino Ratio", "{:.2f}", True),
+        ("Calmar Ratio", "{:.2f}", True),
+        ("Max Drawdown", "{:.2%}", False),
+        ("Profit Factor", "{:.2f}", True),
+        ("Expectancy", "{:.4f}", True),
+        ("SQN", "{:.2f}", True),
+        ("CVaR_95", "{:.2%}", True),
+        ("Ulcer Index", "{:.4f}", False),
+        ("Stability Score", "{:.2f}", True),
+    ]
+
+    for label, fmt, higher_is_better in metrics_to_show:
+        b_val = b_metrics.get(label, 0)
+        s_val = s_metrics.get(label, 0)
+
+        if higher_is_better:
+            improvement = s_val - b_val
         else:
-            console.print(f"  {key}: {val}")
+            improvement = b_val - s_val
+
+        is_improvement = improvement > 1e-9
+        is_worsening = improvement < -1e-9
+
+        if is_improvement:
+            diff_str = f"[green]+{fmt.format(abs(improvement))}[/]"
+        elif is_worsening:
+            diff_str = f"[red]{fmt.format(improvement)}[/]"
+        else:
+            diff_str = fmt.format(0)
+
+        table.add_row(label, fmt.format(b_val), fmt.format(s_val), diff_str)
+
+    console.print(table)
+
+    console.print("\n[bold]Statistical Significance Analysis:[/]")
+    table_sig = Table()
+    table_sig.add_column("Test")
+    table_sig.add_column("Result")
+    table_sig.add_column("P-Value")
+    table_sig.add_column("Status")
+
+    is_sig = comp.get("Significant", False)
+    status_str = "[bold green]SIGNIFICANT[/]" if is_sig else "[yellow]NOT SIGNIFICANT[/]"
+
+    table_sig.add_row("Paired T-test", f"t={comp.get('T-Statistic', 0):.4f}", f"{comp.get('P-Value', 1.0):.4f}", status_str)
+    table_sig.add_row("Wilcoxon Signed-Rank", "N/A", f"{comp.get('Wilcoxon P-Value', 1.0):.4f}", status_str)
+
+    console.print(table_sig)
 
 
 if __name__ == "__main__":

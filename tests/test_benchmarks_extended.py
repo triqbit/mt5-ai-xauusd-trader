@@ -12,6 +12,7 @@ import pytest
 from src.research.benchmarks import (
     ADXStrategy,
     BenchmarkEvaluator,
+    DonchianChannelStrategy,
     EMACrossoverStrategy,
     EnsembleAdapter,
 )
@@ -37,6 +38,13 @@ def sample_data():
 
 def test_adx_strategy_signals(sample_data):
     strategy = ADXStrategy(window=14, adx_threshold=20.0)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+
+
+def test_donchian_strategy_signals(sample_data):
+    strategy = DonchianChannelStrategy(window=10)
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
