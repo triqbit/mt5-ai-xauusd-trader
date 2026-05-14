@@ -831,20 +831,19 @@ class RegimeDetector:
 
             # 2. VOLATILE_BREAKOUT: High Volatility + High Efficiency
             scores[MarketRegime.VOLATILE_BREAKOUT] = (
-                min(atr_ratio / self.THRESH_BREAKOUT_ATR, 2.0) * 0.5 + (er / self.THRESH_BREAKOUT_ER) * 0.5
+                min(atr_ratio / self.THRESH_BREAKOUT_ATR, 2.0) * 0.5
+                + (er / self.THRESH_BREAKOUT_ER) * 0.5
             )
 
             # 3. TRENDING: Efficiency + Persistent Direction
-            scores[MarketRegime.TRENDING] = (
-                (er / self.THRESH_TRENDING_ER) * 0.5
-                + min(abs(angle) / self.THRESH_TRENDING_ANGLE, 2.0) * 0.5
-            )
+            scores[MarketRegime.TRENDING] = (er / self.THRESH_TRENDING_ER) * 0.5 + min(
+                abs(angle) / self.THRESH_TRENDING_ANGLE, 2.0
+            ) * 0.5
 
             # 4. MEAN_REVERSION: High Deviation + Low Efficiency
-            scores[MarketRegime.MEAN_REVERSION] = (
-                (abs(z_score) / self.THRESH_MEAN_REV_Z) * 0.6
-                + (1.0 - er) / (1.0 - self.THRESH_MEAN_REV_ER + 1e-9) * 0.4
-            )
+            scores[MarketRegime.MEAN_REVERSION] = (abs(z_score) / self.THRESH_MEAN_REV_Z) * 0.6 + (
+                1.0 - er
+            ) / (1.0 - self.THRESH_MEAN_REV_ER + 1e-9) * 0.4
 
             # 5. LOW_VOLATILITY_DRIFT: Low Volatility + Steady Angle + Stability
             # Penalty for high volatility

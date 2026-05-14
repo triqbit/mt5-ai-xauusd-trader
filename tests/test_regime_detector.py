@@ -466,7 +466,10 @@ class TestRegimeDetector(unittest.TestCase):
 
         # Mappings might be sensitive to weights, so we verify they are reasonable
         # instead of just failing if thresholds are slightly off in mock data
-        self.assertIn(self.detector._cluster_to_regime[0], [MarketRegime.TRENDING, MarketRegime.VOLATILE_BREAKOUT])
+        self.assertIn(
+            self.detector._cluster_to_regime[0],
+            [MarketRegime.TRENDING, MarketRegime.VOLATILE_BREAKOUT],
+        )
         self.assertEqual(self.detector._cluster_to_regime[1], MarketRegime.NEWS_SHOCK)
         self.assertEqual(self.detector._cluster_to_regime[2], MarketRegime.MEAN_REVERSION)
 
