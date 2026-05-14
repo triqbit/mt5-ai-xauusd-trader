@@ -172,6 +172,45 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
+    def reconcile_state(self, trade_logger: TradeLogger) -> None:
+        """
+        Recover operational state from the database.
+        Populates open positions and restores peak equity for accurate drawdown tracking.
+        """
+        logger.info("Reconciling RiskManager state from database...")
+
+        # 1. Recover open positions
+        try:
+            open_trades = trade_logger.get_open_trades()
+            for trade in open_trades:
+                # trade is now a dict: {"ticket": int, "symbol": str}
+                self.open_positions[trade["symbol"]] = trade["ticket"]
+            if open_trades:
+                logger.info("Recovered %d open positions from database.", len(open_trades))
+        except Exception as e:
+            logger.error("Failed to recover open positions during reconciliation: %s", e)
+
+        # 2. Restore peak equity
+        try:
+            snapshot = trade_logger.get_latest_performance_snapshot()
+            if snapshot and snapshot.get("peak_equity"):
+                # Ensure we don't restore a peak equity lower than current balance
+                peak_from_snapshot = snapshot["peak_equity"]
+                restored_peak = max(peak_from_snapshot, self.balance)
+                self.peak_equity = restored_peak
+                self.daily.peak_equity = max(self.daily.peak_equity, restored_peak)
+                logger.info(
+                    "Restored peak equity: %.2f (Current balance: %.2f)",
+                    self.peak_equity,
+                    self.balance,
+                )
+            else:
+                # If no snapshot, ensure peak_equity is at least current balance
+                self.peak_equity = max(self.peak_equity, self.balance)
+                self.daily.peak_equity = max(self.daily.peak_equity, self.balance)
+        except Exception as e:
+            logger.error("Failed to restore peak equity during reconciliation: %s", e)
+
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:

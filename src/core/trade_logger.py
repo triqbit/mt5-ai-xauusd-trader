@@ -27,8 +27,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from sqlalchemy.exc import OperationalError
+
 from src.core.audit_log import get_audit_logger
 from src.core.database import get_engine, get_session_factory
+from src.core.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +194,7 @@ class PerformanceMetric(Base, AuditMixin):
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
     max_drawdown: Mapped[float | None] = mapped_column(Float)
+    peak_equity: Mapped[float | None] = mapped_column(Float)
     total_trades: Mapped[int | None] = mapped_column(Integer)
     win_rate: Mapped[float | None] = mapped_column(Float)
 
@@ -211,6 +215,7 @@ class TradeLogger:
         # Caching performance report to avoid O(N) DB queries on every signal
         self._perf_cache: dict[str, float] | None = None
 
+    @with_retry(OperationalError, max_retries=3)
     def log_signal(self, signal_data: dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
         import structlog.contextvars
@@ -235,6 +240,7 @@ class TradeLogger:
             session.commit()
             return signal.id
 
+    @with_retry(OperationalError, max_retries=3)
     def log_trade(
         self,
         ticket: int,
@@ -269,6 +275,7 @@ class TradeLogger:
             session.commit()
             return trade.id
 
+    @with_retry(OperationalError, max_retries=3)
     def update_trade(
         self,
         ticket: int,
@@ -328,6 +335,7 @@ class TradeLogger:
                 select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             ).scalar_one_or_none()
 
+    @with_retry(OperationalError, max_retries=3)
     def log_risk_event(
         self,
         event_type: str,
@@ -346,6 +354,7 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
+    @with_retry(OperationalError, max_retries=3)
     def read_performance_report(self, persist: bool = False) -> dict[str, float]:
         """
         Calculate key performance metrics from closed trades.
@@ -436,10 +445,14 @@ class TradeLogger:
 
             # Optionally log these metrics to DB
             if persist:
+                # Calculate peak equity from the curve for state recovery
+                peak_eq = float(np.max(equity_curve)) if len(equity_curve) > 0 else 0.0
+
                 metric_record = PerformanceMetric(
                     sharpe_ratio=metrics["sharpe_ratio"],
                     profit_factor=metrics["profit_factor"],
                     max_drawdown=metrics["max_drawdown"],
+                    peak_equity=peak_eq,
                     total_trades=metrics["total_trades"],
                     win_rate=metrics["win_rate"],
                 )
@@ -447,3 +460,27 @@ class TradeLogger:
                 session.commit()
 
             return metrics
+
+    @with_retry(OperationalError, max_retries=3)
+    def get_open_trades(self) -> list[dict[str, Any]]:
+        """Retrieve all trades currently marked as OPEN."""
+        with self.Session() as session:
+            trades = session.execute(
+                select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
+            ).scalars().all()
+            # Convert to dict to avoid DetachedInstanceError
+            return [{"ticket": t.ticket, "symbol": t.symbol} for t in trades]
+
+    @with_retry(OperationalError, max_retries=3)
+    def get_latest_performance_snapshot(self) -> dict[str, Any] | None:
+        """Retrieve the most recent recorded performance snapshot."""
+        with self.Session() as session:
+            snapshot = session.execute(
+                select(PerformanceMetric)
+                .where(PerformanceMetric.is_deleted.is_(False))
+                .order_by(PerformanceMetric.timestamp.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if snapshot:
+                return {"peak_equity": snapshot.peak_equity}
+            return None

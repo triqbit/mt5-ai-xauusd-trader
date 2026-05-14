@@ -1479,6 +1479,9 @@ def main() -> int:
     allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
 
+    # Enterprise State Recovery
+    risk.reconcile_state(trade_logger)
+
     # Register default strategy in allocator
     # Ensure capital_cap is at least 0.01 to pass Pydantic gt=0 validation if balance is 0
     allocator.add_strategy(
