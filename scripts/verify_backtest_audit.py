@@ -1,17 +1,15 @@
-import os
 import sys
-from datetime import datetime, timedelta
-
-import numpy as np
+import os
 import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 
 # Ensure src is in path
 sys.path.append(os.getcwd())
 
-from src.core.audit_log import AuditLogger
+from src.core.audit_log import AuditLogger, get_audit_logger
 from src.core.feature_engineering import FeatureEngineer
 from src.trading.backtester import BacktestEngine
-
 
 def create_synthetic_data(n_bars=3000):
     start_time = datetime.now()

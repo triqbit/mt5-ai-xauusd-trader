@@ -5,14 +5,12 @@ tests/test_schemas_governance.py
 Tests for Pydantic schema validation and governance.
 """
 
-
 import pytest
 from pydantic import ValidationError
-
-from src.core.config import TradingConfig
+from datetime import datetime, UTC
+from src.core.schemas import TradeSignal, ExecutionDecision
 from src.core.constants import SignalDirection
-from src.core.schemas import ExecutionDecision, TradeSignal
-
+from src.core.config import TradingConfig
 
 def test_trade_signal_valid():
     """Verify valid TradeSignal instantiation."""

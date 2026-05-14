@@ -4,15 +4,14 @@ scripts/generate_incident_report.py
 Analyzes the trade and audit databases to provide a summary of recent operational incidents.
 """
 
-import os
 import sqlite3
+import os
 from datetime import datetime, timedelta, timezone
 
 # Use timezone.utc for compatibility with Python 3.10
 UTC = timezone.utc
 
 from dotenv import load_dotenv
-
 
 def get_db_path(env_var, default_filename):
     load_dotenv()

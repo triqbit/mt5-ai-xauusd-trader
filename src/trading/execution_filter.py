@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/execution_filter.py
-10-layer entry filter cascade to vet signals before execution.
+11-layer entry filter cascade to vet signals before execution.
 Author : triqbit
 License: MIT
 """
@@ -17,31 +17,19 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from src.core.schemas import ExecutionDecision
+
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
 
-
-@dataclass
-class ExecutionDecision:
-    """Result of the 6-layer execution filter cascade."""
-
-    signal: TradeSignal
-    confidence_score: float
-    blocked_by: str | None
-    trace: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def is_approved(self) -> bool:
-        """Returns True if the signal passed all 6 layers."""
-        return self.blocked_by is None
 
 logger = logging.getLogger(__name__)
 
 
 class ExecutionFilter:
     """
-    Implements a 6-layer validation cascade for trading signals.
+    Implements a 11-layer validation cascade for trading signals.
     Layers:
         1. ATR Volatility Threshold
         2. Trend Angle Confirmation
@@ -83,7 +71,7 @@ class ExecutionFilter:
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 9-layer filter cascade.
+        Run the full 11-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -223,15 +211,13 @@ class ExecutionFilter:
             self.monitor.record_internal_rejection("execution_filter", blocked_by)
 
         return ExecutionDecision(
+            is_approved=blocked_by is None,
             signal=signal,
             confidence_score=signal.confidence,
             blocked_by=blocked_by,
             trace=trace,
+            trace_id=signal.trace_id,
         )
-
-    def _check_atr_volatility(self, df: pd.DataFrame, threshold: float = 3.0) -> bool:
-        passed, _ = self._check_atr_volatility_with_metrics(df, threshold)
-        return bool(passed)
 
     def _check_atr_volatility_with_metrics(
         self,
@@ -276,10 +262,6 @@ class ExecutionFilter:
         passed = ratio <= threshold
         return bool(passed), {"current_atr": current_atr, "avg_atr": avg_atr, "ratio": ratio}
 
-    def _check_trend_angle(self, df: pd.DataFrame, direction: int, window: int = 20) -> bool:
-        passed, _ = self._check_trend_angle_with_metrics(df, direction, window)
-        return bool(passed)
-
     def _check_trend_angle_with_metrics(
         self,
         df: pd.DataFrame | None,
@@ -308,10 +290,6 @@ class ExecutionFilter:
 
         passed = (direction > 0 and slope > 0) or (direction < 0 and slope < 0)
         return bool(passed), {"slope": float(slope), "direction": direction}
-
-    def _check_ema_sequence(self, df: pd.DataFrame, direction: int) -> bool:
-        passed, _ = self._check_ema_sequence_with_metrics(df, direction)
-        return bool(passed)
 
     def _check_ema_sequence_with_metrics(
         self,
@@ -343,10 +321,6 @@ class ExecutionFilter:
         else:
             passed = False
         return bool(passed), {"emas": emas, "direction": direction}
-
-    def _check_momentum(self, df: pd.DataFrame, direction: int) -> bool:
-        passed, _ = self._check_momentum_with_metrics(df, direction)
-        return bool(passed)
 
     def _check_momentum_with_metrics(
         self,

@@ -7,13 +7,14 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+import numpy as np
 
 from src.analytics.execution_quality import (
     BlockedSignalQuality,
     ExecutionAnalyzer,
     TradeExecutionQuality,
 )
-from src.core.trade_logger import ExecutionQuality, ModelSignal, Trade
+from src.core.trade_logger import ModelSignal, Trade, ExecutionQuality
 
 
 @pytest.fixture

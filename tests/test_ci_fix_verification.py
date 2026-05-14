@@ -1,10 +1,10 @@
 """Tests to verify CI stability and package structure fixes."""
 
-from src.core.audit_log import AuditLogger, get_audit_logger
+import pytest
 from src.models.ensemble import EnsembleModel
-from src.monitoring import Monitor
+from src.core.audit_log import AuditLogger, get_audit_logger
 from src.utils import ScenarioGenerator
-
+from src.monitoring import Monitor
 
 def test_ensemble_model_initialization():
     """Verify EnsembleModel initializes correctly with its internal state."""

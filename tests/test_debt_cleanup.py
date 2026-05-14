@@ -1,8 +1,6 @@
 import subprocess
-from pathlib import Path
-
 import pytest
-
+from pathlib import Path
 
 def test_no_legacy_datetime_utcnow():
     """
@@ -23,7 +21,7 @@ def test_no_legacy_datetime_utcnow():
             lines = result.stdout.strip().split('\n')
             # Filter out risk_manager.py
             filtered = [line for line in lines if "src/trading/risk_manager.py" not in line]
-            assert not filtered, "Found legacy datetime.utcnow() calls:\n" + "\n".join(filtered)
+            assert not filtered, f"Found legacy datetime.utcnow() calls:\n" + "\n".join(filtered)
 
     except FileNotFoundError:
         pytest.skip("grep command not found")
@@ -52,7 +50,7 @@ def test_no_raw_print_in_core():
                 and "log." not in line
                 and line.strip().startswith("print(")
             ]
-            assert not filtered, "Found raw print() statements in core:\n" + "\n".join(filtered)
+            assert not filtered, f"Found raw print() statements in core:\n" + "\n".join(filtered)
 
     except FileNotFoundError:
         pytest.skip("grep command not found")

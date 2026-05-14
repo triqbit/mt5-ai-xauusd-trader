@@ -1,14 +1,13 @@
-from datetime import datetime, timedelta
-
-import numpy as np
+import os
 import pandas as pd
-from sqlalchemy import text
-
-from src.core.audit_log import AuditLogger
+import numpy as np
+import pytest
+from datetime import datetime, timedelta
+from src.core.audit_log import AuditLogger, get_audit_logger
 from src.core.feature_engineering import FeatureEngineer
-from src.core.schemas import TradeSignal
 from src.trading.backtester import BacktestEngine
-
+from src.core.schemas import TradeSignal
+from sqlalchemy import text
 
 def create_synthetic_data(n_bars=3000):
     start_time = datetime.now()

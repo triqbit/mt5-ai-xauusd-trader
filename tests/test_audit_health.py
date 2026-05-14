@@ -2,15 +2,12 @@
 Unit tests for AuditLogger and additional health checks.
 """
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
 import pytest
-
-from src.core.audit_log import AuditEntry, AuditLogger
-from src.core.config import TradingConfig
+from src.core.audit_log import AuditLogger, AuditEntry
 from src.core.health import HealthChecker, HealthStatus
-
+from src.core.config import TradingConfig
+from pathlib import Path
 
 @pytest.fixture
 def db_url():

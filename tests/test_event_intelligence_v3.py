@@ -1,17 +1,14 @@
-from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
-
 import pytest
-
+from datetime import datetime, timedelta, UTC
+from unittest.mock import patch, MagicMock
 from src.data.event_intelligence import (
-    BaseEventProvider,
+    EventIntelligence,
+    MetaAPIEventProvider,
+    MacroEvent,
     EventCategory,
     EventImpact,
-    EventIntelligence,
-    MacroEvent,
-    MetaAPIEventProvider,
+    BaseEventProvider
 )
-
 
 @pytest.fixture
 def now():

@@ -4,10 +4,12 @@ Unit tests for the BacktestEngine.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from unittest.mock import MagicMock
+
 import pytest
 
 from src.trading.backtester import BacktestEngine

@@ -1,11 +1,9 @@
 
-from unittest.mock import MagicMock, patch
-
 import pytest
-
-from src.core.exceptions import CircuitBreakerError, MT5DataError
+from unittest.mock import MagicMock, patch
 from src.trading.mt5_connector import MT5Connector
-
+from src.core.exceptions import MT5DataError, MT5ConnectionError, CircuitBreakerError
+from src.core.resilience import CircuitState
 
 @pytest.fixture
 def mock_config():

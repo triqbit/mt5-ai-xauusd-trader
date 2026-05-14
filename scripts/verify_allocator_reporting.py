@@ -1,13 +1,13 @@
 
-import os
 import sys
+import os
+from typing import Dict
 
 # Add src to path
 sys.path.append(os.getcwd())
 
-from src.research.reporting import AllocationSection
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-
+from src.research.reporting import AllocationSection
 
 def verify_reporting():
     allocator = CapitalAllocator(total_budget=100000.0)

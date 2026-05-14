@@ -3,13 +3,11 @@ Tests for BacktestEngine using deterministic scenarios from BacktestScenarioBuil
 """
 
 from unittest.mock import MagicMock
-
-import pandas as pd
 import pytest
-
+import pandas as pd
+import numpy as np
 from src.trading.backtester import BacktestEngine
 from src.utils.synthetic_data import BacktestScenarioBuilder
-
 
 class ConstantModel:
     """Always predicts BUY with constant confidence."""

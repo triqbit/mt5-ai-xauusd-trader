@@ -1,16 +1,13 @@
-from datetime import UTC, datetime, timedelta
-
 import pytest
-
+from datetime import datetime, timedelta, UTC
 from src.data.event_intelligence import (
+    EventIntelligence,
     BaseEventProvider,
+    MacroEvent,
     EventCategory,
     EventImpact,
-    EventIntelligence,
-    MacroEvent,
-    MockEventProvider,
+    MockEventProvider
 )
-
 
 @pytest.fixture
 def now():

@@ -1,8 +1,6 @@
 import numpy as np
 import pytest
-
-from src.models.calibration import CalibrationEngine, CalibrationResult
-
+from src.models.calibration import CalibrationEngine, CalibrationResult, ConfidenceBucket
 
 def test_calibration_engine_perfect():
     """Verify metrics for a perfectly calibrated model."""

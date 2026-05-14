@@ -1,8 +1,6 @@
-from unittest.mock import MagicMock, patch
-
 import pytest
-
-from src.core.exceptions import MT5ConnectionError
+from unittest.mock import MagicMock, patch
+from src.core.exceptions import MT5ConnectionError, MT5DataError
 from src.core.retry import with_retry
 
 # --- Retry Decorator Tests ---

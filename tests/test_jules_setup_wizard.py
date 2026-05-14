@@ -2,10 +2,11 @@
 MT5 AI/ML Trading Bot - Setup Wizard Tests
 tests/test_jules_setup_wizard.py
 """
-from unittest.mock import mock_open, patch
-
+import os
+from pathlib import Path
+from unittest.mock import MagicMock, patch, mock_open
+import pytest
 from main import run_setup_wizard
-
 
 def test_setup_wizard_save_logic():
     """Verify that the setup wizard correctly saves configuration to .env."""
