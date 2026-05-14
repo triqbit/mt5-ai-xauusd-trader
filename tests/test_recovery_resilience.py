@@ -1,21 +1,27 @@
 """
 Tests for state recovery and database resilience.
 """
-import pytest
+
 from unittest.mock import MagicMock, patch
-from src.core.trade_logger import TradeLogger, PerformanceMetric, Trade
-from src.trading.risk_manager import RiskManager
-from src.core.config import TradingConfig
+
+import pytest
 from sqlalchemy.exc import OperationalError
+
+from src.core.config import TradingConfig
+from src.core.trade_logger import Trade, TradeLogger
+from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def db_url(tmp_path):
     d = tmp_path / "test.db"
     return f"sqlite:///{d}"
 
+
 @pytest.fixture
 def trade_logger(db_url):
     return TradeLogger(db_url)
+
 
 @pytest.fixture
 def risk_manager():
@@ -25,6 +31,7 @@ def risk_manager():
     cfg.max_positions = 5
     cfg.max_losing_streak = 3
     return RiskManager(cfg, account_balance=10000.0)
+
 
 def test_trade_logger_retry_on_operational_error(db_url):
     # We want to test that the @with_retry decorator is working on TradeLogger methods.
@@ -40,24 +47,27 @@ def test_trade_logger_retry_on_operational_error(db_url):
         mock_session.commit.side_effect = [
             OperationalError("locked", {}, None),
             OperationalError("locked", {}, None),
-            None
+            None,
         ]
 
         # This should succeed after 2 retries
-        logger.log_signal({
-            "symbol": "XAUUSD",
-            "direction": 1,
-            "entry_price": 2000.0
-        })
+        logger.log_signal({"symbol": "XAUUSD", "direction": 1, "entry_price": 2000.0})
 
         assert mock_session.commit.call_count == 3
 
+
 def test_risk_manager_reconcile_open_positions(trade_logger, risk_manager):
     # 1. Manually add open trades to DB
-    trade_logger.log_trade(ticket=111, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=0.1, status="OPEN")
-    trade_logger.log_trade(ticket=222, symbol="EURUSD", direction=-1, entry_price=1.1000, lot_size=0.2, status="OPEN")
+    trade_logger.log_trade(
+        ticket=111, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=0.1, status="OPEN"
+    )
+    trade_logger.log_trade(
+        ticket=222, symbol="EURUSD", direction=-1, entry_price=1.1000, lot_size=0.2, status="OPEN"
+    )
     # Add a closed trade too
-    trade_logger.log_trade(ticket=333, symbol="GBPUSD", direction=1, entry_price=1.2500, lot_size=0.1, status="CLOSED")
+    trade_logger.log_trade(
+        ticket=333, symbol="GBPUSD", direction=1, entry_price=1.2500, lot_size=0.1, status="CLOSED"
+    )
 
     # 2. Reconcile
     risk_manager.reconcile_state(trade_logger)
@@ -70,12 +80,16 @@ def test_risk_manager_reconcile_open_positions(trade_logger, risk_manager):
     assert "GBPUSD" not in risk_manager.open_positions
     assert len(risk_manager.open_positions) == 2
 
+
 def test_risk_manager_reconcile_peak_equity(trade_logger, risk_manager):
     # 1. Add some trades and a performance snapshot with high peak equity
-    trade_logger.log_trade(ticket=1, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=1.0, status="CLOSED")
+    trade_logger.log_trade(
+        ticket=1, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=1.0, status="CLOSED"
+    )
     # Manually update pnl for the closed trade
     with trade_logger.Session() as session:
         from sqlalchemy import select
+
         t = session.execute(select(Trade).where(Trade.ticket == 1)).scalar_one()
         t.pnl = 500.0
         session.commit()
@@ -105,6 +119,7 @@ def test_risk_manager_reconcile_peak_equity(trade_logger, risk_manager):
     # Let's test with a real scenario where PnL sequence actually goes above 0.
     with trade_logger.Session() as session:
         from src.core.trade_logger import PerformanceMetric
+
         p = PerformanceMetric(peak_equity=12000.0, sharpe_ratio=2.0)
         session.add(p)
         session.commit()
@@ -112,6 +127,7 @@ def test_risk_manager_reconcile_peak_equity(trade_logger, risk_manager):
     risk_manager.reconcile_state(trade_logger)
     assert risk_manager.peak_equity == 12000.0
     assert risk_manager.daily.peak_equity == 12000.0
+
 
 def test_risk_manager_reconcile_no_data(db_url):
     cfg = MagicMock(spec=TradingConfig)

@@ -25,9 +25,8 @@ from sqlalchemy import (
     func,
     select,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from src.core.audit_log import get_audit_logger
 from src.core.database import get_engine, get_session_factory
@@ -465,9 +464,13 @@ class TradeLogger:
     def get_open_trades(self) -> list[dict[str, Any]]:
         """Retrieve all trades currently marked as OPEN."""
         with self.Session() as session:
-            trades = session.execute(
-                select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
-            ).scalars().all()
+            trades = (
+                session.execute(
+                    select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
             # Convert to dict to avoid DetachedInstanceError
             return [{"ticket": t.ticket, "symbol": t.symbol} for t in trades]
 

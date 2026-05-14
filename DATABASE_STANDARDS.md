@@ -393,3 +393,9 @@ To ensure enterprise-grade reliability when using SQLite:
 
 ### Implementation Note (v1.3) - Observability
 - **Slow Query Logging**: The system implements automated slow query detection via SQLAlchemy event listeners. Queries exceeding `SLOW_QUERY_THRESHOLD` (default: 1.0s) are logged as warnings for performance monitoring.
+
+### Implementation Note (v1.4) - State Recovery & Resilience
+To ensure system continuity across restarts and harden against transient failures:
+- **Operation Retries**: Critical database operations in `TradeLogger` are wrapped with exponential backoff retries (`@with_retry(OperationalError)`) to handle transient SQLite locks.
+- **State Reconciliation**: The `RiskManager` implements `reconcile_state()` which restores open positions and peak equity from the database during system startup. This prevents loss of risk context and ensures drawdown circuit breakers remain accurate.
+- **Detached Instance Safety**: Data fetched for reconciliation is converted to plain dictionaries to avoid `DetachedInstanceError` after session closure.
