@@ -15,14 +15,15 @@ import pandas as pd
 import pytest
 from sqlalchemy import select
 
-from src.core.audit_log import AuditLogger, AuditEntry
+from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.config import get_config
 from src.core.constants import SignalDirection
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
 from src.models.base_model import Signal
+from src.models.ensemble import EnsembleModel
 from src.trading.execution_filter import ExecutionFilter
+
 
 @pytest.fixture
 def system_env(tmp_path):
@@ -38,7 +39,7 @@ def system_env(tmp_path):
         "MODE": "demo",
         "DATABASE_URL": f"sqlite:///{db_path}",
         "MODEL_DRIFT_THRESHOLD": "0.3",
-        "MODEL_ACCURACY_FLOOR": "0.5"
+        "MODEL_ACCURACY_FLOOR": "0.5",
     }
 
     with patch.dict(os.environ, env_vars):
@@ -52,6 +53,7 @@ def system_env(tmp_path):
         trade_logger = TradeLogger(db_url=f"sqlite:///{db_path}")
 
         yield cfg, audit_logger, trade_logger
+
 
 @pytest.fixture
 def ensemble(system_env):
@@ -69,10 +71,12 @@ def ensemble(system_env):
 
     return model
 
+
 @pytest.fixture
 def execution_filter(system_env):
     cfg, _, _ = system_env
     return ExecutionFilter(max_drawdown=0.15, config=cfg)
+
 
 def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filter):
     """
@@ -86,11 +90,13 @@ def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filte
     cfg, audit_logger, trade_logger = system_env
 
     # Mock market data for ExecutionFilter (Trend matching BUY)
-    df = pd.DataFrame({
-        "high": [2000.0 + i for i in range(200)],
-        "low": [1990.0 + i for i in range(200)],
-        "close": [1995.0 + i for i in range(200)],
-    })
+    df = pd.DataFrame(
+        {
+            "high": [2000.0 + i for i in range(200)],
+            "low": [1990.0 + i for i in range(200)],
+            "close": [1995.0 + i for i in range(200)],
+        }
+    )
     # Add indicators to pass filters
     df["base_M5_ema_8"] = df["close"].ewm(span=8).mean()
     df["base_M5_ema_21"] = df["close"].ewm(span=21).mean()
@@ -116,7 +122,7 @@ def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filte
         lot_size=0.1,
         algorithm="ensemble",
         confidence=sig_obj.confidence,
-        timestamp=fixed_ts
+        timestamp=fixed_ts,
     )
 
     decision = execution_filter.validate(signal, df, current_drawdown=0.01, timestamp=fixed_ts)
@@ -168,7 +174,7 @@ def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filte
         lot_size=0.1,
         algorithm="ensemble",
         confidence=sig_obj_degraded.confidence,
-        timestamp=fixed_ts
+        timestamp=fixed_ts,
     )
 
     # Log to audit (simulating main.py behavior)
@@ -176,15 +182,11 @@ def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filte
         symbol=cfg.symbol,
         direction=sig_obj_degraded.direction.value,
         confidence=sig_obj_degraded.confidence,
-        model_metadata=sig_obj_degraded.metadata
+        model_metadata=sig_obj_degraded.metadata,
     )
 
     decision_blocked = execution_filter.validate(
-        signal_blocked,
-        df,
-        current_drawdown=0.01,
-        model_health=health_critical,
-        timestamp=fixed_ts
+        signal_blocked, df, current_drawdown=0.01, model_health=health_critical, timestamp=fixed_ts
     )
 
     assert decision_blocked.is_approved is False
@@ -195,34 +197,44 @@ def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filte
         symbol=cfg.symbol,
         direction=signal_blocked.direction,
         trace=decision_blocked.trace,
-        is_approved=decision_blocked.is_approved
+        is_approved=decision_blocked.is_approved,
     )
 
     # 5. Verify Traceability (Phase 4: Audit Verification)
     with audit_logger.Session() as session:
         # Verify prediction entry with penalty
-        penalty_entry = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "prediction")
-        ).scalars().all()[-1]
+        penalty_entry = (
+            session.execute(select(AuditEntry).where(AuditEntry.action == "prediction"))
+            .scalars()
+            .all()[-1]
+        )
         assert "drift_penalty" in penalty_entry.metadata_json["model_context"]
 
         # Verify execution decision block
-        block_entry = session.execute(
-            select(AuditEntry).where(AuditEntry.actor == "execution_filter")
-        ).scalars().one()
+        block_entry = (
+            session.execute(select(AuditEntry).where(AuditEntry.actor == "execution_filter"))
+            .scalars()
+            .one()
+        )
         assert block_entry.metadata_json["is_approved"] is False
         assert block_entry.metadata_json["trace"]["model_stability"]["passed"] is False
-        assert block_entry.metadata_json["trace"]["model_stability"]["drift"] == health_critical["drift"]
+        assert (
+            block_entry.metadata_json["trace"]["model_stability"]["drift"]
+            == health_critical["drift"]
+        )
+
 
 def test_recovery_after_stabilization(system_env, ensemble, execution_filter):
     """Verifies that if outcomes improve, the system recovers and allows trading again."""
     cfg, audit_logger, _ = system_env
     # Increasing price for TREND_ANGLE
-    df = pd.DataFrame({
-        "high": [2000.0 + i for i in range(100)],
-        "low": [1990.0 + i for i in range(100)],
-        "close": [1995.0 + i for i in range(100)],
-    })
+    df = pd.DataFrame(
+        {
+            "high": [2000.0 + i for i in range(100)],
+            "low": [1990.0 + i for i in range(100)],
+            "close": [1995.0 + i for i in range(100)],
+        }
+    )
     df["base_M5_ema_8"] = df["close"].ewm(span=8).mean()
     df["base_M5_ema_21"] = df["close"].ewm(span=21).mean()
     df["base_M5_ema_50"] = df["close"].ewm(span=50).mean()
@@ -254,11 +266,18 @@ def test_recovery_after_stabilization(system_env, ensemble, execution_filter):
     obs = np.random.rand(140)
     sig = ensemble.predict(obs)
     trade_sig = TradeSignal(
-        symbol=cfg.symbol, direction=sig.direction.value, entry_price=2100.0,
-        stop_loss=2090.0, take_profit=2120.0, lot_size=0.1, algorithm="ensemble",
+        symbol=cfg.symbol,
+        direction=sig.direction.value,
+        entry_price=2100.0,
+        stop_loss=2090.0,
+        take_profit=2120.0,
+        lot_size=0.1,
+        algorithm="ensemble",
         confidence=sig.confidence,
-        timestamp=fixed_ts
+        timestamp=fixed_ts,
     )
 
-    decision = execution_filter.validate(trade_sig, df, 0.01, model_health=health_recovered, timestamp=fixed_ts)
+    decision = execution_filter.validate(
+        trade_sig, df, 0.01, model_health=health_recovered, timestamp=fixed_ts
+    )
     assert decision.is_approved is True

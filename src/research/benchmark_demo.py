@@ -177,8 +177,15 @@ def main():
     is_sig = comp.get("Significant", False)
     status_str = "[bold green]SIGNIFICANT[/]" if is_sig else "[yellow]NOT SIGNIFICANT[/]"
 
-    table_sig.add_row("Paired T-test", f"t={comp.get('T-Statistic', 0):.4f}", f"{comp.get('P-Value', 1.0):.4f}", status_str)
-    table_sig.add_row("Wilcoxon Signed-Rank", "N/A", f"{comp.get('Wilcoxon P-Value', 1.0):.4f}", status_str)
+    table_sig.add_row(
+        "Paired T-test",
+        f"t={comp.get('T-Statistic', 0):.4f}",
+        f"{comp.get('P-Value', 1.0):.4f}",
+        status_str,
+    )
+    table_sig.add_row(
+        "Wilcoxon Signed-Rank", "N/A", f"{comp.get('Wilcoxon P-Value', 1.0):.4f}", status_str
+    )
 
     console.print(table_sig)
 

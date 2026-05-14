@@ -2,9 +2,9 @@
 Unit tests for the CapitalAllocator system.
 """
 
-import pytest
-
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.core.config import TradingConfig
 from src.trading.capital_allocator import (
@@ -268,6 +268,7 @@ def test_request_allocation_zero_cap(allocator):
     # This shouldn't happen with Pydantic validation (gt=0), but let's test logic if cap was 0
     # Actually Pydantic will raise error on StrategyConfig creation.
     from pydantic import ValidationError
+
     with pytest.raises(ValidationError):
         StrategyConfig(
             strategy_id="s1",
@@ -345,7 +346,9 @@ def test_diversification_score(allocator):
     assert allocator.get_diversification_score() == 1.0
 
     s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
-    s2 = StrategyConfig(strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0)
+    s2 = StrategyConfig(
+        strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0
+    )
     allocator.add_strategy(s1)
     allocator.add_strategy(s2)
 
@@ -450,7 +453,9 @@ def test_cooling_off_mechanism(allocator):
     # 4th loss -> stays floored
     allocator.update_strategy_performance("s1", -100.0)
     assert allocator.strategies["s1"].consecutive_losses == 4
-    assert allocator.strategies["s1"].performance_multiplier == 0.0  # multiplier can go below 0.1 if step continues
+    assert (
+        allocator.strategies["s1"].performance_multiplier == 0.0
+    )  # multiplier can go below 0.1 if step continues
 
     # Win -> resets consecutive losses
     allocator.update_strategy_performance("s1", 100.0)
@@ -706,7 +711,9 @@ def test_diversification_score_multi_factor(allocator):
     """
     # Scenario A: 2 strategies, 2 symbols, 2 families (Perfectly diversified)
     s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
-    s2 = StrategyConfig(strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0)
+    s2 = StrategyConfig(
+        strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0
+    )
     allocator.add_strategy(s1)
     allocator.add_strategy(s2)
     allocator.update_allocation("s1", 10000.0)
@@ -719,8 +726,12 @@ def test_diversification_score_multi_factor(allocator):
     allocator.strategies.clear()
     allocator.current_allocations.clear()
 
-    s1_b = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
-    s2_b = StrategyConfig(strategy_id="s2", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
+    s1_b = StrategyConfig(
+        strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0
+    )
+    s2_b = StrategyConfig(
+        strategy_id="s2", symbol="XAUUSD", model_family="RL", capital_cap=100000.0
+    )
     allocator.add_strategy(s1_b)
     allocator.add_strategy(s2_b)
     allocator.update_allocation("s1", 10000.0)

@@ -403,11 +403,38 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    risk_decision = None
+                    risk_approved = False
+                    if direction != 0:
+                        open_positions = connector.get_positions(cfg.symbol)
+                        # We need to pass atr in market_data for size_position
+                        market_data = df_raw.copy()
+                        if "atr" not in market_data.columns:
+                            # Use 14-period ATR for historical context in sizing
+                            market_data["atr"] = (
+                                (market_data["high"] - market_data["low"]).rolling(14).mean()
+                            )
+                            # Fill NaNs with high-low as proxy
+                            market_data["atr"] = market_data["atr"].fillna(
+                                market_data["high"] - market_data["low"]
+                            )
+
+                        # Use the precise 14-period ATR calculated for signal preparation
+                        market_data.loc[market_data.index[-1], "atr"] = atr
+
+                        risk_decision = risk.validate_signal(
+                            signal,
+                            market_data=market_data,
+                            open_positions=open_positions,
+                            model_health=health,
+                        )
+                        risk_approved = risk_decision.is_approved
+                        if risk_approved:
+                            # Update signal with adjusted lot size from risk engine
+                            signal = signal.model_copy(
+                                update={"lot_size": risk_decision.adjusted_lot_size}
+                            )
+                            lot_size = signal.lot_size
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -605,13 +632,17 @@ def run_live(
                                         exit_price=exit_price,
                                     )
 
-                                    # Update allocator performance for feedback loop
+                                    # Update risk manager and allocator performance for feedback loop
                                     updated_trade = trade_logger.get_trade_by_ticket(ticket)
-                                    if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
-                                        allocator.update_strategy_performance(
-                                            strat_id, updated_trade.pnl
-                                        )
+                                    if updated_trade:
+                                        # Register PnL with RiskManager to trigger daily loss/streak circuit breakers
+                                        risk.record_pnl(updated_trade.pnl)
+
+                                        if allocator:
+                                            strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                            allocator.update_strategy_performance(
+                                                strat_id, updated_trade.pnl
+                                            )
                             closed_tickets.append(symbol)
 
                     if closed_tickets and trade_logger:
