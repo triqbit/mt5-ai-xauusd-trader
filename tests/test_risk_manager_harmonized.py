@@ -95,9 +95,15 @@ def test_max_positions(risk_manager, buy_signal, market_data):
 def test_directional_exposure(risk_manager, buy_signal, market_data):
     # Max single direction is 30% of 10000 = 3000
     # Gold price approx 2300. 1 lot = 230000.
-    # Let's say we have 0.13 lots BUY already
+    # Let's say we have 0.13 lots BUY already (0.13 * 2300 * 100 = 29900)
+    # Wait, contract size 100. 0.13 lots = 13 oz. 13 * 2300 = 29900.
+    # 29900 / 10000 = 2.99 (299%)
+    # Let's use smaller volume to be around 30%
+    # 0.01 lot = 2300. 2300 / 10000 = 23%.
+    # 0.02 lot = 4600. 4600 / 10000 = 46%.
+
     open_positions = [
-        {"ticket": 1, "symbol": "XAUUSD", "volume": 0.13, "type": 0},
+        {"ticket": 1, "symbol": "XAUUSD", "volume": 0.02, "type": 0},
     ]
 
     decision = risk_manager.validate_signal(buy_signal, market_data, open_positions)
@@ -106,17 +112,22 @@ def test_directional_exposure(risk_manager, buy_signal, market_data):
 
 def test_atr_position_sizing(risk_manager, market_data):
     # Normal volatility
-    market_data["atr"] = 1.0
+    market_data.loc[:, "atr"] = 1.0
     size = risk_manager.size_position("XAUUSD", market_data)
     assert size > 0
 
     # Extreme volatility
+    # We need to make sure current_atr / avg_atr > 3.0
+    # avg_atr will be approx 1.0 if we set almost all to 1.0
+    market_data.loc[market_data.index[:-1], "atr"] = 1.0
     market_data.loc[market_data.index[-1], "atr"] = 4.0
-    # avg_atr remains approx 1.0. ratio = 4.0 > 3.0 (extreme threshold)
+
     size = risk_manager.size_position("XAUUSD", market_data)
     assert size == 0.0
 
 def test_full_approval(risk_manager, buy_signal, market_data):
+    # Ensure ATR is reasonable for sizing
+    market_data.loc[:, "atr"] = 1.0
     decision = risk_manager.validate_signal(buy_signal, market_data, [])
     assert decision.is_approved
     assert decision.reason == "Approved"
