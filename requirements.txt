@@ -24,7 +24,7 @@ httpx==0.28.1
 
 # ── MetaTrader 5 ────────────────────────────────────────────
 MetaTrader5==5.0.5735; sys_platform == 'win32'
-metaapi-cloud-sdk==29.1.1; sys_platform == 'win32'
+metaapi-cloud-sdk==29.1.1
 
 # ── Database ────────────────────────────────────────────────
 psycopg2-binary==2.9.10
