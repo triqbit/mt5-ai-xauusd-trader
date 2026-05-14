@@ -60,6 +60,9 @@ class TradeSignal(BaseModel):
         le=1.0,
         description="The model's confidence score (0.0 to 1.0). Higher means more certainty.",
     )
+    trace_id: str | None = Field(
+        None, description="Unique correlation ID for tracing the signal through the system"
+    )
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="The UTC timestamp when the signal was generated",
@@ -138,6 +141,9 @@ class ExecutionDecision(BaseModel):
     )
     blocked_by: str | None = Field(
         None, description="The name of the filter that blocked execution, if any"
+    )
+    trace_id: str | None = Field(
+        None, description="Unique correlation ID for tracing the decision through the system"
     )
     trace: dict[str, Any] = Field(
         default_factory=dict, description="Detailed audit trace of all filter evaluations"
