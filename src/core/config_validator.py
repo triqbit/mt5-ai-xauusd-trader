@@ -740,14 +740,33 @@ class ConfigValidator:
                 # Check if group or others have any permissions (0o077 mask)
                 if mode & (stat.S_IRWXG | stat.S_IRWXO):
                     current_mode = oct(stat.S_IMODE(mode))
-                    self.errors.append(
-                        ValidationError(
-                            "FILE_PERMISSION",
-                            f"Insecure permissions for {path.name}: {current_mode}",
-                            False,  # Warning for now to avoid breaking existing setups
-                            f"Run 'chmod 600 {path.name}' to restrict access.",
+
+                    # Enterprise Security: Automated permission hardening
+                    try:
+                        os.chmod(path, 0o600)
+                        # Verify hardening
+                        new_mode = os.stat(path).st_mode
+                        if not (new_mode & (stat.S_IRWXG | stat.S_IRWXO)):
+                            # Only log a warning if it was insecure but successfully hardened
+                            self.errors.append(
+                                ValidationError(
+                                    "FILE_PERMISSION",
+                                    f"Hardened insecure permissions for {path.name} from {current_mode} to 0o600.",
+                                    False,
+                                    "N/A (Automatically Corrected)",
+                                )
+                            )
+                            continue
+                    except Exception as e:
+                        # If automated hardening fails, report as warning
+                        self.errors.append(
+                            ValidationError(
+                                "FILE_PERMISSION",
+                                f"Insecure permissions for {path.name}: {current_mode}. Automated hardening failed: {e}",
+                                False,
+                                f"Run 'chmod 600 {path.name}' manually.",
+                            )
                         )
-                    )
             except Exception:
                 # Log but don't fail if we can't check permissions
                 pass
