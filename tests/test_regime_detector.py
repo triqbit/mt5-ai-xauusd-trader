@@ -396,8 +396,96 @@ class TestRegimeDetector(unittest.TestCase):
         self.assertAlmostEqual(
             info_detect_gmm.confidence, df_history_gmm["regime_confidence"].iloc[-1]
         )
-        # Transition scores might slightly differ due to state updates in detect if we don't reset last_regime
-        # But here we just care about logical consistency of the calculation path.
+
+    def test_get_regime_performance(self):
+        """Verify institutional performance analysis by regime."""
+        np.random.seed(42)
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "high": 2001.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "low": 1999.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "open": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "returns": np.random.randn(100) * 0.001,
+            }
+        )
+
+        perf = self.detector.get_regime_performance(data)
+        self.assertIsInstance(perf, pd.DataFrame)
+        self.assertIn("sharpe", perf.columns)
+        self.assertIn("total_return", perf.columns)
+        self.assertIn("mean", perf.columns)
+        self.assertGreater(len(perf), 0)
+
+    def test_scaling_integration(self):
+        """Verify that StandardScaler is integrated and active."""
+        np.random.seed(42)
+        # Generate data with high scale to ensure scaling matters
+        data = pd.DataFrame(
+            {
+                "close": 20000.0 + np.cumsum(np.random.randn(100) * 10.0),
+                "high": 20100.0 + np.cumsum(np.random.randn(100) * 10.0),
+                "low": 19900.0 + np.cumsum(np.random.randn(100) * 10.0),
+                "open": 20000.0 + np.cumsum(np.random.randn(100) * 10.0),
+            }
+        )
+
+        self.detector.fit(data, n_clusters=2)
+        self.assertTrue(hasattr(self.detector._scaler, "mean_"))
+        self.assertEqual(len(self.detector._scaler.mean_), len(self.detector.FEATURE_COLUMNS))
+
+        # Ensure detect uses the scaler
+        info = self.detector.detect(data.iloc[-self.detector.long_window - 1 :])
+        self.assertIsNotNone(info.label)
+
+    def test_transition_probability_matrix_completeness(self):
+        """Ensure transition matrix is a proper probability matrix."""
+        np.random.seed(42)
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
+                "high": 2001.0 + np.cumsum(np.random.randn(200) * 0.1),
+                "low": 1999.0 + np.cumsum(np.random.randn(200) * 0.1),
+                "open": 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
+            }
+        )
+        self.detector.fit(data, n_clusters=3)
+        tm = self.detector.transition_matrix
+
+        self.assertIsInstance(tm, pd.DataFrame)
+        # Probabilities should sum to 1 across rows
+        row_sums = tm.sum(axis=1)
+        for s in row_sums:
+            self.assertAlmostEqual(s, 1.0, places=5)
+
+    def test_gmm_mapping_robustness(self):
+        """Ensure cluster mapping works correctly with scaled data."""
+        np.random.seed(42)
+        # 1. Ranging data
+        ranging = pd.DataFrame(
+            {
+                "close": [100.0] * 100 + np.random.randn(100) * 0.01,
+                "high": [100.1] * 100 + np.random.randn(100) * 0.01,
+                "low": [99.9] * 100 + np.random.randn(100) * 0.01,
+                "open": [100.0] * 100 + np.random.randn(100) * 0.01,
+            }
+        )
+        # 2. Trending data
+        trending = pd.DataFrame(
+            {
+                "close": np.linspace(100, 200, 100),
+                "high": np.linspace(100.1, 200.1, 100),
+                "low": np.linspace(99.9, 199.9, 100),
+                "open": np.linspace(100, 200, 100) - 0.05,
+            }
+        )
+        data = pd.concat([ranging, trending])
+
+        self.detector.fit(data, n_clusters=2)
+        # Check if we have at least RANGING and TRENDING or similar mapped
+        labels = list(self.detector._cluster_to_regime.values())
+        self.assertIn(MarketRegime.RANGING, labels)
+        self.assertIn(MarketRegime.TRENDING, labels)
 
 
 if __name__ == "__main__":
