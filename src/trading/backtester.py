@@ -14,16 +14,14 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 import time
-
-import structlog
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import numpy as np
 import pandas as pd
+import structlog
 
 from src.core.audit_log import get_audit_logger
 from src.core.feature_engineering import FeatureEngineer
