@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from src.models.regime_detector import MarketRegime, RegimeInfo
+
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
@@ -55,6 +57,7 @@ class ExecutionFilter:
         9. Confidence Threshold
         10. Signal Consistency
         11. Macro Risk Gate
+        12. Regime Stability (Defensive Transition Check)
     """
 
     def __init__(
@@ -101,6 +104,7 @@ class ExecutionFilter:
         metrics = precomputed_metrics or {}
         model_health = kwargs.get("model_health")
         trade_logger = kwargs.get("trade_logger")
+        regime_info = kwargs.get("regime_info")
 
         # Layer 1: ATR Volatility
         atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(
@@ -162,7 +166,7 @@ class ExecutionFilter:
         # Layer 7: Model Stability
         if model_health:
             stability_passed, stability_metrics = self._check_model_stability_with_metrics(
-                model_health
+                model_health, regime_info=regime_info
             )
             trace["model_stability"] = {
                 "passed": bool(stability_passed),
@@ -178,7 +182,9 @@ class ExecutionFilter:
             }
 
         # Layer 9: Confidence Threshold
-        conf_passed, conf_metrics = self._check_confidence_threshold_with_metrics(signal)
+        conf_passed, conf_metrics = self._check_confidence_threshold_with_metrics(
+            signal, regime_info=regime_info
+        )
         trace["confidence_threshold"] = {
             "passed": bool(conf_passed),
             **conf_metrics,
@@ -200,6 +206,15 @@ class ExecutionFilter:
             **macro_metrics,
         }
 
+        # Layer 12: Regime Stability
+        regime_stab_passed, regime_stab_metrics = self._check_regime_stability_with_metrics(
+            regime_info
+        )
+        trace["regime_stability"] = {
+            "passed": bool(regime_stab_passed),
+            **regime_stab_metrics,
+        }
+
         # Determine final approval and blocked_by reason
         blocked_by = None
         failure_order = [
@@ -214,6 +229,7 @@ class ExecutionFilter:
             ("confidence_threshold", "CONFIDENCE_THRESHOLD"),
             ("signal_consistency", "SIGNAL_FLICKER"),
             ("macro_event", "MACRO_EVENT"),
+            ("regime_stability", "REGIME_UNSTABLE"),
         ]
         for layer_key, reason in failure_order:
             if layer_key in trace and not trace[layer_key]["passed"]:
@@ -391,15 +407,28 @@ class ExecutionFilter:
         return current_drawdown < self.max_drawdown
 
     def _check_model_stability_with_metrics(
-        self, model_health: dict[str, float]
+        self, model_health: dict[str, float], regime_info: RegimeInfo | None = None
     ) -> tuple[bool, dict[str, Any]]:
-        """Blocks if drift is too high or accuracy is too low."""
+        """
+        Blocks if drift is too high or accuracy is too low.
+        Hardens thresholds during NEWS_SHOCK and VOLATILE_BREAKOUT.
+        """
         drift_threshold = (
-            self.cfg.model_drift_threshold if self.cfg and hasattr(self.cfg, "model_drift_threshold") else 0.3
+            self.cfg.model_drift_threshold
+            if self.cfg and hasattr(self.cfg, "model_drift_threshold")
+            else 0.3
         )
         accuracy_floor = (
-            self.cfg.model_accuracy_floor if self.cfg and hasattr(self.cfg, "model_accuracy_floor") else 0.45
+            self.cfg.model_accuracy_floor
+            if self.cfg and hasattr(self.cfg, "model_accuracy_floor")
+            else 0.45
         )
+
+        # Regime-Adaptive Hardening
+        regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
+        if regime in [MarketRegime.NEWS_SHOCK, MarketRegime.VOLATILE_BREAKOUT]:
+            drift_threshold -= 0.10  # More sensitive to drift
+            accuracy_floor += 0.05  # Higher accuracy requirement
 
         drift = model_health.get("drift", 0.0)
         accuracy = model_health.get("accuracy", 1.0)
@@ -410,6 +439,7 @@ class ExecutionFilter:
             "drift_threshold": drift_threshold,
             "accuracy": accuracy,
             "accuracy_floor": accuracy_floor,
+            "regime_adaptive": regime != MarketRegime.UNKNOWN,
         }
 
     def _check_performance_guard_with_metrics(self, trade_logger: Any) -> tuple[bool, dict[str, Any]]:
@@ -427,14 +457,50 @@ class ExecutionFilter:
         return bool(passed), {"win_rate": win_rate, "floor": floor, "total_trades": total_trades}
 
     def _check_confidence_threshold_with_metrics(
-        self, signal: TradeSignal
+        self, signal: TradeSignal, regime_info: RegimeInfo | None = None
     ) -> tuple[bool, dict[str, Any]]:
-        """Blocks if signal confidence is below minimum threshold."""
+        """
+        Blocks if signal confidence is below minimum threshold.
+        Hardens thresholds during NEWS_SHOCK and VOLATILE_BREAKOUT.
+        """
         threshold = (
             self.cfg.min_confidence if self.cfg and hasattr(self.cfg, "min_confidence") else 0.55
         )
+
+        # Regime-Adaptive Hardening
+        regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
+        if regime == MarketRegime.NEWS_SHOCK:
+            threshold = max(threshold, 0.70)
+        elif regime == MarketRegime.VOLATILE_BREAKOUT:
+            threshold = max(threshold, 0.65)
+
         passed = signal.confidence >= threshold
-        return bool(passed), {"confidence": signal.confidence, "threshold": threshold}
+        return bool(passed), {
+            "confidence": signal.confidence,
+            "threshold": threshold,
+            "regime": regime,
+        }
+
+    def _check_regime_stability_with_metrics(
+        self, regime_info: RegimeInfo | None
+    ) -> tuple[bool, dict[str, Any]]:
+        """
+        Blocks if the market regime is highly unstable (transition_score > 0.8).
+        High transition scores indicate the model is uncertain about the current state,
+        making technical indicators less reliable.
+        """
+        if regime_info is None:
+            return True, {"status": "no_regime_info"}
+
+        transition_score = regime_info.transition_score
+        limit = 0.80
+
+        passed = transition_score <= limit
+        return bool(passed), {
+            "transition_score": transition_score,
+            "limit": limit,
+            "regime": regime_info.label,
+        }
 
     def _check_signal_consistency_with_metrics(
         self, symbol: str, direction: int
