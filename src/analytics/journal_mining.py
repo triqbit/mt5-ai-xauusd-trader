@@ -737,7 +737,11 @@ class JournalMiner:
                 total_loss = sum(t["pnl"] for t in current_cluster)
                 # Max drop is the difference between peak before cluster and trough in cluster
                 # If we don't have enough history, use 0 as peak
-                prev_equity = trades[i - len(current_cluster) - 1]["cum_pnl"] if (i - len(current_cluster) - 1) >= 0 else 0.0
+                prev_equity = (
+                    trades[i - len(current_cluster) - 1]["cum_pnl"]
+                    if (i - len(current_cluster) - 1) >= 0
+                    else 0.0
+                )
                 cluster_cum_pnls = [t["cum_pnl"] for t in current_cluster]
                 trough = min(cluster_cum_pnls)
                 max_drop = prev_equity - trough
