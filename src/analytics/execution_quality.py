@@ -83,9 +83,7 @@ class BlockedSignalQuality(BaseModel):
     max_favorable_excursion: float = Field(
         ..., description="Max favorable price movement after signal"
     )
-    max_adverse_excursion: float = Field(
-        ..., description="Max adverse price movement after signal"
-    )
+    max_adverse_excursion: float = Field(..., description="Max adverse price movement after signal")
     would_have_won: bool = Field(..., description="True if signal would have hit TP before SL")
 
 
@@ -107,7 +105,9 @@ class ExecutionSummary(BaseModel):
     rejected_signal_count: int
     executed_trade_count: int
     avg_mae: float = Field(default=0.0, description="Avg Max Adverse Excursion of blocked signals")
-    avg_mfe: float = Field(default=0.0, description="Avg Max Favorable Excursion of blocked signals")
+    avg_mfe: float = Field(
+        default=0.0, description="Avg Max Favorable Excursion of blocked signals"
+    )
 
     def to_report_section(self) -> Any:
         """Convert to reporting model."""
@@ -149,12 +149,12 @@ class ExecutionSummary(BaseModel):
                 value=f"{self.avg_alpha_decay:.2f} pips",
                 status="OK",
             ),
-                ExecutionMetric(
-                    name="Trade MFE/MAE",
-                    value=f"{self.avg_mfe_trades:.1f}/{self.avg_mae_trades:.1f} pips",
-                    status="OK",
-                ),
-            ]
+            ExecutionMetric(
+                name="Trade MFE/MAE",
+                value=f"{self.avg_mfe_trades:.1f}/{self.avg_mae_trades:.1f} pips",
+                status="OK",
+            ),
+        ]
 
         return ExecutionQualitySection(
             efficiency_score=float(self.execution_efficiency_score * 100),
@@ -269,9 +269,7 @@ class ExecutionAnalyzer:
         Compares requested signal price vs actual execution price.
         """
         with self.Session() as session:
-            trade = session.execute(
-                select(Trade).where(Trade.id == trade_id)
-            ).scalar_one_or_none()
+            trade = session.execute(select(Trade).where(Trade.id == trade_id)).scalar_one_or_none()
 
             if not trade or not trade.signal:
                 logger.warning("trade_or_signal_not_found", trade_id=trade_id)
@@ -703,13 +701,17 @@ class ExecutionAnalyzer:
         """Evaluate opportunity cost of rejected signals."""
         results = []
         with self.Session() as session:
-            blocked_events = session.execute(
-                select(RiskEvent).where(
-                    RiskEvent.created_at >= start_time,
-                    RiskEvent.event_type == "SIGNAL_REJECTED",
-                    RiskEvent.signal_id.isnot(None),
+            blocked_events = (
+                session.execute(
+                    select(RiskEvent).where(
+                        RiskEvent.created_at >= start_time,
+                        RiskEvent.event_type == "SIGNAL_REJECTED",
+                        RiskEvent.signal_id.isnot(None),
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             for event in blocked_events:
                 signal = session.execute(
@@ -818,9 +820,13 @@ class ExecutionAnalyzer:
         start_time = datetime.now(UTC) - timedelta(days=days)
         count = 0
         with self.Session() as session:
-            trades = session.execute(
-                select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
-            ).scalars().all()
+            trades = (
+                session.execute(
+                    select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
 
             for trade in trades:
                 existing = session.execute(
@@ -834,9 +840,13 @@ class ExecutionAnalyzer:
         """Aggregate execution quality metrics into a summary report."""
         start_time = datetime.now(UTC) - timedelta(days=days)
         with self.Session() as session:
-            trades = session.execute(
-                select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
-            ).scalars().all()
+            trades = (
+                session.execute(
+                    select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
             qualities = [self.analyze_trade(t.id, persist=persist) for t in trades]
             qualities = [q for q in qualities if q]
             blocked = self.analyze_blocked_signals(start_time, persist=persist)
