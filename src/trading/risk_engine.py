@@ -21,19 +21,10 @@ import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class RiskDecision:
-    """Decision details from the RiskEngine."""
-
-    is_approved: bool
-    reason: str = ""
-    adjusted_lot_size: float = 0.0
 
 
 @dataclass
@@ -106,53 +97,100 @@ class RiskEngine:
         Returns:
             RiskDecision: Approval status, reason, and adjusted lot size.
         """
+        trace: dict[str, Any] = {}
+
         # Layer 1: Circuit Breakers (Equity Drawdown)
-        if not self._check_drawdown_breaker():
-            return RiskDecision(False, "Hard drawdown limit reached")
+        drawdown_passed = self._check_drawdown_breaker()
+        trace["circuit_breaker"] = {"passed": drawdown_passed}
 
         # Layer 2: Daily Loss Limits (Level 4)
-        if self.get_daily_loss_level() >= 4:
-            return RiskDecision(False, "Daily loss limit reached (Level 4)")
+        daily_loss_level = self.get_daily_loss_level()
+        daily_loss_passed = daily_loss_level < 4
+        trace["daily_loss"] = {"passed": daily_loss_passed, "level": daily_loss_level}
 
         # Layer 3: Activity Limits
-        if self.daily.trade_count >= self.cfg.max_trades_per_day:
-            return RiskDecision(False, "Max daily trades reached")
-        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
-            return RiskDecision(False, "Max consecutive losses reached")
+        trade_count_passed = self.daily.trade_count < self.cfg.max_trades_per_day
+        consecutive_losses_passed = self.daily.consecutive_losses < self.cfg.max_losing_streak
+        trace["activity_limits"] = {
+            "passed": trade_count_passed and consecutive_losses_passed,
+            "trade_count": self.daily.trade_count,
+            "consecutive_losses": self.daily.consecutive_losses,
+        }
 
         # Layer 4: Exposure Limits
-        if len(open_positions) >= self.cfg.max_positions:
-            return RiskDecision(False, "Max concurrent positions reached")
-        if not self._check_directional_exposure(signal, open_positions):
-            return RiskDecision(False, "Max directional exposure reached (30%)")
-        if not self._check_total_notional(signal, open_positions, market_data):
-            return RiskDecision(False, "Total notional exposure exceeds equity")
+        positions_passed = len(open_positions) < self.cfg.max_positions
+        directional_passed = self._check_directional_exposure(signal, open_positions)
+        notional_passed = self._check_total_notional(signal, open_positions, market_data)
+        trace["exposure_limits"] = {
+            "passed": positions_passed and directional_passed and notional_passed,
+            "open_positions": len(open_positions),
+        }
 
-        # Layer 5: Symbol Allocation (Simplified for XAUUSD focus)
-        if signal.symbol != self.cfg.symbol:
-            return RiskDecision(False, f"Symbol {signal.symbol} not in approved list")
+        # Layer 5: Symbol Allocation
+        symbol_passed = signal.symbol == self.cfg.symbol
+        trace["symbol_allocation"] = {"passed": symbol_passed}
 
         # Layer 6: Prediction Limits
-        if signal.confidence < self.cfg.min_confidence:
-            return RiskDecision(
-                False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
-            )
+        confidence_passed = signal.confidence >= self.cfg.min_confidence
+        trace["prediction_limits"] = {"passed": confidence_passed, "confidence": signal.confidence}
 
-        # Layer 7: Risk-Reward Validation (Min 1.5 R:R)
-        if not self._check_risk_reward(signal):
-            return RiskDecision(False, "Risk-Reward ratio below 1.5")
+        # Layer 7: Risk-Reward Validation
+        rr_passed = self._check_risk_reward(signal)
+        trace["risk_reward"] = {"passed": rr_passed}
 
         # Layer 8: Model Health
-        if not self._check_model_health(model_health):
-            return RiskDecision(False, "Model health metrics below threshold")
+        health_passed = self._check_model_health(model_health)
+        trace["model_health"] = {"passed": health_passed}
+
+        # Check for first failure
+        failure_order = [
+            ("circuit_breaker", "Hard drawdown limit reached", "CIRCUIT_BREAKER"),
+            ("daily_loss", "Daily loss limit reached (Level 4)", "DAILY_LOSS"),
+            ("activity_limits", "Max daily trades or consecutive losses reached", "ACTIVITY_LIMIT"),
+            ("exposure_limits", "Exposure limits reached", "EXPOSURE_LIMIT"),
+            ("symbol_allocation", f"Symbol {signal.symbol} not in approved list", "SYMBOL_ALLOCATION"),
+            ("prediction_limits", f"Confidence {signal.confidence:.2f} too low", "PREDICTION_LIMIT"),
+            ("risk_reward", "Risk-Reward ratio below 1.5", "RISK_REWARD"),
+            ("model_health", "Model health metrics below threshold", "MODEL_HEALTH"),
+        ]
+
+        blocked_by = None
+        reason = "Approved"
+
+        for layer_key, fail_reason, fail_code in failure_order:
+            if not trace[layer_key]["passed"]:
+                blocked_by = fail_code
+                reason = fail_reason
+                break
+
+        if blocked_by:
+            return RiskDecision(
+                is_approved=False,
+                reason=reason,
+                blocked_by=blocked_by,
+                adjusted_lot_size=0.0,
+                trace=trace,
+            )
 
         # Calculate final lot size using ATR-based sizing
         adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
 
         if adjusted_lots < self.cfg.min_lot_size:
-            return RiskDecision(False, f"Calculated lot size {adjusted_lots} below minimum")
+            return RiskDecision(
+                is_approved=False,
+                reason=f"Calculated lot size {adjusted_lots} below minimum",
+                blocked_by="POSITION_SIZING",
+                adjusted_lot_size=0.0,
+                trace=trace,
+            )
 
-        return RiskDecision(True, "Approved", adjusted_lots)
+        return RiskDecision(
+            is_approved=True,
+            reason="Approved",
+            blocked_by=None,
+            adjusted_lot_size=adjusted_lots,
+            trace=trace,
+        )
 
     def calculate_position_size(self, symbol: str, market_data: pd.DataFrame) -> float:
         """

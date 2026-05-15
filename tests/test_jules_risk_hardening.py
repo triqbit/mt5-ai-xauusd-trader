@@ -48,17 +48,17 @@ def test_risk_manager_consecutive_losses(mock_config, mock_signal):
     rm.record_pnl(-100.0)
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 2
-    assert rm.approve(mock_signal) is True
+    assert rm.approve(mock_signal).is_approved is True
 
     # 2. Third loss (hit limit) - should reject
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 3
-    assert rm.approve(mock_signal) is False
+    assert rm.approve(mock_signal).is_approved is False
 
     # 3. Reset on profit
     rm.record_pnl(50.0)
     assert rm.daily.consecutive_losses == 0
-    assert rm.approve(mock_signal) is True
+    assert rm.approve(mock_signal).is_approved is True
 
 def test_risk_manager_model_health(mock_config, mock_signal):
     """Verify that RiskManager blocks trades based on model health metrics."""
@@ -66,19 +66,19 @@ def test_risk_manager_model_health(mock_config, mock_signal):
 
     # 1. Healthy model
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is True
+    assert rm.approve(mock_signal, model_health=health).is_approved is True
 
     # 2. High drift
     health = {"drift": 0.4, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.approve(mock_signal, model_health=health).is_approved is False
 
     # 3. Low accuracy
     health = {"drift": 0.1, "accuracy": 0.4, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.approve(mock_signal, model_health=health).is_approved is False
 
     # 4. High calibration error
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.3}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.approve(mock_signal, model_health=health).is_approved is False
 
 def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
     """Verify that AuditedRiskManager traces all 8 layers."""

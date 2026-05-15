@@ -108,7 +108,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
         )
 
         approved = risk.approve(signal, signal_id=signal_id)
-        assert approved is True
+        assert approved.is_approved is True
 
         # 5. Execution & Logging
         ticket = mock_connector.place_order(signal)
@@ -214,7 +214,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
             confidence=0.9
         )
         approved = risk.approve(signal)
-        assert approved is False
+        assert approved.is_approved is False
         mock_alert.assert_called_once()
 
     # Verify risk event logged

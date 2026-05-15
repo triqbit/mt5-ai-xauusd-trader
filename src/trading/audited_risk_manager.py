@@ -12,7 +12,7 @@ import logging
 from typing import Optional
 
 from src.core.audit_log import get_audit_logger
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.trading.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
@@ -29,24 +29,14 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision indicating approval and rejection reasons.
         Logs the full decision chain to the audit log.
         """
-        decision_chain = {
-            "circuit_breaker": self._check_circuit_breaker(),
-            "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
-            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
-            "min_confidence": self._check_minimum_confidence(signal.confidence),
-            "risk_reward": self._check_risk_reward(signal),
-            "consecutive_losses": self._check_consecutive_losses(),
-            "model_health": self._check_model_health(model_health),
-        }
-
-        passed = all(decision_chain.values())
+        decision = super().approve(signal, signal_id, model_health)
+        decision_chain = {k: v["passed"] for k, v in decision.trace.items()}
 
         # Log to Audit Trail
         try:
@@ -55,7 +45,7 @@ class AuditedRiskManager(RiskManager):
                 symbol=signal.symbol,
                 direction=signal.direction,
                 decision_chain=decision_chain,
-                passed=passed,
+                passed=decision.is_approved,
             )
 
             # Log high-severity circuit breaker events specifically
@@ -78,23 +68,13 @@ class AuditedRiskManager(RiskManager):
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 
-        if not passed:
+        if not decision.is_approved:
             rejection_reasons = [k for k, v in decision_chain.items() if not v]
             reason_str = ", ".join(rejection_reasons)
-            logger.warning(
-                "Signal REJECTED | %s %s | Failed: %s",
-                signal.symbol,
-                signal.direction,
-                reason_str,
-            )
+            # Warning logging already handled by super().approve()
             if self.monitor:
                 for reason in rejection_reasons:
                     self.monitor.record_internal_rejection("risk_manager", reason.upper())
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=f"Failed filters: {reason_str}",
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
-        return passed
+            # Risk event logging already handled by super().approve()
+
+        return decision

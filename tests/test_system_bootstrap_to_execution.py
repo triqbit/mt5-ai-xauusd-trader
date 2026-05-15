@@ -188,7 +188,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     )
 
     risk_approved = risk_manager.approve(signal)
-    assert risk_approved is True
+    assert risk_approved.is_approved is True
 
     drawdown = (risk_manager.peak_equity - risk_manager.balance) / risk_manager.peak_equity
     # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
@@ -273,7 +273,7 @@ def test_system_failure_handling_risk_rejection(system_env):
 
     # 2. Execute Risk Approval - Should fail
     risk_approved = risk_manager.approve(signal)
-    assert risk_approved is False
+    assert risk_approved.is_approved is False
 
     # 3. Verify failure trace in Audit Log
     with audit_logger.Session() as session:
