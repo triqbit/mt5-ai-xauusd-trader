@@ -542,9 +542,12 @@
                 <th scope="col" title="Max Drawdown: Largest peak-to-trough decline.">MaxDD</th>
                 <th scope="col" title="Conditional Value at Risk: Expected loss in the worst 5% of cases.">CVaR</th>
                 <th scope="col" title="Profit Factor: Gross Profit / Gross Loss.">PF</th>
+                <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recov</th>
                 <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
-                <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recovery</th>
-                <th scope="col" title="Calmar Ratio: Annualized Return / Max Drawdown.">Calmar</th>
+                <th scope="col" title="Ulcer Index: measures drawdown stress (lower is better).">Ulcer</th>
+                <th scope="col" title="Lake Ratio: Ratio of time in drawdown to total time.">Lake</th>
+                <th scope="col" title="Tail Ratio: Ratio of 95th to 5th percentile returns.">Tail</th>
+                <th scope="col" title="Common Sense Ratio: Tail Ratio * Profit Factor.">CSR</th>
                 <th scope="col" title="Statistical significance. p < 0.05 indicates the result is likely not due to luck.">P-Value</th>
             </tr>
         </thead>
@@ -557,9 +560,12 @@
                 <td>{{ b.max_drawdown }}</td>
                 <td>{{ b.expected_shortfall }}</td>
                 <td>{{ b.profit_factor }}</td>
-                <td>{{ b.sqn }}</td>
                 <td>{{ b.recovery_factor }}</td>
-                <td>{{ b.calmar_ratio }}</td>
+                <td>{{ b.sqn }}</td>
+                <td>{{ b.ulcer_index }}</td>
+                <td>{{ b.lake_ratio }}</td>
+                <td>{{ b.tail_ratio }}</td>
+                <td>{{ b.common_sense_ratio }}</td>
                 <td>{{ b.p_value }}</td>
             </tr>
             {% endfor %}
@@ -580,10 +586,11 @@
                     <th scope="col">Agent</th>
                     <th scope="col" title="Sharpe Ratio: Risk-adjusted return.">Sharpe</th>
                     <th scope="col" title="Sortino Ratio: Risk-adjusted return focusing on downside volatility.">Sortino</th>
+                    <th scope="col" title="Annualized Volatility.">Vol</th>
                     <th scope="col" title="Profit Factor: Gross Profit / Gross Loss.">PF</th>
+                    <th scope="col" title="Mathematical Expectancy per trade.">Exp</th>
                     <th scope="col" title="Maximum Drawdown: Largest peak-to-trough decline.">MaxDD</th>
                     <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recov</th>
-                    <th scope="col" title="Value at Risk (95%): Maximum expected loss at 95% confidence level.">VaR(95)</th>
                     <th scope="col" title="Tail Ratio: Ratio of 95th percentile return to 5th percentile absolute return.">Tail</th>
                     <th scope="col" title="Lake Ratio: Ratio of time in drawdown to total time.">Lake</th>
                     <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
@@ -595,10 +602,11 @@
                     <td><strong>{{ m.agent_name }}</strong></td>
                     <td>{{ m.sharpe|round(2) }}</td>
                     <td>{{ m.sortino|round(2) }}</td>
+                    <td>{{ (m.volatility * 100)|round(1) }}%</td>
                     <td>{{ m.profit_factor|round(2) }}</td>
+                    <td>{{ m.expectancy|round(2) }}</td>
                     <td>{{ (m.max_dd * 100)|round(1) }}%</td>
                     <td>{{ m.recovery_factor|round(2) }}</td>
-                    <td>{{ (m.var_95 * 100)|round(2) }}%</td>
                     <td>{{ m.tail_ratio|round(2) }}</td>
                     <td>{{ m.lake_ratio|round(2) }}</td>
                     <td>{{ m.sqn|round(2) }}</td>

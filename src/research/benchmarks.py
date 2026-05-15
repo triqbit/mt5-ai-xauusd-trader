@@ -592,6 +592,10 @@ class BenchmarkEvaluator:
                     recovery_factor=f"{metrics.get('Recovery Factor', 0.0):.2f}",
                     calmar_ratio=f"{metrics.get('Calmar Ratio', 0.0):.2f}",
                     expected_shortfall=f"{metrics.get('CVaR_95', 0.0):.2%}",
+                    ulcer_index=f"{metrics.get('Ulcer Index', 0.0):.2f}",
+                    lake_ratio=f"{metrics.get('Lake Ratio', 0.0):.2f}",
+                    tail_ratio=f"{metrics.get('Tail Ratio', 0.0):.2f}",
+                    common_sense_ratio=f"{metrics.get('Common Sense Ratio', 0.0):.2f}",
                 )
             )
 

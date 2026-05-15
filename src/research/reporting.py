@@ -184,6 +184,10 @@ class BenchmarkComparison(BaseModel):
     recovery_factor: str = "0.00"
     calmar_ratio: str = "0.00"
     expected_shortfall: str = "0.00"
+    ulcer_index: str = "0.00"
+    lake_ratio: str = "0.00"
+    tail_ratio: str = "0.00"
+    common_sense_ratio: str = "0.00"
 
 
 class BenchmarkSection(BaseModel):
@@ -194,12 +198,19 @@ class BenchmarkSection(BaseModel):
 
 
 class RLMetric(BaseModel):
-    """Detailed performance metrics for Reinforcement Learning agents."""
+    """
+    Detailed performance and robustness metrics for a specific RL agent.
+
+    Captures institutional-grade risk-adjusted returns, downside risk,
+    and portfolio exposure characteristics.
+    """
 
     agent_name: str
     sharpe: float
     sortino: float = 0.0
+    volatility: float = 0.0
     profit_factor: float
+    expectancy: float = 0.0
     max_dd: float
     win_rate: float
     calmar: float = 0.0
@@ -612,7 +623,8 @@ class ResearchReporter:
             table.add_column("Sortino")
             table.add_column("PF")
             table.add_column("MaxDD")
-            table.add_column("VaR(95)")
+            table.add_column("Recov")
+            table.add_column("Exp")
             table.add_column("SQN")
             for m in report.rl_evaluation.metrics:
                 table.add_row(
@@ -621,7 +633,8 @@ class ResearchReporter:
                     f"{m.sortino:.2f}",
                     f"[{self._get_color_for_metric(m.profit_factor, 'pf')}]{m.profit_factor:.2f}[/]",
                     f"{m.max_dd:.2%}",
-                    f"{m.var_95:.2%}",
+                    f"[{self._get_color_for_metric(m.recovery_factor, 'recovery')}]{m.recovery_factor:.2f}[/]",
+                    f"{m.expectancy:.2f}",
                     f"{m.sqn:.2f}",
                 )
             self.console.print(table)
