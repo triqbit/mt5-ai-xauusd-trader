@@ -440,6 +440,40 @@ Generic bots are "Positioning Blind." They follow price momentum without realizi
 
 ---
 
+## 13. Institutional Fractal Efficiency & Regime Persistence
+
+### What it is and why it matters
+**Institutional Fractal Efficiency & Regime Persistence** is a specialized analytical layer that utilizes Chaos Theory metrics—specifically the **Hurst Exponent (H)** and **Fractal Dimension (D)**—to quantify the "memory" and structural efficiency of the XAUUSD market.
+
+In institutional trading, distinguishing between a "Random Walk," a "Persistent Trend," and an "Anti-persistent Mean Reversion" is the difference between alpha and liquidation. XAUUSD frequently exhibits long-range dependence, where past price actions significantly influence future moves. This feature allows the system to detect when the market is in a "Persistent" state (H > 0.5), indicating a high-conviction trend that is likely to continue, or an "Efficient" state (H ≈ 0.5), where technical signals are essentially noise.
+
+### How it differentiates from generic trading bots
+Generic bots treat all price movement as equally tradable, often falling victim to "False Trends" in efficient markets. The MT5 AI Trader differentiates by applying **Fractal Filtering**. It recognizes that not all trends are created equal; a trend backed by high Hurst persistence is structurally different from a temporary price spike. By quantifying market "memory," the system can automatically avoid trend-following strategies during mean-reverting regimes and vice-versa, providing a mathematical edge that standard momentum indicators cannot match.
+
+### Architecture Outline
+1.  **Fractal Analytics Engine**: A background service in `src/research/fractal_engine.py` that computes rolling Hurst Exponents using Rescaled Range (R/S) analysis or Detrended Fluctuation Analysis (DFA) across multiple timeframes (M15, H1, D1).
+2.  **Efficiency Scoring Module**: Translates raw fractal metrics into a normalized "Efficiency Index." A low index (High Persistence) signals a "Fractal Greenlight" for trend-following models.
+3.  **Regime Persistence Monitor**: Integrates with the `RegimeDetector` to track how long a specific regime is likely to persist before decaying into a random walk.
+4.  **Signal Persistence Hook**: A gate in the `ExecutionFilter` that adjust the `ExecutionDecision` confidence based on the alignment between the signal direction and the fractal persistence of the current timeframe.
+
+### Acceptance Criteria
+| Category | Requirement |
+| :--- | :--- |
+| **Functional** | Real-time calculation of rolling Hurst Exponent (H) for XAUUSD on M15 and H1 timeframes. |
+| **Functional** | Detection of "Regime Decay" where H drops from >0.6 to <0.5. |
+| **Technical** | Calculation must handle at least 1024 lookback periods for statistical significance without impacting loop latency. |
+| **Operational** | "Fractal Persistence: [Persistent/Efficient/Mean-Reverting]" status displayed in the Decision Cockpit. |
+| **Release Readiness** | Backtests must show a 20% improvement in trend-following win rate when filtered by H > 0.55. |
+
+### Implementation Lane
+*   **Jules04 (Quant Research)**: Lead on fractal mathematics, DFA implementation, and persistence logic.
+*   **Jules01 (Core Development)**: Lead on integrating fractal metrics into the `ExecutionFilter` and `RegimeDetector`.
+
+### Dependencies and Constraints
+*   **Dependencies**: Requires high-fidelity historical M1/M5 data to ensure accurate R/S calculations.
+*   **Constraints**: Fractal metrics are computationally intensive; calculation should be performed on a dedicated worker thread or cached every 1-5 minutes.
+
+---
+
 ## Future Differentiators (Candidates)
-- **Institutional Fractal Efficiency & Regime Persistence** (Hurst Exponent analysis)
 - **Sentiment-Driven Order Routing** (Analyzing retail vs. institutional positioning)
