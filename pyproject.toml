@@ -50,6 +50,7 @@ dependencies = [
     "python-telegram-bot==21.10",
     "psutil==7.2.2",
     "optuna==4.8.0",
+    "python-socketio==4.11.0",
     "MetaTrader5==5.0.5735; sys_platform == 'win32'",
     "metaapi-cloud-sdk==29.1.1",
 ]
@@ -67,6 +68,11 @@ test = [
     "pytest-mock==3.15.1",
     "pytest-cov==7.1.0",
     "hypothesis==6.125.2",
+    "types-redis==4.6.0.20241004",
+    "types-requests==2.32.0.20241016",
+    "types-python-dateutil==2.9.0.20260508",
+    "types-setuptools==82.0.0.20260508",
+    "types-PyYAML==6.0.12.20260510",
 ]
 
 [tool.setuptools.packages.find]
