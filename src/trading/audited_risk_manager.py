@@ -125,7 +125,9 @@ class AuditedRiskManager(RiskManager):
                 )
         return passed
 
-    def _log_audit(self, signal: TradeSignal, decision_chain: Dict[str, bool], passed: bool) -> None:
+    def _log_audit(
+        self, signal: TradeSignal, decision_chain: Dict[str, bool], passed: bool
+    ) -> None:
         """Common audit logging logic."""
         try:
             audit = get_audit_logger()

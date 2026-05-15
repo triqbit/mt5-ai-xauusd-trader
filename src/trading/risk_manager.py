@@ -218,11 +218,13 @@ class RiskManager:
             return self._calculate_atr_size(symbol, market_data)
 
         if win_rate is not None and avg_win is not None and avg_loss is not None:
-             return self._calculate_kelly_size(win_rate, avg_win, avg_loss, pip_value)
+            return self._calculate_kelly_size(win_rate, avg_win, avg_loss, pip_value)
 
         return self.cfg.min_lot_size
 
-    def _calculate_kelly_size(self, win_rate: float, avg_win: float, avg_loss: float, pip_value: float) -> float:
+    def _calculate_kelly_size(
+        self, win_rate: float, avg_win: float, avg_loss: float, pip_value: float
+    ) -> float:
         """Fractional Kelly Criterion position sizing."""
         if avg_loss == 0:
             return self.cfg.min_lot_size
@@ -325,10 +327,14 @@ class RiskManager:
         if self.daily.peak_equity <= 0 or self.daily.realised_pnl >= 0:
             return 0
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if loss_pct >= self.cfg.max_daily_loss: return 4
-        if loss_pct >= self.cfg.daily_loss_lvl3: return 3
-        if loss_pct >= self.cfg.daily_loss_lvl2: return 2
-        if loss_pct >= self.cfg.daily_loss_lvl1: return 1
+        if loss_pct >= self.cfg.max_daily_loss:
+            return 4
+        if loss_pct >= self.cfg.daily_loss_lvl3:
+            return 3
+        if loss_pct >= self.cfg.daily_loss_lvl2:
+            return 2
+        if loss_pct >= self.cfg.daily_loss_lvl1:
+            return 1
         return 0
 
     def get_size_multiplier_from_loss(self) -> float:
@@ -352,7 +358,11 @@ class RiskManager:
                 net_lots -= vol
 
         # SignalDirection is IntEnum, so comparison works
-        net_lots += self.cfg.min_lot_size if signal.direction == SignalDirection.BUY else -self.cfg.min_lot_size
+        net_lots += (
+            self.cfg.min_lot_size
+            if signal.direction == SignalDirection.BUY
+            else -self.cfg.min_lot_size
+        )
         price_estimate = 2300.0  # Gold estimate
         notional = abs(net_lots) * price_estimate * 100
         exposure_pct = notional / self.balance if self.balance > 0 else 1.0
