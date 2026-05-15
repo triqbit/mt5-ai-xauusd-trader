@@ -73,6 +73,7 @@ class ModelSignal(Base, AuditMixin):
     algorithm: Mapped[str | None] = mapped_column(String(50))
     confidence: Mapped[float | None] = mapped_column(Float)
     volatility: Mapped[float | None] = mapped_column(Float)
+    explanation: Mapped[str | None] = mapped_column(Text)  # JSON-encoded SignalExplanation
     trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
@@ -218,6 +219,18 @@ class TradeLogger:
 
         trace_id = structlog.contextvars.get_contextvars().get("trace_id")
 
+        # Handle SignalExplanation object if provided
+        explanation_json = signal_data.get("explanation")
+        if explanation_json is not None and not isinstance(explanation_json, str):
+            from src.core.explainability import SignalExplanation
+
+            if isinstance(explanation_json, SignalExplanation):
+                explanation_json = explanation_json.model_dump_json()
+            else:
+                import json
+
+                explanation_json = json.dumps(explanation_json)
+
         with self.Session() as session:
             signal = ModelSignal(
                 symbol=signal_data["symbol"],
@@ -229,6 +242,7 @@ class TradeLogger:
                 algorithm=signal_data.get("algorithm"),
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
+                explanation=explanation_json,
                 trace_id=trace_id,
                 timestamp=signal_data.get("timestamp", datetime.now(UTC)),
             )

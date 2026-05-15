@@ -24,6 +24,14 @@ class AuditedRiskManager(RiskManager):
     Evaluates the full decision chain for traceability.
     """
 
+    def get_last_decision_chain(self) -> dict[str, bool]:
+        """
+        Retrieves the results of the last evaluation for explainability.
+        In a multi-threaded environment, this would need to be symbol-specific.
+        """
+        # This is a simplified implementation for the current single-threaded loop
+        return getattr(self, "_last_chain", {})
+
     def approve(
         self,
         signal: TradeSignal,
@@ -45,6 +53,7 @@ class AuditedRiskManager(RiskManager):
             "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
         }
+        self._last_chain = decision_chain
 
         passed = all(decision_chain.values())
 

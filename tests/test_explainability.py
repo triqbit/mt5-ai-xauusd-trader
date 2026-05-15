@@ -698,6 +698,38 @@ def test_strategic_confluence_summary():
     assert "Strategic Confluence: High alignment from Trend (-0.60)" in exp_ranging.human_readable_summary
 
 
+def test_signal_explanation_to_report_section():
+    """Test that SignalExplanation correctly converts to StrategicConfluenceSection."""
+    explainer = SignalExplainer()
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.85,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending", "alignment_score": 0.9},
+        execution_data={
+            "passed": True,
+            "filters": [
+                {"name": "session_time", "passed": True},
+                {"name": "atr_volatility", "passed": False},
+            ],
+        },
+        feature_impacts={"rsi": 0.8, "atr": -0.2},
+    )
+
+    section = explanation.to_report_section()
+    from src.research.reporting import StrategicConfluenceSection
+    assert isinstance(section, StrategicConfluenceSection)
+    assert section.regime_alignment == 0.9
+    assert section.session_alignment == 1.0
+    assert section.volatility_alignment == 0.0
+    # confluence_score = 0.8 / (0.8 + 0.2) = 0.8
+    assert abs(section.confluence_score - 0.8) < 1e-6
+    assert section.insights == explanation.human_readable_summary
+
+
 def test_advanced_metrics_calculation():
     """Ensure dominance_ratio and regime_alignment_score are correctly derived."""
     explainer = SignalExplainer()
