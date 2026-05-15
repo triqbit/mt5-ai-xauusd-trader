@@ -8,11 +8,12 @@ Verification of the unified RiskManager with 8-layer cascade.
 import pytest
 import pandas as pd
 import datetime
+import os
 from src.core.config import TradingConfig
-from src.core.schemas import TradeSignal, SignalDirection
+from src.core.schemas import TradeSignal
+from src.core.constants import SignalDirection
 from src.trading.risk_manager import RiskManager
 from src.utils.synthetic_data import ScenarioGenerator
-import os
 
 @pytest.fixture
 def config():

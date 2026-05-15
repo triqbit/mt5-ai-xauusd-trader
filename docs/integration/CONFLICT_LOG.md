@@ -105,3 +105,26 @@
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
 - **Owner**: Jules05
+
+## [2026-05-15] - Core Logic Consolidation & Module Re-alignment
+
+### 1. Risk Management Fragmentation (RiskManager vs RiskEngine)
+- **Conflict**: Two parallel risk implementations exist. `RiskManager` (Jules01) is used in `main.py`, but `RiskEngine` (Jules04) contains the authoritative 8-layer cascade logic and ATR-based sizing required for institutional compliance.
+- **Agents**: Jules01, Jules04
+- **Impact**: High. `main.py` is currently running a simplified 6-layer risk check, bypassing critical exposure limits and advanced volatility sizing.
+- **Resolution**: Port 8-layer cascade and ATR sizing to `RiskManager`. Provide `validate_signal` method to satisfy institutional tests while maintaining `approve` for `main.py` compatibility.
+- **Owner**: Jules05
+
+### 2. Feature Pipeline Location Mismatch
+- **Conflict**: `FeatureEngineer` is located in `src/core/feature_engineering.py`, but architectural standards and Jules04's research outputs expect it in `src/data/feature_engineering.py`.
+- **Agents**: Jules01, Jules04
+- **Impact**: Medium. Causes import errors in research scripts and breaks domain separation.
+- **Resolution**: Relocate `feature_engineering.py` to `src/data/` and update all system-wide imports.
+- **Owner**: Jules05
+
+### 3. Interface Drift in Harmonized Risk Tests
+- **Conflict**: `tests/test_risk_manager_harmonized.py` expects `RiskManager` to have a `validate_signal` method returning a `RiskDecision` object, but the current `RiskManager` only has `approve` returning a boolean.
+- **Agents**: Jules02, Jules05
+- **Impact**: High. The core verification suite for risk harmonization is failing to even import correctly.
+- **Resolution**: Harmonize the `RiskManager` interface to support `validate_signal` and `RiskDecision` output.
+- **Owner**: Jules05

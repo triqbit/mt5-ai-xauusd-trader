@@ -16,7 +16,7 @@ import psutil
 from src.core.config import get_config
 from src.core.monitor import Monitor
 from src.core.trade_logger import RiskEvent, TradeLogger
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import RegimeDetector
 from src.research.benchmarks import EMACrossoverStrategy
@@ -37,7 +37,8 @@ def mock_cfg():
         "TELEGRAM_CHAT_ID": "123456",
         "MODE": "demo",
         "MAX_POSITIONS": "3",
-        "MAX_DAILY_LOSS": "0.05"
+        "MAX_DAILY_LOSS": "0.05",
+        "MAX_DRAWDOWN": "0.15"
     }):
         get_config.cache_clear()
         return get_config()
