@@ -261,6 +261,61 @@ def test_bull_bear_trap_behavior(simulator):
         assert final_price > breakout_price
 
 
+def test_short_squeeze_behavior(simulator):
+    config = RareEventConfig(event_type=RareEventType.SHORT_SQUEEZE, n_steps=400)
+    df, result = simulator.generate_scenario(config)
+
+    assert result.event_type == RareEventType.SHORT_SQUEEZE
+    assert result.peak_impact_pct > 0.03
+
+    # Check for parabolic move (acceleration)
+    # Returns should be positive during the squeeze phase
+    returns = df["close"].pct_change().dropna()
+    squeeze_returns = returns.iloc[result.start_index : result.start_index + 10]
+    assert (squeeze_returns > 0).any()
+
+    # Check for blow-off top reversal
+    post_squeeze_price = df["close"].iloc[result.end_index - 1]
+    peak_price = df["close"].iloc[result.start_index : result.end_index].max()
+    assert post_squeeze_price < peak_price
+
+
+def test_cascade_liquidation_behavior(simulator):
+    config = RareEventConfig(event_type=RareEventType.CASCADE_LIQUIDATION, n_steps=500)
+    df, result = simulator.generate_scenario(config)
+
+    assert result.event_type == RareEventType.CASCADE_LIQUIDATION
+    assert result.peak_impact_pct < -0.04
+
+    # Check for multiple waves of selling
+    # Since it's a cascade, we expect price to be lower at the end than at the start
+    start_price = df["close"].iloc[result.start_index - 1]
+    final_price = df["close"].iloc[result.end_index - 1]
+    assert final_price < start_price
+
+
+def test_recovery_bars_calculation(simulator):
+    # Flash crash is one of the events that explicitly calculates recovery_bars
+    config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=300)
+    _, result = simulator.generate_scenario(config)
+
+    assert result.recovery_bars > 0
+    # For flash crash, it's defined as int(30 * magnitude)
+    assert result.recovery_bars == 30
+
+
+def test_spread_widening_realism(simulator):
+    # High volatility should trigger significant spread widening
+    config = RareEventConfig(event_type=RareEventType.NEWS_SHOCK, n_steps=400, event_magnitude=2.0)
+    df, result = simulator.generate_scenario(config)
+
+    # During news shock, vols[idx] *= 20.0, so exp(vols * 500) should be large
+    shock_spreads = df["spread"].iloc[result.start_index : result.start_index + 5]
+    normal_spreads = df["spread"].iloc[: result.start_index - 10]
+
+    assert shock_spreads.mean() > normal_spreads.mean() * 5
+
+
 def test_generate_suite(simulator):
     suite = simulator.generate_suite(n_steps=200, magnitude=1.5, seed=100)
 

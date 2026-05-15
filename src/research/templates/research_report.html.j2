@@ -623,7 +623,8 @@
                     <th scope="col">Event Type</th>
                     <th scope="col">Peak Impact</th>
                     <th scope="col">Realized Volatility</th>
-                    <th scope="col">Recovery</th>
+                    <th scope="col">Recovery %</th>
+                    <th scope="col">Bars to Recovery</th>
                 </tr>
             </thead>
             <tbody>
@@ -633,6 +634,7 @@
                     <td>{{ (s.peak_impact_pct * 100)|round(2) }}%</td>
                     <td>{{ s.realized_volatility|round(4) }}</td>
                     <td>{{ (s.recovery_attained * 100)|round(1) }}%</td>
+                    <td>{{ s.recovery_bars }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
