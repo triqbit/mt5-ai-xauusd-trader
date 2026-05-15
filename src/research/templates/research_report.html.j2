@@ -591,6 +591,8 @@
                     <th scope="col" title="Mathematical Expectancy per trade.">Exp</th>
                     <th scope="col" title="Maximum Drawdown: Largest peak-to-trough decline.">MaxDD</th>
                     <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recov</th>
+                    <th scope="col" title="Common Sense Ratio: Tail Ratio * Profit Factor.">CSR</th>
+                    <th scope="col" title="Gain-to-Pain Ratio: Sum of gains / Abs(Sum of losses).">G2P</th>
                     <th scope="col" title="Tail Ratio: Ratio of 95th percentile return to 5th percentile absolute return.">Tail</th>
                     <th scope="col" title="Lake Ratio: Ratio of time in drawdown to total time.">Lake</th>
                     <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
@@ -607,6 +609,8 @@
                     <td>{{ m.expectancy|round(2) }}</td>
                     <td>{{ (m.max_dd * 100)|round(1) }}%</td>
                     <td>{{ m.recovery_factor|round(2) }}</td>
+                    <td>{{ m.common_sense_ratio|round(2) }}</td>
+                    <td>{{ m.gain_to_pain_ratio|round(2) }}</td>
                     <td>{{ m.tail_ratio|round(2) }}</td>
                     <td>{{ m.lake_ratio|round(2) }}</td>
                     <td>{{ m.sqn|round(2) }}</td>

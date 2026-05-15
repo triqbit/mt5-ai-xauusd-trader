@@ -207,12 +207,12 @@ class RLMetric(BaseModel):
 
     agent_name: str
     sharpe: float
-    sortino: float = 0.0
-    volatility: float = 0.0
     profit_factor: float
-    expectancy: float = 0.0
     max_dd: float
     win_rate: float
+    sortino: float = 0.0
+    volatility: float = 0.0
+    expectancy: float = 0.0
     calmar: float = 0.0
     stability_score: float = 0.0
     var_95: float = 0.0
@@ -694,13 +694,17 @@ class ResearchReporter:
         if report.strategic_confluence:
             self.console.print(f"\n[bold green]{section_idx}. Strategic Confluence Analysis[/]")
             section_idx += 1
-            self.console.print(f"Confluence Score: [bold]{report.strategic_confluence.confluence_score:.1%}[/]")
+            self.console.print(
+                f"Confluence Score: [bold]{report.strategic_confluence.confluence_score:.1%}[/]"
+            )
             table = Table(box=None)
             table.add_column("Alignment Type")
             table.add_column("Score")
             table.add_row("Market Regime", f"{report.strategic_confluence.regime_alignment:.1%}")
             table.add_row("Trading Session", f"{report.strategic_confluence.session_alignment:.1%}")
-            table.add_row("Volatility State", f"{report.strategic_confluence.volatility_alignment:.1%}")
+            table.add_row(
+                "Volatility State", f"{report.strategic_confluence.volatility_alignment:.1%}"
+            )
             self.console.print(table)
             self.console.print(f"[dim]Insight: {report.strategic_confluence.insights}[/]")
 
