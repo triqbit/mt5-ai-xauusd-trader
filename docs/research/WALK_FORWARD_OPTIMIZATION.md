@@ -24,6 +24,7 @@ Configurations are ranked by a multi-factor `Robustness Score` rather than simpl
 ### 3. Anti-Overfitting Safeguards
 - **Fragility Safeguards**: A high penalty (10.0) is applied if parameter perturbations lead to failures or extreme performance drops.
 - **Constraint Enforcement**: Minimum allowed OOS Sharpe and maximum allowed OOS Drawdown are strictly enforced.
+- **Minimum Trade Threshold**: A `min_trades_per_window` constraint (default: 5) ensures that OOS performance is statistically grounded. Windows with too few trades incur a linear penalty to the robustness score.
 
 ## Usage
 ```python
