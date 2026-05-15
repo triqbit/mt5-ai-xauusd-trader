@@ -128,7 +128,7 @@ class RiskManager:
 
                 # Update daily peak equity
                 daily_pnl_acc = 0
-                daily_peaks = [starting_balance + total_pnl - realised_pnl] # Start of today
+                daily_peaks = [starting_balance + total_pnl - realised_pnl]  # Start of today
                 for t in today_trades:
                     daily_pnl_acc += t.pnl
                     daily_peaks.append(daily_peaks[0] + daily_pnl_acc)
@@ -139,7 +139,7 @@ class RiskManager:
                 self.peak_equity,
                 self.daily.realised_pnl,
                 self.daily.trade_count,
-                self.daily.consecutive_losses
+                self.daily.consecutive_losses,
             )
         except Exception as e:
             logger.error("Failed to reconcile RiskManager state: %s", e, exc_info=True)

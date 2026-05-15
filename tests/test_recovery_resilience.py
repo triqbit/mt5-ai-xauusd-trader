@@ -1,14 +1,18 @@
-import pytest
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
-from src.trading.risk_manager import RiskManager
-from src.core.trade_logger import TradeLogger, Trade
+
+import pytest
+
 from src.core.config import TradingConfig
+from src.core.trade_logger import TradeLogger
+from src.trading.risk_manager import RiskManager
+
 
 class MockTrade:
     def __init__(self, pnl, updated_at=None):
         self.pnl = pnl
         self.updated_at = updated_at or datetime.now(UTC)
+
 
 @pytest.fixture
 def mk_config():
@@ -22,13 +26,14 @@ def mk_config():
     cfg.min_confidence = 0.55
     return cfg
 
+
 def test_risk_manager_reconcile_peak_equity(mk_config):
     # Setup: Starting balance 10000.
     # Trades: +500, +500, -2000. Peak was 11000. Current balance 9000.
     trade_logger = MagicMock(spec=TradeLogger)
     trade_logger.get_reconciliation_data.return_value = {
         "all_pnls": [500.0, 500.0, -2000.0],
-        "today_trades": []
+        "today_trades": [],
     }
 
     rm = RiskManager(mk_config, account_balance=9000.0, logger_db=trade_logger)
@@ -43,6 +48,7 @@ def test_risk_manager_reconcile_peak_equity(mk_config):
     # Should trigger circuit breaker (limit 15%)
     assert rm._check_circuit_breaker() is False
 
+
 def test_risk_manager_reconcile_daily_stats(mk_config):
     trade_logger = MagicMock(spec=TradeLogger)
 
@@ -52,7 +58,7 @@ def test_risk_manager_reconcile_daily_stats(mk_config):
 
     trade_logger.get_reconciliation_data.return_value = {
         "all_pnls": [-100.0, -200.0],
-        "today_trades": [t1, t2]
+        "today_trades": [t1, t2],
     }
 
     rm = RiskManager(mk_config, account_balance=9700.0, logger_db=trade_logger)
@@ -64,15 +70,13 @@ def test_risk_manager_reconcile_daily_stats(mk_config):
     # peak_equity should be 10000
     assert rm.peak_equity == 10000.0
 
+
 def test_risk_manager_reconcile_no_data(mk_config):
     trade_logger = MagicMock(spec=TradeLogger)
-    trade_logger.get_reconciliation_data.return_value = {
-        "all_pnls": [],
-        "today_trades": []
-    }
+    trade_logger.get_reconciliation_data.return_value = {"all_pnls": [], "today_trades": []}
 
     rm = RiskManager(mk_config, account_balance=10000.0, logger_db=trade_logger)
-    rm.peak_equity = 12000.0 # Pretend it was higher
+    rm.peak_equity = 12000.0  # Pretend it was higher
     rm.reconcile_state()
 
     assert rm.peak_equity == 12000.0
