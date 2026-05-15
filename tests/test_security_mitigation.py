@@ -1,14 +1,16 @@
 
 import os
 import sys
-import stat
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-import pytest
+
 import joblib
-from src.models.regime_detector import RegimeDetector, MarketRegime
-from src.core.config_validator import ConfigValidator
+import pytest
+
 from src.core.config import TradingConfig
+from src.core.config_validator import ConfigValidator
+from src.models.regime_detector import MarketRegime, RegimeDetector
+
 
 @pytest.fixture
 def mock_config(tmp_path):
