@@ -73,13 +73,19 @@ def test_robustness_scoring_components(sample_data):
     # Test type-safe perturbations for integers
     int_params = {"window": 10}
     # Mock _evaluate_strategy to just return a dummy Sharpe Ratio
-    optimizer._evaluate_strategy = lambda d, p: ({"Sharpe Ratio": 1.0 + (p["window"] * 0.01)}, np.zeros(len(d)))
+    optimizer._evaluate_strategy = lambda d, p: (
+        {"Sharpe Ratio": 1.0 + (p["window"] * 0.01)},
+        np.zeros(len(d)),
+    )
     stability_int = optimizer._calculate_stability_penalty(int_params, sample_data)
     assert isinstance(stability_int, float)
 
     # Test handling of zero values in stability penalty
     zero_params = {"param": 0.0}
-    optimizer._evaluate_strategy = lambda d, p: ({"Sharpe Ratio": 1.0 + (p["param"] * 0.1)}, np.zeros(len(d)))
+    optimizer._evaluate_strategy = lambda d, p: (
+        {"Sharpe Ratio": 1.0 + (p["param"] * 0.1)},
+        np.zeros(len(d)),
+    )
     stability_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
     assert stability_zero > 0.0  # Should be non-zero due to epsilon perturbation
 
