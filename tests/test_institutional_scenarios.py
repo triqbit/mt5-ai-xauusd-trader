@@ -2,9 +2,9 @@
 Tests for Institutional Flow Scenario Generator.
 """
 import pytest
-import pandas as pd
-import numpy as np
+
 from src.utils.synthetic_data import InstitutionalFlowGenerator
+
 
 @pytest.fixture
 def institutional_builder():
