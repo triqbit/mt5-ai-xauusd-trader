@@ -138,6 +138,15 @@ class DecisionPacket(BaseModel):
     decision_score: float = Field(
         0.0, ge=0.0, le=100.0, description="Composite decision confidence score (0 to 100)."
     )
+    consensus_score: float = Field(
+        0.0, ge=0.0, le=40.0, description="Weighted ensemble consensus component (0-40)."
+    )
+    regime_score: float = Field(
+        0.0, ge=0.0, le=30.0, description="Regime confidence and alignment component (0-30)."
+    )
+    risk_score: float = Field(
+        0.0, ge=0.0, le=30.0, description="Risk/Reward and macro safety component (0-30)."
+    )
     sizing_multiplier: float = Field(
         0.0, ge=0.0, le=1.0, description="Risk-based sizing multiplier (0.0 to 1.0)."
     )
@@ -222,25 +231,28 @@ class DecisionSupportSystem:
         # Determine if executable
         is_executable = len(blocking_reasons) == 0
 
-        # Calculate Consensus and Score
-        consensus = self._calculate_consensus(explanation)
-        decision_score = self._calculate_decision_score(explanation, regime_info, macro_risk)
-
-        # Determine Augmented Status Level
-        status_level = DecisionStatus.BLOCKED
-        if is_executable:
-            status_level = (
-                DecisionStatus.EXECUTE if decision_score >= 70.0 else DecisionStatus.CAUTION
-            )
-
-        # Determine if review is required
-        requires_review = status_level == DecisionStatus.CAUTION or (
-            is_executable and decision_score < 80.0
+        # Calculate Scores
+        c_score, r_score, rs_score = self._calculate_decomposed_scores(
+            explanation, regime_info, macro_risk
         )
+        decision_score = float(min(max(c_score + r_score + rs_score, 0.0), 100.0))
 
-        # Apply REVIEW status if applicable and not blocked
-        if is_executable and requires_review:
-            status_level = DecisionStatus.REVIEW
+        # Calculate Consensus
+        consensus = self._calculate_consensus(explanation)
+
+        # Determine Augmented Status Level and Review Flag
+        status_level = DecisionStatus.BLOCKED
+        requires_review = False
+
+        if is_executable:
+            if decision_score >= 80.0:
+                status_level = DecisionStatus.EXECUTE
+            elif decision_score >= 60.0:
+                status_level = DecisionStatus.REVIEW
+                requires_review = True
+            else:
+                status_level = DecisionStatus.CAUTION
+                requires_review = True
 
         # Calculate Sizing Multiplier
         sizing_multiplier = self._calculate_sizing_multiplier(
@@ -265,7 +277,14 @@ class DecisionSupportSystem:
 
         # Generate executive summary
         executive_summary = self._generate_executive_summary(
-            symbol, explanation, regime_info, status_level, decision_score, blocking_reasons
+            symbol,
+            explanation,
+            regime_info,
+            status_level,
+            decision_score,
+            blocking_reasons,
+            consensus,
+            performance,
         )
 
         return DecisionPacket(
@@ -274,6 +293,9 @@ class DecisionSupportSystem:
             consensus=consensus,
             status_level=status_level,
             decision_score=decision_score,
+            consensus_score=c_score,
+            regime_score=r_score,
+            risk_score=rs_score,
             sizing_multiplier=sizing_multiplier,
             is_executable=is_executable,
             requires_review=requires_review,
@@ -293,6 +315,8 @@ class DecisionSupportSystem:
         status: DecisionStatus,
         score: float,
         blocking_reasons: list[str],
+        consensus: str,
+        performance: PerformanceContext,
     ) -> str:
         """
         Generate a concise executive summary for the operator.
@@ -303,33 +327,38 @@ class DecisionSupportSystem:
 
         dir_str = explanation.direction.name
         summary = f"Institutional {dir_str} signal for {symbol} with a decision score of {score:.1f}/100. "
-        summary += (
-            f"Current market state is {regime.label.value} (Confidence: {regime.confidence:.1%}). "
-        )
+        summary += f"Current market state is {regime.label.value.upper()} (Confidence: {regime.confidence:.1%}). "
+
+        # Consensus Insight
+        summary += f"Model consensus is {consensus}. "
+
+        # Performance Context Enrichment
+        if performance.total_trades > 0:
+            summary += f"Strategy performance is stable (Sharpe: {performance.sharpe_ratio:.2f}, WR: {performance.win_rate:.1%}). "
 
         # Strategic Confluence Enrichment
         alignment = explanation.regime_context.regime_alignment_score
         if alignment >= 0.8:
-            summary += "Strategic alignment is EXCEPTIONAL. "
+            summary += "Strategic alignment is EXCEPTIONAL, providing high statistical confidence. "
         elif alignment >= 0.6:
-            summary += "Strategic alignment is strong. "
+            summary += "Strategic alignment is strong, indicating favorable market conditions. "
         else:
-            summary += "Strategic alignment is weak/divergent. "
+            summary += "Strategic alignment is weak or divergent, suggesting non-ideal conditions. "
 
         if status == DecisionStatus.EXECUTE:
-            summary += "Signal shows strong confluence and satisfies all institutional guardrails."
-        else:
-            summary += (
-                "Signal is valid but carries elevated risk; exercise caution and monitor execution."
-            )
+            summary += "Signal demonstrates maximum confluence and satisfies all institutional guardrails for automated execution."
+        elif status == DecisionStatus.REVIEW:
+            summary += "Signal is technically valid but requires manual oversight due to moderate confidence or specific risk factors."
+        elif status == DecisionStatus.CAUTION:
+            summary += "Signal carries elevated operational risk; reduced sizing or manual rejection is recommended."
 
         return summary
 
-    def _calculate_decision_score(
+    def _calculate_decomposed_scores(
         self, explanation: SignalExplanation, regime: RegimeInfo, macro_risk: RiskStatus
-    ) -> float:
+    ) -> tuple[float, float, float]:
         """
-        Calculate a composite score (0-100) for the decision quality.
+        Calculate decomposed scores for the decision quality.
         Weights:
         - Ensemble Consensus: 40%
         - Regime Confidence: 30%
@@ -354,10 +383,19 @@ class DecisionSupportSystem:
         # Weights: 20% for Risk/Reward quality, 10% for Macro safety
         rr = explanation.risk_assessment.risk_reward_ratio
         rr_quality = min(max(rr, 0.0) / 3.0, 1.0) * 20.0
-        macro_safety = max(macro_risk.risk_multiplier, 0.0) * 10.0
-        risk_score = rr_quality + macro_safety
+        macro_safety = min(max(macro_risk.risk_multiplier, 0.0), 1.0) * 10.0
+        risk_score = min(rr_quality + macro_safety, 30.0)
 
-        return float(min(max(consensus_score + regime_score + risk_score, 0.0), 100.0))
+        return float(consensus_score), float(regime_score), float(risk_score)
+
+    def _calculate_decision_score(
+        self, explanation: SignalExplanation, regime: RegimeInfo, macro_risk: RiskStatus
+    ) -> float:
+        """
+        Legacy method for backward compatibility. Use _calculate_decomposed_scores.
+        """
+        c, r, rs = self._calculate_decomposed_scores(explanation, regime, macro_risk)
+        return float(min(max(c + r + rs, 0.0), 100.0))
 
     def _calculate_sizing_multiplier(
         self, score: float, status: DecisionStatus, macro_risk: RiskStatus
@@ -464,7 +502,7 @@ class DecisionSupportSystem:
             header_content.append(packet.consensus.upper(), style="bold cyan")
 
             if packet.requires_review:
-                header_content.append("\n[REVIEW REQUIRED]", style="bold blink yellow")
+                header_content.append("\n[REVIEW REQUIRED]", style="bold yellow")
 
             blocking_panel = None
             if packet.blocking_reasons:
@@ -509,8 +547,10 @@ class DecisionSupportSystem:
             score_text.append("\n💰 Sizing Rec:  ", style="bold")
             score_text.append(f"{packet.sizing_multiplier:.1%}", style="bold cyan")
 
-            if packet.decision_score >= 90.0 and packet.is_executable:
-                score_text.append("\n[HIGH CONVICTION] 💎", style="bold green")
+            if packet.decision_score >= 85.0 and packet.is_executable:
+                score_text.append("\n[HIGH CONVICTION] 💎💎💎", style="bold green")
+            elif packet.decision_score >= 70.0 and packet.is_executable:
+                score_text.append("\n[STRONG CONVICTION] 💎", style="bold green")
 
             # Conviction Meter
             meter = ProgressBar(
