@@ -159,3 +159,30 @@ class ModelAction(IntEnum):
             ModelAction.SELL: SignalDirection.SELL,
         }
         return mapping[self]
+
+
+class MarketRegime(str, Enum):
+    """
+    XAUUSD Market Regimes with institutional definitions.
+    """
+
+    TRENDING = "trending"
+    """Persistent directional movement with high efficiency and clear slope."""
+
+    RANGING = "ranging"
+    """Mean-reverting behavior within a stable volatility corridor; default state."""
+
+    VOLATILE_BREAKOUT = "volatile_breakout"
+    """High-momentum expansion accompanied by a significant volatility spike."""
+
+    LOW_VOLATILITY_DRIFT = "low_volatility_drift"
+    """Quiet directional movement with minimal retracements and suppressed volatility."""
+
+    NEWS_SHOCK = "news_shock"
+    """Extreme, non-linear price dislocation often linked to macro-economic events."""
+
+    MEAN_REVERSION = "mean_reversion"
+    """Overextended price state indicating a high probability of a corrective snap-back."""
+
+    UNKNOWN = "unknown"
+    """Insufficient data or indeterminate market state."""

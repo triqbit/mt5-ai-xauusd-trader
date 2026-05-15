@@ -433,6 +433,7 @@ def run_live(
                             timestamp=datetime.now(timezone.utc),
                             model_health=health,
                             trade_logger=trade_logger,
+                            regime_info=regime_info,
                         )
                         if audit_logger:
                             audit_logger.log_execution_decision(

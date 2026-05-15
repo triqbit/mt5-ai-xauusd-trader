@@ -109,6 +109,15 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 - **Low Impact News**: Trade normally
 - **Economic Calendar**: Monitor and enforce via automation
 
+### 5.4 Regime-Adaptive Safety Hardening
+- **Regime Stability (Layer 12)**: Blocks execution if `RegimeInfo.transition_score > 0.80`. This prevents trading when the market state is highly uncertain or undergoing a non-linear shift.
+- **Adaptive Confidence Thresholds**: Prediction confidence requirements are dynamically raised during volatile regimes:
+    - **NEWS_SHOCK**: Min Confidence raised to **0.70**.
+    - **VOLATILE_BREAKOUT**: Min Confidence raised to **0.65**.
+- **Model Stability Hardening**: Thresholds for drift and accuracy are tightened during volatile regimes:
+    - Allowed **Drift Threshold** is reduced by **0.10**.
+    - Required **Accuracy Floor** is increased by **0.05**.
+
 ## 6. Drawdown Limits
 
 ### 6.1 Equity Drawdown
