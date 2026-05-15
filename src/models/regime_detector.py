@@ -26,7 +26,6 @@ from __future__ import annotations
 import contextlib
 import os
 import stat
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -38,34 +37,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from scipy import stats
 from sklearn.mixture import GaussianMixture
 
+from src.core.constants import MarketRegime
+from src.core.schemas import RegimeInfo
+
 logger = structlog.get_logger(__name__)
-
-
-class MarketRegime(str, Enum):
-    """
-    XAUUSD Market Regimes with institutional definitions.
-    """
-
-    TRENDING = "trending"
-    """Persistent directional movement with high efficiency and clear slope."""
-
-    RANGING = "ranging"
-    """Mean-reverting behavior within a stable volatility corridor; default state."""
-
-    VOLATILE_BREAKOUT = "volatile_breakout"
-    """High-momentum expansion accompanied by a significant volatility spike."""
-
-    LOW_VOLATILITY_DRIFT = "low_volatility_drift"
-    """Quiet directional movement with minimal retracements and suppressed volatility."""
-
-    NEWS_SHOCK = "news_shock"
-    """Extreme, non-linear price dislocation often linked to macro-economic events."""
-
-    MEAN_REVERSION = "mean_reversion"
-    """Overextended price state indicating a high probability of a corrective snap-back."""
-
-    UNKNOWN = "unknown"
-    """Insufficient data or indeterminate market state."""
 
 
 class RegimeAnalysisReport(BaseModel):
@@ -123,31 +98,6 @@ class RegimeAnalysisReport(BaseModel):
             regimes=self.regime_list,
             transition_insights=f"Stability: {stability:.1f} bars. Common paths: {transition_txt}",
         )
-
-
-class RegimeInfo(BaseModel):
-    """
-    Structured regime detection output with transparency for signal attribution.
-
-    This model is immutable (frozen) and forbids extra fields to ensure
-    market regime data is consistent and auditable.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    label: MarketRegime = Field(..., description="Detected regime label")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence")
-    transition_score: float = Field(
-        ..., ge=0.0, le=1.0, description="Likelihood of a regime transition"
-    )
-    volatility_index: float = Field(..., description="Normalized volatility metric")
-    transition_probabilities: dict[str, float] = Field(
-        default_factory=dict,
-        description="Full distribution of probabilities for potential next regimes",
-    )
-    raw_features: dict[str, float] = Field(
-        default_factory=dict, description="Underlying statistical features used for detection"
-    )
 
 
 class RegimeDetector:

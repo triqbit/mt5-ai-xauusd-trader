@@ -21,7 +21,32 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from src.core.constants import SYMBOL_PATTERN, SignalDirection
+from src.core.constants import SYMBOL_PATTERN, MarketRegime, SignalDirection
+
+
+class RegimeInfo(BaseModel):
+    """
+    Structured regime detection output with transparency for signal attribution.
+
+    This model is immutable (frozen) and forbids extra fields to ensure
+    market regime data is consistent and auditable.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    label: MarketRegime = Field(..., description="Detected regime label")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence")
+    transition_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Likelihood of a regime transition"
+    )
+    volatility_index: float = Field(..., description="Normalized volatility metric")
+    transition_probabilities: dict[str, float] = Field(
+        default_factory=dict,
+        description="Full distribution of probabilities for potential next regimes",
+    )
+    raw_features: dict[str, float] = Field(
+        default_factory=dict, description="Underlying statistical features used for detection"
+    )
 
 
 class TradeSignal(BaseModel):
@@ -142,6 +167,10 @@ class ExecutionDecision(BaseModel):
     trace: dict[str, Any] = Field(
         default_factory=dict, description="Detailed audit trace of all filter evaluations"
     )
+
+    def __bool__(self) -> bool:
+        """Allow boolean context evaluation (e.g. if decision: ...)."""
+        return self.is_approved
 
     @model_validator(mode="after")
     def validate_rejection_reason(self) -> "ExecutionDecision":

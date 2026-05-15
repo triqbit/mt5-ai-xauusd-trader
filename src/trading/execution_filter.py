@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -18,33 +17,20 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from src.models.regime_detector import MarketRegime, RegimeInfo
+from src.core.constants import MarketRegime
+from src.core.schemas import ExecutionDecision, RegimeInfo
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
     from src.core.schemas import TradeSignal
 
 
-@dataclass
-class ExecutionDecision:
-    """Result of the 6-layer execution filter cascade."""
-
-    signal: TradeSignal
-    confidence_score: float
-    blocked_by: str | None
-    trace: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def is_approved(self) -> bool:
-        """Returns True if the signal passed all 6 layers."""
-        return self.blocked_by is None
-
 logger = logging.getLogger(__name__)
 
 
 class ExecutionFilter:
     """
-    Implements a 6-layer validation cascade for trading signals.
+    Implements a 12-layer validation cascade for trading signals.
     Layers:
         1. ATR Volatility Threshold
         2. Trend Angle Confirmation
@@ -52,12 +38,12 @@ class ExecutionFilter:
         4. Momentum Filter
         5. Session/Time Filter
         6. Drawdown Circuit Breaker
-        7. Model Stability
+        7. Model Stability (Adaptive)
         8. Performance Guard
-        9. Confidence Threshold
+        9. Confidence Threshold (Adaptive)
         10. Signal Consistency
         11. Macro Risk Gate
-        12. Regime Stability (Defensive Transition Check)
+        12. Regime Stability
     """
 
     def __init__(
@@ -84,10 +70,11 @@ class ExecutionFilter:
         current_drawdown: float = 0.0,
         timestamp: datetime | None = None,
         precomputed_metrics: dict[str, Any] | None = None,
+        regime_info: RegimeInfo | None = None,
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 9-layer filter cascade.
+        Run the full 12-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -96,6 +83,7 @@ class ExecutionFilter:
             current_drawdown: Current account drawdown (0.0 to 1.0).
             timestamp: Evaluation time.
             precomputed_metrics: Optional dictionary containing pre-calculated metrics.
+            regime_info: Current market regime information for adaptive safety.
         """
         if timestamp is None:
             timestamp = signal.timestamp or datetime.now(UTC)
@@ -104,7 +92,6 @@ class ExecutionFilter:
         metrics = precomputed_metrics or {}
         model_health = kwargs.get("model_health")
         trade_logger = kwargs.get("trade_logger")
-        regime_info = kwargs.get("regime_info")
 
         # Layer 1: ATR Volatility
         atr_passed, atr_metrics = self._check_atr_volatility_with_metrics(
@@ -207,12 +194,10 @@ class ExecutionFilter:
         }
 
         # Layer 12: Regime Stability
-        regime_stab_passed, regime_stab_metrics = self._check_regime_stability_with_metrics(
-            regime_info
-        )
+        regime_passed, regime_metrics = self._check_regime_stability_with_metrics(regime_info)
         trace["regime_stability"] = {
-            "passed": bool(regime_stab_passed),
-            **regime_stab_metrics,
+            "passed": bool(regime_passed),
+            **regime_metrics,
         }
 
         # Determine final approval and blocked_by reason
@@ -241,6 +226,7 @@ class ExecutionFilter:
 
         return ExecutionDecision(
             signal=signal,
+            is_approved=blocked_by is None,
             confidence_score=signal.confidence,
             blocked_by=blocked_by,
             trace=trace,
@@ -409,10 +395,7 @@ class ExecutionFilter:
     def _check_model_stability_with_metrics(
         self, model_health: dict[str, float], regime_info: RegimeInfo | None = None
     ) -> tuple[bool, dict[str, Any]]:
-        """
-        Blocks if drift is too high or accuracy is too low.
-        Hardens thresholds during NEWS_SHOCK and VOLATILE_BREAKOUT.
-        """
+        """Blocks if drift is too high or accuracy is too low. Tightens during volatile regimes."""
         drift_threshold = (
             self.cfg.model_drift_threshold
             if self.cfg and hasattr(self.cfg, "model_drift_threshold")
@@ -424,11 +407,15 @@ class ExecutionFilter:
             else 0.45
         )
 
-        # Regime-Adaptive Hardening
-        regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
-        if regime in [MarketRegime.NEWS_SHOCK, MarketRegime.VOLATILE_BREAKOUT]:
-            drift_threshold -= 0.10  # More sensitive to drift
-            accuracy_floor += 0.05  # Higher accuracy requirement
+        # Adaptive Hardening: Tighten thresholds if in NEWS_SHOCK or VOLATILE_BREAKOUT
+        is_hardened = False
+        if regime_info and regime_info.label in (
+            MarketRegime.NEWS_SHOCK,
+            MarketRegime.VOLATILE_BREAKOUT,
+        ):
+            drift_threshold -= 0.10
+            accuracy_floor += 0.05
+            is_hardened = True
 
         drift = model_health.get("drift", 0.0)
         accuracy = model_health.get("accuracy", 1.0)
@@ -439,7 +426,7 @@ class ExecutionFilter:
             "drift_threshold": drift_threshold,
             "accuracy": accuracy,
             "accuracy_floor": accuracy_floor,
-            "regime_adaptive": regime != MarketRegime.UNKNOWN,
+            "is_hardened": is_hardened,
         }
 
     def _check_performance_guard_with_metrics(self, trade_logger: Any) -> tuple[bool, dict[str, Any]]:
@@ -459,47 +446,41 @@ class ExecutionFilter:
     def _check_confidence_threshold_with_metrics(
         self, signal: TradeSignal, regime_info: RegimeInfo | None = None
     ) -> tuple[bool, dict[str, Any]]:
-        """
-        Blocks if signal confidence is below minimum threshold.
-        Hardens thresholds during NEWS_SHOCK and VOLATILE_BREAKOUT.
-        """
-        threshold = (
+        """Blocks if signal confidence is below minimum threshold. Tightens based on regime."""
+        base_threshold = (
             self.cfg.min_confidence if self.cfg and hasattr(self.cfg, "min_confidence") else 0.55
         )
+        threshold = base_threshold
 
-        # Regime-Adaptive Hardening
-        regime = regime_info.label if regime_info else MarketRegime.UNKNOWN
-        if regime == MarketRegime.NEWS_SHOCK:
-            threshold = max(threshold, 0.70)
-        elif regime == MarketRegime.VOLATILE_BREAKOUT:
-            threshold = max(threshold, 0.65)
+        # Adaptive Hardening: Increase confidence requirements for volatile regimes
+        if regime_info:
+            if regime_info.label == MarketRegime.NEWS_SHOCK:
+                threshold = max(threshold, 0.70)
+            elif regime_info.label == MarketRegime.VOLATILE_BREAKOUT:
+                threshold = max(threshold, 0.65)
 
         passed = signal.confidence >= threshold
         return bool(passed), {
             "confidence": signal.confidence,
             "threshold": threshold,
-            "regime": regime,
+            "base_threshold": base_threshold,
+            "is_hardened": threshold > base_threshold,
         }
 
     def _check_regime_stability_with_metrics(
         self, regime_info: RegimeInfo | None
     ) -> tuple[bool, dict[str, Any]]:
-        """
-        Blocks if the market regime is highly unstable (transition_score > 0.8).
-        High transition scores indicate the model is uncertain about the current state,
-        making technical indicators less reliable.
-        """
-        if regime_info is None:
-            return True, {"status": "no_regime_info"}
+        """Blocks if transition_score indicates an unstable market state."""
+        if not regime_info:
+            return True, {"status": "no_regime_data"}
 
-        transition_score = regime_info.transition_score
-        limit = 0.80
+        threshold = 0.80  # Hard limit for transition instability
+        passed = regime_info.transition_score <= threshold
 
-        passed = transition_score <= limit
         return bool(passed), {
-            "transition_score": transition_score,
-            "limit": limit,
-            "regime": regime_info.label,
+            "regime": regime_info.label.value,
+            "transition_score": regime_info.transition_score,
+            "threshold": threshold,
         }
 
     def _check_signal_consistency_with_metrics(
