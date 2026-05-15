@@ -64,6 +64,9 @@ class TradeSignal(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="The UTC timestamp when the signal was generated",
     )
+    trace_id: str | None = Field(
+        None, description="Unique trace identifier for end-to-end observability."
+    )
 
     @field_validator("direction", mode="before")
     @classmethod
@@ -121,12 +124,54 @@ class TradeSignal(BaseModel):
         return self
 
 
+class RiskDecision(BaseModel):
+    """
+    Structured result of the risk management cascade.
+    Enforces technical trust by ensuring every rejection has an explicit reason.
+
+    This model is immutable (frozen) and forbids extra fields to ensure
+    that risk assessments cannot be tampered with once generated.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="Final decision: True if passed all risk gates")
+    reason: str = Field("", description="Human-readable explanation for the decision")
+    blocked_by: str | None = Field(
+        None, description="The name of the risk gate that blocked execution, if any"
+    )
+    adjusted_lot_size: float = Field(0.0, ge=0.0, description="The risk-adjusted lot size")
+    trace: dict[str, Any] = Field(
+        default_factory=dict, description="Detailed audit trace of all risk evaluations"
+    )
+
+    @model_validator(mode="after")
+    def validate_rejection_reason(self) -> "RiskDecision":
+        """
+        Ensure consistency between is_approved and blocked_by.
+        If not approved, blocked_by must be provided.
+        If approved, blocked_by must be None.
+        """
+        if not self.is_approved:
+            if not self.blocked_by:
+                raise ValueError("A blocked risk decision must provide a 'blocked_by' reason.")
+        else:
+            if self.blocked_by:
+                raise ValueError("An approved risk decision cannot have a 'blocked_by' reason.")
+        return self
+
+    def __bool__(self) -> bool:
+        """Allow the decision to be used in boolean contexts for backward compatibility."""
+        return self.is_approved
+
+
 class ExecutionDecision(BaseModel):
     """
     Structured result of the execution filter cascade.
     Enforces technical trust by ensuring every rejection has an explicit reason.
 
-    This model is immutable (frozen) and forbids extra fields.
+    This model is immutable (frozen) and forbids extra fields to ensure
+    integrity across the validation pipeline.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -152,8 +197,12 @@ class ExecutionDecision(BaseModel):
         """
         if not self.is_approved:
             if not self.blocked_by:
-                raise ValueError("A blocked decision must provide a 'blocked_by' reason.")
+                raise ValueError("A blocked execution decision must provide a 'blocked_by' reason.")
         else:
             if self.blocked_by:
-                raise ValueError("An approved decision cannot have a 'blocked_by' reason.")
+                raise ValueError("An approved execution decision cannot have a 'blocked_by' reason.")
         return self
+
+    def __bool__(self) -> bool:
+        """Allow the decision to be used in boolean contexts for backward compatibility."""
+        return self.is_approved

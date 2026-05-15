@@ -25,7 +25,20 @@ To prevent "fat-finger" errors or model malfunctions, the following directional 
 
 Any signal that violates these boundaries or fails the minimum R:R check will raise a `ValidationError` and will be blocked before reaching the risk engine or broker.
 
-## 2. Decision Support Invariants
+### End-to-End Traceability:
+- **Trace ID**: Every `TradeSignal` includes a mandatory `trace_id` field. This unique identifier is generated at the start of each trading loop and propagated through risk management and execution filters to correlate model predictions with final execution results in the audit logs.
+
+## 2. RiskDecision Schema
+
+To ensure technical trust in risk management, every risk assessment is formalized via the `RiskDecision` Pydantic model in `src/core/schemas.py`.
+
+### Enforced Invariants:
+- **Mandatory Rejection Reason**: If a signal is not approved (`is_approved=False`), a `blocked_by` machine-readable code MUST be provided.
+- **Approval Consistency**: An approved decision (`is_approved=True`) MUST NOT have a `blocked_by` reason.
+- **Audit Trace**: Every decision includes a `trace` dictionary capturing the results of all 8 risk validation layers (Circuit Breaker, Daily Loss, etc.).
+- **Boolean Compatibility**: `RiskDecision` implements `__bool__` for safe integration with legacy conditional logic.
+
+## 3. Decision Support Invariants
 
 To maintain institutional trust, the `DecisionPacket` in `src/core/decision_support.py` enforces logical consistency between decision dimensions:
 1. **Binary Executability**: If `is_executable` is True, there must be ZERO `blocking_reasons`.
@@ -34,13 +47,13 @@ To maintain institutional trust, the `DecisionPacket` in `src/core/decision_supp
 
 These invariants prevent operational surprise by ensuring that the automated decision status aligns perfectly with the underlying risk and filter results.
 
-## 3. Validation Strategy
+## 4. Validation Strategy
 
 1. **Defensive Creation**: Objects are validated at the point of creation using Pydantic models.
 2. **Standardized Enums**: `SignalDirection` IntEnum ensures consistent direction handling across models and adapters.
 3. **Fail-Fast**: Invalid data triggers a `ValidationError` immediately, preventing malformed signals from propagating through the risk engine.
 4. **Unified Schema**: A single source of truth for `TradeSignal` is maintained in `src/core/schemas.py` and used system-wide.
 
-## 4. Implementation Details
+## 5. Implementation Details
 
 The centralized schema is located at `src/core/schemas.py`. All new models or adapters generating signals MUST utilize this schema to ensure compliance with institutional safety standards.

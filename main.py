@@ -108,6 +108,7 @@ def _prepare_trade_signal(
     risk: "RiskManager",
     allocator: "CapitalAllocator",
     audit_logger: Optional["AuditLogger"] = None,
+    trace_id: Optional[str] = None,
 ) -> "TradeSignal":
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -162,6 +163,7 @@ def _prepare_trade_signal(
         lot_size=lot_size,
         algorithm=cfg.algorithm,
         confidence=confidence,
+        trace_id=trace_id,
     )
 
 
@@ -388,6 +390,10 @@ def run_live(
                 atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
                 with profile("signal_preparation"):
+                    # Retrieve trace_id from structlog context
+                    ctx = structlog.contextvars.get_contextvars()
+                    trace_id = ctx.get("trace_id")
+
                     signal = _prepare_trade_signal(
                         cfg=cfg,
                         direction=direction,
@@ -397,21 +403,22 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
+                        trace_id=trace_id,
                     )
                 lot_size = signal.lot_size
 
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    risk_decision = None
+                    if direction != 0:
+                        risk_decision = risk.approve(
+                            signal, signal_id=signal_id, model_health=health
+                        )
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
-                if risk_approved:
+                if risk_decision and risk_decision.is_approved:
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
                         # Model health retrieved in step 6
@@ -437,10 +444,9 @@ def run_live(
                                 cfg.symbol,
                                 filter_decision.blocked_by,
                             )
-                            risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
-                if direction != 0:
+                if direction != 0 and risk_decision:
                     with profile("decision_support"):
                         # Prepare data for explainer
                         model_votes = signal_obj.metadata.get(
@@ -449,16 +455,23 @@ def run_live(
                         )
                         model_weights = signal_obj.metadata.get("weights", {cfg.algorithm: 1.0})
 
+                        # Extract rejection reasons from RiskDecision trace
+                        rejection_reasons = []
+                        if not risk_decision.is_approved:
+                            rejection_reasons = [
+                                k.replace("_", " ").title()
+                                for k, v in risk_decision.trace.items()
+                                if not v.get("passed", True)
+                            ]
+
                         risk_data = {
-                            "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "passed": risk_decision.is_approved,
+                            "rejection_reasons": rejection_reasons,
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason,
                         }
 
                         regime_data = {
@@ -542,7 +555,7 @@ def run_live(
                         else:
                             log.info(dss.format_for_operator(packet))
 
-                if risk_approved and direction != 0:
+                if risk_decision and risk_decision.is_approved and direction != 0:
                     with profile("execution"):
                         from src.core.exceptions import MT5ExecutionError
 

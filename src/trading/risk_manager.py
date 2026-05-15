@@ -24,7 +24,7 @@ from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
@@ -81,45 +81,64 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision indicating approval and rejection reasons.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
-        elif not self._check_consecutive_losses():
-            rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
-            rejection_reason = "Model health metrics below threshold"
+        trace = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+            "consecutive_losses": self._check_consecutive_losses(),
+            "model_health": self._check_model_health(model_health),
+        }
 
-        passed = rejection_reason == ""
-        if not passed:
+        failure_order = [
+            ("circuit_breaker", "Circuit breaker active", "CIRCUIT_BREAKER"),
+            ("daily_loss", "Daily loss limit reached", "DAILY_LOSS"),
+            ("max_positions", "Max positions reached", "MAX_POSITIONS"),
+            ("symbol_allocation", f"Symbol {signal.symbol} not in portfolio", "SYMBOL_ALLOCATION"),
+            ("min_confidence", f"Confidence {signal.confidence:.2f} too low", "PREDICTION_LIMIT"),
+            ("risk_reward", "Risk-Reward ratio too low", "RISK_REWARD"),
+            ("consecutive_losses", "Max consecutive losses reached", "ACTIVITY_LIMIT"),
+            ("model_health", "Model health metrics below threshold", "MODEL_HEALTH"),
+        ]
+
+        blocked_by = None
+        reason = "Approved"
+
+        for layer_key, fail_reason, fail_code in failure_order:
+            if not trace[layer_key]:
+                blocked_by = fail_code
+                reason = fail_reason
+                break
+
+        is_approved = blocked_by is None
+        if not is_approved:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
                 signal.direction,
-                rejection_reason,
+                reason,
             )
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
+                    description=reason,
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+
+        return RiskDecision(
+            is_approved=is_approved,
+            reason=reason,
+            blocked_by=blocked_by,
+            trace={k: {"passed": v} for k, v in trace.items()},
+        )
 
     def size_position(
         self,
