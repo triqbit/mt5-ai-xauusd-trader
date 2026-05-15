@@ -30,6 +30,8 @@ class RareEventType(str, Enum):
     NEWS_SHOCK = "news_shock"
     FAT_FINGER = "fat_finger"
     BULL_BEAR_TRAP = "bull_bear_trap"
+    SHORT_SQUEEZE = "short_squeeze"
+    CASCADE_LIQUIDATION = "cascade_liquidation"
 
 
 class RareEventConfig(BaseModel):
@@ -60,6 +62,7 @@ class RareEventResult(BaseModel):
     peak_impact_pct: float
     realized_volatility: float
     recovery_attained: float
+    recovery_bars: int = 0
     description: str = ""
 
     def to_report_summary(self) -> Any:
@@ -71,6 +74,7 @@ class RareEventResult(BaseModel):
             peak_impact_pct=self.peak_impact_pct,
             realized_volatility=self.realized_volatility,
             recovery_attained=self.recovery_attained,
+            recovery_bars=self.recovery_bars,
             description=self.description,
         )
 
@@ -143,6 +147,10 @@ class RareEventSimulator:
             return self._simulate_fat_finger(config)
         if config.event_type == RareEventType.BULL_BEAR_TRAP:
             return self._simulate_bull_bear_trap(config)
+        if config.event_type == RareEventType.SHORT_SQUEEZE:
+            return self._simulate_short_squeeze(config)
+        if config.event_type == RareEventType.CASCADE_LIQUIDATION:
+            return self._simulate_cascade_liquidation(config)
         raise ValueError(f"Unknown rare event type: {config.event_type}")
 
     def _generate_base_ohlc(
@@ -189,8 +197,11 @@ class RareEventSimulator:
 
         # Generate spread: base XAUUSD spread ~0.2-0.4, plus volatility noise
         base_spread = 0.25 * spread_multiplier
-        # Spread increases with local volatility
-        spreads = base_spread + self.rng.exponential(vols * 100, n)
+        # Spread increases exponentially with local volatility to reflect liquidity drying up
+        # Normal vol ~0.0005 -> exp(0.0005 * 500) ~ 1.28
+        # High vol ~0.01 -> exp(0.01 * 500) ~ 148 (massive spread widening)
+        vol_spread_impact = np.exp(vols * 500) - 1.0
+        spreads = base_spread + (self.rng.exponential(vols * 50, n) + vol_spread_impact).astype(np.float32)
 
         # Volume correlates with absolute returns and volatility
         vol_factor = 1.0 + (np.abs(returns) / (vols + 1e-9)) * 0.5
@@ -288,6 +299,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=float(recovered_total_pct / abs(impact)) if impact != 0 else 0,
+            recovery_bars=recovery_duration,
             description=f"Flash crash of {peak_impact:.2%} with {config.recovery_factor:.0%} recovery.",
         )
 
@@ -600,6 +612,8 @@ class RareEventSimulator:
 
         # Generate automated insights
         critical_events = [s for s in summaries if abs(s.peak_impact_pct) > 0.05]
+        long_recoveries = [s for s in summaries if s.recovery_bars > 50]
+
         insight_msg = (
             f"Evaluated {len(summaries)} rare event scenarios. "
             f"Detected {len(critical_events)} high-impact events (>5% deviation). "
@@ -607,9 +621,12 @@ class RareEventSimulator:
 
         if critical_events:
             most_severe = min(summaries, key=lambda s: s.peak_impact_pct)
-            insight_msg += f"Most severe impact was {most_severe.event_type} at {most_severe.peak_impact_pct:.2%}."
+            insight_msg += f"Most severe impact was {most_severe.event_type} at {most_severe.peak_impact_pct:.2%}. "
         else:
-            insight_msg += "All events remained within manageable risk bounds."
+            insight_msg += "All events remained within manageable risk bounds. "
+
+        if long_recoveries:
+            insight_msg += f"Detected {len(long_recoveries)} events with extended recovery periods (>50 bars)."
 
         return RareEventSection(scenarios=summaries, insights=insight_msg)
 
@@ -851,5 +868,128 @@ class RareEventSimulator:
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
             description=f"Multi-session regime dislocation ({num_sessions} sessions) with {peak_impact:.2%} peak deviation.",
+        )
+        return df, result
+
+    def _simulate_short_squeeze(
+        self, config: RareEventConfig
+    ) -> tuple[pd.DataFrame, RareEventResult]:
+        """
+        Simulates a rapid parabolic upward move driven by buy-side liquidation.
+        Tests resistance-breakout and stop-loss hunting logic.
+        """
+        n = config.n_steps
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
+
+        squeeze_idx = n // 3
+        # Parabolic move: accelerating returns
+        squeeze_len = max(1, int(15 * config.event_magnitude))
+        total_move = 0.04 * config.event_magnitude
+
+        for i in range(squeeze_len):
+            idx = squeeze_idx + i
+            if idx < n:
+                # Accelerating return: (i+1)^2 / sum(1..len^2)
+                accel_factor = (i + 1) ** 2 / ((squeeze_len * (squeeze_len + 1) * (2 * squeeze_len + 1)) / 6)
+                returns[idx] = total_move * accel_factor + self.rng.uniform(0, 0.001)
+                vols[idx] *= 10.0 * config.event_magnitude
+
+        # Blow-off top and sharp reversal
+        reversal_len = int(10 * config.event_magnitude)
+        for i in range(reversal_len):
+            idx = squeeze_idx + squeeze_len + i
+            if idx < n:
+                returns[idx] = -0.015 * config.event_magnitude * self.rng.uniform(0.8, 1.2)
+                vols[idx] *= 5.0 * config.event_magnitude
+
+        df = self._generate_base_ohlc(
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
+        )
+
+        event_prices = df["close"].iloc[squeeze_idx : squeeze_idx + squeeze_len + reversal_len]
+        start_price_val = df["close"].iloc[squeeze_idx - 1] if squeeze_idx > 0 else df["close"].iloc[0]
+        deviations = (event_prices / start_price_val - 1).values
+        # For a squeeze, we are interested in the peak price reached
+        peak_impact = float(np.max(deviations))
+
+        result = RareEventResult(
+            event_type=RareEventType.SHORT_SQUEEZE,
+            config=config,
+            start_index=squeeze_idx,
+            end_index=min(n - 1, squeeze_idx + squeeze_len + reversal_len),
+            peak_impact_pct=peak_impact,
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
+            recovery_attained=0.0,
+            recovery_bars=reversal_len,
+            description=f"Parabolic short squeeze of {peak_impact:.2%} with blow-off top.",
+        )
+        return df, result
+
+    def _simulate_cascade_liquidation(
+        self, config: RareEventConfig
+    ) -> tuple[pd.DataFrame, RareEventResult]:
+        """
+        Simulates a series of accelerating downward price shocks (margin calls).
+        Tests trailing-stop and capital preservation logic under extreme stress.
+        """
+        n = config.n_steps
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
+
+        start_idx = n // 4
+        # Three distinct waves of liquidation
+        waves = 3
+        wave_len = int(12 * config.event_magnitude)
+        gap_len = int(5 * config.event_magnitude)
+
+        current_idx = start_idx
+        for wave in range(waves):
+            wave_magnitude = -0.02 * config.event_magnitude * (1 + wave * 0.5)
+            for _ in range(wave_len):
+                if current_idx < n:
+                    returns[current_idx] = (wave_magnitude / wave_len) * self.rng.uniform(0.9, 1.4)
+                    vols[current_idx] *= (5.0 + wave * 2.0) * config.event_magnitude
+                    current_idx += 1
+
+            # Brief pause / feeble bounce
+            for _ in range(gap_len):
+                if current_idx < n:
+                    returns[current_idx] = 0.001 * config.event_magnitude * self.rng.uniform(0, 1)
+                    vols[current_idx] *= 2.0 * config.event_magnitude
+                    current_idx += 1
+
+        df = self._generate_base_ohlc(
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
+        )
+
+        event_prices = df["close"].iloc[start_idx:current_idx]
+        start_price_val = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        deviations = (event_prices / start_price_val - 1).values
+        # For liquidation, we are interested in the maximum drop
+        peak_impact = float(np.min(deviations))
+
+        result = RareEventResult(
+            event_type=RareEventType.CASCADE_LIQUIDATION,
+            config=config,
+            start_index=start_idx,
+            end_index=min(n - 1, current_idx),
+            peak_impact_pct=peak_impact,
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
+            recovery_attained=0.0,
+            recovery_bars=0,
+            description=f"Cascade liquidation with {waves} waves of selling and {peak_impact:.2%} peak drop.",
         )
         return df, result

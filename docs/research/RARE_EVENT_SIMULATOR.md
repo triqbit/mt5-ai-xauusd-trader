@@ -24,6 +24,8 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 6.  **Volatility Cluster**: An abnormal cluster of high volatility with multiple decaying shocks, approximated using GARCH(1,1) logic.
 7.  **Multi-Session Dislocation**: A sequence of regime shifts across multiple sessions, testing a strategy's multi-day adaptability.
 8.  **News Shock**: A violent directional move followed by sustained high volatility and erratic behavior. Calibrated to trigger the `NEWS_SHOCK` regime in the `RegimeDetector` (ER > 0.7, ATR Ratio > 2.0).
+9.  **Short Squeeze**: Rapid parabolic move up driven by buy-side liquidation, followed by a blow-off top. Tests resistance-breakout and stop-loss hunting logic.
+10. **Cascade Liquidation**: A series of accelerating downward price shocks (margin calls). Tests trailing-stop and capital preservation logic under extreme stress.
 
 ## Configuration
 
@@ -37,6 +39,7 @@ The `RareEventConfig` model includes the following parameters:
 - `base_volume`: Average tick volume during normal periods.
 - `event_magnitude`: Multiplier for the severity of the event.
 - `recovery_factor`: Proportion of the event's impact that is eventually recovered.
+- `recovery_bars`: Number of bars taken for the market to stabilize after the event peak.
 - `bars_per_day`: Number of bars per trading day (defines frequency).
 - `start_date`: Base date for the generated time index.
 - `seed`: Random seed for reproducibility.
