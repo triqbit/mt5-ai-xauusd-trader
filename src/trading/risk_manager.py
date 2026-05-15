@@ -92,9 +92,6 @@ class RiskManager:
             today_trades = data.get("today_trades", [])
 
             # 1. Reconstruct peak_equity
-            # We start with initial balance (assumed to be current balance - total pnl)
-            # but a safer way is to use a fixed starting point or just track peaks.
-            # Here we simulate equity curve from 0 and find max.
             if all_pnls:
                 equity_curve = [0.0]
                 for pnl in all_pnls:
@@ -128,7 +125,8 @@ class RiskManager:
 
                 # Update daily peak equity
                 daily_pnl_acc = 0
-                daily_peaks = [starting_balance + total_pnl - realised_pnl]  # Start of today
+                # Start of today (assume current balance - realised_pnl_today)
+                daily_peaks = [self.balance - realised_pnl]
                 for t in today_trades:
                     daily_pnl_acc += t.pnl
                     daily_peaks.append(daily_peaks[0] + daily_pnl_acc)
