@@ -453,13 +453,17 @@ def test_rl_metric_new_fields():
     metric = RLMetric(
         agent_name="TestAgent",
         sharpe=1.5,
+        volatility=0.15,
         profit_factor=1.2,
+        expectancy=0.45,
         max_dd=0.1,
         win_rate=0.5,
         tail_ratio=1.8,
         common_sense_ratio=2.1,
         gain_to_pain_ratio=1.4,
     )
+    assert metric.volatility == 0.15
+    assert metric.expectancy == 0.45
     assert metric.tail_ratio == 1.8
     assert metric.common_sense_ratio == 2.1
     assert metric.gain_to_pain_ratio == 1.4
