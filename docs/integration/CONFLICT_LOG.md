@@ -128,3 +128,10 @@
 - **Impact**: High. The core verification suite for risk harmonization is failing to even import correctly.
 - **Resolution**: Harmonize the `RiskManager` interface to support `validate_signal` and `RiskDecision` output.
 - **Owner**: Jules05
+
+### 4. Dependency Conflict (Security vs. Vendor SDK)
+- **Conflict**: Security hardening (Jules02) mandates `python-socketio==5.14.0` and `python-engineio==4.11.2` to resolve RCE vulnerability GHSA-g8c6-8fjj-2r4m. However, `metaapi-cloud-sdk` (Jules01/04) pins `python-engineio<4.0.0`, causing a resolution failure in CI.
+- **Agents**: Jules01, Jules02, Jules04
+- **Impact**: Critical. Blocks CI pipelines and prevents the system from being simultaneously secure and functional for MetaAPI integration.
+- **Resolution**: Enforce the secure versions in all `requirements*.txt` files. Verify runtime compatibility with `metaapi-cloud-sdk` via integration tests. If compatibility fails, seek a modern SDK alternative or implement a dedicated microservice for MetaAPI to isolate the insecure dependency.
+- **Owner**: Jules05

@@ -574,6 +574,7 @@ def run_live(
 
                         if ticket:
                             risk.open_positions[cfg.symbol] = ticket
+                            risk.record_trade_open()
                             log.info("Order placed", ticket=ticket, latency_ms=execution_latency_ms)
                             if monitor:
                                 # We don't have slippage here yet, so we pass 0.0

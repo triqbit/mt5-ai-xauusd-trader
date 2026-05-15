@@ -118,7 +118,7 @@ class RiskManager:
         # Layer 3: Activity Limits
         if self.daily.trade_count >= self.cfg.max_trades_per_day:
             return RiskDecision(False, "Max daily trades reached")
-        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
+        if not self._check_consecutive_losses():
             return RiskDecision(False, "Max consecutive losses reached")
 
         # Layer 4: Exposure Limits
@@ -170,6 +170,8 @@ class RiskManager:
             rejection_reason = "Circuit breaker active"
         elif self.get_daily_loss_level() >= 4:
             rejection_reason = "Daily loss limit reached"
+        elif self.daily.trade_count >= self.cfg.max_trades_per_day:
+            rejection_reason = "Max daily trades reached"
         elif len(self.open_positions) >= self.cfg.max_positions:
             rejection_reason = "Max positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
@@ -287,14 +289,19 @@ class RiskManager:
         if current_equity > self.daily.peak_equity:
             self.daily.peak_equity = current_equity
 
+    def record_trade_open(self) -> None:
+        """Increment daily trade count upon successful execution."""
+        self.daily.trade_count += 1
+        logger.debug("Trade opened | Daily count: %d", self.daily.trade_count)
+
     def record_pnl(self, pnl: float) -> None:
         """Accumulate intraday realised PnL."""
         self.daily.realised_pnl += pnl
-        self.daily.trade_count += 1
         if pnl < 0:
             self.daily.consecutive_losses += 1
         else:
             self.daily.consecutive_losses = 0
+        logger.info("PnL recorded: %.2f | Daily total: %.2f", pnl, self.daily.realised_pnl)
 
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
