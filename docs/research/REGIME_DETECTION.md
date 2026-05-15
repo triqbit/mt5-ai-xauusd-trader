@@ -15,7 +15,9 @@ The system classifies the market into the following regimes:
 
 ## Methodology
 
-The `RegimeDetector` utilizes a combination of statistical features derived from OHLCV data:
+The `RegimeDetector` utilizes institutional-grade normalization and a combination of statistical features derived from OHLCV data:
+
+- **Robust Normalization**: All features are normalized using `StandardScaler` from `scikit-learn` before being passed to the GMM. Centroids are inverse-transformed to ensure heuristic mapping logic remains explainable on raw feature scales.
 
 - **ATR Ratio**: Short-term vs. long-term Average True Range to detect volatility expansions or contractions.
 - **Kaufman Efficiency Ratio (ER)**: Measures the efficiency of price moves (net change / sum of absolute changes).
@@ -34,6 +36,14 @@ The system supports two detection modes:
 ### Historical Labeling
 
 The `label_history` method provides a performance-optimized, vectorized utility for adding regime classifications to historical DataFrames, suitable for backtesting and research.
+
+### Performance Analysis
+
+The `get_regime_performance` method calculates historical P&L analysis partitioned by market regime, providing critical metrics for strategy optimization:
+
+- **Sharpe Ratio**: Risk-adjusted returns per regime.
+- **Mean Return**: Expected profitability in specific environments.
+- **Total Return**: Cumulative impact of the regime on the portfolio.
 
 ```python
 from src.models.regime_detector import RegimeDetector

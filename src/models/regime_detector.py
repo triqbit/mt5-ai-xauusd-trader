@@ -456,7 +456,9 @@ class RegimeDetector:
 
         # Group by regime and calculate metrics
         perf = df.groupby("regime")["returns"].agg(["mean", "std", "count"])
-        perf["sharpe"] = (perf["mean"] / (perf["std"] + 1e-9)) * np.sqrt(252 * 24 * 12)  # M5 assuming
+        perf["sharpe"] = (perf["mean"] / (perf["std"] + 1e-9)) * np.sqrt(
+            252 * 24 * 12
+        )  # M5 assuming
         perf["total_return"] = df.groupby("regime")["returns"].sum()
 
         return perf
