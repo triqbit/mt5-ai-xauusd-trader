@@ -76,6 +76,7 @@ class WalkForwardConfig(BaseModel):
     )
     min_oos_sharpe: float = Field(-float("inf"), description="Minimum allowed OOS Sharpe Ratio")
     max_oos_drawdown: float = Field(1.0, description="Maximum allowed OOS Drawdown (fraction)")
+    min_trades_per_window: int = Field(5, description="Minimum trades required in each OOS window")
 
 
 class RobustnessMetrics(BaseModel):
@@ -228,7 +229,9 @@ class WalkForwardOptimizer:
 
         return windows
 
-    def _evaluate_strategy(self, data: pd.DataFrame, params: dict[str, Any]) -> dict[str, Any]:
+    def _evaluate_strategy(
+        self, data: pd.DataFrame, params: dict[str, Any]
+    ) -> tuple[dict[str, Any], np.ndarray]:
         """
         Evaluates a strategy with given parameters on a dataset.
 
@@ -237,14 +240,15 @@ class WalkForwardOptimizer:
             params: Strategy parameters.
 
         Returns:
-            Dict[str, Any]: Performance metrics.
+            Tuple[Dict[str, Any], np.ndarray]: Performance metrics and returns series.
         """
         strategy = self.strategy_factory(**params)
         evaluator = BenchmarkEvaluator(
             data, commission=self.config.commission, bars_per_year=self.config.bars_per_year
         )
         metrics = evaluator._calculate_metrics(strategy.predict(data), strategy.name)
-        return metrics
+        returns = evaluator.results.get(strategy.name + "_returns", np.zeros(len(data)))
+        return metrics, returns
 
     def _calculate_stability_penalty(
         self, params: dict[str, Any], data: pd.DataFrame, perturbation_pct: float = 0.05
@@ -266,7 +270,7 @@ class WalkForwardOptimizer:
         """
         perturbations = []
         try:
-            base_metrics = self._evaluate_strategy(data, params)
+            base_metrics, _ = self._evaluate_strategy(data, params)
             base_sharpe = base_metrics.get("Sharpe Ratio", 0.0)
             if np.isnan(base_sharpe):
                 return 10.0  # Fragility safeguard
@@ -303,7 +307,7 @@ class WalkForwardOptimizer:
                         perturbed_params[key] = new_val
 
                         try:
-                            p_metrics = self._evaluate_strategy(data, perturbed_params)
+                            p_metrics, _ = self._evaluate_strategy(data, perturbed_params)
                             p_sharpe = p_metrics.get("Sharpe Ratio", 0.0)
                             if not np.isnan(p_sharpe):
                                 perturbations.append(float(p_sharpe))
@@ -331,9 +335,7 @@ class WalkForwardOptimizer:
         cv = std_sharpe / (abs(mean_sharpe) + 1e-9)
         return float(np.clip(cv, 0.0, 10.0))
 
-    def _calculate_regime_consistency(
-        self, data: pd.DataFrame, strategy_params: dict[str, Any]
-    ) -> float:
+    def _calculate_regime_consistency(self, data: pd.DataFrame, returns: np.ndarray) -> float:
         """
         Measures how consistent performance (Sharpe Ratio) is across different detected regimes.
         Uses frequency-weighting to ensure that the performance consistency across market
@@ -341,20 +343,13 @@ class WalkForwardOptimizer:
 
         Args:
             data: Data containing 'regime' column (typically the training/IS window).
-            strategy_params: Strategy parameters.
+            returns: Returns series for the given data.
 
         Returns:
             float: Frequency-weighted consistency score (1 - CV), clipped at [0, 1].
         """
-        strategy = self.strategy_factory(**strategy_params)
-        evaluator = BenchmarkEvaluator(
-            data, commission=self.config.commission, bars_per_year=self.config.bars_per_year
-        )
-        signals = strategy.predict(data)
-
-        # Use evaluator to get returns
-        _ = evaluator._calculate_metrics(signals, strategy.name)
-        returns = evaluator.results.get(strategy.name + "_returns", np.zeros(len(data)))
+        if "regime" not in data.columns:
+            return 0.5
 
         temp_df = pd.DataFrame({"returns": returns, "regime": data["regime"]})
 
@@ -424,10 +419,13 @@ class WalkForwardOptimizer:
             oos_max_drawdowns = []
             oos_calmars = []
 
+            constraint_penalty = 0.0
+            violated = False
+
             regime_cons_list = []
             for train_data, test_data in windows:
-                is_metrics = self._evaluate_strategy(train_data, params)
-                oos_metrics = self._evaluate_strategy(test_data, params)
+                is_metrics, is_returns = self._evaluate_strategy(train_data, params)
+                oos_metrics, _ = self._evaluate_strategy(test_data, params)
 
                 is_sharpes.append(is_metrics.get("Sharpe Ratio", 0.0))
                 oos_sharpes.append(oos_metrics.get("Sharpe Ratio", 0.0))
@@ -439,8 +437,15 @@ class WalkForwardOptimizer:
                 oos_max_drawdowns.append(oos_metrics.get("Max Drawdown", 0.0))
                 oos_calmars.append(oos_metrics.get("Calmar Ratio", 0.0))
 
-                # Track regime consistency across windows
-                regime_cons_list.append(self._calculate_regime_consistency(train_data, params))
+                # Track constraints
+                num_trades = oos_metrics.get("Num Trades", 0)
+
+                # Track regime consistency across windows using cached IS returns
+                regime_cons_list.append(self._calculate_regime_consistency(train_data, is_returns))
+
+                if num_trades < self.config.min_trades_per_window:
+                    constraint_penalty += 1.0 * (self.config.min_trades_per_window - num_trades)
+                    violated = True
 
             # Basic metrics
             oos_mean = np.mean(oos_sharpes)
@@ -450,8 +455,6 @@ class WalkForwardOptimizer:
             max_oos_dd = np.max(oos_max_drawdowns)
 
             # Check constraints
-            constraint_penalty = 0.0
-            violated = False
             if worst_oos < self.config.min_oos_sharpe:
                 constraint_penalty += 10.0 * (self.config.min_oos_sharpe - worst_oos)
                 violated = True
@@ -556,20 +559,10 @@ class WalkForwardOptimizer:
         all_oos_returns = []
 
         for i, (train_data, test_data) in enumerate(windows):
-            is_metrics = self._evaluate_strategy(train_data, best_params)
+            is_metrics, _ = self._evaluate_strategy(train_data, best_params)
+            oos_metrics, oos_returns_iter = self._evaluate_strategy(test_data, best_params)
 
-            # Re-evaluate to get returns series
-            strategy = self.strategy_factory(**best_params)
-            evaluator = BenchmarkEvaluator(
-                test_data,
-                commission=self.config.commission,
-                bars_per_year=self.config.bars_per_year,
-            )
-            oos_metrics = evaluator._calculate_metrics(strategy.predict(test_data), strategy.name)
-
-            # Extract returns from evaluator results
-            returns = evaluator.results.get(strategy.name + "_returns", np.zeros(len(test_data)))
-            all_oos_returns.extend(returns.tolist())
+            all_oos_returns.extend(oos_returns_iter.tolist())
 
             window_results.append(
                 WindowResult(window_index=i, is_metrics=is_metrics, oos_metrics=oos_metrics)
