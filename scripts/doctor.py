@@ -4,12 +4,12 @@ scripts/doctor.py
 Performs environment, dependency, and connectivity checks to ensure system readiness.
 """
 
+import logging
 import os
 import platform
-import sys
 import stat
+import sys
 from pathlib import Path
-import logging
 
 # Configure minimal logging for the doctor
 logging.basicConfig(level=logging.INFO, format='%(message)s')
@@ -18,8 +18,8 @@ logger = logging.getLogger("doctor")
 # Try to import rich for beautiful output, fallback to plain text if missing
 try:
     from rich.console import Console
-    from rich.table import Table
     from rich.panel import Panel
+    from rich.table import Table
     from rich.text import Text
     HAS_RICH = True
     console = Console()
@@ -103,6 +103,11 @@ CORE_DEPENDENCIES = {
     "redis": ("redis", "7.4.0"),
     "alembic": ("alembic", "1.14.1"),
     "prometheus-client": ("prometheus_client", "0.21.1"),
+    "python-socketio": ("socketio", "4.11.0"),
+    "pytz": ("pytz", "2026.2"),
+    "psycopg2-binary": ("psycopg2", "2.9.10"),
+    "python-telegram-bot": ("telegram", "21.10"),
+    "optuna": ("optuna", "4.8.0"),
 }
 
 def check_dependencies(dependencies=None):
@@ -137,9 +142,10 @@ def check_dependencies(dependencies=None):
 
                 actual_version = get_version(meta_name)
 
-                if actual_version != "unknown":
-                    if parse_version(actual_version) < parse_version(min_version):
-                        outdated.append(f"{display_name} (found {actual_version}, need {min_version})")
+                if actual_version != "unknown" and parse_version(actual_version) < parse_version(
+                    min_version
+                ):
+                    outdated.append(f"{display_name} (found {actual_version}, need {min_version})")
 
                 versions.append(f"{display_name} v{actual_version}")
             except Exception:
