@@ -1,13 +1,12 @@
-
-import sys
 import os
-from typing import Dict
+import sys
 
 # Add src to path
 sys.path.append(os.getcwd())
 
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.research.reporting import AllocationSection
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
+
 
 def verify_reporting():
     allocator = CapitalAllocator(total_budget=100000.0)
@@ -17,7 +16,7 @@ def verify_reporting():
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=50000.0,
-        performance_multiplier=1.2
+        performance_multiplier=1.2,
     )
     allocator.add_strategy(s1)
     allocator.update_allocation("s1", 20000.0)
@@ -42,6 +41,7 @@ def verify_reporting():
     assert section.rejection_summary["STRATEGY_NOT_FOUND"] == 1
 
     print("Reporting integration verified successfully!")
+
 
 if __name__ == "__main__":
     try:

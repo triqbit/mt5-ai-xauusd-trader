@@ -2,13 +2,16 @@
 Tests for Monitor class.
 Ensures real-time tracking, metrics updates, and Telegram alerting work as expected.
 """
+
 import asyncio
+import contextlib
 import time
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.core.monitor import (
+    AVG_TRADE_DURATION_GAUGE,
     CONFIDENCE_GAUGE,
     CPU_USAGE_GAUGE,
     DAILY_PNL_GAUGE,
@@ -30,7 +33,6 @@ from src.core.monitor import (
     TRADE_COUNTER,
     TRADING_BLOCK_DURATION,
     WIN_RATE_GAUGE,
-    AVG_TRADE_DURATION_GAUGE,
     Monitor,
 )
 
@@ -48,11 +50,11 @@ class TestMonitor(unittest.TestCase):
         self.config.data_freshness_threshold = 300
         self.config.execution_latency_threshold = 1.0
 
-        with patch('telegram.Bot'):
+        with patch("telegram.Bot"):
             self.monitor = Monitor(self.config)
 
     def test_log_equity(self):
-        with patch.object(EQUITY_GAUGE, 'set') as mock_set:
+        with patch.object(EQUITY_GAUGE, "set") as mock_set:
             self.monitor.log_equity(10500.0)
             self.assertEqual(len(self.monitor.equity_history), 1)
             self.assertEqual(self.monitor.equity_history[0]["equity"], 10500.0)
@@ -67,17 +69,17 @@ class TestMonitor(unittest.TestCase):
         self.assertEqual(curve[1]["equity"], 10100.0)
 
     def test_log_pnl(self):
-        with patch.object(DAILY_PNL_GAUGE, 'set') as mock_set:
+        with patch.object(DAILY_PNL_GAUGE, "set") as mock_set:
             self.monitor.log_pnl(250.0)
             mock_set.assert_called_once_with(250.0)
 
     def test_log_monthly_return(self):
-        with patch.object(MONTHLY_RETURN_GAUGE, 'set') as mock_set:
+        with patch.object(MONTHLY_RETURN_GAUGE, "set") as mock_set:
             self.monitor.log_monthly_return(1500.0)
             mock_set.assert_called_once_with(1500.0)
 
     def test_log_trade_duration(self):
-        with patch.object(AVG_TRADE_DURATION_GAUGE, 'set') as mock_set:
+        with patch.object(AVG_TRADE_DURATION_GAUGE, "set") as mock_set:
             self.monitor.log_trade_duration(3600.0)
             mock_set.assert_called_once_with(3600.0)
 
@@ -105,7 +107,7 @@ class TestMonitor(unittest.TestCase):
     def test_alert_circuit_breaker(self):
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = AsyncMock()
-        with patch.object(DRAWDOWN_GAUGE, 'set') as mock_set:
+        with patch.object(DRAWDOWN_GAUGE, "set") as mock_set:
             self.monitor.alert_circuit_breaker(0.15)
             self.assertTrue(self.monitor.bot.send_message.called)
             msg = self.monitor.bot.send_message.call_args[1]["text"]
@@ -116,7 +118,7 @@ class TestMonitor(unittest.TestCase):
     def test_send_daily_summary(self):
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = AsyncMock()
-        with patch.object(DAILY_PNL_GAUGE, 'set') as mock_set:
+        with patch.object(DAILY_PNL_GAUGE, "set") as mock_set:
             self.monitor.send_daily_summary(500.0, 10)
             self.assertTrue(self.monitor.bot.send_message.called)
             msg = self.monitor.bot.send_message.call_args[1]["text"]
@@ -128,7 +130,7 @@ class TestMonitor(unittest.TestCase):
     def test_check_confidence_degradation(self):
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = AsyncMock()
-        with patch.object(CONFIDENCE_GAUGE, 'set') as mock_set:
+        with patch.object(CONFIDENCE_GAUGE, "set") as mock_set:
             # Case 1: Below threshold
             self.monitor.check_confidence_degradation(0.5)
             self.assertTrue(self.monitor.bot.send_message.called)
@@ -166,9 +168,10 @@ class TestMonitor(unittest.TestCase):
             self.assertIn("Connection failed", msg)
 
     def test_update_performance_metrics(self):
-        with patch.object(WIN_RATE_GAUGE, "set") as mock_win_set, patch.object(
-            SHARPE_RATIO_GAUGE, "set"
-        ) as mock_sharpe_set:
+        with (
+            patch.object(WIN_RATE_GAUGE, "set") as mock_win_set,
+            patch.object(SHARPE_RATIO_GAUGE, "set") as mock_sharpe_set,
+        ):
             self.monitor.update_performance_metrics(0.65, 2.1)
             mock_win_set.assert_called_once_with(65.0)
             mock_sharpe_set.assert_called_once_with(2.1)
@@ -194,13 +197,13 @@ class TestMonitor(unittest.TestCase):
         mock_mem.return_value.percent = 50.0
         mock_disk.return_value.percent = 30.0
 
-        with patch.object(CPU_USAGE_GAUGE, "set") as mock_cpu_set, \
-             patch.object(MEMORY_USAGE_GAUGE, "set") as mock_mem_set, \
-             patch.object(DISK_USAGE_GAUGE, "set") as mock_disk_set:
-            try:
+        with (
+            patch.object(CPU_USAGE_GAUGE, "set") as mock_cpu_set,
+            patch.object(MEMORY_USAGE_GAUGE, "set") as mock_mem_set,
+            patch.object(DISK_USAGE_GAUGE, "set") as mock_disk_set,
+        ):
+            with contextlib.suppress(asyncio.CancelledError):
                 asyncio.run(self.monitor._collect_system_metrics(interval=1))
-            except asyncio.CancelledError:
-                pass
 
             mock_cpu_set.assert_called_with(10.0)
             mock_mem_set.assert_called_with(50.0)
@@ -230,10 +233,11 @@ class TestMonitor(unittest.TestCase):
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = AsyncMock()
 
-        with patch.object(EXECUTION_LATENCY_HISTOGRAM, "observe") as mock_latency, \
-             patch.object(SLIPPAGE_HISTOGRAM, "observe") as mock_slippage, \
-             patch.object(FILL_RATE_GAUGE, "set") as mock_fill:
-
+        with (
+            patch.object(EXECUTION_LATENCY_HISTOGRAM, "observe") as mock_latency,
+            patch.object(SLIPPAGE_HISTOGRAM, "observe") as mock_slippage,
+            patch.object(FILL_RATE_GAUGE, "set") as mock_fill,
+        ):
             # Case 1: Normal latency
             self.monitor.log_execution_quality(150.0, 0.5, 0.95)
             mock_latency.assert_called_with(0.15)
@@ -268,8 +272,10 @@ class TestMonitor(unittest.TestCase):
         self.monitor.bot = MagicMock()
         self.monitor.bot.send_message = AsyncMock()
 
-        with patch.object(MODEL_ACCURACY_GAUGE, "set") as mock_acc, \
-             patch.object(MODEL_DRIFT_GAUGE, "set") as mock_drift:
+        with (
+            patch.object(MODEL_ACCURACY_GAUGE, "set") as mock_acc,
+            patch.object(MODEL_DRIFT_GAUGE, "set") as mock_drift,
+        ):
             # Case 1: Healthy performance
             self.monitor.log_model_performance(0.85, 0.05)
             mock_acc.assert_called_with(85.0)
@@ -382,5 +388,6 @@ class TestMonitor(unittest.TestCase):
         self.assertIn("Model Retraining Failed", msg)
         self.assertIn("Disk full", msg)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
