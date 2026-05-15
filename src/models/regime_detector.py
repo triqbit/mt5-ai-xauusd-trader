@@ -23,8 +23,11 @@ License: MIT
 
 from __future__ import annotations
 
+import contextlib
 import os
+import stat
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 import joblib
@@ -752,18 +755,57 @@ class RegimeDetector:
     def load_model(self, filepath: str) -> None:
         """
         Loads a persisted GMM model and state from disk.
+        Institutional security: Validates path and permissions before deserialization.
         """
-        if not os.path.exists(filepath):
+        path = Path(filepath).resolve()
+        if not path.exists():
             logger.error("Model file not found: %s", filepath)
             return
 
-        state = joblib.load(filepath)
-        self._gmm = state.get("gmm")
-        self._cluster_to_regime = state.get("cluster_to_regime", {})
-        self.transition_matrix = state.get("transition_matrix")
-        self.window = state.get("window", self.window)
-        self.long_window = state.get("long_window", self.long_window)
-        logger.info("model_loaded", path=filepath)
+        # Security: Path validation - restrict to project's models directory or /tmp
+        try:
+            from src.core.config import ROOT
+
+            models_dir = (ROOT / "models").resolve()
+
+            # Robust path validation using is_relative_to (Python 3.9+)
+            # This prevents bypasses like /app/models_attacker/
+            is_in_models = False
+            with contextlib.suppress(ValueError):
+                is_in_models = path.is_relative_to(models_dir)
+
+            is_in_tmp = False
+            with contextlib.suppress(ValueError):
+                is_in_tmp = path.is_relative_to("/tmp") or path.is_relative_to("/var/tmp")
+
+            if not (is_in_models or is_in_tmp):
+                logger.error(
+                    "Security violation: Attempted to load model from untrusted path: %s", path
+                )
+                return
+        except ImportError as e:
+            # Fail-closed if security constraints cannot be verified
+            logger.error("Security violation: Could not verify model path safety: %s", e)
+            return
+
+        # Security: Permission check - ensure no world-writable/readable access (Linux/Mac)
+        # Aligned with ConfigValidator: check both group and others (0o077 mask)
+        if os.name != "nt":
+            mode = os.stat(path).st_mode
+            if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                logger.error("Security violation: Insecure permissions for model file: %s", path)
+                return
+
+        try:
+            state = joblib.load(path)
+            self._gmm = state.get("gmm")
+            self._cluster_to_regime = state.get("cluster_to_regime", {})
+            self.transition_matrix = state.get("transition_matrix")
+            self.window = state.get("window", self.window)
+            self.long_window = state.get("long_window", self.long_window)
+            logger.info("model_loaded", path=str(path))
+        except Exception as e:
+            logger.error("Failed to load model from %s: %s", filepath, e)
 
     def _calculate_transition_matrix(self, features: pd.DataFrame) -> None:
         """Calculates transition probability matrix from fitted GMM on training data."""

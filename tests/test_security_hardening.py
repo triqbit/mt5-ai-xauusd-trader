@@ -220,7 +220,7 @@ def test_config_validator_file_permissions(tmp_path, monkeypatch):
     # Check if FILE_PERMISSION warning is present
     permission_errors = [e for e in result.errors if e.field == "FILE_PERMISSION"]
     assert len(permission_errors) > 0
-    assert "Insecure permissions" in permission_errors[0].message
+    assert "Hardened insecure permissions" in permission_errors[0].message
 
 
 def test_safe_pytorch_loading():
