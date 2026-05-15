@@ -590,7 +590,7 @@ def test_decay_calculation_hardened_logic():
     assert report_zero.sharpe_decay == 1.0
 
     # Case 3: Extreme clipping
-    # b = 1.0, m = -5.0 -> decay = (1.0 - (-5.0)) / 1.0 = 6.0 (clipped to 2.0)
+    # b = -1.0, m = -5.0 -> decay = (-1.0 - (-5.0)) / 1.0 = 4.0 (clipped to 2.0)
     metrics_extreme = StressTestMetrics(
         total_return=-0.5, max_drawdown=0.5, sharpe_ratio=-5.0,
         win_rate=0.1, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
@@ -599,3 +599,38 @@ def test_decay_calculation_hardened_logic():
     report_extreme = lab.generate_report(baseline)
     # b= -1, m= -5 -> decay = (-1 - (-5)) / 1 = 4 -> clipped to 2
     assert report_extreme.sharpe_decay == 2.0
+
+
+def test_severity_degradation_tracking(sample_data):
+    """Verify that StressLab correctly tracks and aggregates metrics by severity."""
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    baseline = StressTestMetrics(
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=2.0,
+        win_rate=0.6,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
+    )
+
+    # Run scenarios with different severities
+    low_scenario = StressScenario(name="LowStress", description="test", severity="low", spread_multiplier=1.1)
+    critical_scenario = StressScenario(name="CritStress", description="test", severity="critical", spread_multiplier=5.0)
+
+    lab.run_scenario(low_scenario)
+    lab.run_scenario(critical_scenario)
+
+    report = lab.generate_report(baseline)
+
+    assert "low" in report.severity_impacts
+    assert "critical" in report.severity_impacts
+    # Critical should generally have higher decay than low for spread multiplier
+    assert report.severity_impacts["critical"]["avg_sharpe_decay"] >= report.severity_impacts["low"]["avg_sharpe_decay"]
+
+    # Verify report section includes severity summary
+    section = report.to_report_section()
+    assert "Severity Impact Summary" in section.insights
+    assert "CRITICAL" in section.insights

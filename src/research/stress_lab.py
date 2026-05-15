@@ -156,6 +156,7 @@ class ResilienceReport(BaseModel):
     sharpe_decay: float = 0.0
     sortino_decay: float = 0.0
     win_rate_decay: float = 0.0
+    severity_impacts: dict[StressSeverity, dict[str, float]] = Field(default_factory=dict)
     fragility_indicators: list[str]
     failure_points: list[str]
     degradation_summary: str
@@ -190,13 +191,24 @@ class ResilienceReport(BaseModel):
             if not name.startswith("Sensitivity_")
         ]
 
+        # Enhance insights with severity-based degradation summary
+        severity_summary = ""
+        if self.severity_impacts:
+            severity_summary = "\n\nSeverity Impact Summary (Avg Decay):"
+            for severity, impacts in self.severity_impacts.items():
+                severity_summary += (
+                    f"\n- {severity.value.upper()}: Sharpe Decay: {impacts['avg_sharpe_decay']:.1%}, "
+                    f"Return Decay: {impacts['avg_return_decay']:.1%}, "
+                    f"DD Increase: {impacts['avg_drawdown_increase']:.1%}"
+                )
+
         return StressTestSection(
             resilience_score=self.resilience_score,
             baseline=_map_metric("Baseline", self.baseline_metrics),
             scenarios=main_scenarios,
             fragility_indicators=self.fragility_indicators,
             failure_points=self.failure_points,
-            insights=self.degradation_summary,
+            insights=self.degradation_summary + severity_summary,
         )
 
 
@@ -227,6 +239,7 @@ class StressLab:
         self.initial_balance = initial_balance
         self.contract_multiplier = contract_multiplier
         self.results: dict[str, StressTestMetrics] = {}
+        self.scenarios_run: dict[str, StressScenario] = {}
         self.sensitivity_data: dict[str, list[tuple[float, float]]] = {}
 
     @staticmethod
@@ -371,6 +384,7 @@ class StressLab:
         metrics = self._backtest_with_stress(perturbed_data, scenario)
 
         self.results[scenario.name] = metrics
+        self.scenarios_run[scenario.name] = scenario
         return metrics
 
     def generate_report(self, baseline_metrics: StressTestMetrics) -> ResilienceReport:
@@ -465,12 +479,50 @@ class StressLab:
             sharpe_decay=avg_sharpe_decay,
             sortino_decay=avg_sortino_decay,
             win_rate_decay=avg_win_rate_decay,
+            severity_impacts=self._calculate_severity_degradation(baseline_metrics),
             fragility_indicators=fragility,
             failure_points=failure_points,
             degradation_summary=self._generate_summary(
                 baseline_metrics, scenario_results, self.sensitivity_data
             ),
         )
+
+    def _calculate_severity_degradation(
+        self, baseline: StressTestMetrics
+    ) -> dict[StressSeverity, dict[str, float]]:
+        """
+        Calculates average metric degradation grouped by stress severity.
+
+        This facilitates the analysis of 'graceful degradation' by showing how
+        quickly performance drops as market conditions worsen.
+        """
+        severity_data: dict[StressSeverity, list[StressTestMetrics]] = {
+            s: [] for s in StressSeverity
+        }
+
+        for name, metrics in self.results.items():
+            if name in self.scenarios_run:
+                severity = self.scenarios_run[name].severity
+                severity_data[severity].append(metrics)
+
+        impacts = {}
+
+        def _decay(b: float, m: float) -> float:
+            if abs(b) < 1e-9:
+                return 0.0 if m >= b else 1.0
+            return float(np.clip((b - m) / abs(b), -2.0, 2.0))
+
+        for severity, metrics_list in severity_data.items():
+            if not metrics_list:
+                continue
+
+            impacts[severity] = {
+                "avg_sharpe_decay": float(np.mean([_decay(baseline.sharpe_ratio, m.sharpe_ratio) for m in metrics_list])),
+                "avg_return_decay": float(np.mean([_decay(baseline.total_return, m.total_return) for m in metrics_list])),
+                "avg_drawdown_increase": float(np.mean([_decay(-baseline.max_drawdown, -m.max_drawdown) for m in metrics_list])),
+            }
+
+        return impacts
 
     def _generate_summary(
         self,
