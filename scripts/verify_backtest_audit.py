@@ -1,19 +1,21 @@
-import sys
 import os
-import pandas as pd
-import numpy as np
+import sys
 from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
 
 # Ensure src is in path
 sys.path.append(os.getcwd())
 
-from src.core.audit_log import AuditLogger, get_audit_logger
-from src.core.feature_engineering import FeatureEngineer
+from src.core.audit_log import AuditLogger
+from src.data.feature_engineering import FeatureEngineer
 from src.trading.backtester import BacktestEngine
+
 
 def create_synthetic_data(n_bars=3000):
     start_time = datetime.now()
-    times = [start_time + timedelta(minutes=i*5) for i in range(n_bars)]
+    times = [start_time + timedelta(minutes=i * 5) for i in range(n_bars)]
     data = {
         "time": times,
         "open": np.random.uniform(2300, 2400, n_bars),
@@ -29,11 +31,14 @@ def create_synthetic_data(n_bars=3000):
     df.set_index("time", inplace=True)
     return df
 
+
 class MockModel:
     def predict(self, obs):
         from src.core.schemas import TradeSignal
+
         # Always return a HOLD signal to keep it fast
         return TradeSignal(symbol="XAUUSD", direction=0, confidence=0.0)
+
 
 def main():
     print("Initializing AuditLogger...")
@@ -56,6 +61,7 @@ def main():
     engine.run_walk_forward(data, model, train_window=500, test_window=100, step_size=100)
 
     print("Backtest finished.")
+
 
 if __name__ == "__main__":
     main()

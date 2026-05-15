@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
@@ -574,6 +574,7 @@ def run_live(
 
                         if ticket:
                             risk.open_positions[cfg.symbol] = ticket
+                            risk.record_trade_open()
                             log.info("Order placed", ticket=ticket, latency_ms=execution_latency_ms)
                             if monitor:
                                 # We don't have slippage here yet, so we pass 0.0
@@ -619,11 +620,13 @@ def run_live(
                                     )
 
                                     # Update allocator performance for feedback loop
-                                    if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
-                                        allocator.update_strategy_performance(
-                                            strat_id, updated_trade.pnl
-                                        )
+                                    if updated_trade:
+                                        risk.record_pnl(updated_trade.pnl)
+                                        if allocator:
+                                            strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                            allocator.update_strategy_performance(
+                                                strat_id, updated_trade.pnl
+                                            )
                             closed_tickets.append(symbol)
 
                     if closed_tickets and trade_logger:
@@ -1462,9 +1465,9 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent

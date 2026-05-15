@@ -1,13 +1,15 @@
-
-import pytest
-import pandas as pd
-import numpy as np
-from src.trading.backtester import BacktestEngine
-from src.core.feature_engineering import FeatureEngineer
-from src.trading.execution_filter import ExecutionFilter
-from src.core.trade_logger import TradeLogger
 import os
 import time
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.core.trade_logger import TradeLogger
+from src.data.feature_engineering import FeatureEngineer
+from src.trading.backtester import BacktestEngine
+from src.trading.execution_filter import ExecutionFilter
+
 
 @pytest.fixture
 def large_sample_data():
@@ -18,9 +20,10 @@ def large_sample_data():
         "high": np.random.randn(n_bars) + 2002,
         "low": np.random.randn(n_bars) + 1998,
         "close": np.random.randn(n_bars) + 2000,
-        "tick_volume": np.random.randint(100, 1000, n_bars)
+        "tick_volume": np.random.randint(100, 1000, n_bars),
     }
     return pd.DataFrame(data, index=dates)
+
 
 def test_backtester_scalability(large_sample_data):
     """Verifies that the backtester can handle 1000 bars efficiently."""
@@ -34,11 +37,7 @@ def test_backtester_scalability(large_sample_data):
 
     start = time.perf_counter()
     report = engine.run_walk_forward(
-        large_sample_data,
-        MockModel(),
-        train_window=200,
-        test_window=100,
-        step_size=100
+        large_sample_data, MockModel(), train_window=200, test_window=100, step_size=100
     )
     duration = time.perf_counter() - start
 
@@ -46,6 +45,7 @@ def test_backtester_scalability(large_sample_data):
     # Optimization should keep this very fast
     # Increased from 2.0 to 4.0 to account for CI environment variance
     assert duration < 4.0
+
 
 def test_trade_logger_performance_cache():
     """Verifies the performance caching in TradeLogger."""
