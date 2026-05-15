@@ -1,9 +1,7 @@
-from unittest.mock import patch
-
 import pytest
-
+from unittest.mock import patch
+from pydantic import SecretStr
 from src.core.config import TradingConfig, get_config
-
 
 def test_config_load_defaults():
     cfg = TradingConfig(MT5_PASSWORD="test", MT5_SERVER="test")

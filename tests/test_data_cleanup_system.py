@@ -3,6 +3,7 @@ Tests for the Data Cleanup Script and Retention Policy Enforcement.
 """
 
 import os
+import shutil
 import tarfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -12,17 +13,17 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from scripts.data_cleanup import (
-    RETENTION_AUDIT_LOG,
-    RETENTION_BACKTESTS,
-    RETENTION_LOGS,
-    RETENTION_PERFORMANCE_METRICS,
-    RETENTION_RISK_EVENTS,
-    RETENTION_TRADES,
-    RETENTION_UNLINKED_SIGNALS,
-    check_disk_space,
     cleanup_backtests,
     cleanup_database,
     cleanup_logs,
+    check_disk_space,
+    RETENTION_LOGS,
+    RETENTION_UNLINKED_SIGNALS,
+    RETENTION_RISK_EVENTS,
+    RETENTION_PERFORMANCE_METRICS,
+    RETENTION_TRADES,
+    RETENTION_AUDIT_LOG,
+    RETENTION_BACKTESTS
 )
 from src.core.audit_log import AuditEntry, Base as AuditBase
 from src.core.trade_logger import (
@@ -30,9 +31,8 @@ from src.core.trade_logger import (
     ModelSignal,
     PerformanceMetric,
     RiskEvent,
-    Trade,
+    Trade
 )
-
 
 @pytest.fixture
 def test_env(tmp_path):

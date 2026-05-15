@@ -5,14 +5,11 @@ tests/test_event_model_validation.py
 Tests for MacroEvent and RiskStatus schemas and validation.
 """
 
-from datetime import UTC, datetime, timedelta
-
 import pytest
 from pydantic import ValidationError
-
-from src.core.constants import EventCategory, EventImpact
+from datetime import datetime, UTC, timedelta
 from src.data.event_models import MacroEvent, RiskStatus
-
+from src.core.constants import EventCategory, EventImpact
 
 def test_macro_event_timestamps():
     """Verify UTC conversion and default duration assignment."""

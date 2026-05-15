@@ -1,9 +1,8 @@
 
+import pytest
 from pydantic import SecretStr
-
 from src.core.config import TradingConfig
 from src.core.log_config import SecretMaskingProcessor
-
 
 def test_dynamic_secret_discovery():
     """Verify that all SecretStr fields are automatically discovered and masked."""

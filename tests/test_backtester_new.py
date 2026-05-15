@@ -5,14 +5,15 @@ transaction costs, and metric accuracy.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import MagicMock
 
-from src.trading.backtester import BacktestEngine, BacktestTrade
-
+from src.trading.backtester import BacktestEngine, PerformanceReport, BacktestTrade
+from src.core.schemas import TradeSignal, SignalDirection
 
 class SimpleMockModel:
     def __init__(self, direction=1):

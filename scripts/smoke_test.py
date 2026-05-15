@@ -18,7 +18,7 @@ import sqlite3
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Dict, Any, Optional
 
 try:
     import httpx

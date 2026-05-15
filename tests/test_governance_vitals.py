@@ -1,5 +1,5 @@
+import os
 from pathlib import Path
-
 
 def test_governance_files_exist():
     """Verify that mandatory governance files are present in the repository."""

@@ -524,7 +524,7 @@ def run_live(
                             audit_logger.log(
                                 actor="system",
                                 action="decision_explanation",
-                                details=f"Decision trace for {cfg.symbol}: {explanation.get('summary', 'No summary')}",
+                                details=f"Decision trace for {cfg.symbol}: {explanation.human_readable_summary}",
                                 metadata={
                                     "symbol": cfg.symbol,
                                     "direction": direction,

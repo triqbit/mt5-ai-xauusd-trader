@@ -3,7 +3,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 def test_verify_dependencies_script_success():
     """Test that verify_dependencies.py succeeds when files are harmonized."""
     root = Path(__file__).resolve().parents[1]

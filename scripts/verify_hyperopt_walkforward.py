@@ -5,16 +5,10 @@ Institutional verification script for Walk-Forward Optimization.
 """
 
 import logging
-
 import numpy as np
 import pandas as pd
-
+from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer, RobustnessWeights
 from src.research.benchmarks import EMACrossoverStrategy
-from src.research.hyperopt_walkforward import (
-    RobustnessWeights,
-    WalkForwardConfig,
-    WalkForwardOptimizer,
-)
 from src.research.reporting import ResearchOrchestrator, ResearchReporter
 
 # Configure logging
