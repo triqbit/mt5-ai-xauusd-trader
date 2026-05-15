@@ -155,7 +155,7 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 - **Monitoring**: Real-time margin tracking
 
 ### 8.2 Balance Verification
-- **Reconciliation**: Daily 00:00 UTC reconciliation
+- **Reconciliation**: Daily 00:00 UTC reconciliation. Operational state (peak equity, daily PnL, trade counts) is also reconciled from the local database on system startup to ensure circuit breakers persist across restarts.
 - **Tolerance**: Allow ±0.1% variance from broker
 - **Alert**: If variance >0.5%
 - **Investigation**: If variance >1% → halt trading

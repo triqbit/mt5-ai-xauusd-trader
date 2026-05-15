@@ -608,7 +608,9 @@ def run_live(
                                     # Update allocator performance for feedback loop
                                     updated_trade = trade_logger.get_trade_by_ticket(ticket)
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
@@ -1468,6 +1470,9 @@ def main() -> int:
     )
 
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+    # Reconcile state from database to recover peak_equity and daily stats
+    risk.reconcile_state()
+
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
