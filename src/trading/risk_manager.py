@@ -172,6 +172,40 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
+    def reconcile_state(self, recon_data: dict[str, Any]) -> None:
+        """
+        Restore operational state from database reconciliation data.
+        Ensures circuit breakers and daily limits persist across restarts.
+        """
+        try:
+            # 1. Restore daily stats
+            self.daily.realised_pnl = recon_data.get("today_realised_pnl", 0.0)
+            self.daily.trade_count = recon_data.get("today_trade_count", 0)
+            self.daily.consecutive_losses = recon_data.get("today_consecutive_losses", 0)
+
+            # 2. Restore peak equity trackers
+            # Peak equity is used for total drawdown circuit breaker.
+            # We calculate it as current balance + peak PnL (relative to start).
+            total_pnl = recon_data.get("total_pnl", 0.0)
+            all_time_peak_pnl = recon_data.get("all_time_peak_pnl", 0.0)
+            initial_balance = self.balance - total_pnl
+            self.peak_equity = max(self.balance, initial_balance + all_time_peak_pnl)
+
+            # Restore today's peak equity for daily loss limits
+            today_peak_pnl = recon_data.get("today_peak_pnl", 0.0)
+            today_pnl = recon_data.get("today_realised_pnl", 0.0)
+            today_start_balance = self.balance - today_pnl
+            self.daily.peak_equity = max(self.balance, today_start_balance + today_peak_pnl)
+
+            logger.info(
+                "RiskManager state reconciled | today_pnl=%.2f trades=%d peak_equity=%.2f",
+                self.daily.realised_pnl,
+                self.daily.trade_count,
+                self.peak_equity,
+            )
+        except Exception as e:
+            logger.error("Failed to reconcile RiskManager state: %s", e)
+
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:

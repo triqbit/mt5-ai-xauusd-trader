@@ -351,6 +351,90 @@ class TradeLogger:
                 select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             ).scalar_one_or_none()
 
+    def get_open_trades(self) -> list[Trade]:
+        """Retrieve all currently open trades from the database."""
+        with self.Session() as session:
+            return list(
+                session.execute(
+                    select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
+
+    def get_reconciliation_data(self) -> dict[str, Any]:
+        """
+        Fetch data required to restore RiskManager state after a restart.
+        Returns today's PnL, trade count, consecutive losses, and historical peak PnL.
+        """
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        with self.Session() as session:
+            # 1. Today's stats (closed trades only)
+            today_stats = session.execute(
+                select(
+                    func.sum(Trade.pnl).label("pnl"), func.count(Trade.id).label("count")
+                ).where(
+                    Trade.status == "CLOSED",
+                    Trade.is_deleted.is_(False),
+                    Trade.updated_at >= today_start,
+                )
+            ).one()
+
+            # 2. Today's consecutive losses
+            today_trades_desc = (
+                session.execute(
+                    select(Trade.pnl)
+                    .where(
+                        Trade.status == "CLOSED",
+                        Trade.is_deleted.is_(False),
+                        Trade.updated_at >= today_start,
+                    )
+                    .order_by(Trade.updated_at.desc())
+                )
+                .scalars()
+                .all()
+            )
+
+            consecutive_losses = 0
+            for pnl in today_trades_desc:
+                if pnl < 0:
+                    consecutive_losses += 1
+                else:
+                    break
+
+            # 3. All-time peak PnL (relative to initial start)
+            all_pnls_asc = (
+                session.execute(
+                    select(Trade.pnl)
+                    .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    .order_by(Trade.updated_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            # Prepend 0.0 to account for starting point of curve
+            pnl_series = np.cumsum([0.0] + list(all_pnls_asc))
+            peak_pnl = float(np.max(pnl_series))
+            total_pnl = float(pnl_series[-1])
+
+            # 4. Today's peak PnL (relative to start of today)
+            today_trades_asc = list(reversed(today_trades_desc))
+
+            # Reconstruct today's PnL curve relative to start of day, including start at 0.0
+            today_pnl_curve = np.cumsum([0.0] + today_trades_asc)
+            today_peak_pnl = float(np.max(today_pnl_curve))
+
+            return {
+                "today_realised_pnl": float(today_stats.pnl or 0.0),
+                "today_trade_count": int(today_stats.count or 0),
+                "today_consecutive_losses": consecutive_losses,
+                "today_peak_pnl": today_peak_pnl,
+                "all_time_peak_pnl": peak_pnl,
+                "total_pnl": total_pnl,
+            }
+
     def log_risk_event(
         self,
         event_type: str,

@@ -1491,6 +1491,20 @@ def main() -> int:
     allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
 
+    # ── Operational State Reconciliation ──────────────────────────────────────
+    if trade_logger and hasattr(risk, "reconcile_state"):
+        with profile("risk_state_reconciliation"):
+            log.info("Performing operational state reconciliation...")
+            recon_data = trade_logger.get_reconciliation_data()
+            risk.reconcile_state(recon_data)
+
+            # Restore open positions mapping
+            open_trades = trade_logger.get_open_trades()
+            for trade in open_trades:
+                if trade.symbol == cfg.symbol:
+                    risk.open_positions[trade.symbol] = trade.ticket
+                    log.info("Restored open position", symbol=trade.symbol, ticket=trade.ticket)
+
     # Register default strategy in allocator
     # Ensure capital_cap is at least 0.01 to pass Pydantic gt=0 validation if balance is 0
     allocator.add_strategy(
