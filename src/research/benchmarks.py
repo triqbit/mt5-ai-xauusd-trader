@@ -6,7 +6,7 @@ Benchmarking framework to compare advanced models against baseline strategies.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -18,29 +18,54 @@ if TYPE_CHECKING:
     from src.models.regime_detector import RegimeInfo
 
 
+@runtime_checkable
 class BenchmarkStrategy(Protocol):
-    """Protocol for all strategies and baselines to ensure consistent evaluation."""
+    """
+    Protocol for all strategies and baselines to ensure consistent evaluation.
+
+    Any class implementing this protocol must provide a `predict` method
+    that returns trading signals and a `name` property for identification.
+    """
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         """
         Generate signals for a given dataset.
+
         Args:
             df: DataFrame containing OHLCV data and technical indicators.
+
         Returns:
-            np.ndarray: Array of signals (1: Buy, -1: Sell, 0: Hold).
+            np.ndarray: Array of signals (1.0: Buy, -1.0: Sell, 0.0: Hold).
         """
         ...
 
     @property
     def name(self) -> str:
-        """Return the name of the strategy."""
+        """
+        Return the unique name of the strategy for reporting.
+
+        Returns:
+            str: Strategy name.
+        """
         ...
 
 
 class EMACrossoverStrategy:
-    """Simple EMA Crossover baseline."""
+    """
+    Simple Exponential Moving Average (EMA) Crossover baseline.
+
+    A trend-following strategy that generates a BUY signal when a fast EMA
+    crosses above a slow EMA, and a SELL signal when it crosses below.
+    """
 
     def __init__(self, fast_window: int = 9, slow_window: int = 21):
+        """
+        Initialize the EMA Crossover strategy.
+
+        Args:
+            fast_window: Period for the fast EMA.
+            slow_window: Period for the slow EMA.
+        """
         self.fast_window = fast_window
         self.slow_window = slow_window
 
@@ -49,19 +74,40 @@ class EMACrossoverStrategy:
         return f"EMA_Crossover_{self.fast_window}_{self.slow_window}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using EMA crossover logic.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         fast_ema = df["close"].ewm(span=self.fast_window, adjust=False).mean()
         slow_ema = df["close"].ewm(span=self.slow_window, adjust=False).mean()
 
         signals = np.zeros(len(df))
-        signals[fast_ema > slow_ema] = 1
-        signals[fast_ema < slow_ema] = -1
+        signals[fast_ema > slow_ema] = 1.0
+        signals[fast_ema < slow_ema] = -1.0
         return signals
 
 
 class MomentumStrategy:
-    """Momentum-based (ROC) baseline."""
+    """
+    Momentum-based (Rate of Change) baseline.
+
+    Generates signals based on the percentage change in price over a
+    specified window.
+    """
 
     def __init__(self, window: int = 14, threshold: float = 0.0):
+        """
+        Initialize the Momentum strategy.
+
+        Args:
+            window: Period for calculating Rate of Change (ROC).
+            threshold: Minimum ROC required to generate a signal.
+        """
         self.window = window
         self.threshold = threshold
 
@@ -70,17 +116,39 @@ class MomentumStrategy:
         return f"Momentum_ROC_{self.window}_T{self.threshold}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using ROC momentum logic.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         roc = df["close"].pct_change(periods=self.window)
         signals = np.zeros(len(df))
-        signals[roc > self.threshold] = 1
-        signals[roc < -self.threshold] = -1
+        signals[roc > self.threshold] = 1.0
+        signals[roc < -self.threshold] = -1.0
         return signals
 
 
 class VolatilityBreakoutStrategy:
-    """Bollinger Band Breakout baseline."""
+    """
+    Bollinger Band Breakout baseline.
+
+    A volatility-based strategy that generates a BUY signal when price
+    breaks above the upper Bollinger Band and a SELL signal when it
+    breaks below the lower band.
+    """
 
     def __init__(self, window: int = 20, num_std: float = 2.0):
+        """
+        Initialize the Volatility Breakout strategy.
+
+        Args:
+            window: Period for the moving average and standard deviation.
+            num_std: Number of standard deviations for the bands.
+        """
         self.window = window
         self.num_std = num_std
 
@@ -89,50 +157,98 @@ class VolatilityBreakoutStrategy:
         return f"Volatility_Breakout_{self.window}_{self.num_std}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using Bollinger Band breakout logic.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         rolling_mean = df["close"].rolling(window=self.window).mean()
         rolling_std = df["close"].rolling(window=self.window).std()
         upper_band = rolling_mean + (rolling_std * self.num_std)
         lower_band = rolling_mean - (rolling_std * self.num_std)
 
         signals = np.zeros(len(df))
-        signals[df["close"] > upper_band] = 1
-        signals[df["close"] < lower_band] = -1
+        signals[df["close"] > upper_band] = 1.0
+        signals[df["close"] < lower_band] = -1.0
         return signals
 
 
 class NaiveDirectionalStrategy:
-    """Naive 'Follow the Leader' (last candle direction) strategy."""
+    """
+    Naive 'Follow the Leader' (last candle direction) strategy.
+
+    Generates a BUY signal if the last candle was bullish, and a SELL
+    signal if it was bearish.
+    """
 
     @property
     def name(self) -> str:
         return "Naive_Directional"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals based on previous candle direction.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         diff = df["close"].diff()
         signals = np.zeros(len(df))
-        signals[diff > 0] = 1
-        signals[diff < 0] = -1
+        signals[diff > 0] = 1.0
+        signals[diff < 0] = -1.0
         return signals
 
 
 class BuyAndHoldStrategy:
-    """Simple Buy and Hold baseline."""
+    """
+    Simple Buy and Hold baseline.
+
+    Always maintains a BUY signal, representing a long-term investment.
+    """
 
     @property
     def name(self) -> str:
         return "Buy_and_Hold"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
-        """Always return BUY signal."""
+        """
+        Always return BUY signal.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Constant BUY signals.
+        """
         return np.ones(len(df))
 
 
 class RiskFilteredBaseline:
-    """EMA Crossover strategy with a simple volatility filter."""
+    """
+    EMA Crossover strategy with a simple volatility filter.
+
+    Only generates signals when the rolling volatility is below a
+    predefined threshold, aiming to avoid choppy or extreme market states.
+    """
 
     def __init__(
         self, fast_window: int = 9, slow_window: int = 21, vol_threshold_pct: float = 0.02
     ):
+        """
+        Initialize the Risk Filtered strategy.
+
+        Args:
+            fast_window: Period for fast EMA.
+            slow_window: Period for slow EMA.
+            vol_threshold_pct: Max allowed volatility (as decimal).
+        """
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.vol_threshold_pct = vol_threshold_pct
@@ -142,6 +258,15 @@ class RiskFilteredBaseline:
         return f"Risk_Filtered_EMA_{self.vol_threshold_pct}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using EMA crossover and volatility filtering.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         fast_ema = df["close"].ewm(span=self.fast_window, adjust=False).mean()
         slow_ema = df["close"].ewm(span=self.slow_window, adjust=False).mean()
         volatility = df["close"].rolling(window=20).std() / df["close"]
@@ -149,15 +274,80 @@ class RiskFilteredBaseline:
         signals = np.zeros(len(df))
         # Only trade if volatility is below threshold
         mask = volatility < self.vol_threshold_pct
-        signals[mask & (fast_ema > slow_ema)] = 1
-        signals[mask & (fast_ema < slow_ema)] = -1
+        signals[mask & (fast_ema > slow_ema)] = 1.0
+        signals[mask & (fast_ema < slow_ema)] = -1.0
         return signals
 
 
+class RegimeFilterBaseline:
+    """
+    A baseline that filters another strategy's signals based on market regime.
+
+    Uses external regime labels (e.g., from RegimeDetector) to restrict
+    the underlying strategy to specific market environments.
+    """
+
+    def __init__(
+        self,
+        base_strategy: BenchmarkStrategy,
+        allowed_regimes: list[str],
+        name: Optional[str] = None,
+    ):
+        """
+        Initialize the Regime Filtered baseline.
+
+        Args:
+            base_strategy: The underlying strategy to filter.
+            allowed_regimes: List of market regime labels where trading is permitted.
+            name: Optional override for the strategy name.
+        """
+        self.base_strategy = base_strategy
+        self.allowed_regimes = allowed_regimes
+        self._name = name or f"Regime_Filtered_{base_strategy.name}"
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Filter base signals using regime column.
+
+        Args:
+            df: OHLCV DataFrame with 'regime' column.
+
+        Returns:
+            np.ndarray: Filtered signals.
+        """
+        base_signals = self.base_strategy.predict(df)
+        if "regime" not in df.columns:
+            return np.zeros(len(df))
+
+        # Only keep signals if regime is allowed
+        # Handles both string labels and MarketRegime enum members
+        mask = df["regime"].astype(str).isin(self.allowed_regimes)
+        filtered_signals = np.zeros(len(df))
+        filtered_signals[mask] = base_signals[mask]
+        return filtered_signals
+
+
 class MACDStrategy:
-    """Moving Average Convergence Divergence baseline."""
+    """
+    Moving Average Convergence Divergence (MACD) baseline.
+
+    A trend-following momentum indicator that shows the relationship
+    between two moving averages of a security's price.
+    """
 
     def __init__(self, fast_window: int = 12, slow_window: int = 26, signal_window: int = 9):
+        """
+        Initialize the MACD strategy.
+
+        Args:
+            fast_window: Period for fast EMA.
+            slow_window: Period for slow EMA.
+            signal_window: Period for the MACD signal line.
+        """
         self.fast_window = fast_window
         self.slow_window = slow_window
         self.signal_window = signal_window
@@ -167,21 +357,43 @@ class MACDStrategy:
         return f"MACD_{self.fast_window}_{self.slow_window}_{self.signal_window}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using MACD crossovers.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         exp1 = df["close"].ewm(span=self.fast_window, adjust=False).mean()
         exp2 = df["close"].ewm(span=self.slow_window, adjust=False).mean()
         macd = exp1 - exp2
         signal_line = macd.ewm(span=self.signal_window, adjust=False).mean()
 
         signals = np.zeros(len(df))
-        signals[macd > signal_line] = 1
-        signals[macd < signal_line] = -1
+        signals[macd > signal_line] = 1.0
+        signals[macd < signal_line] = -1.0
         return signals
 
 
 class MeanReversionStrategy:
-    """RSI-based Mean Reversion baseline."""
+    """
+    RSI-based Mean Reversion baseline.
+
+    Generates BUY signals when price is oversold and SELL signals when
+    price is overbought, based on the Relative Strength Index.
+    """
 
     def __init__(self, window: int = 14, overbought: int = 70, oversold: int = 30):
+        """
+        Initialize the Mean Reversion strategy.
+
+        Args:
+            window: Period for RSI calculation.
+            overbought: RSI threshold for overbought state.
+            oversold: RSI threshold for oversold state.
+        """
         self.window = window
         self.overbought = overbought
         self.oversold = oversold
@@ -191,23 +403,43 @@ class MeanReversionStrategy:
         return f"Mean_Reversion_RSI_{self.window}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using RSI thresholds.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         delta = df["close"].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=self.window).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=self.window).mean()
 
-        rs = gain / loss
+        rs = gain / (loss + 1e-9)
         rsi = 100 - (100 / (1 + rs))
 
         signals = np.zeros(len(df))
-        signals[rsi < self.oversold] = 1
-        signals[rsi > self.overbought] = -1
+        signals[rsi < self.oversold] = 1.0
+        signals[rsi > self.overbought] = -1.0
         return signals
 
 
 class RandomStrategy:
-    """Random signal baseline (Null Hypothesis)."""
+    """
+    Random signal baseline (Null Hypothesis).
+
+    Generates stochastic BUY, SELL, or HOLD signals. Used to verify
+    if a strategy's performance is statistically better than random chance.
+    """
 
     def __init__(self, seed: int = 42):
+        """
+        Initialize the Random strategy.
+
+        Args:
+            seed: Random seed for reproducibility.
+        """
         self.seed = seed
 
     @property
@@ -215,15 +447,34 @@ class RandomStrategy:
         return f"Random_Baseline_seed_{self.seed}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate random signals.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Random signals (-1, 0, 1).
+        """
         rng = np.random.default_rng(self.seed)
-        # Generate random signals: -1 (Sell), 0 (Hold), 1 (Buy)
-        return rng.choice([-1, 0, 1], size=len(df))
+        return rng.choice([-1.0, 0.0, 1.0], size=len(df))
 
 
 class DonchianChannelStrategy:
-    """Donchian Channel breakout baseline."""
+    """
+    Donchian Channel breakout baseline.
+
+    Generates signals when the price breaks out of the high/low range
+    of the previous N bars.
+    """
 
     def __init__(self, window: int = 20):
+        """
+        Initialize the Donchian Breakout strategy.
+
+        Args:
+            window: Period for calculating high/low channel.
+        """
         self.window = window
 
     @property
@@ -231,19 +482,40 @@ class DonchianChannelStrategy:
         return f"Donchian_Breakout_{self.window}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using Donchian Channel breakouts.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         upper_channel = df["high"].rolling(window=self.window).max()
         lower_channel = df["low"].rolling(window=self.window).min()
 
         signals = np.zeros(len(df))
-        signals[df["close"] >= upper_channel.shift(1)] = 1
-        signals[df["close"] <= lower_channel.shift(1)] = -1
+        signals[df["close"] >= upper_channel.shift(1)] = 1.0
+        signals[df["close"] <= lower_channel.shift(1)] = -1.0
         return signals
 
 
 class ADXStrategy:
-    """Trend-following strategy based on the Average Directional Index (ADX)."""
+    """
+    Trend-following strategy based on the Average Directional Index (ADX).
+
+    Uses ADX to confirm trend strength and Directional Indicators (DI)
+    to determine trend direction.
+    """
 
     def __init__(self, window: int = 14, adx_threshold: float = 25.0):
+        """
+        Initialize the ADX strategy.
+
+        Args:
+            window: Period for ADX and DI calculations.
+            adx_threshold: Minimum ADX required to confirm a strong trend.
+        """
         self.window = window
         self.adx_threshold = adx_threshold
 
@@ -253,9 +525,13 @@ class ADXStrategy:
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         """
-        Predict signals using ADX and Directional Indicators.
-        Buy if ADX > threshold and +DI > -DI.
-        Sell if ADX > threshold and -DI > +DI.
+        Predict signals using ADX and DI.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
         """
         try:
             import talib
@@ -269,8 +545,7 @@ class ADXStrategy:
             plus_di = talib.PLUS_DI(high, low, close, timeperiod=self.window)
             minus_di = talib.MINUS_DI(high, low, close, timeperiod=self.window)
         except (ImportError, Exception):
-            # Fallback: Simple EMA-based trend strength proxy if TA-Lib is missing
-            # This is a heuristic for benchmarking consistency when TA-Lib is absent.
+            # Fallback: Simple manual DI calculation
             diff = df["close"].diff()
             plus_dm = diff.where(diff > 0, 0.0).rolling(self.window).mean()
             minus_dm = (-diff.where(diff < 0, 0.0)).rolling(self.window).mean()
@@ -288,8 +563,8 @@ class ADXStrategy:
                 .mean()
             )
 
-            plus_di = 100 * (plus_dm / tr)
-            minus_di = 100 * (minus_dm / tr)
+            plus_di = 100 * (plus_dm / (tr + 1e-9))
+            minus_di = 100 * (minus_dm / (tr + 1e-9))
             dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di + 1e-9)
             adx = dx.rolling(self.window).mean().values
             plus_di = plus_di.values
@@ -297,13 +572,18 @@ class ADXStrategy:
 
         signals = np.zeros(len(df))
         strong_trend = adx > self.adx_threshold
-        signals[strong_trend & (plus_di > minus_di)] = 1
-        signals[strong_trend & (minus_di > plus_di)] = -1
+        signals[strong_trend & (plus_di > minus_di)] = 1.0
+        signals[strong_trend & (minus_di > plus_di)] = -1.0
         return signals
 
 
 class BenchmarkEvaluator:
-    """Evaluates multiple strategies and generates comparative reports."""
+    """
+    Evaluates multiple strategies and generates comparative reports.
+
+    Provides high-fidelity backtesting of signals with realistic
+    costs (commission, slippage) and statistical validation of results.
+    """
 
     def __init__(
         self,
@@ -331,7 +611,15 @@ class BenchmarkEvaluator:
         self.results: dict[str, Any] = {}
 
     def evaluate_all(self, strategies: list[BenchmarkStrategy]) -> pd.DataFrame:
-        """Run evaluation for all provided strategies."""
+        """
+        Run evaluation for all provided strategies.
+
+        Args:
+            strategies: List of objects implementing BenchmarkStrategy.
+
+        Returns:
+            pd.DataFrame: Summary table of performance metrics.
+        """
         summary = {}
         for strategy in strategies:
             signals = strategy.predict(self.df)
@@ -349,11 +637,11 @@ class BenchmarkEvaluator:
         daily_returns = np.zeros(n)
         trade_pnls = []
 
-        position = 0
+        position = 0.0
         entry_equity = self.initial_balance
 
         for i in range(1, n):
-            target_pos = signals[i - 1]
+            target_pos = float(signals[i - 1])
             prev_price = close[i - 1]
             current_price = close[i]
             current_equity = equity[i - 1]
@@ -376,10 +664,10 @@ class BenchmarkEvaluator:
                 position = target_pos
 
             # Update equity based on market movement
-            if position == 1:
+            if position == 1.0:
                 change = (current_price - prev_price) / prev_price
                 current_equity *= 1 + change
-            elif position == -1:
+            elif position == -1.0:
                 change = (prev_price - current_price) / prev_price
                 current_equity *= 1 + change
 
@@ -398,6 +686,7 @@ class BenchmarkEvaluator:
 
         active_returns = daily_returns[1:] if len(daily_returns) > 1 else daily_returns
 
+        # Initialize defaults
         sharpe = 0.0
         sortino = 0.0
         volatility = 0.0
@@ -474,10 +763,8 @@ class BenchmarkEvaluator:
         if len(equity) > 2:
             x = np.arange(len(equity))
             y = equity
-            slope, intercept = np.polyfit(x, y, 1)
-            line = slope * x + intercept
-            y_var = np.sum((y - y.mean()) ** 2)
-            stability_score = 1 - (np.sum((y - line) ** 2) / (y_var + 1e-9))
+            slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+            stability_score = float(r_value**2)
 
         calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
         common_sense_ratio = tail_ratio * (profit_factor if profit_factor != float("inf") else 1.0)
@@ -511,7 +798,19 @@ class BenchmarkEvaluator:
         }
 
     def compare_to_baseline(self, strategy_name: str, baseline_name: str) -> dict[str, Any]:
-        """Perform statistical comparison between a strategy and a baseline."""
+        """
+        Perform statistical comparison between a strategy and a baseline.
+
+        Uses paired t-tests and Wilcoxon signed-rank tests to determine
+        if outperformance is statistically significant.
+
+        Args:
+            strategy_name: Name of the strategy to test.
+            baseline_name: Name of the baseline for comparison.
+
+        Returns:
+            dict[str, Any]: Statistical comparison metrics.
+        """
         if strategy_name not in self.results or baseline_name not in self.results:
             return {"error": "Strategy or baseline not found in results."}
 
@@ -531,7 +830,6 @@ class BenchmarkEvaluator:
         b_active = trim_warmup(b_returns)
 
         # Ensure we compare the same number of data points from the end
-        # to align the trading periods correctly if warmup lengths differ.
         min_len = min(len(s_active), len(b_active))
         if min_len < 2:
             return {"error": "Insufficient active returns for statistical comparison."}
@@ -539,19 +837,17 @@ class BenchmarkEvaluator:
         s_final = s_active[-min_len:]
         b_final = b_active[-min_len:]
 
-        # Paired t-test on return distributions for identical market conditions
+        # Paired t-test on return distributions
         t_stat, p_value = stats.ttest_rel(s_final, b_final)
 
         # Wilcoxon signed-rank test (non-parametric)
         wilcoxon_p = 1.0
         try:
-            # Only run if there is variance in differences
             if not np.array_equal(s_final, b_final):
                 _, wilcoxon_p = stats.wilcoxon(s_final, b_final)
         except Exception:
             wilcoxon_p = 1.0
 
-        # Simple relative performance
         outperformance = s_metrics["Total Return"] - b_metrics["Total Return"]
         sharpe_diff = s_metrics["Sharpe Ratio"] - b_metrics["Sharpe Ratio"]
 
@@ -570,7 +866,12 @@ class BenchmarkEvaluator:
     def to_report_section(self, baseline_name: str) -> Any:
         """
         Convert results into a BenchmarkSection for the ResearchReporter.
-        Requires src.research.reporting models to be available.
+
+        Args:
+            baseline_name: The strategy to use as the primary baseline.
+
+        Returns:
+            BenchmarkSection: Pydantic model for reporting.
         """
         from src.research.reporting import BenchmarkComparison, BenchmarkSection
 
@@ -599,7 +900,6 @@ class BenchmarkEvaluator:
                 )
             )
 
-        # Statistical summary
         significant_count = 0
         for name in self.results:
             if name.endswith("_returns") or name == baseline_name:
@@ -655,10 +955,20 @@ class AdapterBase:
 class EnsembleAdapter(AdapterBase):
     """
     Adapter for EnsembleModel to match BenchmarkStrategy interface.
-    Handles windowing for LSTM-Attention component and per-step inference.
+
+    Handles windowing for LSTM-Attention component and per-step inference
+    with regime-awareness.
     """
 
     def __init__(self, model: Any, window_size: int = 60, name: str = "Ensemble_Model"):
+        """
+        Initialize the Ensemble adapter.
+
+        Args:
+            model: EnsembleModel instance.
+            window_size: Sequence length for models requiring history.
+            name: Identification name.
+        """
         self.model = model
         self.window_size = window_size
         self._name = name
@@ -668,6 +978,15 @@ class EnsembleAdapter(AdapterBase):
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate ensemble signals.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         import torch
 
         signals = np.zeros(len(df))
@@ -685,7 +1004,6 @@ class EnsembleAdapter(AdapterBase):
             seq = torch.from_numpy(seq_data).float()
             regime_info = self._extract_regime_info(row)
 
-            # EnsembleModel always supports regime_info in predict
             signal = self.model.predict(obs, seq=seq, regime_info=regime_info)
             signals[i] = float(signal.direction)
 
@@ -695,10 +1013,18 @@ class EnsembleAdapter(AdapterBase):
 class PPOAdapter(AdapterBase):
     """
     Adapter for PPOAgent to match BenchmarkStrategy interface.
+
     Supports basic feature alignment and ModelAction to SignalDirection mapping.
     """
 
     def __init__(self, agent: Any, name: str = "PPO_Agent"):
+        """
+        Initialize the PPO adapter.
+
+        Args:
+            agent: PPOAgent instance.
+            name: Identification name.
+        """
         self.agent = agent
         self._name = name
 
@@ -707,6 +1033,15 @@ class PPOAdapter(AdapterBase):
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate PPO signals.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         signals = np.zeros(len(df))
         feature_cols = self._get_feature_cols(df)
 
@@ -715,7 +1050,6 @@ class PPOAdapter(AdapterBase):
             obs = row[feature_cols].values.astype(np.float32)
             regime_info = self._extract_regime_info(row)
 
-            # PPOAgent supports **kwargs in predict
             signal = self.agent.predict(obs, regime_info=regime_info)
             signals[i] = float(signal.direction)
 
@@ -725,6 +1059,7 @@ class PPOAdapter(AdapterBase):
 class TransformerAdapter(AdapterBase):
     """
     Adapter for TimeSeriesTransformer to match BenchmarkStrategy interface.
+
     Handles sliding window extraction and device placement.
     """
 
@@ -735,6 +1070,15 @@ class TransformerAdapter(AdapterBase):
         name: str = "Transformer_Model",
         device: str = "cpu",
     ):
+        """
+        Initialize the Transformer adapter.
+
+        Args:
+            model: TimeSeriesTransformer instance.
+            window_size: Lookback window length.
+            name: Identification name.
+            device: Computing device.
+        """
         self.model = model
         self.window_size = window_size
         self._name = name
@@ -745,6 +1089,15 @@ class TransformerAdapter(AdapterBase):
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate Transformer signals.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         import torch
 
         self.model.eval()
@@ -762,12 +1115,10 @@ class TransformerAdapter(AdapterBase):
                 regime_info = self._extract_regime_info(row)
 
                 if hasattr(self.model, "predict"):
-                    # If predict returns a Signal object, use its direction
                     output = self.model.predict(data, regime_info=regime_info)
                     if hasattr(output, "direction"):
                         signals[i] = float(output.direction)
                         continue
-                    # Otherwise assume it's probs/logits
                     probs = output
                 else:
                     probs = self.model(data)
@@ -781,6 +1132,7 @@ class TransformerAdapter(AdapterBase):
 class LSTMAdapter(AdapterBase):
     """
     Adapter for LSTMPricePredictor to match BenchmarkStrategy interface.
+
     Handles sliding window extraction for sequence processing.
     """
 
@@ -791,6 +1143,15 @@ class LSTMAdapter(AdapterBase):
         name: str = "LSTM_Model",
         device: str = "cpu",
     ):
+        """
+        Initialize the LSTM adapter.
+
+        Args:
+            model: LSTMModel instance.
+            window_size: Lookback window length.
+            name: Identification name.
+            device: Computing device.
+        """
         self.model = model
         self.window_size = window_size
         self._name = name
@@ -801,6 +1162,15 @@ class LSTMAdapter(AdapterBase):
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate LSTM signals.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         import torch
 
         self.model.eval()
@@ -838,10 +1208,18 @@ class LSTMAdapter(AdapterBase):
 class DreamerAdapter(AdapterBase):
     """
     Adapter for DreamerAgent to match BenchmarkStrategy interface.
+
     Supports state-aware inference if implemented in the agent.
     """
 
     def __init__(self, agent: Any, name: str = "Dreamer_Agent"):
+        """
+        Initialize the Dreamer adapter.
+
+        Args:
+            agent: DreamerAgent instance.
+            name: Identification name.
+        """
         self.agent = agent
         self._name = name
 
@@ -850,6 +1228,15 @@ class DreamerAdapter(AdapterBase):
         return self._name
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Generate Dreamer signals.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
         signals = np.zeros(len(df))
         feature_cols = self._get_feature_cols(df)
 
@@ -861,7 +1248,6 @@ class DreamerAdapter(AdapterBase):
             obs = row[feature_cols].values.astype(np.float32)
             regime_info = self._extract_regime_info(row)
 
-            # DreamerAgent supports **kwargs in predict
             signal = self.agent.predict(obs, regime_info=regime_info)
             direction = float(signal.direction)
             signals[i] = direction

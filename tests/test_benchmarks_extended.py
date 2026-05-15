@@ -12,9 +12,11 @@ import pytest
 from src.research.benchmarks import (
     ADXStrategy,
     BenchmarkEvaluator,
+    BuyAndHoldStrategy,
     DonchianChannelStrategy,
     EMACrossoverStrategy,
     EnsembleAdapter,
+    RegimeFilterBaseline,
 )
 
 
@@ -89,6 +91,27 @@ def test_adx_strategy_fallback(sample_data):
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
+
+
+def test_regime_filter_comparison(sample_data):
+    """Test comparison using RegimeFilterBaseline."""
+    from src.models.regime_detector import MarketRegime
+
+    sample_data["regime"] = MarketRegime.RANGING.value
+    # More variance in later half
+    sample_data.loc[50:, "close"] += np.cumsum(np.random.randn(50) * 2)
+    sample_data.loc[50:, "regime"] = MarketRegime.TRENDING.value
+
+    evaluator = BenchmarkEvaluator(sample_data)
+
+    s_base = BuyAndHoldStrategy()
+    s_filtered = RegimeFilterBaseline(s_base, allowed_regimes=[MarketRegime.TRENDING.value])
+
+    evaluator.evaluate_all([s_base, s_filtered])
+
+    comp = evaluator.compare_to_baseline(s_filtered.name, s_base.name)
+    assert "Outperformance" in comp
+    assert not comp.get("error")
 
 
 def test_adapter_robustness_short_df():
