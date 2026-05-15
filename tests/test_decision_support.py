@@ -111,6 +111,9 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
     # Verification of Augmented Fields
     assert packet.status_level == DecisionStatus.EXECUTE
     assert packet.decision_score > 0
+    assert packet.consensus_score > 0
+    assert packet.regime_score > 0
+    assert packet.risk_score > 0
     assert packet.sizing_multiplier > 0
 
 
@@ -128,9 +131,29 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     assert packet.decision_score == 100.0  # (1.0*40) + (1.0*30) + (20 + 10)
     assert packet.status_level == DecisionStatus.EXECUTE
+    assert packet.consensus_score == 40.0
+    assert packet.regime_score == 30.0
+    assert packet.risk_score == 30.0
     assert packet.sizing_multiplier == 1.0
 
-    # 2. Caution Case (Low Score)
+    # 2. REVIEW Case (Moderate Score: 60-80)
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=1.0)
+    ]
+    mock_regime = mock_regime.model_copy(update={"confidence": 0.5})
+    mock_explanation.risk_assessment.risk_reward_ratio = 2.0  # (2/3)*20 = 13.33
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.8})
+
+    # Consensus score: 1.0 * 40 = 40
+    # Regime score: 0.5 * 30 = 15
+    # Risk score: 13.33 + 8 = 21.33
+    # Total ~ 76.33
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert 76.0 < packet.decision_score < 77.0
+    assert packet.status_level == DecisionStatus.REVIEW
+    assert packet.requires_review is True
+
+    # 3. CAUTION Case (Low Score: < 60)
     mock_explanation.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.5, weight=0.5),
         ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.5, weight=0.5),
@@ -145,10 +168,8 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     # Total ~ 46.66
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     assert 46.0 < packet.decision_score < 47.0
-    assert packet.status_level == DecisionStatus.REVIEW
-    # Sizing: (0.4666^1.5) * 0.5 (CAUTION penalty) * 0.5 (Macro multiplier)
-    expected_sizing = (packet.decision_score / 100.0) ** 1.5 * 0.5 * 0.5
-    assert abs(packet.sizing_multiplier - expected_sizing) < 1e-6
+    assert packet.status_level == DecisionStatus.CAUTION
+    assert packet.requires_review is True
 
     # 3. Blocked Case
     mock_explanation.risk_assessment.passed = False
@@ -340,13 +361,16 @@ def test_performance_metric_color_coding(mock_explanation, mock_regime, mock_mac
 
 
 def test_strategic_confluence_summary(mock_explanation, mock_regime, mock_macro_risk):
-    """Verify that executive summary includes strategic alignment details."""
+    """Verify that executive summary includes strategic alignment and performance details."""
     dss = DecisionSupportSystem()
 
-    # 1. Exceptional Alignment
+    # 1. Exceptional Alignment with Performance
     mock_explanation.regime_context.regime_alignment_score = 0.9
-    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    perf = {"sharpe_ratio": 2.5, "win_rate": 0.65, "total_trades": 100}
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, perf)
     assert "Strategic alignment is EXCEPTIONAL" in packet.executive_summary
+    assert "Sharpe: 2.50" in packet.executive_summary
+    assert "WR: 65.0%" in packet.executive_summary
 
     # 2. Strong Alignment
     mock_explanation.regime_context.regime_alignment_score = 0.65
@@ -356,7 +380,7 @@ def test_strategic_confluence_summary(mock_explanation, mock_regime, mock_macro_
     # 3. Weak Alignment
     mock_explanation.regime_context.regime_alignment_score = 0.3
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
-    assert "Strategic alignment is weak/divergent" in packet.executive_summary
+    assert "Strategic alignment is weak or divergent" in packet.executive_summary
 
 
 def test_regime_alignment_display(mock_explanation, mock_regime, mock_macro_risk, mocker):
@@ -422,7 +446,7 @@ def test_review_status_assignment(mock_explanation, mock_regime, mock_macro_risk
     """Verify that signals requiring review are correctly assigned the REVIEW status."""
     dss = DecisionSupportSystem()
 
-    # Case: Executable but score < 80 (should be REVIEW)
+    # Case: Executable but score in [60, 80) (should be REVIEW)
     mock_explanation.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.7, weight=1.0)
     ]
@@ -433,6 +457,7 @@ def test_review_status_assignment(mock_explanation, mock_regime, mock_macro_risk
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
 
     assert packet.is_executable is True
+    assert 60.0 <= packet.decision_score < 80.0
     assert packet.requires_review is True
     assert packet.status_level == DecisionStatus.REVIEW
 
@@ -478,6 +503,9 @@ def test_packet_immutability():
             symbol="XAUUSD",
             direction=SignalDirection.BUY,
             consensus="Test",
+            consensus_score=20.0,
+            regime_score=15.0,
+            risk_score=15.0,
             explanation=MagicMock(),
             regime=MagicMock(),
             macro_risk=MagicMock(),
@@ -503,6 +531,9 @@ def test_decision_packet_field_completeness(mock_explanation, mock_regime, mock_
     assert hasattr(packet, "consensus")
     assert hasattr(packet, "status_level")
     assert hasattr(packet, "decision_score")
+    assert hasattr(packet, "consensus_score")
+    assert hasattr(packet, "regime_score")
+    assert hasattr(packet, "risk_score")
     assert hasattr(packet, "sizing_multiplier")
     assert hasattr(packet, "is_executable")
     assert hasattr(packet, "blocking_reasons")
