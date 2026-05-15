@@ -73,13 +73,13 @@ def test_robustness_scoring_components(sample_data):
     # Test type-safe perturbations for integers
     int_params = {"window": 10}
     # Mock _evaluate_strategy to just return a dummy Sharpe Ratio
-    optimizer._evaluate_strategy = lambda d, p: {"Sharpe Ratio": 1.0 + (p["window"] * 0.01)}
+    optimizer._evaluate_strategy = lambda d, p: ({"Sharpe Ratio": 1.0 + (p["window"] * 0.01)}, np.zeros(len(d)))
     stability_int = optimizer._calculate_stability_penalty(int_params, sample_data)
     assert isinstance(stability_int, float)
 
     # Test handling of zero values in stability penalty
     zero_params = {"param": 0.0}
-    optimizer._evaluate_strategy = lambda d, p: {"Sharpe Ratio": 1.0 + (p["param"] * 0.1)}
+    optimizer._evaluate_strategy = lambda d, p: ({"Sharpe Ratio": 1.0 + (p["param"] * 0.1)}, np.zeros(len(d)))
     stability_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
     assert stability_zero > 0.0  # Should be non-zero due to epsilon perturbation
 
@@ -286,8 +286,8 @@ def test_ranking_by_robustness(sample_data):
     # Trial 2 (param=2): Lower Return, Zero Instability
     def mock_eval(data, params):
         if params["param"] == 1:
-            return {"Sharpe Ratio": 2.0, "Total Return": 0.5}
-        return {"Sharpe Ratio": 1.5, "Total Return": 0.2}
+            return {"Sharpe Ratio": 2.0, "Total Return": 0.5, "Num Trades": 10}, np.zeros(len(data))
+        return {"Sharpe Ratio": 1.5, "Total Return": 0.2, "Num Trades": 10}, np.zeros(len(data))
 
     optimizer._evaluate_strategy = mock_eval
 
@@ -365,7 +365,7 @@ def test_stability_penalty_fragility_safeguard(sample_data):
 
     # Force a failure/NaN to trigger the safeguard
     def failing_eval(data, params):
-        return {"Sharpe Ratio": np.nan}
+        return {"Sharpe Ratio": np.nan}, np.zeros(len(data))
 
     optimizer._evaluate_strategy = failing_eval
     params = {"param": 0.5}
@@ -396,7 +396,7 @@ def test_stability_penalty_scale_invariance(sample_data):
         sharpes = [1.0, 1.1, 0.9]
         s = sharpes[eval_count % 3]
         eval_count += 1
-        return {"Sharpe Ratio": s}
+        return {"Sharpe Ratio": s}, np.zeros(len(data))
 
     optimizer._evaluate_strategy = mock_eval
     params = {"p1": 100.0}
@@ -495,7 +495,7 @@ def test_wfe_calculation(sample_data):
         # Even calls (IS) = 2.0, Odd calls (OOS) = 1.0
         val = 2.0 if eval_count % 2 == 0 else 1.0
         eval_count += 1
-        return {"Sharpe Ratio": val}
+        return {"Sharpe Ratio": val, "Num Trades": 10}, np.zeros(len(data))
 
     optimizer._evaluate_strategy = mock_eval
     result = optimizer.run_optimization()
@@ -539,7 +539,7 @@ def test_strict_fragility_penalty(sample_data):
         eval_calls += 1
         # Base case (1st call): Sharpe = 1.0
         # Perturbation (subsequent calls): Sharpe = -0.5 (Catastrophic drop)
-        return {"Sharpe Ratio": 1.0 if eval_calls == 1 else -0.5}
+        return {"Sharpe Ratio": 1.0 if eval_calls == 1 else -0.5}, np.zeros(len(data))
 
     optimizer._evaluate_strategy = mock_eval
     params = {"fast_window": 10, "slow_window": 20}
@@ -569,7 +569,7 @@ def test_wfe_integration_in_robustness(sample_data):
         nonlocal eval_count
         val = 2.0 if eval_count % 2 == 0 else 1.0
         eval_count += 1
-        return {"Sharpe Ratio": val}
+        return {"Sharpe Ratio": val, "Num Trades": 10}, np.zeros(len(data))
 
     optimizer._evaluate_strategy = mock_eval
     result = optimizer.run_optimization()
@@ -616,8 +616,8 @@ def test_regime_consistency_single_regime_fallback(sample_data):
     data = sample_data.copy()
     data["regime"] = "ranging"  # Only one regime
 
-    params = {"fast_window": 10, "slow_window": 30}
-    consistency = optimizer._calculate_regime_consistency(data, params)
+    returns = np.zeros(len(data))
+    consistency = optimizer._calculate_regime_consistency(data, returns)
 
     assert consistency == 0.5
 
