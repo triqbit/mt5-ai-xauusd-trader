@@ -10,7 +10,16 @@ from src.analytics.journal_mining import (
 
 @pytest.fixture
 def miner():
-    return JournalMiner(db_url="sqlite:///:memory:")
+    # Use a completely fresh in-memory DB for every test
+    # By using a random string or no name, and bypassing get_engine's cache
+    from src.analytics.journal_mining import JournalMiner
+    import time
+    import random
+
+    unique_id = f"test_{int(time.time() * 1000)}_{random.randint(0, 1000)}"
+    db_url = f"sqlite:///file:{unique_id}?mode=memory&cache=shared"
+
+    return JournalMiner(db_url=db_url)
 
 
 @pytest.fixture
