@@ -327,9 +327,7 @@ class DecisionSupportSystem:
 
         dir_str = explanation.direction.name
         summary = f"Institutional {dir_str} signal for {symbol} with a decision score of {score:.1f}/100. "
-        summary += (
-            f"Current market state is {regime.label.value.upper()} (Confidence: {regime.confidence:.1%}). "
-        )
+        summary += f"Current market state is {regime.label.value.upper()} (Confidence: {regime.confidence:.1%}). "
 
         # Consensus Insight
         summary += f"Model consensus is {consensus}. "
