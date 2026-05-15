@@ -952,14 +952,14 @@ class RareEventSimulator:
         current_idx = start_idx
         for wave in range(waves):
             wave_magnitude = -0.02 * config.event_magnitude * (1 + wave * 0.5)
-            for i in range(wave_len):
+            for _ in range(wave_len):
                 if current_idx < n:
                     returns[current_idx] = (wave_magnitude / wave_len) * self.rng.uniform(0.9, 1.4)
                     vols[current_idx] *= (5.0 + wave * 2.0) * config.event_magnitude
                     current_idx += 1
 
             # Brief pause / feeble bounce
-            for i in range(gap_len):
+            for _ in range(gap_len):
                 if current_idx < n:
                     returns[current_idx] = 0.001 * config.event_magnitude * self.rng.uniform(0, 1)
                     vols[current_idx] *= 2.0 * config.event_magnitude
