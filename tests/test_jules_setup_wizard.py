@@ -23,7 +23,8 @@ def test_setup_wizard_save_logic():
         # 2. Server
         # 3. Use MetaAPI
         # 4. Ready to save
-        mock_ask.side_effect = ["demo", "XAUUSD", "M5", "IC-Markets-Demo", "n", "y"]
+        # 5. Run Health Check?
+        mock_ask.side_effect = ["demo", "XAUUSD", "M5", "IC-Markets-Demo", "n", "y", "n"]
         mock_int_ask.return_value = 123456
 
         # Mock open for .env.example (minimal content)

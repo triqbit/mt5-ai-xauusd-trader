@@ -146,6 +146,9 @@ class TradingConfig(BaseSettings):
     )
 
     # Execution
+    poll_interval: int = Field(
+        default=60, ge=1, description="Frequency of signal evaluation in seconds", validation_alias="POLL_INTERVAL"
+    )
     max_slippage_pips: float = Field(default=1.0, description="Max Acceptable Slippage: 1.0 pip")
     min_spread_pips: float = Field(default=0.5, description="Min Bid-Ask Spread: <0.5 pips")
     spread_alert_pips: float = Field(default=1.0, description="Alert if spread >1.0 pip")
