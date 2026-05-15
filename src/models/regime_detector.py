@@ -37,6 +37,7 @@ import structlog
 from pydantic import BaseModel, ConfigDict, Field
 from scipy import stats
 from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import StandardScaler
 
 logger = structlog.get_logger(__name__)
 
@@ -194,6 +195,7 @@ class RegimeDetector:
         self.long_window = long_window
         self._last_regime: MarketRegime = MarketRegime.UNKNOWN
         self._gmm: GaussianMixture | None = None
+        self._scaler = StandardScaler()
         self._cluster_to_regime: dict[int, MarketRegime] = {}
         self.transition_matrix: pd.DataFrame | None = None
 
@@ -321,8 +323,9 @@ class RegimeDetector:
             # Clustering-based detection
             X = last_row[self.FEATURE_COLUMNS].values.reshape(1, -1)
             X = np.nan_to_num(X, nan=0.0)
+            X_scaled = self._scaler.transform(X)
 
-            probs = self._gmm.predict_proba(X)[0]
+            probs = self._gmm.predict_proba(X_scaled)[0]
             cluster_idx = int(np.argmax(probs))
             label = self._cluster_to_regime.get(cluster_idx, MarketRegime.RANGING)
             confidence = float(probs[cluster_idx])
@@ -439,6 +442,27 @@ class RegimeDetector:
         )
         return label, confidence, transition_score
 
+    def get_regime_performance(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculates historical P&L analysis partitioned by market regime.
+        Requires 'returns' column in the DataFrame.
+        """
+        if "regime" not in df.columns:
+            df = self.label_history(df)
+
+        if "returns" not in df.columns:
+            logger.warning("No 'returns' column found for performance analysis")
+            return pd.DataFrame()
+
+        # Group by regime and calculate metrics
+        perf = df.groupby("regime")["returns"].agg(["mean", "std", "count"])
+        perf["sharpe"] = (perf["mean"] / (perf["std"] + 1e-9)) * np.sqrt(
+            252 * 24 * 12
+        )  # M5 assuming
+        perf["total_return"] = df.groupby("regime")["returns"].sum()
+
+        return perf
+
     def run_analysis(self, df: pd.DataFrame) -> RegimeAnalysisReport:
         """
         Analyze a historical DataFrame and generate a RegimeAnalysisReport.
@@ -464,15 +488,18 @@ class RegimeDetector:
         regime_series = analysis_df["regime"]
         transitions = pd.crosstab(regime_series, regime_series.shift(-1), normalize="index")
 
+        # Get performance metrics
+        perf_df = self.get_regime_performance(df)
+
         regime_list = []
         for label, freq in counts.items():
             if label == MarketRegime.UNKNOWN.value:
                 continue
 
-            # Determine profitability if 'returns' column exists
+            # Determine profitability based on perf_df
             profitability = "N/A"
-            if "returns" in df.columns:
-                pnl = df[df["regime"] == label]["returns"].mean()
+            if not perf_df.empty and label in perf_df.index:
+                pnl = perf_df.loc[label, "mean"]
                 profitability = "High" if pnl > 0.0001 else ("Low" if pnl < -0.0001 else "Neutral")
 
             avg_dur = avg_durations.get(label, 0)
@@ -538,8 +565,9 @@ class RegimeDetector:
             X = features.values
             # Handle NaNs in features
             X = np.nan_to_num(X, nan=0.0)
+            X_scaled = self._scaler.transform(X)
 
-            probs = self._gmm.predict_proba(X)
+            probs = self._gmm.predict_proba(X_scaled)
             cluster_indices = np.argmax(probs, axis=1)
 
             regimes = [
@@ -720,11 +748,12 @@ class RegimeDetector:
         # Skip the burn-in period and handle NaNs
         X = features.iloc[self.long_window :].values
         X = np.nan_to_num(X, nan=0.0)
+        X_scaled = self._scaler.fit_transform(X)
 
         self._gmm = GaussianMixture(
             n_components=n_clusters, covariance_type="full", random_state=42, n_init=5
         )
-        self._gmm.fit(X)
+        self._gmm.fit(X_scaled)
 
         # Automated cluster-to-regime mapping based on centroids
         self._map_clusters(self._gmm.means_)
@@ -744,6 +773,7 @@ class RegimeDetector:
 
         state = {
             "gmm": self._gmm,
+            "scaler": self._scaler,
             "cluster_to_regime": self._cluster_to_regime,
             "transition_matrix": self.transition_matrix,
             "window": self.window,
@@ -799,6 +829,7 @@ class RegimeDetector:
         try:
             state = joblib.load(path)
             self._gmm = state.get("gmm")
+            self._scaler = state.get("scaler", StandardScaler())
             self._cluster_to_regime = state.get("cluster_to_regime", {})
             self.transition_matrix = state.get("transition_matrix")
             self.window = state.get("window", self.window)
@@ -814,7 +845,8 @@ class RegimeDetector:
 
         X = features.values
         X = np.nan_to_num(X, nan=0.0)
-        probs = self._gmm.predict_proba(X)
+        X_scaled = self._scaler.transform(X)
+        probs = self._gmm.predict_proba(X_scaled)
         cluster_indices = np.argmax(probs, axis=1)
         regimes = [
             self._cluster_to_regime.get(idx, MarketRegime.RANGING).value for idx in cluster_indices
@@ -828,9 +860,11 @@ class RegimeDetector:
     def _map_clusters(self, centroids: np.ndarray) -> None:
         """Maps GMM clusters to MarketRegime enum using centroid heuristics."""
         self._cluster_to_regime = {}
+        # Inverse transform centroids to use raw thresholds
+        raw_centroids = self._scaler.inverse_transform(centroids)
         feat_map = {name: i for i, name in enumerate(self.FEATURE_COLUMNS)}
 
-        for i, center in enumerate(centroids):
+        for i, center in enumerate(raw_centroids):
             atr_ratio = center[feat_map["atr_ratio"]]
             er = center[feat_map["efficiency_ratio"]]
             slope = center[feat_map["slope"]]
