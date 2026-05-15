@@ -21,6 +21,7 @@ Each stress test generates a comprehensive report including:
 - **Fragility Indicators**: Automated detection of over-trading, drawdown explosions, or negative edge transitions.
 - **Breaking Points**: Identifies the exact level of friction (e.g., number of delay steps) where a strategy becomes unprofitable.
 - **Institutional Metrics**: Tracks Profit Factor (PF) and Recovery Factor across all scenarios.
+- **Hardened Analytics**: Implements robust decay calculations for Sharpe and Sortino ratios, handling negative or near-zero baselines with absolute scaling and outlier clipping for enterprise stability.
 
 ## Usage
 

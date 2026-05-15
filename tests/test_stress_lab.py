@@ -560,3 +560,42 @@ def test_fragility_detection_overtrading(sample_data):
 
     report = lab.generate_report(baseline)
     assert any("Over-trading spike in Overtrading" in fi for fi in report.fragility_indicators)
+
+
+def test_decay_calculation_hardened_logic():
+    """Verify the hardened decay calculation with negative and zero baselines."""
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, pd.DataFrame())
+
+    # Case 1: Negative baseline, result is more negative (decay should be positive)
+    # b = -1.0, m = -2.0 -> decay = (-1.0 - (-2.0)) / |-1.0| = 1.0
+    baseline = StressTestMetrics(
+        total_return=0.1, max_drawdown=0.05, sharpe_ratio=-1.0,
+        win_rate=0.5, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+    )
+    metrics = StressTestMetrics(
+        total_return=0.05, max_drawdown=0.1, sharpe_ratio=-2.0,
+        win_rate=0.4, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+    )
+    lab.results["Scenario"] = metrics
+    report = lab.generate_report(baseline)
+    assert report.sharpe_decay == 1.0
+
+    # Case 2: Zero baseline, negative result (100% decay)
+    baseline_zero = StressTestMetrics(
+        total_return=0.1, max_drawdown=0.05, sharpe_ratio=0.0,
+        win_rate=0.5, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+    )
+    report_zero = lab.generate_report(baseline_zero)
+    assert report_zero.sharpe_decay == 1.0
+
+    # Case 3: Extreme clipping
+    # b = 1.0, m = -5.0 -> decay = (1.0 - (-5.0)) / 1.0 = 6.0 (clipped to 2.0)
+    metrics_extreme = StressTestMetrics(
+        total_return=-0.5, max_drawdown=0.5, sharpe_ratio=-5.0,
+        win_rate=0.1, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+    )
+    lab.results["Scenario"] = metrics_extreme
+    report_extreme = lab.generate_report(baseline)
+    # b= -1, m= -5 -> decay = (-1 - (-5)) / 1 = 4 -> clipped to 2
+    assert report_extreme.sharpe_decay == 2.0
