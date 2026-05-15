@@ -1107,3 +1107,98 @@ class AdversarialScenarioBuilder:
             vol = 0.05 if (i // 10) % 2 == 0 else 0.00001
             returns[i] = self.gen.rng.normal(0, vol)
         return self.gen._generate_base(n_steps, start_price, returns)
+
+
+class InstitutionalFlowGenerator:
+    """
+    Generates deterministic price sequences simulating institutional market behavior.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def stop_hunting(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Simulates a 'stop hunt': price moves steadily, dips sharply below a support
+        level to trigger stops, then reverses rapidly.
+        """
+        mid = n_steps // 2
+        # Phase 1: Steady ranging
+        returns_ranging = self.gen.rng.normal(0, 0.0001, mid)
+
+        # Phase 2: Sharp dip (stop hunt)
+        returns_dip = np.zeros(10)
+        returns_dip[:5] = -0.005  # Sharp drop
+        returns_dip[5:] = 0.007  # Rapid reversal
+
+        # Phase 3: Resume ranging or trend
+        remaining = n_steps - mid - 10
+        if remaining > 0:
+            returns_end = self.gen.rng.normal(0.0002, 0.0001, remaining)
+            returns = np.concatenate([returns_ranging, returns_dip, returns_end])
+        else:
+            returns = np.concatenate([returns_ranging, returns_dip])[:n_steps]
+
+        return self.gen._generate_base(n_steps, start_price, returns)
+
+    def iceberg_absorption(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Simulates price hitting a large hidden (iceberg) limit order.
+        Results in multiple failed attempts to break a level with high volume
+        and low price progress.
+        """
+        mid = n_steps // 2
+        iceberg_level = start_price * 1.01
+
+        returns = np.zeros(n_steps)
+        current_price = start_price
+
+        # Phase 1: Trend towards iceberg
+        for i in range(mid):
+            ret = 0.0005 + self.gen.rng.normal(0, 0.0001)
+            current_price *= np.exp(ret)
+            returns[i] = ret
+            if current_price >= iceberg_level:
+                # Early hit
+                break
+
+        # Phase 2: Absorption at iceberg
+        for i in range(mid, n_steps):
+            # Attempt to break up
+            ret = 0.001 + self.gen.rng.normal(0, 0.0002)
+            temp_price = current_price * np.exp(ret)
+
+            if temp_price > iceberg_level:
+                # Absorbed! Small bounce back
+                ret = np.log(iceberg_level / current_price) - 0.0002
+                current_price *= np.exp(ret)
+            else:
+                current_price = temp_price
+
+            returns[i] = ret
+
+        df = self.gen._generate_base(n_steps, start_price, returns)
+
+        # Inject high volume during absorption phase
+        df.iloc[mid:, df.columns.get_loc("tick_volume")] *= 5
+
+        return df
+
+    def trend_exhaustion(self, n_steps: int = 150, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Simulates an exhausting trend: strong growth, followed by a parabolic
+        blow-off top (climax) and a sharp collapse.
+        """
+        one_third = n_steps // 3
+
+        # Phase 1: Steady trend
+        returns_steady = self.gen.rng.normal(0.0005, 0.0001, one_third)
+
+        # Phase 2: Parabolic blow-off
+        returns_climax = np.linspace(0.001, 0.005, one_third) + self.gen.rng.normal(0, 0.0005, one_third)
+
+        # Phase 3: Sharp reversal
+        returns_collapse = self.gen.rng.normal(-0.004, 0.001, n_steps - 2 * one_third)
+
+        returns = np.concatenate([returns_steady, returns_climax, returns_collapse])
+        return self.gen._generate_base(n_steps, start_price, returns)
