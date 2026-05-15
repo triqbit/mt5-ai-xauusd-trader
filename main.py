@@ -375,18 +375,6 @@ def run_live(
                 log.debug("Model signal received", direction=direction, confidence=confidence)
 
                 signal_id = None
-                if trade_logger:
-                    signal_id = trade_logger.log_signal(
-                        {
-                            "symbol": cfg.symbol,
-                            "direction": direction,
-                            "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
-                            "algorithm": cfg.algorithm,
-                            "confidence": confidence,
-                            "volatility": volatility,
-                            "metadata": {"regime": regime_info.label.value},
-                        }
-                    )
 
                 # 4. Signal Preparation & Institutional Risk
                 price = tick["ask"] if direction == 1 else tick["bid"]
@@ -460,9 +448,15 @@ def run_live(
                         )
                         model_weights = signal_obj.metadata.get("weights", {cfg.algorithm: 1.0})
 
+                        # Extract detailed risk reasons if available
+                        risk_rejection_reasons = []
+                        if not risk_approved and hasattr(risk, "get_last_decision_chain"):
+                            chain = risk.get_last_decision_chain()
+                            risk_rejection_reasons = [k for k, v in chain.items() if not v]
+
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": risk_rejection_reasons,
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
@@ -511,12 +505,26 @@ def run_live(
                             execution_data=execution_data,
                         )
 
+                        # Persist signal with structured explanation
+                        if trade_logger:
+                            signal_id = trade_logger.log_signal(
+                                {
+                                    "symbol": cfg.symbol,
+                                    "direction": direction,
+                                    "entry_price": tick["ask"] if direction >= 0 else tick["bid"],
+                                    "algorithm": cfg.algorithm,
+                                    "confidence": confidence,
+                                    "volatility": volatility,
+                                    "explanation": explanation,
+                                }
+                            )
+
                         # Log comprehensive decision trace for every non-hold signal
                         if audit_logger:
                             audit_logger.log(
                                 actor="system",
                                 action="decision_explanation",
-                                details=f"Decision trace for {cfg.symbol}: {explanation.get('summary', 'No summary')}",
+                                details=f"Decision trace for {cfg.symbol}: {explanation.human_readable_summary}",
                                 metadata={
                                     "symbol": cfg.symbol,
                                     "direction": direction,
@@ -620,7 +628,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )

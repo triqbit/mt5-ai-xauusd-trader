@@ -186,6 +186,59 @@ class SignalExplanation(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, use_enum_values=False)
 
+    def to_report_section(self) -> Any:
+        """
+        Convert the explanation into a StrategicConfluenceSection for institutional reporting.
+        Decomposes attribution into standardized alignment scores.
+        """
+        from src.research.reporting import StrategicConfluenceSection
+
+        # 1. Regime Alignment (direct mapping)
+        regime_alignment = self.regime_context.regime_alignment_score
+
+        # 2. Session Alignment (derived from execution filters)
+        session_filter = next(
+            (
+                f
+                for f in self.execution_summary.filters
+                if f.filter_name in ["session_time", "SESSION_CLOSED"]
+            ),
+            None,
+        )
+        session_alignment = 1.0 if (session_filter is None or session_filter.passed) else 0.0
+
+        # 3. Volatility Alignment (derived from execution filters)
+        vol_filter = next(
+            (
+                f
+                for f in self.execution_summary.filters
+                if f.filter_name in ["atr_volatility", "ATR_VOLATILITY"]
+            ),
+            None,
+        )
+        vol_alignment = 1.0 if (vol_filter is None or vol_filter.passed) else 0.0
+
+        # 4. Global Confluence Score (weighted feature alignment)
+        supporting = sum(
+            abs(c.contribution_score)
+            for c in self.feature_contributions
+            if (self.direction.value > 0 and c.contribution_score > 0)
+            or (self.direction.value < 0 and c.contribution_score < 0)
+        )
+        total_abs_impact = sum(abs(c.contribution_score) for c in self.feature_contributions)
+
+        confluence_score = (
+            supporting / total_abs_impact if total_abs_impact > 0 else self.total_confidence
+        )
+
+        return StrategicConfluenceSection(
+            confluence_score=float(confluence_score),
+            regime_alignment=float(regime_alignment),
+            session_alignment=float(session_alignment),
+            volatility_alignment=float(vol_alignment),
+            insights=self.human_readable_summary,
+        )
+
     signal_id: int | None = Field(None, description="Database ID of the signal")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
@@ -239,6 +292,7 @@ class SignalExplainer:
             "log_returns",
             "dist_ema",
             "dist_vwap",
+            "efficiency_ratio",
         ],
         "Volatility": [
             "atr",
@@ -250,10 +304,15 @@ class SignalExplainer:
             "ht_sine",
             "body_size",
             "day_range",
+            "z_score",
+            "kurtosis",
+            "skewness",
+            "vol_of_vol",
+            "vol_clustering",
         ],
-        "Trend": ["slope", "ema", "adx", "ht_"],
+        "Trend": ["slope", "ema", "adx", "ht_", "angle", "dema", "tema"],
         "Volume": ["vol", "obv", "vwap", "vpt", "vp_", "rvol", "vol_sma_20"],
-        "Patterns": ["pattern_"],
+        "Patterns": ["pattern_", "cdl_"],
     }
 
     def __init__(self) -> None:
@@ -408,21 +467,21 @@ class SignalExplainer:
             elif abs(weighted_conf - max_weighted_conf) < 1e-6 and max_weighted_conf > 0:
                 dominant_models.append(name)
 
-            temp_attributions.append({
-                "model_name": name,
-                "vote": vote_dir,
-                "confidence": model_conf,
-                "weight": weight,
-                "weighted_conf": weighted_conf,
-            })
+            temp_attributions.append(
+                {
+                    "model_name": name,
+                    "vote": vote_dir,
+                    "confidence": model_conf,
+                    "weight": weight,
+                    "weighted_conf": weighted_conf,
+                }
+            )
 
         # Second pass: Calculate dominance ratio and finalize attribution objects
         final_attributions = []
         for attr_dict in temp_attributions:
             dom_ratio = (
-                attr_dict["weighted_conf"] / total_weighted_conf
-                if total_weighted_conf > 0
-                else 0.0
+                attr_dict["weighted_conf"] / total_weighted_conf if total_weighted_conf > 0 else 0.0
             )
             final_attributions.append(
                 ModelAttribution(
@@ -541,15 +600,27 @@ class SignalExplainer:
         regime_lower = regime_context.regime_name.lower()
         strategic_edge = ""
         if "trending" in regime_lower:
-            strategic_edge = "Trending regimes provide high-velocity environments for our momentum models."
+            strategic_edge = (
+                "Trending regimes provide high-velocity environments for momentum models."
+            )
         elif "ranging" in regime_lower:
             strategic_edge = "Mean-reversion setups are prioritized in ranging regimes to capture cyclical price action."
+        elif "volatile_breakout" in regime_lower:
+            strategic_edge = "High-momentum expansion detected. Requiring extreme confluence for breakout validation."
+        elif "low_volatility_drift" in regime_lower:
+            strategic_edge = "Quiet directional drift detected. Trend-following models prioritized with wider stops."
+        elif "news_shock" in regime_lower:
+            strategic_edge = "Extreme dislocation detected. Risk-off stance recommended unless clear mean-reversion exists."
+        elif "mean_reversion" in regime_lower:
+            strategic_edge = "Overextended price state detected. Counter-trend signals are weighted more heavily."
         elif "volatile" in regime_lower:
             strategic_edge = "Elevated volatility requires tighter execution gates and confluence between technical clusters."
         else:
             strategic_edge = "Market state stable, following base ensemble consensus."
 
-        reasoning += f"Market is currently in a {regime_context.regime_name} regime. {strategic_edge} "
+        reasoning += (
+            f"Market is currently in a {regime_context.regime_name} regime. {strategic_edge} "
+        )
         if regime_context.is_favorable:
             reasoning += "Market state is considered favorable for this strategy setup. "
         else:

@@ -35,6 +35,44 @@ def test_log_signal(logger):
     assert signal_id > 0
 
 
+def test_log_signal_with_explanation(logger):
+    """Test that a signal with a structured explanation can be persisted."""
+    from src.core.explainability import SignalExplainer
+
+    explainer = SignalExplainer()
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.9,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+    )
+
+    data = {
+        "symbol": "XAUUSD",
+        "direction": 1,
+        "entry_price": 2000.0,
+        "algorithm": "ppo",
+        "confidence": 0.9,
+        "explanation": explanation,
+    }
+    signal_id = logger.log_signal(data)
+
+    with logger.Session() as session:
+        from src.core.trade_logger import ModelSignal
+
+        signal = session.get(ModelSignal, signal_id)
+        assert signal.explanation is not None
+        assert "Ensemble generated a BUY signal" in signal.explanation
+        # Check for presence of key machine fields in JSON
+        assert (
+            '"direction":1' in signal.explanation
+            or '"direction":"BUY"' in signal.explanation.upper()
+        )
+
+
 def test_log_trade(logger):
     signal_id = logger.log_signal({"symbol": "XAUUSD", "direction": 1, "entry_price": 2000.0})
     trade_id = logger.log_trade(
