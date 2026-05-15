@@ -202,10 +202,10 @@
 ## {{ ns.count }}. Rare Event Simulations
 **Insights:** {{ rare_events.insights }}
 
-| Event Type | Peak Impact | Realized Vol | Recovery |
-|------------|-------------|--------------|----------|
+| Event Type | Peak Impact | Realized Vol | Recovery | Bars to Recovery |
+|------------|-------------|--------------|----------|------------------|
 {% for s in rare_events.scenarios %}
-| {{ s.event_type }} | {{ (s.peak_impact_pct * 100)|round(2) }}% | {{ s.realized_volatility|round(4) }} | {{ (s.recovery_attained * 100)|round(1) }}% |
+| {{ s.event_type }} | {{ (s.peak_impact_pct * 100)|round(2) }}% | {{ s.realized_volatility|round(4) }} | {{ (s.recovery_attained * 100)|round(1) }}% | {{ s.recovery_bars }} |
 {% endfor %}
 {% endif %}
 
