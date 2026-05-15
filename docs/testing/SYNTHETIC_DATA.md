@@ -147,6 +147,16 @@ Located in , this builder creates "trap" scenarios to test technical robustness 
 - **liquidity_void()**: Price jumps between bars without continuity (gaps) to test gap-detection logic.
 - **vov_explosion()**: Ranging data where the volatility itself is extremely unstable to test VoV filters.
 
+## InstitutionalFlowGenerator
+
+Located in `src/utils/synthetic_data.py`, this generator provides deterministic price sequences simulating complex institutional market behavior and microstructure.
+
+### Key Methods
+
+- **stop_hunting(n_steps, start_price)**: Simulates a "stop hunt" where price moves steadily, dips sharply below a support level to trigger stops, and then reverses rapidly. Useful for testing stop-loss resilience and mean-reversion models.
+- **iceberg_absorption(n_steps, start_price)**: Simulates price hitting a large hidden (iceberg) limit order. It results in a trend towards a level followed by multiple failed breakout attempts with high volume and minimal price progress. Useful for testing volume-weighted models and consolidation detection.
+- **trend_exhaustion(n_steps, start_price)**: Simulates an exhausting trend consisting of a steady growth phase, a parabolic "blow-off top" (climax), and a sharp collapse. Essential for validating trend-following filters and exhaustion markers.
+
 ## Usage in Tests
 
-These tools are designed to make tests deterministic and broad. See  and  for implementation examples.
+These tools are designed to make tests deterministic and broad. See `tests/test_synthetic_data.py`, `tests/test_institutional_scenarios.py`, and `tests/test_enhanced_synthetic_scenarios.py` for implementation examples.
