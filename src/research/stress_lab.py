@@ -29,10 +29,31 @@ class StressSeverity(str, Enum):
 
 class StressScenario(BaseModel):
     """
-    Configuration for a specific stress scenario.
+    Institutional configuration for a specific adversarial stress scenario.
 
-    Defines the parameters for market data perturbations and execution friction
-    used to test strategy resilience under adverse conditions.
+    This model defines the parameters for market data perturbations and execution friction
+    used to test strategy resilience under adverse conditions. It covers execution
+    inefficiencies, data quality issues, and structural market shifts.
+
+    Attributes:
+        name: Unique identifier for the scenario.
+        description: Qualitative description of the stress conditions.
+        severity: Qualitative assessment of the stress intensity (LOW to CRITICAL).
+        spread_multiplier: Scaler for the base market spread.
+        spread_spike_prob: Probability of a sudden, extreme spread expansion.
+        spread_spike_magnitude: Additional spread added during a spike.
+        slippage_bps: Base execution slippage in basis points.
+        slippage_spike_prob: Probability of an extreme slippage event.
+        slippage_spike_magnitude_bps: Additional slippage bps during a spike.
+        execution_delay_steps: Number of price bars to delay execution signals.
+        execution_delay_jitter: Random variance (+/-) added to the execution delay.
+        missing_tick_prob: Probability of the strategy missing a price update.
+        stale_data_prob: Probability of receiving repeated (stale) price data.
+        price_noise_sigma: Standard deviation of Gaussian noise added to OHLC prices.
+        choppy_breakout_prob: Probability of adversarial price spikes designed to trap trends.
+        regime_flip_prob: Probability of inducing a sudden regime transition or trend reversal.
+        service_failure_prob: Probability of simulated infrastructure or API failure.
+        flash_crash_prob: Probability of a violent, deep price dislocation and recovery.
     """
 
     name: str
@@ -71,10 +92,23 @@ class StressScenario(BaseModel):
 
 class StressTestMetrics(BaseModel):
     """
-    Standardized metrics captured during a stress test simulation.
+    Standardized performance and resilience metrics captured during a stress simulation.
 
-    Aggregates performance, risk, and execution quality data to facilitate
-    comparative analysis against baseline runs.
+    This model aggregates institutional-grade performance, risk, and execution quality
+    data to facilitate rigorous comparative analysis against baseline (neutral) runs.
+
+    Attributes:
+        total_return: Percentage return over the simulation period.
+        max_drawdown: Maximum peak-to-trough equity decline.
+        sharpe_ratio: Annualized risk-adjusted return (using 252-day scaling).
+        win_rate: Proportion of trades with positive realized P&L.
+        num_trades: Total number of round-trip trades executed.
+        recovery_factor: Ratio of total net profit to maximum drawdown.
+        profit_factor: Ratio of gross profit to gross loss.
+        execution_quality_score: 0.0-1.0 score based on successfully processed signals vs failures.
+        latency_impact: Percentage of signals delayed or blocked by simulated latency.
+        max_slippage_experienced: Maximum basis points of slippage seen in any single trade.
+        sortino_ratio: Annualized return relative to downside volatility.
     """
 
     total_return: float
@@ -91,7 +125,27 @@ class StressTestMetrics(BaseModel):
 
 
 class ResilienceReport(BaseModel):
-    """Comprehensive report for a strategy's resilience under stress."""
+    """
+    Comprehensive institutional audit report for a strategy's resilience under stress.
+
+    This model serves as the final analytical output of the StressLab, synthesizing
+    results from multiple adversarial scenarios and sensitivity analyses to provide
+    a definitive assessment of strategy fragility.
+
+    Attributes:
+        strategy_name: Name of the strategy under evaluation.
+        timestamp: Audit execution time.
+        baseline_metrics: Reference performance metrics under normal market conditions.
+        scenario_results: Dictionary mapping scenario names to their respective metrics.
+        sensitivity_results: Results from parameter sweep sensitivity analyses.
+        resilience_score: Composite 0-100 score representing overall robustness.
+        sharpe_decay: Average percentage degradation in Sharpe ratio across scenarios.
+        sortino_decay: Average percentage degradation in Sortino ratio across scenarios.
+        win_rate_decay: Average percentage degradation in win rate across scenarios.
+        fragility_indicators: List of qualitative warnings identifying specific weaknesses.
+        failure_points: List of conditions where the strategy becomes fundamentally unviable.
+        degradation_summary: Human-readable executive summary of the strategy's robustness.
+    """
 
     strategy_name: str
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -107,7 +161,15 @@ class ResilienceReport(BaseModel):
     degradation_summary: str
 
     def to_report_section(self) -> Any:
-        """Convert to StressTestSection for ResearchReporter."""
+        """
+        Converts the ResilienceReport into a StressTestSection for institutional reporting.
+
+        This facilitates seamless integration with the ResearchReporter pipeline,
+        ensuring that stress test outcomes are presented with high-fidelity formatting.
+
+        Returns:
+            StressTestSection: A populated Pydantic model for the reporting orchestrator.
+        """
         from src.research.reporting import StressedMetric, StressTestSection
 
         def _map_metric(name: str, m: StressTestMetrics) -> StressedMetric:
@@ -134,6 +196,7 @@ class ResilienceReport(BaseModel):
             scenarios=main_scenarios,
             fragility_indicators=self.fragility_indicators,
             failure_points=self.failure_points,
+            insights=self.degradation_summary,
         )
 
 
@@ -348,9 +411,14 @@ class StressLab:
 
             # Calculate decays (percentage degradation relative to baseline magnitude)
             def _calc_decay(b: float, m: float) -> float:
+                """Robust decay calculation handling zero/near-zero baselines."""
                 if abs(b) < 1e-9:
+                    # If baseline is zero, any negative result is 100% decay, positive is 0%
                     return 0.0 if m >= b else 1.0
-                return (b - m) / abs(b)
+                # Use absolute baseline for relative comparison to handle negative metrics (e.g., negative Sharpe)
+                decay = (b - m) / abs(b)
+                # Cap extreme outliers for reporting stability
+                return float(np.clip(decay, -2.0, 2.0))
 
             s_decay = _calc_decay(baseline_metrics.sharpe_ratio, metrics.sharpe_ratio)
             so_decay = _calc_decay(baseline_metrics.sortino_ratio, metrics.sortino_ratio)
