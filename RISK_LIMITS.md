@@ -8,6 +8,7 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 
 ### 1.1 Per-Trade Limits
 - **8-Layer Safety Cascade**: All signals must pass 8 validation layers (Circuit Breaker, Daily Loss, Max Positions, Symbol Allocation, Min Confidence, Risk-Reward, Consecutive Losses, Model Health).
+- **Deterministic Validation**: Every risk decision is enforced via a centralized Pydantic schema (`RiskDecision`). Rejections MUST include a machine-readable `blocked_by` code and a human-readable reason.
 - **Max Position Size**: 10% of account equity per trade
 - **Min Position Size**: 0.01 lot (prevent rounding errors)
 - **Max Leverage**: 10:1 (conservative for gold trading)
@@ -251,7 +252,7 @@ END IF
 - **Model Report**: Model accuracy, drift, performance
 
 ### 12.3 Audit Trail
-- **All Decisions**: Log every trade decision
+- **All Decisions**: Log every trade decision. Includes a unique `trace_id` in every `TradeSignal` to correlate model predictions with risk and execution results across the entire pipeline.
 - **Override Attempts**: Log all manual overrides
 - **Limit Breaches**: Log when limits are hit
 - **Alerts**: Log all alerts triggered

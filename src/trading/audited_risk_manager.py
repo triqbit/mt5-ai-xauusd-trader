@@ -70,7 +70,6 @@ class AuditedRiskManager(RiskManager):
 
         if not decision.is_approved:
             rejection_reasons = [k for k, v in decision_chain.items() if not v]
-            reason_str = ", ".join(rejection_reasons)
             # Warning logging already handled by super().approve()
             if self.monitor:
                 for reason in rejection_reasons:

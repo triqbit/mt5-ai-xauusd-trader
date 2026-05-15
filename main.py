@@ -444,7 +444,6 @@ def run_live(
                                 cfg.symbol,
                                 filter_decision.blocked_by,
                             )
-                            risk_approved = False
 
                 # 8. Decision Support System (Cockpit)
                 if direction != 0 and risk_decision:
