@@ -763,8 +763,8 @@ class BenchmarkEvaluator:
         if len(equity) > 2:
             x = np.arange(len(equity))
             y = equity
-            slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
-            stability_score = float(r_value**2)
+            _res = stats.linregress(x, y)
+            stability_score = float(_res.rvalue**2)
 
         calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
         common_sense_ratio = tail_ratio * (profit_factor if profit_factor != float("inf") else 1.0)
