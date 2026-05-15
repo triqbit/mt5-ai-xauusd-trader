@@ -12,12 +12,16 @@ from src.core.profiler import profile
 if TYPE_CHECKING:
     from src.core.feature_engineering import FeatureEngineer
 else:
-    # Lazy load FeatureEngineer to avoid early talib dependency
+    # Lazy load to avoid early heavy dependency triggers
     def __getattr__(name):
         if name == "FeatureEngineer":
             from src.core.feature_engineering import FeatureEngineer
 
             return FeatureEngineer
+        if name == "health":
+            import src.core.health as health_mod
+
+            return health_mod
         raise AttributeError(f"module {__name__} has no attribute {name}")
 
 

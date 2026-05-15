@@ -195,7 +195,7 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = 60  # seconds between signal evaluations
+    poll_interval = cfg.poll_interval
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -635,13 +635,27 @@ def run_live(
 
                 # Wait for next interval with operator feedback
                 if console:
+                    # Construct status message components
+                    pnl = risk.daily.realised_pnl
+                    pnl_color = "green" if pnl > 0 else "red" if pnl < 0 else "white"
+                    pos_count = len(risk.open_positions)
+                    regime_label = (
+                        regime_info.label.value.upper() if "regime_info" in locals() else "N/A"
+                    )
+
                     with console.status(
                         "[bold blue]Waiting for next signal evaluation..."
                     ) as status:
                         for i in range(poll_interval, 0, -1):
-                            status.update(
-                                f"[bold blue]Waiting for next signal evaluation ({i}s remaining)..."
+                            status_msg = (
+                                f"[bold blue]LIVE SESSION[/] | [cyan]{cfg.symbol}[/] | "
+                                f"Equity: [bold white]{risk.balance:,.2f}[/] | "
+                                f"Daily: [bold {pnl_color}]{pnl:+,.2f}[/] | "
+                                f"Positions: [bold]{pos_count}[/] | "
+                                f"Regime: [bold cyan]{regime_label}[/] | "
+                                f"Next: [bold white]{i}s[/]"
                             )
+                            status.update(status_msg)
                             time.sleep(1)
                 else:
                     time.sleep(poll_interval)
@@ -805,8 +819,17 @@ def run_setup_wizard() -> int:
         os.chmod(env_path, 0o600)
 
     console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
+
+    if Prompt.ask("\nWould you like to run a [cyan]Health Check[/] now to verify connectivity?", choices=["y", "n"], default="y") == "y":
+        # We can't easily jump back to main with new args here cleanly without re-parsing or recursion,
+        # but since we are in main.py already, we can set a flag or just tell the user we're doing it.
+        console.print("[bold blue]Starting Pre-flight Health Check...[/]\n")
+        # Returning a special exit code that the caller in main() can interpret, or just perform the check here.
+        # Let's use a return code 2 to indicate "Run check"
+        return 2
+
     console.print(
-        "You can now run the bot with [cyan]python main.py --check[/] to verify connectivity.\n"
+        "\nSetup complete. You can run the bot with [cyan]python main.py --check[/] to verify connectivity.\n"
     )
     return 0
 
@@ -834,23 +857,29 @@ Usage Examples:
   python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
         """,
     )
-    p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
+    p.add_argument(
+        "-v", "--version", action="version", version=f"%(prog)s {get_system_version()}"
+    )
 
     # -- Execution Group
     execution = p.add_argument_group("Execution Options")
     execution.add_argument(
+        "-m",
         "--mode",
         choices=["demo", "live", "backtest"],
         help="Execution mode: 'demo' (paper), 'live' (real money), or 'backtest' (simulation).",
     )
     execution.add_argument(
+        "-a",
         "--algo",
         dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
         help="AI algorithm architecture to use for signal generation.",
     )
-    execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
-    execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
+    execution.add_argument("-s", "--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
+    execution.add_argument(
+        "-t", "--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1)."
+    )
     execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",
@@ -1054,7 +1083,7 @@ def main() -> int:
         RichTable = None
 
     # 0. Identify diagnostic commands that can proceed without full setup
-    diagnostic_flags = ["--help", "-h", "--version", "--doctor", "--setup"]
+    diagnostic_flags = ["--help", "-h", "--version", "--doctor", "--setup", "--check"]
     is_diagnostic = any(arg in sys.argv for arg in diagnostic_flags)
 
     # 1. Guided Setup: Detect missing .env and offer to initialize it
@@ -1081,7 +1110,13 @@ def main() -> int:
                     # Create basic directories first
                     for d in ["data", "logs", "models/trained"]:
                         Path(d).mkdir(parents=True, exist_ok=True)
-                    return run_setup_wizard()
+                    setup_res = run_setup_wizard()
+                    if setup_res == 2:
+                        # User wants to run health check immediately
+                        sys.argv = [sys.argv[0], "--check"]
+                        is_diagnostic = True
+                    else:
+                        return setup_res
                 else:
                     print(
                         "\n[!] Manual setup required. You can run 'python main.py --setup' later."
@@ -1139,7 +1174,15 @@ def main() -> int:
 
     # 0. Immediate Diagnostic Handlers
     if args.setup:
-        return run_setup_wizard()
+        setup_res = run_setup_wizard()
+        if setup_res == 2:
+            # User wants to run health check immediately
+            # Update sys.argv so subsequent parsing/attribution works
+            sys.argv = [sys.argv[0], "--check"]
+            parser = get_parser()
+            args = parser.parse_args(["--check"])
+        else:
+            return setup_res
 
     if args.doctor:
         try:

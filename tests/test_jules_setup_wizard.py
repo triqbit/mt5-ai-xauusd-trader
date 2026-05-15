@@ -2,11 +2,10 @@
 MT5 AI/ML Trading Bot - Setup Wizard Tests
 tests/test_jules_setup_wizard.py
 """
-import os
-from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
-import pytest
+from unittest.mock import mock_open, patch
+
 from main import run_setup_wizard
+
 
 def test_setup_wizard_save_logic():
     """Verify that the setup wizard correctly saves configuration to .env."""
@@ -23,7 +22,8 @@ def test_setup_wizard_save_logic():
         # 2. Server
         # 3. Use MetaAPI
         # 4. Ready to save
-        mock_ask.side_effect = ["demo", "XAUUSD", "M5", "IC-Markets-Demo", "n", "y"]
+        # 5. Run Health Check?
+        mock_ask.side_effect = ["demo", "XAUUSD", "M5", "IC-Markets-Demo", "n", "y", "n"]
         mock_int_ask.return_value = 123456
 
         # Mock open for .env.example (minimal content)
