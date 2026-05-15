@@ -32,6 +32,8 @@ class RareEventType(str, Enum):
     BULL_BEAR_TRAP = "bull_bear_trap"
     SHORT_SQUEEZE = "short_squeeze"
     CASCADE_LIQUIDATION = "cascade_liquidation"
+    MEAN_REVERSION_FAILURE = "mean_reversion_failure"
+    SILENT_TREND = "silent_trend"
 
 
 class RareEventConfig(BaseModel):
@@ -151,6 +153,10 @@ class RareEventSimulator:
             return self._simulate_short_squeeze(config)
         if config.event_type == RareEventType.CASCADE_LIQUIDATION:
             return self._simulate_cascade_liquidation(config)
+        if config.event_type == RareEventType.MEAN_REVERSION_FAILURE:
+            return self._simulate_mean_reversion_failure(config)
+        if config.event_type == RareEventType.SILENT_TREND:
+            return self._simulate_silent_trend(config)
         raise ValueError(f"Unknown rare event type: {config.event_type}")
 
     def _generate_base_ohlc(
@@ -303,6 +309,119 @@ class RareEventSimulator:
             description=f"Flash crash of {peak_impact:.2%} with {config.recovery_factor:.0%} recovery.",
         )
 
+        return df, result
+
+    def _simulate_mean_reversion_failure(
+        self, config: RareEventConfig
+    ) -> tuple[pd.DataFrame, RareEventResult]:
+        """
+        Simulates an overextended move where mean-reversion signals (e.g., RSI overbought)
+        fail as price continues to grind higher/lower without significant pullbacks.
+        """
+        n = config.n_steps
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
+
+        start_idx = n // 4
+        # Phase 1: Normal trend reaching 'overextended' levels
+        overextend_len = 40
+        direction = self.rng.choice([-1, 1])
+        base_move = 0.015 * direction
+
+        for i in range(overextend_len):
+            idx = start_idx + i
+            if idx < n:
+                returns[idx] += (base_move / overextend_len) * self.rng.uniform(0.8, 1.2)
+                vols[idx] *= 1.5 * config.event_magnitude
+
+        # Phase 2: Failure to revert (The Grind)
+        grind_idx = start_idx + overextend_len
+        grind_len = 60
+        grind_move = 0.02 * direction
+
+        for i in range(grind_len):
+            idx = grind_idx + i
+            if idx < n:
+                # Small, persistent moves with very low volatility (the 'grind' that kills shorts)
+                returns[idx] = (grind_move / grind_len) * self.rng.uniform(0.9, 1.1)
+                vols[idx] = config.base_volatility * 0.8  # Low vol makes it harder to trigger exits
+
+        df = self._generate_base_ohlc(
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
+        )
+
+        event_prices = df["close"].iloc[start_idx : grind_idx + grind_len]
+        start_price_val = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        deviations = (event_prices / start_price_val - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
+
+        result = RareEventResult(
+            event_type=RareEventType.MEAN_REVERSION_FAILURE,
+            config=config,
+            start_index=start_idx,
+            end_index=min(n - 1, grind_idx + grind_len),
+            peak_impact_pct=peak_impact,
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
+            recovery_attained=0.0,
+            description=f"Mean reversion failure: persistent {peak_impact:.2%} grind without pullback.",
+        )
+        return df, result
+
+    def _simulate_silent_trend(
+        self, config: RareEventConfig
+    ) -> tuple[pd.DataFrame, RareEventResult]:
+        """
+        Simulates a persistent, low-volatility trend that steadily moves away from entry points.
+        Tests trailing stop effectiveness in low-volatility environments.
+        """
+        n = config.n_steps
+        returns = self._generate_t_returns(n, config.drift, config.base_volatility)
+        vols = np.full(n, config.base_volatility)
+
+        start_idx = n // 5
+        trend_len = n // 2
+        direction = self.rng.choice([-1, 1])
+        total_trend = 0.03 * direction * config.event_magnitude
+
+        for i in range(trend_len):
+            idx = start_idx + i
+            if idx < n:
+                # Very consistent small returns
+                returns[idx] = (total_trend / trend_len) + self.rng.normal(0, config.base_volatility * 0.2)
+                # Volatility remains very low, often below base
+                vols[idx] = config.base_volatility * 0.7
+
+        df = self._generate_base_ohlc(
+            config.start_price,
+            returns,
+            config.base_volatility,
+            config.base_volume,
+            vols=vols,
+            bars_per_day=config.bars_per_day,
+            start_date=config.start_date,
+        )
+
+        event_prices = df["close"].iloc[start_idx : start_idx + trend_len]
+        start_price_val = df["close"].iloc[start_idx - 1] if start_idx > 0 else df["close"].iloc[0]
+        deviations = (event_prices / start_price_val - 1).values
+        peak_impact = float(deviations[np.argmax(np.abs(deviations))])
+
+        result = RareEventResult(
+            event_type=RareEventType.SILENT_TREND,
+            config=config,
+            start_index=start_idx,
+            end_index=min(n - 1, start_idx + trend_len),
+            peak_impact_pct=peak_impact,
+            realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
+            recovery_attained=0.0,
+            description=f"Silent trend: low-volatility persistent move of {peak_impact:.2%}.",
+        )
         return df, result
 
     def _simulate_liquidity_vacuum(

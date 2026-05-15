@@ -371,3 +371,29 @@ def test_feature_engineer_compatibility(simulator):
     # Ensure it produces a significant number of features
     assert features.shape[1] > 20
     assert not features.isnull().values.any()
+
+
+def test_mean_reversion_failure_behavior(simulator):
+    config = RareEventConfig(event_type=RareEventType.MEAN_REVERSION_FAILURE, n_steps=400)
+    df, result = simulator.generate_scenario(config)
+
+    assert result.event_type == RareEventType.MEAN_REVERSION_FAILURE
+    assert abs(result.peak_impact_pct) > 0.02
+
+    # Check for the 'grind': volatility should be low during the grind phase
+    grind_vols = df["spread"].iloc[result.start_index + 40 : result.end_index]
+    # Spread is a proxy for volatility in our generator
+    assert grind_vols.mean() < df["spread"].iloc[: result.start_index].mean() * 1.5
+
+
+def test_silent_trend_behavior(simulator):
+    config = RareEventConfig(event_type=RareEventType.SILENT_TREND, n_steps=400)
+    df, result = simulator.generate_scenario(config)
+
+    assert result.event_type == RareEventType.SILENT_TREND
+    assert abs(result.peak_impact_pct) > 0.02
+
+    # Check for low volatility throughout the trend
+    returns = df["close"].pct_change().dropna()
+    trend_returns = returns.iloc[result.start_index : result.end_index]
+    assert trend_returns.std() < config.base_volatility * 1.5

@@ -26,6 +26,8 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 8.  **News Shock**: A violent directional move followed by sustained high volatility and erratic behavior. Calibrated to trigger the `NEWS_SHOCK` regime in the `RegimeDetector` (ER > 0.7, ATR Ratio > 2.0).
 9.  **Short Squeeze**: Rapid parabolic move up driven by buy-side liquidation, followed by a blow-off top. Tests resistance-breakout and stop-loss hunting logic.
 10. **Cascade Liquidation**: A series of accelerating downward price shocks (margin calls). Tests trailing-stop and capital preservation logic under extreme stress.
+11. **Mean Reversion Failure**: An overextended move without significant pullbacks, testing strategy discipline during persistent grinds.
+12. **Silent Trend**: A persistent, low-volatility trend that steadily moves away from entry points without triggering volatility alerts.
 
 ## Configuration
 
