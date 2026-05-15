@@ -24,6 +24,7 @@ from src.research.benchmarks import (
     NaiveDirectionalStrategy,
     PPOAdapter,
     RandomStrategy,
+    RegimeFilterBaseline,
     RiskFilteredBaseline,
     TransformerAdapter,
     VolatilityBreakoutStrategy,
@@ -55,6 +56,26 @@ def test_ema_crossover_signals(sample_data):
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
+
+
+def test_regime_filter_signals(sample_data):
+    from src.models.regime_detector import MarketRegime
+
+    # Create dummy regime column
+    sample_data["regime"] = MarketRegime.RANGING.value
+    # Set half to TRENDING
+    sample_data.loc[50:, "regime"] = MarketRegime.TRENDING.value
+
+    base_strategy = BuyAndHoldStrategy()
+    # Only allow TRENDING
+    strategy = RegimeFilterBaseline(base_strategy, allowed_regimes=[MarketRegime.TRENDING.value])
+
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    # First 50 should be 0 (RANGING not allowed)
+    assert np.all(signals[:50] == 0)
+    # Remaining 50 should be 1 (TRENDING allowed)
+    assert np.all(signals[50:] == 1)
 
 
 def test_buy_and_hold_signals(sample_data):
