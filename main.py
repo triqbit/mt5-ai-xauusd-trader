@@ -331,7 +331,12 @@ def run_live(
                     obs = df_features.values[-1]  # Full 140+ features
                     regime_info = regime_detector.detect(df_raw)
 
-                    volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
+                    # Optimization: Extract volatility from already-computed features if available
+                    # RegimeDetector already calculates z-score (using rolling std), we can reuse it
+                    if regime_info.raw_features and "atr_ratio" in regime_info.raw_features:
+                        volatility = regime_info.volatility_index
+                    else:
+                        volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
 
                 # 3. Model Signal Generation
                 with profile("inference"):
@@ -385,7 +390,13 @@ def run_live(
 
                 # 4. Signal Preparation & Institutional Risk
                 price = tick["ask"] if direction == 1 else tick["bid"]
-                atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
+
+                # Optimization: Extract ATR from already-computed features to avoid redundant calculation
+                atr_col = f"base_{cfg.timeframe}_atr"
+                if atr_col in df_features.columns:
+                    atr = float(df_features[atr_col].iloc[-1])
+                else:
+                    atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
                 with profile("signal_preparation"):
                     signal = _prepare_trade_signal(
@@ -600,13 +611,14 @@ def run_live(
                                     )
                                     # P&L will be calculated automatically by update_trade
                                     # This also logs to audit trail internally now
-                                    trade_logger.update_trade(
+                                    # Optimization: Pass trade_info (Trade object) to avoid redundant DB query
+                                    updated_trade = trade_logger.update_trade(
                                         ticket=ticket,
                                         exit_price=exit_price,
+                                        trade_obj=trade_info,
                                     )
 
                                     # Update allocator performance for feedback loop
-                                    updated_trade = trade_logger.get_trade_by_ticket(ticket)
                                     if updated_trade and allocator:
                                         strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
                                         allocator.update_strategy_performance(

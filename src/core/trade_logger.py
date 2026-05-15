@@ -276,15 +276,33 @@ class TradeLogger:
         exit_price: float,
         pnl: float | None = None,
         drawdown_impact: float = 0.0,
-    ) -> None:
-        """Update a trade when it is closed. Calculates P&L if not provided."""
+        trade_obj: Trade | None = None,
+    ) -> Trade | None:
+        """
+        Update a trade when it is closed. Calculates P&L if not provided.
+
+        Args:
+            ticket: MT5 ticket ID.
+            exit_price: Price at which the trade was closed.
+            pnl: Optional realized P&L. Calculated if not provided.
+            drawdown_impact: Impact on total drawdown.
+            trade_obj: Optional already-fetched Trade ORM object to avoid redundant query.
+
+        Returns:
+            The updated Trade object or None if not found.
+        """
         # Invalidate cache since a trade is being closed
         self._perf_cache = None
 
         with self.Session() as session:
-            trade = session.execute(
-                select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
-            ).scalar_one_or_none()
+            if trade_obj:
+                # Merge the object into the current session if it was fetched elsewhere
+                trade = session.merge(trade_obj)
+            else:
+                trade = session.execute(
+                    select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
+                ).scalar_one_or_none()
+
             if trade:
                 trade.exit_price = exit_price
                 if pnl is not None:
@@ -302,6 +320,8 @@ class TradeLogger:
                 trade.drawdown_impact = drawdown_impact
                 trade.status = "CLOSED"
                 session.commit()
+                # Refresh to ensure P&L and other calculated fields are available
+                session.refresh(trade)
 
                 # Audit the outcome
                 try:
@@ -319,8 +339,10 @@ class TradeLogger:
                     )
                 except (RuntimeError, ImportError):
                     pass
+                return trade
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
+                return None
 
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""
