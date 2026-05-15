@@ -76,6 +76,74 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
+    def reconcile_state(self) -> None:
+        """
+        Recover operational state from the database.
+        Reconstructs peak_equity and daily stats to ensure circuit breakers
+        persist across system restarts.
+        """
+        if not self.trade_logger:
+            logger.warning("TradeLogger not available for state reconciliation")
+            return
+
+        try:
+            data = self.trade_logger.get_reconciliation_data()
+            all_pnls = data.get("all_pnls", [])
+            today_trades = data.get("today_trades", [])
+
+            # 1. Reconstruct peak_equity
+            # We start with initial balance (assumed to be current balance - total pnl)
+            # but a safer way is to use a fixed starting point or just track peaks.
+            # Here we simulate equity curve from 0 and find max.
+            if all_pnls:
+                equity_curve = [0.0]
+                for pnl in all_pnls:
+                    equity_curve.append(equity_curve[-1] + pnl)
+
+                # Offset by current balance - total pnl to get actual equity curve
+                total_pnl = equity_curve[-1]
+                starting_balance = self.balance - total_pnl
+
+                actual_peaks = [starting_balance + p for p in equity_curve]
+                self.peak_equity = max(starting_balance, max(actual_peaks), self.balance)
+            else:
+                self.peak_equity = max(self.peak_equity, self.balance)
+
+            # 2. Reconcile Daily Stats
+            if today_trades:
+                realised_pnl = sum(t.pnl for t in today_trades)
+                trade_count = len(today_trades)
+
+                # Reconstruct consecutive losses
+                consecutive_losses = 0
+                for t in reversed(today_trades):
+                    if t.pnl < 0:
+                        consecutive_losses += 1
+                    else:
+                        break
+
+                self.daily.realised_pnl = realised_pnl
+                self.daily.trade_count = trade_count
+                self.daily.consecutive_losses = consecutive_losses
+
+                # Update daily peak equity
+                daily_pnl_acc = 0
+                daily_peaks = [starting_balance + total_pnl - realised_pnl] # Start of today
+                for t in today_trades:
+                    daily_pnl_acc += t.pnl
+                    daily_peaks.append(daily_peaks[0] + daily_pnl_acc)
+                self.daily.peak_equity = max(daily_peaks)
+
+            logger.info(
+                "RiskManager state reconciled | peak_equity=%.2f realised_pnl=%.2f trades=%d losses=%d",
+                self.peak_equity,
+                self.daily.realised_pnl,
+                self.daily.trade_count,
+                self.daily.consecutive_losses
+            )
+        except Exception as e:
+            logger.error("Failed to reconcile RiskManager state: %s", e, exc_info=True)
+
     def approve(
         self,
         signal: TradeSignal,

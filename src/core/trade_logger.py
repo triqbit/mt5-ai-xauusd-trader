@@ -25,11 +25,13 @@ from sqlalchemy import (
     func,
     select,
 )
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from src.core.audit_log import get_audit_logger
 from src.core.database import get_engine, get_session_factory
 from src.core.profiler import profile
+from src.core.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +214,7 @@ class TradeLogger:
         # Caching performance report to avoid O(N) DB queries on every signal
         self._perf_cache: dict[str, float] | None = None
 
+    @with_retry(OperationalError, max_retries=3)
     def log_signal(self, signal_data: dict[str, Any]) -> int:
         """Log a new model signal and return its ID."""
         import structlog.contextvars
@@ -236,6 +239,7 @@ class TradeLogger:
             session.commit()
             return signal.id
 
+    @with_retry(OperationalError, max_retries=3)
     def log_trade(
         self,
         ticket: int,
@@ -270,6 +274,7 @@ class TradeLogger:
             session.commit()
             return trade.id
 
+    @with_retry(OperationalError, max_retries=3)
     def update_trade(
         self,
         ticket: int,
@@ -329,6 +334,44 @@ class TradeLogger:
                 select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             ).scalar_one_or_none()
 
+    @with_retry(OperationalError, max_retries=3)
+    def get_reconciliation_data(self) -> dict[str, Any]:
+        """
+        Fetch data required for RiskManager state reconciliation:
+        - All historical PnLs
+        - Today's closed trades
+        """
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        with self.Session() as session:
+            # All historical PnLs for peak_equity calculation
+            all_pnls = session.execute(
+                select(Trade.pnl)
+                .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                .order_by(Trade.created_at.asc())
+            ).scalars().all()
+
+            # Today's trades for daily stats
+            today_trades = session.execute(
+                select(Trade)
+                .where(
+                    Trade.status == "CLOSED",
+                    Trade.is_deleted.is_(False),
+                    Trade.updated_at >= today_start
+                )
+                .order_by(Trade.created_at.asc())
+            ).scalars().all()
+
+            # Expunge today_trades to use them outside session
+            for t in today_trades:
+                session.expunge(t)
+
+            return {
+                "all_pnls": list(all_pnls),
+                "today_trades": list(today_trades)
+            }
+
+    @with_retry(OperationalError, max_retries=3)
     def log_risk_event(
         self,
         event_type: str,
@@ -347,6 +390,7 @@ class TradeLogger:
             session.add(event)
             session.commit()
 
+    @with_retry(OperationalError, max_retries=3)
     def read_performance_report(self, persist: bool = False) -> dict[str, float]:
         """
         Calculate key performance metrics from closed trades.
