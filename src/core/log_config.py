@@ -81,44 +81,65 @@ class SecretMaskingProcessor(logging.Filter):
                 except (IndexError, ValueError):
                     continue
 
-    def redact_any(self, data: Any) -> Any:
+    def redact_any(self, data: Any, _in_place: bool = False) -> Any:
         """
         Recursively redact secrets and sensitive fields from any data structure.
+
+        Args:
+            data: The data to redact.
+            _in_place: Whether to modify dicts/lists in-place (internal use).
         """
+        # 1. Fast-path for non-string primitives (numbers, bools)
+        if isinstance(data, (int, float, bool)) or data is None:
+            return data
+
         if isinstance(data, str):
-            # 1. Mask known secret values
+            # 2. Mask known secret values in strings
+            if not self.secrets or len(data) < 4:
+                return data
             result = data
-            if self.secrets:
-                for secret in self.secrets:
-                    if secret and secret in result:
-                        result = result.replace(secret, self.mask)
+            for secret in self.secrets:
+                if secret in result:
+                    result = result.replace(secret, self.mask)
             return result
 
         elif isinstance(data, dict):
-            new_dict = {}
+            # 3. Handle dictionaries (optimized for structlog processors)
+            target = data if _in_place else {}
             for k, v in data.items():
-                # 2. Mask by key name (heuristic)
-                if isinstance(k, str) and any(p in k.lower() for p in self.sensitive_patterns):
+                is_sensitive_key = isinstance(k, str) and any(
+                    p in k.lower() for p in self.sensitive_patterns
+                )
+                if is_sensitive_key:
                     if isinstance(v, (str, int, float)) or v is None:
-                        new_dict[k] = self.mask
+                        target[k] = self.mask
                     else:
-                        # If it's a complex object under a sensitive key, still redact its contents
-                        new_dict[k] = self.redact_any(v)
+                        target[k] = self.redact_any(v, _in_place=_in_place)
                 else:
-                    new_dict[k] = self.redact_any(v)
-            return new_dict
+                    redacted_v = self.redact_any(v, _in_place=_in_place)
+                    if not _in_place or redacted_v is not v:
+                        target[k] = redacted_v
+            return target
 
         elif isinstance(data, (list, tuple)):
-            return type(data)(self.redact_any(v) for v in data)
+            # 4. Handle sequences
+            if _in_place and isinstance(data, list):
+                for i, item in enumerate(data):
+                    data[i] = self.redact_any(item, _in_place=True)
+                return data
+            return type(data)(self.redact_any(v, _in_place=_in_place) for v in data)
 
         elif isinstance(data, set):
-            return {self.redact_any(v) for v in data}
+            return {self.redact_any(v, _in_place=_in_place) for v in data}
 
         return data
 
     def __call__(self, logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
-        """Structlog-compatible processor interface."""
-        return self.redact_any(event_dict)
+        """
+        Structlog-compatible processor interface.
+        Uses in-place modification for high-performance log processing.
+        """
+        return self.redact_any(event_dict, _in_place=True)
 
     def filter(self, record: logging.LogRecord) -> bool:
         """

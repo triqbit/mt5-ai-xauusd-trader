@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import logging
 import time
+
+import structlog
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -29,7 +31,7 @@ from src.core.profiler import profile
 from src.core.schemas import TradeSignal
 from src.trading.execution_filter import ExecutionFilter
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -231,6 +233,16 @@ class BacktestEngine:
         feature_cols = [c for c in df_features.columns if c not in cols_to_exclude]
         feature_vals = df_features[feature_cols].values
 
+        # Lightweight timing accumulators for institutional performance analysis
+        stats_timers = {
+            "normalization": 0.0,
+            "inference": 0.0,
+            "execution_filter": 0.0,
+            "trade_simulation": 0.0,
+            "equity_tracking": 0.0,
+            "update_active": 0.0,
+        }
+
         with profile("bt_walk_forward_loop_total"):
             while start + train_window + test_window <= n:
                 test_start_idx = start + train_window
@@ -242,106 +254,125 @@ class BacktestEngine:
                 train_std = np.nanstd(train_slice, axis=0)
                 train_std[train_std == 0] = 1.0  # Avoid division by zero
 
-                with profile("bt_test_window_segment"):
-                    for i in range(test_window):
-                        abs_idx = test_start_idx + i
+                for i in range(test_window):
+                    abs_idx = test_start_idx + i
 
-                        # Prevent double-processing bars due to step overlap
-                        if abs_idx <= last_processed_idx or abs_idx >= n:
-                            continue
+                    # Prevent double-processing bars due to step overlap
+                    if abs_idx <= last_processed_idx or abs_idx >= n:
+                        continue
 
-                        bar_time = time_vals[abs_idx]
-                        current_price = close_vals[abs_idx]
+                    bar_time = time_vals[abs_idx]
+                    current_price = close_vals[abs_idx]
 
-                        # 1. Update active trades: Check if any simulated exit is reached
-                        with profile("bt_update_active_trades"):
-                            self._update_active_trades(active_trades, abs_idx)
+                    # 1. Update active trades: Check if any simulated exit is reached
+                    t0 = time.perf_counter()
+                    self._update_active_trades(active_trades, abs_idx)
+                    stats_timers["update_active"] += time.perf_counter() - t0
 
-                        # 2. Evaluation Logic: If slot available, check for new signals
-                        if len(active_trades) < self.max_positions:
-                            # Apply train-window normalization to the current observation
-                            with profile("bt_observation_normalization"):
-                                obs_raw = feature_vals[abs_idx]
-                                obs = (obs_raw - train_mean) / (train_std + 1e-8)
+                    # 2. Evaluation Logic: If slot available, check for new signals
+                    if len(active_trades) < self.max_positions:
+                        # Apply train-window normalization to the current observation
+                        t0 = time.perf_counter()
+                        obs_raw = feature_vals[abs_idx]
+                        obs = (obs_raw - train_mean) / (train_std + 1e-8)
+                        stats_timers["normalization"] += time.perf_counter() - t0
 
-                            try:
-                                # Standard Signal object or fallback to raw int
-                                with profile("bt_model_predict"):
-                                    signal_obj = model.predict(obs)
-                                    direction = int(signal_obj.direction)
-                                    confidence = float(signal_obj.confidence)
-                            except Exception:
-                                direction, confidence = 0, 0.0
+                        try:
+                            # Standard Signal object or fallback to raw int
+                            t0 = time.perf_counter()
+                            signal_obj = model.predict(obs)
+                            direction = int(signal_obj.direction)
+                            confidence = float(signal_obj.confidence)
+                            stats_timers["inference"] += time.perf_counter() - t0
+                        except Exception:
+                            direction, confidence = 0, 0.0
 
-                            if direction != 0:
-                                with profile("bt_signal_validation_and_entry"):
-                                    atr = atr_vals[abs_idx]
-                                    if not np.isnan(atr) and atr > 0:
-                                        # 3. Prepare Signal and Validate with Filter Cascade
-                                        signal = TradeSignal(
-                                            symbol=self.symbol,
-                                            direction=direction,
-                                            entry_price=current_price,
-                                            stop_loss=current_price - (direction * 2 * atr),
-                                            take_profit=current_price + (direction * 4 * atr),
-                                            lot_size=0.1,  # Base lot for backtest
-                                            algorithm="backtest",
-                                            confidence=confidence,
-                                            timestamp=bar_time,
-                                        )
+                        if direction != 0:
+                            atr = atr_vals[abs_idx]
+                            if not np.isnan(atr) and atr > 0:
+                                # 3. Prepare Signal and Validate with Filter Cascade
+                                signal = TradeSignal(
+                                    symbol=self.symbol,
+                                    direction=direction,
+                                    entry_price=current_price,
+                                    stop_loss=current_price - (direction * 2 * atr),
+                                    take_profit=current_price + (direction * 4 * atr),
+                                    lot_size=0.1,  # Base lot for backtest
+                                    algorithm="backtest",
+                                    confidence=confidence,
+                                    timestamp=bar_time,
+                                )
 
-                                        # Dynamic Drawdown for Layer 6 (O(1) lookup)
-                                        current_drawdown = 0.0
-                                        if self.equity_curve:
-                                            peak = self.max_equity
-                                            current_equity = self.equity_curve[-1][1]
-                                            current_drawdown = (peak - current_equity) / (
-                                                peak + 1e-8
-                                            )
+                                # Dynamic Drawdown for Layer 6 (O(1) lookup)
+                                current_drawdown = 0.0
+                                if self.equity_curve:
+                                    peak = self.max_equity
+                                    current_equity = self.equity_curve[-1][1]
+                                    current_drawdown = (peak - current_equity) / (
+                                        peak + 1e-8
+                                    )
 
-                                        # Pack precomputed metrics for speed
-                                        precomputed = {
-                                            "atr_volatility": {
-                                                "current_atr": atr_current_vals[abs_idx],
-                                                "avg_atr": atr_avg_vals[abs_idx],
-                                            },
-                                            "trend_angle": {"slope": slopes[abs_idx]},
-                                            "ema_sequence": {
-                                                "emas": {
-                                                    p: ema_vals[p][abs_idx]
-                                                    for p in [8, 21, 50, 200]
-                                                }
-                                            },
-                                            "momentum": {"rsi": rsi_vals[abs_idx]},
+                                # Pack precomputed metrics for speed
+                                precomputed = {
+                                    "atr_volatility": {
+                                        "current_atr": atr_current_vals[abs_idx],
+                                        "avg_atr": atr_avg_vals[abs_idx],
+                                    },
+                                    "trend_angle": {"slope": slopes[abs_idx]},
+                                    "ema_sequence": {
+                                        "emas": {
+                                            p: ema_vals[p][abs_idx]
+                                            for p in [8, 21, 50, 200]
                                         }
+                                    },
+                                    "momentum": {"rsi": rsi_vals[abs_idx]},
+                                }
 
-                                        # Validate signal through 10-layer filter
-                                        # Optimization: market_data=None because we use precomputed_metrics
-                                        decision = self.ef.validate(
-                                            signal,
-                                            market_data=None,
-                                            current_drawdown=current_drawdown,
-                                            timestamp=bar_time,
-                                            precomputed_metrics=precomputed,
-                                        )
+                                # Validate signal through 10-layer filter
+                                # Optimization: market_data=None because we use precomputed_metrics
+                                t0 = time.perf_counter()
+                                decision = self.ef.validate(
+                                    signal,
+                                    market_data=None,
+                                    current_drawdown=current_drawdown,
+                                    timestamp=bar_time,
+                                    precomputed_metrics=precomputed,
+                                )
+                                stats_timers["execution_filter"] += time.perf_counter() - t0
 
-                                        if decision.is_approved:
-                                            # Vectorized Exit Simulation: Scan future bars for SL/TP hit
-                                            self._open_and_simulate_trade(
-                                                active_trades,
-                                                signal,
-                                                abs_idx,
-                                                high_vals,
-                                                low_vals,
-                                                time_vals,
-                                            )
+                                if decision.is_approved:
+                                    # Vectorized Exit Simulation: Scan future bars for SL/TP hit
+                                    t0 = time.perf_counter()
+                                    self._open_and_simulate_trade(
+                                        active_trades,
+                                        signal,
+                                        abs_idx,
+                                        high_vals,
+                                        low_vals,
+                                        time_vals,
+                                    )
+                                    stats_timers["trade_simulation"] += time.perf_counter() - t0
 
-                        # 4. Record equity at the end of each bar
-                        with profile("bt_record_equity"):
-                            self._record_equity(bar_time, current_price, active_trades)
-                        last_processed_idx = abs_idx
+                    # 4. Record equity at the end of each bar
+                    t0 = time.perf_counter()
+                    self._record_equity(bar_time, current_price, active_trades)
+                    stats_timers["equity_tracking"] += time.perf_counter() - t0
+                    last_processed_idx = abs_idx
 
                 start += step_size
+
+        # Log lightweight performance summary
+        total_loop_time = sum(stats_timers.values())
+        logger.info(
+            "backtest_loop_performance_breakdown",
+            total_loop_ms=round(total_loop_time * 1000, 2),
+            normalization_ms=round(stats_timers["normalization"] * 1000, 2),
+            inference_ms=round(stats_timers["inference"] * 1000, 2),
+            execution_filter_ms=round(stats_timers["execution_filter"] * 1000, 2),
+            trade_simulation_ms=round(stats_timers["trade_simulation"] * 1000, 2),
+            equity_tracking_ms=round(stats_timers["equity_tracking"] * 1000, 2),
+            update_active_ms=round(stats_timers["update_active"] * 1000, 2),
+        )
 
         # 4. Finalization: Close any trailing trades
         self._close_all_trades(active_trades, close_vals[-1], time_vals[-1])
