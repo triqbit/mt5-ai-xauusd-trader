@@ -63,6 +63,11 @@ class TradeExecutionQuality(BaseModel):
     execution_cost_pips: float = Field(
         ..., description="Total cost of execution (slippage + half spread)"
     )
+    mfe_pips: float = Field(default=0.0, description="Max Favorable Excursion after entry")
+    mae_pips: float = Field(default=0.0, description="Max Adverse Excursion after entry")
+    implementation_shortfall_pips: float = Field(
+        default=0.0, description="Total cost from signal to fill including alpha decay"
+    )
     markout_pnls: dict[str, float] = Field(
         default_factory=dict, description="Price drift at various horizons (1m, 5m, 15m, 30m, 60m)"
     )
@@ -78,9 +83,7 @@ class BlockedSignalQuality(BaseModel):
     max_favorable_excursion: float = Field(
         ..., description="Max favorable price movement after signal"
     )
-    max_adverse_excursion: float = Field(
-        ..., description="Max adverse price movement after signal"
-    )
+    max_adverse_excursion: float = Field(..., description="Max adverse price movement after signal")
     would_have_won: bool = Field(..., description="True if signal would have hit TP before SL")
 
 
@@ -96,11 +99,15 @@ class ExecutionSummary(BaseModel):
     avg_edge_capture: float
     avg_timing_efficiency: float
     avg_alpha_decay: float
+    avg_mfe_trades: float = Field(default=0.0, description="Avg MFE of executed trades")
+    avg_mae_trades: float = Field(default=0.0, description="Avg MAE of executed trades")
     execution_efficiency_score: float
     rejected_signal_count: int
     executed_trade_count: int
     avg_mae: float = Field(default=0.0, description="Avg Max Adverse Excursion of blocked signals")
-    avg_mfe: float = Field(default=0.0, description="Avg Max Favorable Excursion of blocked signals")
+    avg_mfe: float = Field(
+        default=0.0, description="Avg Max Favorable Excursion of blocked signals"
+    )
 
     def to_report_section(self) -> Any:
         """Convert to reporting model."""
@@ -140,6 +147,11 @@ class ExecutionSummary(BaseModel):
             ExecutionMetric(
                 name="Alpha Decay",
                 value=f"{self.avg_alpha_decay:.2f} pips",
+                status="OK",
+            ),
+            ExecutionMetric(
+                name="Trade MFE/MAE",
+                value=f"{self.avg_mfe_trades:.1f}/{self.avg_mae_trades:.1f} pips",
                 status="OK",
             ),
         ]
@@ -257,9 +269,7 @@ class ExecutionAnalyzer:
         Compares requested signal price vs actual execution price.
         """
         with self.Session() as session:
-            trade = session.execute(
-                select(Trade).where(Trade.id == trade_id)
-            ).scalar_one_or_none()
+            trade = session.execute(select(Trade).where(Trade.id == trade_id)).scalar_one_or_none()
 
             if not trade or not trade.signal:
                 logger.warning("trade_or_signal_not_found", trade_id=trade_id)
@@ -310,8 +320,9 @@ class ExecutionAnalyzer:
             fill_quality = 1.0 / (1.0 + np.exp(slippage_ratio - 2.0))
             fill_quality *= max(0.0, 1.0 - (latency_ms / 10000.0))
 
-            # 8. Drift and Edge Capture
+            # 8. Drift, Excursions and Edge Capture
             markout_horizons = [1, 5, 15, 30, 60]
+            excursions = self.calculate_excursions(trade)
             markouts = self.calculate_markouts(
                 symbol, trade.created_at, trade.entry_price, trade.direction, markout_horizons
             )
@@ -340,8 +351,11 @@ class ExecutionAnalyzer:
                 slippage_to_spread_ratio=float(slippage_ratio),
                 alpha_decay_pips=float(alpha_decay),
                 broker_slippage_pips=float(broker_slippage),
-                effective_spread_pips=float(spread_pips),
+                effective_spread_pips=float(effective_spread_pips),
                 execution_cost_pips=float(execution_cost),
+                mfe_pips=float(excursions.get("mfe", 0.0)),
+                mae_pips=float(excursions.get("mae", 0.0)),
+                implementation_shortfall_pips=float(slippage_pips + alpha_decay),
                 markout_pnls=markouts,
             )
 
@@ -349,6 +363,46 @@ class ExecutionAnalyzer:
                 self.save_execution_quality(quality)
 
             return quality
+
+    def calculate_excursions(self, trade: Trade) -> dict[str, float]:
+        """Calculate MFE and MAE for an executed trade."""
+        if not self.connector or not trade.exit_price:
+            return {"mfe": 0.0, "mae": 0.0}
+
+        t_entry = (
+            trade.created_at.replace(tzinfo=UTC)
+            if trade.created_at.tzinfo is None
+            else trade.created_at
+        )
+        # Fallback for updated_at if not set or before entry
+        t_exit = (
+            trade.updated_at.replace(tzinfo=UTC)
+            if trade.updated_at.tzinfo is None
+            else trade.updated_at
+        )
+        if t_exit <= t_entry:
+            t_exit = t_entry + timedelta(minutes=5)
+
+        pip_size = self._get_pip_size(trade.symbol)
+
+        try:
+            df = self.connector.get_rates_range(trade.symbol, "M1", t_entry, t_exit)
+            if not df.empty:
+                if trade.direction > 0:  # BUY
+                    mfe_price = df["high"].max() - trade.entry_price
+                    mae_price = trade.entry_price - df["low"].min()
+                else:  # SELL
+                    mfe_price = trade.entry_price - df["low"].min()
+                    mae_price = df["high"].max() - trade.entry_price
+
+                return {
+                    "mfe": float(max(0.0, mfe_price / pip_size)),
+                    "mae": float(max(0.0, mae_price / pip_size)),
+                }
+        except Exception:
+            pass
+
+        return {"mfe": 0.0, "mae": 0.0}
 
     def calculate_markouts(
         self,
@@ -570,8 +624,21 @@ class ExecutionAnalyzer:
                 existing.effective_spread_pips = quality.effective_spread_pips
                 existing.execution_cost_pips = quality.execution_cost_pips
                 existing.session = quality.session
-                existing.markout_data = json.dumps(quality.markout_pnls)
+                # Backward-compatible payload: keep horizons at top level
+                markout_payload = {
+                    **quality.markout_pnls,
+                    "mfe_pips": quality.mfe_pips,
+                    "mae_pips": quality.mae_pips,
+                    "is_pips": quality.implementation_shortfall_pips,
+                }
+                existing.markout_data = json.dumps(markout_payload)
             else:
+                markout_payload = {
+                    **quality.markout_pnls,
+                    "mfe_pips": quality.mfe_pips,
+                    "mae_pips": quality.mae_pips,
+                    "is_pips": quality.implementation_shortfall_pips,
+                }
                 db_record = ExecutionQuality(
                     trade_id=quality.trade_id,
                     slippage_pips=quality.slippage_pips,
@@ -584,7 +651,7 @@ class ExecutionAnalyzer:
                     effective_spread_pips=quality.effective_spread_pips,
                     execution_cost_pips=quality.execution_cost_pips,
                     session=quality.session,
-                    markout_data=json.dumps(quality.markout_pnls),
+                    markout_data=json.dumps(markout_payload),
                 )
                 session.add(db_record)
             session.commit()
@@ -634,13 +701,17 @@ class ExecutionAnalyzer:
         """Evaluate opportunity cost of rejected signals."""
         results = []
         with self.Session() as session:
-            blocked_events = session.execute(
-                select(RiskEvent).where(
-                    RiskEvent.created_at >= start_time,
-                    RiskEvent.event_type == "SIGNAL_REJECTED",
-                    RiskEvent.signal_id.isnot(None),
+            blocked_events = (
+                session.execute(
+                    select(RiskEvent).where(
+                        RiskEvent.created_at >= start_time,
+                        RiskEvent.event_type == "SIGNAL_REJECTED",
+                        RiskEvent.signal_id.isnot(None),
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             for event in blocked_events:
                 signal = session.execute(
@@ -703,13 +774,16 @@ class ExecutionAnalyzer:
             mae_price = signal.entry_price - np.min(lows)
             mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
-                if signal.take_profit and h_val >= signal.take_profit:
-                    would_win = True
-                    exit_price = signal.take_profit
-                    break
-                if signal.stop_loss and l_val <= signal.stop_loss:
+                # If both are hit in same candle, be conservative and assume SL hit first
+                hit_tp = signal.take_profit and h_val >= signal.take_profit
+                hit_sl = signal.stop_loss and l_val <= signal.stop_loss
+                if hit_sl:
                     would_win = False
                     exit_price = signal.stop_loss
+                    break
+                if hit_tp:
+                    would_win = True
+                    exit_price = signal.take_profit
                     break
             contract_size = self._get_contract_size(signal.symbol)
             opp_cost = (exit_price - signal.entry_price) * (signal.lot_size or 0.0) * contract_size
@@ -718,13 +792,15 @@ class ExecutionAnalyzer:
             mae_price = np.max(highs) - signal.entry_price
             mfe, mae = mfe_price / pip_size, mae_price / pip_size
             for h_val, l_val in zip(highs, lows, strict=False):
-                if signal.take_profit and l_val <= signal.take_profit:
-                    would_win = True
-                    exit_price = signal.take_profit
-                    break
-                if signal.stop_loss and h_val >= signal.stop_loss:
+                hit_tp = signal.take_profit and l_val <= signal.take_profit
+                hit_sl = signal.stop_loss and h_val >= signal.stop_loss
+                if hit_sl:
                     would_win = False
                     exit_price = signal.stop_loss
+                    break
+                if hit_tp:
+                    would_win = True
+                    exit_price = signal.take_profit
                     break
             contract_size = self._get_contract_size(signal.symbol)
             opp_cost = (signal.entry_price - exit_price) * (signal.lot_size or 0.0) * contract_size
@@ -744,9 +820,13 @@ class ExecutionAnalyzer:
         start_time = datetime.now(UTC) - timedelta(days=days)
         count = 0
         with self.Session() as session:
-            trades = session.execute(
-                select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
-            ).scalars().all()
+            trades = (
+                session.execute(
+                    select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
 
             for trade in trades:
                 existing = session.execute(
@@ -760,9 +840,13 @@ class ExecutionAnalyzer:
         """Aggregate execution quality metrics into a summary report."""
         start_time = datetime.now(UTC) - timedelta(days=days)
         with self.Session() as session:
-            trades = session.execute(
-                select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
-            ).scalars().all()
+            trades = (
+                session.execute(
+                    select(Trade).where(Trade.created_at >= start_time, Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
             qualities = [self.analyze_trade(t.id, persist=persist) for t in trades]
             qualities = [q for q in qualities if q]
             blocked = self.analyze_blocked_signals(start_time, persist=persist)
@@ -794,6 +878,8 @@ class ExecutionAnalyzer:
             avg_edge = np.mean([q.edge_capture for q in qualities])
             avg_timing = np.mean([q.timing_efficiency for q in qualities])
             avg_alpha = np.mean([q.alpha_decay_pips for q in qualities])
+            avg_mfe_trades = np.mean([q.mfe_pips for q in qualities])
+            avg_mae_trades = np.mean([q.mae_pips for q in qualities])
             eff_score = (avg_fill * 0.7) + (max(0.0, 1.0 - (avg_latency / 5000.0)) * 0.3)
 
             return ExecutionSummary(
@@ -805,9 +891,11 @@ class ExecutionAnalyzer:
                 avg_edge_capture=float(avg_edge),
                 avg_timing_efficiency=float(avg_timing),
                 avg_alpha_decay=float(avg_alpha),
+                avg_mfe_trades=float(avg_mfe_trades),
+                avg_mae_trades=float(avg_mae_trades),
+                avg_mfe=float(avg_mfe),
+                avg_mae=float(avg_mae),
                 execution_efficiency_score=float(eff_score),
                 rejected_signal_count=len(blocked),
                 executed_trade_count=len(qualities),
-                avg_mae=float(avg_mae),
-                avg_mfe=float(avg_mfe),
             )
