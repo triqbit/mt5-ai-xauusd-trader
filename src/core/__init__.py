@@ -11,7 +11,6 @@ from src.core.profiler import profile
 
 if TYPE_CHECKING:
     from src.core.feature_engineering import FeatureEngineer
-    from src.core import health
 else:
     # Lazy load to avoid early heavy dependency triggers
     def __getattr__(name):

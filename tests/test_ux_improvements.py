@@ -3,12 +3,11 @@ MT5 AI/ML Trading Bot - UX Improvement Tests
 tests/test_ux_improvements.py
 """
 import os
-import sys
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
 from main import get_parser, main, run_setup_wizard
 from src.core.config import get_config
+
 
 def test_cli_aliases():
     """Verify that short CLI aliases work as expected."""
@@ -109,21 +108,21 @@ def test_main_onboarding_flow():
             with patch("src.core.config.get_config", return_value=mock_cfg):
                 # Mock parse_args to return an object with check=True when called with ["--check"]
                 # and setup=True when called with no args (first pass)
+                import contextlib
+
                 def side_effect(args=None):
                     m = MagicMock()
-                    m.setup = True if args is None else False
+                    m.setup = args is None
                     m.doctor = False
-                    m.check = True if args == ["--check"] else False
+                    m.check = args == ["--check"]
                     m.show_config = False
                     m.version = False
                     return m
 
                 mock_parser.parse_args.side_effect = side_effect
 
-                try:
+                with contextlib.suppress(SystemExit, TypeError, Exception):
                     main()
-                except (SystemExit, TypeError, Exception):
-                    pass
 
                 # Check if parser.parse_args was called with ["--check"]
                 mock_parser.parse_args.assert_any_call(["--check"])
