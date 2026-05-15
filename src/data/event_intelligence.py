@@ -312,7 +312,10 @@ class MetaAPIEventProvider(BaseEventProvider):
     def _guess_category(self, name: str) -> EventCategory:
         """Guesses the event category based on the event name."""
         name_upper = name.upper()
-        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI"]):
+        if any(
+            kw in name_upper
+            for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI", "COST OF LIVING"]
+        ):
             return EventCategory.CPI
         if any(
             kw in name_upper
@@ -324,13 +327,35 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "JOBLESS",
                 "JOBLESS CLAIMS",
                 "ADP",
+                "LABOR MARKET",
+                "EARNINGS",
             ]
         ):
             return EventCategory.NFP
         if (
             any(
                 kw in name_upper
-                for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT", "BEIGE BOOK"]
+                for kw in [
+                    "FOMC",
+                    "FED ",
+                    "FEDERAL RESERVE",
+                    "POWELL",
+                    "DOT PLOT",
+                    "BEIGE BOOK",
+                    "BRAINARD",
+                    "WILLIAMS",
+                    "WALLER",
+                    "BOWMAN",
+                    "JEFFERSON",
+                    "BARR",
+                    "LOGAN",
+                    "COOK",
+                    "KASHKARI",
+                    "BOSTIC",
+                    "BARKIN",
+                    "MESTER",
+                    "DALY",
+                ]
             )
             and "PHILLY FED" not in name_upper
         ):
@@ -347,6 +372,13 @@ class MetaAPIEventProvider(BaseEventProvider):
                     "TARGET",
                     "HIKE",
                     "CUT",
+                    "ECB",
+                    "BOE",
+                    "BOJ",
+                    "SNB",
+                    "LAGARDE",
+                    "BAILEY",
+                    "UEDA",
                 ]
             )
         ) or any(kw in name_upper for kw in ["FUNDS RATE", "MONETARY POLICY"]):
@@ -368,6 +400,17 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "ATTACK",
                 "COUP",
                 "NUCLEAR",
+                "MILITARY",
+                "INVASION",
+                "TRUMP",
+                "BIDEN",
+                "GEOPOLITICAL",
+                "TAIWAN",
+                "UKRAINE",
+                "RUSSIA",
+                "GAZA",
+                "ISRAEL",
+                "IRAN",
             ]
         ):
             return EventCategory.GEOPOLITICAL
@@ -393,6 +436,9 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "OPEC",
                 "PERSONAL INCOME",
                 "SPENDING",
+                "MICHIGAN SENTIMENT",
+                "ECI",
+                "JACKSON HOLE",
             ]
         ):
             return EventCategory.USD_MACRO
@@ -425,7 +471,6 @@ class EventIntelligence:
 
         # Default risk windows (minutes)
         if config and hasattr(config, "macro_pre_event_minutes"):
-            # Map dict[int, int] to dict[EventImpact, int]
             self.pre_event_minutes = {
                 EventImpact(k): v for k, v in config.macro_pre_event_minutes.items()
             }
@@ -447,6 +492,29 @@ class EventIntelligence:
                 EventImpact.MEDIUM: 30,
                 EventImpact.HIGH: 120,
                 EventImpact.CRITICAL: 240,
+            }
+
+        # Category-based overrides
+        if config and hasattr(config, "macro_category_pre_event_minutes"):
+            self.category_pre_minutes = config.macro_category_pre_event_minutes
+        else:
+            self.category_pre_minutes = {
+                "FOMC": 120,
+                "NFP": 120,
+                "RATES": 120,
+                "CPI": 120,
+                "GEOPOLITICAL": 60,
+            }
+
+        if config and hasattr(config, "macro_category_post_event_minutes"):
+            self.category_post_minutes = config.macro_category_post_event_minutes
+        else:
+            self.category_post_minutes = {
+                "FOMC": 180,
+                "NFP": 180,
+                "RATES": 180,
+                "CPI": 180,
+                "GEOPOLITICAL": 1440,
             }
 
     def refresh(self, current_time: datetime | None = None) -> None:
@@ -558,17 +626,16 @@ class EventIntelligence:
             pre_window = self.pre_event_minutes.get(event.impact, 0)
             post_window = self.post_event_minutes.get(event.impact, 0)
 
-            # Explicit category-specific overrides for major market movers
-            major_categories = [
-                EventCategory.FOMC,
-                EventCategory.NFP,
-                EventCategory.RATES,
-                EventCategory.CPI,
-            ]
-            if event.category in major_categories:
-                # Major events require significantly larger windows for institutional safety
-                pre_window = max(pre_window, 120)  # 2h lead time
-                post_window = max(post_window, 180)  # 3h digestion time
+            # Category-specific overrides
+            cat_pre = self.category_pre_minutes.get(event.category.value, 0)
+            cat_post = self.category_post_minutes.get(event.category.value, 0)
+
+            pre_window = max(pre_window, cat_pre)
+            post_window = max(post_window, cat_post)
+
+            # Major categories for specific blocking logic
+            major_categories = ["FOMC", "NFP", "RATES", "CPI"]
+            is_major = event.category.value in major_categories
 
             is_active = False
             is_event_blocking = False
@@ -587,7 +654,7 @@ class EventIntelligence:
                     is_event_blocking = True
                 elif event.impact == EventImpact.HIGH:
                     # Block 60 mins before major events, 30 mins before others
-                    threshold = 60 if event.category in major_categories else 30
+                    threshold = 60 if is_major else 30
                     if (event.timestamp - now) <= timedelta(minutes=threshold):
                         is_event_blocking = True
 
@@ -599,7 +666,7 @@ class EventIntelligence:
                 # Critical events always block during cooldown; HIGH impact majors block for first 60 mins
                 if event.impact == EventImpact.CRITICAL or (
                     event.impact == EventImpact.HIGH
-                    and event.category in major_categories
+                    and is_major
                     and (now - (event.end_timestamp or event.timestamp)) <= timedelta(minutes=60)
                 ):
                     is_event_blocking = True
@@ -615,7 +682,7 @@ class EventIntelligence:
                 event_mult = max(0.0, round(1.0 - event.severity_score, 2))
 
                 # Extra institutional guardrails for major events
-                if event.category in major_categories and event.impact >= EventImpact.HIGH:
+                if is_major and event.impact >= EventImpact.HIGH:
                     # Major high-impact events should never have more than 0.25 multiplier
                     event_mult = min(event_mult, 0.25)
 

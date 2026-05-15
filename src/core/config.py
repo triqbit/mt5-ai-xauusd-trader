@@ -108,6 +108,26 @@ class TradingConfig(BaseSettings):
         default_factory=lambda: {1: 5, 2: 30, 3: 120, 4: 240},
         description="Minutes after an event to maintain risk reduction/blocking, indexed by Impact Level",
     )
+    macro_category_pre_event_minutes: dict[str, int] = Field(
+        default_factory=lambda: {
+            "FOMC": 120,
+            "NFP": 120,
+            "RATES": 120,
+            "CPI": 120,
+            "GEOPOLITICAL": 60,
+        },
+        description="Minutes before specific event categories to begin risk reduction/blocking",
+    )
+    macro_category_post_event_minutes: dict[str, int] = Field(
+        default_factory=lambda: {
+            "FOMC": 180,
+            "NFP": 180,
+            "RATES": 180,
+            "CPI": 180,
+            "GEOPOLITICAL": 1440,
+        },
+        description="Minutes after specific event categories to maintain risk reduction/blocking",
+    )
 
     # Daily Limits (Cascading)
     max_daily_loss: float = Field(
