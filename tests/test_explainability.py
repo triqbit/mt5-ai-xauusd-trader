@@ -128,7 +128,7 @@ def test_signal_explainer_execution_blocked():
         symbol="XAUUSD",
         direction=1,
         confidence=0.8,
-        model_votes={"ppo": 1}, # 1=buy
+        model_votes={"ppo": 1},  # 1=buy
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 2.0, "summary": "Risk OK"},
         regime_info={"name": "Bullish"},
@@ -174,7 +174,7 @@ def test_format_for_terminal_fallback():
         symbol="XAUUSD",
         direction=1,
         confidence=0.9,
-        model_votes={"ppo": 1}, # 1=buy
+        model_votes={"ppo": 1},  # 1=buy
         model_weights={"ppo": 1.0},
         risk_data={"passed": True, "risk_reward": 3.0, "summary": "Ok"},
         regime_info={"name": "Bullish"},
@@ -259,7 +259,10 @@ def test_signal_explainer_feature_contributions():
     assert trend.impact_level == "High"
 
     # Check that high impact feature is in summary (now via Strategic Confluence)
-    assert "Strategic Confluence: High alignment from Trend (+0.80)" in explanation.human_readable_summary
+    assert (
+        "Strategic Confluence: High alignment from Trend (+0.80)"
+        in explanation.human_readable_summary
+    )
 
     # Check machine attribution for features
     assert "feature_impacts" in explanation.machine_attribution
@@ -290,9 +293,9 @@ def test_signal_explainer_feature_clustering():
 
     clusters = [c.cluster_name for c in explanation.feature_contributions]
     assert "Momentum" in clusters  # rsi, macd
-    assert "Trend" in clusters     # slope
-    assert "Volatility" in clusters # atr
-    assert "Other" in clusters      # unknown_feature
+    assert "Trend" in clusters  # slope
+    assert "Volatility" in clusters  # atr
+    assert "Other" in clusters  # unknown_feature
 
     momentum = next(c for c in explanation.feature_contributions if c.cluster_name == "Momentum")
     assert momentum.contribution_score == 0.7  # (0.8 + 0.6) / 2
@@ -392,7 +395,9 @@ def test_signal_explainer_structured_inputs():
     assert "Blocked by ATR_VOLATILITY" in explanation.execution_summary.summary
 
     # Check filter trace mapping
-    atr_filter = next(f for f in explanation.execution_summary.filters if f.filter_name == "atr_volatility")
+    atr_filter = next(
+        f for f in explanation.execution_summary.filters if f.filter_name == "atr_volatility"
+    )
     assert atr_filter.passed is False
     assert atr_filter.value == 3.5
     assert atr_filter.threshold == 3.0
@@ -542,7 +547,10 @@ def test_signal_explainer_summary_regime_favorability():
         risk_data={"passed": True},
         regime_info={"name": "Trending", "is_favorable": True},
     )
-    assert "Market state is considered favorable for this strategy" in exp_favorable.human_readable_summary
+    assert (
+        "Market state is considered favorable for this strategy"
+        in exp_favorable.human_readable_summary
+    )
 
     # Case 2: Unfavorable Regime
     exp_unfavorable = explainer.explain(
@@ -554,16 +562,19 @@ def test_signal_explainer_summary_regime_favorability():
         risk_data={"passed": True},
         regime_info={"name": "Volatile", "is_favorable": False},
     )
-    assert "Market state is UNFAVORABLE/CAUTIONARY for this strategy" in exp_unfavorable.human_readable_summary
+    assert (
+        "Market state is UNFAVORABLE/CAUTIONARY for this strategy"
+        in exp_unfavorable.human_readable_summary
+    )
 
 
 def test_human_readable_summary_confluence():
     """Test that the summary correctly identifies supporting and opposing factors."""
     explainer = SignalExplainer()
     feature_impacts = {
-        "rsi": 0.8,    # Supporting BUY
-        "atr": -0.3,   # Opposing BUY
-        "volume": 0.5, # Supporting BUY
+        "rsi": 0.8,  # Supporting BUY
+        "atr": -0.3,  # Opposing BUY
+        "volume": 0.5,  # Supporting BUY
     }
 
     explanation = explainer.explain(
@@ -694,8 +705,14 @@ def test_strategic_confluence_summary():
         regime_info={"name": "Ranging", "is_favorable": True},
         feature_impacts={"slope": -0.6},
     )
-    assert "Mean-reversion setups are prioritized in ranging regimes" in exp_ranging.human_readable_summary
-    assert "Strategic Confluence: High alignment from Trend (-0.60)" in exp_ranging.human_readable_summary
+    assert (
+        "Mean-reversion setups are prioritized in ranging regimes"
+        in exp_ranging.human_readable_summary
+    )
+    assert (
+        "Strategic Confluence: High alignment from Trend (-0.60)"
+        in exp_ranging.human_readable_summary
+    )
 
 
 def test_signal_explanation_to_report_section():
@@ -721,6 +738,7 @@ def test_signal_explanation_to_report_section():
 
     section = explanation.to_report_section()
     from src.research.reporting import StrategicConfluenceSection
+
     assert isinstance(section, StrategicConfluenceSection)
     assert section.regime_alignment == 0.9
     assert section.session_alignment == 1.0

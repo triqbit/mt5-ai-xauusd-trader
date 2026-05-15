@@ -67,7 +67,10 @@ def test_log_signal_with_explanation(logger):
         assert signal.explanation is not None
         assert "Ensemble generated a BUY signal" in signal.explanation
         # Check for presence of key machine fields in JSON
-        assert "\"direction\":1" in signal.explanation or "\"direction\":\"BUY\"" in signal.explanation.upper()
+        assert (
+            '"direction":1' in signal.explanation
+            or '"direction":"BUY"' in signal.explanation.upper()
+        )
 
 
 def test_log_trade(logger):
