@@ -12,10 +12,12 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from src.models.regime_detector import MarketRegime
 from src.research.benchmarks import (
     BenchmarkEvaluator,
     EMACrossoverStrategy,
     MomentumStrategy,
+    RegimeFilterBaseline,
     RiskFilteredBaseline,
     VolatilityBreakoutStrategy,
 )
@@ -79,15 +81,23 @@ def main():
     )
     df, _ = simulator.generate_scenario(config)
 
+    # Add dummy regime labels to demonstrate RegimeFilterBaseline
+    df["regime"] = MarketRegime.RANGING.value
+    # Use iloc for positional indexing
+    df.iloc[200:400, df.columns.get_loc("regime")] = MarketRegime.TRENDING.value
+    df.iloc[600:800, df.columns.get_loc("regime")] = MarketRegime.TRENDING.value
+
     # 2. Initialize Evaluator
     evaluator = BenchmarkEvaluator(df, initial_balance=10000.0, commission=0.0001)
 
     # 3. Define Strategies
+    ema_base = EMACrossoverStrategy(9, 21)
     strategies = [
-        EMACrossoverStrategy(9, 21),
+        ema_base,
         MomentumStrategy(14, 0.001),
         VolatilityBreakoutStrategy(20, 2.0),
         RiskFilteredBaseline(9, 21, 0.01),
+        RegimeFilterBaseline(ema_base, [MarketRegime.TRENDING.value]),
         MockAdvancedStrategy(),
     ]
 
@@ -174,11 +184,14 @@ def main():
     table_sig.add_column("P-Value")
     table_sig.add_column("Status")
 
-    is_sig = comp.get("Significant", False)
-    status_str = "[bold green]SIGNIFICANT[/]" if is_sig else "[yellow]NOT SIGNIFICANT[/]"
+    t_p = comp.get("P-Value", 1.0)
+    w_p = comp.get("Wilcoxon P-Value", 1.0)
 
-    table_sig.add_row("Paired T-test", f"t={comp.get('T-Statistic', 0):.4f}", f"{comp.get('P-Value', 1.0):.4f}", status_str)
-    table_sig.add_row("Wilcoxon Signed-Rank", "N/A", f"{comp.get('Wilcoxon P-Value', 1.0):.4f}", status_str)
+    t_status = "[bold green]SIGNIFICANT[/]" if t_p < 0.05 else "[yellow]NOT SIGNIFICANT[/]"
+    w_status = "[bold green]SIGNIFICANT[/]" if w_p < 0.05 else "[yellow]NOT SIGNIFICANT[/]"
+
+    table_sig.add_row("Paired T-test", f"t={comp.get('T-Statistic', 0):.4f}", f"{t_p:.4f}", t_status)
+    table_sig.add_row("Wilcoxon Signed-Rank", "N/A", f"{w_p:.4f}", w_status)
 
     console.print(table_sig)
 
