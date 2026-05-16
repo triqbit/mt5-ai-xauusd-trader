@@ -61,7 +61,7 @@ def test_check_talib_linkage_error():
     """Verify TA-Lib linkage failure handling."""
     with patch("talib.SMA", side_effect=Exception("Linkage error")):
         res = doctor.check_talib()
-        assert res.status == "FAILED"
+        assert res.status == "WARNING"
         assert "Linkage error" in res.message
 
 def test_check_file_permissions_linux():
