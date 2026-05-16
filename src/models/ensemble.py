@@ -230,7 +230,21 @@ class EnsembleModel(BaseModel):
 
         # 4. Defensive Safeguards (Risk Control & Drift Monitoring)
 
-        # 4.1 Drift-Aware Confidence Penalty
+        # 4.1 Veto Power
+        # Any model with confidence < 40% forces a skip to prevent execution on weak sub-signals.
+        for name, sig in signals.items():
+            if sig.confidence < 0.40:
+                logger.warning(
+                    "Veto power active | symbol=%s | model=%s | confidence=%.2f < 0.40 | forcing HOLD",
+                    metadata.get("symbol", "unknown"),
+                    name,
+                    sig.confidence,
+                )
+                metadata["veto_active"] = True
+                metadata["veto_model"] = name
+                return Signal(direction=SignalDirection.HOLD, confidence=0.0, metadata=metadata)
+
+        # 4.2 Drift-Aware Confidence Penalty
         # If aggregate drift is rising, we proactively reduce confidence to trigger safer sizing
         # or block trades before hard limits are hit.
         health = self.get_health_metrics()
@@ -254,7 +268,7 @@ class EnsembleModel(BaseModel):
             )
             metadata["drift_penalty"] = drift_penalty
 
-        # 4.2 Entropy Guard (Consistency Check)
+        # 4.3 Entropy Guard (Consistency Check)
         # If sub-models are highly divergent in their confidence, it indicates uncertainty.
         winning_signals = [s for s in signals.values() if s.direction == direction]
         if len(winning_signals) > 1:
