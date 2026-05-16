@@ -12,13 +12,16 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
 
+from src.core.database import get_engine, get_session_factory
 from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
+
+logger = structlog.get_logger(__name__)
 
 
 class SessionAnalysis(BaseModel):
@@ -29,6 +32,7 @@ class SessionAnalysis(BaseModel):
     win_rate: float
     profit_factor: float
     is_overtrading: bool = False
+    z_score: float = 0.0
 
 
 class VolatilityPattern(BaseModel):
@@ -40,6 +44,16 @@ class VolatilityPattern(BaseModel):
     avg_confidence: float
 
 
+class PerformanceDecay(BaseModel):
+    """Metrics for rolling performance decay."""
+
+    window_size: int
+    profit_factor_trend: float
+    is_decaying: bool
+    recent_pf: float
+    baseline_pf: float
+
+
 class DrawdownCluster(BaseModel):
     """A cluster of consecutive losing trades."""
 
@@ -47,6 +61,7 @@ class DrawdownCluster(BaseModel):
     end_time: datetime
     trade_count: int
     total_loss: float
+    max_equity_drop: float = 0.0
 
 
 class ProfitCluster(BaseModel):
@@ -146,6 +161,7 @@ class JournalReport(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     session_analysis: list[SessionAnalysis]
     volatility_patterns: list[VolatilityPattern]
+    performance_decay: PerformanceDecay | None = None
     drawdown_clusters: list[DrawdownCluster]
     profit_clusters: list[ProfitCluster] = Field(default_factory=list)
     profitable_concentrations: list[PatternConcentration]
@@ -190,16 +206,25 @@ class JournalReport(BaseModel):
             risks.append(
                 BehavioralRisk(
                     type="Overtrading",
-                    description=f"High trade frequency detected in sessions: {', '.join(overtrading_sessions)}",
+                    description=f"Statistical overtrading detected in sessions: {', '.join(overtrading_sessions)} (Z-score > 1.5).",
                 )
             )
 
         if len(self.drawdown_clusters) > 0:
             total_loss = sum(c.total_loss for c in self.drawdown_clusters)
+            max_drop = max(c.max_equity_drop for c in self.drawdown_clusters)
             risks.append(
                 BehavioralRisk(
                     type="Loss Clustering",
-                    description=f"Detected {len(self.drawdown_clusters)} significant drawdown clusters with total loss of {total_loss:.2f}",
+                    description=f"Detected {len(self.drawdown_clusters)} drawdown clusters with total loss of {total_loss:.2f} (Max cluster drop: {max_drop:.2f}).",
+                )
+            )
+
+        if self.performance_decay and self.performance_decay.is_decaying:
+            risks.append(
+                BehavioralRisk(
+                    type="Alpha Decay",
+                    description=f"Strategy alpha is decaying: Profit Factor dropped by {abs(self.performance_decay.profit_factor_trend):.1%} over last {self.performance_decay.window_size} trades.",
                 )
             )
 
@@ -383,9 +408,9 @@ class JournalMiner:
     """Enterprise pattern recognition engine for trade journals."""
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
-        self.engine = create_engine(db_url)
+        self.engine = get_engine(db_url)
         Base.metadata.create_all(self.engine)
-        self.Session = sessionmaker(bind=self.engine)
+        self.Session = get_session_factory(self.engine)
         self.sessions = {
             "Sydney": (22, 7),
             "Tokyo": (0, 9),
@@ -405,7 +430,7 @@ class JournalMiner:
         return active
 
     def get_session_stats(self, trades_df: pd.DataFrame) -> list[SessionAnalysis]:
-        """Detect overtrading and performance per session."""
+        """Detect overtrading and performance per session using Z-score statistics."""
         if trades_df.empty:
             return []
 
@@ -414,10 +439,22 @@ class JournalMiner:
         exploded = trades_df.explode("sessions")
 
         results = []
-        avg_trades_per_session = len(trades_df) / 4  # Rough heuristic
+
+        # Calculate session trade counts for Z-score
+        session_counts = []
+        for name in self.sessions:
+            session_counts.append(len(exploded[exploded["sessions"] == name]))
+
+        mean_trades = np.mean(session_counts)
+        std_trades = np.std(session_counts) if len(session_counts) > 1 else 0.0
 
         for name in self.sessions:
             sess_data = exploded[exploded["sessions"] == name]
+            trade_count = len(sess_data)
+
+            # Calculate Z-score for overtrading detection
+            z_score = (trade_count - mean_trades) / std_trades if std_trades > 0 else 0.0
+
             if sess_data.empty:
                 results.append(
                     SessionAnalysis(
@@ -426,11 +463,11 @@ class JournalMiner:
                         win_rate=0.0,
                         profit_factor=0.0,
                         is_overtrading=False,
+                        z_score=z_score,
                     )
                 )
                 continue
 
-            trade_count = len(sess_data)
             wins = sess_data[sess_data["pnl"] > 0]
             losses = sess_data[sess_data["pnl"] < 0]
             win_rate = len(wins) / trade_count if trade_count > 0 else 0.0
@@ -443,13 +480,15 @@ class JournalMiner:
                 else (float("inf") if gross_profit > 0 else 0.0)
             )
 
+            # Institutional standard: Z-score > 1.5 indicates significant overtrading
             results.append(
                 SessionAnalysis(
                     session_name=name,
                     trade_count=trade_count,
                     win_rate=win_rate,
                     profit_factor=profit_factor,
-                    is_overtrading=trade_count > (avg_trades_per_session * 1.5),
+                    is_overtrading=z_score > 1.5,
+                    z_score=z_score,
                 )
             )
 
@@ -603,7 +642,7 @@ class JournalMiner:
         return revenge_trades
 
     def detect_drawdown_clusters(self, trades_df: pd.DataFrame) -> list[DrawdownCluster]:
-        """Detect clusters of 3+ consecutive losing trades."""
+        """Detect clusters of 3+ consecutive losing trades with equity impact analysis."""
         if trades_df.empty:
             return []
 
@@ -619,32 +658,31 @@ class JournalMiner:
         clusters = []
         current_cluster = []
 
+        def build_cluster(cluster_trades: list[dict[str, Any]]) -> DrawdownCluster:
+            pnls = [t["pnl"] for t in cluster_trades]
+            cumulative_pnl = np.cumsum(pnls)
+            max_drop = float(np.min(cumulative_pnl)) if len(cumulative_pnl) > 0 else 0.0
+
+            return DrawdownCluster(
+                start_time=cluster_trades[0]["created_at"],
+                end_time=cluster_trades[-1]["created_at"],
+                trade_count=len(cluster_trades),
+                total_loss=sum(pnls),
+                max_equity_drop=abs(max_drop),
+            )
+
         for trade in trades:
             if trade["pnl"] < 0:
                 current_cluster.append(trade)
             elif len(current_cluster) >= 3:
-                clusters.append(
-                    DrawdownCluster(
-                        start_time=current_cluster[0]["created_at"],
-                        end_time=current_cluster[-1]["created_at"],
-                        trade_count=len(current_cluster),
-                        total_loss=sum(t["pnl"] for t in current_cluster),
-                    )
-                )
+                clusters.append(build_cluster(current_cluster))
                 current_cluster = []
             else:
                 current_cluster = []
 
         # Check last cluster
         if len(current_cluster) >= 3:
-            clusters.append(
-                DrawdownCluster(
-                    start_time=current_cluster[0]["created_at"],
-                    end_time=current_cluster[-1]["created_at"],
-                    trade_count=len(current_cluster),
-                    total_loss=sum(t["pnl"] for t in current_cluster),
-                )
-            )
+            clusters.append(build_cluster(current_cluster))
 
         return clusters
 
@@ -1421,6 +1459,47 @@ class JournalMiner:
                 )
         return results
 
+    def analyze_performance_decay(
+        self, trades_df: pd.DataFrame, window_size: int = 20
+    ) -> PerformanceDecay | None:
+        """
+        Detect rolling performance decay based on profit factor trends.
+
+        Analyzes the last N trades and compares their profit factor to the
+        preceding baseline to detect if the strategy alpha is degrading.
+        """
+        if trades_df.empty or len(trades_df) < window_size * 2:
+            return None
+
+        df = trades_df.sort_values("created_at").copy()
+
+        def calc_pf(data: pd.DataFrame) -> float:
+            wins = data[data["pnl"] > 0]["pnl"].sum()
+            losses = abs(data[data["pnl"] < 0]["pnl"].sum())
+            return wins / losses if losses > 0 else (float("inf") if wins > 0 else 1.0)
+
+        recent_trades = df.tail(window_size)
+        baseline_trades = df.iloc[-(window_size * 2) : -window_size]
+
+        recent_pf = calc_pf(recent_trades)
+        baseline_pf = calc_pf(baseline_trades)
+
+        # Calculate decay trend (percentage change in PF)
+        if baseline_pf == float("inf"):
+            pf_trend = -1.0 if recent_pf < float("inf") else 0.0
+        elif baseline_pf > 0:
+            pf_trend = (recent_pf - baseline_pf) / baseline_pf
+        else:
+            pf_trend = 1.0 if recent_pf > 0 else 0.0
+
+        return PerformanceDecay(
+            window_size=window_size,
+            profit_factor_trend=float(pf_trend),
+            is_decaying=pf_trend < -0.3,  # 30% drop in PF is significant decay
+            recent_pf=float(recent_pf),
+            baseline_pf=float(baseline_pf),
+        )
+
     def run_mining(self, weak_state_window_hours: int = 24) -> JournalReport:
         """Execute full mining suite and return typed report."""
         from src.core.trade_logger import BlockedSignalAnalysis
@@ -1513,6 +1592,7 @@ class JournalMiner:
             return JournalReport(
                 session_analysis=self.get_session_stats(trades_df),
                 volatility_patterns=self.analyze_volatility_patterns(signals_df),
+                performance_decay=self.analyze_performance_decay(trades_df),
                 drawdown_clusters=self.detect_drawdown_clusters(trades_df),
                 profit_clusters=self.detect_profit_clusters(trades_df),
                 profitable_concentrations=self.find_profitable_patterns(trades_df),
