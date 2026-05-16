@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Resilient Bootstrapping:** Enhanced `scripts/bootstrap.sh` to handle TA-Lib installation failures gracefully, allowing setup to complete with functional fallbacks.
+- **Accurate Diagnostics:** Updated `scripts/doctor.py` to report missing TA-Lib as a WARNING instead of a CRITICAL FAILURE, aligning with the bot's built-in fallback capabilities.
 - **Interactive Setup Wizard:** Introduced a guided CLI configuration wizard (`python main.py --setup`) to simplify `.env` initialization and MT5 credential management.
 - **Improved CLI Ergonomics:** Refactored argument parsing into logical groups (Execution, Backtesting, Setup, Logging) and enhanced `--help` readability.
 - **Enhanced Startup Visibility:** Updated the configuration summary panel to include masked MT5 account details and server information for operator verification.
@@ -37,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement Institutional Decision Support System (#1086)
 
 ### Fixed
+- **Dependency Harmonization:** Aligned `python-socketio` version to 5.14.0 across `requirements.txt` and `pyproject.toml` to resolve synchronization mismatches.
 - Resolve undefined name `batch_idx` in LSTMModel training loop.
 - Resolve starlette and fastapi version conflicts in requirements files.
 - Resolve security vulnerabilities in starlette dependency (upgrade to 0.52.1).
