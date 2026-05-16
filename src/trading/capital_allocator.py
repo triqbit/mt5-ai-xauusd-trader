@@ -397,7 +397,9 @@ class CapitalAllocator:
             return max(0.0, min(1.0, 1.0 - normalized_hhi))
 
         # 1. Strategy-level HHI
-        strategy_shares = [amt / total_allocated for amt in self.current_allocations.values() if amt > 0]
+        strategy_shares = [
+            amt / total_allocated for amt in self.current_allocations.values() if amt > 0
+        ]
         strategy_score = _calculate_score(strategy_shares)
 
         # 2. Symbol-level HHI
@@ -459,9 +461,11 @@ class CapitalAllocator:
         # Sort requests by strategy performance multiplier (descending)
         sorted_requests = sorted(
             requests,
-            key=lambda r: self.strategies.get(r.strategy_id).performance_multiplier
-            if r.strategy_id in self.strategies
-            else 0.0,
+            key=lambda r: (
+                self.strategies.get(r.strategy_id).performance_multiplier
+                if r.strategy_id in self.strategies
+                else 0.0
+            ),
             reverse=True,
         )
 
@@ -744,7 +748,9 @@ class CapitalAllocator:
                 code=result.rejection_code,
             )
             if self.monitor and result.rejection_code:
-                self.monitor.record_internal_rejection("capital_allocator", result.rejection_code.value)
+                self.monitor.record_internal_rejection(
+                    "capital_allocator", result.rejection_code.value
+                )
 
         with contextlib.suppress(RuntimeError, ImportError):
             get_audit_logger().log_allocation_decision(

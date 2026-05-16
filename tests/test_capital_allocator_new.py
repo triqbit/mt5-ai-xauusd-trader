@@ -3,11 +3,13 @@ Unit tests for the new features of the CapitalAllocator system.
 """
 
 import pytest
+
 from src.trading.capital_allocator import (
     CapitalAllocator,
-    StrategyConfig,
     RejectionCode,
+    StrategyConfig,
 )
+
 
 @pytest.fixture
 def allocator():
@@ -22,6 +24,7 @@ def allocator():
         soft_limit_buffer=0.0,  # Disable soft buffer for easier hard limit testing
     )
 
+
 def test_strategy_concentration_limit(allocator):
     """Test that the strategy-level concentration limit is enforced."""
     config = StrategyConfig(
@@ -29,7 +32,7 @@ def test_strategy_concentration_limit(allocator):
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=100000.0,
-        max_allocation_pct=0.15, # 15% limit
+        max_allocation_pct=0.15,  # 15% limit
     )
     allocator.add_strategy(config)
 
@@ -43,15 +46,16 @@ def test_strategy_concentration_limit(allocator):
     assert res2.is_allowed is False
     assert res2.rejection_code == RejectionCode.STRATEGY_CONCENTRATION_LIMIT
 
+
 def test_global_strategy_risk_limit(allocator):
     """Test that the global max_strategy_risk limit is enforced."""
-    allocator.max_strategy_risk = 0.1 # 10% global limit
+    allocator.max_strategy_risk = 0.1  # 10% global limit
     config = StrategyConfig(
         strategy_id="s1",
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=100000.0,
-        max_allocation_pct=0.2, # 20% strategy-specific limit
+        max_allocation_pct=0.2,  # 20% strategy-specific limit
     )
     allocator.add_strategy(config)
 
@@ -60,6 +64,7 @@ def test_global_strategy_risk_limit(allocator):
     assert res.is_allowed is False
     assert res.rejection_code == RejectionCode.STRATEGY_CONCENTRATION_LIMIT
 
+
 def test_route_allocation_with_performance_tie_break(allocator):
     """Test that route_allocation breaks ties using performance multiplier."""
     s1 = StrategyConfig(
@@ -67,14 +72,14 @@ def test_route_allocation_with_performance_tie_break(allocator):
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=50000.0,
-        performance_multiplier=1.0
+        performance_multiplier=1.0,
     )
     s2 = StrategyConfig(
         strategy_id="s2",
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=50000.0,
-        performance_multiplier=1.5 # Better multiplier
+        performance_multiplier=1.5,  # Better multiplier
     )
     allocator.add_strategy(s1)
     allocator.add_strategy(s2)
@@ -83,6 +88,7 @@ def test_route_allocation_with_performance_tie_break(allocator):
     # But s2 has a higher multiplier.
     result = allocator.route_allocation("XAUUSD", 0.01)
     assert result.strategy_id == "s2"
+
 
 def test_get_active_allocations(allocator):
     """Test that get_active_allocations returns only strategies with > 0 allocation."""
