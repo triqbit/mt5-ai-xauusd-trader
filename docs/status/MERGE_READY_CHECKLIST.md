@@ -3,26 +3,33 @@
 > [!IMPORTANT]
 > **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules.
 
-Generated on: 2026-05-15 14:10:41 UTC
+Generated on: 2026-05-16 13:10:03 UTC
 
-This checklist identifies the top promising PRs for immediate review, focusing on lower-risk areas and contribution quality.
+This checklist identifies top promising PRs for immediate review.
 
-> [!NOTE]
-> **Triage Alert:** No open PRs currently have a "success" CI status. The candidates below are selected as the lowest-risk "New" entries (post-big-bang), but MUST achieve CI success before consideration for merge.
-
-## 1. PR #1223: Institutional StressLab: Severity-Based Resilience Analysis
-- **Short scope summary**: Enhances the StressLab framework by introducing severity-based tracking for resilience tests. This allows the system to distinguish between minor deviations and critical failures during adversarial simulations.
-- **Domains touched**: research, tests
+## 1. PR #1245: 🛡️ Jules02: Risk control and drift monitoring — Veto power and schema unification
+- **Short scope summary**: Medium Risk update implementing '🛡️ Jules02: Risk control and drift monitoring — Veto power and schema unification'
+- **Domains touched**: AI models, core architecture, core trading, tests
 - **CI status**: pending
-- **Missing items**: documentation for the new severity levels
-- **Recommendation**: Best candidate for review. Provides valuable visibility into system robustness without modifying core trading logic. **Blocking: Needs CI success before merge.**
+- **Missing items**: docs
+- **Qualitative Assessment**: Standardizes risk schemas and introduces veto power, critical for preventing drift-induced rogue trades.
+- **Recommendation**: Needs CI success before merge
 
-## 2. PR #1176: 🚀 Jules05: Release candidate v1.1.0-rc8 composition
-- **Short scope summary**: Release candidate composition for v1.1.0-rc8. (Note: This is technically "Stale" relative to the latest Big-Bang but remains a focused 'Safe Surface' candidate).
-- **Domains touched**: other (release orchestration)
+## 2. PR #1257: Implement Institutional-Grade Capital Allocator
+- **Short scope summary**: High Risk update implementing 'Implement Institutional-Grade Capital Allocator'
+- **Domains touched**: core architecture, core trading, docs, tests
 - **CI status**: pending
-- **Missing items**: sync with the latest Big-Bang baseline
-- **Recommendation**: Safe Surface candidate. Useful for Jules05 to track release composition progress. **Blocking: Needs rebase and CI success.**
+- **Missing items**: None identified
+- **Qualitative Assessment**: Core infrastructure update for position sizing; requires careful validation of capital protection logic and domain expert sign-off.
+- **Recommendation**: High-risk — needs domain expert review
+
+## 3. PR #1256: 📡 Jules02: Observability improvement — Decision funnel and technical metrics
+- **Short scope summary**: High Risk update implementing '📡 Jules02: Observability improvement — Decision funnel and technical metrics'
+- **Domains touched**: core architecture, core trading, other, tests
+- **CI status**: pending
+- **Missing items**: docs
+- **Qualitative Assessment**: Enhances decision funnel visibility, providing better transparency into trade rejections and technical performance.
+- **Recommendation**: High-risk — needs domain expert review
 
 ---
 *Prepared by Jules06 (qufuwan) for Jules05 and human review.*

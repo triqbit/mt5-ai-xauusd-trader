@@ -1,43 +1,55 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-05-15 14:10:41 UTC
+**Date:** 2026-05-16 13:10:03 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (495)
+- High number of open PRs (507)
 
 ---
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Address Turbulence:** High number of open PRs (495)
-2. **Core Progress:** Review Medium Risk PR #1223 (Institutional StressLab: Severity-Based Resilience Analysis)
-3. **Critical Path:** High Risk PR #1227 needs expert review.
+1. **Address Turbulence:** High number of open PRs (507)
+2. **Core Progress:** Review Medium Risk PR #1245 (🛡️ Jules02: Risk control and drift monitoring — Veto power and schema unification)
+3. **Critical Path:** High Risk PR #1257 needs expert review.
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|-----------|------------|-------------|
-| [1227](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1227) | 🗄️ Jules02: Database reliability improvement — operational state reconciliation | xnessom | `jules02-db-reconciliation-6133725546972143180` | pending | High Risk | New |
-| [1223](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1223) | Institutional StressLab: Severity-Based Resilience Analysis | saysgrok | `feat/stress-lab-severity-tracking-15885290868617108463` | pending | Medium Risk | New |
-| [1222](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1222) | Macro Event Intelligence and Risk Integration | saysgrok | `feat/macro-event-intelligence-10701451590615114884` | pending | High Risk | New |
-| [1215](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1215) | 🛡️ Jules02: Risk control and drift monitoring — Regime-adaptive safety hardening | xnessom | `jules02-regime-adaptive-safety-hardening-4357052007584945700` | pending | High Risk | New |
-| [1212](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1212) | 🛠️ Jules02: Resilience improvement — State recovery & DB retries | xnessom | `resilience-recovery-path-7031444098850161571` | pending | High Risk | New |
-| [1210](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1210) | docs: 📘 Jules02: Documentation and schema governance — Unified decision schemas and tracing | xnessom | `jules02-unified-schemas-8823223411712761998` | pending | High Risk | New |
+| [1257](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1257) | Implement Institutional-Grade Capital Allocator | saysgrok | `feat/institutional-capital-allocator-16513485529532250136` | pending | High Risk | New |
+| [1256](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1256) | 📡 Jules02: Observability improvement — Decision funnel and technical metrics | xnessom | `observability-funnel-metrics-16831189211973735111` | pending | High Risk | New |
+| [1248](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1248) | Implement Macro Risk Intelligence System | saysgrok | `feat/macro-risk-intelligence-4109573103476842992` | pending | High Risk | New |
+| [1247](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1247) | 🔁 Jules02: CI quality gate improvement — deterministic quality and security auditing | xnessom | `main-16694512644741550359` | pending | High Risk | New |
+| [1245](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1245) | 🛡️ Jules02: Risk control and drift monitoring — Veto power and schema unification | xnessom | `feat/risk-drift-safeguards-unification-12257166877906468723` | pending | Medium Risk | New |
+| [1244](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1244) | 🔐 Jules02: Security hardening — Prevent secret leakage in log tracebacks | xnessom | `security-hardening-logging-7970842447214562324` | unknown | Triage Required | New |
+| [1242](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1242) | ✨ Jules05: Product coherence improvements | yxynoty | `product-coherence-improvements-10678569114578149311` | unknown | Triage Required | New |
+| [1241](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1241) | Implement Advanced Trade Journal Pattern Mining | saysgrok | `feat/enhanced-journal-mining-4754422993727045392` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1238](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1238) | feat: structured explainability system for trade signal attribution | saysgrok | `feat/structured-explainability-system-15405406642174584056` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1236](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1236) | 🔧 Jules05: Resolve cross-agent conflict — Risk Management & Feature Pipeline Harmonization | yxynoty | `jules05-resolve-cross-agent-conflicts-2026-05-15-4371341847152875680` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1235](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1235) | 💡 Jules02: CLI and operator UX improvement — enhance ergonomics and visibility | xnessom | `jules/ux-improvements-2808478044336810019` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1233](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1233) | 🤖 Jules05: Auto-merge policy update | yxynoty | `auto-merge-policy-update-17280945416221836731` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1227](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1227) | 🗄️ Jules02: Database reliability improvement — operational state reconciliation | xnessom | `jules02-db-reconciliation-6133725546972143180` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1223](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1223) | Institutional StressLab: Severity-Based Resilience Analysis | saysgrok | `feat/stress-lab-severity-tracking-15885290868617108463` | unknown | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1222](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1222) | Macro Event Intelligence and Risk Integration | saysgrok | `feat/macro-event-intelligence-10701451590615114884` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1215](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1215) | 🛡️ Jules02: Risk control and drift monitoring — Regime-adaptive safety hardening | xnessom | `jules02-regime-adaptive-safety-hardening-4357052007584945700` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1212](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1212) | 🛠️ Jules02: Resilience improvement — State recovery & DB retries | xnessom | `resilience-recovery-path-7031444098850161571` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1210](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1210) | docs: 📘 Jules02: Documentation and schema governance — Unified decision schemas and tracing | xnessom | `jules02-unified-schemas-8823223411712761998` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1207](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1207) | Institutional Capital Allocator Implementation | saysgrok | `feat/capital-allocator-institutional-7216075788528344685` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1206](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1206) | 🧹 Jules05: Technical debt cleanup — architectural harmonization | yxynoty | `jules05-tech-debt-cleanup-4428469418656040805` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1205](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1205) | Institutional-Grade Market Regime Detector | saysgrok | `feat/institutional-regime-detector-7169196241149037630` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1199](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1199) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05/auto-merge-policy-update-2532325731224488972` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1195](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1195) | chore(deps)(deps): bump torch from 2.5.1 to 2.7.1+cpu | dependabot[bot] | `dependabot/pip/torch-2.7.1cpu` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1190](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1190) | 📡 Jules02: Observability improvement — trace correlation and unified decisions | xnessom | `jules02-observability-trace-correlation-16190067741735266104` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1189](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1189) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-coherence-improvements-5863018355456663935` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1187](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1187) | 🧹 Jules05: Technical debt cleanup — Risk management and architectural coherence | yxynoty | `tech-debt-cleanup-16405513240068772382` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1183](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1183) | 🛡️ Jules02: Risk control and drift monitoring — Regime-adaptive safety hardening | xnessom | `shield-regime-safety-16723378927150899498` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1181](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1181) | 🛠️ Jules02: Resilience improvement — State recovery and DB hardening | xnessom | `resilience-recovery-hardening-3788446117228887479` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1177](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1177) | Enhance Institutional Benchmarking Framework and Baselines | saysgrok | `feat/benchmarking-framework-refinement-9833468043642086307` | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1176](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1176) | 🚀 Jules05: Release candidate v1.1.0-rc8 composition | yxynoty | `jules-rc-v1-1-0-rc8-composition-8977160276477196424` | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1172](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1172) | 📡 Jules02: Observability improvement — End-to-end traceability and market context metrics | xnessom | `observability-hardening-18050191493835081722` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1171](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1171) | 🔧 Jules05: Resolve cross-agent conflict [Risk and Macro Harmonization] | yxynoty | `jules05-harmonize-risk-macro-analytics-2506304349975459343` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1205](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1205) | Institutional-Grade Market Regime Detector | saysgrok | `feat/institutional-regime-detector-7169196241149037630` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1199](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1199) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05/auto-merge-policy-update-2532325731224488972` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1195](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1195) | chore(deps)(deps): bump torch from 2.5.1 to 2.7.1+cpu | dependabot[bot] | `dependabot/pip/torch-2.7.1cpu` | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1190](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1190) | 📡 Jules02: Observability improvement — trace correlation and unified decisions | xnessom | `jules02-observability-trace-correlation-16190067741735266104` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1189](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1189) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-coherence-improvements-5863018355456663935` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1187](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1187) | 🧹 Jules05: Technical debt cleanup — Risk management and architectural coherence | yxynoty | `tech-debt-cleanup-16405513240068772382` | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1183](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1183) | 🛡️ Jules02: Risk control and drift monitoring — Regime-adaptive safety hardening | xnessom | `shield-regime-safety-16723378927150899498` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1181](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1181) | 🛠️ Jules02: Resilience improvement — State recovery and DB hardening | xnessom | `resilience-recovery-hardening-3788446117228887479` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1177](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1177) | Enhance Institutional Benchmarking Framework and Baselines | saysgrok | `feat/benchmarking-framework-refinement-9833468043642086307` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1176](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1176) | 🚀 Jules05: Release candidate v1.1.0-rc8 composition | yxynoty | `jules-rc-v1-1-0-rc8-composition-8977160276477196424` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1172](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1172) | 📡 Jules02: Observability improvement — End-to-end traceability and market context metrics | xnessom | `observability-hardening-18050191493835081722` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1171](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1171) | 🔧 Jules05: Resolve cross-agent conflict [Risk and Macro Harmonization] | yxynoty | `jules05-harmonize-risk-macro-analytics-2506304349975459343` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1159](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1159) | 🧪 Jules02: Integration test coverage — Enterprise risk cascade and recovery | xnessom | `integration-test-coverage-risk-cascade-6731118668585697452` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1157](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1157) | 🔁 Jules02: CI quality gate improvement — fix format bypass and add consistency checks | xnessom | `jules-ci-quality-fix-2377864910779478693` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1154](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1154) | Implement institutional signal explainability system | saysgrok | `feat-explainability-system-12986319302117331480` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
@@ -516,18 +528,18 @@
 
 ## 🛡️ Risk Classification Summary
 
-- **High Risk (New):** 5 PRs
+- **High Risk (New):** 4 PRs
 - **Medium Risk (New):** 1 PR
 - **Safe Surface (New):** 0 PRs
-- **Triage Required (New):** 0 PRs
-- **Stale (Total):** 489 PRs
+- **Triage Required (New):** 2 PRs
+- **Stale (Total):** 500 PRs
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #1223**: Institutional StressLab: Severity-Based Resilience Analysis (saysgrok) [CI: pending] - *Medium Risk*
-- **PR #1227**: 🗄️ Jules02: Database reliability improvement — operational state reconciliation (xnessom) [CI: pending] - *High Risk*
-- **PR #1222**: Macro Event Intelligence and Risk Integration (saysgrok) [CI: pending] - *High Risk*
-- **PR #1215**: 🛡️ Jules02: Risk control and drift monitoring — Regime-adaptive safety hardening (xnessom) [CI: pending] - *High Risk*
+- **PR #1245**: 🛡️ Jules02: Risk control and drift monitoring — Veto power and schema unification (xnessom) [CI: pending] - *Medium Risk*
+- **PR #1257**: Implement Institutional-Grade Capital Allocator (saysgrok) [CI: pending] - *High Risk*
+- **PR #1256**: 📡 Jules02: Observability improvement — Decision funnel and technical metrics (xnessom) [CI: pending] - *High Risk*
+- **PR #1248**: Implement Macro Risk Intelligence System (saysgrok) [CI: pending] - *High Risk*
 
 ---
 *Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths and heuristics.*
