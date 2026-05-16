@@ -6,35 +6,36 @@ Verification script for the StressLab framework.
 
 import os
 import sys
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.research import (
-    StressLab,
-    EMACrossoverStrategy,
-    StressTestMetrics
-)
+from src.research import EMACrossoverStrategy, StressLab
+
 
 def generate_synthetic_data(n=1000):
     """Generate synthetic XAUUSD data."""
     np.random.seed(42)
     # Trend + Noise
     close = 2300 + np.cumsum(np.random.randn(n) * 2 + 0.1)
-    df = pd.DataFrame({
-        "open": close - np.random.randn(n),
-        "high": close + np.abs(np.random.randn(n) * 2),
-        "low": close - np.abs(np.random.randn(n) * 2),
-        "close": close,
-        "tick_volume": np.random.randint(100, 1000, n),
-        "spread": np.ones(n) * 0.25
-    })
+    df = pd.DataFrame(
+        {
+            "open": close - np.random.randn(n),
+            "high": close + np.abs(np.random.randn(n) * 2),
+            "low": close - np.abs(np.random.randn(n) * 2),
+            "close": close,
+            "tick_volume": np.random.randint(100, 1000, n),
+            "spread": np.ones(n) * 0.25,
+        }
+    )
     df.index = pd.date_range(start="2024-01-01", periods=n, freq="5min")
     return df
+
 
 def main():
     console = Console()
@@ -49,6 +50,7 @@ def main():
     console.print("\n[bold]📈 Calculating Baseline Metrics...[/]")
     # We use a neutral scenario as baseline
     from src.research.stress_lab import StressScenario
+
     baseline_scenario = StressScenario(name="Baseline", description="No stress")
     baseline_metrics = lab.run_scenario(baseline_scenario)
 
@@ -72,7 +74,7 @@ def main():
         f"{baseline_metrics.max_drawdown:.2%}",
         f"{baseline_metrics.sharpe_ratio:.2f}",
         f"{baseline_metrics.recovery_factor:.2f}",
-        "N/A"
+        "N/A",
     )
 
     for name, m in report.scenario_results.items():
@@ -84,7 +86,7 @@ def main():
             f"{m.max_drawdown:.2%}",
             f"{m.sharpe_ratio:.2f}",
             f"{m.recovery_factor:.2f}",
-            f"{m.max_slippage_experienced:.1f} bps"
+            f"{m.max_slippage_experienced:.1f} bps",
         )
 
     console.print(table)
@@ -105,6 +107,7 @@ def main():
     console.print(f"\n[bold]Summary:[/]\n{report.degradation_summary}")
 
     console.print("\n[bold green]✅ StressLab Framework Verification Complete![/]")
+
 
 if __name__ == "__main__":
     main()

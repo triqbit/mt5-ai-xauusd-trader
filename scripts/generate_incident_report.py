@@ -4,14 +4,15 @@ scripts/generate_incident_report.py
 Analyzes the trade and audit databases to provide a summary of recent operational incidents.
 """
 
-import sqlite3
 import os
+import sqlite3
 from datetime import datetime, timedelta, timezone
+
+from dotenv import load_dotenv
 
 # Use timezone.utc for compatibility with Python 3.10
 UTC = timezone.utc
 
-from dotenv import load_dotenv
 
 def get_db_path(env_var, default_filename):
     load_dotenv()
@@ -22,6 +23,7 @@ def get_db_path(env_var, default_filename):
     # we predominantly use SQLite for operational data.
     return default_filename
 
+
 def get_db_connection(path):
     if not os.path.exists(path):
         return None
@@ -30,54 +32,72 @@ def get_db_connection(path):
     except Exception:
         return None
 
+
 def table_exists(conn, table_name):
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
     return cursor.fetchone() is not None
 
+
 def analyze_risk_events(conn):
     if not conn or not table_exists(conn, "risk_events"):
         return []
     cursor = conn.cursor()
-    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         "SELECT event_type, description, symbol, created_at FROM risk_events "
         "WHERE created_at > ? ORDER BY created_at DESC",
-        (yesterday,)
+        (yesterday,),
     )
     return cursor.fetchall()
+
 
 def analyze_audit_logs(conn):
     if not conn or not table_exists(conn, "audit_log"):
         return []
     cursor = conn.cursor()
-    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     actions = (
-        'risk_decision', 'trade_blocked', 'operator_action', 'deployment', 'mt5_connection_status',
-        'circuit_breaker_triggered', 'daily_loss_limit_triggered', 'system_restored', 'config_change',
-        'operator_circuit_breaker_triggered', 'operator_db_repair_attempt', 'operator_db_restoration',
-        'operator_db_incident_resolved', 'operator_rollback_initiated', 'operator_db_migration_downgrade',
-        'operator_rollback_verified', 'operator_secret_rotation_initiated', 'operator_secret_rotation_completed'
+        "risk_decision",
+        "trade_blocked",
+        "operator_action",
+        "deployment",
+        "mt5_connection_status",
+        "circuit_breaker_triggered",
+        "daily_loss_limit_triggered",
+        "system_restored",
+        "config_change",
+        "operator_circuit_breaker_triggered",
+        "operator_db_repair_attempt",
+        "operator_db_restoration",
+        "operator_db_incident_resolved",
+        "operator_rollback_initiated",
+        "operator_db_migration_downgrade",
+        "operator_rollback_verified",
+        "operator_secret_rotation_initiated",
+        "operator_secret_rotation_completed",
     )
-    placeholders = ', '.join(['?'] * len(actions))
+    placeholders = ", ".join(["?"] * len(actions))
     cursor.execute(
         f"SELECT action, details, created_at FROM audit_log "
         f"WHERE action IN ({placeholders}) AND created_at > ? ORDER BY created_at DESC",
-        (*actions, yesterday)
+        (*actions, yesterday),
     )
     return cursor.fetchall()
+
 
 def analyze_recent_trades(conn):
     if not conn or not table_exists(conn, "trades"):
         return []
     cursor = conn.cursor()
-    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute(
         "SELECT ticket, symbol, direction, pnl, status, created_at FROM trades "
         "WHERE created_at > ? ORDER BY created_at DESC",
-        (yesterday,)
+        (yesterday,),
     )
     return cursor.fetchall()
+
 
 def generate_report():
     print("=== MT5 Operational Incident Report (Last 24h) ===")
@@ -107,8 +127,11 @@ def generate_report():
     if not risk_events and not audit_logs and not recent_trades:
         print("\nNo significant operational events detected in the last 24 hours.")
 
-    if trades_conn: trades_conn.close()
-    if audit_conn: audit_conn.close()
+    if trades_conn:
+        trades_conn.close()
+    if audit_conn:
+        audit_conn.close()
+
 
 if __name__ == "__main__":
     generate_report()
