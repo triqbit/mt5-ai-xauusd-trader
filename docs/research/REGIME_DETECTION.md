@@ -20,6 +20,7 @@ The `RegimeDetector` utilizes institutional-grade normalization and a combinatio
 - **Robust Normalization**: All features are normalized using `StandardScaler` from `scikit-learn` before being passed to the GMM. Centroids are inverse-transformed to ensure heuristic mapping logic remains explainable on raw feature scales.
 
 - **ATR Ratio**: Short-term vs. long-term Average True Range to detect volatility expansions or contractions.
+- **Volume Ratio**: Short-term vs. long-term average `tick_volume` to identify high-conviction participation during breakouts and news shocks.
 - **Kaufman Efficiency Ratio (ER)**: Measures the efficiency of price moves (net change / sum of absolute changes).
 - **Slope and Angle**: Linear regression slope of prices, scaled to degrees, to determine trend strength.
 - **Z-Score**: Distance from the rolling mean to identify overextended conditions.
@@ -30,8 +31,8 @@ The `RegimeDetector` utilizes institutional-grade normalization and a combinatio
 
 The system supports two detection modes:
 
-1. **Heuristic Detection**: Uses expert-defined thresholds for rapid, explainable classification.
-2. **Clustering Detection (GMM)**: Utilizes Gaussian Mixture Models to learn market states from historical data autonomously.
+1. **Heuristic Detection**: Uses expert-defined thresholds (including ATR, volume, and efficiency ratios) for rapid, explainable classification.
+2. **Clustering Detection (GMM)**: Utilizes Gaussian Mixture Models to learn market states from historical data autonomously. Supports adaptive selection of the optimal number of clusters based on the **Bayesian Information Criterion (BIC)**.
 
 ### Historical Labeling
 
