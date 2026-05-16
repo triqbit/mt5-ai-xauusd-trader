@@ -170,15 +170,18 @@ class RegimeDetector:
         "skewness",
         "vol_of_vol",
         "vol_clustering",
+        "volume_ratio",
     ]
 
     # Heuristic Thresholds (Institutional Standard)
     THRESH_NEWS_SHOCK_ATR: float = 2.0
     THRESH_NEWS_SHOCK_ER: float = 0.7
-    THRESH_NEWS_SHOCK_VOV: float = 1.2
+    THRESH_NEWS_SHOCK_VOV: float = 0.1
+    THRESH_NEWS_SHOCK_VOL: float = 2.5
 
     THRESH_BREAKOUT_ATR: float = 1.25
     THRESH_BREAKOUT_ER: float = 0.5
+    THRESH_BREAKOUT_VOL: float = 1.5
 
     THRESH_TRENDING_ER: float = 0.4
     THRESH_TRENDING_ANGLE: float = 15.0
@@ -362,6 +365,7 @@ class RegimeDetector:
                 vc=float(last_row["vol_clustering"]),
                 angle=angle,
                 vov=float(last_row["vol_of_vol"]),
+                volume_ratio=float(last_row["volume_ratio"]),
             )
             transition_probabilities = {
                 label.value: confidence,
@@ -398,21 +402,27 @@ class RegimeDetector:
         vc: float,
         angle: float,
         vov: float,
+        volume_ratio: float,
     ) -> tuple[MarketRegime, float, float]:
         """Heuristic logic to classify market regime."""
         label = MarketRegime.RANGING
         confidence = 0.5
 
-        # NEWS_SHOCK: Extreme volatility spike + high efficiency + high vol-of-vol
+        # NEWS_SHOCK: Extreme volatility spike + high efficiency + high vol-of-vol + high volume
         if (
             atr_ratio > self.THRESH_NEWS_SHOCK_ATR
             and er > self.THRESH_NEWS_SHOCK_ER
             and vov > self.THRESH_NEWS_SHOCK_VOV
+            and volume_ratio > self.THRESH_NEWS_SHOCK_VOL
         ):
             label = MarketRegime.NEWS_SHOCK
             confidence = min(atr_ratio / 5.0, 1.0)
-        # VOLATILE_BREAKOUT: High volatility + high efficiency
-        elif atr_ratio > self.THRESH_BREAKOUT_ATR and er > self.THRESH_BREAKOUT_ER:
+        # VOLATILE_BREAKOUT: High volatility + high efficiency + increased volume
+        elif (
+            atr_ratio > self.THRESH_BREAKOUT_ATR
+            and er > self.THRESH_BREAKOUT_ER
+            and volume_ratio > self.THRESH_BREAKOUT_VOL
+        ):
             label = MarketRegime.VOLATILE_BREAKOUT
             confidence = er
         # TRENDING: High efficiency + clear angle
@@ -588,6 +598,7 @@ class RegimeDetector:
             angle = np.degrees(np.arctan(slope * self.ANGLE_SCALE))
             vov = features["vol_of_vol"].values
             vc = features["vol_clustering"].values
+            volume_ratio = features["volume_ratio"].values
 
             regimes = np.array([MarketRegime.RANGING.value] * len(df), dtype=object)
             confidences = 1.0 - er
@@ -597,8 +608,13 @@ class RegimeDetector:
                 (atr_ratio > self.THRESH_NEWS_SHOCK_ATR)
                 & (er > self.THRESH_NEWS_SHOCK_ER)
                 & (vov > self.THRESH_NEWS_SHOCK_VOV)
+                & (volume_ratio > self.THRESH_NEWS_SHOCK_VOL)
             )
-            breakout_mask = (atr_ratio > self.THRESH_BREAKOUT_ATR) & (er > self.THRESH_BREAKOUT_ER)
+            breakout_mask = (
+                (atr_ratio > self.THRESH_BREAKOUT_ATR)
+                & (er > self.THRESH_BREAKOUT_ER)
+                & (volume_ratio > self.THRESH_BREAKOUT_VOL)
+            )
             trending_mask = (er > self.THRESH_TRENDING_ER) & (
                 np.abs(angle) > self.THRESH_TRENDING_ANGLE
             )
@@ -704,17 +720,20 @@ class RegimeDetector:
         vov_window = max(2, self.window // 2)
         rolling_vol = returns.rolling(window=vov_window).std(ddof=0)
 
-        adj_window = self.window - vov_window + 1
-        if adj_window >= 2:
-            vov_std = rolling_vol.rolling(window=adj_window).std(ddof=0)
-            vov_mean = rolling_vol.rolling(window=adj_window).mean()
-            vov = (vov_std / (vov_mean + 1e-9)).fillna(0.0)
-        else:
-            vov = pd.Series(0.0, index=close.index)
+        adj_window = self.window
+        vov_std = rolling_vol.rolling(window=adj_window).std(ddof=0)
+        vov_mean = rolling_vol.rolling(window=adj_window).mean()
+        vov = (vov_std / (vov_mean + 1e-9)).fillna(0.0)
 
         # Volatility Clustering: Correlation of absolute returns with lagged absolute returns
         abs_rets = returns.abs()
         vc = abs_rets.rolling(window=self.window).corr(abs_rets.shift(1)).fillna(0.0)
+
+        # 6. Volume Ratio
+        vol = data["tick_volume"] if "tick_volume" in data.columns else pd.Series(1.0, index=close.index)
+        vol_short = vol.rolling(window=self.window).mean()
+        vol_long = vol.rolling(window=self.long_window).mean()
+        volume_ratio = (vol_short / (vol_long + 1e-9)).fillna(1.0)
 
         features = pd.DataFrame(
             {
@@ -726,12 +745,13 @@ class RegimeDetector:
                 "skewness": skew,
                 "vol_of_vol": vov,
                 "vol_clustering": vc,
+                "volume_ratio": volume_ratio,
             }
         )
 
         return features[self.FEATURE_COLUMNS]
 
-    def fit(self, data: pd.DataFrame, n_clusters: int = 6) -> None:
+    def fit(self, data: pd.DataFrame, n_clusters: int | list[int] | range = 6) -> None:
         """
         Trains GMM on historical data to learn market regimes.
         Automatically maps clusters to labels and calculates a transition matrix.
@@ -739,6 +759,8 @@ class RegimeDetector:
         Args:
             data: Historical OHLCV DataFrame for training.
             n_clusters: Number of clusters for Gaussian Mixture Model (default 6).
+                        If a list or range is provided, the optimal number of clusters
+                        is selected based on the Bayesian Information Criterion (BIC).
         """
         features = self._extract_features(data)
         if features.empty or len(features) < self.long_window * 2:
@@ -750,10 +772,35 @@ class RegimeDetector:
         X = np.nan_to_num(X, nan=0.0)
         X_scaled = self._scaler.fit_transform(X)
 
-        self._gmm = GaussianMixture(
-            n_components=n_clusters, covariance_type="full", random_state=42, n_init=5
-        )
-        self._gmm.fit(X_scaled)
+        best_gmm = None
+        best_bic = np.inf
+
+        cluster_candidates: list[int] | range
+        if isinstance(n_clusters, int):
+            cluster_candidates = [n_clusters]
+        else:
+            cluster_candidates = n_clusters
+
+        for n in cluster_candidates:
+            try:
+                gmm = GaussianMixture(
+                    n_components=n, covariance_type="full", random_state=42, n_init=5
+                )
+                gmm.fit(X_scaled)
+                bic = gmm.bic(X_scaled)
+                if bic < best_bic:
+                    best_bic = bic
+                    best_gmm = gmm
+            except Exception as e:
+                logger.error("gmm_fit_error", n_components=n, error=str(e))
+                continue
+
+        if best_gmm is None:
+            logger.error("gmm_fit_failed_all_candidates")
+            return
+
+        self._gmm = best_gmm
+        n_selected = int(self._gmm.n_components)
 
         # Automated cluster-to-regime mapping based on centroids
         self._map_clusters(self._gmm.means_)
@@ -761,7 +808,7 @@ class RegimeDetector:
         # Calculate transition matrix from training data
         self._calculate_transition_matrix(features.iloc[self.long_window :])
 
-        logger.info("gmm_fit_complete", n_clusters=n_clusters)
+        logger.info("gmm_fit_complete", n_clusters=n_selected, bic=best_bic)
 
     def save_model(self, filepath: str) -> None:
         """
@@ -870,6 +917,7 @@ class RegimeDetector:
             slope = center[feat_map["slope"]]
             z_score = center[feat_map["z_score"]]
             vov = center[feat_map["vol_of_vol"]]
+            volume_ratio = center[feat_map["volume_ratio"]]
 
             angle = self._calculate_angle(slope)
 
@@ -878,9 +926,14 @@ class RegimeDetector:
                 atr_ratio > self.THRESH_NEWS_SHOCK_ATR
                 and er > self.THRESH_NEWS_SHOCK_ER
                 and vov > self.THRESH_NEWS_SHOCK_VOV
+                and volume_ratio > self.THRESH_NEWS_SHOCK_VOL
             ):
                 self._cluster_to_regime[i] = MarketRegime.NEWS_SHOCK
-            elif atr_ratio > self.THRESH_BREAKOUT_ATR and er > self.THRESH_BREAKOUT_ER:
+            elif (
+                atr_ratio > self.THRESH_BREAKOUT_ATR
+                and er > self.THRESH_BREAKOUT_ER
+                and volume_ratio > self.THRESH_BREAKOUT_VOL
+            ):
                 self._cluster_to_regime[i] = MarketRegime.VOLATILE_BREAKOUT
             elif er > self.THRESH_TRENDING_ER and abs(angle) > self.THRESH_TRENDING_ANGLE:
                 self._cluster_to_regime[i] = MarketRegime.TRENDING
