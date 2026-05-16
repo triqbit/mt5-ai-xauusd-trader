@@ -31,8 +31,31 @@ $PIP install --upgrade pip
 
 if [ -f "requirements.txt" ]; then
     echo "Installing from requirements.txt..."
-    # On Linux/macOS, MetaTrader5 and other win32-marked packages will be skipped automatically by pip
-    $PIP install -r requirements.txt
+    # Attempt standard installation
+    if ! $PIP install -r requirements.txt; then
+        echo ""
+        echo "----------------------------------------------------------"
+        echo "WARNING: Standard installation failed (likely TA-Lib)."
+        echo "Attempting resilient installation (ignoring TA-Lib)..."
+        echo "----------------------------------------------------------"
+
+        # Create a temporary requirements file without TA-Lib
+        grep -iv "TA-Lib" requirements.txt > requirements-temp.txt
+        $PIP install -r requirements-temp.txt
+        rm requirements-temp.txt
+
+        echo ""
+        echo "Attempting to install TA-Lib separately..."
+        if ! $PIP install TA-Lib; then
+            echo ""
+            echo "NOTICE: TA-Lib C-library not found on system."
+            echo "The bot will use internal fallbacks for technical indicators."
+            echo "To enable full TA-Lib support, please install the C-library:"
+            echo "  - Linux: sudo apt-get install libta-lib0"
+            echo "  - macOS: brew install ta-lib"
+            echo "----------------------------------------------------------"
+        fi
+    fi
 else
     echo "requirements.txt not found, skipping installation."
 fi

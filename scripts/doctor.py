@@ -84,7 +84,6 @@ CORE_DEPENDENCIES = {
     "metaapi-cloud-sdk": ("metaapi_cloud_sdk", "29.1.1"),
     "torch": ("torch", "2.5.1"),
     "fastapi": ("fastapi", "0.136.1"),
-    "talib": ("talib", "0.6.4"),
     "structlog": ("structlog", "25.5.0"),
     "rich": ("rich", "13.9.4"),
     "python-dotenv": ("dotenv", "1.2.2"),
@@ -257,16 +256,16 @@ def check_talib():
     except ImportError:
         return DiagnosticCheck(
             "TA-Lib Library",
-            "FAILED",
+            "WARNING",
             "Python wrapper not installed",
-            "Run 'pip install TA-Lib'"
+            "The bot will use internal fallbacks. Run 'pip install TA-Lib' for full performance."
         )
     except Exception as e:
         return DiagnosticCheck(
             "TA-Lib Library",
-            "FAILED",
+            "WARNING",
             f"Linkage error: {e}",
-            "Ensure TA-Lib C-library is installed on your system (e.g., brew install ta-lib or apt-get install libta-lib0)."
+            "The bot will use internal fallbacks. Ensure TA-Lib C-library is installed for full performance (e.g., brew install ta-lib)."
         )
 
 def check_hardware_acceleration():
