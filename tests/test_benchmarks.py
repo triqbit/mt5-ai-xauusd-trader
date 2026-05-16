@@ -12,8 +12,10 @@ import pytest
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
 from src.research.benchmarks import (
+    ADXStrategy,
     BenchmarkEvaluator,
     BuyAndHoldStrategy,
+    DonchianChannelStrategy,
     DreamerAdapter,
     EMACrossoverStrategy,
     EnsembleAdapter,
@@ -122,6 +124,20 @@ def test_mean_reversion_signals(sample_data):
 
 def test_macd_signals(sample_data):
     strategy = MACDStrategy(5, 10, 3)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+
+
+def test_donchian_signals(sample_data):
+    strategy = DonchianChannelStrategy(window=10)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+
+
+def test_adx_signals(sample_data):
+    strategy = ADXStrategy(window=10)
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
