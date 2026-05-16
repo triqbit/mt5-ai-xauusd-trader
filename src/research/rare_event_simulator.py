@@ -210,8 +210,10 @@ class RareEventSimulator:
         # Spread increases exponentially with local volatility to reflect liquidity drying up
         # Normal vol ~0.0005 -> exp(0.0005 * 500) ~ 1.28
         # High vol ~0.01 -> exp(0.01 * 500) ~ 148 (massive spread widening)
-        vol_spread_impact = np.exp(vols * 500) - 1.0
-        spreads = base_spread + (self.rng.exponential(vols * 50, n) + vol_spread_impact).astype(np.float32)
+        vol_spread_impact = np.exp(np.clip(vols * 500, 0, 10)) - 1.0
+        spreads = base_spread + (self.rng.exponential(vols * 50, n) + vol_spread_impact).astype(
+            np.float32
+        )
 
         # Volume correlates with absolute returns and volatility
         vol_factor = 1.0 + (np.abs(returns) / (vols + 1e-9)) * 0.5
@@ -409,7 +411,9 @@ class RareEventSimulator:
             idx = start_idx + i
             if idx < n:
                 # Very consistent small returns
-                returns[idx] = (total_trend / trend_len) + self.rng.normal(0, config.base_volatility * 0.2)
+                returns[idx] = (total_trend / trend_len) + self.rng.normal(
+                    0, config.base_volatility * 0.2
+                )
                 # Volatility remains very low, often below base
                 vols[idx] = config.base_volatility * 0.7
 
@@ -537,7 +541,9 @@ class RareEventSimulator:
 
         # Generate jump occurrences using a Poisson process approximation
         num_jumps = self.rng.poisson(jump_intensity * n)
-        jump_indices = self.rng.choice(range(n // 4, 3 * n // 4), size=min(num_jumps, n // 2), replace=False)
+        jump_indices = self.rng.choice(
+            range(n // 4, 3 * n // 4), size=min(num_jumps, n // 2), replace=False
+        )
 
         max_gap_pct = 0.0
         primary_gap_idx = n // 2
@@ -864,7 +870,9 @@ class RareEventSimulator:
             insight_msg += "All events remained within manageable risk bounds. "
 
         if long_recoveries:
-            insight_msg += f"Detected {len(long_recoveries)} events with extended recovery periods (>50 bars)."
+            insight_msg += (
+                f"Detected {len(long_recoveries)} events with extended recovery periods (>50 bars)."
+            )
 
         return RareEventSection(scenarios=summaries, insights=insight_msg)
 
@@ -1160,7 +1168,9 @@ class RareEventSimulator:
             idx = squeeze_idx + i
             if idx < n:
                 # Accelerating return: (i+1)^2 / sum(1..len^2)
-                accel_factor = (i + 1) ** 2 / ((squeeze_len * (squeeze_len + 1) * (2 * squeeze_len + 1)) / 6)
+                accel_factor = (i + 1) ** 2 / (
+                    (squeeze_len * (squeeze_len + 1) * (2 * squeeze_len + 1)) / 6
+                )
                 returns[idx] = total_move * accel_factor + self.rng.uniform(0, 0.001)
                 vols[idx] *= 10.0 * config.event_magnitude
 
@@ -1183,7 +1193,9 @@ class RareEventSimulator:
         )
 
         event_prices = df["close"].iloc[squeeze_idx : squeeze_idx + squeeze_len + reversal_len]
-        start_price_val = df["close"].iloc[squeeze_idx - 1] if squeeze_idx > 0 else df["close"].iloc[0]
+        start_price_val = (
+            df["close"].iloc[squeeze_idx - 1] if squeeze_idx > 0 else df["close"].iloc[0]
+        )
         deviations = (event_prices / start_price_val - 1).values
         # For a squeeze, we are interested in the peak price reached
         peak_impact = float(np.max(deviations))
