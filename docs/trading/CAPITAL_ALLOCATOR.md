@@ -16,14 +16,16 @@ The `CapitalAllocator` system (src/trading/capital_allocator.py) provides instit
 ### Strategy Configuration
 Each strategy or model family is registered with a `StrategyConfig` that defines:
 - `capital_cap`: Maximum absolute capital allowed.
+- `max_allocation_pct`: Maximum fraction of total budget this strategy can use (default: 0.2).
 - `performance_multiplier`: Dynamic scaling factor based on historical performance.
 - `max_consecutive_losses`: Threshold for the automated cooling-off mechanism.
 
 ### Allocation Workflow
 1. **Performance Scaling:** Requested risk is first scaled by the strategy's current performance multiplier.
 2. **Cap Enforcement:** The scaled amount is capped at the strategy's `capital_cap`.
-3. **Diversification Guard:** If approaching total heat, symbol, or family limits, the allocation is linearly scaled down within a configurable `soft_limit_buffer`.
-4. **Hard Limit Verification:** A final check ensures no absolute safety limits are violated.
+3. **Strategy-Level Limit:** The allocation is checked against the strategy-specific `max_allocation_pct` and the global `allocator_max_strategy_risk`.
+4. **Diversification Guard:** If approaching total heat, symbol, family, or strategy limits, the allocation is linearly scaled down within a configurable `soft_limit_buffer`.
+5. **Hard Limit Verification:** A final check ensures no absolute safety limits (total heat, symbol, family, or strategy concentration) are violated.
 
 ### Diversification Scoring
 The system calculates a diversification score (0.0 to 1.0) based on strategy concentration:
@@ -48,10 +50,30 @@ allocator.add_strategy(config)
 
 ### Requesting Allocation
 ```python
+# Standard request
 result = allocator.request_allocation("gold_rl_v1", risk_pct=0.01)
+
+# Request with scaling (returns max possible if limit hit)
+result = allocator.request_allocation("gold_rl_v1", risk_pct=0.05, allow_scaling=True)
+
 if result.is_allowed:
     # Proceed with order execution using result.allocated_amount
     allocator.update_allocation("gold_rl_v1", result.allocated_amount)
+```
+
+### Optimal Routing
+The `route_allocation` method selects the best strategy for a given symbol by evaluating the diversification impact (HHI) of each candidate. If multiple strategies result in the same diversification score, it uses the `performance_multiplier` as a tie-breaker.
+
+```python
+result = allocator.route_allocation("XAUUSD", risk_pct=0.01)
+```
+
+### Monitoring Allocations
+Use `get_active_allocations()` to retrieve a map of currently utilized capital.
+
+```python
+active = allocator.get_active_allocations()
+# {'gold_rl_v1': 1250.0, 'eur_lstm_v2': 800.0}
 ```
 
 ### Updating Performance
