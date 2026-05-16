@@ -6,19 +6,27 @@ on:
     branches: [main]
   pull_request_review:
     types: [submitted]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
   checks: read
   statuses: read
+  actions: read
 
 jobs:
   enforce-policy:
     name: Enforce Auto-Merge Policy
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    if: |
+      github.event_name == 'pull_request' ||
+      github.event_name == 'pull_request_review' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     outputs:
+      pr_number: ${{ steps.pr-number.outputs.pr_number }}
       risk_status: ${{ steps.risk-check.outputs.risk_status }}
       violated_category: ${{ steps.risk-check.outputs.violated_category }}
       has_tests: ${{ steps.compliance-check.outputs.has_tests }}
@@ -26,20 +34,35 @@ jobs:
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
       coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
       observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
+      approvals_pass: ${{ steps.approval-check.outputs.approvals_pass }}
+      mergeable_pass: ${{ steps.mergeable-check.outputs.mergeable_pass }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get PR Number
+        id: pr-number
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            PR_NUMBER=$(gh pr list --head ${{ github.event.workflow_run.head_branch }} --json number -q '.[0].number')
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v47
+        with:
+          pull_request_number: ${{ steps.pr-number.outputs.pr_number }}
 
       - name: Check for High-Risk Files
         id: risk-check
         run: |
           # Patterns that strictly block and escalate as per Jules05 mandate
+
           # Category: Live Trading Execution Logic
           EXECUTION_PATTERNS=(
             "src/trading/executor.py"
@@ -145,20 +168,48 @@ jobs:
         id: coverage-check
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Verify coverage threshold (assuming 80% is enforced in ci.yml and reported back)
+          # In a real environment, we would fetch the coverage report from the CI job
+          # or use a tool like Codecov. For now, we assume the 80% threshold is
+          # enforced by ci.yml (pytest --cov-fail-under=80).
           echo "coverage_pass=true" >> $GITHUB_OUTPUT
+
+      - name: Check Approvals
+        id: approval-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr-number.outputs.pr_number }}
+        run: |
+          APPROVALS=$(gh pr view $PR_NUMBER --json reviews -q '.reviews | map(select(.state == "APPROVED")) | length')
+          if [ "$APPROVALS" -gt 0 ]; then
+            echo "approvals_pass=true" >> $GITHUB_OUTPUT
+          else
+            echo "approvals_pass=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check Mergeability (No Conflicts)
+        id: mergeable-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr-number.outputs.pr_number }}
+        run: |
+          MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable -q '.mergeable')
+          if [ "$MERGEABLE" == "MERGEABLE" ]; then
+            echo "mergeable_pass=true" >> $GITHUB_OUTPUT
+          else
+            echo "mergeable_pass=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Handle Violations
         if: |
           steps.risk-check.outputs.risk_status == 'blocked' ||
           (steps.compliance-check.outputs.source_modified == 'true' &&
            (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
-          steps.observability-check.outputs.observability_pass == 'false'
+          steps.observability-check.outputs.observability_pass == 'false' ||
+          steps.mergeable-check.outputs.mergeable_pass == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr-number.outputs.pr_number }}
         run: |
           REASON="The following auto-merge criteria were not met:"
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
@@ -177,6 +228,9 @@ jobs:
               REASON="$REASON\n- ❌ **Source code modified but no documentation updated.**"
             fi
           fi
+          if [ "${{ steps.mergeable-check.outputs.mergeable_pass }}" = "false" ]; then
+            REASON="$REASON\n- ❌ **Merge conflicts detected.** Please rebase or merge main."
+          fi
 
           gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, secrets, or infrastructure are automatically escalated."
           gh pr merge $PR_NUMBER --disable-auto || true
@@ -186,12 +240,20 @@ jobs:
     name: Enable Auto-Merge
     needs: enforce-policy
     runs-on: ubuntu-latest
-    if: success()
+    if: |
+      needs.enforce-policy.result == 'success' &&
+      needs.enforce-policy.outputs.approvals_pass == 'true'
     steps:
       - uses: actions/checkout@v5
       - name: Enable Auto-Merge
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ needs.enforce-policy.outputs.pr_number }}
         run: |
-          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled."
+          # Verify all CI checks are passing before enabling
+          CHECKS_FAILING=$(gh pr checks $PR_NUMBER --json state,name -q '.[] | select(.state != "SUCCESS" and .name != "Enforce Auto-Merge Policy") | .name')
+          if [ -z "$CHECKS_FAILING" ]; then
+            gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled."
+          else
+            echo "⏳ Waiting for other CI checks to pass: $CHECKS_FAILING"
+          fi
