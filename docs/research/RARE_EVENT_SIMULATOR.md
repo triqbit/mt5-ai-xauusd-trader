@@ -8,7 +8,8 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 
 ## Key Features
 
-- **Plausible Scenarios**: Generates flash crashes, liquidity vacuums, gold gaps, and more.
+- **Plausible Scenarios**: Generates flash crashes, liquidity vacuums, gold gaps, and more using scientifically grounded models (Merton Jump-Diffusion, GARCH).
+- **Scenario Chaining**: Supports linking multiple rare events into a single, continuous OHLCV price path with guaranteed price and date continuity.
 - **Pipeline Compatible**: Produces DataFrames with standardized lowercase columns (`open`, `high`, `low`, `close`, `tick_volume`, `real_volume`, `spread`). Uses strict `float32` for prices and `int64` for volumes to match `FeatureEngineer` expectations.
 - **Numerical Stability**: Implements explicit casting for all DataFrame modifications to avoid pandas `FutureWarning` issues and ensure numerical consistency during high-fidelity simulations.
 - **Configurable**: Supports adjusting magnitude, duration, recovery factor, and frequency (bars per day).
@@ -48,6 +49,7 @@ The `RareEventConfig` model includes the following parameters:
 
 ## Usage Example
 
+### Single Scenario
 ```python
 from src.research.rare_event_simulator import RareEventSimulator, RareEventConfig, RareEventType
 
@@ -63,6 +65,18 @@ df, result = simulator.generate_scenario(config)
 print(df.head())
 print(f"Peak Impact: {result.peak_impact_pct:.2%}")
 print(f"Description: {result.description}")
+```
+
+### Chained Scenarios
+```python
+configs = [
+    RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=200),
+    RareEventConfig(event_type=RareEventType.GOLD_GAP, n_steps=100),
+    RareEventConfig(event_type=RareEventType.NEWS_SHOCK, n_steps=200),
+]
+
+# Generates a continuous 500-bar DataFrame containing all three events
+combined_df, results = simulator.chain_scenarios(configs)
 ```
 
 ## Suite Generation and Reporting
