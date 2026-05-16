@@ -1,13 +1,13 @@
-# 🎯 Jules05: Deterministic Merge Queue [2026-05-15]
+# 🎯 Jules05: Deterministic Merge Queue [2026-05-16]
 
 This document serves as the authoritative source of truth for the integration state and merge priorities of the repository, managed by Jules05.
 
 ## 📊 Summary State
 - **Merge-Ready**: 1
-- **Fix-Required**: 15+ (Divergent branches)
+- **Fix-Required**: 20+ (Divergent branches/roots)
 - **Blocked**: 0
-- **Risky (Escalated)**: 12
-- **Superseded/Stale**: 495+
+- **Risky (Escalated)**: 18
+- **Superseded/Stale**: 500+
 
 ---
 
@@ -16,26 +16,24 @@ This document serves as the authoritative source of truth for the integration st
 | Order | PR # | Branch | Classification | Rationale | Next Action |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 1 | #1187 | `tech-debt-cleanup-16405513240068772382` | merge-ready | **BASE:** Big Bang Harmonization. Resolves architectural drift and implements 8-layer safety cascade. Must merge before any other PRs. | Merge to main. |
-| 2 | #1112 | `observability-resilience-metrics-6812208704950725445` | fix-required | **SAFE SURFACE:** High diagnostic value but stale (Pre-Big-Bang). | Rebase on tech-debt-cleanup. |
-| 3 | #1136 | `jules05-product-coherence-improvements-6139647032211712134` | fix-required | **COHERENCE:** Systematic cleanup but stale (Pre-Big-Bang). | Rebase on tech-debt-cleanup. |
-| 4 | #1210 | `jules02-unified-schemas-8823223411712761998` | fix-required | **GOVERNANCE:** Unified decision schemas. Stale (Pre-Big-Bang). | Rebase on tech-debt-cleanup. |
+| 2 | #1245 | `feat/risk-drift-safeguards-unification-12257166877906468723` | fix-required | **RISK:** Veto power and schema unification. High value but divergent root history. | Rebase on #1187. |
+| 3 | #1257 | `feat/institutional-capital-allocator-16513485529532250136` | fix-required | **STRATEGY:** Institutional Capital Allocator. Divergent root history. | Rebase on #1187. |
+| 4 | #1248 | `feat/macro-risk-intelligence-4109573103476842992` | fix-required | **INTELLIGENCE:** Macro Risk System. Divergent root history. | Rebase on #1187. |
+| 5 | #1256 | `observability-funnel-metrics-16831189211973735111` | fix-required | **OBSERVABILITY:** Decision funnel metrics. Divergent root history. | Rebase on #1187. |
 
 ---
 
 ## 🛠️ Fix Required (Architectural Divergence)
 
-The following PRs are currently classified as Fix Required because they are stale relative to the Big Bang commit (`e23adfa`). Merging them as-is would destroy the harmonized architecture.
+The following PRs are currently classified as Fix Required because they are disconnected roots or stale relative to the Big Bang commit (`e23adfa`). Merging them as-is would destroy the harmonized architecture or cause severe conflicts.
 
 | PR # | Branch | Reason | Next Action |
 | :--- | :--- | :--- | :--- |
-| #1227 | `jules02-db-reconciliation-6133725546972143180` | **STALE:** New work but lacks Big Bang base. | Jules02 to rebase. |
-| #1223 | `feat/stress-lab-severity-tracking-15885290868617108463` | **STALE:** New work but lacks Big Bang base. | Jules04 to rebase. |
-| #1222 | `feat/macro-event-intelligence-10701451590615114884` | **STALE:** New work but lacks Big Bang base. | Jules04 to rebase. |
-| #1215 | `jules02-regime-adaptive-safety-hardening-4357052007584945700` | **STALE:** New work but lacks Big Bang base. | Jules02 to rebase. |
-| #1212 | `resilience-recovery-path-7031444098850161571` | **STALE:** New work but lacks Big Bang base. | Jules02 to rebase. |
-| #1207 | `feat/capital-allocator-institutional-7216075788528344685` | **STALE:** Pre-Big-Bang. | Jules04 to rebase. |
-| #1159 | `integration-test-coverage-risk-cascade-6731118668585697452` | **STALE:** Pre-Big-Bang. | Jules02 to rebase. |
-| #1157 | `jules-ci-quality-fix-2377864910779478693` | **STALE:** Pre-Big-Bang. | Jules02 to rebase. |
+| #1247 | `main-16694512644741550359` | **CI:** Quality gate improvements. Divergent root. | Jules02 to rebase. |
+| #1244 | `security-hardening-logging-7970842447214562324` | **SECURITY:** Log hardening. Divergent root. | Jules02 to rebase. |
+| #1242 | `product-coherence-improvements-10678569114578149311` | **COHERENCE:** Systematic cleanup. Divergent root. | Jules05 to rebase. |
+| #1227 | `jules02-db-reconciliation-6133725546972143180` | **STALE:** Missing Big Bang base. | Jules02 to rebase. |
+| #1223 | `feat/stress-lab-severity-tracking-15885290868617108463` | **STALE:** Missing Big Bang base. | Jules04 to rebase. |
 
 ---
 
@@ -45,25 +43,25 @@ The following changes touch high-risk areas and require manual review per the Ju
 
 | PR # | Branch | Reason for Escalation | Impact Area |
 | :--- | :--- | :--- | :--- |
-| #1227 | `jules02-db-reconciliation-...` | **DB:** Touches `migrations/`. | Database |
-| #1215 | `jules02-regime-adaptive-...` | **RISK:** Touches `RiskManager`. | Risk Management |
-| #1207 | `feat/capital-allocator-...` | **RISK:** Touches `capital_allocator.py`. | Risk Management |
-| #1212 | `resilience-recovery-path-...` | **DB/CORE:** Touches DB retries and state recovery. | Core/Resilience |
-| #1222 | `feat/macro-event-intelligence-...` | **TRADING:** Touches signal filtering and intelligence. | Trading Logic |
+| #1257 | `feat/institutional-capital-allocator-...` | **RISK:** Major overhaul of capital management. | Capital Allocation |
+| #1245 | `feat/risk-drift-safeguards-unification-...` | **RISK:** Changes to `RiskManager` and veto power. | Risk Management |
+| #1248 | `feat/macro-risk-intelligence-...` | **TRADING:** New signal filtering logic. | Trading Logic |
+| #1247 | `main-16694512644741550359` | **CI:** Touches all workflow files. | CI/CD |
+| #1244 | `security-hardening-logging-...` | **SECURITY:** Changes to logging and dependencies. | Security |
 
 ---
 
 ## 📅 Stale / Superseded / Low-Priority
 
-- **Action Required:** Bulk close 495 stale PRs/branches dated before 2026-05-14.
+- **Action Required:** Bulk close 500+ stale PRs/branches dated before 2026-05-16 that are not active or rebased.
 - **Superseded:** All PRs pre-dating the Big Bang (2026-05-14) that have not been rebased.
 
 ---
 
 ## 🚨 Critical Process Alert
 **Integration Status:** Transitioning to Release Candidate v1.1.0-rc10.
-**Warning:** Severe divergence detected. `main` must be aligned with the Big Bang commit (`e23adfa`) immediately.
-**Requirement:** All agents must rebase active work on the harmonized base after #1187 is merged.
+**Warning:** Severe divergence detected. The repository has multiple disconnected roots.
+**Requirement:** All agents MUST rebase active work on the harmonized base (#1187 / `e23adfa`) immediately. Do not create new root commits.
 
 ---
-*Last Updated: 2026-05-15 by Jules05*
+*Last Updated: 2026-05-16 by Jules05*
