@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-05-16 13:10:03 UTC
+**Date:** 2026-05-16 14:09:45 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -31,11 +31,11 @@
 | [1235](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1235) | 💡 Jules02: CLI and operator UX improvement — enhance ergonomics and visibility | xnessom | `jules/ux-improvements-2808478044336810019` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1233](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1233) | 🤖 Jules05: Auto-merge policy update | yxynoty | `auto-merge-policy-update-17280945416221836731` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1227](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1227) | 🗄️ Jules02: Database reliability improvement — operational state reconciliation | xnessom | `jules02-db-reconciliation-6133725546972143180` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
-| [1223](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1223) | Institutional StressLab: Severity-Based Resilience Analysis | saysgrok | `feat/stress-lab-severity-tracking-15885290868617108463` | unknown | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1222](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1222) | Macro Event Intelligence and Risk Integration | saysgrok | `feat/macro-event-intelligence-10701451590615114884` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1215](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1215) | 🛡️ Jules02: Risk control and drift monitoring — Regime-adaptive safety hardening | xnessom | `jules02-regime-adaptive-safety-hardening-4357052007584945700` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1212](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1212) | 🛠️ Jules02: Resilience improvement — State recovery & DB retries | xnessom | `resilience-recovery-path-7031444098850161571` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1210](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1210) | docs: 📘 Jules02: Documentation and schema governance — Unified decision schemas and tracing | xnessom | `jules02-unified-schemas-8823223411712761998` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1223](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1223) | Institutional StressLab: Severity-Based Resilience Analysis | saysgrok | `feat/stress-lab-severity-tracking-15885290868617108463` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1222](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1222) | Macro Event Intelligence and Risk Integration | saysgrok | `feat/macro-event-intelligence-10701451590615114884` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1215](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1215) | 🛡️ Jules02: Risk control and drift monitoring — Regime-adaptive safety hardening | xnessom | `jules02-regime-adaptive-safety-hardening-4357052007584945700` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1212](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1212) | 🛠️ Jules02: Resilience improvement — State recovery & DB retries | xnessom | `resilience-recovery-path-7031444098850161571` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1210](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1210) | docs: 📘 Jules02: Documentation and schema governance — Unified decision schemas and tracing | xnessom | `jules02-unified-schemas-8823223411712761998` | unknown | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1207](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1207) | Institutional Capital Allocator Implementation | saysgrok | `feat/capital-allocator-institutional-7216075788528344685` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1206](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1206) | 🧹 Jules05: Technical debt cleanup — architectural harmonization | yxynoty | `jules05-tech-debt-cleanup-4428469418656040805` | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1205](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1205) | Institutional-Grade Market Regime Detector | saysgrok | `feat/institutional-regime-detector-7169196241149037630` | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
