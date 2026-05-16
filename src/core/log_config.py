@@ -144,7 +144,7 @@ class SecretMaskingProcessor(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         """
         Standard logging Filter interface.
-        Redacts secrets from the log message and its arguments.
+        Redacts secrets from the log message, its arguments, and exception/stack info.
         """
         if isinstance(record.msg, str):
             record.msg = self.redact_any(record.msg)
@@ -154,6 +154,19 @@ class SecretMaskingProcessor(logging.Filter):
                 record.args = self.redact_any(record.args)
             elif isinstance(record.args, (list, tuple)):
                 record.args = tuple(self.redact_any(arg) for arg in record.args)
+
+        # Redact secrets from exception text and stack info if present
+        # In standard logging, exc_text is usually None until formatted.
+        # We force formatting here to ensure redaction if exc_info is present.
+        if record.exc_info and not record.exc_text:
+            # Use a dummy formatter to generate the traceback text
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+
+        if hasattr(record, "exc_text") and record.exc_text:
+            record.exc_text = self.redact_any(record.exc_text)
+
+        if hasattr(record, "stack_info") and record.stack_info:
+            record.stack_info = self.redact_any(record.stack_info)
 
         return True
 
