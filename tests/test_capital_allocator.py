@@ -99,12 +99,14 @@ def test_total_heat_limit(allocator):
     allocator.soft_limit_buffer = 0.0
     allocator.max_symbol_risk = 1.0
     allocator.max_family_risk = 1.0
+    allocator.max_strategy_risk = 1.0
 
     config = StrategyConfig(
         strategy_id="s1",
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=100000.0,
+        max_allocation_pct=1.0,
     )
     allocator.add_strategy(config)
 
@@ -463,12 +465,14 @@ def test_diversification_guard_scaling(allocator):
     # Increase other limits so they don't interfere
     allocator.max_symbol_risk = 1.0
     allocator.max_family_risk = 1.0
+    allocator.max_strategy_risk = 1.0
 
     config = StrategyConfig(
         strategy_id="s1",
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=100000.0,
+        max_allocation_pct=1.0,
     )
     allocator.add_strategy(config)
 
