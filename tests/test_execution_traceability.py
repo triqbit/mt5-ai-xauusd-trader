@@ -1,13 +1,14 @@
 """
 Tests for structured execution filter traceability.
 """
-import pytest
+
 import pandas as pd
-import numpy as np
-from datetime import datetime, timezone
-from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
+import pytest
+
+from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.schemas import TradeSignal
-from src.core.audit_log import AuditLogger, AuditEntry
+from src.trading.execution_filter import ExecutionDecision, ExecutionFilter
+
 
 class MockConfig:
     def __init__(self):
@@ -19,15 +20,18 @@ class MockConfig:
         self.signal_flicker_window = 6
         self.max_signal_changes = 3
 
+
 @pytest.fixture
 def execution_filter():
     cfg = MockConfig()
     return ExecutionFilter(max_drawdown=0.15, config=cfg)
 
+
 @pytest.fixture
 def audit_logger(tmp_path):
     db_path = tmp_path / "audit.db"
     return AuditLogger(db_url=f"sqlite:///{db_path}")
+
 
 def test_execution_filter_full_trace(execution_filter):
     """Verify that ExecutionFilter evaluates all layers and returns a full trace."""
@@ -48,15 +52,11 @@ def test_execution_filter_full_trace(execution_filter):
         take_profit=2020.0,
         lot_size=0.1,
         algorithm="test",
-        confidence=0.8
+        confidence=0.8,
     )
 
     # We use UTC for the test to avoid deprecation warnings where possible
-    decision = execution_filter.validate(
-        signal=signal,
-        market_data=df,
-        current_drawdown=0.05
-    )
+    decision = execution_filter.validate(signal=signal, market_data=df, current_drawdown=0.05)
 
     assert isinstance(decision, ExecutionDecision)
     assert "atr_volatility" in decision.trace
@@ -71,23 +71,24 @@ def test_execution_filter_full_trace(execution_filter):
     for layer, result in decision.trace.items():
         assert "passed" in result, f"Layer {layer} missing 'passed' status"
 
+
 def test_audit_log_execution_decision(audit_logger):
     """Verify that AuditLogger correctly records the execution trace."""
     trace = {
         "atr_volatility": {"passed": True, "ratio": 1.1},
-        "drawdown_limit": {"passed": False, "current_drawdown": 0.2, "max_drawdown": 0.15}
+        "drawdown_limit": {"passed": False, "current_drawdown": 0.2, "max_drawdown": 0.15},
     }
 
     entry_id = audit_logger.log_execution_decision(
-        symbol="XAUUSD",
-        direction=1,
-        trace=trace,
-        is_approved=False
+        symbol="XAUUSD", direction=1, trace=trace, is_approved=False
     )
 
     with audit_logger.Session() as session:
         from sqlalchemy import select
-        entry = session.execute(select(AuditEntry).where(AuditEntry.id == entry_id)).scalar_one_or_none()
+
+        entry = session.execute(
+            select(AuditEntry).where(AuditEntry.id == entry_id)
+        ).scalar_one_or_none()
         assert entry is not None
         assert entry.actor == "execution_filter"
         assert entry.metadata_json["symbol"] == "XAUUSD"

@@ -113,6 +113,7 @@ ignore = [
     "B008",   # function calls in default args (FastAPI Depends pattern)
     "RUF012", # mutable class attrs — false positives in pydantic models
     "SIM108", # ternary operator — sometimes less readable
+    "E712",   # SQLAlchemy filter comparison with False/True required
 ]
 
 [tool.ruff.lint.isort]

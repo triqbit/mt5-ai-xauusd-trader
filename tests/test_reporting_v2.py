@@ -3,15 +3,15 @@ Extended tests for the research reporting system.
 Focuses on overall status and actionable recommendations.
 """
 
-import pytest
-from src.research.reporting import ResearchOrchestrator, ResearchReporter, ResearchReport
+from src.research.reporting import ResearchOrchestrator, ResearchReporter
+
 
 def test_reporting_v2_status_and_recommendations():
     orchestrator = ResearchOrchestrator(
         title="V2 Test Report",
         executive_summary="Summary",
         conclusion="Conclusion",
-        overall_status="PROVISIONAL"
+        overall_status="PROVISIONAL",
     )
 
     orchestrator.add_recommendation("Recommendation 1")
@@ -25,13 +25,14 @@ def test_reporting_v2_status_and_recommendations():
     assert "Recommendation 1" in report.recommendations
     assert "Recommendation 2" in report.recommendations
 
+
 def test_v2_template_rendering():
     orchestrator = ResearchOrchestrator(
         title="V2 Rendering Test",
         executive_summary="Summary",
         conclusion="Strategic Conclusion",
         overall_status="VERIFIED",
-        recommendations=["Action 1", "Action 2"]
+        recommendations=["Action 1", "Action 2"],
     )
 
     report = orchestrator.build()
@@ -54,13 +55,14 @@ def test_v2_template_rendering():
     assert "- Action 2" in md
     assert "Strategic Conclusion" in md
 
+
 def test_terminal_formatting_v2(capsys):
     orchestrator = ResearchOrchestrator(
         title="Terminal V2 Test",
         executive_summary="Summary",
         conclusion="Conclusion",
         overall_status="VERIFIED",
-        recommendations=["Rec A"]
+        recommendations=["Rec A"],
     )
     report = orchestrator.build()
     reporter = ResearchReporter()
