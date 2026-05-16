@@ -4,15 +4,15 @@ Ensures that signal rejections across RiskManager, ExecutionFilter, and CapitalA
 are correctly recorded in Prometheus metrics.
 """
 import unittest
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
-from datetime import datetime, UTC
 
-from src.core.monitor import Monitor, INTERNAL_REJECTION_COUNTER
-from src.trading.risk_manager import RiskManager
-from src.trading.audited_risk_manager import AuditedRiskManager
-from src.trading.execution_filter import ExecutionFilter
-from src.trading.capital_allocator import CapitalAllocator, RejectionCode
+from src.core.monitor import INTERNAL_REJECTION_COUNTER, Monitor
 from src.core.schemas import TradeSignal
+from src.trading.audited_risk_manager import AuditedRiskManager
+from src.trading.capital_allocator import CapitalAllocator, RejectionCode
+from src.trading.execution_filter import ExecutionFilter
+
 
 class TestDecisionFunnelMetrics(unittest.TestCase):
     def setUp(self):

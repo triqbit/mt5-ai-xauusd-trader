@@ -1,15 +1,16 @@
 
-import sys
 import os
-from datetime import datetime, UTC
+import sys
+
 from rich.console import Console
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.core.explainability import SignalExplainer, SignalDirection
-from src.core.schemas import TradeSignal, ExecutionDecision
+from src.core.explainability import SignalExplainer
+from src.core.schemas import ExecutionDecision, TradeSignal
 from src.models.regime_detector import MarketRegime, RegimeInfo
+
 
 def verify_ui():
     console = Console(force_terminal=True, width=100)

@@ -1,9 +1,12 @@
-import pytest
 from unittest.mock import MagicMock
-from src.core.monitor import Monitor
-from src.core.config import TradingConfig
-from src.trading.capital_allocator import StrategyConfig
+
+import pytest
 from pydantic import SecretStr
+
+from src.core.config import TradingConfig
+from src.core.monitor import Monitor
+from src.trading.capital_allocator import StrategyConfig
+
 
 def test_monitor_logging_fix():
     """Verify the structured logging fix in Monitor.send_message."""

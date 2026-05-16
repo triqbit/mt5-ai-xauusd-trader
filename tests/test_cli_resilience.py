@@ -1,6 +1,6 @@
 import subprocess
 import sys
-from pathlib import Path
+
 
 def test_cli_help_resilience():
     """Verify that --help works even if dependencies are missing (logic check)."""

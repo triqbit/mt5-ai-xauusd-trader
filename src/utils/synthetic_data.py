@@ -111,13 +111,28 @@ class ScenarioGenerator:
         high_prices = np.maximum(open_prices, close_prices) + high_noise
         low_prices = np.minimum(open_prices, close_prices) - low_noise
 
+        # Generate spread (in pips)
+        # Standard spread is 0.5 - 1.5 pips for XAUUSD in normal conditions
+        base_spread = 0.8
+        spread_noise = self.rng.uniform(0, 0.4, n_steps)
+        spreads = base_spread + spread_noise
+
+        # Generate volume correlated with price movement
+        # Base volume 100-500
+        base_volume = self.rng.integers(100, 500, n_steps)
+        # Spike volume on large moves
+        move_magnitude = np.abs(returns)
+        volume_spike = (move_magnitude * 200000).astype(int)
+        tick_volumes = base_volume + volume_spike
+
         df = pd.DataFrame(
             {
                 "open": open_prices,
                 "high": high_prices,
                 "low": low_prices,
                 "close": close_prices,
-                "tick_volume": self.rng.integers(100, 1000, n_steps),
+                "tick_volume": tick_volumes,
+                "spread_pips": spreads,
             }
         )
 
@@ -189,7 +204,7 @@ class ScenarioGenerator:
     def inject_faults(
         self,
         df: pd.DataFrame,
-        fault_type: Literal["stale", "outliers", "zero_volume", "gaps"],
+        fault_type: Literal["stale", "outliers", "zero_volume", "gaps", "high_spread"],
         prob: float = 0.05,
     ) -> pd.DataFrame:
         """Injects operational faults into an existing dataset."""
@@ -225,6 +240,10 @@ class ScenarioGenerator:
                     df.iloc[idx + 1 :, df.columns.get_loc("high")] += gap
                     df.iloc[idx + 1 :, df.columns.get_loc("low")] += gap
                     df.iloc[idx + 1 :, df.columns.get_loc("close")] += gap
+        elif fault_type == "high_spread":
+            # Spread spikes (e.g. news or rollover)
+            # Standard halt is usually around 2.0 pips for XAUUSD
+            df.iloc[indices, df.columns.get_loc("spread_pips")] *= 5.0
 
         return df
 
@@ -335,7 +354,12 @@ class ScenarioGenerator:
         # Generate 100 steps of very low vol, then a massive spike
         n_steps = max(n_steps, 101)
         returns = self.rng.normal(0, 0.00005, n_steps)
-        returns[-1] = 0.1  # 10% move in one bar
+        # NEWS_SHOCK requires high Efficiency Ratio (> 0.7).
+        # We must ensure the return sequence is sustained or extremely efficient.
+        # But detector uses Kaufman ER which is (net change) / (sum of abs changes).
+        # A single massive spike at the end should have high ER.
+        # Let's ensure volatility of volatility (vov) is also high (> 0.1).
+        returns[-1] = 0.15  # Massive 15% move in one bar
         return self._generate_base(n_steps, start_price, returns)
 
     def _generate_malformed(self, n_steps: int, start_price: float) -> pd.DataFrame:
@@ -1202,3 +1226,142 @@ class InstitutionalFlowGenerator:
 
         returns = np.concatenate([returns_steady, returns_climax, returns_collapse])
         return self.gen._generate_base(n_steps, start_price, returns)
+
+class LifecycleScenarioBuilder:
+    """
+    Generates multi-stage deterministic price and event sequences.
+    Simulates operational lifecycles: Normal -> Failure -> Recovery.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+        self.macro = MacroScenarioBuilder()
+
+    def flash_crash_recovery_cycle(self, n_steps: int = 300) -> tuple[pd.DataFrame, list[MacroEvent]]:
+        """
+        Sequence:
+        - 1/3: Ranging (Normal)
+        - Mid: Flash Crash (Fault)
+        - Final 1/3: Flat then recovery (Stabilization)
+        """
+        one_third = n_steps // 3
+
+        # 1. Normal Ranging
+        df_normal = self.gen.generate(n_steps=one_third, regime="ranging", volatility=0.0005)
+
+        # 2. Flash Crash
+        df_crash = self.gen.generate(
+            n_steps=one_third,
+            regime="flash_crash",
+            start_price=df_normal["close"].iloc[-1]
+        )
+
+        # 3. Stabilization and Recovery
+        df_recovery = self.gen.generate(
+            n_steps=n_steps - 2 * one_third,
+            regime="trending",
+            start_price=df_crash["close"].iloc[-1],
+            trend_strength=0.0005,
+            volatility=0.0001
+        )
+
+        df = pd.concat([df_normal, df_crash, df_recovery])
+        # Fix index if start_date was provided, otherwise it's just integer index
+        df.index = range(len(df))
+
+        return df, []
+
+    def news_block_lifecycle(self, n_steps: int = 200) -> tuple[pd.DataFrame, list[MacroEvent], datetime]:
+        """
+        Sequence:
+        - Ranging -> High Impact News -> News Shock Price Action -> Post-news stabilization.
+        """
+        mid = n_steps // 2
+        start_date = datetime(2024, 5, 22, 11, 0, tzinfo=UTC)
+
+        df = self.gen.generate(
+            n_steps=n_steps,
+            regime="news_shock",
+            start_date=start_date
+        )
+
+        # News event at 12:30 (middle of the 200-bar window if freq is 5min)
+        # 200 * 5min = 1000min ~= 16h. 11:00 + 500min ~= 19:20.
+        # Let's adjust event time to be 11:00 + mid * 5min
+        event_time = start_date + pd.Timedelta(minutes=mid * 5)
+        event = self.macro.nfp_shock(timestamp=event_time)
+
+        return df, [event], event_time
+
+
+class ExecutionQualityScenarioBuilder:
+    """
+    Generates deterministic sets of historical trade data for performance testing.
+    Useful for verifying win rate guards, slippage alerts, and cost analysis.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.rng = np.random.default_rng(seed)
+
+    def toxic_flow_sequence(self, n_trades: int = 30) -> list[dict[str, Any]]:
+        """
+        Generates trades with consistently high negative slippage and low win rate.
+        Simulates 'toxic' execution environment or bad alpha.
+        """
+        trades = []
+        for i in range(n_trades):
+            # 80% loss rate
+            is_win = self.rng.random() < 0.2
+            pnl = self.rng.uniform(10, 50) if is_win else self.rng.uniform(-100, -20)
+
+            # High slippage: 2.0 to 5.0 pips (threshold is usually 1.0)
+            slippage = self.rng.uniform(2.0, 5.0)
+
+            trades.append({
+                "ticket": 1000 + i,
+                "symbol": "XAUUSD",
+                "direction": 1,
+                "pnl": pnl,
+                "slippage_pips": slippage,
+                "execution_latency_ms": self.rng.uniform(500, 2000),
+                "status": "CLOSED"
+            })
+        return trades
+
+    def high_performance_sequence(self, n_trades: int = 30) -> list[dict[str, Any]]:
+        """
+        Generates trades with 70% win rate and positive edge capture.
+        """
+        trades = []
+        for i in range(n_trades):
+            is_win = self.rng.random() < 0.7
+            pnl = self.rng.uniform(50, 200) if is_win else self.rng.uniform(-30, -10)
+
+            # Low slippage: 0.1 to 0.5 pips
+            slippage = self.rng.uniform(0.1, 0.5)
+
+            trades.append({
+                "ticket": 2000 + i,
+                "symbol": "XAUUSD",
+                "direction": 1,
+                "pnl": pnl,
+                "slippage_pips": slippage,
+                "execution_latency_ms": self.rng.uniform(50, 150),
+                "status": "CLOSED"
+            })
+        return trades
+
+    def edge_case_fills(self) -> list[dict[str, Any]]:
+        """
+        Specific scenarios:
+        1. Zero slippage (perfect fill)
+        2. Extreme slippage spike (10 pips)
+        3. Zero PnL (break even)
+        4. Partial fill (represented by small lot size)
+        """
+        return [
+            {"ticket": 3001, "symbol": "XAUUSD", "direction": 1, "pnl": 100.0, "slippage_pips": 0.0, "status": "CLOSED"},
+            {"ticket": 3002, "symbol": "XAUUSD", "direction": 1, "pnl": -500.0, "slippage_pips": 10.0, "status": "CLOSED"},
+            {"ticket": 3003, "symbol": "XAUUSD", "direction": 1, "pnl": 0.0, "slippage_pips": 0.5, "status": "CLOSED"},
+            {"ticket": 3004, "symbol": "XAUUSD", "direction": 1, "pnl": 10.0, "slippage_pips": 0.2, "status": "CLOSED", "lot_size": 0.01},
+        ]

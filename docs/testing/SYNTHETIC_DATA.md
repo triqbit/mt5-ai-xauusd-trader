@@ -31,7 +31,28 @@ Located in , the  provides deterministic OHLCV data for various market regimes.
     - **outliers**: Ghost ticks or extreme price spikes (e.g., bad feed).
     - **zero_volume**: Price moves but volume is reported as zero.
     - **gaps**: Price jumps without continuity (slippage or weekend gaps).
-- **Price Continuity**: The generator ensures  for standard regimes, providing realistic price action for backtesting.
+    - **high_spread**: Simulates extreme spread spikes (e.g., news or rollover) to test spread-related risk limits and halts.
+- **Price Continuity**: The generator ensures price continuity for standard regimes, providing realistic price action for backtesting.
+- **Spread & Volume**: Generates movement-correlated `tick_volume` and deterministic `spread_pips` to support realistic technical analysis and spread-risk validation.
+
+## LifecycleScenarioBuilder
+
+Located in `src/utils/synthetic_data.py`, this builder creates multi-stage deterministic price and event sequences to test the system's operational lifecycle and state machine transitions.
+
+### Key Scenarios
+
+- **flash_crash_recovery_cycle(n_steps)**: Simulates a full cycle of Normal Ranging -> Flash Crash -> Circuit Breaker -> Stabilization -> Recovery. Essential for end-to-end resilience testing.
+- **news_block_lifecycle(n_steps)**: Simulates Ranging -> High Impact News (Macro Event) -> News Shock Price Action -> Post-news stabilization.
+
+## ExecutionQualityScenarioBuilder
+
+Located in `src/utils/synthetic_data.py`, this builder generates deterministic sets of historical trade data for performance testing. Useful for verifying win rate guards, slippage alerts, and execution cost analysis.
+
+### Key Scenarios
+
+- **toxic_flow_sequence(n_trades)**: Generates trades with consistently high negative slippage and a low win rate (approx 20%). Used to verify that `Performance Guard` correctly halts trading.
+- **high_performance_sequence(n_trades)**: Generates trades with a high win rate (approx 70%) and positive edge capture (low slippage).
+- **edge_case_fills()**: Specific scenarios including perfect fills (zero slippage), extreme slippage spikes, and break-even trades.
 
 ## BacktestScenarioBuilder
 

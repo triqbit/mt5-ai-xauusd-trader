@@ -1,5 +1,7 @@
-from datetime import datetime, UTC
+from datetime import datetime
+
 from src.research.reporting import ResearchReport
+
 
 def test_research_report_instantiation():
     """Verify ResearchReport can be instantiated with required fields."""
