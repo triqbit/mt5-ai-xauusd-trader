@@ -44,9 +44,9 @@ class StressedMetric(BaseModel):
     total_return: str
     max_drawdown: str
     sharpe: str
+    outcome: str
     recovery_factor: str = "0.00"
     profit_factor: str = "0.00"
-    outcome: str
 
 
 class StressTestSection(BaseModel):
@@ -101,9 +101,9 @@ class SignalMotif(BaseModel):
     direction: int
     volatility_bucket: str
     confidence_bucket: str
-    session: str = "Unknown"
     frequency: int
     win_rate: float
+    session: str = "Unknown"
     expectancy: float = 0.0
     efficiency_ratio: float = 0.0
     cluster_frequency: int = 0
@@ -142,8 +142,8 @@ class DriftMetric(BaseModel):
     baseline: str
     current: str
     drift_pct: float
-    psi_score: float = 0.0
     status: str
+    psi_score: float = 0.0
 
 
 class ModelDriftSection(BaseModel):
@@ -320,10 +320,11 @@ class ResearchReport(BaseModel):
     """Structured research report container."""
 
     title: str
+    executive_summary: str
+    conclusion: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     author: str = "Jules Research"
     overall_status: str = "PROVISIONAL"
-    executive_summary: str
 
     regime_analysis: RegimeSection | None = None
     stress_tests: StressTestSection | None = None
@@ -339,7 +340,6 @@ class ResearchReport(BaseModel):
     strategic_confluence: StrategicConfluenceSection | None = None
     methodology: MethodologySection | None = None
 
-    conclusion: str
     recommendations: list[str] = Field(default_factory=list)
 
 

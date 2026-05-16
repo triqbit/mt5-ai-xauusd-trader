@@ -217,6 +217,7 @@
     {% if regime_analysis %}
     {% set ns.count = ns.count + 1 %}
     <section id="regime-analysis">
+        <div style="float: right;"><span class="badge badge-stable">ANALYTICAL</span></div>
         <h2>{{ ns.count }}. Market Regime Analysis</h2>
         <p>{{ regime_analysis.summary }}</p>
         <table>
@@ -249,6 +250,13 @@
     {% if stress_tests %}
     {% set ns.count = ns.count + 1 %}
     <section id="stress-tests">
+        <div style="float: right;">
+            {% set stress_ns = namespace(worst='PASS') %}
+            {% for s in stress_tests.scenarios %}{% if s.outcome == 'FAIL' %}{% set stress_ns.worst = 'FAIL' %}{% endif %}{% endfor %}
+            <span class="badge {% if stress_ns.worst == 'FAIL' %}badge-critical{% else %}badge-stable{% endif %}">
+                RESILIENCE: {{ stress_ns.worst }}
+            </span>
+        </div>
         <h2>{{ ns.count }}. Stress Test Outcomes</h2>
         <div class="score-container">
             <span>Resilience Score:</span>
@@ -322,6 +330,11 @@
     {% if hyperparameter_robustness %}
     {% set ns.count = ns.count + 1 %}
     <section id="hyperparameter-robustness">
+        <div style="float: right;">
+            <span class="badge {% if hyperparameter_robustness.stability_score > 80 %}badge-stable{% elif hyperparameter_robustness.stability_score > 60 %}badge-warning{% else %}badge-critical{% endif %}">
+                STABILITY: {{ hyperparameter_robustness.stability_score }}%
+            </span>
+        </div>
         <h2>{{ ns.count }}. Hyperparameter Robustness</h2>
         <div class="score-container">
             <span>Stability Score:</span>
@@ -456,6 +469,16 @@
     {% if model_drift %}
     {% set ns.count = ns.count + 1 %}
     <section id="model-drift">
+        <div style="float: right;">
+            {% set drift_ns = namespace(worst='STABLE') %}
+            {% for m in model_drift.metrics %}
+                {% if m.status == 'CRITICAL' %}{% set drift_ns.worst = 'CRITICAL' %}
+                {% elif m.status == 'WARNING' and drift_ns.worst != 'CRITICAL' %}{% set drift_ns.worst = 'WARNING' %}{% endif %}
+            {% endfor %}
+            <span class="badge {% if drift_ns.worst == 'CRITICAL' %}badge-critical{% elif drift_ns.worst == 'WARNING' %}badge-warning{% else %}badge-stable{% endif %}">
+                DRIFT: {{ drift_ns.worst }}
+            </span>
+        </div>
         <h2>{{ ns.count }}. Model Drift Observations</h2>
         <table>
             <thead>
@@ -694,6 +717,11 @@
     {% if execution_quality %}
     {% set ns.count = ns.count + 1 %}
     <section id="execution-quality">
+        <div style="float: right;">
+            <span class="badge {% if execution_quality.efficiency_score > 90 %}badge-stable{% elif execution_quality.efficiency_score > 75 %}badge-warning{% else %}badge-critical{% endif %}">
+                EFFICIENCY: {{ execution_quality.efficiency_score|round(1) }}%
+            </span>
+        </div>
         <h2>{{ ns.count }}. Execution Quality & Alpha Decay</h2>
         <div class="score-container">
             <span>Execution Efficiency:</span>
