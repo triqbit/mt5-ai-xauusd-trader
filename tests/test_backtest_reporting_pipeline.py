@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.research.benchmarks import BenchmarkEvaluator
 from src.research.reporting import ResearchOrchestrator, ResearchReporter
 from src.research.stress_lab import StressLab, StressTestMetrics
