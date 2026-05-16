@@ -30,7 +30,7 @@ This map identifies the production readiness of various subsystems to ensure tra
 | **Ensemble Models** | 🟡 Release Candidate | Backtest-validated; live edge-case hardening in progress. |
 | **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
 | **Decision Support** | 🟡 Release Candidate | Structured decision packets and operator dashboard active. |
-| **Explainability Engine** | 🟢 Production | Institutional attribution reporting and TUI integration complete. |
+| **Explainability Engine** | 🟡 Release Candidate | Institutional attribution reporting and TUI integration launched (May 15). |
 
 ---
 
