@@ -31,22 +31,22 @@ mock_talib.MACD.side_effect = lambda d, *a, **k: (
     np.random.rand(len(d)),
     np.random.rand(len(d)),
 )
-mock_talib.ATR.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
-mock_talib.BBANDS.side_effect = lambda close, *a, **k: (
-    np.random.rand(len(close)),
-    np.random.rand(len(close)),
-    np.random.rand(len(close)),
+mock_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.BBANDS.side_effect = lambda c, *a, **k: (
+    np.random.rand(len(c)),
+    np.random.rand(len(c)),
+    np.random.rand(len(c)),
 )
 mock_talib.EMA.side_effect = default_talib_effect
-mock_talib.ADX.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
-mock_talib.STOCH.side_effect = lambda high, low, close, *a, **k: (
-    np.random.rand(len(close)),
-    np.random.rand(len(close)),
+mock_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (
+    np.random.rand(len(c)),
+    np.random.rand(len(c)),
 )
-mock_talib.OBV.side_effect = lambda close, volume, *a, **k: np.random.rand(len(close))
-mock_talib.MFI.side_effect = lambda high, low, close, volume, *a, **k: np.random.rand(len(close))
-mock_talib.CCI.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
-mock_talib.MOM.side_effect = lambda close, *a, **k: np.random.rand(len(close))
+mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+mock_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+mock_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
 mock_talib.get_function_groups.return_value = {"Pattern Recognition": []}
 
 # Setup the system modules with our mocks BEFORE importing src components
@@ -60,11 +60,11 @@ with patch.dict(
     },
 ):
     # Import components we want to test
-    from src.core.constants import SignalDirection  # noqa: E402
-    from src.data.feature_engineering import FeatureEngineer  # noqa: E402
-    from src.models import ensemble  # noqa: E402  # Use the module to avoid attribute errors on reload
-    from src.models.ensemble import EnsembleModel  # noqa: E402
-    from src.utils.synthetic_data import ScenarioGenerator  # noqa: E402
+    from src.core.constants import SignalDirection
+    from src.data.feature_engineering import FeatureEngineer
+    from src.models import ensemble  # Use the module to avoid attribute errors on reload
+    from src.models.ensemble import EnsembleModel
+    from src.utils.synthetic_data import ScenarioGenerator
 
 
 @pytest.fixture
@@ -86,7 +86,7 @@ def mock_ensemble():
     ):
         model = EnsembleModel(device="cpu")
         model.ppo_agent = MagicMock()
-        from src.core.constants import SignalDirection  # noqa: E402
+        from src.core.constants import SignalDirection
         from src.models.base_model import Signal
 
         model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
@@ -101,24 +101,24 @@ def setup_mock_talib(m_talib):
         np.random.rand(len(data)),
         np.random.rand(len(data)),
     )
-    m_talib.ATR.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
-    m_talib.BBANDS.side_effect = lambda close, *a, **k: (
-        np.random.rand(len(close)),
-        np.random.rand(len(close)),
-        np.random.rand(len(close)),
+    m_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.BBANDS.side_effect = lambda c, *a, **k: (
+        np.random.rand(len(c)),
+        np.random.rand(len(c)),
+        np.random.rand(len(c)),
     )
     m_talib.EMA.side_effect = lambda data, *a, **k: np.random.rand(len(data))
-    m_talib.ADX.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
-    m_talib.STOCH.side_effect = lambda high, low, close, *a, **k: (
-        np.random.rand(len(close)),
-        np.random.rand(len(close)),
+    m_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (
+        np.random.rand(len(c)),
+        np.random.rand(len(c)),
     )
-    m_talib.OBV.side_effect = lambda close, volume, *a, **k: np.random.rand(len(close))
-    m_talib.MFI.side_effect = lambda high, low, close, volume, *a, **k: np.random.rand(len(close))
-    m_talib.CCI.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
-    m_talib.MOM.side_effect = lambda close, *a, **k: np.random.rand(len(close))
-    m_talib.WILLR.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
-    m_talib.ULTOSC.side_effect = lambda high, low, close, *a, **k: np.random.rand(len(close))
+    m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
+    m_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
+    m_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
+    m_talib.WILLR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.ULTOSC.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
     m_talib.LINEARREG_SLOPE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_TRENDLINE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_DCPERIOD.side_effect = lambda x, *a, **k: np.random.rand(len(x))
