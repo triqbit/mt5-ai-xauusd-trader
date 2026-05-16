@@ -12,9 +12,9 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
-import structlog
 import numpy as np
 import pandas as pd
+import structlog
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
