@@ -8,7 +8,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 95% | RC v1.1.0-rc5 verified and stable. |
 | **Lint Debt** | 🟡 342 Issues | Primarily un-sorted imports and unused variables in tests. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (14 consecutive days). |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (17 consecutive days). |
 | **Evidence Maturity** | 🟡 Emerging | 1 verified audit; 5 upcoming enterprise scorecards. |
 
 ---
@@ -29,7 +29,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
-- **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes in trading and risk modules. Fourteenth consecutive day of history destruction recorded on 2026-05-13, with multiple system-wide swaps per day.
+- **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes in trading and risk modules. Seventeenth consecutive day of history destruction recorded on 2026-05-15, with multiple system-wide swaps per day.
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
@@ -39,7 +39,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 | Evidence Artifact | Category | Status |
 | :--- | :--- | :--- |
-| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified (2026-05-08) |
+| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ⏳ Provisional (In Review) |
 | Architecture Quick-Start | System Map | ✅ Verified (2026-05-07) |
 | Enterprise Scorecard | Compliance | ⏳ Upcoming |
 | ADR Audit Report | Governance | ⏳ Upcoming |
