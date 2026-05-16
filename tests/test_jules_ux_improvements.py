@@ -18,7 +18,9 @@ def test_cli_aliases():
 
 
 def test_poll_interval_config():
-    config = TradingConfig(MT5_PASSWORD="test_password", MT5_SERVER="test_server", poll_interval=120)
+    config = TradingConfig(
+        MT5_PASSWORD="test_password", MT5_SERVER="test_server", poll_interval=120
+    )
     assert config.poll_interval == 120
 
     # Default value
