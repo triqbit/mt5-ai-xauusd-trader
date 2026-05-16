@@ -1,3 +1,7 @@
+"""
+Unit tests for StressLab resilience testing framework.
+"""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -567,12 +571,22 @@ def test_decay_calculation_hardened_logic():
     # Case 1: Negative baseline, result is more negative (decay should be positive)
     # b = -1.0, m = -2.0 -> decay = (-1.0 - (-2.0)) / |-1.0| = 1.0
     baseline = StressTestMetrics(
-        total_return=0.1, max_drawdown=0.05, sharpe_ratio=-1.0,
-        win_rate=0.5, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=-1.0,
+        win_rate=0.5,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
     )
     metrics = StressTestMetrics(
-        total_return=0.05, max_drawdown=0.1, sharpe_ratio=-2.0,
-        win_rate=0.4, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+        total_return=0.05,
+        max_drawdown=0.1,
+        sharpe_ratio=-2.0,
+        win_rate=0.4,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
     )
     lab.results["Scenario"] = metrics
     report = lab.generate_report(baseline)
@@ -580,8 +594,13 @@ def test_decay_calculation_hardened_logic():
 
     # Case 2: Zero baseline, negative result (100% decay)
     baseline_zero = StressTestMetrics(
-        total_return=0.1, max_drawdown=0.05, sharpe_ratio=0.0,
-        win_rate=0.5, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+        total_return=0.1,
+        max_drawdown=0.05,
+        sharpe_ratio=0.0,
+        win_rate=0.5,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
     )
     report_zero = lab.generate_report(baseline_zero)
     assert report_zero.sharpe_decay == 1.0
@@ -589,34 +608,48 @@ def test_decay_calculation_hardened_logic():
     # Case 3: Extreme clipping
     # b = 1.0, m = -5.0 -> decay = (1.0 - (-5.0)) / 1.0 = 6.0 (clipped to 2.0)
     metrics_extreme = StressTestMetrics(
-        total_return=-0.5, max_drawdown=0.5, sharpe_ratio=-5.0,
-        win_rate=0.1, num_trades=10, execution_quality_score=1.0, latency_impact=0.0
+        total_return=-0.5,
+        max_drawdown=0.5,
+        sharpe_ratio=-5.0,
+        win_rate=0.1,
+        num_trades=10,
+        execution_quality_score=1.0,
+        latency_impact=0.0,
     )
     lab.results["Scenario"] = metrics_extreme
     report_extreme = lab.generate_report(baseline)
     # b= -1, m= -5 -> decay = (-1 - (-5)) / 1 = 4 -> clipped to 2
     assert report_extreme.sharpe_decay == 2.0
 
+
 def test_immediate_reversal_logic(sample_data):
     """Verify that a signal flip from 1 to -1 in a single step triggers both actions."""
+
     class FlipStrategy:
         @property
-        def name(self): return "FlipStrategy"
+        def name(self):
+            return "FlipStrategy"
+
         def predict(self, df):
             signals = np.zeros(len(df))
-            signals[0] = 1.0   # Buy
+            signals[0] = 1.0  # Buy
             signals[1] = -1.0  # Flip to Sell
-            signals[2] = 1.0   # Flip back to Buy
+            signals[2] = 1.0  # Flip back to Buy
             return signals
 
     strategy = FlipStrategy()
     lab = StressLab(strategy, sample_data)
 
     # Force 0 delay and 0 friction to make it predictable
-    scenario = StressScenario(name="Flip", description="test", execution_delay_steps=0, slippage_bps=0, spread_multiplier=0)
+    scenario = StressScenario(
+        name="Flip",
+        description="test",
+        execution_delay_steps=0,
+        slippage_bps=0,
+        spread_multiplier=0,
+    )
     metrics = lab.run_scenario(scenario)
 
-    # If it works:
     # Bar 1: Closes Long (opened Bar 0)
     # Bar 2: Closes Short (opened Bar 1)
     # Bar 3: Closes Long (opened Bar 2, as signals[3] is 0)
