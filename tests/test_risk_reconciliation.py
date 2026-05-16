@@ -2,21 +2,26 @@
 Test suite for RiskManager state reconciliation and recovery.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, UTC, timedelta
-from src.core.trade_logger import TradeLogger, Trade
-from src.trading.risk_manager import RiskManager
+
 from src.core.config import TradingConfig
 from src.core.schemas import TradeSignal
+from src.core.trade_logger import Trade, TradeLogger
+from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def temp_db(tmp_path):
     db_path = tmp_path / "test_trades.db"
     return f"sqlite:///{db_path}"
 
+
 @pytest.fixture
 def logger(temp_db):
     return TradeLogger(db_url=temp_db)
+
 
 @pytest.fixture
 def config():
@@ -28,21 +33,28 @@ def config():
         max_daily_loss=0.05,
         max_positions=3,
         max_losing_streak=3,
-        risk_per_trade=0.01
+        risk_per_trade=0.01,
     )
+
 
 def test_risk_manager_reconciliation_full_cycle(logger, config):
     # 1. Setup historical data in DB
     # Start with $10,000 balance
-    initial_balance = 10000.0
 
     # Yesterday: One winner of $200
     yesterday = datetime.now(UTC) - timedelta(days=1)
     with logger.Session() as session:
         t1 = Trade(
-            ticket=100, symbol="XAUUSD", direction=1, entry_price=2300.0,
-            exit_price=2302.0, lot_size=0.1, pnl=200.0, status="CLOSED",
-            created_at=yesterday, updated_at=yesterday
+            ticket=100,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2300.0,
+            exit_price=2302.0,
+            lot_size=0.1,
+            pnl=200.0,
+            status="CLOSED",
+            created_at=yesterday,
+            updated_at=yesterday,
         )
         session.add(t1)
         session.commit()
@@ -51,19 +63,39 @@ def test_risk_manager_reconciliation_full_cycle(logger, config):
     today = datetime.now(UTC)
     with logger.Session() as session:
         t2 = Trade(
-            ticket=101, symbol="XAUUSD", direction=1, entry_price=2300.0,
-            exit_price=2299.0, lot_size=0.1, pnl=-100.0, status="CLOSED",
-            created_at=today, updated_at=today
+            ticket=101,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2300.0,
+            exit_price=2299.0,
+            lot_size=0.1,
+            pnl=-100.0,
+            status="CLOSED",
+            created_at=today,
+            updated_at=today,
         )
         t3 = Trade(
-            ticket=102, symbol="XAUUSD", direction=1, entry_price=2300.0,
-            exit_price=2299.0, lot_size=0.1, pnl=-100.0, status="CLOSED",
-            created_at=today, updated_at=today
+            ticket=102,
+            symbol="XAUUSD",
+            direction=1,
+            entry_price=2300.0,
+            exit_price=2299.0,
+            lot_size=0.1,
+            pnl=-100.0,
+            status="CLOSED",
+            created_at=today,
+            updated_at=today,
         )
         # One open trade
         t4 = Trade(
-            ticket=103, symbol="EURUSD", direction=-1, entry_price=1.0800,
-            lot_size=0.1, status="OPEN", created_at=today, updated_at=today
+            ticket=103,
+            symbol="EURUSD",
+            direction=-1,
+            entry_price=1.0800,
+            lot_size=0.1,
+            status="OPEN",
+            created_at=today,
+            updated_at=today,
         )
         session.add_all([t2, t3, t4])
         session.commit()
@@ -98,9 +130,14 @@ def test_risk_manager_reconciliation_full_cycle(logger, config):
     # Current loss is $200.
 
     signal = TradeSignal(
-        symbol="XAUUSD", direction=1, entry_price=2300.0,
-        stop_loss=2290.0, take_profit=2320.0, lot_size=0.1,
-        algorithm="test", confidence=0.8
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.8,
     )
 
     # Should still be approved
@@ -113,14 +150,22 @@ def test_risk_manager_reconciliation_full_cycle(logger, config):
     # Should now be rejected due to daily loss limit
     assert risk.approve(signal) is False
 
+
 def test_risk_manager_consecutive_losses_reconciliation(logger, config):
     today = datetime.now(UTC)
     with logger.Session() as session:
         for i in range(3):
             t = Trade(
-                ticket=200+i, symbol="XAUUSD", direction=1, entry_price=2300.0,
-                exit_price=2299.0, lot_size=0.1, pnl=-10.0, status="CLOSED",
-                created_at=today, updated_at=today
+                ticket=200 + i,
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=2300.0,
+                exit_price=2299.0,
+                lot_size=0.1,
+                pnl=-10.0,
+                status="CLOSED",
+                created_at=today,
+                updated_at=today,
             )
             session.add(t)
         session.commit()
@@ -132,9 +177,14 @@ def test_risk_manager_consecutive_losses_reconciliation(logger, config):
     assert risk.daily.consecutive_losses == 3
 
     signal = TradeSignal(
-        symbol="XAUUSD", direction=1, entry_price=2300.0,
-        stop_loss=2290.0, take_profit=2320.0, lot_size=0.1,
-        algorithm="test", confidence=0.8
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.8,
     )
 
     # Should be rejected due to max_losing_streak (3)

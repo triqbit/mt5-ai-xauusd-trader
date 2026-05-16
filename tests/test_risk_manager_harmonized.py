@@ -6,12 +6,13 @@ Verification of the unified RiskManager.
 """
 
 import datetime
-import os
+
 import pytest
+
 from src.core.config import TradingConfig
 from src.core.schemas import SignalDirection, TradeSignal
 from src.trading.risk_manager import RiskManager
-from src.utils.synthetic_data import ScenarioGenerator
+
 
 @pytest.fixture
 def config():
@@ -28,12 +29,14 @@ def config():
         max_losing_streak=5,
         min_confidence=0.6,
         max_drawdown=0.15,
-        min_lot_size=0.01
+        min_lot_size=0.01,
     )
+
 
 @pytest.fixture
 def risk_manager(config):
     return RiskManager(config, account_balance=10000.0)
+
 
 @pytest.fixture
 def buy_signal():
@@ -46,8 +49,9 @@ def buy_signal():
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.8,
-        timestamp=datetime.datetime.now(datetime.timezone.utc)
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
     )
+
 
 def test_drawdown_breaker(risk_manager, buy_signal):
     # Set peak equity high and current balance low to trigger drawdown
@@ -57,6 +61,7 @@ def test_drawdown_breaker(risk_manager, buy_signal):
     approved = risk_manager.approve(buy_signal)
     assert not approved
 
+
 def test_daily_loss_limit(risk_manager, buy_signal):
     risk_manager.daily.peak_equity = 10000.0
     risk_manager.daily.realised_pnl = -600.0  # 6% loss
@@ -64,15 +69,13 @@ def test_daily_loss_limit(risk_manager, buy_signal):
     approved = risk_manager.approve(buy_signal)
     assert not approved
 
+
 def test_max_positions(risk_manager, buy_signal):
-    risk_manager.open_positions = {
-        "XAUUSD": 1,
-        "EURUSD": 2,
-        "GBPUSD": 3
-    }
+    risk_manager.open_positions = {"XAUUSD": 1, "EURUSD": 2, "GBPUSD": 3}
 
     approved = risk_manager.approve(buy_signal)
     assert not approved
+
 
 def test_kelly_position_sizing(risk_manager):
     # Test Kelly sizing
@@ -80,6 +83,7 @@ def test_kelly_position_sizing(risk_manager):
     size = risk_manager.size_position("XAUUSD", 0.6, 20.0, 10.0)
     assert size > 0
     assert isinstance(size, float)
+
 
 def test_full_approval(risk_manager, buy_signal):
     approved = risk_manager.approve(buy_signal)
