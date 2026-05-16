@@ -12,7 +12,7 @@ from . import (
     utils,
 )
 
-__version__ = "1.1.0-rc9"
+__version__ = "1.1.0-rc7"
 __author__ = "triqbit"
 __license__ = "MIT"
 

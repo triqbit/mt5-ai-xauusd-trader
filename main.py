@@ -620,9 +620,7 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = (
-                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
-                                        )
+                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
@@ -638,9 +636,7 @@ def run_live(
                 # Wait for next interval with dynamic Session Dashboard
                 if console:
                     pnl_color = "green" if risk.daily.realised_pnl >= 0 else "red"
-                    regime_label = (
-                        regime_info.label.value.upper() if "regime_info" in locals() else "UNKNOWN"
-                    )
+                    regime_label = regime_info.label.value.upper() if "regime_info" in locals() else "UNKNOWN"
 
                     with console.status("[bold blue]Session Dashboard Initializing...") as status:
                         for i in range(poll_interval, 0, -1):
@@ -818,9 +814,7 @@ def run_setup_wizard() -> int:
 
     if (
         Prompt.ask(
-            "\nWould you like to run a connectivity health check now?",
-            choices=["y", "n"],
-            default="y",
+            "\nWould you like to run a connectivity health check now?", choices=["y", "n"], default="y"
         )
         == "y"
     ):
@@ -873,9 +867,7 @@ Usage Examples:
         help="AI algorithm architecture to use for signal generation.",
     )
     execution.add_argument("-s", "--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
-    execution.add_argument(
-        "-t", "--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1)."
-    )
+    execution.add_argument("-t", "--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
     execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",

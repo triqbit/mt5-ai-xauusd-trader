@@ -1,4 +1,4 @@
-# Configuration Reference (v1.1.0-rc7)
+# Configuration Reference (v1.1.0-rc9)
 
 This document lists the available configuration fields, their types, and descriptions.
 
