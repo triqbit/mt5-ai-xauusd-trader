@@ -30,6 +30,7 @@ class RejectionCode(str, Enum):
     TOTAL_HEAT_LIMIT = "TOTAL_HEAT_LIMIT"
     SYMBOL_CONCENTRATION_LIMIT = "SYMBOL_CONCENTRATION_LIMIT"
     FAMILY_CONCENTRATION_LIMIT = "FAMILY_CONCENTRATION_LIMIT"
+    STRATEGY_CONCENTRATION_LIMIT = "STRATEGY_CONCENTRATION_LIMIT"
     CAPITAL_CAP_REACHED = "CAPITAL_CAP_REACHED"
     SCALED_TO_ZERO = "SCALED_TO_ZERO"
     NO_BUDGET = "NO_BUDGET"
@@ -42,6 +43,12 @@ class StrategyConfig(BaseModel):
     symbol: str
     model_family: str
     capital_cap: float = Field(..., gt=0, description="Maximum capital this strategy can use.")
+    max_allocation_pct: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=1.0,
+        description="Maximum fraction of total budget this strategy can use.",
+    )
     performance_multiplier: float = Field(
         default=1.0, ge=0.0, le=2.0, description="Multiplier based on recent performance."
     )
@@ -89,6 +96,7 @@ class CapitalAllocator:
         max_symbol_risk: float = 0.4,  # Max 40% of budget per symbol
         max_family_risk: float = 0.4,  # Max 40% of budget per model family
         max_total_heat: float = 0.7,  # Max 70% of budget committed at once
+        max_strategy_risk: float = 0.2,  # Max 20% of budget per strategy
         performance_step: float = 0.05,  # Adjustment step for performance multiplier
         decay_rate: float = 0.001,  # Rate at which multiplier returns to 1.0
         soft_limit_buffer: float = 0.1,  # Buffer for diversification guard
@@ -98,6 +106,7 @@ class CapitalAllocator:
         self.max_symbol_risk = max_symbol_risk
         self.max_family_risk = max_family_risk
         self.max_total_heat = max_total_heat
+        self.max_strategy_risk = max_strategy_risk
         self.performance_step = performance_step
         self.decay_rate = decay_rate
         self.soft_limit_buffer = soft_limit_buffer
@@ -108,7 +117,9 @@ class CapitalAllocator:
         self.rejection_history: dict[str, int] = {code.value: 0 for code in RejectionCode}
 
     @staticmethod
-    def from_config(config: TradingConfig, total_budget: float, monitor: Any | None = None) -> CapitalAllocator:
+    def from_config(
+        config: TradingConfig, total_budget: float, monitor: Any | None = None
+    ) -> CapitalAllocator:
         """
         Factory method to initialize CapitalAllocator from TradingConfig.
         """
@@ -117,6 +128,7 @@ class CapitalAllocator:
             max_symbol_risk=config.allocator_max_symbol_risk,
             max_family_risk=config.allocator_max_family_risk,
             max_total_heat=config.allocator_max_total_heat,
+            max_strategy_risk=getattr(config, "allocator_max_strategy_risk", 0.2),
             performance_step=config.allocator_performance_step,
             decay_rate=config.allocator_decay_rate,
             soft_limit_buffer=config.allocator_soft_limit_buffer,
@@ -164,6 +176,7 @@ class CapitalAllocator:
         Diversification-aware routing.
         Selects the optimal strategy for a symbol by calculating which one
         would result in the best portfolio diversification score.
+        Uses performance multiplier as a secondary sort criterion for ties.
         """
         eligible_strategies = [
             sid for sid, config in self.strategies.items() if config.symbol == symbol
@@ -172,8 +185,7 @@ class CapitalAllocator:
             logger.warning("no_strategies_for_symbol", symbol=symbol)
             return None
 
-        best_score = -1.0
-        best_result = None
+        candidates = []
 
         for sid in eligible_strategies:
             # Simulate allocation silently to avoid audit pollution
@@ -184,21 +196,31 @@ class CapitalAllocator:
             with self._temporary_allocation(sid, res.allocated_amount):
                 score = self.get_diversification_score()
 
-            if score > best_score:
-                best_score = score
-                best_result = res
-
-        if best_result:
-            logger.info(
-                "allocation_routed",
-                symbol=symbol,
-                strategy_id=best_result.strategy_id,
-                diversification_score=best_score,
+            candidates.append(
+                {
+                    "result": res,
+                    "score": score,
+                    "multiplier": self.strategies[sid].performance_multiplier,
+                }
             )
-        else:
-            logger.warning("no_eligible_strategy", symbol=symbol)
 
-        return best_result
+        if not candidates:
+            logger.warning("no_eligible_strategy", symbol=symbol)
+            return None
+
+        # Sort by diversification score (descending), then performance multiplier (descending)
+        candidates.sort(key=lambda x: (x["score"], x["multiplier"]), reverse=True)
+        best = candidates[0]
+
+        logger.info(
+            "allocation_routed",
+            symbol=symbol,
+            strategy_id=best["result"].strategy_id,
+            diversification_score=best["score"],
+            multiplier=best["multiplier"],
+        )
+
+        return best["result"]
 
     def save_state(self, filepath: str | Path) -> None:
         """
@@ -342,6 +364,10 @@ class CapitalAllocator:
         cap = self.strategies[strategy_id].capital_cap
         return allocated / cap if cap > 0 else 1.0
 
+    def get_active_allocations(self) -> dict[str, float]:
+        """Return a map of strategy_id to currently active capital allocation."""
+        return {sid: amt for sid, amt in self.current_allocations.items() if amt > 0}
+
     def get_diversification_score(self) -> float:
         """
         Calculate portfolio diversification score using multi-factor normalized HHI.
@@ -371,7 +397,9 @@ class CapitalAllocator:
             return max(0.0, min(1.0, 1.0 - normalized_hhi))
 
         # 1. Strategy-level HHI
-        strategy_shares = [amt / total_allocated for amt in self.current_allocations.values() if amt > 0]
+        strategy_shares = [
+            amt / total_allocated for amt in self.current_allocations.values() if amt > 0
+        ]
         strategy_score = _calculate_score(strategy_shares)
 
         # 2. Symbol-level HHI
@@ -433,9 +461,11 @@ class CapitalAllocator:
         # Sort requests by strategy performance multiplier (descending)
         sorted_requests = sorted(
             requests,
-            key=lambda r: self.strategies.get(r.strategy_id).performance_multiplier
-            if r.strategy_id in self.strategies
-            else 0.0,
+            key=lambda r: (
+                self.strategies.get(r.strategy_id).performance_multiplier
+                if r.strategy_id in self.strategies
+                else 0.0
+            ),
             reverse=True,
         )
 
@@ -556,6 +586,11 @@ class CapitalAllocator:
             # Linear decay from 1.0 to 0.0 across the buffer
             return (limit - current) / buffer
 
+        # 4. Enforce Strategy-Level Risk Limit
+        # Combined limit of strategy-specific max_allocation_pct and global max_strategy_risk
+        strat_limit_pct = min(config.max_allocation_pct, self.max_strategy_risk)
+        current_strat_heat = self.current_allocations.get(strategy_id, 0.0) / self.total_budget
+
         heat_scale = _calculate_soft_scale(
             current_total_heat, self.max_total_heat, self.soft_limit_buffer
         )
@@ -565,8 +600,11 @@ class CapitalAllocator:
         family_scale = _calculate_soft_scale(
             family_heat, self.max_family_risk, self.soft_limit_buffer
         )
+        strat_scale = _calculate_soft_scale(
+            current_strat_heat, strat_limit_pct, self.soft_limit_buffer
+        )
 
-        overall_soft_scale = min(heat_scale, symbol_scale, family_scale)
+        overall_soft_scale = min(heat_scale, symbol_scale, family_scale, strat_scale)
         if overall_soft_scale < 1.0:
             target_risk_pct *= overall_soft_scale
             was_scaled = True
@@ -579,8 +617,27 @@ class CapitalAllocator:
                 family_scale=family_scale,
             )
 
-        # 4. Hard Safety Limits: Final check of scaled amount against absolute limits
+        # 5. Hard Safety Limits: Final check of scaled amount against absolute limits
         # Use the final target_risk_pct for safety checks.
+
+        if current_strat_heat + target_risk_pct > strat_limit_pct:
+            if allow_scaling:
+                target_risk_pct = max(0.0, strat_limit_pct - current_strat_heat)
+                was_capped = True
+            else:
+                if not silent:
+                    self._record_rejection(RejectionCode.STRATEGY_CONCENTRATION_LIMIT)
+                res = AllocationResult(
+                    strategy_id=strategy_id,
+                    allocated_amount=0.0,
+                    allocated_risk_pct=0.0,
+                    requested_risk_pct=risk_pct,
+                    is_allowed=False,
+                    rejection_reason=f"Strategy concentration limit reached: {current_strat_heat:.2f}",
+                    rejection_code=RejectionCode.STRATEGY_CONCENTRATION_LIMIT,
+                )
+                self._log_and_audit(res, silent=silent)
+                return res
 
         if current_total_heat + target_risk_pct > self.max_total_heat:
             if allow_scaling:
@@ -691,7 +748,9 @@ class CapitalAllocator:
                 code=result.rejection_code,
             )
             if self.monitor and result.rejection_code:
-                self.monitor.record_internal_rejection("capital_allocator", result.rejection_code.value)
+                self.monitor.record_internal_rejection(
+                    "capital_allocator", result.rejection_code.value
+                )
 
         with contextlib.suppress(RuntimeError, ImportError):
             get_audit_logger().log_allocation_decision(
