@@ -812,8 +812,13 @@ def run_setup_wizard() -> int:
 
     console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
 
-    if Prompt.ask("\nWould you like to run a connectivity health check now?", choices=["y", "n"], default="y") == "y":
-        return 2 # Signal to main() to run health check
+    if (
+        Prompt.ask(
+            "\nWould you like to run a connectivity health check now?", choices=["y", "n"], default="y"
+        )
+        == "y"
+    ):
+        return 2  # Signal to main() to run health check
 
     console.print(
         "\nSetup complete. You can run the bot with [cyan]python main.py --check[/] to verify connectivity.\n"
