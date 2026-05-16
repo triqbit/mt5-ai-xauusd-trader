@@ -9,11 +9,13 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
-from src.trading.risk_manager import RiskManager
+from src.trading.risk_manager import RiskDecision, RiskManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,29 +26,51 @@ class AuditedRiskManager(RiskManager):
     Evaluates the full decision chain for traceability.
     """
 
-    def approve(
+    def validate_signal(
         self,
         signal: TradeSignal,
-        signal_id: Optional[int] = None,
-        model_health: Optional[dict] = None,
-    ) -> bool:
+        market_data: pd.DataFrame,
+        open_positions: List[Dict[str, Any]],
+        model_health: Optional[Dict[str, float]] = None,
+    ) -> RiskDecision:
         """
-        Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Validate a trade signal against the 8-layer cascade from RISK_LIMITS.md.
         Logs the full decision chain to the audit log.
         """
+        # Execute checks individually for detailed auditing
         decision_chain = {
-            "circuit_breaker": self._check_circuit_breaker(),
-            "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
+            "circuit_breaker": self._check_drawdown_breaker(),
+            "daily_loss": self.get_daily_loss_level() < 4,
+            "activity_limits": (
+                self.daily.trade_count < self.cfg.max_trades_per_day
+                and self.daily.consecutive_losses < self.cfg.max_losing_streak
+            ),
+            "exposure_limits": (
+                len(open_positions) < self.cfg.max_positions
+                and self._check_directional_exposure(signal, open_positions)
+                and self._check_total_notional(signal, open_positions, market_data)
+            ),
             "symbol_allocation": self._check_symbol_allocation(signal.symbol),
-            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "min_confidence": signal.confidence >= self.cfg.min_confidence,
             "risk_reward": self._check_risk_reward(signal),
-            "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
         }
 
         passed = all(decision_chain.values())
+
+        # Determine rejection reason if any
+        reason = "Approved"
+        if not passed:
+            rejection_reasons = [k for k, v in decision_chain.items() if not v]
+            reason = f"Rejected: {', '.join(rejection_reasons)}"
+
+        # Calculate lot size if passed
+        adjusted_lots = 0.0
+        if passed:
+            adjusted_lots = self.size_position(signal.symbol, market_data)
+            if adjusted_lots < self.cfg.min_lot_size:
+                passed = False
+                reason = f"Calculated lot size {adjusted_lots} below minimum"
 
         # Log to Audit Trail
         try:
@@ -79,22 +103,39 @@ class AuditedRiskManager(RiskManager):
             logger.debug("AuditLogger not available for risk decision logging")
 
         if not passed:
-            rejection_reasons = [k for k, v in decision_chain.items() if not v]
-            reason_str = ", ".join(rejection_reasons)
             logger.warning(
-                "Signal REJECTED | %s %s | Failed: %s",
+                "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
                 signal.direction,
-                reason_str,
+                reason,
             )
             if self.monitor:
-                for reason in rejection_reasons:
-                    self.monitor.record_internal_rejection("risk_manager", reason.upper())
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=f"Failed filters: {reason_str}",
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
-        return passed
+                # Record the first failed filter in monitor
+                failed_filter = next((k for k, v in decision_chain.items() if not v), "LOT_SIZE")
+                self.monitor.record_internal_rejection("risk_manager", failed_filter.upper())
+
+        return RiskDecision(is_approved=passed, reason=reason, adjusted_lot_size=adjusted_lots)
+
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        model_health: Optional[dict] = None,
+    ) -> bool:
+        """
+        Legacy wrapper for backward compatibility with main.py.
+        Uses validate_signal internally with empty defaults.
+        """
+        decision = self.validate_signal(
+            signal=signal, market_data=pd.DataFrame(), open_positions=[], model_health=model_health
+        )
+
+        if not decision.is_approved and self.trade_logger:
+            self.trade_logger.log_risk_event(
+                event_type="SIGNAL_REJECTED",
+                description=decision.reason,
+                symbol=signal.symbol,
+                signal_id=signal_id,
+            )
+
+        return decision.is_approved

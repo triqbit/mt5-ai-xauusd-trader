@@ -1,37 +1,39 @@
-# Product Coherence Audit - May 2026
+# Product Coherence Audit - May 16, 2026
 
-## 1. Executive Summary
-This audit evaluates the MT5 AI XAUUSD Trader for architectural coherence, naming consistency, and institutional polish. While the system demonstrates high technical maturity, several areas of "fragmentation debt" have been identified that could reduce operator trust and increase maintenance overhead.
+## 📋 Executive Summary
+This audit evaluates the MT5 AI/ML Trading Bot for architectural coherence, naming consistency, and institutional polish. While the system demonstrates high technical capability, several points of fragmentation were identified in the core risk management and data processing layers.
 
-**Status Update (May 8, 2026):** Remediation in progress by Jules05 to resolve fragmentation debt in CLI, logging, and model output standardization.
+## 🔍 Audit Findings
 
-## 2. Findings
+### 1. Naming Consistency & API Uniformity
+- **Risk Management Fragmentation**: The system currently maintains two parallel risk components: `RiskEngine` (src/trading/risk_engine.py) and `RiskManager` (src/trading/risk_manager.py).
+    - `RiskEngine` implements a modern 8-layer ATR-based cascade.
+    - `RiskManager` implements a legacy 6-layer Kelly-based approach.
+    - **Impact**: High. Developers and operators may be confused about which risk logic is active.
+- **Method Disparity**: `RiskManager` uses `approve()` while `RiskEngine` uses `validate_signal()`.
+- **Inconsistent Exports**: `src/trading/__init__.py` exports `RiskEngine` but not the newer `AuditedRiskManager`.
 
-### A. Naming & Type Consistency
-- **Duplicate Enums:** `SignalDirection` is defined in both `src/core/schemas.py` and `src/core/constants.py`. (RESOLVED)
-- **Mapping Layers:** Multiple layers of mapping exist between `ModelAction` (0,1,2) and `SignalDirection` (1,-1,0). (HARMOMIZING)
-- **Terminology Drift:** Standardizing on "Signal" for raw model outputs and "Decision" for risk-filtered outputs. (IN PROGRESS)
+### 2. Module Boundaries
+- **Data vs Core**: `FeatureEngineer` is currently located in `src/core/feature_engineering.py`. By institutional standards, feature engineering belongs in the `data` domain.
+    - **Impact**: Medium. Weakens domain separation.
+- **Circular Dependencies**: Lazy-loading in `src/core/__init__.py` for `FeatureEngineer` indicates a boundary tension that should be resolved by proper relocation.
 
-### B. Module Boundaries
-- **Core Package bloat:** `src/core` contains diverse logic. Evaluation for future domain separation (e.g., moving FeatureEngineer to `src/data`) is ongoing.
-- **Circular Risk:** Centralizing enums in `constants.py` has reduced circular dependency risks between `schemas` and other modules.
+### 3. Documentation Coherence
+- **README Mismatch**: The README mentions a "9-Layer Execution Filter" and "8-layer safety cascade," but the implementation in `RiskManager` is 6-layer.
+- **Stale References**: Some docstrings still reference the Kelly Criterion as the primary sizing method, while the system is transitioning to ATR-based institutional sizing.
 
-### C. UX & Institutional Polish
-- **CLI Terminology:** `argparse` help messages are inconsistent. (STANDARDIZING)
-- **Logging:** `main.py` transitions from standard `logging` to `structlog` for system-wide consistency. (IN PROGRESS)
+### 4. Institutional Polish
+- **Error Handling**: `main.py` has robust bootstrap error handling, but the transition between `RiskManager` and `MT5Connector` for position tracking is slightly coupled.
+- **Graceful Degradation**: The 8-layer cascade in `RiskEngine` provides better degradation (sizing reduction) than the binary `approve()` in `RiskManager`.
 
-## 3. Remediation Plan
+## 🛠️ Remediation Plan
 
-### Immediate Fixes (PR ✨ Jules05 - Applied May 8, 2026)
-1. **Consolidate Enums:** Move `SignalDirection` and `DecisionStatus` into `src/core/constants.py`. (Verified)
-2. **Harmonize Schemas:** Update `src/core/schemas.py` to import from `constants.py`. (Verified)
-3. **Refactor BaseModel & Subclasses:** Ensure all models return a `Signal` NamedTuple using `SignalDirection`. (Applied to PPO, LSTM, Transformer, Ensemble)
-4. **Main entrypoint cleanup:** Standardize terminology in CLI flags and help text; implement `structlog`. (Applied)
+| Issue | Action | Priority |
+| :--- | :--- | :--- |
+| **Risk Fragmentation** | Consolidate 8-layer logic into `RiskManager` and delete `RiskEngine`. | CRITICAL |
+| **Domain Misalignment** | Relocate `FeatureEngineer` to `src/data/feature_engineering.py`. | HIGH |
+| **API Standardization** | Standardize on `validate_signal()` returning `RiskDecision`. | HIGH |
+| **Docs Sync** | Update README and docstrings to reflect 8-layer ATR cascade. | MEDIUM |
 
-### Long-term Recommendations
-- **Domain Separation:** Evaluate moving `feature_engineering.py` to `src/data/`.
-- **TUI Dashboard:** Transition the CLI from rich-panels to a full TUI (Decision Cockpit) for better operator experience.
-
----
-**Audit Status:** ✅ RECOVERING (Remediation active)
-**Steward:** Jules05 (yxynoty)
+## ✅ Status: FIX REQUIRED
+The system is technically functional but requires harmonization to maintain "One Coherent Product" status.
