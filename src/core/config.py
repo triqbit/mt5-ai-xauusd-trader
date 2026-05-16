@@ -154,6 +154,9 @@ class TradingConfig(BaseSettings):
     execution_latency_threshold: float = Field(
         default=1.0, description="Max allowed execution latency in seconds before alerting"
     )
+    poll_interval: int = Field(
+        default=60, ge=1, description="Interval in seconds between signal evaluation loops"
+    )
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
