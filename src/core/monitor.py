@@ -88,6 +88,16 @@ DATA_FRESHNESS_GAUGE = Gauge(
     "trading_data_freshness_seconds", "Age of latest data point in seconds"
 )
 
+# 6. Technical & Decision Funnel Metrics
+MARKET_REGIME_GAUGE = Gauge("trading_market_regime", "Current market regime status", ["regime"])
+MARKET_VOLATILITY_GAUGE = Gauge("trading_market_volatility", "Current market volatility index")
+TECHNICAL_INDICATOR_GAUGE = Gauge(
+    "trading_technical_indicator", "Current technical indicator values", ["indicator"]
+)
+DECISION_FUNNEL_COUNTER = Counter(
+    "trading_decision_funnel_total", "Total signals at each funnel stage", ["stage"]
+)
+
 
 class Monitor:
     """
@@ -430,6 +440,26 @@ class Monitor:
             msg = f"⚠️ WARNING: Data Stale!\nLast Data Point: {age / 60:.1f} minutes ago."
             self.send_message(msg)
             logger.warning("stale_data_alert", age_seconds=age)
+
+    def log_market_context(self, regime: str, volatility: float) -> None:
+        """Update market regime and volatility metrics."""
+        # Reset other regime labels to 0, set current to 1
+        # This is a common pattern for tracking categorical states in Prometheus Gauges
+        for r in ["TRENDING_UP", "TRENDING_DOWN", "RANGING", "VOLATILE", "UNKNOWN"]:
+            MARKET_REGIME_GAUGE.labels(regime=r).set(1 if r == regime.upper() else 0)
+
+        MARKET_VOLATILITY_GAUGE.set(volatility)
+        logger.debug("market_context_logged", regime=regime, volatility=volatility)
+
+    def log_technical_indicator(self, indicator: str, value: float) -> None:
+        """Update a specific technical indicator metric."""
+        TECHNICAL_INDICATOR_GAUGE.labels(indicator=indicator).set(value)
+        logger.debug("technical_indicator_logged", indicator=indicator, value=value)
+
+    def record_funnel_step(self, stage: str) -> None:
+        """Increment a step in the decision funnel."""
+        DECISION_FUNNEL_COUNTER.labels(stage=stage).inc()
+        logger.debug("funnel_step_recorded", stage=stage)
 
     def alert_inference_timeout(self, latency_ms: float, threshold_ms: float) -> None:
         """Send warning for model inference timeout."""
