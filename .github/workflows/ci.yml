@@ -94,7 +94,7 @@ jobs:
       - name: Bootstrap validation (Smoke Test)
         run: python main.py --show-config
       - name: Run tests with coverage
-        run: pytest tests/ --cov=src -v
+        run: pytest tests/ --cov=src --cov-fail-under=80 -v
         env:
           MT5_LOGIN: "0"
           MT5_PASSWORD: "test"
