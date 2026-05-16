@@ -1,31 +1,44 @@
 # Acceptance Criteria: StressLab (Strategy Resilience Testing)
 
-## Overview
-StressLab is an adversarial testing framework designed to evaluate the robustness of XAUUSD trading strategies beyond normal market conditions. It simulates various execution, data, and market structure hurdles to identify strategy fragility.
+## Functional Acceptance Criteria
+- **Behavior:**
+    - Simulate adverse market conditions: Spread widening, slippage spikes, missing ticks, and delayed fills.
+    - Inject synthetic "Flash Crashes" and "News Shocks" into historical data streams.
+    - Calculate a "Resilience Score" (0-100) based on performance retention under stress scenarios.
+    - Automatically identify "Fragility Points" where a strategy's drawdown inflates significantly.
+- **Edge Cases:**
+    - Maintain OHLC integrity after price perturbations (e.g., High must be >= Low).
+    - Handle extreme spread widening that exceeds the ATR.
+    - Detect and log "Execution Failures" in the simulator during high-slippage events.
+- **Inputs/Outputs:**
+    - **Inputs:** Strategy under test, OHLCV data, stress profile (multipliers, probabilities).
+    - **Outputs:** `StressTestReport` including resilience scores and scenario-specific metrics.
 
-## 1. Adverse Condition Replay
-- [x] **Spread Widening:** Must support multipliers on base spreads to simulate low-liquidity periods.
-- [x] **Slippage Spikes:** Must inject basis-point slippage on entries and exits.
-- [x] **Missing Ticks:** Must support probabilistic dropping of OHLCV bars.
-- [x] **Delayed Fills:** Must support N-step execution delays to simulate latency.
-- [x] **Choppy Fake Breakouts:** Must inject synthetic price spikes followed by immediate reversals.
-- [x] **Regime Transitions:** Must simulate sudden trend flips or volatility shocks.
-- [x] **Service Degradation:** Must support probabilistic blocking of signals (connectivity simulation).
-- [x] **Flash Crash Simulation:** Must simulate sudden deep price dislocations and partial recoveries.
+## Technical Acceptance
+- **Test Coverage:**
+    - Unit tests for individual perturbation algorithms (Slippage, Spread, Jitter).
+    - Integration tests for the full StressLab pipeline.
+    - Verification of reproducibility using seeded random generation.
+- **Performance:**
+    - A standard stress suite (5+ scenarios) for 100,000 candles must complete in < 1 minute.
+- **Error Handling:**
+    - Prevent generation of negative prices or invalid spread values.
+- **Observability:**
+    - Log detailed "Scenario Results" for post-test analysis.
 
-## 2. Reporting & Analytics
-- [x] **Typed Metrics:** All results must be captured in `StressTestMetrics` Pydantic models.
-- [x] **Resilience Score:** A composite 0-100 score indicating performance retention under stress.
-- [x] **Fragility Indicators:** Automated detection of drawdown inflation, Sharpe ratio decay, infrastructure delay sensitivity, and extreme slippage sensitivity.
-- [x] **Failure Points:** Identification of specific scenarios where a strategy becomes unprofitable.
-- [x] **Standard Test Suite:** Support for running a standardized suite of high-severity stress tests.
+## Operational Acceptance
+- **Documentation:**
+    - Guide for creating custom stress profiles.
+    - Explanation of Resilience Score calculation.
+- **Configuration:**
+    - Support for JSON-based stress profile definitions.
+- **Rollback:**
+    - N/A (Research component).
+- **Monitoring:**
+    - N/A.
 
-## 3. Implementation Standards
-- [x] **Type Safety:** Full Pydantic v2 usage for configuration and reports.
-- [x] **Reproducibility:** Seeded random number generation for deterministic stress runs.
-- [x] **Candle Consistency:** Recalculates high/low values after price perturbations to maintain OHLC integrity.
-- [x] **Compliance:** Adheres to Python 3.11+ UTC timestamp standards.
-
-## 4. Test Coverage
-- [x] **Unit Tests:** Verified perturbations, backtest logic, and report generation in `tests/test_stress_lab.py`.
-- [x] **E2E Compatibility:** Integrated with synthetic data generators and existing strategy protocols.
+## Release Readiness
+- **Deployment:** Part of the Research & Development module.
+- **Backward Compatibility:** Must be compatible with the `BaseStrategy` interface.
+- **Migration:** No data migration required.
+- **Sign-off:** Requires approval from the Quant Lead (Jules04) and Performance Lead (Jules02).
