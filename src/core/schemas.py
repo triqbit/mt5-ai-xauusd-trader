@@ -157,3 +157,26 @@ class ExecutionDecision(BaseModel):
             if self.blocked_by:
                 raise ValueError("An approved decision cannot have a 'blocked_by' reason.")
         return self
+
+    def __bool__(self) -> bool:
+        """Backward compatibility for boolean context evaluations."""
+        return self.is_approved
+
+
+class RiskDecision(BaseModel):
+    """
+    Structured result of the RiskEngine validation.
+    Enforces technical trust by ensuring every decision is auditable.
+
+    This model is immutable (frozen) and forbids extra fields.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="Final risk approval status")
+    reason: str = Field(..., description="rejection reason or 'Approved'")
+    adjusted_lot_size: float = Field(0.0, description="The final calculated position size in lots")
+
+    def __bool__(self) -> bool:
+        """Backward compatibility for boolean context evaluations."""
+        return self.is_approved
