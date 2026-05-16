@@ -19,6 +19,14 @@ The research reporting system is a high-fidelity audit framework designed to pro
     - **Interactive UX:** Sticky navigation headers with scroll progress indicators, tooltips for institutional metrics, and interactive card hover effects.
     - **Accessibility:** ARIA-hardened accessibility and print-optimized CSS for PDF generation.
 - **Modular Architecture:** Pydantic-based data models for extensible research sections covering Regimes, Stress Tests, Hyperopt, Journal Mining (Trade Patterns), Model Drift (PSI), Capital Allocation, Benchmarking, RL Evaluation, Rare Event Simulations, Confidence Calibration, Execution Quality, Strategic Confluence, and Audit Methodology.
+- **Sectional Scannability:** HTML reports feature top-level 'Summary' status badges for each analytical section (e.g., RESILIENCE: PASS, DRIFT: STABLE), allowing stakeholders to quickly identify areas of concern.
+
+## Data Models and Constraints
+
+To ensure robust serialization and prevent runtime errors, the reporting system follows strict Pydantic best practices:
+
+- **Field Ordering:** In all research section models (e.g., `StressedMetric`, `SignalMotif`), fields with default values MUST follow all fields without default values. This prevents `PydanticUserError` during model instantiation.
+- **Type Safety:** All metrics are strictly typed to ensure consistency across the research pipeline.
 
 ## Components
 
