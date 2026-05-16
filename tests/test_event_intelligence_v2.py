@@ -1,26 +1,27 @@
-import pytest
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
+
+import pytest
+
 from src.data.event_intelligence import (
-    EventIntelligence,
-    MockEventProvider,
-    MacroEvent,
     EventCategory,
     EventImpact,
-    TradingViewEventProvider
+    EventIntelligence,
+    MacroEvent,
+    MockEventProvider,
+    TradingViewEventProvider,
 )
+
 
 @pytest.fixture
 def now():
     return datetime(2024, 5, 1, 12, 0, 0, tzinfo=UTC)
 
+
 def test_refresh_interval_logic(now):
     """Test that EventIntelligence respects the refresh_interval."""
     event = MacroEvent(
-        name="Test Event",
-        category=EventCategory.USD,
-        impact=EventImpact.LOW,
-        timestamp=now
+        name="Test Event", category=EventCategory.USD, impact=EventImpact.LOW, timestamp=now
     )
     provider = MagicMock()
     provider.get_upcoming_events.return_value = [event]
@@ -40,8 +41,10 @@ def test_refresh_interval_logic(now):
     intel.get_risk_status(now + timedelta(minutes=6))
     assert provider.get_upcoming_events.call_count == 2
 
+
 def test_fail_safe_blocked_true(now):
     """Test that fail_safe_blocked=True blocks when no data is available."""
+
     class FailingProvider(MockEventProvider):
         def get_upcoming_events(self, start, end):
             raise Exception("API Down")
@@ -53,8 +56,10 @@ def test_fail_safe_blocked_true(now):
     assert status.risk_multiplier == 0.0
     assert "Event data unavailable (no cache)" in status.reason
 
+
 def test_fail_safe_blocked_false(now):
     """Test that fail_safe_blocked=False (default) does not block when no data is available."""
+
     class FailingProvider(MockEventProvider):
         def get_upcoming_events(self, start, end):
             raise Exception("API Down")
@@ -64,6 +69,7 @@ def test_fail_safe_blocked_false(now):
 
     assert status.is_blocked is False
     assert status.risk_multiplier == 1.0
+
 
 def test_tradingview_mock_provider(now):
     """Test the TradingView mock provider returns events for known dates."""
@@ -85,16 +91,18 @@ def test_tradingview_mock_provider(now):
     events = provider.get_upcoming_events(start, end)
     assert any("CPI" in e.name for e in events)
 
+
 def test_geopolitical_default_duration(now):
     """Test that GEOPOLITICAL events get a 24h default duration."""
     event = MacroEvent(
         name="War breakout",
         category=EventCategory.GEOPOLITICAL,
         impact=EventImpact.HIGH,
-        timestamp=now
+        timestamp=now,
     )
     # validate_timestamps is called on init
     assert event.end_timestamp == now + timedelta(hours=24)
+
 
 def test_central_bank_default_duration(now):
     """Test that FOMC/RATES events get a 4h default duration."""
@@ -102,6 +110,6 @@ def test_central_bank_default_duration(now):
         name="Fed Rate Decision",
         category=EventCategory.FOMC,
         impact=EventImpact.CRITICAL,
-        timestamp=now
+        timestamp=now,
     )
     assert event.end_timestamp == now + timedelta(hours=4)

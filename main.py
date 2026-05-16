@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
@@ -141,17 +141,10 @@ def _prepare_trade_signal(
     else:
         approved_risk = alloc_result.allocated_risk_pct
 
-    # 3. Lot Sizing
-    lot_size = (
-        risk.size_position(
-            cfg.symbol,
-            win_rate=0.58,
-            avg_win=4 * atr,
-            avg_loss=2 * atr,
-        )
-        if approved_risk > 0
-        else 0.0
-    )
+    # 3. Lot Sizing (Preliminary)
+    # In run_live, risk.validate_signal will recalculate the authoritative lot size
+    # using ATR-based sizing from market data.
+    lot_size = cfg.min_lot_size if approved_risk > 0 else 0.0
 
     return TradeSignal(
         symbol=cfg.symbol,
@@ -412,13 +405,27 @@ def run_live(
                 lot_size = signal.lot_size
 
                 # 6. Risk approval gate
+                risk_decision = None
+                risk_approved = False
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    if direction != 0:
+                        # Fetch current positions for exposure checks
+                        current_positions = connector.get_positions(cfg.symbol)
+                        risk_decision = risk.validate_signal(
+                            signal,
+                            df_raw,
+                            open_positions=current_positions,
+                            model_health=health,
+                        )
+                        risk_approved = risk_decision.is_approved
+                        if risk_approved:
+                            # Update lot size from risk manager's calculated value
+                            signal = signal.model_copy(
+                                update={"lot_size": risk_decision.adjusted_lot_size}
+                            )
+                    else:
+                        risk_approved = False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -462,14 +469,18 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": [risk_decision.reason]
+                            if risk_decision and not risk_approved
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason
+                            if risk_decision
+                            else (
+                                "Passed all risk gates" if risk_approved else "Risk gate rejected"
+                            ),
                         }
 
                         regime_data = {
@@ -588,7 +599,7 @@ def run_live(
                                     symbol=cfg.symbol,
                                     direction=direction,
                                     entry_price=price,
-                                    lot_size=lot_size,
+                                    lot_size=signal.lot_size,
                                     signal_id=signal_id,
                                 )
                 # 6. Check for closed positions to update logger
@@ -620,7 +631,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
@@ -1462,9 +1475,9 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent

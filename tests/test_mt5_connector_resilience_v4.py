@@ -1,9 +1,10 @@
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
+
+from src.core.exceptions import CircuitBreakerError, MT5DataError
 from src.trading.mt5_connector import MT5Connector
-from src.core.exceptions import MT5DataError, MT5ConnectionError, CircuitBreakerError
-from src.core.resilience import CircuitState
+
 
 @pytest.fixture
 def mock_config():
@@ -16,6 +17,7 @@ def mock_config():
     cfg.mt5_server = "server"
     cfg.metaapi_token = None
     return cfg
+
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
@@ -36,10 +38,11 @@ def test_get_account_info_resilience(mock_mt5, mock_config):
         connector._is_initialized = True
         return True
 
-    with patch.object(connector, 'initialize', side_effect=mock_init):
+    with patch.object(connector, "initialize", side_effect=mock_init):
         info = connector.get_account_info()
         assert info["balance"] == 1000.0
         assert mock_mt5.account_info.call_count == 3
+
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
@@ -59,11 +62,12 @@ def test_get_positions_resilience(mock_mt5, mock_config):
         connector._is_initialized = True
         return True
 
-    with patch.object(connector, 'initialize', side_effect=mock_init):
+    with patch.object(connector, "initialize", side_effect=mock_init):
         positions = connector.get_positions()
         assert len(positions) == 1
         assert positions[0]["ticket"] == 1
         assert mock_mt5.positions_get.call_count == 3
+
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
@@ -79,6 +83,7 @@ def test_get_account_balance_failure_propagation(mock_mt5, mock_config):
     with pytest.raises(MT5DataError):
         connector.get_account_balance()
 
+
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
 def test_circuit_breaker_tripping_on_account_info(mock_mt5, mock_config):
@@ -89,7 +94,7 @@ def test_circuit_breaker_tripping_on_account_info(mock_mt5, mock_config):
 
     mock_mt5.account_info.return_value = None
     mock_mt5.last_error.return_value = (10001, "Failed")
-    mock_mt5.initialize.return_value = False # Make initialize fail too
+    mock_mt5.initialize.return_value = False  # Make initialize fail too
 
     # with_retry will do 3 retries (total 4 attempts)
     # Circuit breaker should trip after 2 failures.
@@ -114,6 +119,7 @@ def test_circuit_breaker_tripping_on_account_info(mock_mt5, mock_config):
 
     assert connector.circuit_state == "OPEN"
 
+
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
 def test_get_terminal_status_resilience(mock_mt5, mock_config):
@@ -131,10 +137,11 @@ def test_get_terminal_status_resilience(mock_mt5, mock_config):
         connector._is_initialized = True
         return True
 
-    with patch.object(connector, 'initialize', side_effect=mock_init):
+    with patch.object(connector, "initialize", side_effect=mock_init):
         status = connector.get_terminal_status()
         assert status["algo_trading"] is True
         assert mock_mt5.terminal_info.call_count == 2
+
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
@@ -144,7 +151,7 @@ def test_get_symbol_properties_resilience(mock_mt5, mock_config):
 
     mock_symbol = MagicMock()
     mock_symbol.name = "XAUUSD"
-    mock_symbol.trade_mode = 0 # SYMBOL_TRADE_MODE_FULL
+    mock_symbol.trade_mode = 0  # SYMBOL_TRADE_MODE_FULL
     mock_symbol.spread = 10
     mock_symbol.digits = 3
     mock_symbol.point = 0.001
@@ -159,7 +166,7 @@ def test_get_symbol_properties_resilience(mock_mt5, mock_config):
         connector._is_initialized = True
         return True
 
-    with patch.object(connector, 'initialize', side_effect=mock_init):
+    with patch.object(connector, "initialize", side_effect=mock_init):
         props = connector.get_symbol_properties("XAUUSD")
         assert props["name"] == "XAUUSD"
         assert mock_mt5.symbol_info.call_count == 2

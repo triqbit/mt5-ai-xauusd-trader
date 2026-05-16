@@ -356,7 +356,7 @@ def test_start_date_config(simulator):
 
 def test_feature_engineer_compatibility(simulator):
     """Verify that generated rare events are compatible with the FeatureEngineer pipeline."""
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
 
     # Use a large enough number of steps for indicators (e.g. EMA 200)
     config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=500)

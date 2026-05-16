@@ -23,6 +23,8 @@ pydantic-settings==2.14.1
 
 # -- MetaTrader 5 (Cloud Fallback) ---------------------------------
 metaapi-cloud-sdk==29.1.1
+python-socketio==4.6.1
+python-engineio==3.14.2
 
 # -- Testing -------------------------------------------------------
 optuna==4.8.0
