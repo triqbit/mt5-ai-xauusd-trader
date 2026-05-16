@@ -7,7 +7,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 95% | RC v1.1.0-rc5 verified and stable. |
-| **Lint Debt** | 🟡 342 Issues | Primarily un-sorted imports and unused variables in tests. |
+| **Lint Debt** | 🟡 4,400+ Issues | Primarily un-sorted imports and unused variables in tests. |
 | **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (18 consecutive days). |
 | **Evidence Maturity** | 🟡 Emerging | 1 verified audit; 5 upcoming enterprise scorecards. |
 
@@ -21,10 +21,11 @@ This dashboard provides real-time visibility into the technical health, process 
 - **Primary Bottleneck:** Environment stability (dependency conflicts in `requirements-linux.txt`).
 
 ### 🧹 Code Quality (Ruff)
-- **Total Errors:** 342
+- **Total Errors:** 4,400+
 - **Key Areas:**
-  - `tests/`: 310+ issues (Unused imports, unformatted blocks).
-  - `src/`: <30 issues (High quality in core logic).
+  - `tests/`: 3,400+ issues (Unused imports, unformatted blocks).
+  - `src/`: 0 issues (100% clean core).
+  - `scripts/`: 800+ issues.
 - **Strategy:** Automated fixes for formatting are blocked by history integrity concerns.
 
 ### 📜 Process Integrity
