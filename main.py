@@ -195,7 +195,7 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = 60  # seconds between signal evaluations
+    poll_interval = cfg.poll_interval  # seconds between signal evaluations
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -633,15 +633,21 @@ def run_live(
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
-                # Wait for next interval with operator feedback
+                # Wait for next interval with dynamic Session Dashboard
                 if console:
-                    with console.status(
-                        "[bold blue]Waiting for next signal evaluation..."
-                    ) as status:
+                    pnl_color = "green" if risk.daily.realised_pnl >= 0 else "red"
+                    regime_label = regime_info.label.value.upper() if "regime_info" in locals() else "UNKNOWN"
+
+                    with console.status("[bold blue]Session Dashboard Initializing...") as status:
                         for i in range(poll_interval, 0, -1):
-                            status.update(
-                                f"[bold blue]Waiting for next signal evaluation ({i}s remaining)..."
+                            dashboard = (
+                                f"[bold white]Equity:[/] [green]${risk.balance:,.2f}[/] | "
+                                f"[bold white]Daily PnL:[/] [{pnl_color}]${risk.daily.realised_pnl:+.2f}[/] | "
+                                f"[bold white]Pos:[/] {len(risk.open_positions)} | "
+                                f"[bold white]Regime:[/] [cyan]{regime_label}[/] | "
+                                f"[bold blue]Next check in {i}s...[/]"
                             )
+                            status.update(dashboard)
                             time.sleep(1)
                 else:
                     time.sleep(poll_interval)
@@ -805,8 +811,17 @@ def run_setup_wizard() -> int:
         os.chmod(env_path, 0o600)
 
     console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
+
+    if (
+        Prompt.ask(
+            "\nWould you like to run a connectivity health check now?", choices=["y", "n"], default="y"
+        )
+        == "y"
+    ):
+        return 2  # Signal to main() to run health check
+
     console.print(
-        "You can now run the bot with [cyan]python main.py --check[/] to verify connectivity.\n"
+        "\nSetup complete. You can run the bot with [cyan]python main.py --check[/] to verify connectivity.\n"
     )
     return 0
 
@@ -834,23 +849,25 @@ Usage Examples:
   python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
         """,
     )
-    p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
+    p.add_argument("-v", "--version", action="version", version=f"%(prog)s {get_system_version()}")
 
     # -- Execution Group
     execution = p.add_argument_group("Execution Options")
     execution.add_argument(
+        "-m",
         "--mode",
         choices=["demo", "live", "backtest"],
         help="Execution mode: 'demo' (paper), 'live' (real money), or 'backtest' (simulation).",
     )
     execution.add_argument(
+        "-a",
         "--algo",
         dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
         help="AI algorithm architecture to use for signal generation.",
     )
-    execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
-    execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
+    execution.add_argument("-s", "--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
+    execution.add_argument("-t", "--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
     execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",
@@ -1139,7 +1156,13 @@ def main() -> int:
 
     # 0. Immediate Diagnostic Handlers
     if args.setup:
-        return run_setup_wizard()
+        setup_result = run_setup_wizard()
+        if setup_result == 2:
+            # User requested immediate health check
+            args.check = True
+            # Fall through to standard check logic
+        else:
+            return setup_result
 
     if args.doctor:
         try:

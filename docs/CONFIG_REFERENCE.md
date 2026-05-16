@@ -1,4 +1,4 @@
-# Configuration Reference (v1.1.0-rc7)
+# Configuration Reference (v1.1.0-rc9)
 
 This document lists the available configuration fields, their types, and descriptions.
 
@@ -53,6 +53,7 @@ This document lists the available configuration fields, their types, and descrip
 | `spread_reduce_pips` | `float` | Reduce if spread >1.5 pips | `1.5` |
 | `spread_halt_pips` | `float` | Halt if spread >2.0 pips | `2.0` |
 | `execution_latency_threshold` | `float` | Max allowed execution latency in seconds before alerting | `1.0` |
+| `poll_interval` | `int` | Interval in seconds between signal evaluation loops | `60` |
 | `algorithm` | `Literal['ppo', 'dreamer', 'lstm', 'ensemble']` | The ML algorithm architecture to use for signal generation | `ensemble` |
 | `model_path` | `Path` | Path to the serialized weights of the trained model | `models / trained / ensemble_latest.pt` |
 | `train_steps` | `int` | Number of environment steps for model training | `1000000` |
