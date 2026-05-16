@@ -88,10 +88,10 @@ def categorize_commits(commits, labels=None):
         subject = lines[0]
         # Filter out metadata lines from body (Co-authored-by, etc.)
         body_lines = [
-            l
-            for l in lines[1:]
+            line
+            for line in lines[1:]
             if not any(
-                marker in l
+                marker in line
                 for marker in ["Co-authored-by:", "Signed-off-by:", "PR-URL:", "---------"]
             )
         ]
