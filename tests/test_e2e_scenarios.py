@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.core.config import get_config
-from src.core.trade_logger import TradeLogger
 from src.core.schemas import TradeSignal
+from src.core.trade_logger import TradeLogger
 from src.trading.risk_manager import RiskManager
 from src.utils.synthetic_data import ScenarioGenerator
 
@@ -29,6 +29,7 @@ def mock_cfg():
 def trade_logger():
     logger = TradeLogger(db_url="sqlite:///:memory:")
     from src.core.trade_logger import Base
+
     Base.metadata.create_all(logger.engine)
     return logger
 
