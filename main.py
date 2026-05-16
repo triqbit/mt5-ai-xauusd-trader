@@ -338,6 +338,9 @@ def run_live(
                     else:
                         volatility = float(df_raw["close"].rolling(20).std().iloc[-1])
 
+                    if monitor:
+                        monitor.log_market_context(regime_info.label.value, volatility)
+
                 # 3. Model Signal Generation
                 with profile("inference"):
                     seq = None
@@ -350,6 +353,9 @@ def run_live(
 
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
+
+                    if direction != 0 and monitor:
+                        monitor.record_funnel_step("generated")
                     if monitor:
                         monitor.check_confidence_degradation(confidence)
                         # Log model performance if available
@@ -411,7 +417,7 @@ def run_live(
                     )
                 lot_size = signal.lot_size
 
-                # 6. Risk approval gate
+                # 5. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
                     risk_approved = (
@@ -419,13 +425,15 @@ def run_live(
                         if direction != 0
                         else False
                     )
+                    if risk_approved and monitor:
+                        monitor.record_funnel_step("risk_approved")
 
-                # 7. Execution Filter Cascade
+                # 6. Execution Filter Cascade
                 filter_decision = None
                 if risk_approved:
                     with profile("execution_filter"):
                         drawdown = (risk.peak_equity - risk.balance) / risk.peak_equity
-                        # Model health retrieved in step 6
+                        # Model health retrieved in step 5
                         filter_decision = execution_filter.validate(
                             signal,
                             df_features,
@@ -449,8 +457,10 @@ def run_live(
                                 filter_decision.blocked_by,
                             )
                             risk_approved = False
+                        elif monitor:
+                            monitor.record_funnel_step("filter_approved")
 
-                # 8. Decision Support System (Cockpit)
+                # 7. Decision Support System (Cockpit)
                 if direction != 0:
                     with profile("decision_support"):
                         # Prepare data for explainer
@@ -553,6 +563,7 @@ def run_live(
                         else:
                             log.info(dss.format_for_operator(packet))
 
+                # 8. Order Execution
                 if risk_approved and direction != 0:
                     with profile("execution"):
                         from src.core.exceptions import MT5ExecutionError
@@ -576,6 +587,7 @@ def run_live(
                             risk.open_positions[cfg.symbol] = ticket
                             log.info("Order placed", ticket=ticket, latency_ms=execution_latency_ms)
                             if monitor:
+                                monitor.record_funnel_step("executed")
                                 # We don't have slippage here yet, so we pass 0.0
                                 monitor.log_execution_quality(
                                     latency_ms=execution_latency_ms,
@@ -591,7 +603,7 @@ def run_live(
                                     lot_size=lot_size,
                                     signal_id=signal_id,
                                 )
-                # 6. Check for closed positions to update logger
+                # 9. Check for closed positions to update logger
                 with profile("closed_positions_check"):
                     current_positions = connector.get_positions(cfg.symbol)
                     current_tickets = {p["ticket"] for p in current_positions}
@@ -633,6 +645,19 @@ def run_live(
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
+                # 10. Loop iteration summary for observability
+                log.info(
+                    "loop_iteration_complete",
+                    symbol=cfg.symbol,
+                    direction=direction,
+                    confidence=confidence,
+                    regime=regime_info.label.value,
+                    risk_approved=risk_approved,
+                    filter_passed=filter_decision.is_approved if filter_decision else None,
+                    blocking_reason=filter_decision.blocked_by if filter_decision and not filter_decision.is_approved else None,
+                    loop_count=loop_count
+                )
+
                 # Wait for next interval with operator feedback
                 if console:
                     with console.status(
@@ -665,6 +690,13 @@ def run_live(
                     log.error("Re-initialization failed during outer loop recovery.")
             except Exception as exc:
                 log.exception("Unhandled error in trading loop: %s", exc)
+                if audit_logger:
+                    audit_logger.log(
+                        actor="system",
+                        action="loop_exception",
+                        details=f"Unhandled exception in trading loop: {exc!s}",
+                        metadata={"exception_type": type(exc).__name__, "loop_count": loop_count}
+                    )
                 time.sleep(poll_interval)
 
 

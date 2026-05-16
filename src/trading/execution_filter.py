@@ -110,6 +110,8 @@ class ExecutionFilter:
             "passed": bool(atr_passed),
             **atr_metrics,
         }
+        if self.monitor:
+            self.monitor.log_technical_indicator("atr_ratio", atr_metrics.get("ratio", 0.0))
 
         # Layer 2: Trend Angle
         trend_passed, trend_metrics = self._check_trend_angle_with_metrics(
@@ -121,6 +123,8 @@ class ExecutionFilter:
             "passed": bool(trend_passed),
             **trend_metrics,
         }
+        if self.monitor:
+            self.monitor.log_technical_indicator("trend_slope", trend_metrics.get("slope", 0.0))
 
         # Layer 3: EMA Sequence
         ema_passed, ema_metrics = self._check_ema_sequence_with_metrics(
@@ -143,6 +147,8 @@ class ExecutionFilter:
             "passed": bool(momentum_passed),
             **momentum_metrics,
         }
+        if self.monitor:
+            self.monitor.log_technical_indicator("rsi", momentum_metrics.get("rsi", 0.0))
 
         # Layer 5: Session/Time
         session_passed = self._check_session_time(timestamp)
@@ -222,6 +228,7 @@ class ExecutionFilter:
 
         if blocked_by and self.monitor:
             self.monitor.record_internal_rejection("execution_filter", blocked_by)
+            self.monitor.record_funnel_step("filter_rejected")
 
         return ExecutionDecision(
             signal=signal,
