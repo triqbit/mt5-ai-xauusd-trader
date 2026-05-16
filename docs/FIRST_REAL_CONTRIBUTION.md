@@ -14,7 +14,7 @@ Before you start, be aware of two unique factors in this repository:
 
 ## 🎯 Your Mission: Reduce the "Lint Debt"
 
-The repository currently has a significant amount of "lint debt" (over 4,000 issues), primarily in the `tests/` directory. Since `tests/` is a defined **Safe Zone**, this is the perfect place for a first contribution.
+The repository currently has a significant amount of "lint debt" (over 4,400 issues), primarily in the `tests/` directory. Since `tests/` is a defined **Safe Zone**, this is the perfect place for a first contribution.
 
 ### Step 1: Prepare Your Environment
 
@@ -23,8 +23,11 @@ The repository currently has a significant amount of "lint debt" (over 4,000 iss
 git checkout main
 git pull origin main
 
-# 2. Create a docs branch
-git checkout -b docs/cleanup-test-lint
+# 2. Install development tools
+pip install ".[dev]"
+
+# 3. Create a cleanup branch
+git checkout -b refactor/cleanup-test-lint
 ```
 
 ### Step 2: Identify Targets
