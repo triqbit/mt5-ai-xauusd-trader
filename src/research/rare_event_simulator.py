@@ -103,6 +103,10 @@ class RareEventSimulator:
         """
         Generate returns following a Student's t-distribution to capture 'fat tails'
         observed in real market data.
+
+        Mathematical Model: Student's t-distribution
+        Used to model asset returns with higher kurtosis (fatter tails) than the
+        normal distribution, reflecting the empirical frequency of extreme moves.
         """
         # Variance of standard t-distribution is df / (df - 2) for df > 2
         if df > 2:
@@ -244,6 +248,10 @@ class RareEventSimulator:
         """
         Simulates a rapid price collapse and partial/full recovery.
         Calibrated to trigger high-volatility regimes.
+
+        Mathematical Model: Asymmetric Jump Process
+        Injects negative jump components with time-varying intensity and
+        volatility scaling, followed by a mean-reverting recovery phase.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
@@ -317,6 +325,10 @@ class RareEventSimulator:
         """
         Simulates an overextended move where mean-reversion signals (e.g., RSI overbought)
         fail as price continues to grind higher/lower without significant pullbacks.
+
+        Mathematical Model: Persistent Drift with Low Volatility (The Grind)
+        Models a state where returns are consistently directional and
+        volatility is suppressed, preventing typical signal-based reversals.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
@@ -379,6 +391,10 @@ class RareEventSimulator:
         """
         Simulates a persistent, low-volatility trend that steadily moves away from entry points.
         Tests trailing stop effectiveness in low-volatility environments.
+
+        Mathematical Model: Low-Variance Random Walk with Drift
+        Generates a price path with high autocorrelation and minimal
+        white noise, creating a 'clean' but unrelenting trend.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
@@ -427,7 +443,14 @@ class RareEventSimulator:
     def _simulate_liquidity_vacuum(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
-        """Simulates a period of erratic price jumps and extreme spreads."""
+        """
+        Simulates a period of erratic price jumps and extreme spreads.
+
+        Mathematical Model: Low-Degrees-of-Freedom T-Distribution
+        Uses a Student's t-distribution with df close to 1.0 to generate
+        extremely heavy tails and frequent outliers, combined with
+        log-normal spread expansion.
+        """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
         vols = np.full(n, config.base_volatility)
@@ -495,24 +518,44 @@ class RareEventSimulator:
         return df, result
 
     def _simulate_gold_gap(self, config: RareEventConfig) -> tuple[pd.DataFrame, RareEventResult]:
-        """Simulates discontinuous price jumps."""
+        """
+        Simulates discontinuous price jumps.
+
+        Mathematical Model: Merton Jump-Diffusion
+        Models the price process as a combination of standard geometric Brownian
+        motion and a Poisson-driven jump process for discrete price gaps.
+        """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
         vols = np.full(n, config.base_volatility)
-
-        gap_idx = n // 2
-        gap_magnitude_pct = 0.02 * config.event_magnitude * self.rng.choice([-1, 1])
-
         gaps = np.zeros(n)
-        gaps[gap_idx] = config.start_price * gap_magnitude_pct
 
-        # Follow-through volatility
-        vol_boost = 4.0 * config.event_magnitude
-        post_gap_duration = 20
-        for i in range(post_gap_duration):
-            if gap_idx + i < n:
-                returns[gap_idx + i] *= vol_boost
-                vols[gap_idx + i] *= vol_boost
+        # Arrival intensity (lambda) for jumps
+        jump_intensity = 0.05 * config.event_magnitude
+        jump_mean = 0.0
+        jump_std = 0.015 * config.event_magnitude
+
+        # Generate jump occurrences using a Poisson process approximation
+        num_jumps = self.rng.poisson(jump_intensity * n)
+        jump_indices = self.rng.choice(range(n // 4, 3 * n // 4), size=min(num_jumps, n // 2), replace=False)
+
+        max_gap_pct = 0.0
+        primary_gap_idx = n // 2
+
+        for idx in jump_indices:
+            jump_size = self.rng.normal(jump_mean, jump_std)
+            gaps[idx] = config.start_price * jump_size
+            if abs(jump_size) > abs(max_gap_pct):
+                max_gap_pct = jump_size
+                primary_gap_idx = int(idx)
+
+            # Follow-through volatility for each jump
+            vol_boost = 3.0 * config.event_magnitude
+            duration = 10
+            for i in range(duration):
+                if idx + i < n:
+                    returns[idx + i] *= vol_boost
+                    vols[idx + i] *= vol_boost
 
         df = self._generate_base_ohlc(
             config.start_price,
@@ -528,19 +571,25 @@ class RareEventSimulator:
         result = RareEventResult(
             event_type=RareEventType.GOLD_GAP,
             config=config,
-            start_index=gap_idx,
-            end_index=gap_idx + post_gap_duration,
-            peak_impact_pct=gap_magnitude_pct,
+            start_index=primary_gap_idx,
+            end_index=min(n - 1, primary_gap_idx + 10),
+            peak_impact_pct=max_gap_pct,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
-            description=f"Discontinuous gold gap of {gap_magnitude_pct:.2%}.",
+            description=f"Merton Jump-Diffusion simulation with {len(jump_indices)} gaps, peak {max_gap_pct:.2%}.",
         )
         return df, result
 
     def _simulate_violent_reversal(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
-        """Simulates a strong trend followed by an abrupt reversal."""
+        """
+        Simulates a strong trend followed by an abrupt reversal.
+
+        Mathematical Model: Trend-Switching Process
+        Implements a two-phase process: a deterministic trend phase followed
+        by a stochastic reversal phase with increasing jump intensity.
+        """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
         vols = np.full(n, config.base_volatility)
@@ -590,7 +639,13 @@ class RareEventSimulator:
     def _simulate_dislocation(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
-        """Simulates a regime shift."""
+        """
+        Simulates a regime shift.
+
+        Mathematical Model: Markov Regime-Switching Approximation
+        Simulates a structural break in the stochastic process where drift
+        and volatility parameters undergo a discrete, permanent shift.
+        """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
         vols = np.full(n, config.base_volatility)
@@ -642,7 +697,13 @@ class RareEventSimulator:
     def _simulate_vol_cluster(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
-        """Simulates an abnormal cluster of high volatility with multiple shocks."""
+        """
+        Simulates an abnormal cluster of high volatility with multiple shocks.
+
+        Mathematical Model: GARCH(1,1) (Generalized Autoregressive Conditional Heteroskedasticity)
+        Models conditional variance as a function of past residuals and past variance,
+        simulating the 'volatility clustering' effect common in XAUUSD.
+        """
         n = config.n_steps
         vols = np.full(n, config.base_volatility)
 
@@ -697,6 +758,64 @@ class RareEventSimulator:
             description=f"Abnormal volatility cluster with {peak_impact:.2%} peak deviation.",
         )
         return df, result
+
+    def chain_scenarios(
+        self, configs: list[RareEventConfig]
+    ) -> tuple[pd.DataFrame, list[RareEventResult]]:
+        """
+        Generates a single OHLCV DataFrame containing multiple rare events in sequence.
+
+        Facilitates complex adversarial testing by linking distinct market shocks
+        into a continuous price path, ensuring logical continuity of OHLC data.
+
+        Args:
+            configs: List of configurations for the events to be chained.
+
+        Returns:
+            A tuple containing:
+                - pd.DataFrame: Combined OHLCV data.
+                - list[RareEventResult]: Metadata for each event in the chain.
+        """
+        if not configs:
+            return pd.DataFrame(), []
+
+        all_dfs = []
+        all_results = []
+
+        # We use a copy of the configs to avoid side effects
+        current_configs = [cfg.model_copy() for cfg in configs]
+
+        total_offset = 0
+        for i, config in enumerate(current_configs):
+            if i > 0:
+                # Continuity: use the end state of previous scenario
+                prev_df = all_dfs[-1]
+                config.start_price = float(prev_df["close"].iloc[-1])
+
+                # Date continuity
+                freq = (
+                    prev_df.index[1] - prev_df.index[0]
+                    if len(prev_df) > 1
+                    else pd.Timedelta(seconds=86400 // config.bars_per_day)
+                )
+                config.start_date = (prev_df.index[-1] + freq).strftime("%Y-%m-%d %H:%M:%S")
+
+            df, result = self.generate_scenario(config)
+
+            # Adjust indices for the combined dataframe
+            adjusted_result = result.model_copy(
+                update={
+                    "start_index": result.start_index + total_offset,
+                    "end_index": result.end_index + total_offset,
+                }
+            )
+
+            all_dfs.append(df)
+            all_results.append(adjusted_result)
+            total_offset += len(df)
+
+        combined_df = pd.concat(all_dfs)
+        return combined_df, all_results
 
     def generate_suite(
         self, n_steps: int = 500, magnitude: float = 1.0, seed: int | None = None
@@ -753,6 +872,10 @@ class RareEventSimulator:
         """
         Simulates a violent directional move (News Shock) followed by sustained
         high volatility and erratic behavior. Designed to trigger NEWS_SHOCK regime.
+
+        Mathematical Model: Jump Diffusion with Volatility Persistence
+        Combines a directional jump with an exponential decay of post-shock
+        volatility, simulating the market's reaction to high-impact economic data.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
@@ -760,28 +883,33 @@ class RareEventSimulator:
 
         shock_idx = n // 3
         # Magnitude needs to be high enough to hit ER > 0.7 and ATR Ratio > 2.0
-        # XAUUSD often moves 20-40 dollars on major news ($2300 * 0.015 = $34.5)
-        shock_magnitude = 0.03 * config.event_magnitude * self.rng.choice([-1, 1])
+        shock_direction = self.rng.choice([-1, 1])
+        shock_magnitude = 0.04 * config.event_magnitude * shock_direction
 
         # Phase 1: The Shock (multi-bar directional move to keep ER high)
-        shock_len = max(1, int(10 * config.event_magnitude))
+        shock_len = max(1, int(15 * config.event_magnitude))
         for i in range(shock_len):
             idx = shock_idx + i
             if idx < n:
                 returns[idx] = (shock_magnitude / shock_len) * self.rng.uniform(0.9, 1.1)
-                vols[idx] *= 20.0 * config.event_magnitude
+                vols[idx] *= 35.0 * config.event_magnitude
 
-        # Phase 2: Sustained Volatility and erratic follow-through
+        # Phase 2: Sustained Volatility and erratic follow-through with secondary mini-shocks
         shock_duration = int(40 * config.event_magnitude)
         for i in range(shock_len, shock_duration):
             idx = shock_idx + i
             if idx < n:
                 # Decay volatility but keep it high to maintain VoV and ATR Ratio
-                decay_factor = np.exp(-(i - shock_len) / (30 * config.event_magnitude))
+                decay_factor = np.exp(-(i - shock_len) / (20 * config.event_magnitude))
                 vols[idx] = config.base_volatility * (
-                    1 + 15.0 * config.event_magnitude * decay_factor
+                    1 + 35.0 * config.event_magnitude * decay_factor
                 )
-                returns[idx] = self._generate_t_returns(1, config.drift, vols[idx], df=1.2)[0]
+
+                # Mini-shock probability (echoes of the news)
+                if self.rng.random() < 0.2:
+                    returns[idx] = self.rng.normal(0, vols[idx] * 3.0)
+                else:
+                    returns[idx] = self._generate_t_returns(1, config.drift, vols[idx], df=1.2)[0]
 
         df = self._generate_base_ohlc(
             config.start_price,
@@ -792,6 +920,10 @@ class RareEventSimulator:
             bars_per_day=config.bars_per_day,
             start_date=config.start_date,
         )
+
+        # Explicit Volume Surge during news shock to trigger RegimeDetector THRESH_NEWS_SHOCK_VOL
+        shock_mask = (np.arange(n) >= shock_idx) & (np.arange(n) < shock_idx + shock_duration)
+        df.loc[shock_mask, "tick_volume"] *= np.int64(4 * config.event_magnitude)
 
         event_prices = df["close"].iloc[shock_idx : shock_idx + shock_duration]
         start_price_val = df["close"].iloc[shock_idx - 1] if shock_idx > 0 else df["close"].iloc[0]
@@ -806,7 +938,7 @@ class RareEventSimulator:
             peak_impact_pct=peak_impact,
             realized_volatility=float(np.std(returns) * np.sqrt(config.bars_per_day)),
             recovery_attained=0.0,
-            description=f"News-driven directional shock of {peak_impact:.2%}.",
+            description=f"News shock of {peak_impact:.2%} with persistence and echos.",
         )
         return df, result
 
@@ -814,6 +946,10 @@ class RareEventSimulator:
         """
         Simulates an extreme single-tick outlier (wick) that quickly returns to
         the prior price level. Tests stop-loss resilience.
+
+        Mathematical Model: Impulse Noise Injection
+        Injects a high-magnitude, zero-persistence shock into the candle range
+        (high/low) without altering the underlying price path (open/close).
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
@@ -864,6 +1000,10 @@ class RareEventSimulator:
         """
         Simulates a fake breakout past a consolidation range followed by a
         violent reversal. Tests trend-following strategy robustness.
+
+        Mathematical Model: Adversarial Mean-Reversion Trap
+        Simulates a short-term trend exhaustion pattern where a breakout
+        signal is synthetically generated before inducing a contra-trend move.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
@@ -930,7 +1070,13 @@ class RareEventSimulator:
     def _simulate_multi_session_dislocation(
         self, config: RareEventConfig
     ) -> tuple[pd.DataFrame, RareEventResult]:
-        """Simulates a sequence of regime shifts across multiple sessions."""
+        """
+        Simulates a sequence of regime shifts across multiple sessions.
+
+        Mathematical Model: Composite Multi-Regime Process
+        Chains multiple stochastic processes with randomized parameters
+        across distinct temporal windows to simulate erratic session behavior.
+        """
         n = config.n_steps
         returns = np.zeros(n)
         vols = np.zeros(n)
@@ -996,6 +1142,10 @@ class RareEventSimulator:
         """
         Simulates a rapid parabolic upward move driven by buy-side liquidation.
         Tests resistance-breakout and stop-loss hunting logic.
+
+        Mathematical Model: Parabolic Acceleration Process
+        Uses a quadratic return acceleration function combined with
+        exponentially increasing volatility to simulate a feedback loop.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)
@@ -1057,6 +1207,10 @@ class RareEventSimulator:
         """
         Simulates a series of accelerating downward price shocks (margin calls).
         Tests trailing-stop and capital preservation logic under extreme stress.
+
+        Mathematical Model: Multi-Wave Jump Process
+        Injects a sequence of increasingly severe negative jumps with
+        volatility spikes and intermittent 'feeble' bounce phases.
         """
         n = config.n_steps
         returns = self._generate_t_returns(n, config.drift, config.base_volatility)

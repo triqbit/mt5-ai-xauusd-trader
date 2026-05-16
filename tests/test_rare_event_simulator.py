@@ -397,3 +397,39 @@ def test_silent_trend_behavior(simulator):
     returns = df["close"].pct_change().dropna()
     trend_returns = returns.iloc[result.start_index : result.end_index]
     assert trend_returns.std() < config.base_volatility * 1.5
+
+
+def test_chain_scenarios(simulator):
+    configs = [
+        RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=100, start_price=2300.0),
+        RareEventConfig(event_type=RareEventType.GOLD_GAP, n_steps=150),
+        RareEventConfig(event_type=RareEventType.NEWS_SHOCK, n_steps=100),
+    ]
+
+    combined_df, results = simulator.chain_scenarios(configs)
+
+    assert len(combined_df) == 100 + 150 + 100
+    assert len(results) == 3
+
+    # Check price continuity
+    for i in range(len(combined_df) - 1):
+        # We allow small gaps only for GOLD_GAP event indices
+        # results[1] is GOLD_GAP, starts at offset 100
+        # In Merton implementation, jump indices are randomized, but let's check basic OHLC link
+        if i == 99:  # End of first scenario
+            # open of next candle should match close of previous unless it's a gap
+            # Since GOLD_GAP only injects gaps within its range, the link at 100 should be continuous
+            np.testing.assert_allclose(
+                combined_df.iloc[i + 1]["open"], combined_df.iloc[i]["close"], atol=1e-5
+            )
+
+    # Check results indices
+    assert results[0].start_index == 50  # 100 // 2
+    assert results[1].start_index >= 100 + (150 // 4)
+    assert results[1].start_index <= 100 + (3 * 150 // 4)
+    assert results[2].start_index == 100 + 150 + (100 // 3)
+
+    # Check descriptions
+    assert "Flash crash" in results[0].description
+    assert "Merton Jump-Diffusion" in results[1].description
+    assert "News shock" in results[2].description
