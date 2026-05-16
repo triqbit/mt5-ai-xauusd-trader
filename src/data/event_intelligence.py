@@ -211,8 +211,6 @@ class GeopoliticalEventProvider(BaseEventProvider):
                     events.append(event)
             except Exception as e:
                 logger.error(f"Error parsing geopolitical event: {e}", item=item)
-                # Keep going if one event fails to parse?
-                # For consistency with "failure return None", maybe if it fails to parse the whole source is suspect.
                 return None
 
         return events
@@ -270,9 +268,6 @@ class MetaAPIEventProvider(BaseEventProvider):
                 category = self._guess_category(name)
 
                 # Filter for XAUUSD relevant events:
-                # 1. US/USD events
-                # 2. Geopolitical events (regardless of country)
-                # 3. High/Critical impact events from other major economies
                 is_usd = item.get("country") == "US" or item.get("currency") == "USD"
                 is_geopolitical = category == EventCategory.GEOPOLITICAL
                 is_major_economy = item.get("country") in ["EU", "GB", "JP", "CH", "CN"]
@@ -312,7 +307,10 @@ class MetaAPIEventProvider(BaseEventProvider):
     def _guess_category(self, name: str) -> EventCategory:
         """Guesses the event category based on the event name."""
         name_upper = name.upper()
-        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI"]):
+        if any(
+            kw in name_upper
+            for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI", "COST OF LIVING"]
+        ):
             return EventCategory.CPI
         if any(
             kw in name_upper
@@ -324,6 +322,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "JOBLESS",
                 "JOBLESS CLAIMS",
                 "ADP",
+                "LABOR",
             ]
         ):
             return EventCategory.NFP
@@ -449,6 +448,23 @@ class EventIntelligence:
                 EventImpact.CRITICAL: 240,
             }
 
+        # Category-specific overrides
+        self.category_pre_event_minutes: dict[EventCategory, int] = {}
+        if config and hasattr(config, "macro_category_pre_event_minutes"):
+            for k, v in config.macro_category_pre_event_minutes.items():
+                try:
+                    self.category_pre_event_minutes[EventCategory(k)] = v
+                except ValueError:
+                    logger.warning(f"Invalid EventCategory in config: {k}")
+
+        self.category_post_event_minutes: dict[EventCategory, int] = {}
+        if config and hasattr(config, "macro_category_post_event_minutes"):
+            for k, v in config.macro_category_post_event_minutes.items():
+                try:
+                    self.category_post_event_minutes[EventCategory(k)] = v
+                except ValueError:
+                    logger.warning(f"Invalid EventCategory in config: {k}")
+
     def refresh(self, current_time: datetime | None = None) -> None:
         """
         Force a refresh of event data from all providers.
@@ -480,13 +496,10 @@ class EventIntelligence:
                 logger.error(f"Provider {provider.__class__.__name__} failed during refresh: {e}")
 
         if any_success:
-            # Use a dictionary for merging to preserve uniqueness and prevent data loss
-            # from temporarily failing providers.
             unique_events = {(ev.name, ev.timestamp): ev for ev in self._cached_events}
             for ev in new_events:
                 unique_events[(ev.name, ev.timestamp)] = ev
 
-            # Filter out stale events from cache to keep it performant
             stale_threshold = now - timedelta(days=2)
             self._cached_events = [
                 ev
@@ -504,7 +517,6 @@ class EventIntelligence:
         if now.tzinfo is None:
             now = now.replace(tzinfo=UTC)
 
-        # Determine if we need to refresh cache
         needs_refresh = (
             self._last_successful_fetch is None
             or (now - self._last_successful_fetch) > self.refresh_interval
@@ -514,12 +526,10 @@ class EventIntelligence:
         if needs_refresh:
             self.refresh(now)
 
-        # Re-verify if fetch failed completely and we have no cache
         all_fetch_failed = self._last_successful_fetch is None or (
             needs_refresh and (now - self._last_successful_fetch) > timedelta(seconds=1)
         )
 
-        # Look ahead and behind based on max windows
         max_pre = max(self.pre_event_minutes.values())
         max_post = max(self.post_event_minutes.values())
         max_pre = max(max_pre, 120)
@@ -528,7 +538,6 @@ class EventIntelligence:
         start_lookback = now - timedelta(minutes=max_post + 1440)
         end_lookahead = now + timedelta(minutes=max_pre + 1440)
 
-        # Always filter the cache for the current relevant window
         events = [
             e
             for e in self._cached_events
@@ -536,8 +545,6 @@ class EventIntelligence:
         ]
 
         if not events and (all_fetch_failed or self._last_successful_fetch is None):
-            # If no data is available and providers failed (or haven't succeeded yet),
-            # return status based on fail_safe_blocked setting.
             reason = (
                 "Event data unavailable (no cache). "
                 f"Fail-safe {'BLOCKING' if self.fail_safe_blocked else 'PASSING'}."
@@ -558,12 +565,22 @@ class EventIntelligence:
             pre_window = self.pre_event_minutes.get(event.impact, 0)
             post_window = self.post_event_minutes.get(event.impact, 0)
 
-            # Explicit category-specific overrides for major market movers
+            # Category-specific overrides from config
+            cat_pre = self.category_pre_event_minutes.get(event.category)
+            if cat_pre is not None:
+                pre_window = max(pre_window, cat_pre)
+
+            cat_post = self.category_post_event_minutes.get(event.category)
+            if cat_post is not None:
+                post_window = max(post_window, cat_post)
+
+            # Explicit category-specific overrides for major market movers (institutional defaults)
             major_categories = [
                 EventCategory.FOMC,
                 EventCategory.NFP,
                 EventCategory.RATES,
                 EventCategory.CPI,
+                EventCategory.GEOPOLITICAL,
             ]
             if event.category in major_categories:
                 # Major events require significantly larger windows for institutional safety
@@ -582,11 +599,9 @@ class EventIntelligence:
             # Check pre-event window
             elif event.timestamp > now and (event.timestamp - now) <= timedelta(minutes=pre_window):
                 is_active = True
-                # Stricter blocking for HIGH impact major events and all CRITICAL events
                 if event.impact == EventImpact.CRITICAL:
                     is_event_blocking = True
                 elif event.impact == EventImpact.HIGH:
-                    # Block 60 mins before major events, 30 mins before others
                     threshold = 60 if event.category in major_categories else 30
                     if (event.timestamp - now) <= timedelta(minutes=threshold):
                         is_event_blocking = True
@@ -596,7 +611,6 @@ class EventIntelligence:
                 now - (event.end_timestamp or event.timestamp)
             ) <= timedelta(minutes=post_window):
                 is_active = True
-                # Critical events always block during cooldown; HIGH impact majors block for first 60 mins
                 if event.impact == EventImpact.CRITICAL or (
                     event.impact == EventImpact.HIGH
                     and event.category in major_categories
@@ -610,16 +624,11 @@ class EventIntelligence:
                     is_blocked = True
                     blocking_events.append(event)
 
-                # Calculate multiplier using severity_score (1.0 - severity_score)
-                # But we apply stricter caps for institutional safety
                 event_mult = max(0.0, round(1.0 - event.severity_score, 2))
 
-                # Extra institutional guardrails for major events
                 if event.category in major_categories and event.impact >= EventImpact.HIGH:
-                    # Major high-impact events should never have more than 0.25 multiplier
                     event_mult = min(event_mult, 0.25)
 
-                # CRITICAL events always zero the multiplier
                 if event.impact == EventImpact.CRITICAL:
                     event_mult = 0.0
 

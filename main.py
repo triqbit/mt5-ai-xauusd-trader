@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
+    from src.data.event_intelligence import EventIntelligence
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
@@ -108,6 +109,7 @@ def _prepare_trade_signal(
     risk: "RiskManager",
     allocator: "CapitalAllocator",
     audit_logger: Optional["AuditLogger"] = None,
+    risk_multiplier: float = 1.0,
 ) -> "TradeSignal":
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -153,6 +155,19 @@ def _prepare_trade_signal(
         else 0.0
     )
 
+    # 4. Macro Risk Scaling
+    if risk_multiplier < 1.0:
+        old_size = lot_size
+        lot_size = (
+            max(cfg.min_lot_size, round(lot_size * risk_multiplier, 2)) if lot_size > 0 else 0.0
+        )
+        log.info(
+            "Macro risk scaling applied",
+            multiplier=risk_multiplier,
+            old_size=old_size,
+            new_size=lot_size,
+        )
+
     return TradeSignal(
         symbol=cfg.symbol,
         direction=direction,
@@ -175,6 +190,7 @@ def run_live(
     regime_detector: "RegimeDetector",
     allocator: "CapitalAllocator",
     dss: "DecisionSupportSystem",
+    event_intelligence: Optional["EventIntelligence"] = None,
     trade_logger: Optional["TradeLogger"] = None,
     monitor: Optional["Monitor"] = None,
     console: Optional["Console"] = None,
@@ -193,6 +209,14 @@ def run_live(
     from src.data.event_intelligence import RiskStatus
 
     log = structlog.get_logger("main.live")
+
+    # Macro intelligence background refresh
+    if event_intelligence:
+        try:
+            event_intelligence.refresh()
+            log.info("Initial macro event refresh complete")
+        except Exception as e:
+            log.warning("Initial macro refresh failed", error=str(e))
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
     poll_interval = 60  # seconds between signal evaluations
@@ -398,6 +422,11 @@ def run_live(
                 else:
                     atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
+                # 4. Macro Risk Status (Calculated early for sizing and blocking)
+                macro_risk = RiskStatus(is_blocked=False, risk_multiplier=1.0, reason="No intel")
+                if event_intelligence:
+                    macro_risk = event_intelligence.get_risk_status(datetime.now(timezone.utc))
+
                 with profile("signal_preparation"):
                     signal = _prepare_trade_signal(
                         cfg=cfg,
@@ -408,6 +437,7 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
+                        risk_multiplier=macro_risk.risk_multiplier,
                     )
                 lot_size = signal.lot_size
 
@@ -511,6 +541,8 @@ def run_live(
                             execution_data=execution_data,
                         )
 
+                        # 8.1 Macro Risk Status (Already calculated above)
+
                         # Log comprehensive decision trace for every non-hold signal
                         if audit_logger:
                             audit_logger.log(
@@ -526,11 +558,6 @@ def run_live(
                                     "execution_data": execution_data,
                                 },
                             )
-
-                        # Use a stub for macro risk since we don't have a live feed in this loop yet
-                        macro_risk = RiskStatus(
-                            is_blocked=False, active_events=[], reason="No active data"
-                        )
 
                         # Optimization: Use real performance metrics from TradeLogger
                         if trade_logger:
@@ -620,7 +647,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
@@ -1465,6 +1494,11 @@ def main() -> int:
     from src.core.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
+    from src.data.event_intelligence import (
+        EventIntelligence,
+        GeopoliticalEventProvider,
+        MetaAPIEventProvider,
+    )
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent
@@ -1479,10 +1513,25 @@ def main() -> int:
         db_url=database_url if "sqlite" in database_url else "sqlite:///trades.db"
     )
 
+    # Macro Intelligence
+    event_providers = []
+    if cfg.metaapi_token:
+        event_providers.append(MetaAPIEventProvider(token=cfg.metaapi_token.get_secret_value()))
+    # Geopolitical provider with local fallback
+    geo_path = cfg.data_dir / "geopolitical_events.json"
+    event_providers.append(GeopoliticalEventProvider(source=str(geo_path)))
+
+    event_intelligence = EventIntelligence(
+        providers=event_providers,
+        fail_safe_blocked=getattr(cfg, "macro_fail_safe_blocked", False),
+        config=cfg,
+    )
+
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
+        event_intelligence=event_intelligence,
         monitor=monitor,
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
@@ -1628,6 +1677,7 @@ def main() -> int:
                 regime_detector,
                 allocator,
                 dss,
+                event_intelligence=event_intelligence,
                 trade_logger=trade_logger,
                 monitor=monitor,
                 console=console,

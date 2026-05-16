@@ -108,6 +108,18 @@ class TradingConfig(BaseSettings):
         default_factory=lambda: {1: 5, 2: 30, 3: 120, 4: 240},
         description="Minutes after an event to maintain risk reduction/blocking, indexed by Impact Level",
     )
+    macro_category_pre_event_minutes: dict[str, int] = Field(
+        default_factory=dict,
+        description="Minutes before an event by Category (e.g. {'FOMC': 120})",
+    )
+    macro_category_post_event_minutes: dict[str, int] = Field(
+        default_factory=dict,
+        description="Minutes after an event by Category (e.g. {'FOMC': 240})",
+    )
+    macro_fail_safe_blocked: bool = Field(
+        default=False,
+        description="If True, block trading if event data is unavailable",
+    )
 
     # Daily Limits (Cascading)
     max_daily_loss: float = Field(
@@ -130,9 +142,15 @@ class TradingConfig(BaseSettings):
     allocator_max_total_heat: float = Field(default=0.70, description="Max 70% of budget committed")
     allocator_max_symbol_risk: float = Field(default=0.40, description="Max 40% per symbol")
     allocator_max_family_risk: float = Field(default=0.40, description="Max 40% per model family")
-    allocator_performance_step: float = Field(default=0.05, description="Adjustment step for performance")
-    allocator_decay_rate: float = Field(default=0.001, description="Rate at which multiplier returns to 1.0")
-    allocator_soft_limit_buffer: float = Field(default=0.10, description="Buffer for diversification guard")
+    allocator_performance_step: float = Field(
+        default=0.05, description="Adjustment step for performance"
+    )
+    allocator_decay_rate: float = Field(
+        default=0.001, description="Rate at which multiplier returns to 1.0"
+    )
+    allocator_soft_limit_buffer: float = Field(
+        default=0.10, description="Buffer for diversification guard"
+    )
 
     # Volatility Thresholds
     volatility_high_threshold: float = Field(
