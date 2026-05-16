@@ -14,7 +14,7 @@ import sys
 import tarfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List
 
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import sessionmaker
@@ -272,7 +272,7 @@ def cleanup_backtests(backtest_dir: Path, dry_run: bool = False, archive_dir: Pa
 
 
 def cleanup_database(
-    db_url: str, audit_db_url: str = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR
+    db_url: str, audit_db_url: str | None = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR
 ) -> dict:
     """Purge old records from the database according to the retention policy."""
     engine = create_engine(db_url)

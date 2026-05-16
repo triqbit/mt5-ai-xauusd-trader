@@ -10,20 +10,20 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-import pytest
 import psutil
+import pytest
 
 from src.core.config import get_config
-from src.core.monitor import Monitor
-from src.core.trade_logger import RiskEvent, TradeLogger
 from src.core.feature_engineering import FeatureEngineer
+from src.core.monitor import Monitor
+from src.core.schemas import TradeSignal
+from src.core.trade_logger import RiskEvent, TradeLogger
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import RegimeDetector
 from src.research.benchmarks import EMACrossoverStrategy
 from src.research.hyperopt_walkforward import WalkForwardConfig, WalkForwardOptimizer
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
-from src.core.schemas import TradeSignal
 from src.trading.risk_manager import RiskManager
 
 # --- Fixtures ---
@@ -103,8 +103,8 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
         obs = df_features.values[-1]
 
         # 3. Model Inference
-        from src.models.base_model import Signal
         from src.core.constants import SignalDirection
+        from src.models.base_model import Signal
         model.ppo_agent = MagicMock()
         model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
         signal_out = model.predict(obs, regime_info=regime_info)
@@ -144,7 +144,7 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
         ticket = mock_connector.place_order(signal)
         assert ticket == 999888
 
-        trade_id = trade_logger.log_trade(
+        trade_logger.log_trade(
             ticket=ticket,
             symbol="XAUUSD",
             direction=signal_out.direction,
@@ -308,8 +308,8 @@ def test_ensemble_intelligence_integration(sample_market_data):
     assert model.weights["ppo"] > initial_weights["ppo"]
 
     # 3. Decision
-    from src.models.base_model import Signal
     from src.core.constants import SignalDirection
+    from src.models.base_model import Signal
     model.ppo_agent = MagicMock()
     model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
 
@@ -345,7 +345,7 @@ def test_system_performance_and_resources(mock_cfg, trade_logger, sample_market_
         start = time.perf_counter()
 
         # Full stack logic (Inference + Filter)
-        signal_obj = model.predict(obs)
+        model.predict(obs)
         signal = TradeSignal(
             symbol="XAUUSD",
             direction=1,

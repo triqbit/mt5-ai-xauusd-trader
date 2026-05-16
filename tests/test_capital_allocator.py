@@ -2,9 +2,9 @@
 Unit tests for the CapitalAllocator system.
 """
 
-import pytest
-
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.core.config import TradingConfig
 from src.trading.capital_allocator import (

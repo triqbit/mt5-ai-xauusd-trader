@@ -1,17 +1,18 @@
 """
 Tests for operational lifecycle and execution quality scenarios.
 """
-import pytest
-import pandas as pd
 import os
-from datetime import datetime, UTC
-from src.utils.synthetic_data import (
-    ScenarioGenerator,
-    LifecycleScenarioBuilder,
-    ExecutionQualityScenarioBuilder
-)
-from src.models.regime_detector import MarketRegime, RegimeDetector
+
+import pytest
+
 from src.core.trade_logger import TradeLogger
+from src.models.regime_detector import MarketRegime, RegimeDetector
+from src.utils.synthetic_data import (
+    ExecutionQualityScenarioBuilder,
+    LifecycleScenarioBuilder,
+    ScenarioGenerator,
+)
+
 
 @pytest.fixture
 def scenario_gen():
@@ -90,7 +91,8 @@ def test_toxic_flow_execution_quality(exec_quality_builder):
 def test_performance_guard_with_synthetic_trades(exec_quality_builder):
     """Verify that Performance Guard would trigger on toxic synthetic trades."""
     db_path = "test_perf_lifecycle.db"
-    if os.path.exists(db_path): os.remove(db_path)
+    if os.path.exists(db_path):
+        os.remove(db_path)
 
     try:
         logger = TradeLogger(db_url=f"sqlite:///{db_path}")
@@ -114,4 +116,5 @@ def test_performance_guard_with_synthetic_trades(exec_quality_builder):
         assert report["win_rate"] < 0.45 # Performance floor is 0.45
 
     finally:
-        if os.path.exists(db_path): os.remove(db_path)
+        if os.path.exists(db_path):
+            os.remove(db_path)

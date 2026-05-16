@@ -1,9 +1,10 @@
 
 import os
-import sqlite3
+
 import pytest
-from sqlalchemy import Column, Integer, ForeignKey, select
+from sqlalchemy import Column, ForeignKey, Integer
 from sqlalchemy.orm import declarative_base
+
 from src.core.database import get_engine, get_session_factory
 
 Base = declarative_base()

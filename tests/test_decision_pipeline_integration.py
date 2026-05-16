@@ -34,12 +34,12 @@ with patch.dict("sys.modules", {
     from src.core.constants import SignalDirection
     from src.core.decision_support import DecisionSupportSystem
     from src.core.explainability import SignalExplainer
+    from src.core.schemas import TradeSignal
     from src.data.event_intelligence import RiskStatus
     from src.models import ensemble
     from src.models.ensemble import EnsembleModel
     from src.models.regime_detector import MarketRegime, RegimeInfo
     from src.trading.execution_filter import ExecutionFilter
-    from src.core.schemas import TradeSignal
     from src.trading.risk_manager import RiskManager
     from src.utils.synthetic_data import ScenarioGenerator
 
@@ -66,8 +66,8 @@ def ensemble_model():
         model = EnsembleModel(device="cpu")
         # Mock sub-models
         model.ppo_agent = MagicMock()
-        from src.models.base_model import Signal
         from src.core.constants import SignalDirection
+        from src.models.base_model import Signal
         model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
         return model
 
@@ -188,7 +188,7 @@ def test_decision_pipeline_risk_rejection(
     mock_cfg, data_generator, ensemble_model, risk_manager, execution_filter, explainer, dss
 ):
     """Case 2: Risk Rejection - Rejected due to low R:R."""
-    df = data_generator.generate(n_steps=10)
+    data_generator.generate(n_steps=10)
     price = 2300.0
 
         # Valid R:R (2.0) to pass Pydantic validation, but we can mock RiskManager to reject it later if needed

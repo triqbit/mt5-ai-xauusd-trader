@@ -1,13 +1,13 @@
 
-import sys
 import os
-from datetime import datetime
+import sys
 
 # Add src to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.research.rare_event_simulator import RareEventSimulator, RareEventType, RareEventConfig
+from src.research.rare_event_simulator import RareEventConfig, RareEventSimulator, RareEventType
 from src.research.reporting import RareEventSection, RareEventSummary
+
 
 def verify_integration():
     print("Verifying RareEventSimulator -> ResearchReporting integration...")

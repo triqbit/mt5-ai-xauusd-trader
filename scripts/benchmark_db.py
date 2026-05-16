@@ -43,21 +43,21 @@ def run_benchmark(n_trades=5000):
     # Benchmark 1: ORM Objects (Original slow approach)
     start = time.perf_counter()
     with Session() as session:
-        trades = session.query(Trade).filter(Trade.status == "CLOSED", Trade.is_deleted == False).all()
+        trades = session.query(Trade).filter(Trade.status == "CLOSED", Trade.is_deleted is False).all()
         pnls = np.array([t.pnl for t in trades])
         # Simulate some processing
-        avg = np.mean(pnls)
-        std = np.std(pnls)
+        np.mean(pnls)
+        np.std(pnls)
     duration1 = time.perf_counter() - start
     print(f"ORM All Objects: {duration1:.4f}s")
 
     # Benchmark 2: Scalar Select (Optimized approach)
     start = time.perf_counter()
     with Session() as session:
-        pnls = np.array(session.execute(select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted == False)).scalars().all())
+        pnls = np.array(session.execute(select(Trade.pnl).where(Trade.status == "CLOSED", Trade.is_deleted is False)).scalars().all())
         # Simulate same processing
-        avg = np.mean(pnls)
-        std = np.std(pnls)
+        np.mean(pnls)
+        np.std(pnls)
     duration2 = time.perf_counter() - start
     print(f"Scalar Select:   {duration2:.4f}s")
 

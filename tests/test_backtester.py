@@ -4,12 +4,10 @@ Unit tests for the BacktestEngine.
 
 from __future__ import annotations
 
-from datetime import datetime
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
-from unittest.mock import MagicMock
-
 import pytest
 
 from src.trading.backtester import BacktestEngine
@@ -118,7 +116,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
     test_window = 50
     step_size = 50
 
-    report = engine.run_walk_forward(
+    engine.run_walk_forward(
         sample_data,
         model,
         train_window=train_window,
@@ -143,7 +141,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
 
     # Verify it's not the same as any raw feature row in a naive way
     # (Normalization should change the values significantly)
-    raw_row = raw_features.iloc[train_window]
+    raw_features.iloc[train_window]
 
     # Excluding OHLCV columns from comparison as BacktestEngine does
     cols_to_exclude = ["open", "high", "low", "close", "tick_volume", "atr", "real_volume"]

@@ -1,11 +1,10 @@
 
-import pytest
-from pathlib import Path
 from scripts.verify_version_sync import (
-    extract_version_pyproject,
+    extract_version_changelog,
     extract_version_init,
-    extract_version_changelog
+    extract_version_pyproject,
 )
+
 
 def test_version_sync_extraction(tmp_path):
     # Setup mock project structure

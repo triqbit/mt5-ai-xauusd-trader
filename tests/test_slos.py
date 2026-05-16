@@ -1,6 +1,8 @@
 import os
 import re
+
 from scripts.verify_slos import TARGETS
+
 
 def test_slo_targets_doc_exists():
     """Verify that the SLO targets documentation exists."""
