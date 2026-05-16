@@ -7,10 +7,8 @@ Config Loading -> Component Bootstrap -> Health Gate -> Full Execution Iteration
 """
 
 import os
-import sys
 import time
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -20,18 +18,18 @@ from sqlalchemy import select
 
 # We rely on conftest.py for initial mocks of talib, MetaTrader5, and telegram.
 # We only add specific overrides here if needed.
-
-from src.core.audit_log import AuditLogger, AuditEntry
+from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.config import get_config
-from src.core.health import init_health_checker, HealthStatus, ComponentStatus
+from src.core.constants import SignalDirection
+from src.core.health import ComponentStatus, HealthStatus, init_health_checker
 from src.core.schemas import TradeSignal
-from src.core.trade_logger import TradeLogger, Trade, RiskEvent
-from src.trading.mt5_connector import MT5Connector
-from src.trading.audited_risk_manager import AuditedRiskManager
-from src.trading.execution_filter import ExecutionFilter
+from src.core.trade_logger import RiskEvent, Trade, TradeLogger
 from src.data.feature_engineering import FeatureEngineer
 from src.models.base_model import Signal
-from src.core.constants import SignalDirection
+from src.trading.audited_risk_manager import AuditedRiskManager
+from src.trading.execution_filter import ExecutionFilter
+from src.trading.mt5_connector import MT5Connector
+
 
 @pytest.fixture
 def system_env(tmp_path):
@@ -54,7 +52,7 @@ def system_env(tmp_path):
         "RISK_PER_TRADE": "0.01",
         "MAX_DRAWDOWN": "0.15",
         "TELEGRAM_TOKEN": "123:abc",
-        "TELEGRAM_CHAT_ID": "12345"
+        "TELEGRAM_CHAT_ID": "12345",
     }
 
     with patch.dict(os.environ, env_vars):
@@ -71,6 +69,7 @@ def system_env(tmp_path):
 
         yield cfg, audit_logger, trade_logger
 
+
 def test_full_system_bootstrap_and_execution_audit(system_env):
     """
     Integration Path: Config -> Bootstrap -> Health -> Execution -> Audit
@@ -83,6 +82,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
 
     # 1. Setup MT5 Mocks
     import MetaTrader5 as mt5
+
     mt5.initialize.return_value = True
     mt5.login.return_value = True
 
@@ -90,7 +90,9 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     acc_info.balance = 10000.0
     acc_info.equity = 10000.0
     acc_info.trade_allowed = True
-    acc_info.get.side_effect = lambda k, d=None: {"trade_allowed": True, "balance": 10000.0}.get(k, d)
+    acc_info.get.side_effect = lambda k, d=None: {"trade_allowed": True, "balance": 10000.0}.get(
+        k, d
+    )
     mt5.account_info.return_value = acc_info
 
     term_info = MagicMock()
@@ -100,13 +102,25 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
 
     n_bars = 500
     start_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    rates = np.zeros(n_bars, dtype=[('time', 'i8'), ('open', 'f8'), ('high', 'f8'), ('low', 'f8'), ('close', 'f8'), ('tick_volume', 'i8')])
-    rates['close'] = np.linspace(2000, 2010, n_bars)
-    rates['high'] = rates['close'] + 1
-    rates['low'] = rates['close'] - 1
-    rates['open'] = rates['close']
-    rates['tick_volume'] = 100
-    rates['time'] = [int((start_time + timedelta(minutes=5*i)).timestamp()) for i in range(n_bars)]
+    rates = np.zeros(
+        n_bars,
+        dtype=[
+            ("time", "i8"),
+            ("open", "f8"),
+            ("high", "f8"),
+            ("low", "f8"),
+            ("close", "f8"),
+            ("tick_volume", "i8"),
+        ],
+    )
+    rates["close"] = np.linspace(2000, 2010, n_bars)
+    rates["high"] = rates["close"] + 1
+    rates["low"] = rates["close"] - 1
+    rates["open"] = rates["close"]
+    rates["tick_volume"] = 100
+    rates["time"] = [
+        int((start_time + timedelta(minutes=5 * i)).timestamp()) for i in range(n_bars)
+    ]
     mt5.copy_rates_from_pos.return_value = rates
 
     tick_info = MagicMock()
@@ -135,20 +149,44 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     mock_model.predict.return_value = Signal(
         direction=SignalDirection.BUY,
         confidence=0.85,
-        metadata={"per_algo_votes": {"ppo": 1}, "weights": {"ppo": 1.0}}
+        metadata={"per_algo_votes": {"ppo": 1}, "weights": {"ppo": 1.0}},
     )
 
     # 3. Health Gate
     from src.core.health import HealthChecker
-    with patch.object(HealthChecker, "check_config", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
-         patch.object(HealthChecker, "check_redis", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
-         patch.object(HealthChecker, "check_mt5", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
-         patch.object(HealthChecker, "check_system_resources", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")), \
-         patch.object(HealthChecker, "check_disk_space", return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK")):
 
-            health_checker = init_health_checker(cfg, connector, trade_logger, mock_model, audit_logger=audit_logger)
-            report = health_checker.startup_gate()
-            assert report.status == HealthStatus.HEALTHY
+    with (
+        patch.object(
+            HealthChecker,
+            "check_config",
+            return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK"),
+        ),
+        patch.object(
+            HealthChecker,
+            "check_redis",
+            return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK"),
+        ),
+        patch.object(
+            HealthChecker,
+            "check_mt5",
+            return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK"),
+        ),
+        patch.object(
+            HealthChecker,
+            "check_system_resources",
+            return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK"),
+        ),
+        patch.object(
+            HealthChecker,
+            "check_disk_space",
+            return_value=ComponentStatus(status=HealthStatus.HEALTHY, message="OK"),
+        ),
+    ):
+        health_checker = init_health_checker(
+            cfg, connector, trade_logger, mock_model, audit_logger=audit_logger
+        )
+        report = health_checker.startup_gate()
+        assert report.status == HealthStatus.HEALTHY
 
     # 4. Simulated Execution Cycle
     df_raw = connector.get_ohlcv(cfg.symbol, cfg.timeframe, n_bars=n_bars)
@@ -172,7 +210,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
         symbol=cfg.symbol,
         direction=signal_obj.direction.value,
         confidence=signal_obj.confidence,
-        model_metadata=signal_obj.metadata
+        model_metadata=signal_obj.metadata,
     )
 
     price = tick["ask"] if signal_obj.direction == SignalDirection.BUY else tick["bid"]
@@ -184,7 +222,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
         take_profit=price + 20.0,
         lot_size=0.1,
         algorithm="test",
-        confidence=signal_obj.confidence
+        confidence=signal_obj.confidence,
     )
 
     risk_approved = risk_manager.approve(signal)
@@ -194,10 +232,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     # Use a fixed Wednesday timestamp to avoid SESSION_CLOSED during CI runs on weekends
     fixed_timestamp = datetime(2024, 5, 22, 12, 0, tzinfo=timezone.utc)
     filter_decision = execution_filter.validate(
-        signal,
-        df_features,
-        current_drawdown=drawdown,
-        timestamp=fixed_timestamp
+        signal, df_features, current_drawdown=drawdown, timestamp=fixed_timestamp
     )
     assert filter_decision.is_approved is True
 
@@ -205,7 +240,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
         symbol=cfg.symbol,
         direction=signal.direction,
         trace=filter_decision.trace,
-        is_approved=filter_decision.is_approved
+        is_approved=filter_decision.is_approved,
     )
 
     res = MagicMock()
@@ -223,29 +258,48 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
         symbol=cfg.symbol,
         direction=signal.direction,
         entry_price=price,
-        lot_size=signal.lot_size
+        lot_size=signal.lot_size,
     )
 
     # 5. Verification
     with audit_logger.Session() as session:
-        snapshot = session.execute(select(AuditEntry).where(AuditEntry.action == "config_snapshot")).scalars().first()
+        snapshot = (
+            session.execute(select(AuditEntry).where(AuditEntry.action == "config_snapshot"))
+            .scalars()
+            .first()
+        )
         assert snapshot is not None
 
-        pred = session.execute(select(AuditEntry).where(AuditEntry.action == "prediction")).scalars().first()
+        pred = (
+            session.execute(select(AuditEntry).where(AuditEntry.action == "prediction"))
+            .scalars()
+            .first()
+        )
         assert pred is not None
 
-        risk_audit = session.execute(select(AuditEntry).where(AuditEntry.actor == "risk_engine")).scalars().first()
+        risk_audit = (
+            session.execute(select(AuditEntry).where(AuditEntry.actor == "risk_engine"))
+            .scalars()
+            .first()
+        )
         assert risk_audit is not None
         assert risk_audit.metadata_json["passed"] is True
 
-        exec_audit = session.execute(select(AuditEntry).where(AuditEntry.actor == "execution_filter")).scalars().first()
+        exec_audit = (
+            session.execute(select(AuditEntry).where(AuditEntry.actor == "execution_filter"))
+            .scalars()
+            .first()
+        )
         assert exec_audit is not None
         assert exec_audit.metadata_json["is_approved"] is True
 
     with trade_logger.Session() as session:
-        trade_record = session.execute(select(Trade).where(Trade.ticket == 123456)).scalars().first()
+        trade_record = (
+            session.execute(select(Trade).where(Trade.ticket == 123456)).scalars().first()
+        )
         assert trade_record is not None
         assert trade_record.status == "OPEN"
+
 
 def test_system_failure_handling_risk_rejection(system_env):
     """
@@ -257,7 +311,7 @@ def test_system_failure_handling_risk_rejection(system_env):
     # 1. Setup Environment in Drawdown
     risk_manager = AuditedRiskManager(cfg, account_balance=10000.0, logger_db=trade_logger)
     # Simulate 20% drawdown (limit is 15%)
-    risk_manager.update_equity(10000.0) # Peak
+    risk_manager.update_equity(10000.0)  # Peak
     risk_manager.update_equity(8000.0)  # Current
 
     signal = TradeSignal(
@@ -268,7 +322,7 @@ def test_system_failure_handling_risk_rejection(system_env):
         take_profit=2020.0,
         lot_size=0.1,
         algorithm="test",
-        confidence=0.9
+        confidence=0.9,
     )
 
     # 2. Execute Risk Approval - Should fail
@@ -278,25 +332,37 @@ def test_system_failure_handling_risk_rejection(system_env):
     # 3. Verify failure trace in Audit Log
     with audit_logger.Session() as session:
         # Check risk decision entry
-        entry = session.execute(
-            select(AuditEntry).where(AuditEntry.actor == "risk_engine", AuditEntry.action == "risk_decision")
-        ).scalars().first()
+        entry = (
+            session.execute(
+                select(AuditEntry).where(
+                    AuditEntry.actor == "risk_engine", AuditEntry.action == "risk_decision"
+                )
+            )
+            .scalars()
+            .first()
+        )
         assert entry is not None
         assert entry.metadata_json["passed"] is False
         assert entry.metadata_json["decision_chain"]["circuit_breaker"] is False
 
         # Check operator action log for high-severity event
-        halt_event = session.execute(
-            select(AuditEntry).where(AuditEntry.action == "operator_circuit_breaker_triggered")
-        ).scalars().first()
+        halt_event = (
+            session.execute(
+                select(AuditEntry).where(AuditEntry.action == "operator_circuit_breaker_triggered")
+            )
+            .scalars()
+            .first()
+        )
         assert halt_event is not None
         assert "drawdown limit hit" in halt_event.metadata_json["reason"].lower()
 
     # 4. Verify failure in Trade Log
     with trade_logger.Session() as session:
-        risk_event = session.execute(
-            select(RiskEvent).where(RiskEvent.event_type == "SIGNAL_REJECTED")
-        ).scalars().first()
+        risk_event = (
+            session.execute(select(RiskEvent).where(RiskEvent.event_type == "SIGNAL_REJECTED"))
+            .scalars()
+            .first()
+        )
         assert risk_event is not None
         # Check if either 'circuit_breaker' or 'circuit breaker' is in description
         desc = risk_event.description.lower()

@@ -3,8 +3,8 @@ Tests for system-wide product coherence and architectural standards.
 Ensures that core types and enums are centralized and consistently used.
 """
 
-import pytest
-from src.core.constants import SignalDirection, DecisionStatus, EventImpact, EventCategory
+from src.core.constants import DecisionStatus, EventCategory, EventImpact, SignalDirection
+
 
 def test_enum_centralization():
     """Verify that core enums are correctly exported from constants."""
@@ -52,12 +52,13 @@ def test_event_intelligence_import_coherence():
 
 def test_model_interface_polymorphism():
     """Verify that all core models follow the polymorphic predict signature."""
-    from src.models.ppo_agent import PPOAgent
-    from src.models.lstm_model import LSTMModel
-    from src.models.transformer_model import TimeSeriesTransformer
+    import inspect
+
     from src.models.dreamer_agent import DreamerAgent
     from src.models.ensemble import EnsembleModel
-    import inspect
+    from src.models.lstm_model import LSTMModel
+    from src.models.ppo_agent import PPOAgent
+    from src.models.transformer_model import TimeSeriesTransformer
 
     models = [PPOAgent, LSTMModel, TimeSeriesTransformer, DreamerAgent, EnsembleModel]
 

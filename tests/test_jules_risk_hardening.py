@@ -3,14 +3,16 @@ Tests for Jules02 risk hardening and drift monitoring enhancements.
 Verifies the 8-layer safety cascade, consecutive loss blocking, and model calibration alerts.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from datetime import date
-from src.trading.risk_manager import RiskManager, DailyStats
-from src.trading.audited_risk_manager import AuditedRiskManager
-from src.core.schemas import TradeSignal
+
+import pytest
+
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
+from src.core.schemas import TradeSignal
+from src.trading.audited_risk_manager import AuditedRiskManager
+from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def mock_config():
@@ -27,6 +29,7 @@ def mock_config():
     cfg.telegram_token.get_secret_value.return_value = ""
     return cfg
 
+
 @pytest.fixture
 def mock_signal():
     return TradeSignal(
@@ -37,8 +40,9 @@ def mock_signal():
         take_profit=2020.0,
         lot_size=0.1,
         confidence=0.7,
-        algorithm="ensemble"
+        algorithm="ensemble",
     )
+
 
 def test_risk_manager_consecutive_losses(mock_config, mock_signal):
     """Verify that RiskManager blocks trades after max consecutive losses."""
@@ -60,6 +64,7 @@ def test_risk_manager_consecutive_losses(mock_config, mock_signal):
     assert rm.daily.consecutive_losses == 0
     assert rm.approve(mock_signal) is True
 
+
 def test_risk_manager_model_health(mock_config, mock_signal):
     """Verify that RiskManager blocks trades based on model health metrics."""
     rm = RiskManager(mock_config, account_balance=10000.0)
@@ -80,6 +85,7 @@ def test_risk_manager_model_health(mock_config, mock_signal):
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.3}
     assert rm.approve(mock_signal, model_health=health) is False
 
+
 def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
     """Verify that AuditedRiskManager traces all 8 layers."""
     with patch("src.trading.audited_risk_manager.get_audit_logger") as mock_get_audit:
@@ -97,12 +103,19 @@ def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
         decision_chain = call_args["decision_chain"]
 
         expected_layers = [
-            "circuit_breaker", "daily_loss", "max_positions", "symbol_allocation",
-            "min_confidence", "risk_reward", "consecutive_losses", "model_health"
+            "circuit_breaker",
+            "daily_loss",
+            "max_positions",
+            "symbol_allocation",
+            "min_confidence",
+            "risk_reward",
+            "consecutive_losses",
+            "model_health",
         ]
         for layer in expected_layers:
             assert layer in decision_chain
             assert decision_chain[layer] is True
+
 
 def test_monitor_calibration_alert(mock_config):
     """Verify that Monitor alerts on high calibration error."""
