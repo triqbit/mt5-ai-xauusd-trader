@@ -109,8 +109,11 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
+            # Use a fixed weekday timestamp to avoid SESSION_CLOSED rejections on weekends
+            weekday_ts = datetime(2026, 5, 13, 12, 0, 0, tzinfo=UTC) # Wednesday
+
             # Mock market data as empty to avoid calculation errors
-            ef.validate(signal, market_data=None)
+            ef.validate(signal, market_data=None, timestamp=weekday_ts)
 
             mock_labels.assert_any_call(component="execution_filter", reason="CONFIDENCE_THRESHOLD")
             mock_counter.inc.assert_called()
