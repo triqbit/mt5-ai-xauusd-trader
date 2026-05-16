@@ -287,6 +287,18 @@ class StressLab:
             spread_multiplier=5.0,
         )
 
+    @staticmethod
+    def create_data_freeze_scenario() -> StressScenario:
+        """Create a scenario with prolonged stale price data (API/Feed freeze)."""
+        return StressScenario(
+            name="Data Freeze",
+            description="Feed instability: prolonged periods of stale price data and missed updates.",
+            severity=StressSeverity.HIGH,
+            stale_data_prob=0.8,
+            missing_tick_prob=0.1,
+            spread_multiplier=1.5,
+        )
+
     def run_standard_suite(self, baseline_metrics: StressTestMetrics) -> ResilienceReport:
         """
         Executes the standard suite of adversarial stress scenarios and sensitivity analysis.
@@ -296,6 +308,7 @@ class StressLab:
         - Liquidity Crisis: Data gaps and choppy price action.
         - Regime Shock: Structural market instability.
         - Flash Crash: Extreme tail risk events.
+        - Data Freeze: Feed instability and stale data.
         - Sensitivity Analysis: Spread and slippage breaking point detection.
 
         Args:
@@ -309,6 +322,7 @@ class StressLab:
             self.create_liquidity_crisis_scenario(),
             self.create_regime_shock_scenario(),
             self.create_flash_crash_scenario(),
+            self.create_data_freeze_scenario(),
         ]
 
         for scenario in scenarios:
@@ -534,6 +548,21 @@ class StressLab:
                     summary += f"\n- Breaking point for {param} detected at {breaking_point:.2f}."
                 if fifty_pct_decay is not None:
                     summary += f"\n- 50% performance decay for {param} at {fifty_pct_decay:.2f}."
+
+                # Calculate Alpha Decay (Slope of performance degradation)
+                if len(data) > 1:
+                    vals = [d[0] for d in data]
+                    rets = [d[1] for d in data]
+                    # Linear slope between first and last tested points
+                    slope = (rets[-1] - rets[0]) / (vals[-1] - vals[0] + 1e-9)
+
+                    if param == "slippage_bps":
+                        # Return loss in basis points per bp of slippage
+                        summary += f"\n- Alpha Decay: {abs(slope) * 10000:.1f} bps return loss per bp of slippage."
+                    elif param == "spread_multiplier":
+                        summary += f"\n- Alpha Decay: {abs(slope):.2%} return loss per unit of spread multiplier."
+                    else:
+                        summary += f"\n- Alpha Decay: {abs(slope):.2f} units of return loss per unit of {param}."
 
         return summary
 
@@ -781,24 +810,28 @@ class StressLab:
             slippage = current_price * (current_slippage_bps / 10000.0)
 
             # 4. Execution Logic
-            if current_sig == 1 and position == 0:  # Buy
-                position = 1
-                entry_price = current_price + (current_spread / 2) + slippage
-            elif current_sig == -1 and position == 1:  # Close Long
+            # Exit existing position if signal changed or is zero
+            if position == 1 and current_sig != 1:
                 exit_price = current_price - (current_spread / 2) - slippage
                 pnl = (exit_price - entry_price) * lot_size * contract_multiplier
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
-            elif current_sig == -1 and position == 0:  # Short
-                position = -1
-                entry_price = current_price - (current_spread / 2) - slippage
-            elif current_sig == 1 and position == -1:  # Close Short
+            elif position == -1 and current_sig != -1:
                 exit_price = current_price + (current_spread / 2) + slippage
                 pnl = (entry_price - exit_price) * lot_size * contract_multiplier
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
+
+            # Open new position if signal is non-zero
+            if position == 0 and current_sig != 0:
+                if current_sig == 1:
+                    position = 1
+                    entry_price = current_price + (current_spread / 2) + slippage
+                elif current_sig == -1:
+                    position = -1
+                    entry_price = current_price - (current_spread / 2) - slippage
 
             # Update Equity (Mark-to-Market including potential exit cost)
             exit_cost = (current_spread / 2) + slippage

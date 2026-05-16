@@ -1,7 +1,3 @@
-"""
-Unit tests for StressLab resilience testing framework.
-"""
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -336,9 +332,10 @@ def test_run_standard_suite(sample_data):
     )
 
     report = lab.run_standard_suite(baseline)
-    # 4 standard scenarios + (5 spread sensitivity + 5 slippage sensitivity) = 14
-    assert len(report.scenario_results) == 14
+    # 5 standard scenarios + (5 spread sensitivity + 5 slippage sensitivity) = 15
+    assert len(report.scenario_results) == 15
     assert "Flash Crash" in report.scenario_results
+    assert "Data Freeze" in report.scenario_results
     assert "spread_multiplier" in report.sensitivity_results
     assert report.resilience_score >= 0
 
@@ -599,3 +596,29 @@ def test_decay_calculation_hardened_logic():
     report_extreme = lab.generate_report(baseline)
     # b= -1, m= -5 -> decay = (-1 - (-5)) / 1 = 4 -> clipped to 2
     assert report_extreme.sharpe_decay == 2.0
+
+def test_immediate_reversal_logic(sample_data):
+    """Verify that a signal flip from 1 to -1 in a single step triggers both actions."""
+    class FlipStrategy:
+        @property
+        def name(self): return "FlipStrategy"
+        def predict(self, df):
+            signals = np.zeros(len(df))
+            signals[0] = 1.0   # Buy
+            signals[1] = -1.0  # Flip to Sell
+            signals[2] = 1.0   # Flip back to Buy
+            return signals
+
+    strategy = FlipStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # Force 0 delay and 0 friction to make it predictable
+    scenario = StressScenario(name="Flip", description="test", execution_delay_steps=0, slippage_bps=0, spread_multiplier=0)
+    metrics = lab.run_scenario(scenario)
+
+    # If it works:
+    # Bar 1: Closes Long (opened Bar 0)
+    # Bar 2: Closes Short (opened Bar 1)
+    # Bar 3: Closes Long (opened Bar 2, as signals[3] is 0)
+    # Total 3 trades in metrics.num_trades
+    assert metrics.num_trades == 3
