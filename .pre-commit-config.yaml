@@ -15,7 +15,7 @@ repos:
   #    Single tool replacing: black, isort, flake8, pyupgrade
   # -----------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.3
+    rev: v0.9.6
     hooks:
       - id: ruff
         name: ruff lint + auto-fix

@@ -1195,7 +1195,9 @@ class InstitutionalFlowGenerator:
         returns_steady = self.gen.rng.normal(0.0005, 0.0001, one_third)
 
         # Phase 2: Parabolic blow-off
-        returns_climax = np.linspace(0.001, 0.005, one_third) + self.gen.rng.normal(0, 0.0005, one_third)
+        returns_climax = np.linspace(0.001, 0.005, one_third) + self.gen.rng.normal(
+            0, 0.0005, one_third
+        )
 
         # Phase 3: Sharp reversal
         returns_collapse = self.gen.rng.normal(-0.004, 0.001, n_steps - 2 * one_third)
