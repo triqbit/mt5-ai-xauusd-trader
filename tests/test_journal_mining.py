@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -10,7 +11,9 @@ from src.analytics.journal_mining import (
 
 @pytest.fixture
 def miner():
-    return JournalMiner(db_url="sqlite:///:memory:")
+    # Use a unique URI to ensure database isolation between tests despite LRU caching of engines
+    unique_id = uuid.uuid4().hex
+    return JournalMiner(db_url=f"sqlite:///file:{unique_id}?mode=memory&cache=shared")
 
 
 @pytest.fixture
@@ -104,6 +107,8 @@ def test_drawdown_clusters(miner, sample_trades):
     assert len(clusters) == 1
     assert clusters[0].trade_count == 4
     assert clusters[0].total_loss == -110.0
+    # Cumulative losses: -50, -70, -100, -110. Max drop should be 110.
+    assert clusters[0].max_equity_drop == 110.0
 
 
 def test_profitable_patterns(miner, sample_trades):
@@ -337,7 +342,7 @@ def test_to_report_section_with_toxic_motif(miner):
                 win_rate=0.9,
                 is_golden=True,
                 expectancy=50,
-            )
+            ),
         ],
         avg_win_duration=15.5,
         avg_loss_duration=45.2,
@@ -427,61 +432,167 @@ def test_find_combination_motifs(miner):
 
     # Toxic Instance 1 (10:00)
     t1 = base_time
-    trades_toxic1 = pd.DataFrame([
-        {"id": 1, "pnl": -10, "created_at": t1, "signal_id": 1},
-        {"id": 2, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=1), "signal_id": 2},
-        {"id": 3, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=2), "signal_id": 3},
-        {"id": 4, "pnl": 10, "created_at": t1 + pd.Timedelta(minutes=3), "signal_id": 4}, # Win Breaker
-        {"id": 41, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=4), "signal_id": 41}, # Loss Breaker for profit clusters
-    ])
-    sigs_toxic1 = pd.DataFrame([
-        {"id": 10, "algorithm": "A", "direction": 1, "volatility": 0.1, "created_at": t1 - pd.Timedelta(minutes=5)},
-        {"id": 11, "algorithm": "B", "direction": 1, "volatility": 0.1, "created_at": t1 - pd.Timedelta(minutes=4)},
-    ])
+    trades_toxic1 = pd.DataFrame(
+        [
+            {"id": 1, "pnl": -10, "created_at": t1, "signal_id": 1},
+            {"id": 2, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=1), "signal_id": 2},
+            {"id": 3, "pnl": -10, "created_at": t1 + pd.Timedelta(minutes=2), "signal_id": 3},
+            {
+                "id": 4,
+                "pnl": 10,
+                "created_at": t1 + pd.Timedelta(minutes=3),
+                "signal_id": 4,
+            },  # Win Breaker
+            {
+                "id": 41,
+                "pnl": -10,
+                "created_at": t1 + pd.Timedelta(minutes=4),
+                "signal_id": 41,
+            },  # Loss Breaker for profit clusters
+        ]
+    )
+    sigs_toxic1 = pd.DataFrame(
+        [
+            {
+                "id": 10,
+                "algorithm": "A",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t1 - pd.Timedelta(minutes=5),
+            },
+            {
+                "id": 11,
+                "algorithm": "B",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t1 - pd.Timedelta(minutes=4),
+            },
+        ]
+    )
 
     # Toxic Instance 2 (next day, same hour)
     t2 = t1 + pd.Timedelta(days=1)
-    trades_toxic2 = pd.DataFrame([
-        {"id": 5, "pnl": -10, "created_at": t2, "signal_id": 5},
-        {"id": 6, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=1), "signal_id": 6},
-        {"id": 7, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=2), "signal_id": 7},
-        {"id": 8, "pnl": 10, "created_at": t2 + pd.Timedelta(minutes=3), "signal_id": 8}, # Win Breaker
-        {"id": 81, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=4), "signal_id": 81}, # Loss Breaker
-    ])
-    sigs_toxic2 = pd.DataFrame([
-        {"id": 20, "algorithm": "A", "direction": 1, "volatility": 0.1, "created_at": t2 - pd.Timedelta(minutes=5)},
-        {"id": 21, "algorithm": "B", "direction": 1, "volatility": 0.1, "created_at": t2 - pd.Timedelta(minutes=4)},
-    ])
+    trades_toxic2 = pd.DataFrame(
+        [
+            {"id": 5, "pnl": -10, "created_at": t2, "signal_id": 5},
+            {"id": 6, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=1), "signal_id": 6},
+            {"id": 7, "pnl": -10, "created_at": t2 + pd.Timedelta(minutes=2), "signal_id": 7},
+            {
+                "id": 8,
+                "pnl": 10,
+                "created_at": t2 + pd.Timedelta(minutes=3),
+                "signal_id": 8,
+            },  # Win Breaker
+            {
+                "id": 81,
+                "pnl": -10,
+                "created_at": t2 + pd.Timedelta(minutes=4),
+                "signal_id": 81,
+            },  # Loss Breaker
+        ]
+    )
+    sigs_toxic2 = pd.DataFrame(
+        [
+            {
+                "id": 20,
+                "algorithm": "A",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t2 - pd.Timedelta(minutes=5),
+            },
+            {
+                "id": 21,
+                "algorithm": "B",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t2 - pd.Timedelta(minutes=4),
+            },
+        ]
+    )
 
     # Golden Instance 1 (at 14:00)
     t3 = base_time + pd.Timedelta(hours=4)
-    trades_golden1 = pd.DataFrame([
-        {"id": 100, "pnl": 50, "created_at": t3, "signal_id": 100},
-        {"id": 101, "pnl": 50, "created_at": t3 + pd.Timedelta(minutes=1), "signal_id": 101},
-        {"id": 102, "pnl": 50, "created_at": t3 + pd.Timedelta(minutes=2), "signal_id": 102},
-        {"id": 103, "pnl": -10, "created_at": t3 + pd.Timedelta(minutes=3), "signal_id": 103}, # Loss Breaker
-        {"id": 104, "pnl": 10, "created_at": t3 + pd.Timedelta(minutes=4), "signal_id": 104}, # Win Breaker for drawdown clusters
-    ])
-    sigs_golden1 = pd.DataFrame([
-        {"id": 110, "algorithm": "X", "direction": 1, "volatility": 0.1, "created_at": t3 - pd.Timedelta(minutes=5)},
-        {"id": 111, "algorithm": "Y", "direction": 1, "volatility": 0.1, "created_at": t3 - pd.Timedelta(minutes=4)},
-    ])
+    trades_golden1 = pd.DataFrame(
+        [
+            {"id": 100, "pnl": 50, "created_at": t3, "signal_id": 100},
+            {"id": 101, "pnl": 50, "created_at": t3 + pd.Timedelta(minutes=1), "signal_id": 101},
+            {"id": 102, "pnl": 50, "created_at": t3 + pd.Timedelta(minutes=2), "signal_id": 102},
+            {
+                "id": 103,
+                "pnl": -10,
+                "created_at": t3 + pd.Timedelta(minutes=3),
+                "signal_id": 103,
+            },  # Loss Breaker
+            {
+                "id": 104,
+                "pnl": 10,
+                "created_at": t3 + pd.Timedelta(minutes=4),
+                "signal_id": 104,
+            },  # Win Breaker for drawdown clusters
+        ]
+    )
+    sigs_golden1 = pd.DataFrame(
+        [
+            {
+                "id": 110,
+                "algorithm": "X",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t3 - pd.Timedelta(minutes=5),
+            },
+            {
+                "id": 111,
+                "algorithm": "Y",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t3 - pd.Timedelta(minutes=4),
+            },
+        ]
+    )
 
     # Golden Instance 2 (next day, same hour)
     t4 = t3 + pd.Timedelta(days=1)
-    trades_golden2 = pd.DataFrame([
-        {"id": 200, "pnl": 50, "created_at": t4, "signal_id": 200},
-        {"id": 201, "pnl": 50, "created_at": t4 + pd.Timedelta(minutes=1), "signal_id": 201},
-        {"id": 202, "pnl": 50, "created_at": t4 + pd.Timedelta(minutes=2), "signal_id": 202},
-        {"id": 203, "pnl": -10, "created_at": t4 + pd.Timedelta(minutes=3), "signal_id": 203}, # Loss Breaker
-        {"id": 204, "pnl": 10, "created_at": t4 + pd.Timedelta(minutes=4), "signal_id": 204}, # Win Breaker
-    ])
-    sigs_golden2 = pd.DataFrame([
-        {"id": 210, "algorithm": "X", "direction": 1, "volatility": 0.1, "created_at": t4 - pd.Timedelta(minutes=5)},
-        {"id": 211, "algorithm": "Y", "direction": 1, "volatility": 0.1, "created_at": t4 - pd.Timedelta(minutes=4)},
-    ])
+    trades_golden2 = pd.DataFrame(
+        [
+            {"id": 200, "pnl": 50, "created_at": t4, "signal_id": 200},
+            {"id": 201, "pnl": 50, "created_at": t4 + pd.Timedelta(minutes=1), "signal_id": 201},
+            {"id": 202, "pnl": 50, "created_at": t4 + pd.Timedelta(minutes=2), "signal_id": 202},
+            {
+                "id": 203,
+                "pnl": -10,
+                "created_at": t4 + pd.Timedelta(minutes=3),
+                "signal_id": 203,
+            },  # Loss Breaker
+            {
+                "id": 204,
+                "pnl": 10,
+                "created_at": t4 + pd.Timedelta(minutes=4),
+                "signal_id": 204,
+            },  # Win Breaker
+        ]
+    )
+    sigs_golden2 = pd.DataFrame(
+        [
+            {
+                "id": 210,
+                "algorithm": "X",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t4 - pd.Timedelta(minutes=5),
+            },
+            {
+                "id": 211,
+                "algorithm": "Y",
+                "direction": 1,
+                "volatility": 0.1,
+                "created_at": t4 - pd.Timedelta(minutes=4),
+            },
+        ]
+    )
 
-    all_trades = pd.concat([trades_toxic1, trades_toxic2, trades_golden1, trades_golden2]).sort_values("created_at")
+    all_trades = pd.concat(
+        [trades_toxic1, trades_toxic2, trades_golden1, trades_golden2]
+    ).sort_values("created_at")
     all_sigs = pd.concat([sigs_toxic1, sigs_toxic2, sigs_golden1, sigs_golden2])
 
     motifs = miner.find_combination_motifs(all_sigs, all_trades)
@@ -843,6 +954,56 @@ def test_run_mining_enhanced(miner):
     assert report.rejection_quality[0].profit_opportunity_cost == 100.0
     assert len(report.overconfidence_events) == 1
     assert report.overconfidence_events[0].consecutive_wins == 3
+
+
+def test_session_stats_z_score(miner, sample_trades):
+    stats = miner.get_session_stats(sample_trades)
+    # Check that z_score is calculated
+    for s in stats:
+        assert hasattr(s, "z_score")
+
+    # Statistical overtrading (if we add many trades to one session)
+    many_trades = pd.concat([sample_trades] * 10)
+    stats_many = miner.get_session_stats(many_trades)
+    # With balanced distribution, Z-score might still be low.
+    # We don't assert specific value but existence.
+    assert all(isinstance(s.z_score, float) for s in stats_many)
+
+
+def test_analyze_performance_decay(miner):
+    # Setup data with a clear decay
+    # Baseline (20 trades): PF = 2.0
+    baseline = pd.DataFrame(
+        [
+            {"pnl": 100.0, "created_at": datetime(2024, 1, 1, i, 0, tzinfo=timezone.utc)}
+            for i in range(10)
+        ]
+        + [
+            {"pnl": -50.0, "created_at": datetime(2024, 1, 1, i + 10, 0, tzinfo=timezone.utc)}
+            for i in range(10)
+        ]
+    )
+
+    # Recent (20 trades): PF = 0.5
+    recent = pd.DataFrame(
+        [
+            {"pnl": 50.0, "created_at": datetime(2024, 1, 2, i, 0, tzinfo=timezone.utc)}
+            for i in range(10)
+        ]
+        + [
+            {"pnl": -100.0, "created_at": datetime(2024, 1, 2, i + 10, 0, tzinfo=timezone.utc)}
+            for i in range(10)
+        ]
+    )
+
+    all_trades = pd.concat([baseline, recent])
+    decay = miner.analyze_performance_decay(all_trades, window_size=20)
+
+    assert decay is not None
+    assert decay.is_decaying is True
+    assert decay.baseline_pf == 2.0
+    assert decay.recent_pf == 0.5
+    assert decay.profit_factor_trend == -0.75  # (0.5 - 2.0) / 2.0
 
 
 def test_to_report_section_enhanced_risks(miner):
