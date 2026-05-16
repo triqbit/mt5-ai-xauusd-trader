@@ -108,7 +108,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
     test_window = 50
     step_size = 50
 
-    report = engine.run_walk_forward(
+    engine.run_walk_forward(
         sample_data, model, train_window=train_window, test_window=test_window, step_size=step_size
     )
 
@@ -130,7 +130,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
 
     # Verify it's not the same as any raw feature row in a naive way
     # (Normalization should change the values significantly)
-    raw_row = raw_features.iloc[train_window]
+    raw_features.iloc[train_window]
 
     # Excluding OHLCV columns from comparison as BacktestEngine does
     cols_to_exclude = ["open", "high", "low", "close", "tick_volume", "atr", "real_volume"]

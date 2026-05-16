@@ -50,9 +50,7 @@ def test_walk_forward_overlap_prevention(test_data):
     model = SimpleMockModel(direction=1)
 
     # Train 500, Test 100, Step 50
-    report = engine.run_walk_forward(
-        test_data, model, train_window=500, test_window=100, step_size=50
-    )
+    engine.run_walk_forward(test_data, model, train_window=500, test_window=100, step_size=50)
 
     # Check if trades are unique and sequential
     for i in range(len(engine.trades) - 1):
@@ -78,7 +76,7 @@ def test_transaction_costs(test_data):
     model = SimpleMockModel(direction=1)
 
     # Run a small slice where we expect one trade
-    report = engine.run_walk_forward(
+    engine.run_walk_forward(
         test_data.iloc[:650], model, train_window=500, test_window=100, step_size=100
     )
 

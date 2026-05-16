@@ -164,7 +164,7 @@ def test_trading_env_hold_action():
     assert env.position == 1
 
     # 2. Step with HOLD (action 0) should close the position in our implementation
-    obs, reward, terminated, truncated, info = env.step(0)
+    _obs, _reward, _terminated, _truncated, info = env.step(0)
     assert env.position == 0
     assert info["position"] == 0
 
@@ -207,7 +207,7 @@ def test_trading_env_column_mapping():
     # Step should use index 2 for price
     # current_step starts at 1. step(1) increments to 2.
     # index 2 of Close is 1.2
-    obs, reward, terminated, truncated, info = env.step(1)
+    _obs, _reward, _terminated, _truncated, info = env.step(1)
     assert info["entry_price"] > 1.2  # Close (1.2) + spread + slippage
 
 

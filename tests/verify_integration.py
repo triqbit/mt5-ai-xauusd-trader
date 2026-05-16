@@ -173,7 +173,7 @@ def test_full_pipeline_integration(
         ticket = mock_connector.place_order(signal)
         assert ticket == 999888
 
-        trade_id = trade_logger.log_trade(
+        trade_logger.log_trade(
             ticket=ticket,
             symbol="XAUUSD",
             direction=signal_out.direction,
@@ -397,7 +397,7 @@ def test_system_performance_and_resources(mock_cfg, trade_logger, sample_market_
         start = time.perf_counter()
 
         # Full stack logic (Inference + Filter)
-        signal_obj = model.predict(obs)
+        model.predict(obs)
         signal = TradeSignal(
             symbol="XAUUSD",
             direction=1,

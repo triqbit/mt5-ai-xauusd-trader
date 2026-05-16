@@ -284,7 +284,10 @@ def cleanup_backtests(
 
 
 def cleanup_database(
-    db_url: str, audit_db_url: str = None, dry_run: bool = False, archive_dir: Path = ARCHIVE_DIR
+    db_url: str,
+    audit_db_url: str | None = None,
+    dry_run: bool = False,
+    archive_dir: Path = ARCHIVE_DIR,
 ) -> dict:
     """Purge old records from the database according to the retention policy."""
     engine = create_engine(db_url)

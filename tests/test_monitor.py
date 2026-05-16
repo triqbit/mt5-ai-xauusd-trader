@@ -4,6 +4,7 @@ Ensures real-time tracking, metrics updates, and Telegram alerting work as expec
 """
 
 import asyncio
+import contextlib
 import time
 import unittest
 from datetime import datetime, timezone
@@ -201,10 +202,8 @@ class TestMonitor(unittest.TestCase):
             patch.object(MEMORY_USAGE_GAUGE, "set") as mock_mem_set,
             patch.object(DISK_USAGE_GAUGE, "set") as mock_disk_set,
         ):
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 asyncio.run(self.monitor._collect_system_metrics(interval=1))
-            except asyncio.CancelledError:
-                pass
 
             mock_cpu_set.assert_called_with(10.0)
             mock_mem_set.assert_called_with(50.0)

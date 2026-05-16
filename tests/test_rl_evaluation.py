@@ -326,7 +326,7 @@ def test_parameterized_indices(mock_env_data):
     data6[:, 4] = np.linspace(100, 110, 200)
 
     env = TradingEnv(data=data6, window_size=10)
-    evaluator = RLEvaluator(env=env, close_idx=4, n_features=6)
+    RLEvaluator(env=env, close_idx=4, n_features=6)
 
     # Momentum baseline should also use these
     baseline = MomentumBaseline(close_idx=4, n_features=6)

@@ -100,7 +100,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
     ):
         # 2. Inference
         obs = mock_ohlcv[-1]
-        signal_out = model.predict(obs)
+        model.predict(obs)
 
         # 3. Log Signal
         signal_id = trade_logger.log_signal(
@@ -132,7 +132,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
         ticket = mock_connector.place_order(signal)
         assert ticket == 123456
 
-        trade_id = trade_logger.log_trade(
+        trade_logger.log_trade(
             ticket=ticket,
             symbol="XAUUSD",
             direction=1,
@@ -293,9 +293,7 @@ def test_intelligence_ensemble_adaptation():
 
 
 def test_performance_latency(mock_cfg, trade_logger, mock_monitor):
-    risk = RiskManager(
-        mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor
-    )
+    RiskManager(mock_cfg, account_balance=10000.0, logger_db=trade_logger, monitor=mock_monitor)
     model = EnsembleModel(device="cpu")
 
     obs = np.random.rand(140)

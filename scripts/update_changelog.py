@@ -141,7 +141,7 @@ def categorize_commits(commits, labels=None):
                 category = "Changed"
                 if label_to_cat:
                     # Use the first matching label as category
-                    category = list(label_to_cat.values())[0]
+                    category = next(iter(label_to_cat.values()))
 
                 if entry not in categories[category]:
                     categories[category].append(entry)

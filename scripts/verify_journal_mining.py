@@ -27,8 +27,6 @@ def generate_synthetic_data(db_url):
 
     with Session() as session:
         # 1. Generate normal signals and trades
-        algos = ["Ensemble_V2", "PPO_Agent", "Dreamer_V3"]
-        symbols = ["XAUUSD", "EURUSD"]
 
         now = datetime.now(UTC)
 

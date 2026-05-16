@@ -93,7 +93,7 @@ def test_institutional_cost_calculation(institutional_data):
     model = InstitutionalMockModel()
 
     # Run a small slice
-    report = engine.run_walk_forward(
+    engine.run_walk_forward(
         institutional_data.iloc[:500], model, train_window=100, test_window=50, step_size=50
     )
 

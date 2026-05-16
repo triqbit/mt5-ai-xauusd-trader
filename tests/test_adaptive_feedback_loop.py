@@ -87,7 +87,7 @@ def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filte
     4. ExecutionFilter eventually blocks trade due to MODEL_STABILITY.
     5. Audit trail records the entire degradation.
     """
-    cfg, audit_logger, trade_logger = system_env
+    cfg, audit_logger, _trade_logger = system_env
 
     # Mock market data for ExecutionFilter (Trend matching BUY)
     df = pd.DataFrame(
@@ -226,7 +226,7 @@ def test_adaptive_feedback_loop_end_to_end(system_env, ensemble, execution_filte
 
 def test_recovery_after_stabilization(system_env, ensemble, execution_filter):
     """Verifies that if outcomes improve, the system recovers and allows trading again."""
-    cfg, audit_logger, _ = system_env
+    cfg, _audit_logger, _ = system_env
     # Increasing price for TREND_ANGLE
     df = pd.DataFrame(
         {

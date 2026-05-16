@@ -261,7 +261,7 @@ def test_check_disk_space(test_env):
     archive_dir = test_env["archive_dir"]
 
     # Should pass on normal systems
-    assert check_disk_space(archive_dir, min_mb=1) == True
+    assert check_disk_space(archive_dir, min_mb=1)
 
     # Should fail if we ask for an impossible amount (e.g. 1000 TB)
-    assert check_disk_space(archive_dir, min_mb=1000 * 1024 * 1024) == False
+    assert not check_disk_space(archive_dir, min_mb=1000 * 1024 * 1024)
