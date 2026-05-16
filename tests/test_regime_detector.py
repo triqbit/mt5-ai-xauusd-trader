@@ -22,7 +22,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2000.2 + np.random.randn(50) * 0.1,
                 "low": 1999.8 + np.random.randn(50) * 0.1,
                 "open": 2000.0 + np.random.randn(50) * 0.1,
-                "tick_volume": np.full(50, 100.0)
+                "tick_volume": np.full(50, 100.0),
             }
         )
         info = self.detector.detect(data)
@@ -32,7 +32,13 @@ class TestRegimeDetector(unittest.TestCase):
         # Strong steady trend
         close = np.linspace(2000, 2100, 50)
         data = pd.DataFrame(
-            {"close": close, "high": close + 0.1, "low": close - 0.1, "open": close - 0.05, "tick_volume": np.full(50, 100.0)}
+            {
+                "close": close,
+                "high": close + 0.1,
+                "low": close - 0.1,
+                "open": close - 0.05,
+                "tick_volume": np.full(50, 100.0),
+            }
         )
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.TRENDING)
@@ -45,15 +51,15 @@ class TestRegimeDetector(unittest.TestCase):
         # Use variable moves to ensure high vol-of-vol
         for i in range(90, 100):
             if i % 2 == 0:
-                close[i] = close[i-1] * 1.15
+                close[i] = close[i - 1] * 1.15
             else:
-                close[i] = close[i-1] * 1.05
+                close[i] = close[i - 1] * 1.05
 
         high = close * 1.01
         low = close * 0.99
         # Need high volume for NEWS_SHOCK now
         volume = np.full(100, 100.0)
-        volume[90:] = 3000.0 # Higher volume for robust ratio
+        volume[90:] = 3000.0  # Higher volume for robust ratio
         data = pd.DataFrame(
             {"close": close, "high": high, "low": low, "open": close - 0.5, "tick_volume": volume}
         )
@@ -73,7 +79,15 @@ class TestRegimeDetector(unittest.TestCase):
 
         high = close + 1.0
         low = close - 1.0
-        data = pd.DataFrame({"close": close, "high": high, "low": low, "open": close - 0.5, "tick_volume": np.full(60, 100.0)})
+        data = pd.DataFrame(
+            {
+                "close": close,
+                "high": high,
+                "low": low,
+                "open": close - 0.5,
+                "tick_volume": np.full(60, 100.0),
+            }
+        )
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.MEAN_REVERSION)
 
@@ -89,7 +103,15 @@ class TestRegimeDetector(unittest.TestCase):
         high = close + np.concatenate([np.full(50, 5.0), np.full(20, 0.05)])
         low = close - np.concatenate([np.full(50, 5.0), np.full(20, 0.05)])
 
-        data = pd.DataFrame({"close": close, "high": high, "low": low, "open": close - 0.1, "tick_volume": np.full(70, 100.0)})
+        data = pd.DataFrame(
+            {
+                "close": close,
+                "high": high,
+                "low": low,
+                "open": close - 0.1,
+                "tick_volume": np.full(70, 100.0),
+            }
+        )
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.LOW_VOLATILITY_DRIFT)
 
@@ -101,7 +123,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2000.5 + np.cumsum(np.random.randn(100) * 0.1),
                 "low": 1999.5 + np.cumsum(np.random.randn(100) * 0.1),
                 "open": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
-                "tick_volume": np.full(100, 100.0)
+                "tick_volume": np.full(100, 100.0),
             }
         )
 
@@ -123,7 +145,9 @@ class TestRegimeDetector(unittest.TestCase):
         self.assertAlmostEqual(df_history["regime_confidence"].iloc[idx], info_detect.confidence)
 
     def test_insufficient_data(self):
-        data = pd.DataFrame({"close": [1.0, 2.0], "high": [1.1, 2.1], "low": [0.9, 1.9], "tick_volume": [100, 100]})
+        data = pd.DataFrame(
+            {"close": [1.0, 2.0], "high": [1.1, 2.1], "low": [0.9, 1.9], "tick_volume": [100, 100]}
+        )
         info = self.detector.detect(data)
         self.assertEqual(info.label, MarketRegime.UNKNOWN)
 
@@ -162,7 +186,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2000.0 + np.cumsum(np.random.randn(150) * 0.1) + 0.1,
                 "low": 2000.0 + np.cumsum(np.random.randn(150) * 0.1) - 0.1,
                 "open": 2000.0 + np.cumsum(np.random.randn(150) * 0.1),
-                "tick_volume": np.full(150, 100.0)
+                "tick_volume": np.full(150, 100.0),
             }
         )
 
@@ -216,7 +240,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2000.2 + np.random.randn(50) * 0.1,
                 "low": 1999.8 + np.random.randn(50) * 0.1,
                 "open": 2000.0 + np.random.randn(50) * 0.1,
-                "tick_volume": np.full(50, 100.0)
+                "tick_volume": np.full(50, 100.0),
             }
         )
 
@@ -236,7 +260,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": np.concatenate([ranging + 0.1, trending + 0.1]),
                 "low": np.concatenate([ranging - 0.1, trending - 0.1]),
                 "open": np.concatenate([ranging, trending]),
-                "tick_volume": np.full(200, 100.0)
+                "tick_volume": np.full(200, 100.0),
             }
         )
         self.detector.fit(fit_data, n_clusters=2)
@@ -259,7 +283,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2000.0 + np.cumsum(np.random.randn(size) * 0.1) + 0.1,
                 "low": 2000.0 + np.cumsum(np.random.randn(size) * 0.1) - 0.1,
                 "open": 2000.0 + np.cumsum(np.random.randn(size) * 0.1),
-                "tick_volume": np.full(size, 100.0)
+                "tick_volume": np.full(size, 100.0),
             }
         )
 
@@ -296,7 +320,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2000.0 + np.cumsum(np.random.randn(200) * 0.1) + 0.1,
                 "low": 2000.0 + np.cumsum(np.random.randn(200) * 0.1) - 0.1,
                 "open": 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
-                "tick_volume": np.full(200, 100.0)
+                "tick_volume": np.full(200, 100.0),
             }
         )
 
@@ -338,7 +362,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": [1000.1] * 50,
                 "low": [999.9] * 50,
                 "open": [1000.0] * 50,
-                "tick_volume": [100.0] * 50
+                "tick_volume": [100.0] * 50,
             }
         )
         # Inject NaNs
@@ -359,7 +383,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2000.2 + np.random.randn(50) * 0.1,
                 "low": 1999.8 + np.random.randn(50) * 0.1,
                 "open": 2000.0 + np.random.randn(50) * 0.1,
-                "tick_volume": np.full(50, 100.0)
+                "tick_volume": np.full(50, 100.0),
             }
         )
         info = self.detector.detect(data)
@@ -377,7 +401,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": [2000.0] * 100,
                 "low": [2000.0] * 100,
                 "open": [2000.0] * 100,
-                "tick_volume": [100.0] * 100
+                "tick_volume": [100.0] * 100,
             }
         )
         info = self.detector.detect(data)
@@ -394,7 +418,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2001.0 + np.cumsum(np.random.randn(100) * 0.1),
                 "low": 1999.0 + np.cumsum(np.random.randn(100) * 0.1),
                 "open": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
-                "tick_volume": np.full(100, 100.0)
+                "tick_volume": np.full(100, 100.0),
             }
         )
 
@@ -452,7 +476,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 20100.0 + np.cumsum(np.random.randn(100) * 10.0),
                 "low": 19900.0 + np.cumsum(np.random.randn(100) * 10.0),
                 "open": 20000.0 + np.cumsum(np.random.randn(100) * 10.0),
-                "tick_volume": np.full(100, 100.0)
+                "tick_volume": np.full(100, 100.0),
             }
         )
 
@@ -473,7 +497,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": 2001.0 + np.cumsum(np.random.randn(200) * 0.1),
                 "low": 1999.0 + np.cumsum(np.random.randn(200) * 0.1),
                 "open": 2000.0 + np.cumsum(np.random.randn(200) * 0.1),
-                "tick_volume": np.full(200, 100.0)
+                "tick_volume": np.full(200, 100.0),
             }
         )
         self.detector.fit(data, n_clusters=3)
@@ -495,7 +519,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": [100.1] * 100 + np.random.randn(100) * 0.01,
                 "low": [99.9] * 100 + np.random.randn(100) * 0.01,
                 "open": [100.0] * 100 + np.random.randn(100) * 0.01,
-                "tick_volume": np.full(100, 100.0)
+                "tick_volume": np.full(100, 100.0),
             }
         )
         # 2. Trending data
@@ -505,7 +529,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "high": np.linspace(100.1, 200.1, 100),
                 "low": np.linspace(99.9, 199.9, 100),
                 "open": np.linspace(100, 200, 100) - 0.05,
-                "tick_volume": np.full(100, 100.0)
+                "tick_volume": np.full(100, 100.0),
             }
         )
         data = pd.concat([ranging, trending])
@@ -521,16 +545,20 @@ class TestRegimeDetector(unittest.TestCase):
         np.random.seed(42)
         # 3 clusters of data
         c1 = 2000.0 + np.random.randn(100) * 0.1
-        c2 = 2100.0 + np.linspace(0, 10, 100) # trending-like
-        c3 = 2200.0 + np.random.randn(100) * 5.0 # volatile
+        c2 = 2100.0 + np.linspace(0, 10, 100)  # trending-like
+        c3 = 2200.0 + np.random.randn(100) * 5.0  # volatile
 
-        data = pd.DataFrame({
-            "close": np.concatenate([c1, c2, c3]),
-            "high": np.concatenate([c1, c2, c3]) + 0.1,
-            "low": np.concatenate([c1, c2, c3]) - 0.1,
-            "open": np.concatenate([c1, c2, c3]),
-            "tick_volume": np.concatenate([np.full(100, 100), np.full(100, 200), np.full(100, 500)])
-        })
+        data = pd.DataFrame(
+            {
+                "close": np.concatenate([c1, c2, c3]),
+                "high": np.concatenate([c1, c2, c3]) + 0.1,
+                "low": np.concatenate([c1, c2, c3]) - 0.1,
+                "open": np.concatenate([c1, c2, c3]),
+                "tick_volume": np.concatenate(
+                    [np.full(100, 100), np.full(100, 200), np.full(100, 500)]
+                ),
+            }
+        )
 
         # Range of clusters
         self.detector.fit(data, n_clusters=range(2, 6))

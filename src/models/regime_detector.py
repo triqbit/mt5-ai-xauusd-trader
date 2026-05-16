@@ -730,7 +730,11 @@ class RegimeDetector:
         vc = abs_rets.rolling(window=self.window).corr(abs_rets.shift(1)).fillna(0.0)
 
         # 6. Volume Ratio
-        vol = data["tick_volume"] if "tick_volume" in data.columns else pd.Series(1.0, index=close.index)
+        vol = (
+            data["tick_volume"]
+            if "tick_volume" in data.columns
+            else pd.Series(1.0, index=close.index)
+        )
         vol_short = vol.rolling(window=self.window).mean()
         vol_long = vol.rolling(window=self.long_window).mean()
         volume_ratio = (vol_short / (vol_long + 1e-9)).fillna(1.0)
