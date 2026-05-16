@@ -1491,6 +1491,13 @@ def main() -> int:
     allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
 
+    # 5. Operational State Reconciliation
+    # Restore RiskManager and position context from DB after restart
+    if trade_logger:
+        recon_data = trade_logger.get_reconciliation_data(balance)
+        open_positions = trade_logger.get_open_trades()
+        risk.reconcile_state(recon_data, open_positions)
+
     # Register default strategy in allocator
     # Ensure capital_cap is at least 0.01 to pass Pydantic gt=0 validation if balance is 0
     allocator.add_strategy(

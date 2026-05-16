@@ -351,6 +351,91 @@ class TradeLogger:
                 select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             ).scalar_one_or_none()
 
+    def get_open_trades(self) -> dict[str, int]:
+        """Retrieve all currently OPEN trades as a symbol -> ticket mapping."""
+        with self.Session() as session:
+            trades = (
+                session.execute(
+                    select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
+                )
+                .scalars()
+                .all()
+            )
+            return {t.symbol: t.ticket for t in trades}
+
+    def get_reconciliation_data(self, current_balance: float) -> dict[str, Any]:
+        """
+        Fetch historical PnLs, today's closed trades, and peak equity statistics.
+        Used to restore RiskManager state after a restart.
+        """
+        with self.Session() as session:
+            # 1. Fetch all historical PnLs for all-time peak equity
+            all_pnls = (
+                session.execute(
+                    select(Trade.pnl)
+                    .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    .order_by(Trade.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            # Drawdown tracking: peak equity is the maximum of (starting balance + cumulative PnL)
+            # We assume current_balance is equity after all closed trades.
+            total_realised = sum(all_pnls)
+            initial_account_balance = current_balance - total_realised
+
+            pnls_array = np.array(all_pnls)
+            cum_pnl = np.cumsum(pnls_array) if len(pnls_array) > 0 else np.array([])
+
+            # Prepend 0.0 to handle accounts that only have losses correctly for peak detection
+            equity_curve = initial_account_balance + np.concatenate(([0.0], cum_pnl))
+            peak_equity = float(np.max(equity_curve))
+
+            # 2. Today's stats
+            today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            logger.debug("reconcile_today_start", today_start=today_start.isoformat())
+            today_trades = (
+                session.execute(
+                    select(Trade)
+                    .where(
+                        Trade.status == "CLOSED",
+                        Trade.updated_at >= today_start,
+                        Trade.is_deleted.is_(False),
+                    )
+                    .order_by(Trade.updated_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            realised_pnl = sum(t.pnl for t in today_trades)
+            trade_count = len(today_trades)
+
+            # Today's peak equity
+            today_pnls = [t.pnl for t in today_trades]
+            today_cum_pnl = np.cumsum(today_pnls) if len(today_pnls) > 0 else np.array([])
+            # Equity at start of today
+            today_initial_balance = current_balance - sum(today_pnls)
+            today_equity_curve = today_initial_balance + np.concatenate(([0.0], today_cum_pnl))
+            daily_peak_equity = float(np.max(today_equity_curve))
+
+            # Consecutive losses (today)
+            consecutive_losses = 0
+            for t in reversed(today_trades):
+                if t.pnl < 0:
+                    consecutive_losses += 1
+                else:
+                    break
+
+            return {
+                "realised_pnl": float(realised_pnl),
+                "trade_count": int(trade_count),
+                "consecutive_losses": int(consecutive_losses),
+                "daily_peak_equity": daily_peak_equity,
+                "all_time_peak_equity": peak_equity,
+            }
+
     def log_risk_event(
         self,
         event_type: str,

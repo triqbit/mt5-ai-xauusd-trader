@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -171,6 +171,29 @@ class RiskManager:
             self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
+
+    def reconcile_state(
+        self, reconciliation_data: dict[str, Any], open_positions: dict[str, int]
+    ) -> None:
+        """
+        Restore RiskManager state from database records.
+        Ensures circuit breakers and daily limits are consistent across restarts.
+        """
+        self.daily.realised_pnl = reconciliation_data.get("realised_pnl", 0.0)
+        self.daily.trade_count = reconciliation_data.get("trade_count", 0)
+        self.daily.consecutive_losses = reconciliation_data.get("consecutive_losses", 0)
+        self.daily.peak_equity = reconciliation_data.get("daily_peak_equity", self.balance)
+
+        self.peak_equity = reconciliation_data.get("all_time_peak_equity", self.balance)
+        self.open_positions = open_positions
+
+        logger.info(
+            "risk_manager_reconciliation_complete",
+            realised_pnl=self.daily.realised_pnl,
+            trade_count=self.daily.trade_count,
+            peak_equity=self.peak_equity,
+            open_positions=len(self.open_positions),
+        )
 
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:
