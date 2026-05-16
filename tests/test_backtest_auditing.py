@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from datetime import datetime, timedelta
 from src.core.audit_log import AuditLogger, get_audit_logger
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.trading.backtester import BacktestEngine
 from src.core.schemas import TradeSignal
 from sqlalchemy import text
