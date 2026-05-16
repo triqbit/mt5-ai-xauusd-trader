@@ -1,35 +1,45 @@
-# Benchmarking Framework
+# Acceptance Criteria: Institutional Benchmarking Framework
 
-## Overview
-This document outlines the acceptance criteria and usage for the benchmarking framework in `src/research/benchmarks.py`.
+## Functional Acceptance Criteria
+- **Behavior:**
+    - Provide a standardized framework for evaluating AI models against technical baselines (EMA Crossover, Momentum, etc.).
+    - All strategies must implement a common interface returning signals in the set {-1, 0, 1}.
+    - Calculate a comprehensive suite of institutional metrics: Sharpe, Sortino, Calmar, Ulcer Index, and Expectancy.
+    - Support statistical significance testing (Paired T-test, Wilcoxon) to compare strategy return distributions.
+- **Edge Cases:**
+    - Handle empty or insufficient data for specific benchmarks (e.g., long-window EMAs).
+    - Ensure reproducibility by using fixed random seeds for `RandomStrategy`.
+    - Correctly handle timeframe-specific annualization for risk-adjusted metrics.
+- **Inputs/Outputs:**
+    - **Inputs:** Pandas DataFrame (OHLCV), target strategy, baseline strategies.
+    - **Outputs:** `BenchmarkingReport` including comparative metrics and statistical significance results.
 
-## Features
-- **Consistent Interface**: All strategies implement the `BenchmarkStrategy` protocol.
-- **Baseline Strategies**:
-    - `EMACrossoverStrategy`: Fast/Slow EMA crossover logic.
-    - `MomentumStrategy`: ROC-based trend following.
-    - `VolatilityBreakoutStrategy`: Bollinger Band breakout signals.
-    - `NaiveDirectionalStrategy`: Last candle direction persistence.
-    - `RiskFilteredBaseline`: EMA crossover with a volatility threshold filter.
-    - `RandomStrategy`: Reproducible random signals for null-hypothesis testing.
-- **Quantitative Evaluator**:
-    - Equity-curve-based backtesting.
-    - Metrics: Total Return, Sharpe Ratio, Sortino Ratio, Calmar Ratio, Max Drawdown, Win Rate, Profit Factor, Expectancy, Trade Count.
-- **Statistical Comparison**:
-    - Support for comparing strategy return distributions using a paired t-test with warmup-trimming alignment.
-- **Model Adapters**:
-    - `EnsembleAdapter`: Wraps `EnsembleModel`.
-    - `PPOAdapter`: Wraps `PPOAgent`.
-    - `TransformerAdapter`: Wraps `TimeSeriesTransformer`.
-    - `LSTMAdapter`: Wraps `LSTMPricePredictor`.
-    - `DreamerAdapter`: Wraps `DreamerAgent` with state management.
+## Technical Acceptance
+- **Test Coverage:**
+    - Unit tests for each baseline strategy's signal generation logic.
+    - Integration tests for the quantitative evaluator using synthetic OHLCV data.
+    - Verification of statistical comparison logic (p-values, t-stats).
+- **Performance:**
+    - Evaluation of 10+ benchmarks over 1 year of M15 data must complete in < 5 seconds.
+- **Error Handling:**
+    - Strategies should fail-safe by returning "HOLD" (0) signals if internal errors occur.
+- **Observability:**
+    - Log benchmarking session summaries to the system audit trail.
 
-## Acceptance Criteria
-- [x] All baseline strategies produce signals in the set {-1, 0, 1}.
-- [x] Evaluator correctly calculates metrics from synthetic OHLCV data.
-- [x] Model adapters support rolling window lookbacks for sequence-dependent models.
-- [x] Comparison logic provides t-statistic and p-value for significance testing.
-- [x] Support for timeframe-specific annualization via `bars_per_year`.
-- [x] Documentation includes all advanced risk-adjusted metrics.
-- [x] Linting passes (Ruff).
-- [x] Unit tests in `tests/test_benchmarks.py` pass.
+## Operational Acceptance
+- **Documentation:**
+    - Guide for adding new baseline strategies to the framework.
+    - Detailed explanation of the statistical significance tests used.
+- **Configuration:**
+    - `BENCHMARK_LOOKBACK`: Data window for evaluation.
+    - `STAT_SIGNIFICANCE_THRESHOLD`: Alpha level for p-value (default 0.05).
+- **Rollback:**
+    - N/A (Research component).
+- **Monitoring:**
+    - N/A.
+
+## Release Readiness
+- **Deployment:** Part of the Research & Development module.
+- **Backward Compatibility:** No impact on core execution logic.
+- **Migration:** No data migration required.
+- **Sign-off:** Requires approval from the Quant Lead (Jules04).
