@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import pandas as pd
 
@@ -28,6 +28,9 @@ from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
+
+if TYPE_CHECKING:
+    from src.trading.risk_engine import RiskDecision
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +85,9 @@ class RiskManager:
         self,
         signal: TradeSignal,
         market_data: Optional[pd.DataFrame] = None,
-        open_positions: Optional[list] = None,
-        model_health: Optional[dict] = None,
+        open_positions: Optional[List[dict]] = None, model_health: Optional[dict] = None,
         signal_id: Optional[int] = None,
-    ) -> "src.trading.risk_engine.RiskDecision":
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
         Returns a RiskDecision object.
@@ -121,6 +123,7 @@ class RiskManager:
             # Layer 4: Exposure Limits (requires open_positions)
             if open_positions is not None:
                 from src.trading.risk_engine import RiskEngine
+
                 engine_stub = RiskEngine(self.cfg, self.balance)
                 engine_stub.daily = self.daily
 
@@ -129,7 +132,9 @@ class RiskManager:
                     passed = False
                     rejection_reason = "Max directional exposure reached (30%)"
                 # Check total notional
-                elif market_data is not None and not engine_stub._check_total_notional(signal, open_positions, market_data):
+                elif market_data is not None and not engine_stub._check_total_notional(
+                    signal, open_positions, market_data
+                ):
                     passed = False
                     rejection_reason = "Total notional exposure exceeds equity"
 
@@ -149,7 +154,9 @@ class RiskManager:
                 )
 
         return RiskDecision(
-            is_approved=passed, reason=rejection_reason or "Approved", adjusted_lot_size=adjusted_lots
+            is_approved=passed,
+            reason=rejection_reason or "Approved",
+            adjusted_lot_size=adjusted_lots,
         )
 
     def approve(
@@ -191,6 +198,9 @@ class RiskManager:
         # Sizing: risk 1% (cfg.risk_per_trade) of balance
         risk_amount = self.balance * self.cfg.risk_per_trade
         # ATR * 100 converts gold ATR to $ per lot (for XAUUSD)
+        # We ensure current_atr is not zero to avoid division by zero
+        if current_atr <= 0:
+            return self.cfg.min_lot_size
         lot_size = (risk_amount / (current_atr * 100)) * vol_multiplier
 
         # Cap at Max Position Size (10% of equity)
@@ -320,7 +330,7 @@ class RiskManager:
             return False
         return True
 
-    def _check_max_positions(self, open_positions: Optional[list] = None) -> bool:
+    def _check_max_positions(self, open_positions: Optional[List[dict]] = None) -> bool:
         count = len(open_positions) if open_positions is not None else len(self.open_positions)
         if count >= self.cfg.max_positions:
             logger.debug("Max positions reached (%d)", self.cfg.max_positions)
