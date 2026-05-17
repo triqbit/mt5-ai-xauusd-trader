@@ -6,6 +6,12 @@ Trade signal explainability and attribution system.
 Provides institutional-grade structured breakdowns of why a signal was generated,
 including ensemble voting, feature impacts, and execution filter results.
 
+This module is the core of the system's "Glass Box" architecture, ensuring
+that every automated decision is traceable, justifiable, and auditable.
+
+All attribution models in this module are immutable (frozen) and enforce strict
+validation to ensure technical trust and a reliable audit trail.
+
 Usage:
     explainer = SignalExplainer()
     explanation = explainer.explain(
@@ -16,9 +22,6 @@ Usage:
     )
     # Use explainer.format_for_terminal(explanation) for visualization
 
-All attribution models in this module are immutable (frozen) and enforce strict
-validation to ensure technical trust and a reliable audit trail.
-
 Author : triqbit
 License: MIT
 """
@@ -26,7 +29,8 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+from enum import IntEnum
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -137,10 +141,10 @@ class RegimeContext(BaseModel):
         0.0, ge=0.0, le=1.0, description="Quantitative strategy suitability for this regime."
     )
     session_alignment: float = Field(
-        0.0, ge=0.0, le=1.0, description="Alignment with current trading session (0.0 to 1.0)."
+        0.5, ge=0.0, le=1.0, description="Alignment with current trading session (0.0 to 1.0)."
     )
     volatility_alignment: float = Field(
-        0.0, ge=0.0, le=1.0, description="Alignment with current volatility state (0.0 to 1.0)."
+        0.5, ge=0.0, le=1.0, description="Alignment with current volatility state (0.0 to 1.0)."
     )
     summary: str = Field(
         "Market state stable", description="Contextual summary of the market state"
@@ -194,7 +198,7 @@ class SignalExplanation(BaseModel):
 
     signal_id: int | None = Field(None, description="Database ID of the signal")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="Time the explanation was generated",
     )
     symbol: str = Field(..., description="Trading symbol (e.g., XAUUSD)")
@@ -222,6 +226,25 @@ class SignalExplanation(BaseModel):
     machine_attribution: dict[str, Any] = Field(
         ..., description="Key-value pairs for automated post-trade analysis"
     )
+
+    def get_confluence_score(self) -> float:
+        """
+        Calculates a weighted confluence score (0.0 to 1.0) based on institutional metrics.
+        Weighted logic: 40% Confidence, 30% Regime, 15% Session, 15% Volatility.
+        """
+        weights = {
+            "confidence": 0.40,
+            "regime": 0.30,
+            "session": 0.15,
+            "volatility": 0.15,
+        }
+        score = (
+            self.total_confidence * weights["confidence"]
+            + self.regime_context.regime_alignment_score * weights["regime"]
+            + self.regime_context.session_alignment * weights["session"]
+            + self.regime_context.volatility_alignment * weights["volatility"]
+        )
+        return float(score)
 
 
 class SignalExplainer:
@@ -307,11 +330,13 @@ class SignalExplainer:
             model_votes: Dictionary mapping model names to their actions (ModelAction index).
             model_weights: Dictionary mapping model names to their ensemble weights.
             risk_data: Raw risk assessment data (passed, rejection_reasons, risk_reward, etc.).
-            regime_info: Market regime data (name, confidence, volatility, etc.) or RegimeInfo object.
+            regime_info: Market regime data or RegimeInfo object.
             execution_data: Optional execution filter data or ExecutionDecision object.
             feature_impacts: Optional list of cluster impacts or dict of individual feature scores.
             model_confidences: Optional dictionary mapping model names to their individual confidence scores.
             signal_id: Optional database ID of the signal for traceability.
+            session_alignment: Alignment override for the current trading session (0.0 to 1.0).
+            volatility_alignment: Alignment override for the current volatility state (0.0 to 1.0).
 
         Returns:
             A structured SignalExplanation object.
@@ -330,16 +355,19 @@ class SignalExplainer:
             execution_summary = ExecutionSummary(
                 passed=True, filters=[], summary="Execution filters bypassed"
             )
-        elif hasattr(execution_data, "trace"):  # ExecutionDecision dataclass
+        elif hasattr(execution_data, "trace"):  # ExecutionDecision dataclass or pydantic model
             filters = []
-            for name, res in execution_data.trace.items():
+            # Extract blocked_by if available (handles both dataclass and model validator outcomes)
+            blocked_by = getattr(execution_data, "blocked_by", None)
+            # Default to False for institutional safety (fail-closed)
+            is_approved = getattr(execution_data, "is_approved", False)
+
+            for name, res in getattr(execution_data, "trace", {}).items():
                 filters.append(
                     FilterResult(
                         filter_name=name,
                         passed=res.get("passed", False),
-                        message=f"Blocked by {execution_data.blocked_by}"
-                        if execution_data.blocked_by == name.upper()
-                        else None,
+                        message=f"Blocked by {blocked_by}" if blocked_by == name.upper() else None,
                         value=res.get("value")
                         or res.get("ratio")
                         or res.get("rsi")
@@ -350,10 +378,10 @@ class SignalExplainer:
                     )
                 )
             execution_summary = ExecutionSummary(
-                passed=execution_data.is_approved,
+                passed=is_approved,
                 filters=filters,
-                summary=f"Blocked by {execution_data.blocked_by}"
-                if execution_data.blocked_by
+                summary=f"Blocked by {blocked_by}"
+                if blocked_by
                 else "Passed all execution filters",
             )
         elif isinstance(execution_data, dict):
@@ -416,21 +444,21 @@ class SignalExplainer:
             elif abs(weighted_conf - max_weighted_conf) < 1e-6 and max_weighted_conf > 0:
                 dominant_models.append(name)
 
-            temp_attributions.append({
-                "model_name": name,
-                "vote": vote_dir,
-                "confidence": model_conf,
-                "weight": weight,
-                "weighted_conf": weighted_conf,
-            })
+            temp_attributions.append(
+                {
+                    "model_name": name,
+                    "vote": vote_dir,
+                    "confidence": model_conf,
+                    "weight": weight,
+                    "weighted_conf": weighted_conf,
+                }
+            )
 
         # Second pass: Calculate dominance ratio and finalize attribution objects
         final_attributions = []
         for attr_dict in temp_attributions:
             dom_ratio = (
-                attr_dict["weighted_conf"] / total_weighted_conf
-                if total_weighted_conf > 0
-                else 0.0
+                attr_dict["weighted_conf"] / total_weighted_conf if total_weighted_conf > 0 else 0.0
             )
             final_attributions.append(
                 ModelAttribution(
@@ -468,7 +496,6 @@ class SignalExplainer:
             )
         elif hasattr(regime_info, "label"):  # RegimeInfo pydantic model
             alignment = regime_info.confidence if regime_info.confidence > 0.6 else 0.4
-            # Use alignment values from RegimeInfo if provided, otherwise use explicit overrides
             s_align = getattr(regime_info, "session_alignment", session_alignment)
             v_align = getattr(regime_info, "volatility_alignment", volatility_alignment)
 
@@ -521,7 +548,6 @@ class SignalExplainer:
                 if isinstance(fi, dict)
             ]
         elif isinstance(feature_impacts, dict):
-            # Individual feature scores -> Aggregate into clusters
             cluster_scores: dict[str, list[float]] = {k: [] for k in self.FEATURE_MAPPING}
             cluster_scores["Other"] = []
 
@@ -557,25 +583,27 @@ class SignalExplainer:
         if dominant_models:
             reasoning += f"Primary driver(s): {', '.join(dominant_models)}. "
 
-        # Strategic Context Mapping
         regime_lower = regime_context.regime_name.lower()
         strategic_edge = ""
         if "trending" in regime_lower:
-            strategic_edge = "Trending regimes provide high-velocity environments for our momentum models."
+            strategic_edge = (
+                "Trending regimes provide high-velocity environments for momentum models."
+            )
         elif "ranging" in regime_lower:
-            strategic_edge = "Mean-reversion setups are prioritized in ranging regimes to capture cyclical price action."
+            strategic_edge = "Mean-reversion setups are prioritized in ranging regimes."
         elif "volatile" in regime_lower:
-            strategic_edge = "Elevated volatility requires tighter execution gates and confluence between technical clusters."
+            strategic_edge = "Elevated volatility requires tighter execution gates."
         else:
             strategic_edge = "Market state stable, following base ensemble consensus."
 
-        reasoning += f"Market is currently in a {regime_context.regime_name} regime. {strategic_edge} "
+        reasoning += (
+            f"Market is currently in a {regime_context.regime_name} regime. {strategic_edge} "
+        )
         if regime_context.is_favorable:
             reasoning += "Market state is considered favorable for this strategy setup. "
         else:
             reasoning += "Market state is UNFAVORABLE/CAUTIONARY for this strategy. "
 
-        # Categorize feature confluence (supporting vs opposing)
         supporting = []
         opposing = []
         for c in contributions:
@@ -638,160 +666,10 @@ class SignalExplainer:
             machine_attribution=machine_attr,
         )
 
-    def format_for_terminal(
-        self, explanation: SignalExplanation, console: Any | None = None
-    ) -> str:
-        """
-        Format the explanation for terminal display.
-        Uses 'rich' for pretty printing if available, otherwise returns plain text.
-        """
-        try:
-            from rich import box
-            from rich.console import Console
-            from rich.panel import Panel
-            from rich.table import Table
-
-            # Reuse provided console or create a lightweight one
-            console_provided = console is not None
-            if console is None:
-                console = Console(force_terminal=True)
-
-            # 1. Main Header Panel
-            status_color = (
-                "green"
-                if explanation.direction == SignalDirection.BUY
-                else "red"
-                if explanation.direction == SignalDirection.SELL
-                else "yellow"
-            )
-            header = Panel(
-                f"[bold {status_color}]{explanation.direction.name}[/bold {status_color}] for [bold]{explanation.symbol}[/bold]\n"
-                f"Confidence: [bold]{explanation.total_confidence:.1%}[/bold]\n\n"
-                f"{explanation.human_readable_summary}",
-                title="Trade Signal Explanation",
-                subtitle=f"ID: {explanation.signal_id or 'N/A'} | {explanation.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
-                box=box.DOUBLE,
-            )
-
-            # 2. Model Votes Table
-            model_table = Table(title="Model Attribution", box=box.SIMPLE)
-            model_table.add_column("Model", style="cyan")
-            model_table.add_column("Vote", style="bold")
-            model_table.add_column("Weight", justify="right")
-            model_table.add_column("Confidence", justify="right")
-            model_table.add_column("Dominant", justify="center")
-
-            for attr in explanation.model_attributions:
-                vote_color = (
-                    "green"
-                    if attr.vote == SignalDirection.BUY
-                    else "red"
-                    if attr.vote == SignalDirection.SELL
-                    else "white"
-                )
-                vote_icon = self._get_direction_icon(attr.vote)
-                model_table.add_row(
-                    attr.model_name,
-                    f"{vote_icon} [{vote_color}]{attr.vote.name}[/{vote_color}]",
-                    f"{attr.weight:.1%}",
-                    f"{attr.confidence:.1%}",
-                    "⭐" if attr.is_dominant else "",
-                )
-
-            # 3. Feature Contributions
-            feature_table = Table(title="Feature Cluster Contributions", box=box.SIMPLE)
-            feature_table.add_column("Cluster", style="magenta")
-            feature_table.add_column("Score", justify="right")
-            feature_table.add_column("Impact", justify="center")
-            feature_table.add_column("Summary")
-
-            for cont in explanation.feature_contributions:
-                impact_color = (
-                    "red"
-                    if cont.impact_level == "High"
-                    else "yellow"
-                    if cont.impact_level == "Medium"
-                    else "dim"
-                )
-                impact_marker = self._get_impact_marker(cont.impact_level)
-                # Confluence-aware coloring: Green if the contribution aligns with the signal direction
-                is_confluent = (
-                    explanation.direction == SignalDirection.BUY and cont.contribution_score > 0
-                ) or (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
-                score_color = (
-                    "green" if is_confluent else "red" if cont.contribution_score != 0 else "white"
-                )
-                score_icon = self._get_direction_icon(
-                    1 if cont.contribution_score > 0 else -1 if cont.contribution_score < 0 else 0
-                )
-                feature_table.add_row(
-                    cont.cluster_name,
-                    f"{score_icon} [{score_color}]{cont.contribution_score:+.2f}[/{score_color}]",
-                    f"[{impact_color}]{impact_marker} {cont.impact_level}[/{impact_color}]",
-                    cont.summary,
-                )
-
-            # 4. Execution and Risk
-            exec_table = Table(title="Execution Filters", box=box.SIMPLE, expand=True)
-            exec_table.add_column("Filter")
-            exec_table.add_column("Status", justify="center")
-            exec_table.add_column("Details")
-
-            for f in explanation.execution_summary.filters:
-                status = "[green]OK[/green]" if f.passed else "[red]FAIL[/red]"
-                details = f.message or f"Value: {f.value} (Thr: {f.threshold})"
-                exec_table.add_row(f.filter_name, status, details)
-
-            risk_status = (
-                "[bold green]PASSED[/bold green]"
-                if explanation.risk_assessment.passed
-                else "[bold red]REJECTED[/bold red]"
-            )
-            risk_info = (
-                f"Risk Gate: {risk_status}\n"
-                f"R:R Ratio: [bold]{explanation.risk_assessment.risk_reward_ratio:.2f}[/bold]\n"
-                f"Kelly Size: [bold]{explanation.risk_assessment.kelly_fraction:.2%}[/bold]\n"
-            )
-            if explanation.risk_assessment.rejection_reasons:
-                risk_info += f"Reasons: [dim]{', '.join(explanation.risk_assessment.rejection_reasons)}[/dim]"
-
-            regime_info = (
-                f"Market Regime: [bold cyan]{explanation.regime_context.regime_name}[/bold cyan]\n"
-                f"Volatility: [bold]{explanation.regime_context.volatility_state}[/bold]\n"
-                f"Favored: {'[green]YES[/green]' if explanation.regime_context.is_favorable else '[red]NO[/red]'}"
-            )
-
-            # Bypass expensive capture if we are printing directly to a console
-            if console_provided and not getattr(console, "_record", False):
-                console.print(header)
-                console.print(model_table)
-                if explanation.feature_contributions:
-                    console.print(feature_table)
-                if explanation.execution_summary.filters:
-                    console.print(exec_table)
-                console.print(Panel(risk_info, title="Risk Assessment"))
-                console.print(Panel(regime_info, title="Market Context"))
-                return ""
-
-            with console.capture() as capture:
-                console.print(header)
-                console.print(model_table)
-                if explanation.feature_contributions:
-                    console.print(feature_table)
-                if explanation.execution_summary.filters:
-                    console.print(exec_table)
-                console.print(Panel(risk_info, title="Risk Assessment"))
-                console.print(Panel(regime_info, title="Market Context"))
-
-            return capture.get()
-
-        except ImportError:
-            return self._get_plain_text_explanation(explanation)
-
     def get_renderable(self, explanation: SignalExplanation) -> Any:
         """
         Return a 'rich' Group containing the full breakdown.
-        Used for integration with larger dashboards.
+        Used for integration with institutional dashboards.
         """
         try:
             from rich import box
@@ -840,7 +718,6 @@ class SignalExplainer:
                     else "dim"
                 )
                 impact_marker = self._get_impact_marker(cont.impact_level)
-                # Confluence-aware coloring: Green if the contribution aligns with the signal direction
                 is_confluent = (
                     explanation.direction == SignalDirection.BUY and cont.contribution_score > 0
                 ) or (explanation.direction == SignalDirection.SELL and cont.contribution_score < 0)
@@ -898,14 +775,57 @@ class SignalExplainer:
 
             return Group(*components)
         except ImportError:
-            # We don't have a good fallback here as this returns a renderable
             return None
 
+    def format_for_terminal(
+        self, explanation: SignalExplanation, console: Any | None = None
+    ) -> str:
+        """
+        Format the explanation for terminal display using 'rich'.
+        """
+        try:
+            from rich import box
+            from rich.console import Console
+            from rich.panel import Panel
+
+            if console is None:
+                console = Console(force_terminal=True)
+
+            status_color = (
+                "green"
+                if explanation.direction == SignalDirection.BUY
+                else "red"
+                if explanation.direction == SignalDirection.SELL
+                else "yellow"
+            )
+            header = Panel(
+                f"[bold {status_color}]{explanation.direction.name}[/bold {status_color}] for [bold]{explanation.symbol}[/bold]\n"
+                f"Confidence: [bold]{explanation.total_confidence:.1%}[/bold]\n\n"
+                f"{explanation.human_readable_summary}",
+                title="Trade Signal Explanation",
+                subtitle=f"ID: {explanation.signal_id or 'N/A'} | {explanation.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                box=box.DOUBLE,
+            )
+
+            renderable = self.get_renderable(explanation)
+            if renderable is None:
+                return self._get_plain_text_explanation(explanation)
+
+            with console.capture() as capture:
+                console.print(header)
+                console.print(renderable)
+
+            return capture.get()
+
+        except ImportError:
+            return self._get_plain_text_explanation(explanation)
+
     def _get_plain_text_explanation(self, explanation: SignalExplanation) -> str:
-        """Fallback plain text formatter."""
+        """Fallback plain text formatter for non-interactive environments."""
         output = "=== TRADE SIGNAL EXPLANATION ===\n"
         output += f"Symbol: {explanation.symbol} | Direction: {explanation.direction.name} | Conf: {explanation.total_confidence:.1%}\n"
         output += f"Summary: {explanation.human_readable_summary}\n\n"
+
         output += "Model Votes:\n"
         for attr in explanation.model_attributions:
             output += (
