@@ -14,7 +14,7 @@ def verify_integration():
 
     simulator = RareEventSimulator(seed=42)
     config = RareEventConfig(event_type=RareEventType.FLASH_CRASH, n_steps=200)
-    df, result = simulator.generate_scenario(config)
+    _, result = simulator.generate_scenario(config)
 
     # 1. Test to_report_summary conversion
     summary = result.to_report_summary()
