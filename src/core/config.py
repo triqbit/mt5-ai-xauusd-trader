@@ -133,9 +133,15 @@ class TradingConfig(BaseSettings):
     allocator_max_strategy_risk: float = Field(
         default=0.30, description="Max 30% per individual strategy"
     )
-    allocator_performance_step: float = Field(default=0.05, description="Adjustment step for performance")
-    allocator_decay_rate: float = Field(default=0.001, description="Rate at which multiplier returns to 1.0")
-    allocator_soft_limit_buffer: float = Field(default=0.10, description="Buffer for diversification guard")
+    allocator_performance_step: float = Field(
+        default=0.05, description="Adjustment step for performance"
+    )
+    allocator_decay_rate: float = Field(
+        default=0.001, description="Rate at which multiplier returns to 1.0"
+    )
+    allocator_soft_limit_buffer: float = Field(
+        default=0.10, description="Buffer for diversification guard"
+    )
 
     # Volatility Thresholds
     volatility_high_threshold: float = Field(

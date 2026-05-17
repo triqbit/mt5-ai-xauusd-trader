@@ -41,6 +41,7 @@ This document lists the available configuration fields, their types, and descrip
 | `allocator_max_total_heat` | `float` | Max 70% of budget committed | `0.7` |
 | `allocator_max_symbol_risk` | `float` | Max 40% per symbol | `0.4` |
 | `allocator_max_family_risk` | `float` | Max 40% per model family | `0.4` |
+| `allocator_max_strategy_risk` | `float` | Max 30% per individual strategy | `0.3` |
 | `allocator_performance_step` | `float` | Adjustment step for performance | `0.05` |
 | `allocator_decay_rate` | `float` | Rate at which multiplier returns to 1.0 | `0.001` |
 | `allocator_soft_limit_buffer` | `float` | Buffer for diversification guard | `0.1` |
