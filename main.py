@@ -1480,6 +1480,11 @@ def main() -> int:
     )
 
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
+    # Reconcile risk state from database to maintain circuit breaker integrity across restarts
+    with status_ctx:
+        risk.reconcile_state(balance)
+
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
@@ -1490,13 +1495,6 @@ def main() -> int:
     # Use balance for allocator; if balance is 0, CapitalAllocator will handle it (or fail validation)
     allocator = CapitalAllocator(total_budget=balance, monitor=monitor)
     dss = DecisionSupportSystem()
-
-    # 5. Operational State Reconciliation
-    # Restore RiskManager and position context from DB after restart
-    if trade_logger:
-        recon_data = trade_logger.get_reconciliation_data(balance)
-        open_positions = trade_logger.get_open_trades()
-        risk.reconcile_state(recon_data, open_positions)
 
     # Register default strategy in allocator
     # Ensure capital_cap is at least 0.01 to pass Pydantic gt=0 validation if balance is 0

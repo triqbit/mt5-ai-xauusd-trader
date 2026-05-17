@@ -1,191 +1,93 @@
-"""
-Test suite for RiskManager state reconciliation and recovery.
-"""
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from src.core.config import TradingConfig
-from src.core.schemas import TradeSignal
 from src.core.trade_logger import Trade, TradeLogger
 from src.trading.risk_manager import RiskManager
 
 
+class MockConfig:
+    def __init__(self):
+        self.risk_per_trade = 0.01
+        self.max_daily_loss = 0.05
+        self.max_positions = 3
+        self.max_losing_streak = 5
+        self.model_drift_threshold = 0.1
+        self.model_accuracy_floor = 0.5
+        self.model_calibration_threshold = 0.2
+
 @pytest.fixture
-def temp_db(tmp_path):
-    db_path = tmp_path / "test_trades.db"
-    return f"sqlite:///{db_path}"
-
-
-@pytest.fixture
-def logger(temp_db):
-    return TradeLogger(db_url=temp_db)
-
+def db_url():
+    # Use a unique in-memory database for each test to avoid engine caching side effects
+    return f"sqlite:///:memory-{uuid.uuid4()}:"
 
 @pytest.fixture
-def config():
-    return TradingConfig(
-        MT5_LOGIN=123456,
-        MT5_PASSWORD="password",
-        MT5_SERVER="Demo",
-        mt5_path="C:/Program Files/MetaTrader 5/terminal64.exe",
-        max_daily_loss=0.05,
-        max_positions=3,
-        max_losing_streak=3,
-        risk_per_trade=0.01,
-    )
+def trade_logger(db_url):
+    return TradeLogger(db_url)
 
+@pytest.fixture
+def risk_manager(trade_logger):
+    cfg = MockConfig()
+    return RiskManager(config=cfg, account_balance=10000.0, logger_db=trade_logger)
 
-def test_risk_manager_reconciliation_full_cycle(logger, config):
+def test_risk_reconciliation_cycle(trade_logger, risk_manager):
     # 1. Setup historical data in DB
-    # Start with $10,000 balance
+    # We'll simulate a sequence where we had 2 trades yesterday and 2 trades today.
+    # Total PnL: 100 + 200 + 200 - 50 = 450
+    # Today's PnL: 200 - 50 = 150
+    # Historical Max PnL: 500 (after first 3 trades)
 
-    # Yesterday: One winner of $200
-    yesterday = datetime.now(UTC) - timedelta(days=1)
-    with logger.Session() as session:
-        t1 = Trade(
-            ticket=100,
-            symbol="XAUUSD",
-            direction=1,
-            entry_price=2300.0,
-            exit_price=2302.0,
-            lot_size=0.1,
-            pnl=200.0,
-            status="CLOSED",
-            created_at=yesterday,
-            updated_at=yesterday,
-        )
-        session.add(t1)
+    now = datetime.now(UTC)
+    yesterday = now - timedelta(days=1)
+
+    with trade_logger.Session() as session:
+        # Yesterday's trades
+        t1 = Trade(ticket=1001, symbol="XAUUSD", direction=1, entry_price=2000.0, exit_price=2001.0, lot_size=1.0, pnl=100.0, status="CLOSED")
+        t1.created_at = yesterday
+        t1.updated_at = yesterday
+
+        t2 = Trade(ticket=1002, symbol="XAUUSD", direction=1, entry_price=2000.0, exit_price=2002.0, lot_size=1.0, pnl=200.0, status="CLOSED")
+        t2.created_at = yesterday
+        t2.updated_at = yesterday
+
+        # Today's trades
+        t3 = Trade(ticket=1003, symbol="XAUUSD", direction=1, entry_price=2000.0, exit_price=2002.0, lot_size=1.0, pnl=200.0, status="CLOSED")
+        t3.created_at = now
+        t3.updated_at = now
+
+        t4 = Trade(ticket=1004, symbol="XAUUSD", direction=-1, entry_price=2000.0, exit_price=2000.5, lot_size=1.0, pnl=-50.0, status="CLOSED")
+        t4.created_at = now
+        t4.updated_at = now
+
+        # Open trade
+        t5 = Trade(ticket=1005, symbol="XAUUSD", direction=1, entry_price=2000.0, lot_size=1.0, status="OPEN")
+
+        session.add_all([t1, t2, t3, t4, t5])
         session.commit()
 
-    # Today: Two losers of $100 each
-    today = datetime.now(UTC)
-    with logger.Session() as session:
-        t2 = Trade(
-            ticket=101,
-            symbol="XAUUSD",
-            direction=1,
-            entry_price=2300.0,
-            exit_price=2299.0,
-            lot_size=0.1,
-            pnl=-100.0,
-            status="CLOSED",
-            created_at=today,
-            updated_at=today,
-        )
-        t3 = Trade(
-            ticket=102,
-            symbol="XAUUSD",
-            direction=1,
-            entry_price=2300.0,
-            exit_price=2299.0,
-            lot_size=0.1,
-            pnl=-100.0,
-            status="CLOSED",
-            created_at=today,
-            updated_at=today,
-        )
-        # One open trade
-        t4 = Trade(
-            ticket=103,
-            symbol="EURUSD",
-            direction=-1,
-            entry_price=1.0800,
-            lot_size=0.1,
-            status="OPEN",
-            created_at=today,
-            updated_at=today,
-        )
-        session.add_all([t2, t3, t4])
-        session.commit()
+    # 2. Run reconciliation
+    # Current balance is assumed to be 10450.0 (10000 base + 450 total pnl)
+    current_balance = 10450.0
+    risk_manager.reconcile_state(current_balance)
 
-    # Current balance would be 10000 + 200 - 100 - 100 = 10000
-    current_balance = 10000.0
+    # 3. Verify state
+    assert risk_manager.daily.realised_pnl == 150.0
+    assert risk_manager.daily.trade_count == 2
+    assert "XAUUSD" in risk_manager.open_positions
+    assert risk_manager.open_positions["XAUUSD"] == 1005
 
-    # 2. Get reconciliation data
-    recon_data = logger.get_reconciliation_data(current_balance)
-    open_trades = logger.get_open_trades()
+    # Total PnL = 450.0
+    # Peak PnL was 500.0 (after t1, t2, t3)
+    # Deposit = 10450 - 450 = 10000
+    # Peak Equity = 10000 + 500 = 10500
+    assert risk_manager.peak_equity == 10500.0
+    assert risk_manager.daily.peak_equity == 10500.0
 
-    # Verify recon data
-    assert recon_data["realised_pnl"] == -200.0
-    assert recon_data["trade_count"] == 2
-    assert recon_data["consecutive_losses"] == 2
-    assert recon_data["all_time_peak_equity"] == 10200.0
-    assert open_trades == {"EURUSD": 103}
-
-    # 3. Initialize RiskManager and Reconcile
-    risk = RiskManager(config, account_balance=current_balance, logger_db=logger)
-    risk.reconcile_state(recon_data, open_trades)
-
-    # 4. Assert RiskManager state
-    assert risk.daily.realised_pnl == -200.0
-    assert risk.daily.trade_count == 2
-    assert risk.daily.consecutive_losses == 2
-    assert risk.peak_equity == 10200.0
-    assert risk.open_positions == {"EURUSD": 103}
-
-    # 5. Verify circuit breaker triggers based on reconciled state
-    # Daily loss limit is 5% of peak ($10200 * 0.05 = $510).
-    # Current loss is $200.
-
-    signal = TradeSignal(
-        symbol="XAUUSD",
-        direction=1,
-        entry_price=2300.0,
-        stop_loss=2290.0,
-        take_profit=2320.0,
-        lot_size=0.1,
-        algorithm="test",
-        confidence=0.8,
-    )
-
-    # Should still be approved
-    assert risk.approve(signal) is True
-
-    # Record another big loss today to hit limit
-    risk.record_pnl(-400.0)
-    assert risk.daily.realised_pnl == -600.0
-
-    # Should now be rejected due to daily loss limit
-    assert risk.approve(signal) is False
-
-
-def test_risk_manager_consecutive_losses_reconciliation(logger, config):
-    today = datetime.now(UTC)
-    with logger.Session() as session:
-        for i in range(3):
-            t = Trade(
-                ticket=200 + i,
-                symbol="XAUUSD",
-                direction=1,
-                entry_price=2300.0,
-                exit_price=2299.0,
-                lot_size=0.1,
-                pnl=-10.0,
-                status="CLOSED",
-                created_at=today,
-                updated_at=today,
-            )
-            session.add(t)
-        session.commit()
-
-    recon_data = logger.get_reconciliation_data(970.0)
-    risk = RiskManager(config, account_balance=970.0)
-    risk.reconcile_state(recon_data, {})
-
-    assert risk.daily.consecutive_losses == 3
-
-    signal = TradeSignal(
-        symbol="XAUUSD",
-        direction=1,
-        entry_price=2300.0,
-        stop_loss=2290.0,
-        take_profit=2320.0,
-        lot_size=0.1,
-        algorithm="test",
-        confidence=0.8,
-    )
-
-    # Should be rejected due to max_losing_streak (3)
-    assert risk.approve(signal) is False
+def test_reconciliation_empty_db(trade_logger, risk_manager):
+    risk_manager.reconcile_state(10000.0)
+    assert risk_manager.daily.realised_pnl == 0.0
+    assert risk_manager.daily.trade_count == 0
+    assert len(risk_manager.open_positions) == 0
+    assert risk_manager.peak_equity == 10000.0

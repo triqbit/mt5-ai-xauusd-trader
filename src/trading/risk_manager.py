@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -165,35 +165,55 @@ class RiskManager:
         else:
             self.daily.consecutive_losses = 0
 
+    def reconcile_state(self, initial_balance: float) -> None:
+        """
+        Reconcile internal state from the database.
+        Crucial for maintaining risk circuit breakers across restarts.
+        """
+        if not self.trade_logger:
+            logger.warning("No trade logger available for reconciliation")
+            return
+
+        try:
+            data = self.trade_logger.get_reconciliation_data()
+            logger.info("Reconciling risk state | data=%s", data)
+
+            # Update daily stats
+            self.daily.realised_pnl = data["daily_realised_pnl"]
+            self.daily.trade_count = data["daily_trade_count"]
+
+            # Update open positions
+            self.open_positions = data["open_positions"]
+
+            # Update equity trackers
+            # Note: initial_balance passed here is the CURRENT balance from the broker.
+            # total_pnl is the sum of all historical closed trades.
+            # We assume initial_deposit + total_pnl = initial_balance (if no withdrawals/deposits)
+            # Peak equity needs to be relative to the current balance.
+            total_pnl = data["total_pnl"]
+            historical_max_pnl = data["historical_max_pnl"]
+
+            # If total_pnl = 0, initial_deposit = initial_balance
+            # deposit = balance - total_pnl
+            deposit = initial_balance - total_pnl
+            self.peak_equity = max(initial_balance, deposit + historical_max_pnl)
+            self.daily.peak_equity = max(initial_balance, self.peak_equity)
+
+            logger.info(
+                "Risk reconciliation COMPLETE | daily_pnl=%.2f positions=%d peak_equity=%.2f",
+                self.daily.realised_pnl,
+                len(self.open_positions),
+                self.peak_equity,
+            )
+        except Exception as e:
+            logger.error("Failed to reconcile risk state: %s", e, exc_info=True)
+
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:
             self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
-
-    def reconcile_state(
-        self, reconciliation_data: dict[str, Any], open_positions: dict[str, int]
-    ) -> None:
-        """
-        Restore RiskManager state from database records.
-        Ensures circuit breakers and daily limits are consistent across restarts.
-        """
-        self.daily.realised_pnl = reconciliation_data.get("realised_pnl", 0.0)
-        self.daily.trade_count = reconciliation_data.get("trade_count", 0)
-        self.daily.consecutive_losses = reconciliation_data.get("consecutive_losses", 0)
-        self.daily.peak_equity = reconciliation_data.get("daily_peak_equity", self.balance)
-
-        self.peak_equity = reconciliation_data.get("all_time_peak_equity", self.balance)
-        self.open_positions = open_positions
-
-        logger.info(
-            "risk_manager_reconciliation_complete",
-            realised_pnl=self.daily.realised_pnl,
-            trade_count=self.daily.trade_count,
-            peak_equity=self.peak_equity,
-            open_positions=len(self.open_positions),
-        )
 
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:

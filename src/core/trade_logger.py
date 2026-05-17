@@ -352,25 +352,55 @@ class TradeLogger:
             ).scalar_one_or_none()
 
     def get_open_trades(self) -> dict[str, int]:
-        """Retrieve all currently OPEN trades as a symbol -> ticket mapping."""
+        """
+        Fetch all currently open trades from the database.
+        Returns:
+            dict[str, int]: Mapping of symbol to ticket ID.
+        """
         with self.Session() as session:
-            trades = (
-                session.execute(
-                    select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
-                )
-                .scalars()
-                .all()
-            )
+            stmt = select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
+            trades = session.execute(stmt).scalars().all()
             return {t.symbol: t.ticket for t in trades}
 
-    def get_reconciliation_data(self, current_balance: float) -> dict[str, Any]:
+    def get_reconciliation_data(self) -> dict[str, Any]:
         """
-        Fetch historical PnLs, today's closed trades, and peak equity statistics.
-        Used to restore RiskManager state after a restart.
+        Fetch data needed to reconcile RiskManager state after restart.
+        Includes:
+            - Daily realised PnL (since start of current day UTC)
+            - Peak equity (all-time)
+            - Current open positions
         """
+        now = datetime.now(UTC)
+        today_start = datetime(now.year, now.month, now.day, tzinfo=UTC)
+
         with self.Session() as session:
-            # 1. Fetch all historical PnLs for all-time peak equity
-            all_pnls = (
+            # 1. Daily realised PnL
+            # We look at trades closed today.
+            daily_pnl = (
+                session.execute(
+                    select(func.sum(Trade.pnl)).where(
+                        Trade.status == "CLOSED",
+                        Trade.updated_at >= today_start,
+                        Trade.is_deleted.is_(False),
+                    )
+                ).scalar()
+                or 0.0
+            )
+
+            # 2. Daily trade count
+            daily_count = (
+                session.execute(
+                    select(func.count(Trade.id)).where(
+                        Trade.status == "CLOSED",
+                        Trade.updated_at >= today_start,
+                        Trade.is_deleted.is_(False),
+                    )
+                ).scalar()
+                or 0
+            )
+
+            # 3. All-time peak equity approximation
+            pnls = (
                 session.execute(
                     select(Trade.pnl)
                     .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
@@ -380,60 +410,15 @@ class TradeLogger:
                 .all()
             )
 
-            # Drawdown tracking: peak equity is the maximum of (starting balance + cumulative PnL)
-            # We assume current_balance is equity after all closed trades.
-            total_realised = sum(all_pnls)
-            initial_account_balance = current_balance - total_realised
-
-            pnls_array = np.array(all_pnls)
-            cum_pnl = np.cumsum(pnls_array) if len(pnls_array) > 0 else np.array([])
-
-            # Prepend 0.0 to handle accounts that only have losses correctly for peak detection
-            equity_curve = initial_account_balance + np.concatenate(([0.0], cum_pnl))
-            peak_equity = float(np.max(equity_curve))
-
-            # 2. Today's stats
-            today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-            logger.debug("reconcile_today_start", today_start=today_start.isoformat())
-            today_trades = (
-                session.execute(
-                    select(Trade)
-                    .where(
-                        Trade.status == "CLOSED",
-                        Trade.updated_at >= today_start,
-                        Trade.is_deleted.is_(False),
-                    )
-                    .order_by(Trade.updated_at.asc())
-                )
-                .scalars()
-                .all()
-            )
-
-            realised_pnl = sum(t.pnl for t in today_trades)
-            trade_count = len(today_trades)
-
-            # Today's peak equity
-            today_pnls = [t.pnl for t in today_trades]
-            today_cum_pnl = np.cumsum(today_pnls) if len(today_pnls) > 0 else np.array([])
-            # Equity at start of today
-            today_initial_balance = current_balance - sum(today_pnls)
-            today_equity_curve = today_initial_balance + np.concatenate(([0.0], today_cum_pnl))
-            daily_peak_equity = float(np.max(today_equity_curve))
-
-            # Consecutive losses (today)
-            consecutive_losses = 0
-            for t in reversed(today_trades):
-                if t.pnl < 0:
-                    consecutive_losses += 1
-                else:
-                    break
+            cumulative_pnl = np.cumsum([0.0, *pnls])
+            historical_max_pnl = np.max(cumulative_pnl) if len(cumulative_pnl) > 0 else 0.0
 
             return {
-                "realised_pnl": float(realised_pnl),
-                "trade_count": int(trade_count),
-                "consecutive_losses": int(consecutive_losses),
-                "daily_peak_equity": daily_peak_equity,
-                "all_time_peak_equity": peak_equity,
+                "daily_realised_pnl": float(daily_pnl),
+                "daily_trade_count": int(daily_count),
+                "total_pnl": float(cumulative_pnl[-1]) if len(cumulative_pnl) > 0 else 0.0,
+                "historical_max_pnl": float(historical_max_pnl),
+                "open_positions": self.get_open_trades(),
             }
 
     def log_risk_event(
@@ -468,94 +453,94 @@ class TradeLogger:
 
         with profile("perf_report_total"), self.Session() as session:
             # 1. Database-level aggregation for basic metrics
-            # Optimized: use func.sum and func.count to reduce application-side processing
-            with profile("perf_report_db_aggregate"):
-                stats = session.execute(
-                    select(
-                        func.count(Trade.id).label("total"),
-                        func.sum(Trade.pnl).filter(Trade.pnl > 0).label("gross_profit"),
-                        func.sum(Trade.pnl).filter(Trade.pnl < 0).label("gross_loss"),
-                        func.count(Trade.id).filter(Trade.pnl > 0).label("wins"),
-                    ).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
-                ).one()
+                # Optimized: use func.sum and func.count to reduce application-side processing
+                with profile("perf_report_db_aggregate"):
+                    stats = session.execute(
+                        select(
+                            func.count(Trade.id).label("total"),
+                            func.sum(Trade.pnl).filter(Trade.pnl > 0).label("gross_profit"),
+                            func.sum(Trade.pnl).filter(Trade.pnl < 0).label("gross_loss"),
+                            func.count(Trade.id).filter(Trade.pnl > 0).label("wins"),
+                        ).where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    ).one()
 
-            total_trades = stats.total or 0
-            if total_trades == 0:
-                return {
-                    "sharpe_ratio": 0.0,
-                    "profit_factor": 0.0,
-                    "max_drawdown": 0.0,
-                    "win_rate": 0.0,
-                    "total_trades": 0,
+                total_trades = stats.total or 0
+                if total_trades == 0:
+                    return {
+                        "sharpe_ratio": 0.0,
+                        "profit_factor": 0.0,
+                        "max_drawdown": 0.0,
+                        "win_rate": 0.0,
+                        "total_trades": 0,
+                    }
+
+                gross_profit = float(stats.gross_profit or 0.0)
+                gross_loss = abs(float(stats.gross_loss or 0.0))
+                profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
+                win_rate = float(stats.wins or 0) / total_trades
+
+                # 2. Sharpe Ratio and Max Drawdown require the full P&L sequence
+                # Still fetch only the necessary column
+                with profile("perf_report_db_pnl_fetch"):
+                    pnls = np.array(
+                        session.execute(
+                            select(Trade.pnl)
+                            .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                            .order_by(Trade.created_at.asc())
+                        )
+                        .scalars()
+                        .all()
+                    )
+
+                with profile("perf_report_math_metrics"):
+                    # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
+                    avg_ret = np.mean(pnls) if len(pnls) > 0 else 0.0
+                    if len(pnls) > 1:
+                        std_ret = np.std(pnls)
+                        sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
+                    else:
+                        sharpe = 0.0
+
+                    # Max Drawdown
+                    equity_curve = np.cumsum(pnls)
+                    peak = np.maximum.accumulate(equity_curve)
+                    drawdown = peak - equity_curve
+                    max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
+
+                    # Calmar Ratio (Annualized Return / Max Drawdown)
+                    # Rough approximation using mean P&L for annualized return if we don't have clear timeframes
+                    # per standard: (mean_pnl * 252) / max_dd
+                    calmar = (avg_ret * 252 / max_dd) if max_dd > 0 and len(pnls) > 0 else 0.0
+
+                    # Expectancy: (WinRate * AvgWin) - (LossRate * AvgLoss)
+                    avg_win = np.mean(pnls[pnls > 0]) if any(pnls > 0) else 0.0
+                    avg_loss = abs(np.mean(pnls[pnls < 0])) if any(pnls < 0) else 0.0
+                    expectancy = (win_rate * avg_win) - ((1 - win_rate) * avg_loss)
+
+                metrics = {
+                    "sharpe_ratio": float(sharpe),
+                    "profit_factor": float(profit_factor),
+                    "max_drawdown": float(max_dd),
+                    "calmar_ratio": float(calmar),
+                    "expectancy": float(expectancy),
+                    "win_rate": float(win_rate),
+                    "total_trades": int(total_trades),
                 }
 
-            gross_profit = float(stats.gross_profit or 0.0)
-            gross_loss = abs(float(stats.gross_loss or 0.0))
-            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
-            win_rate = float(stats.wins or 0) / total_trades
+                # Update cache
+                self._perf_cache = metrics
 
-            # 2. Sharpe Ratio and Max Drawdown require the full P&L sequence
-            # Still fetch only the necessary column
-            with profile("perf_report_db_pnl_fetch"):
-                pnls = np.array(
-                    session.execute(
-                        select(Trade.pnl)
-                        .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
-                        .order_by(Trade.created_at.asc())
-                    )
-                    .scalars()
-                    .all()
-                )
+                # Optionally log these metrics to DB
+                if persist:
+                    with profile("perf_report_db_persist"):
+                        metric_record = PerformanceMetric(
+                            sharpe_ratio=metrics["sharpe_ratio"],
+                            profit_factor=metrics["profit_factor"],
+                            max_drawdown=metrics["max_drawdown"],
+                            total_trades=metrics["total_trades"],
+                            win_rate=metrics["win_rate"],
+                        )
+                        session.add(metric_record)
+                        session.commit()
 
-            with profile("perf_report_math_metrics"):
-                # Sharpe Ratio (assumes risk-free rate = 0, per-trade returns)
-                avg_ret = np.mean(pnls) if len(pnls) > 0 else 0.0
-                if len(pnls) > 1:
-                    std_ret = np.std(pnls)
-                    sharpe = (avg_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
-                else:
-                    sharpe = 0.0
-
-                # Max Drawdown
-                equity_curve = np.cumsum(pnls)
-                peak = np.maximum.accumulate(equity_curve)
-                drawdown = peak - equity_curve
-                max_dd = np.max(drawdown) if len(drawdown) > 0 else 0.0
-
-                # Calmar Ratio (Annualized Return / Max Drawdown)
-                # Rough approximation using mean P&L for annualized return if we don't have clear timeframes
-                # per standard: (mean_pnl * 252) / max_dd
-                calmar = (avg_ret * 252 / max_dd) if max_dd > 0 and len(pnls) > 0 else 0.0
-
-                # Expectancy: (WinRate * AvgWin) - (LossRate * AvgLoss)
-                avg_win = np.mean(pnls[pnls > 0]) if any(pnls > 0) else 0.0
-                avg_loss = abs(np.mean(pnls[pnls < 0])) if any(pnls < 0) else 0.0
-                expectancy = (win_rate * avg_win) - ((1 - win_rate) * avg_loss)
-
-            metrics = {
-                "sharpe_ratio": float(sharpe),
-                "profit_factor": float(profit_factor),
-                "max_drawdown": float(max_dd),
-                "calmar_ratio": float(calmar),
-                "expectancy": float(expectancy),
-                "win_rate": float(win_rate),
-                "total_trades": int(total_trades),
-            }
-
-            # Update cache
-            self._perf_cache = metrics
-
-            # Optionally log these metrics to DB
-            if persist:
-                with profile("perf_report_db_persist"):
-                    metric_record = PerformanceMetric(
-                        sharpe_ratio=metrics["sharpe_ratio"],
-                        profit_factor=metrics["profit_factor"],
-                        max_drawdown=metrics["max_drawdown"],
-                        total_trades=metrics["total_trades"],
-                        win_rate=metrics["win_rate"],
-                    )
-                    session.add(metric_record)
-                    session.commit()
-
-            return metrics
+                return metrics
