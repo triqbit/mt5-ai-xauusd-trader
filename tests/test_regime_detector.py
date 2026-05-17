@@ -565,6 +565,80 @@ class TestRegimeDetector(unittest.TestCase):
         self.assertIsNotNone(self.detector._gmm)
         self.assertIn(self.detector._gmm.n_components, [2, 3, 4, 5])
 
+    def test_session_alignment_scores(self):
+        """Validate session alignment scores for major trading sessions."""
+        from datetime import datetime, time
+
+        # London (08:00 UTC)
+        ts_london = datetime(2024, 1, 1, 9, 0)
+        score_london = self.detector._calculate_session_alignment(ts_london)
+        self.assertEqual(score_london, 0.8)
+
+        # NY (18:00 UTC)
+        ts_ny = datetime(2024, 1, 1, 18, 0)
+        score_ny = self.detector._calculate_session_alignment(ts_ny)
+        self.assertEqual(score_ny, 0.8)
+
+        # Overlap (14:00 UTC)
+        ts_overlap = datetime(2024, 1, 1, 14, 0)
+        score_overlap = self.detector._calculate_session_alignment(ts_overlap)
+        self.assertEqual(score_overlap, 1.0)
+
+        # Asian (04:00 UTC)
+        ts_asian = datetime(2024, 1, 1, 4, 0)
+        score_asian = self.detector._calculate_session_alignment(ts_asian)
+        self.assertEqual(score_asian, 0.5)
+
+        # Dead zone (22:30 UTC)
+        ts_dead = datetime(2024, 1, 1, 22, 30)
+        score_dead = self.detector._calculate_session_alignment(ts_dead)
+        self.assertEqual(score_dead, 0.3)
+
+    def test_volatility_alignment_scores(self):
+        """Validate volatility alignment scoring for different regimes."""
+        # Trending with normal volatility
+        score_t = self.detector._calculate_volatility_alignment(MarketRegime.TRENDING, 1.2)
+        self.assertEqual(score_t, 1.0)
+
+        # Trending with extreme volatility
+        score_t_ext = self.detector._calculate_volatility_alignment(MarketRegime.TRENDING, 3.5)
+        self.assertEqual(score_t_ext, 0.6)
+
+        # News shock with high volatility
+        score_n = self.detector._calculate_volatility_alignment(MarketRegime.NEWS_SHOCK, 2.5)
+        self.assertAlmostEqual(score_n, 1.0)
+
+        # Ranging with low volatility
+        score_r = self.detector._calculate_volatility_alignment(MarketRegime.RANGING, 0.5)
+        self.assertAlmostEqual(score_r, 1.0)
+
+        # Ranging with high volatility (poor alignment)
+        score_r_high = self.detector._calculate_volatility_alignment(MarketRegime.RANGING, 2.0)
+        self.assertAlmostEqual(score_r_high, 0.6)
+
+    def test_label_history_alignment_data(self):
+        """Ensure alignment columns are present and populated in label_history."""
+        np.random.seed(42)
+        idx = pd.date_range("2024-01-01", periods=100, freq="15min")
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "high": 2000.5 + np.cumsum(np.random.randn(100) * 0.1),
+                "low": 1999.5 + np.cumsum(np.random.randn(100) * 0.1),
+                "open": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "tick_volume": np.full(100, 100.0),
+            },
+            index=idx
+        )
+
+        df = self.detector.label_history(data)
+        self.assertIn("session_alignment", df.columns)
+        self.assertIn("volatility_alignment", df.columns)
+
+        # Check a specific point in London session
+        # idx[40] is roughly 10:00
+        self.assertEqual(df["session_alignment"].iloc[40], 0.8)
+
 
 if __name__ == "__main__":
     unittest.main()
