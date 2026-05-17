@@ -76,9 +76,9 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
-            get_masking_processor(),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
+            get_masking_processor(),
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.BoundLogger,
@@ -747,7 +747,10 @@ def run_setup_wizard() -> int:
     meta_token = ""
     meta_id = ""
     if use_meta == "y":
-        meta_token = Prompt.ask("MetaAPI Token")
+        while not meta_token:
+            meta_token = getpass.getpass("MetaAPI Token: ")
+            if not meta_token:
+                console.print("[red]Token cannot be empty.[/]")
         meta_id = Prompt.ask("MetaAPI Account ID")
 
     # 4. Confirm and Save

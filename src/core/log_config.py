@@ -89,6 +89,10 @@ class SecretMaskingProcessor(logging.Filter):
             data: The data to redact.
             _in_place: Whether to modify dicts/lists in-place (internal use).
         """
+        # 0. Mask Pydantic Secret types immediately if passed as objects
+        if hasattr(data, "get_secret_value"):
+            return self.mask
+
         # 1. Fast-path for non-string primitives (numbers, bools)
         if isinstance(data, (int, float, bool)) or data is None:
             return data
@@ -144,7 +148,7 @@ class SecretMaskingProcessor(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         """
         Standard logging Filter interface.
-        Redacts secrets from the log message and its arguments.
+        Redacts secrets from the log message, its arguments, and tracebacks.
         """
         if isinstance(record.msg, str):
             record.msg = self.redact_any(record.msg)
@@ -154,6 +158,18 @@ class SecretMaskingProcessor(logging.Filter):
                 record.args = self.redact_any(record.args)
             elif isinstance(record.args, (list, tuple)):
                 record.args = tuple(self.redact_any(arg) for arg in record.args)
+
+        # Redact formatted exception text if it exists
+        if hasattr(record, "exc_text") and record.exc_text:
+            record.exc_text = self.redact_any(record.exc_text)
+        elif record.exc_info:
+            # Proactively format and redact exc_info to prevent leakage in standard output
+            # record.exc_text is often None until formatted by the handler
+            record.exc_text = self.redact_any(logging.Formatter().formatException(record.exc_info))
+
+        # Redact stack info if it exists
+        if hasattr(record, "stack_info") and record.stack_info:
+            record.stack_info = self.redact_any(record.stack_info)
 
         return True
 
