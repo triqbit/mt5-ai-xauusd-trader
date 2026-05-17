@@ -232,16 +232,18 @@ def test_execution_delay_jitter(sample_data):
         assert fixed_metrics.total_return != jitter_metrics.total_return
 
 
-def test_factory_methods():
-    hell = StressLab.create_execution_hell_scenario()
+def test_factory_methods(sample_data):
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+    hell = lab.create_execution_hell_scenario()
     assert hell.name == "Execution Hell"
     assert hell.slippage_spike_prob > 0
 
-    crisis = StressLab.create_liquidity_crisis_scenario()
+    crisis = lab.create_liquidity_crisis_scenario()
     assert crisis.name == "Liquidity Crisis"
     assert crisis.missing_tick_prob > 0
 
-    shock = StressLab.create_regime_shock_scenario()
+    shock = lab.create_regime_shock_scenario()
     assert shock.name == "Regime Shock"
     assert shock.regime_flip_prob > 0
 
@@ -314,7 +316,7 @@ def test_backtest_pnl_accuracy(sample_data):
 def test_flash_crash_scenario(sample_data):
     strategy = EMACrossoverStrategy()
     lab = StressLab(strategy, sample_data)
-    scenario = StressLab.create_flash_crash_scenario()
+    scenario = lab.create_flash_crash_scenario()
 
     perturbed = lab._apply_perturbations(sample_data, scenario)
     # Flash crash should significantly lower the minimum 'low' price
@@ -655,3 +657,67 @@ def test_immediate_reversal_logic(sample_data):
     # Bar 3: Closes Long (opened Bar 2, as signals[3] is 0)
     # Total 3 trades in metrics.num_trades
     assert metrics.num_trades == 3
+
+
+def test_commission_deduction(sample_data):
+    """Verify that commissions are correctly deducted from net P&L and recorded."""
+    strategy = EMACrossoverStrategy()
+    # Use a high commission to make impact obvious
+    comm_per_lot = 100.0
+    lab = StressLab(strategy, sample_data, commission_per_lot=comm_per_lot)
+
+    # 1. Run with high commission
+    high_comm_scenario = lab.create_execution_hell_scenario()
+    high_comm_scenario.commission_per_lot = comm_per_lot
+    metrics_high = lab.run_scenario(high_comm_scenario)
+
+    # 2. Run with zero commission
+    zero_comm_scenario = lab.create_execution_hell_scenario()
+    zero_comm_scenario.commission_per_lot = 0.0
+    metrics_zero = lab.run_scenario(zero_comm_scenario)
+
+    if metrics_zero.num_trades > 0:
+        # Total return should be lower with high commission
+        assert metrics_high.total_return < metrics_zero.total_return
+        # total_commission_cost should match trades * lot_size * comm_per_lot
+        # Wait, opening and closing both might have commissions?
+        # In our implementation:
+        # Close: commission = lot_size * scenario.commission_per_lot
+        # Total cost is accumulated.
+
+        # Actually our implementation accumulates commission only on CLOSE of a trade
+        # (and during force close).
+        expected_comm = metrics_high.num_trades * high_comm_scenario.lot_size * comm_per_lot
+        assert np.isclose(metrics_high.total_commission_cost, expected_comm)
+
+
+def test_slippage_cost_tracking(sample_data):
+    """Verify that total_slippage_cost is correctly accumulated across trades."""
+    strategy = EMACrossoverStrategy()
+    lab = StressLab(strategy, sample_data)
+
+    # Force high slippage
+    scenario = lab.create_execution_hell_scenario()
+    scenario.slippage_bps = 100.0  # 1% slippage
+    scenario.slippage_spike_prob = 0.0
+
+    metrics = lab.run_scenario(scenario)
+
+    if metrics.num_trades > 0:
+        # total_slippage_cost should be > 0
+        assert metrics.total_slippage_cost > 0
+
+        # Each trade has slippage at ENTRY and EXIT in StressLab._backtest_with_stress
+        # In the loop:
+        # Entry: total_slippage += slippage * lot_size * contract_multiplier
+        # Exit: total_slippage += slippage * lot_size * contract_multiplier
+
+        # Approximate check: slippage * trades * lot_size * contract_multiplier * 2
+        # Note: 'slippage' in bps is price * 100 / 10000 = price * 0.01
+        avg_price = sample_data["close"].mean()
+        expected_slippage_per_leg = avg_price * (100.0 / 10000.0) * scenario.lot_size * lab.contract_multiplier
+        total_legs = metrics.num_trades * 2
+        expected_total = expected_slippage_per_leg * total_legs
+
+        # Since price varies, we use a wide tolerance or check more strictly
+        assert np.isclose(metrics.total_slippage_cost, expected_total, rtol=0.2)
