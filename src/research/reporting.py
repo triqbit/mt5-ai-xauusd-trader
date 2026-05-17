@@ -9,6 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import os
+import typing
 from datetime import UTC, datetime
 
 from jinja2 import Environment, FileSystemLoader
@@ -301,6 +302,29 @@ class StrategicConfluenceSection(BaseModel):
     session_alignment: float
     volatility_alignment: float
     insights: str
+
+    @classmethod
+    def from_explanation(cls, explanation: typing.Any) -> StrategicConfluenceSection:
+        """
+        Create a StrategicConfluenceSection from a SignalExplanation object.
+        This provides a decoupled mapping from core explainability to research reporting.
+        """
+        # Weighted confluence calculation:
+        # 40% Model Confidence, 30% Regime Alignment, 15% Session, 15% Volatility
+        confluence_score = (
+            explanation.total_confidence * 0.4
+            + explanation.regime_context.regime_alignment_score * 0.3
+            + explanation.regime_context.session_alignment * 0.15
+            + explanation.regime_context.volatility_alignment * 0.15
+        )
+
+        return cls(
+            confluence_score=float(confluence_score),
+            regime_alignment=float(explanation.regime_context.regime_alignment_score),
+            session_alignment=float(explanation.regime_context.session_alignment),
+            volatility_alignment=float(explanation.regime_context.volatility_alignment),
+            insights=explanation.human_readable_summary,
+        )
 
 
 class MethodologySection(BaseModel):
