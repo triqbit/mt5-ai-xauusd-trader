@@ -76,6 +76,37 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
+    def reconcile_state(self, initial_balance: float, reconciled_data: dict) -> None:
+        """
+        Restore operational state from database records.
+        Ensures circuit breakers and daily limits are consistent across restarts.
+        """
+        from itertools import accumulate
+
+        # 1. Restore daily stats
+        self.daily.realised_pnl = reconciled_data.get("daily_pnl", 0.0)
+        self.daily.trade_count = reconciled_data.get("daily_count", 0)
+
+        # 2. Restore peak equity (all-time)
+        # Handle accounts that only have losses by including 0.0 in cumulative series
+        pnl_series = [0.0, *reconciled_data.get("pnl_series", [])]
+        cumulative_pnl = list(accumulate(pnl_series))
+        historical_peak_pnl = max(cumulative_pnl) if cumulative_pnl else 0.0
+
+        # Peak equity is initial balance plus the highest cumulative PnL point
+        self.peak_equity = initial_balance + historical_peak_pnl
+
+        # 3. Restore daily peak equity
+        # (Assuming the system starts at the current balance today if no trades closed yet)
+        self.daily.peak_equity = max(self.balance, self.peak_equity)
+
+        logger.info(
+            "State RECONCILED | daily_pnl=%.2f trades=%d peak_equity=%.2f",
+            self.daily.realised_pnl,
+            self.daily.trade_count,
+            self.peak_equity,
+        )
+
     def approve(
         self,
         signal: TradeSignal,

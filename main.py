@@ -620,7 +620,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
@@ -1480,6 +1482,20 @@ def main() -> int:
     )
 
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
+    # Reconcile operational state from database
+    try:
+        recon_data = trade_logger.get_reconciliation_data()
+        risk.reconcile_state(initial_balance=balance, reconciled_data=recon_data)
+        risk.open_positions = trade_logger.get_open_trades()
+        log.info(
+            "Operational state reconciled",
+            open_trades=len(risk.open_positions),
+            daily_pnl=recon_data.get("daily_pnl"),
+        )
+    except Exception as e:
+        log.error("Failed to reconcile operational state", error=str(e))
+
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
