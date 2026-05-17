@@ -567,7 +567,7 @@ class TestRegimeDetector(unittest.TestCase):
 
     def test_session_alignment_scores(self):
         """Validate session alignment scores for major trading sessions."""
-        from datetime import datetime, time
+        from datetime import datetime
 
         # London (08:00 UTC)
         ts_london = datetime(2024, 1, 1, 9, 0)

@@ -754,7 +754,7 @@ class RegimeDetector:
                     volatility_alignments[mask] = np.clip(atr_vals / 1.5, 0.5, 1.0)
                 elif r_val == MarketRegime.TRENDING:
                     volatility_alignments[mask] = np.where(
-                        (0.8 <= atr_vals) & (atr_vals <= 2.5), 1.0, 0.6
+                        (atr_vals >= 0.8) & (atr_vals <= 2.5), 1.0, 0.6
                     )
                 elif r_val in [MarketRegime.RANGING, MarketRegime.LOW_VOLATILITY_DRIFT]:
                     volatility_alignments[mask] = np.clip(1.2 / (atr_vals + 1e-9), 0.5, 1.0)
