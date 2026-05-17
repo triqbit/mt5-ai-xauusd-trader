@@ -97,7 +97,7 @@ print(report_section.insights)
 The generated DataFrames can be passed directly to the `FeatureEngineer` or used as synthetic environments for RL agent evaluation:
 
 ```python
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 
 fe = FeatureEngineer()
 features_df = fe.compute_features(df)

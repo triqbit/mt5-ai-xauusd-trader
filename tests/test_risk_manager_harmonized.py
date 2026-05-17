@@ -84,10 +84,11 @@ def test_daily_loss_limit(risk_manager, buy_signal, market_data):
     assert "daily loss" in decision.reason.lower()
 
 def test_max_positions(risk_manager, buy_signal, market_data):
+    # Reduced volume to avoid triggering directional exposure filter
     open_positions = [
-        {"ticket": 1, "symbol": "XAUUSD", "volume": 0.1, "type": 0},
-        {"ticket": 2, "symbol": "XAUUSD", "volume": 0.1, "type": 0},
-        {"ticket": 3, "symbol": "XAUUSD", "volume": 0.1, "type": 0},
+        {"ticket": 1, "symbol": "XAUUSD", "volume": 0.01, "type": 0},
+        {"ticket": 2, "symbol": "XAUUSD", "volume": 0.01, "type": 0},
+        {"ticket": 3, "symbol": "XAUUSD", "volume": 0.01, "type": 0},
     ]
 
     decision = risk_manager.validate_signal(buy_signal, market_data, open_positions)
@@ -109,13 +110,13 @@ def test_directional_exposure(risk_manager, buy_signal, market_data):
 def test_atr_position_sizing(risk_manager, market_data):
     # Normal volatility
     market_data["atr"] = 1.0
-    size = risk_manager.size_position("XAUUSD", market_data)
+    size = risk_manager.calculate_position_size("XAUUSD", market_data)
     assert size > 0
 
     # Extreme volatility
     market_data.loc[market_data.index[-1], "atr"] = 4.0
     # avg_atr remains approx 1.0. ratio = 4.0 > 3.0 (extreme threshold)
-    size = risk_manager.size_position("XAUUSD", market_data)
+    size = risk_manager.calculate_position_size("XAUUSD", market_data)
     assert size == 0.0
 
 def test_full_approval(risk_manager, buy_signal, market_data):

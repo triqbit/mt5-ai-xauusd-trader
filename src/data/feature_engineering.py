@@ -1,6 +1,6 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
-src/core/feature_engineering.py
+src.data.feature_engineering.py
 Institutional-grade feature engineering pipeline for XAUUSD.
 Computes 140+ technical features including multi-timeframe analysis,
 candle patterns, and volume profiles.

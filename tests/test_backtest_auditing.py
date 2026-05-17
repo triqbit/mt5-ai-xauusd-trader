@@ -5,7 +5,7 @@ import pandas as pd
 from sqlalchemy import text
 
 from src.core.audit_log import AuditLogger
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.core.schemas import TradeSignal
 from src.trading.backtester import BacktestEngine
 
