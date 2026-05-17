@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from enum import IntEnum
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -366,9 +367,7 @@ class SignalExplainer:
                     FilterResult(
                         filter_name=name,
                         passed=res.get("passed", False),
-                        message=f"Blocked by {blocked_by}"
-                        if blocked_by == name.upper()
-                        else None,
+                        message=f"Blocked by {blocked_by}" if blocked_by == name.upper() else None,
                         value=res.get("value")
                         or res.get("ratio")
                         or res.get("rsi")
@@ -445,21 +444,21 @@ class SignalExplainer:
             elif abs(weighted_conf - max_weighted_conf) < 1e-6 and max_weighted_conf > 0:
                 dominant_models.append(name)
 
-            temp_attributions.append({
-                "model_name": name,
-                "vote": vote_dir,
-                "confidence": model_conf,
-                "weight": weight,
-                "weighted_conf": weighted_conf,
-            })
+            temp_attributions.append(
+                {
+                    "model_name": name,
+                    "vote": vote_dir,
+                    "confidence": model_conf,
+                    "weight": weight,
+                    "weighted_conf": weighted_conf,
+                }
+            )
 
         # Second pass: Calculate dominance ratio and finalize attribution objects
         final_attributions = []
         for attr_dict in temp_attributions:
             dom_ratio = (
-                attr_dict["weighted_conf"] / total_weighted_conf
-                if total_weighted_conf > 0
-                else 0.0
+                attr_dict["weighted_conf"] / total_weighted_conf if total_weighted_conf > 0 else 0.0
             )
             final_attributions.append(
                 ModelAttribution(
@@ -587,7 +586,9 @@ class SignalExplainer:
         regime_lower = regime_context.regime_name.lower()
         strategic_edge = ""
         if "trending" in regime_lower:
-            strategic_edge = "Trending regimes provide high-velocity environments for momentum models."
+            strategic_edge = (
+                "Trending regimes provide high-velocity environments for momentum models."
+            )
         elif "ranging" in regime_lower:
             strategic_edge = "Mean-reversion setups are prioritized in ranging regimes."
         elif "volatile" in regime_lower:
@@ -595,7 +596,9 @@ class SignalExplainer:
         else:
             strategic_edge = "Market state stable, following base ensemble consensus."
 
-        reasoning += f"Market is currently in a {regime_context.regime_name} regime. {strategic_edge} "
+        reasoning += (
+            f"Market is currently in a {regime_context.regime_name} regime. {strategic_edge} "
+        )
         if regime_context.is_favorable:
             reasoning += "Market state is considered favorable for this strategy setup. "
         else:
