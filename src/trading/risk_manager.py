@@ -85,7 +85,8 @@ class RiskManager:
         self,
         signal: TradeSignal,
         market_data: Optional[pd.DataFrame] = None,
-        open_positions: Optional[List[dict]] = None, model_health: Optional[dict] = None,
+        open_positions: Optional[List[dict]] = None,
+        model_health: Optional[dict] = None,
         signal_id: Optional[int] = None,
     ) -> RiskDecision:
         """

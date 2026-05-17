@@ -81,7 +81,7 @@ def test_daily_loss_limit(risk_manager, buy_signal, market_data):
 
     decision = risk_manager.validate_signal(buy_signal, market_data, [])
     assert not decision.is_approved
-    assert "daily loss" in decision.reason.lower()
+    assert "circuit breaker" in decision.reason.lower()
 
 def test_max_positions(risk_manager, buy_signal, market_data):
     open_positions = [
