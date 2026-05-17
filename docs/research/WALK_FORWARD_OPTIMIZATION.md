@@ -20,8 +20,17 @@ Configurations are ranked by a multi-factor `Robustness Score` rather than simpl
 - **Walk-Forward Efficiency (WFE)**: Ratio of OOS Sharpe to IS Sharpe. High WFE indicates a strategy that translates well from training to live-simulated trading. The score rewards WFE up to 1.2.
 - **Regime Consistency**: Performance stability across different market regimes (Trending, Ranging, etc.), frequency-weighted to ensure statistical significance. Gracefully handles sparse data by returning a neutral score (0.5) when fewer than two regimes are present.
 - **Stability Penalty**: Sensitivity of performance to small parameter perturbations. Uses scale-robust epsilon (1e-5) for float parameters and ensures integer parameters remain integers during sensitivity sweeps. Calculated using Coefficient of Variation (CV) with fragility safeguards.
+- **Granular Sensitivity Tracking**: The optimizer now tracks individual Coefficient of Variation (CV) scores for each parameter across windows. This identifies which specific hyperparameters are most responsible for strategy fragility.
 
-### 3. Anti-Overfitting Safeguards
+### 3. Institutional Reporting
+WFO results are integrated into the `ResearchReport` framework.
+- **Stability Score**: An aggregate robustness metric scaled from 0 to 100.
+- **Parameter Analysis**: Each optimized parameter is tagged with a qualitative sensitivity label:
+    - **Low**: CV < 0.2
+    - **Medium**: 0.2 <= CV < 0.5
+    - **High**: CV >= 0.5 (indicates a potential overfitting risk or extreme fragility)
+
+### 4. Anti-Overfitting Safeguards
 - **Fragility Safeguards**: A high penalty (10.0) is applied if parameter perturbations lead to failures or extreme performance drops.
 - **Constraint Enforcement**: Minimum allowed OOS Sharpe and maximum allowed OOS Drawdown are strictly enforced.
 - **Minimum Trade Threshold**: A `min_trades_per_window` constraint (default: 5) ensures that OOS performance is statistically grounded. Windows with too few trades incur a linear penalty to the robustness score.
