@@ -167,6 +167,17 @@ Located in , this builder creates "trap" scenarios to test technical robustness 
 - **wick_trap_cascade()**: Sequence of bars with small bodies but massive alternating wicks to test stop-loss sensitivity.
 - **liquidity_void()**: Price jumps between bars without continuity (gaps) to test gap-detection logic.
 - **vov_explosion()**: Ranging data where the volatility itself is extremely unstable to test VoV filters.
+- **ema_crossover_flicker()**: Rapid oscillations around a mean to test signal flicker guards.
+- **rsi_boundary_oscillation()**: Pinning RSI near thresholds (e.g., 75) to test momentum filter edge cases.
+
+## AnomalyScenarioBuilder
+
+Located in `src/utils/synthetic_data.py`, this builder creates data with technical anomalies like bad ticks or feed jitter.
+
+### Key Scenarios
+
+- **ghost_spikes()**: Extreme high/low wicks that do not affect the closing price. Critical for testing resilience to bad data feed "ghost wicks".
+- **stale_data_with_noise()**: Simulates a frozen data feed with tiny sub-pip jitter to test stale-data detection robustness.
 
 ## InstitutionalFlowGenerator
 

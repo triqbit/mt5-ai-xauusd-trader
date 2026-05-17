@@ -1,10 +1,11 @@
 """
 Tests for new anomaly and adversarial synthetic scenarios.
 """
+
 import numpy as np
-import pytest
-import pandas as pd
+
 from src.utils.synthetic_data import AdversarialScenarioBuilder, AnomalyScenarioBuilder
+
 
 def test_ema_crossover_flicker():
     builder = AdversarialScenarioBuilder(seed=42)
@@ -18,6 +19,7 @@ def test_ema_crossover_flicker():
     crossings = np.diff(np.sign(df["close"] - 2300))
     assert np.count_nonzero(crossings) > 10
 
+
 def test_rsi_boundary_oscillation():
     builder = AdversarialScenarioBuilder(seed=42)
     # Target high RSI (e.g., 75)
@@ -29,6 +31,7 @@ def test_rsi_boundary_oscillation():
     # Target low RSI (e.g., 25)
     df_low = builder.rsi_boundary_oscillation(n_steps=100, target_rsi=25.0)
     assert df_low["close"].iloc[-1] < df_low["close"].iloc[0]
+
 
 def test_ghost_spikes():
     builder = AnomalyScenarioBuilder(seed=42)
@@ -43,6 +46,7 @@ def test_ghost_spikes():
     # Background volatility is low (0.0001)
     # Check that close price at 10 is near close price at 9
     assert abs(df.loc[spike_idx, "close"] - df.iloc[9]["close"]) < 1.0
+
 
 def test_stale_data_with_noise():
     builder = AnomalyScenarioBuilder(seed=42)
