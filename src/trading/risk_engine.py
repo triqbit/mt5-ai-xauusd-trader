@@ -121,12 +121,15 @@ class RiskEngine:
 
         # Layer 5: Symbol Allocation (Simplified for XAUUSD focus)
         if signal.symbol != self.cfg.symbol:
-            return RiskDecision(is_approved=False, reason=f"Symbol {signal.symbol} not in approved list")
+            return RiskDecision(
+                is_approved=False, reason=f"Symbol {signal.symbol} not in approved list"
+            )
 
         # Layer 6: Prediction Limits
         if signal.confidence < self.cfg.min_confidence:
             return RiskDecision(
-                is_approved=False, reason=f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
+                is_approved=False,
+                reason=f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}",
             )
 
         # Layer 7: Risk-Reward Validation (Min 1.5 R:R)

@@ -415,7 +415,9 @@ def run_live(
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
                     if direction != 0:
-                        risk_decision = risk.approve(signal, signal_id=signal_id, model_health=health)
+                        risk_decision = risk.approve(
+                            signal, signal_id=signal_id, model_health=health
+                        )
                         risk_approved = risk_decision.is_approved
                     else:
                         risk_decision = None
@@ -463,12 +465,16 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_decision.is_approved if risk_decision else False,
-                            "rejection_reasons": [risk_decision.reason] if risk_decision and not risk_decision.is_approved else [],
+                            "rejection_reasons": [risk_decision.reason]
+                            if risk_decision and not risk_decision.is_approved
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": risk_decision.reason if risk_decision else "Risk gate rejected",
+                            "summary": risk_decision.reason
+                            if risk_decision
+                            else "Risk gate rejected",
                         }
 
                         regime_data = {
@@ -603,7 +609,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
