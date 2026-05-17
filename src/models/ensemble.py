@@ -30,11 +30,11 @@ from src.models.base_model import BaseModel, Signal
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
-from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
+from src.models.regime_detector import MarketRegime, RegimeInfo
 
 logger = logging.getLogger(__name__)
 
