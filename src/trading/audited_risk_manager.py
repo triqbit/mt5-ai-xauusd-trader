@@ -41,25 +41,16 @@ class AuditedRiskManager(RiskManager):
         decision_chain = {
             "circuit_breaker": bool(self._check_circuit_breaker()),
             "daily_loss": bool(self.get_daily_loss_level() < 4),
-            "activity_limits": bool(
-                self.daily.trade_count < self.cfg.max_trades_per_day
-            ),
-            "consecutive_losses": bool(
-                self.daily.consecutive_losses < self.cfg.max_losing_streak
-            ),
-            "max_positions": bool(
-                len(open_positions) < self.cfg.max_positions
-            ),
-            "directional_exposure": bool(
-                self._check_directional_exposure(signal, open_positions)
-            ),
-            "total_notional": bool(
-                self._check_total_notional(signal, open_positions, market_data)
-            ),
+            "max_positions": bool(len(open_positions) < self.cfg.max_positions),
             "symbol_allocation": bool(self._check_symbol_allocation(signal.symbol)),
             "min_confidence": bool(signal.confidence >= self.cfg.min_confidence),
             "risk_reward": bool(self._check_risk_reward(signal)),
+            "consecutive_losses": bool(self.daily.consecutive_losses < self.cfg.max_losing_streak),
             "model_health": bool(self._check_model_health(model_health)),
+            # Additional detailed layers for audit but keeping primary keys for test matching
+            "activity_limits": bool(self.daily.trade_count < self.cfg.max_trades_per_day),
+            "directional_exposure": bool(self._check_directional_exposure(signal, open_positions)),
+            "total_notional": bool(self._check_total_notional(signal, open_positions, market_data)),
         }
 
         is_approved = all(decision_chain.values())

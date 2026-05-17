@@ -9,10 +9,10 @@ This audit evaluates the MT5 AI XAUUSD Trader for architectural coherence, namin
 ## 2. Findings & Resolution
 
 ### A. Risk Management API Harmonization
-- **Issue:** Architectural drift between `RiskManager` (legacy 6-layer) and `RiskEngine` (harmonized 8-layer) caused integration conflicts and reduced safety reliability.
+- **Issue:** Architectural drift between `RiskManager` (legacy 6-layer) and `RiskEngine` (experimental 8-layer) caused integration conflicts and reduced safety reliability.
 - **Resolution:**
     - Ported the 8-layer safety cascade and ATR-based position sizing into `src/trading/risk_manager.py`.
-    - Standardized the API to `validate_signal()` returning a `RiskDecision` object.
+    - Standardized the API to `validate_signal()` returning a structured `RiskDecision` object.
     - Deprecated legacy `approve()` and `size_position()` methods with backward-compatible stubs.
     - Updated `AuditedRiskManager` to override `validate_signal()`, ensuring full decision-chain auditability.
     - Removed redundant `src/trading/risk_engine.py`.
@@ -30,6 +30,7 @@ This audit evaluates the MT5 AI XAUUSD Trader for architectural coherence, namin
     - Standardized the main trading loop in `main.py` to use the harmonized Risk and Feature Engineering APIs.
     - Verified cross-component stability through comprehensive integration tests (`test_system_bootstrap_to_execution.py`).
     - Resolved JSON serialization issues in audit logs by ensuring explicit type casting of NumPy/Pydantic types.
+    - **Note on Dependency Pinning**: `python-socketio` remains pinned to `<5.0.0` due to upstream compatibility constraints with `metaapi-cloud-sdk`, ensuring the project remains buildable for non-Windows platforms.
 
 ## 3. Current System Coherence Metrics
 

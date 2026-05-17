@@ -126,6 +126,7 @@ def _prepare_trade_signal(
     strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
     alloc_result = allocator.request_allocation(strat_id, risk_pct=cfg.risk_per_trade)
 
+    _ = alloc_result.allocated_risk_pct  # Tracked but not currently used in this helper
     if not alloc_result.is_allowed:
         log.warning(
             "Allocation REJECTED | %s | Reason: %s",
