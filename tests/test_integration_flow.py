@@ -6,6 +6,7 @@ Verifies end-to-end integration across all system components.
 import time
 
 import numpy as np
+import pandas as pd
 import pytest
 
 try:
@@ -107,7 +108,8 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
             confidence=0.85
         )
 
-        approved = risk.validate_signal(signal, df_raw, [])
+        df_raw_risk = pd.DataFrame({"close": [2351], "atr": [0.1]})
+        approved = risk.validate_signal(signal, df_raw_risk, [])
         assert approved.is_approved is True
 
         # 5. Execution & Logging
@@ -203,6 +205,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.update_equity(10000.0) # peak
     risk.update_equity(8000.0)  # 20% drawdown
 
+    df_raw_risk = pd.DataFrame({"close": [2300], "atr": [0.1]})
     with patch.object(mock_monitor, "alert_circuit_breaker") as mock_alert:
         signal = TradeSignal(
             symbol="XAUUSD",
@@ -214,7 +217,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
             algorithm="test",
             confidence=0.9
         )
-        approved = risk.validate_signal(signal, df_raw, [])
+        approved = risk.validate_signal(signal, df_raw_risk, [])
         assert approved.is_approved is False
         mock_alert.assert_called_once()
 

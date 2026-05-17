@@ -14,10 +14,10 @@ import psutil
 import pytest
 
 from src.core.config import get_config
-from src.data.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import RiskEvent, TradeLogger
+from src.data.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import RegimeDetector
 from src.research.benchmarks import EMACrossoverStrategy
@@ -130,7 +130,8 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
             confidence=signal_out.confidence
         )
 
-        risk_approved = risk.validate_signal(signal, df_raw, [])
+        df_raw_risk = pd.DataFrame({"close": [2311], "atr": [0.1]})
+        risk_approved = risk.validate_signal(signal, df_raw_risk, [])
         assert risk_approved.is_approved is True
 
         # 6. Execution Filter
@@ -212,6 +213,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.update_equity(10000.0) # peak
     risk.update_equity(8000.0)  # 20% drawdown (Limit 15%)
 
+    df_raw_fail = pd.DataFrame({"close": [2300], "atr": [0.1]})
     with patch.object(mock_monitor, "alert_circuit_breaker") as mock_alert:
         signal = TradeSignal(
             symbol="XAUUSD",
@@ -223,7 +225,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
             algorithm="test",
             confidence=0.9
         )
-        approved = risk.validate_signal(signal, df_raw, [])
+        approved = risk.validate_signal(signal, df_raw_fail, [])
         assert approved.is_approved is False
         mock_alert.assert_called_once()
 
@@ -232,18 +234,18 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.update_equity(10000.0) # Reset drawdown
     risk.daily.realised_pnl = -600.0 # $600 loss on $10k is 6% (Limit 5%)
 
-    approved = risk.validate_signal(signal, df_raw, [])
+    approved = risk.validate_signal(signal, df_raw_fail, [])
     assert approved.is_approved is False
 
     # 3. Trigger via Max Positions
     risk.daily.realised_pnl = 0.0 # reset daily loss
     risk.open_positions = {"EURUSD": 1, "GBPUSD": 2, "USDJPY": 3} # Max is 3
-    approved = risk.validate_signal(signal, df_raw, [])
+    approved = risk.validate_signal(signal, df_raw_fail, [])
     assert approved.is_approved is False
 
     # 4. Trigger via Invalid Symbol
     risk.open_positions = {}
-    signal_invalid = TradeSignal(
+    signal_invalid = TradeSignal.model_construct(
         symbol="INVALID",
         direction=1,
         entry_price=1.0,
@@ -253,7 +255,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
         algorithm="test",
         confidence=0.9
     )
-    approved = risk.validate_signal(signal, df_raw, [])
+    approved = risk.validate_signal(signal_invalid, df_raw_fail, [])
     assert approved.is_approved is False
 
     # 5. Trigger via Low Confidence
@@ -267,7 +269,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
         algorithm="test",
         confidence=0.4
     )
-    approved = risk.validate_signal(signal, df_raw, [])
+    approved = risk.validate_signal(signal_low_conf, df_raw_fail, [])
     assert approved.is_approved is False
 
     # 6. Verify Logging of events
@@ -282,7 +284,8 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.daily.realised_pnl = 0.0
     risk.update_equity(10000.0)
     risk.open_positions = {}
-    assert risk.validate_signal(signal, df_raw, []) is True
+    df_raw_recover = pd.DataFrame({"close": [2300], "atr": [0.1]})
+    assert risk.validate_signal(signal, df_raw_recover, []).is_approved is True
 
 # --- Path 5: Intelligence & Adaptive Weighting ---
 

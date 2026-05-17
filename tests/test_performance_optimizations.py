@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.data.feature_engineering import FeatureEngineer
 from src.core.trade_logger import TradeLogger
+from src.data.feature_engineering import FeatureEngineer
 from src.trading.backtester import BacktestEngine
 from src.trading.execution_filter import ExecutionFilter
 

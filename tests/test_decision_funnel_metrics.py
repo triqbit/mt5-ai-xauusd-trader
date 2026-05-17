@@ -7,6 +7,8 @@ import unittest
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
+
 from src.core.monitor import INTERNAL_REJECTION_COUNTER, Monitor
 from src.core.schemas import TradeSignal
 from src.trading.audited_risk_manager import AuditedRiskManager
@@ -22,6 +24,21 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
         self.config.telegram_chat_id = "fake_chat_id"
         self.config.max_positions = 5
         self.config.max_losing_streak = 5
+        self.config.max_drawdown = 0.15
+        self.config.max_trades_per_day = 20
+        self.config.max_single_direction_pct = 0.3
+        self.config.max_total_notional_pct = 1.0
+        self.config.min_lot_size = 0.01
+        self.config.max_position_size_pct = 0.1
+        self.config.volatility_high_threshold = 1.5
+        self.config.volatility_very_high_threshold = 2.0
+        self.config.volatility_extreme_threshold = 3.0
+        self.config.daily_loss_lvl1 = 0.02
+        self.config.daily_loss_lvl2 = 0.03
+        self.config.daily_loss_lvl3 = 0.04
+        self.config.risk_per_trade = 0.01
+        self.config.symbol = "XAUUSD"
+        self.config.min_confidence = 0.55
         self.config.max_daily_loss = 0.05
         self.config.model_drift_threshold = 0.3
         self.config.model_accuracy_floor = 0.45
@@ -35,6 +52,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
     def test_audited_risk_manager_rejection_metrics_symbol(self):
         # Setup AuditedRiskManager with monitor
         risk = AuditedRiskManager(self.config, account_balance=10000.0, monitor=self.monitor)
+        df_raw = pd.DataFrame({"close": [2000], "atr": [0.1]})
 
         # Create a signal that will be rejected (e.g., symbol not in portfolio)
         # Using model_construct to bypass Pydantic validation (including SYMBOL_PATTERN)
@@ -61,6 +79,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
     def test_audited_risk_manager_rejection_metrics_confidence(self):
         # Setup AuditedRiskManager with monitor
         risk = AuditedRiskManager(self.config, account_balance=10000.0, monitor=self.monitor)
+        df_raw = pd.DataFrame({"close": [2000], "atr": [0.1]})
 
         # Trigger rejection by setting confidence too low
         signal = TradeSignal.model_construct(

@@ -27,16 +27,17 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
     from src.trading.execution_filter import ExecutionFilter
     from src.trading.mt5_connector import MT5Connector
-    from src.trading.risk_manager import RiskManager
+    from src.trading.risk_manager import RiskDecision, RiskManager
+
 
 HAS_DEPENDENCIES = True
 BOOTSTRAP_ERROR = None
@@ -137,9 +138,6 @@ def _prepare_trade_signal(
                 reason=f"Capital allocation rejected: {alloc_result.rejection_reason}",
                 context={"strategy_id": strat_id},
             )
-        approved_risk = 0.0
-    else:
-        approved_risk = alloc_result.allocated_risk_pct
 
     # 3. Lot Sizing (Legacy, now handled by validate_signal in main loop)
     # We keep a fallback if needed but set to 0.0 here as main loop overrides it
@@ -1476,9 +1474,9 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.data.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent

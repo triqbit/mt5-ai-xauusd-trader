@@ -121,10 +121,11 @@ def test_capital_and_risk_integration(trade_logger):
         )
 
         # Signal approval
+        df_raw = pd.DataFrame({"close": [2350], "atr": [0.1]})
         approved = risk.validate_signal(signal, df_raw, [])
         assert approved.is_approved is True
 
         # Test rejection (high drawdown simulation)
         risk.update_equity(80000.0) # 20% drawdown
         approved_after_crash = risk.validate_signal(signal, df_raw, [])
-        assert approved_after_crash is False
+        assert approved_after_crash.is_approved is False
