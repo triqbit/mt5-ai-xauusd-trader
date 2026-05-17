@@ -1132,6 +1132,80 @@ class AdversarialScenarioBuilder:
             returns[i] = self.gen.rng.normal(0, vol)
         return self.gen._generate_base(n_steps, start_price, returns)
 
+    def ema_crossover_flicker(
+        self, n_steps: int = 100, start_price: float = 2300.0
+    ) -> pd.DataFrame:
+        """
+        Generates price action that oscillates exactly around a long-term EMA,
+        causing frequent bullish/bearish crossovers.
+        """
+        # Create a base stable price
+        prices = np.full(n_steps, start_price)
+        # Add oscillation that crosses the start_price every few bars
+        for i in range(n_steps):
+            oscillation = 0.5 * np.sin(i * 0.8)  # Frequent crossings
+            prices[i] += oscillation
+
+        returns = np.diff(prices) / prices[:-1]
+        returns = np.insert(returns, 0, 0)
+        return self.gen._generate_base(n_steps, start_price, returns)
+
+    def rsi_boundary_oscillation(
+        self, n_steps: int = 100, start_price: float = 2300.0, target_rsi: float = 75.0
+    ) -> pd.DataFrame:
+        """
+        Generates price action that keeps RSI hovering around a specific boundary (e.g. 75).
+        Tests momentum filter edge cases.
+        """
+        prices = np.zeros(n_steps)
+        prices[0] = start_price
+        # Simple heuristic to keep RSI high: mostly small gains with occasional small drops
+        for i in range(1, n_steps):
+            if target_rsi > 50:
+                change = 0.0002 if i % 4 != 0 else -0.0001
+            else:
+                change = -0.0002 if i % 4 != 0 else 0.0001
+            prices[i] = prices[i - 1] * (1 + change)
+
+        returns = np.diff(prices) / prices[:-1]
+        returns = np.insert(returns, 0, 0)
+        return self.gen._generate_base(n_steps, start_price, returns)
+
+
+class AnomalyScenarioBuilder:
+    """
+    Generates deterministic data with technical anomalies (ghost wicks, jittery staleness).
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def ghost_spikes(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Significant price moves in high/low wicks that do NOT affect the close price.
+        Tests if the system is overly sensitive to wicks while trend/momentum remain stable.
+        """
+        df = self.gen.generate(n_steps, regime="ranging", start_price=start_price, volatility=0.0001)
+        # Inject ghost wicks every 10 bars
+        for i in range(10, n_steps, 10):
+            idx = df.index[i]
+            # Massive high wick
+            df.at[idx, "high"] = df.at[idx, "close"] + 50.0
+            # Massive low wick
+            df.at[idx, "low"] = df.at[idx, "close"] - 50.0
+        return df
+
+    def stale_data_with_noise(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Simulates a frozen data feed that has tiny, sub-pip floating point jitter.
+        Tests if 'stale data' detection is robust against non-zero but insignificant changes.
+        """
+        df = self.gen.generate(n_steps, regime="stale", start_price=start_price)
+        # Add tiny jitter (e.g. 1e-7)
+        jitter = self.gen.rng.uniform(-1e-7, 1e-7, (n_steps, 4))
+        df[["open", "high", "low", "close"]] += jitter
+        return df
+
 
 class InstitutionalFlowGenerator:
     """
