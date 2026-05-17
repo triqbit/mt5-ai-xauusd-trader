@@ -33,14 +33,20 @@ def test_cli_short_aliases():
         assert args.symbol == "XAUUSD"
         assert args.timeframe == "H1"
 
-def test_poll_interval_config():
-    """Verify that poll_interval is correctly loaded from environment."""
-    with patch.dict(os.environ, {
-             "POLL_INTERVAL": "45",
+def test_poll_interval_cli():
+    """Verify that poll-interval CLI argument is correctly parsed."""
+    test_args = [
+        "main.py",
+        "-i", "45",
+    ]
+
+    with patch("sys.argv", test_args), \
+         patch.dict(os.environ, {
              "MT5_PASSWORD": "test",
              "MT5_SERVER": "test",
          }):
 
-        get_config.cache_clear()
-        cfg = get_config()
-        assert cfg.poll_interval == 45
+        parser = get_parser()
+        args = parser.parse_args()
+
+        assert args.poll_interval == 45

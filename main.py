@@ -195,7 +195,8 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = cfg.poll_interval  # seconds between signal evaluations
+    # seconds between signal evaluations (CLI override handled in main)
+    poll_interval = getattr(cfg, "poll_interval", 60)
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -784,6 +785,10 @@ def run_setup_wizard() -> int:
 
     # 4. Confirm and Save
     console.print("\n[bold]4. Review & Save[/]")
+
+    # Check if POLL_INTERVAL exists in example but not in current logic
+    # (Existing logic already prompts for it, we just need to ensure it's written)
+
     if Prompt.ask("Ready to save configuration to .env?", choices=["y", "n"], default="y") != "y":
         console.print("[yellow]Setup aborted. No changes made.[/]")
         return 0
@@ -793,29 +798,49 @@ def run_setup_wizard() -> int:
     example_path = Path(".env.example")
 
     lines = []
+    keys_handled = set()
     if example_path.exists():
         with open(example_path, "r") as f:
             for line in f:
                 if line.startswith("MT5_LOGIN="):
                     lines.append(f"MT5_LOGIN={login}\n")
+                    keys_handled.add("MT5_LOGIN")
                 elif line.startswith("MT5_PASSWORD="):
                     lines.append(f"MT5_PASSWORD={password}\n")
+                    keys_handled.add("MT5_PASSWORD")
                 elif line.startswith("MT5_SERVER="):
                     lines.append(f"MT5_SERVER={server}\n")
+                    keys_handled.add("MT5_SERVER")
                 elif line.startswith("SYMBOL="):
                     lines.append(f"SYMBOL={symbol}\n")
+                    keys_handled.add("SYMBOL")
                 elif line.startswith("TIMEFRAME="):
                     lines.append(f"TIMEFRAME={timeframe}\n")
+                    keys_handled.add("TIMEFRAME")
                 elif line.startswith("MODE="):
                     lines.append(f"MODE={mode}\n")
+                    keys_handled.add("MODE")
                 elif line.startswith("POLL_INTERVAL="):
                     lines.append(f"POLL_INTERVAL={poll_interval}\n")
-                elif line.startswith("METAAPI_TOKEN=") and meta_token:
-                    lines.append(f"METAAPI_TOKEN={meta_token}\n")
-                elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
-                    lines.append(f"METAAPI_ACCOUNT_ID={meta_id}\n")
+                    keys_handled.add("POLL_INTERVAL")
+                elif line.startswith("METAAPI_TOKEN="):
+                    if meta_token:
+                        lines.append(f"METAAPI_TOKEN={meta_token}\n")
+                        keys_handled.add("METAAPI_TOKEN")
+                    else:
+                        lines.append(line)
+                elif line.startswith("METAAPI_ACCOUNT_ID="):
+                    if meta_id:
+                        lines.append(f"METAAPI_ACCOUNT_ID={meta_id}\n")
+                        keys_handled.add("METAAPI_ACCOUNT_ID")
+                    else:
+                        lines.append(line)
                 else:
                     lines.append(line)
+
+        # Append keys that were not in .env.example
+        if "POLL_INTERVAL" not in keys_handled:
+            lines.append(f"POLL_INTERVAL={poll_interval}\n")
     else:
         # Fallback if .env.example is missing
         lines = [
@@ -886,6 +911,11 @@ Usage Examples:
     )
     execution.add_argument("-s", "--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
     execution.add_argument("-t", "--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
+    execution.add_argument(
+        "-i", "--poll-interval",
+        type=int,
+        help="Seconds between signal evaluations in the live trading loop.",
+    )
     execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",
@@ -1650,6 +1680,10 @@ def main() -> int:
             "version": __version__,
         },
     )
+
+    # Handle poll_interval override from CLI
+    if args.poll_interval:
+        cfg.poll_interval = args.poll_interval
 
     try:
         if cfg.mode in ("demo", "live"):

@@ -13,7 +13,6 @@ This document lists the available configuration fields, their types, and descrip
 | `symbol` | `str` | The financial instrument to trade (e.g., XAUUSD) | `XAUUSD` |
 | `timeframe` | `VALID_TIMEFRAMES` | The chart timeframe for analysis (e.g., M5, H1) | `M5` |
 | `mode` | `Literal['demo', 'live', 'backtest']` | Execution mode: demo, live, or backtest | `demo` |
-| `poll_interval` | `int` | Interval in seconds between signal evaluations in the live trading loop | `60` |
 | `max_positions` | `int` | Maximum number of concurrent open positions permitted | `5` |
 | `risk_per_trade` | `float` | Fraction of account equity to risk per trade (e.g., 0.01 = 1%) | `0.01` |
 | `max_position_size_pct` | `float` | Max Position Size: 10% of account equity per trade | `0.1` |
