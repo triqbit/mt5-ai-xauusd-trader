@@ -1,19 +1,19 @@
-"""
-MT5 AI/ML Trading Bot - Enterprise Edition
-src/data/__init__.py
-"""
+"""Data processing and engineering modules."""
 
-from .event_intelligence import (
-    EventCategory,
-    EventImpact,
-    EventIntelligence,
-)
-from .event_models import MacroEvent, RiskStatus
+from __future__ import annotations
 
-__all__ = [
-    "EventCategory",
-    "EventImpact",
-    "EventIntelligence",
-    "MacroEvent",
-    "RiskStatus",
-]
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.data.feature_engineering import FeatureEngineer
+else:
+    # Lazy load FeatureEngineer to avoid early talib dependency
+    def __getattr__(name):
+        if name == "FeatureEngineer":
+            from src.data.feature_engineering import FeatureEngineer
+
+            return FeatureEngineer
+        raise AttributeError(f"module {__name__} has no attribute {name}")
+
+
+__all__ = ["FeatureEngineer"]

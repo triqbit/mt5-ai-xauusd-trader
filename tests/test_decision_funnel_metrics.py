@@ -53,7 +53,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            risk.approve(signal)
+            risk.validate_signal(signal, df_raw, [])
 
             mock_labels.assert_any_call(component="risk_manager", reason="SYMBOL_ALLOCATION")
             mock_counter.inc.assert_called()
@@ -78,7 +78,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             mock_counter = MagicMock()
             mock_labels.return_value = mock_counter
 
-            risk.approve(signal)
+            risk.validate_signal(signal, df_raw, [])
 
             # Should be called for "MIN_CONFIDENCE"
             self.assertTrue(mock_labels.called)

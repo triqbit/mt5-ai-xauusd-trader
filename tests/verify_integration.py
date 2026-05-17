@@ -14,7 +14,7 @@ import psutil
 import pytest
 
 from src.core.config import get_config
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import RiskEvent, TradeLogger
@@ -130,8 +130,8 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
             confidence=signal_out.confidence
         )
 
-        risk_approved = risk.approve(signal, signal_id=signal_id)
-        assert risk_approved is True
+        risk_approved = risk.validate_signal(signal, df_raw, [])
+        assert risk_approved.is_approved is True
 
         # 6. Execution Filter
         df_for_filter = df_features.copy()
@@ -223,8 +223,8 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
             algorithm="test",
             confidence=0.9
         )
-        approved = risk.approve(signal)
-        assert approved is False
+        approved = risk.validate_signal(signal, df_raw, [])
+        assert approved.is_approved is False
         mock_alert.assert_called_once()
 
     # 2. Trigger via Daily Loss
@@ -232,14 +232,14 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.update_equity(10000.0) # Reset drawdown
     risk.daily.realised_pnl = -600.0 # $600 loss on $10k is 6% (Limit 5%)
 
-    approved = risk.approve(signal)
-    assert approved is False
+    approved = risk.validate_signal(signal, df_raw, [])
+    assert approved.is_approved is False
 
     # 3. Trigger via Max Positions
     risk.daily.realised_pnl = 0.0 # reset daily loss
     risk.open_positions = {"EURUSD": 1, "GBPUSD": 2, "USDJPY": 3} # Max is 3
-    approved = risk.approve(signal)
-    assert approved is False
+    approved = risk.validate_signal(signal, df_raw, [])
+    assert approved.is_approved is False
 
     # 4. Trigger via Invalid Symbol
     risk.open_positions = {}
@@ -253,8 +253,8 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
         algorithm="test",
         confidence=0.9
     )
-    approved = risk.approve(signal_invalid)
-    assert approved is False
+    approved = risk.validate_signal(signal, df_raw, [])
+    assert approved.is_approved is False
 
     # 5. Trigger via Low Confidence
     signal_low_conf = TradeSignal(
@@ -267,8 +267,8 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
         algorithm="test",
         confidence=0.4
     )
-    approved = risk.approve(signal_low_conf)
-    assert approved is False
+    approved = risk.validate_signal(signal, df_raw, [])
+    assert approved.is_approved is False
 
     # 6. Verify Logging of events
     with trade_logger.Session() as session:
@@ -282,7 +282,7 @@ def test_resilience_and_circuit_breaker(mock_cfg, trade_logger, mock_monitor):
     risk.daily.realised_pnl = 0.0
     risk.update_equity(10000.0)
     risk.open_positions = {}
-    assert risk.approve(signal) is True
+    assert risk.validate_signal(signal, df_raw, []) is True
 
 # --- Path 5: Intelligence & Adaptive Weighting ---
 

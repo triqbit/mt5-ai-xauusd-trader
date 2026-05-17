@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
@@ -141,17 +141,9 @@ def _prepare_trade_signal(
     else:
         approved_risk = alloc_result.allocated_risk_pct
 
-    # 3. Lot Sizing
-    lot_size = (
-        risk.size_position(
-            cfg.symbol,
-            win_rate=0.58,
-            avg_win=4 * atr,
-            avg_loss=2 * atr,
-        )
-        if approved_risk > 0
-        else 0.0
-    )
+    # 3. Lot Sizing (Legacy, now handled by validate_signal in main loop)
+    # We keep a fallback if needed but set to 0.0 here as main loop overrides it
+    lot_size = 0.01
 
     return TradeSignal(
         symbol=cfg.symbol,
@@ -399,6 +391,32 @@ def run_live(
                     atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
                 with profile("signal_preparation"):
+                    # Institutional Risk approval gate
+                    health = getattr(model, "get_health_metrics", lambda: None)()
+
+                    risk_decision = (
+                        risk.validate_signal(
+                            TradeSignal(
+                                symbol=cfg.symbol,
+                                direction=direction,
+                                entry_price=price,
+                                stop_loss=price - (direction * 2 * atr),
+                                take_profit=price + (direction * 4 * atr),
+                                lot_size=0.01, # Placeholder, will be adjusted
+                                algorithm=cfg.algorithm,
+                                confidence=confidence,
+                            ),
+                            market_data=df_raw,
+                            open_positions=connector.get_positions(cfg.symbol),
+                            model_health=health
+                        )
+                        if direction != 0
+                        else RiskDecision(False, "Hold signal")
+                    )
+
+                    risk_approved = risk_decision.is_approved
+                    lot_size = risk_decision.adjusted_lot_size
+
                     signal = _prepare_trade_signal(
                         cfg=cfg,
                         direction=direction,
@@ -409,16 +427,9 @@ def run_live(
                         allocator=allocator,
                         audit_logger=audit_logger,
                     )
-                lot_size = signal.lot_size
-
-                # 6. Risk approval gate
-                with profile("risk_check"):
-                    health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    # Use the adjusted lot size from risk manager
+                    if risk_approved:
+                        signal = signal.model_copy(update={"lot_size": lot_size})
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -1465,7 +1476,7 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
     from src.models.ensemble import EnsembleModel

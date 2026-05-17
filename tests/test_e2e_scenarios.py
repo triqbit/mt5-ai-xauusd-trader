@@ -53,7 +53,7 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
     )
 
     # Should be rejected due to circuit breaker
-    assert risk.approve(signal) is False
+    assert risk.validate_signal(signal, df_raw, []) is False
 
 
 def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
@@ -76,7 +76,7 @@ def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
         confidence=0.9,
     )
 
-    assert risk.approve(signal) is False
+    assert risk.validate_signal(signal, df_raw, []) is False
 
 
 def test_ensemble_model_with_gapping_data(mock_cfg):
