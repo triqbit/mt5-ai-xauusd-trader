@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -158,7 +158,7 @@ class RevengeTrade(BaseModel):
 class JournalReport(BaseModel):
     """Final analytical report from journal mining."""
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     session_analysis: list[SessionAnalysis]
     volatility_patterns: list[VolatilityPattern]
     performance_decay: PerformanceDecay | None = None
@@ -611,7 +611,7 @@ class JournalMiner:
         df = trades_df.sort_values("created_at").copy()
         # Ensure UTC
         if df["created_at"].dt.tz is None:
-            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(UTC)
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(timezone.utc)
 
         revenge_trades = []
         for i in range(1, len(df)):
@@ -649,9 +649,9 @@ class JournalMiner:
         # Ensure UTC-aware
         df = trades_df.copy()
         if df["created_at"].dt.tz is None:
-            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(UTC)
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(timezone.utc)
         else:
-            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_convert(UTC)
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_convert(timezone.utc)
 
         trades = df.sort_values("created_at").to_dict("records")
 
@@ -694,9 +694,9 @@ class JournalMiner:
         # Ensure UTC-aware
         df = trades_df.copy()
         if df["created_at"].dt.tz is None:
-            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(UTC)
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_localize(timezone.utc)
         else:
-            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_convert(UTC)
+            df["created_at"] = pd.to_datetime(df["created_at"]).dt.tz_convert(timezone.utc)
 
         trades = df.sort_values("created_at").to_dict("records")
 
@@ -1121,7 +1121,7 @@ class JournalMiner:
             # Ensure sigs for comparison are UTC-aware
             sigs = signals_df.copy()
             if sigs["created_at"].dt.tz is None:
-                sigs["created_at"] = sigs["created_at"].dt.tz_localize(UTC)
+                sigs["created_at"] = sigs["created_at"].dt.tz_localize(timezone.utc)
 
             mask = (sigs["created_at"] >= start_window) & (sigs["created_at"] < cluster.start_time)
             pre_cluster_signals.append(sigs[mask])
@@ -1158,18 +1158,18 @@ class JournalMiner:
         # Ensure UTC-aware
         signals_df = signals_df.copy()
         if signals_df["created_at"].dt.tz is None:
-            signals_df["created_at"] = pd.to_datetime(signals_df["created_at"]).dt.tz_localize(UTC)
+            signals_df["created_at"] = pd.to_datetime(signals_df["created_at"]).dt.tz_localize(timezone.utc)
         else:
-            signals_df["created_at"] = pd.to_datetime(signals_df["created_at"]).dt.tz_convert(UTC)
+            signals_df["created_at"] = pd.to_datetime(signals_df["created_at"]).dt.tz_convert(timezone.utc)
 
         if trades_df is not None and not trades_df.empty:
             trades_df = trades_df.copy()
             if trades_df["created_at"].dt.tz is None:
                 trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_localize(
-                    UTC
+                    timezone.utc
                 )
             else:
-                trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_convert(UTC)
+                trades_df["created_at"] = pd.to_datetime(trades_df["created_at"]).dt.tz_convert(timezone.utc)
 
         df = signals_df.copy()
         df["vol_bucket"] = df["volatility"].apply(self._extract_volatility_bucket)
@@ -1189,11 +1189,11 @@ class JournalMiner:
                 # Ensure cluster times are UTC-aware Timestamps for comparison
                 c_start = pd.Timestamp(cluster.start_time)
                 if c_start.tzinfo is None:
-                    c_start = c_start.replace(tzinfo=UTC)
+                    c_start = c_start.replace(tzinfo=timezone.utc)
 
                 c_end = pd.Timestamp(cluster.end_time)
                 if c_end.tzinfo is None:
-                    c_end = c_end.replace(tzinfo=UTC)
+                    c_end = c_end.replace(tzinfo=timezone.utc)
 
                 # Find trades in this cluster
                 mask = (
@@ -1313,10 +1313,10 @@ class JournalMiner:
             # Ensure cluster start/end are UTC
             c_start = cluster.start_time
             if c_start.tzinfo is None:
-                c_start = c_start.replace(tzinfo=UTC)
+                c_start = c_start.replace(tzinfo=timezone.utc)
             c_end = cluster.end_time
             if c_end.tzinfo is None:
-                c_end = c_end.replace(tzinfo=UTC)
+                c_end = c_end.replace(tzinfo=timezone.utc)
 
             start_time = c_start - pd.Timedelta(hours=window_hours)
             weak_windows.append((start_time, c_end))
@@ -1324,7 +1324,7 @@ class JournalMiner:
         def is_weak(dt: datetime) -> bool:
             # Ensure dt is timezone-aware
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=UTC)
+                dt = dt.replace(tzinfo=timezone.utc)
             return any(start <= dt <= end for start, end in weak_windows)
 
         # Ensure risk_events_df created_at is available and formatted
@@ -1369,9 +1369,9 @@ class JournalMiner:
         # Ensure UTC-awareness for comparisons
         sigs = signals_df.copy()
         if sigs["created_at"].dt.tz is None:
-            sigs["created_at"] = sigs["created_at"].dt.tz_localize(UTC)
+            sigs["created_at"] = sigs["created_at"].dt.tz_localize(timezone.utc)
         else:
-            sigs["created_at"] = sigs["created_at"].dt.tz_convert(UTC)
+            sigs["created_at"] = sigs["created_at"].dt.tz_convert(timezone.utc)
 
         drawdown_clusters = self.detect_drawdown_clusters(trades_df)
         profit_clusters = self.detect_profit_clusters(trades_df)
@@ -1407,9 +1407,9 @@ class JournalMiner:
         for cluster in clusters:
             cluster_start = cluster.start_time
             if cluster_start.tzinfo is None:
-                cluster_start = cluster_start.replace(tzinfo=UTC)
+                cluster_start = cluster_start.replace(tzinfo=timezone.utc)
             else:
-                cluster_start = cluster_start.astimezone(UTC)
+                cluster_start = cluster_start.astimezone(timezone.utc)
 
             start_window = cluster_start - pd.Timedelta(minutes=window_minutes)
 
