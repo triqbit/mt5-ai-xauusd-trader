@@ -47,3 +47,4 @@ types-setuptools==82.0.0.20260508
 types-PyYAML==6.0.12.20260510
 playwright==1.50.1
 pytest-playwright==0.6.3
+python-engineio==4.11.2
