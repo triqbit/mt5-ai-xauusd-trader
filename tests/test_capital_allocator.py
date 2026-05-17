@@ -21,6 +21,7 @@ def allocator():
         total_budget=100000.0,
         max_symbol_risk=0.4,
         max_family_risk=0.4,
+        max_strategy_risk=0.8,  # Set higher for tests to avoid interfering with heat limits
         max_total_heat=0.7,
         performance_step=0.1,
         decay_rate=0.01,
@@ -323,7 +324,7 @@ def test_rejection_history(allocator):
         strategy_id="s1",
         symbol="XAUUSD",
         model_family="RL",
-        capital_cap=1000.0,
+        capital_cap=100000.0,
     )
     allocator.add_strategy(config)
 
@@ -651,6 +652,7 @@ def test_from_config():
     mock_config = MagicMock(spec=TradingConfig)
     mock_config.allocator_max_symbol_risk = 0.5
     mock_config.allocator_max_family_risk = 0.6
+    mock_config.allocator_max_strategy_risk = 0.35
     mock_config.allocator_max_total_heat = 0.8
     mock_config.allocator_performance_step = 0.02
     mock_config.allocator_decay_rate = 0.005
@@ -661,6 +663,7 @@ def test_from_config():
     assert allocator.total_budget == 200000.0
     assert allocator.max_symbol_risk == 0.5
     assert allocator.max_family_risk == 0.6
+    assert allocator.max_strategy_risk == 0.35
     assert allocator.max_total_heat == 0.8
     assert allocator.performance_step == 0.02
     assert allocator.decay_rate == 0.005
@@ -734,3 +737,81 @@ def test_diversification_score_multi_factor(allocator):
     assert score_b == pytest.approx(0.4)
 
     assert score_b < score_a
+
+def test_max_strategy_risk_enforcement(allocator):
+    """Verify that global max_strategy_risk is enforced."""
+    allocator.soft_limit_buffer = 0.0
+    allocator.max_strategy_risk = 0.2
+
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=100000.0,
+    )
+    allocator.add_strategy(config)
+
+    # Request 25% risk, should be rejected (Limit 20%)
+    result = allocator.request_allocation("s1", 0.25)
+    assert result.is_allowed is False
+    assert result.rejection_code == RejectionCode.STRATEGY_CONCENTRATION_LIMIT
+
+    # Request 15% risk, should be allowed
+    result_ok = allocator.request_allocation("s1", 0.15)
+    assert result_ok.is_allowed is True
+    assert result_ok.allocated_risk_pct == 0.15
+
+def test_incremental_allocation(allocator):
+    """Test increase_allocation and decrease_allocation."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+    )
+    allocator.add_strategy(config)
+
+    allocator.increase_allocation("s1", 1000.0)
+    assert allocator.current_allocations["s1"] == 1000.0
+
+    allocator.increase_allocation("s1", 500.0)
+    assert allocator.current_allocations["s1"] == 1500.0
+
+    allocator.decrease_allocation("s1", 200.0)
+    assert allocator.current_allocations["s1"] == 1300.0
+
+    allocator.decrease_allocation("s1", 2000.0) # Should floor at 0
+    assert allocator.current_allocations["s1"] == 0.0
+
+def test_route_allocation_tie_breaker(allocator):
+    """Verify performance_multiplier tie-breaker in route_allocation."""
+    s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=50000.0, performance_multiplier=1.2)
+    s2 = StrategyConfig(strategy_id="s2", symbol="XAUUSD", model_family="RL", capital_cap=50000.0, performance_multiplier=1.5)
+
+    allocator.add_strategy(s1)
+    allocator.add_strategy(s2)
+
+    # Both strategies give same diversification score because they are identical in symbol/family
+    # and currently have 0 allocation. Performance multiplier should break the tie.
+    result = allocator.route_allocation("XAUUSD", 0.01)
+    assert result.strategy_id == "s2"
+
+def test_capital_cap_with_existing_allocation(allocator):
+    """Verify capital_cap accounts for current allocations."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=5000.0,
+    )
+    allocator.add_strategy(config)
+
+    # Already allocated 4000
+    allocator.update_allocation("s1", 4000.0)
+
+    # Requesting 2000 (2%) should be capped to 1000 (1%)
+    result = allocator.request_allocation("s1", 0.02)
+    assert result.is_allowed is True
+    assert result.allocated_amount == 1000.0
+    assert result.allocated_risk_pct == 0.01
+    assert result.was_capped is True

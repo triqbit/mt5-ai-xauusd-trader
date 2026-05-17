@@ -30,6 +30,7 @@ class RejectionCode(str, Enum):
     TOTAL_HEAT_LIMIT = "TOTAL_HEAT_LIMIT"
     SYMBOL_CONCENTRATION_LIMIT = "SYMBOL_CONCENTRATION_LIMIT"
     FAMILY_CONCENTRATION_LIMIT = "FAMILY_CONCENTRATION_LIMIT"
+    STRATEGY_CONCENTRATION_LIMIT = "STRATEGY_CONCENTRATION_LIMIT"
     CAPITAL_CAP_REACHED = "CAPITAL_CAP_REACHED"
     SCALED_TO_ZERO = "SCALED_TO_ZERO"
     NO_BUDGET = "NO_BUDGET"
@@ -88,6 +89,7 @@ class CapitalAllocator:
         total_budget: float,
         max_symbol_risk: float = 0.4,  # Max 40% of budget per symbol
         max_family_risk: float = 0.4,  # Max 40% of budget per model family
+        max_strategy_risk: float = 0.3,  # Max 30% of budget per strategy
         max_total_heat: float = 0.7,  # Max 70% of budget committed at once
         performance_step: float = 0.05,  # Adjustment step for performance multiplier
         decay_rate: float = 0.001,  # Rate at which multiplier returns to 1.0
@@ -97,6 +99,7 @@ class CapitalAllocator:
         self.total_budget = total_budget
         self.max_symbol_risk = max_symbol_risk
         self.max_family_risk = max_family_risk
+        self.max_strategy_risk = max_strategy_risk
         self.max_total_heat = max_total_heat
         self.performance_step = performance_step
         self.decay_rate = decay_rate
@@ -116,6 +119,7 @@ class CapitalAllocator:
             total_budget=total_budget,
             max_symbol_risk=config.allocator_max_symbol_risk,
             max_family_risk=config.allocator_max_family_risk,
+            max_strategy_risk=config.allocator_max_strategy_risk,
             max_total_heat=config.allocator_max_total_heat,
             performance_step=config.allocator_performance_step,
             decay_rate=config.allocator_decay_rate,
@@ -140,6 +144,18 @@ class CapitalAllocator:
         """Update the currently used capital for a strategy."""
         if strategy_id in self.strategies:
             self.current_allocations[strategy_id] = max(0.0, amount)
+
+    def increase_allocation(self, strategy_id: str, amount: float) -> None:
+        """Incrementally increase allocated capital for a strategy."""
+        if strategy_id in self.strategies:
+            current = self.current_allocations.get(strategy_id, 0.0)
+            self.update_allocation(strategy_id, current + amount)
+
+    def decrease_allocation(self, strategy_id: str, amount: float) -> None:
+        """Incrementally decrease allocated capital for a strategy."""
+        if strategy_id in self.strategies:
+            current = self.current_allocations.get(strategy_id, 0.0)
+            self.update_allocation(strategy_id, current - amount)
 
     def release_allocation(self, strategy_id: str) -> None:
         """Explicitly release all allocated capital for a strategy."""
@@ -173,6 +189,7 @@ class CapitalAllocator:
             return None
 
         best_score = -1.0
+        best_multiplier = -1.0
         best_result = None
 
         for sid in eligible_strategies:
@@ -184,8 +201,12 @@ class CapitalAllocator:
             with self._temporary_allocation(sid, res.allocated_amount):
                 score = self.get_diversification_score()
 
-            if score > best_score:
+            multiplier = self.strategies[sid].performance_multiplier
+
+            # Tie-breaker logic: pick the one with better score, or better performance if tied
+            if score > best_score or (abs(score - best_score) < 1e-6 and multiplier > best_multiplier):
                 best_score = score
+                best_multiplier = multiplier
                 best_result = res
 
         if best_result:
@@ -511,14 +532,19 @@ class CapitalAllocator:
 
         # 2. Check Strategy-Level Capital Cap
         # Ensure we don't exceed the absolute capital limit for this strategy.
-        if target_amount > config.capital_cap:
+        # We must account for capital already allocated to this strategy.
+        current_strategy_allocation = self.current_allocations.get(strategy_id, 0.0)
+        available_under_cap = max(0.0, config.capital_cap - current_strategy_allocation)
+
+        if target_amount > available_under_cap:
             logger.debug(
                 "strategy_cap_exceeded",
                 strategy_id=strategy_id,
                 target_amount=target_amount,
+                available=available_under_cap,
                 cap=config.capital_cap,
             )
-            target_amount = config.capital_cap
+            target_amount = available_under_cap
             target_risk_pct = target_amount / self.total_budget
             was_capped = True
 
@@ -542,6 +568,9 @@ class CapitalAllocator:
         current_total_heat = self.get_total_heat()
         symbol_heat = self.get_symbol_heat(config.symbol)
         family_heat = self.get_family_heat(config.model_family)
+        strategy_heat = self.get_strategy_utilization(strategy_id) * (
+            config.capital_cap / self.total_budget
+        )
 
         def _calculate_soft_scale(current: float, limit: float, buffer: float) -> float:
             """Linearly scale down if within the buffer zone of a limit."""
@@ -565,8 +594,11 @@ class CapitalAllocator:
         family_scale = _calculate_soft_scale(
             family_heat, self.max_family_risk, self.soft_limit_buffer
         )
+        strategy_scale = _calculate_soft_scale(
+            strategy_heat, self.max_strategy_risk, self.soft_limit_buffer
+        )
 
-        overall_soft_scale = min(heat_scale, symbol_scale, family_scale)
+        overall_soft_scale = min(heat_scale, symbol_scale, family_scale, strategy_scale)
         if overall_soft_scale < 1.0:
             target_risk_pct *= overall_soft_scale
             was_scaled = True
@@ -597,6 +629,25 @@ class CapitalAllocator:
                     is_allowed=False,
                     rejection_reason=f"Total heat limit reached: {current_total_heat:.2f}",
                     rejection_code=RejectionCode.TOTAL_HEAT_LIMIT,
+                )
+                self._log_and_audit(res, silent=silent)
+                return res
+
+        if strategy_heat + target_risk_pct > self.max_strategy_risk:
+            if allow_scaling:
+                target_risk_pct = max(0.0, self.max_strategy_risk - strategy_heat)
+                was_capped = True
+            else:
+                if not silent:
+                    self._record_rejection(RejectionCode.STRATEGY_CONCENTRATION_LIMIT)
+                res = AllocationResult(
+                    strategy_id=strategy_id,
+                    allocated_amount=0.0,
+                    allocated_risk_pct=0.0,
+                    requested_risk_pct=risk_pct,
+                    is_allowed=False,
+                    rejection_reason=f"Strategy concentration limit reached for {strategy_id}",
+                    rejection_code=RejectionCode.STRATEGY_CONCENTRATION_LIMIT,
                 )
                 self._log_and_audit(res, silent=silent)
                 return res
