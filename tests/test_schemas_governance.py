@@ -5,6 +5,7 @@ tests/test_schemas_governance.py
 Tests for Pydantic schema validation and governance.
 """
 
+
 import pytest
 from pydantic import ValidationError
 
@@ -23,11 +24,10 @@ def test_trade_signal_valid():
         take_profit=2320.0,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.85,
+        confidence=0.85
     )
     assert signal.symbol == "XAUUSD"
     assert signal.direction == SignalDirection.BUY
-
 
 def test_trade_signal_invalid_symbol():
     """Verify SYMBOL_PATTERN enforcement."""
@@ -40,10 +40,9 @@ def test_trade_signal_invalid_symbol():
             take_profit=2320.0,
             lot_size=0.1,
             algorithm="ensemble",
-            confidence=0.85,
+            confidence=0.85
         )
     assert "pattern" in str(exc.value).lower()
-
 
 def test_trade_signal_invalid_rr_ratio():
     """Verify Risk-Reward ratio enforcement (minimum 1.5)."""
@@ -56,10 +55,9 @@ def test_trade_signal_invalid_rr_ratio():
             take_profit=2310.0,  # RR = 10/10 = 1.0 (less than 1.5)
             lot_size=0.1,
             algorithm="ensemble",
-            confidence=0.85,
+            confidence=0.85
         )
     assert "risk-reward ratio" in str(exc.value).lower()
-
 
 def test_trade_signal_frozen():
     """Verify TradeSignal is immutable."""
@@ -71,12 +69,11 @@ def test_trade_signal_frozen():
         take_profit=2320.0,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.85,
+        confidence=0.85
     )
     with pytest.raises(ValidationError) as exc:
-        signal.symbol = "BTCUSD"  # type: ignore
+        signal.symbol = "BTCUSD" # type: ignore
     assert "frozen" in str(exc.value).lower() or "immutable" in str(exc.value).lower()
-
 
 def test_trade_signal_extra_forbid():
     """Verify TradeSignal forbids extra fields."""
@@ -90,11 +87,10 @@ def test_trade_signal_extra_forbid():
             lot_size=0.1,
             algorithm="ensemble",
             confidence=0.85,
-            extra_field="untrusted",  # type: ignore
+            extra_field="untrusted" # type: ignore
         )
     # Pydantic 2 error message changed slightly, but extra_forbidden is part of the type
     assert "extra inputs are not permitted" in str(exc.value).lower()
-
 
 def test_execution_decision_blocking_invariant():
     """Verify that a blocked decision must have a reason."""
@@ -106,7 +102,7 @@ def test_execution_decision_blocking_invariant():
         take_profit=2350.0,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.85,
+        confidence=0.85
     )
 
     # Valid blocked decision
@@ -115,17 +111,20 @@ def test_execution_decision_blocking_invariant():
         is_approved=False,
         confidence_score=0.85,
         blocked_by="ATR_VOLATILITY",
-        trace={"atr_volatility": {"passed": False, "ratio": 4.5}},
+        trace={"atr_volatility": {"passed": False, "ratio": 4.5}}
     )
     assert decision.blocked_by == "ATR_VOLATILITY"
 
     # Invalid: Not approved but blocked_by is None
     with pytest.raises(ValidationError) as exc:
         ExecutionDecision(
-            signal=signal, is_approved=False, confidence_score=0.85, blocked_by=None, trace={}
+            signal=signal,
+            is_approved=False,
+            confidence_score=0.85,
+            blocked_by=None,
+            trace={}
         )
     assert "blocked decision must provide a 'blocked_by' reason" in str(exc.value).lower()
-
 
 def test_execution_decision_approved_consistency():
     """Verify that an approved decision cannot have a blocked_by reason."""
@@ -137,7 +136,7 @@ def test_execution_decision_approved_consistency():
         take_profit=2350.0,
         lot_size=0.1,
         algorithm="ensemble",
-        confidence=0.85,
+        confidence=0.85
     )
 
     with pytest.raises(ValidationError) as exc:
@@ -146,10 +145,9 @@ def test_execution_decision_approved_consistency():
             is_approved=True,
             confidence_score=0.85,
             blocked_by="SOME_FILTER",
-            trace={},
+            trace={}
         )
     assert "approved decision cannot have a 'blocked_by' reason" in str(exc.value).lower()
-
 
 def test_trading_config_validation(monkeypatch):
     """Verify TradingConfig enforces SYMBOL_PATTERN and VALID_TIMEFRAMES."""

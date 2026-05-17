@@ -190,9 +190,7 @@ def main():
     t_status = "[bold green]SIGNIFICANT[/]" if t_p < 0.05 else "[yellow]NOT SIGNIFICANT[/]"
     w_status = "[bold green]SIGNIFICANT[/]" if w_p < 0.05 else "[yellow]NOT SIGNIFICANT[/]"
 
-    table_sig.add_row(
-        "Paired T-test", f"t={comp.get('T-Statistic', 0):.4f}", f"{t_p:.4f}", t_status
-    )
+    table_sig.add_row("Paired T-test", f"t={comp.get('T-Statistic', 0):.4f}", f"{t_p:.4f}", t_status)
     table_sig.add_row("Wilcoxon Signed-Rank", "N/A", f"{w_p:.4f}", w_status)
 
     console.print(table_sig)

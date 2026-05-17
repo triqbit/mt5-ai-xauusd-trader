@@ -22,7 +22,6 @@ def test_governance_files_exist():
     for file_path in mandatory_files:
         assert (root / file_path).exists(), f"Mandatory governance file missing: {file_path}"
 
-
 def test_codeowners_quality_leads():
     """Verify that CODEOWNERS contains lead maintainer handles."""
     root = Path(__file__).parent.parent
@@ -33,7 +32,6 @@ def test_codeowners_quality_leads():
     assert "@maintainer-quality" in content
     assert "@maintainer-trading" in content
     assert "@maintainer-models" in content
-
 
 def test_contributing_quality_gates():
     """Verify that CONTRIBUTING.md defines mandatory quality gates."""

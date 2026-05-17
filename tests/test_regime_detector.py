@@ -628,7 +628,7 @@ class TestRegimeDetector(unittest.TestCase):
                 "open": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
                 "tick_volume": np.full(100, 100.0),
             },
-            index=idx,
+            index=idx
         )
 
         df = self.detector.label_history(data)

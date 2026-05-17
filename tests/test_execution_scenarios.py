@@ -1,7 +1,6 @@
 """
 Tests for ExecutionFilter using synthetic scenarios.
 """
-
 from datetime import UTC, datetime
 
 import pytest
@@ -15,7 +14,6 @@ from src.utils.synthetic_data import ExecutionScenarioBuilder, ModelHealthGenera
 def execution_builder():
     return ExecutionScenarioBuilder(seed=42)
 
-
 @pytest.fixture
 def config(monkeypatch):
     monkeypatch.setenv("MT5_PASSWORD", "fake_password")
@@ -24,14 +22,12 @@ def config(monkeypatch):
         model_drift_threshold=0.2,
         model_accuracy_floor=0.6,
         model_calibration_threshold=0.3,
-        min_confidence=0.6,
+        min_confidence=0.6
     )
-
 
 @pytest.fixture
 def filter_svc(config):
     return ExecutionFilter(config=config)
-
 
 def test_passing_scenario(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
@@ -42,7 +38,6 @@ def test_passing_scenario(filter_svc, execution_builder):
     assert decision.is_approved is True
     assert decision.blocked_by is None
 
-
 def test_atr_failure_scenario(filter_svc, execution_builder):
     signal, df = execution_builder.atr_failure()
     decision = filter_svc.validate(signal, df, current_drawdown=0.0)
@@ -50,14 +45,12 @@ def test_atr_failure_scenario(filter_svc, execution_builder):
     assert decision.is_approved is False
     assert decision.blocked_by == "ATR_VOLATILITY"
 
-
 def test_trend_failure_scenario(filter_svc, execution_builder):
     signal, df = execution_builder.trend_failure()
     decision = filter_svc.validate(signal, df, current_drawdown=0.0)
 
     assert decision.is_approved is False
     assert decision.blocked_by == "TREND_ANGLE"
-
 
 def test_ema_sequence_failure_scenario(filter_svc, execution_builder):
     signal, df = execution_builder.ema_out_of_sequence()
@@ -67,7 +60,6 @@ def test_ema_sequence_failure_scenario(filter_svc, execution_builder):
     assert decision.is_approved is False
     assert decision.blocked_by == "EMA_SEQUENCE"
 
-
 def test_momentum_failure_scenario(filter_svc, execution_builder):
     signal, df = execution_builder.momentum_failure()
     decision = filter_svc.validate(signal, df, current_drawdown=0.0)
@@ -75,7 +67,6 @@ def test_momentum_failure_scenario(filter_svc, execution_builder):
     # Rapid trend strength 0.05 will spike RSI > 75
     assert decision.is_approved is False
     assert decision.blocked_by == "MOMENTUM"
-
 
 def test_model_health_drift_failure(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()
@@ -87,7 +78,6 @@ def test_model_health_drift_failure(filter_svc, execution_builder):
     assert decision.blocked_by == "MODEL_STABILITY"
     assert decision.trace["model_stability"]["passed"] is False
     assert decision.trace["model_stability"]["drift"] == 0.35
-
 
 def test_model_health_accuracy_failure(filter_svc, execution_builder):
     signal, df = execution_builder.passing_buy()

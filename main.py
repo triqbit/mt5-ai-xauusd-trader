@@ -629,9 +629,7 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = (
-                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
-                                        )
+                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )

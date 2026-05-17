@@ -160,7 +160,9 @@ class TradingEnv(gym.Env):
             # Handle actions (0=HOLD, 1=BUY, 2=SELL)
             if action == 1:  # LONG
                 if self.position == -1:  # Close short
-                    realized_pnl = self.entry_price - current_price - (self.spread + self.slippage)
+                    realized_pnl = (
+                        self.entry_price - current_price - (self.spread + self.slippage)
+                    )
                     self.balance += realized_pnl
                     self.position = 0
 
@@ -171,7 +173,9 @@ class TradingEnv(gym.Env):
 
             elif action == 2:  # SHORT
                 if self.position == 1:  # Close long
-                    realized_pnl = current_price - self.entry_price - (self.spread + self.slippage)
+                    realized_pnl = (
+                        current_price - self.entry_price - (self.spread + self.slippage)
+                    )
                     self.balance += realized_pnl
                     self.position = 0
 

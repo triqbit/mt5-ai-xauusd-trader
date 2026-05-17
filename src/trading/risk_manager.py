@@ -6,7 +6,7 @@ Enterprise risk management engine implementing:
   - Kelly Criterion position sizing (fractional)
   - Ray Dalio All-Weather portfolio allocation
   - Dynamic drawdown protection & circuit breakers
-  - 6-layer entry filter cascade
+  - 8-layer entry filter cascade
 
 This module relies on the unified TradeSignal schema from src.core.schemas
 to ensure all signals entering the risk engine are technically valid.
@@ -154,18 +154,29 @@ class RiskManager:
         vol_multiplier = 1.0
         ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
 
-        if hasattr(self.cfg, "volatility_extreme_threshold") and ratio > self.cfg.volatility_extreme_threshold:
+        if (
+            hasattr(self.cfg, "volatility_extreme_threshold")
+            and ratio > self.cfg.volatility_extreme_threshold
+        ):
             return 0.0
 
-        if hasattr(self.cfg, "volatility_very_high_threshold") and ratio > self.cfg.volatility_very_high_threshold:
+        if (
+            hasattr(self.cfg, "volatility_very_high_threshold")
+            and ratio > self.cfg.volatility_very_high_threshold
+        ):
             vol_multiplier = 0.5
-        elif hasattr(self.cfg, "volatility_high_threshold") and ratio > self.cfg.volatility_high_threshold:
+        elif (
+            hasattr(self.cfg, "volatility_high_threshold")
+            and ratio > self.cfg.volatility_high_threshold
+        ):
             vol_multiplier = 0.75
 
         # Sizing: risk 1% (cfg.risk_per_trade) of balance
         risk_amount = self.balance * self.cfg.risk_per_trade
         # ATR * 100 converts gold ATR to $ per lot
-        lot_size = (risk_amount / (current_atr * 100)) * vol_multiplier if current_atr > 0 else 0.01
+        lot_size = (
+            (risk_amount / (current_atr * 100)) * vol_multiplier if current_atr > 0 else 0.01
+        )
 
         final_lots = max(0.01, round(lot_size, 2))
         return final_lots
@@ -177,6 +188,7 @@ class RiskManager:
         model_health: Optional[dict] = None,
     ) -> bool:
         """Legacy approval method for backward compatibility."""
+        # Create dummy market data and open positions if not provided
         decision = self.validate_signal(
             signal, pd.DataFrame(), [], model_health=model_health, signal_id=signal_id
         )
@@ -235,7 +247,7 @@ class RiskManager:
 
     # -- Private filter layers ----------------------------------------------
     def _check_directional_exposure(self, signal: TradeSignal, open_positions: list[dict]) -> bool:
-        \"\"\"30% net directional exposure.\"\"\"
+        """30% net directional exposure."""
         net_lots = 0.0
         for pos in open_positions:
             vol = pos.get("volume", 0.0)
@@ -330,7 +342,7 @@ class RiskManager:
         return True
 
     def _check_symbol_allocation(self, symbol: str) -> bool:
-        \"\"\"Block trading on symbols not in the All-Weather portfolio.\"\"\"
+        """Block trading on symbols not in the All-Weather portfolio."""
         if symbol not in ALLOCATION_WEIGHTS:
             logger.warning("Symbol %s not in approved portfolio", symbol)
             return False

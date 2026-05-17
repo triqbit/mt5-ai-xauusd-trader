@@ -2,7 +2,6 @@
 MT5 AI/ML Trading Bot - Jules UX Enhancements Tests
 tests/test_jules_ux_new.py
 """
-
 import os
 from datetime import datetime
 from unittest.mock import MagicMock, patch
@@ -14,30 +13,24 @@ from src.trading.backtester import BacktestEngine
 
 def test_doctor_flag_invokes_doctor():
     """Verify that --doctor flag calls scripts.doctor.main()."""
-    with (
-        patch("sys.argv", ["main.py", "--doctor"]),
-        patch("scripts.doctor.main") as mock_doctor_main,
-    ):
+    with patch("sys.argv", ["main.py", "--doctor"]), \
+         patch("scripts.doctor.main") as mock_doctor_main:
+
         # main() should return 0
         assert main() == 0
         mock_doctor_main.assert_called_once()
 
-
 def test_show_config_flag_displays_config():
     """Verify that --show-config flag displays sanitized config and exits."""
-    with (
-        patch("sys.argv", ["main.py", "--show-config"]),
-        patch("main.configure_logging"),
-        patch.dict(
-            os.environ,
-            {
-                "MT5_LOGIN": "123456",
-                "MT5_PASSWORD": "SecretPassword",
-                "MT5_SERVER": "TestServer",
-                "DATABASE_URL": "postgresql://user:pass@localhost/db",
-            },
-        ),
-    ):
+    with patch("sys.argv", ["main.py", "--show-config"]), \
+         patch("main.configure_logging"), \
+         patch.dict(os.environ, {
+             "MT5_LOGIN": "123456",
+             "MT5_PASSWORD": "SecretPassword",
+             "MT5_SERVER": "TestServer",
+             "DATABASE_URL": "postgresql://user:pass@localhost/db"
+         }):
+
         get_config.cache_clear()
 
         with patch("rich.console.Console.print") as mock_print:
@@ -45,7 +38,6 @@ def test_show_config_flag_displays_config():
             assert main() == 0
             # Ensure something was printed
             assert mock_print.called
-
 
 def test_recovery_factor_calculation():
     """Verify recovery factor calculation in BacktestEngine."""
@@ -68,20 +60,18 @@ def test_recovery_factor_calculation():
     assert report.max_drawdown > 0
     assert report.recovery_factor == report.total_return / report.max_drawdown
 
-
 def test_cli_argument_handling_refactored():
     """Verify refactored CLI argument handling maps to correct env vars."""
     # We use destination names for env vars now
-    with (
-        patch("sys.argv", ["main.py", "--mode", "backtest", "--algo", "ppo", "--symbol", "EURUSD"]),
-        patch.dict(os.environ, {}, clear=True),
-        patch("main.configure_logging"),
-    ):
+    with patch("sys.argv", ["main.py", "--mode", "backtest", "--algo", "ppo", "--symbol", "EURUSD"]), \
+         patch.dict(os.environ, {}, clear=True), \
+         patch("main.configure_logging"):
+
         get_config.cache_clear()
 
         # We need to mock things so main doesn't actually run the whole app
         with patch("src.core.config_validator.ConfigValidator.validate") as mock_val:
-            mock_val.side_effect = Exception("Stop here")  # Use exception to stop main
+            mock_val.side_effect = Exception("Stop here") # Use exception to stop main
             try:
                 main()
             except Exception as e:

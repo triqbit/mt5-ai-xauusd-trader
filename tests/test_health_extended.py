@@ -1,3 +1,4 @@
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -15,12 +16,10 @@ class TestHealthExtended(unittest.TestCase):
         self.checker = HealthChecker(self.config, connector=self.connector)
 
     def test_check_environment(self):
-        with (
-            patch("platform.python_version", return_value="3.10.0"),
-            patch("platform.system", return_value="Linux"),
-            patch("platform.release", return_value="5.4.0"),
-            patch("platform.machine", return_value="x86_64"),
-        ):
+        with patch("platform.python_version", return_value="3.10.0"), \
+             patch("platform.system", return_value="Linux"), \
+             patch("platform.release", return_value="5.4.0"), \
+             patch("platform.machine", return_value="x86_64"):
             status = self.checker.check_environment()
             self.assertEqual(status.status, HealthStatus.HEALTHY)
             self.assertIn("Python 3.10.0", status.message)
@@ -28,10 +27,8 @@ class TestHealthExtended(unittest.TestCase):
             self.assertIn("x86_64", status.message)
 
     def test_check_system_resources_healthy(self):
-        with (
-            patch("psutil.cpu_percent", return_value=10.0),
-            patch("psutil.virtual_memory") as mock_mem,
-        ):
+        with patch("psutil.cpu_percent", return_value=10.0), \
+             patch("psutil.virtual_memory") as mock_mem:
             mock_mem.return_value.percent = 20.0
             status = self.checker.check_system_resources()
             self.assertEqual(status.status, HealthStatus.HEALTHY)
@@ -39,10 +36,8 @@ class TestHealthExtended(unittest.TestCase):
             self.assertIn("MEM: 20.0%", status.message)
 
     def test_check_system_resources_degraded_cpu(self):
-        with (
-            patch("psutil.cpu_percent", return_value=95.0),
-            patch("psutil.virtual_memory") as mock_mem,
-        ):
+        with patch("psutil.cpu_percent", return_value=95.0), \
+             patch("psutil.virtual_memory") as mock_mem:
             mock_mem.return_value.percent = 20.0
             status = self.checker.check_system_resources()
             self.assertEqual(status.status, HealthStatus.DEGRADED)
@@ -50,10 +45,8 @@ class TestHealthExtended(unittest.TestCase):
             self.assertIn("runaway processes", status.remedy)
 
     def test_check_system_resources_degraded_mem(self):
-        with (
-            patch("psutil.cpu_percent", return_value=10.0),
-            patch("psutil.virtual_memory") as mock_mem,
-        ):
+        with patch("psutil.cpu_percent", return_value=10.0), \
+             patch("psutil.virtual_memory") as mock_mem:
             mock_mem.return_value.percent = 95.0
             status = self.checker.check_system_resources()
             self.assertEqual(status.status, HealthStatus.DEGRADED)
@@ -90,7 +83,6 @@ class TestHealthExtended(unittest.TestCase):
         self.assertIn("Symbol 'XAUUSD' not found", status.message)
         self.assertIn("GOLD, XAUUSD.m", status.message)
         self.assertIn("Check SYMBOL in .env", status.remedy)
-
 
 if __name__ == "__main__":
     unittest.main()

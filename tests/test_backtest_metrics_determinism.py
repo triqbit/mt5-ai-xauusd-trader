@@ -13,19 +13,15 @@ from src.utils.synthetic_data import BacktestScenarioBuilder
 
 class ConstantModel:
     """Always predicts BUY with constant confidence."""
-
     def __init__(self, direction=1, confidence=0.8):
         self.direction = direction
         self.confidence = confidence
-
     def predict(self, obs):
         return type("Signal", (), {"direction": self.direction, "confidence": self.confidence})
-
 
 @pytest.fixture
 def backtest_builder():
     return BacktestScenarioBuilder(seed=42)
-
 
 def test_drawdown_and_recovery_metrics(backtest_builder):
     """Verifies that max_drawdown and recovery_factor are calculated correctly."""
@@ -41,7 +37,7 @@ def test_drawdown_and_recovery_metrics(backtest_builder):
     engine = BacktestEngine(
         symbol="XAUUSD",
         execution_filter=mock_ef,
-        spread=0.0,  # Zero spread for deterministic math
+        spread=0.0  # Zero spread for deterministic math
     )
 
     # Run backtest with a constant buyer
@@ -49,7 +45,11 @@ def test_drawdown_and_recovery_metrics(backtest_builder):
     engine.fe.timeframes = []
 
     report = engine.run_walk_forward(
-        df, ConstantModel(direction=1), train_window=100, test_window=800, step_size=800
+        df,
+        ConstantModel(direction=1),
+        train_window=100,
+        test_window=800,
+        step_size=800
     )
 
     assert report.total_trades > 0
@@ -57,7 +57,6 @@ def test_drawdown_and_recovery_metrics(backtest_builder):
     # Equity drawdown should be around 10% if we bought near the peak.
     assert report.max_drawdown > 0.05
     assert report.recovery_factor > 0.3
-
 
 def test_wick_traps_sl_priority(backtest_builder):
     """
@@ -78,7 +77,11 @@ def test_wick_traps_sl_priority(backtest_builder):
     engine.fe.timeframes = []
 
     report = engine.run_walk_forward(
-        df, ConstantModel(direction=1), train_window=100, test_window=300, step_size=300
+        df,
+        ConstantModel(direction=1),
+        train_window=100,
+        test_window=300,
+        step_size=300
     )
 
     assert report.total_trades > 0
@@ -98,7 +101,6 @@ def test_wick_traps_sl_priority(backtest_builder):
     # Every trade that hit a trap bar should be a loss due to SL priority
     # (High/Low both hit SL/TP distance)
 
-
 def test_steady_sharpe_calibration(backtest_builder):
     """Verifies that a steady trend produces high risk-adjusted metrics."""
     df = backtest_builder.steady_sharpe(n_steps=500)
@@ -113,7 +115,11 @@ def test_steady_sharpe_calibration(backtest_builder):
     engine.fe.timeframes = []
 
     report = engine.run_walk_forward(
-        df, ConstantModel(direction=1), train_window=200, test_window=100, step_size=100
+        df,
+        ConstantModel(direction=1),
+        train_window=200,
+        test_window=100,
+        step_size=100
     )
 
     assert report.total_trades > 0

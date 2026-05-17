@@ -129,18 +129,10 @@ def test_institutional_indicators(synthetic_ohlcv):
     features = fe.compute_features(synthetic_ohlcv)
 
     expected_cols = [
-        "base_M1_donchian_high",
-        "base_M1_donchian_low",
-        "base_M1_keltner_upper",
-        "base_M1_keltner_lower",
-        "base_M1_ema_8",
-        "base_M1_ema_21",
-        "base_M1_ema_50",
-        "base_M1_ema_200",
-        "base_M1_ht_trendline",
-        "vp_poc",
-        "rvol",
-        "dist_vwap_20",
+        "base_M1_donchian_high", "base_M1_donchian_low",
+        "base_M1_keltner_upper", "base_M1_keltner_lower",
+        "base_M1_ema_8", "base_M1_ema_21", "base_M1_ema_50", "base_M1_ema_200",
+        "base_M1_ht_trendline", "vp_poc", "rvol", "dist_vwap_20"
     ]
 
     for col in expected_cols:
@@ -159,7 +151,7 @@ def test_full_mtf_suite(synthetic_ohlcv):
         base_timeframe="M5",
         timeframes=["M1", "M15", "H1", "H4", "D1"],
         normalize=False,
-        include_mtf_patterns=True,
+        include_mtf_patterns=True
     )
     features = fe.compute_features(large_df)
 

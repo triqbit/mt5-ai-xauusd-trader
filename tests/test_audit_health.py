@@ -16,7 +16,6 @@ from src.core.health import HealthChecker, HealthStatus
 def db_url():
     return "sqlite:///:memory:"
 
-
 @pytest.fixture
 def mock_config():
     cfg = MagicMock(spec=TradingConfig)
@@ -28,7 +27,6 @@ def mock_config():
     cfg.redis_url = mock_redis_url
     return cfg
 
-
 def test_audit_logger_singleton(db_url):
     # Reset singleton for testing
     AuditLogger._instance = None
@@ -38,7 +36,6 @@ def test_audit_logger_singleton(db_url):
     logger2 = AuditLogger(db_url)
     assert logger1 is logger2
     assert logger1._initialized is True
-
 
 def test_audit_log_entry(db_url):
     AuditLogger._instance = None
@@ -54,7 +51,6 @@ def test_audit_log_entry(db_url):
         assert entry.action == "test_action"
         assert entry.details == "test_details"
 
-
 def test_check_redis_success(mock_config):
     checker = HealthChecker(mock_config)
     with patch("redis.from_url") as mock_redis:
@@ -64,7 +60,6 @@ def test_check_redis_success(mock_config):
         status = checker.check_redis()
         assert status.status == HealthStatus.HEALTHY
         assert "reachable" in status.message
-
 
 def test_check_redis_failure(mock_config):
     checker = HealthChecker(mock_config)
@@ -76,7 +71,6 @@ def test_check_redis_failure(mock_config):
         assert status.status == HealthStatus.DEGRADED
         assert "ping failed" in status.message
 
-
 def test_check_redis_exception(mock_config):
     checker = HealthChecker(mock_config)
     with patch("redis.from_url") as mock_redis:
@@ -85,7 +79,6 @@ def test_check_redis_exception(mock_config):
         status = checker.check_redis()
         assert status.status == HealthStatus.DEGRADED
         assert "Redis unreachable" in status.message
-
 
 def test_check_audit_log_success(mock_config):
     mock_audit = MagicMock()
@@ -96,7 +89,6 @@ def test_check_audit_log_success(mock_config):
     assert status.status == HealthStatus.HEALTHY
     assert "active" in status.message
 
-
 def test_check_audit_log_failure(mock_config):
     mock_audit = MagicMock()
     mock_audit._initialized = False
@@ -105,7 +97,6 @@ def test_check_audit_log_failure(mock_config):
     status = checker.check_audit_log()
     assert status.status == HealthStatus.FAILED
     assert "not properly initialized" in status.message
-
 
 def test_check_audit_log_none(mock_config):
     checker = HealthChecker(mock_config, audit_logger=None)

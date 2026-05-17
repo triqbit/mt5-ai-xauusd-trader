@@ -22,9 +22,8 @@ def get_required_vars_from_config():
                 if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
                     var_name = item.target.id
                     if var_name != "model_config":
-                        required_vars.add(var_name.lower())
+                         required_vars.add(var_name.lower())
     return required_vars
-
 
 def get_vars_from_example():
     example_path = Path(".env.example")
@@ -40,7 +39,6 @@ def get_vars_from_example():
                 var = line.split("=")[0].strip()
                 vars.add(var.lower())
     return vars
-
 
 def validate():
     print("Validating environment configuration template...")
@@ -69,11 +67,8 @@ def validate():
         print("=" * 60)
         return False
 
-    print(
-        f"SUCCESS: Environment validation passed. .env.example contains all {len(required)} fields."
-    )
+    print(f"SUCCESS: Environment validation passed. .env.example contains all {len(required)} fields.")
     return True
-
 
 if __name__ == "__main__":
     if not validate():

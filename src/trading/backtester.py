@@ -306,7 +306,9 @@ class BacktestEngine:
                                 if self.equity_curve:
                                     peak = self.max_equity
                                     current_equity = self.equity_curve[-1][1]
-                                    current_drawdown = (peak - current_equity) / (peak + 1e-8)
+                                    current_drawdown = (peak - current_equity) / (
+                                        peak + 1e-8
+                                    )
 
                                 # Pack precomputed metrics for speed
                                 precomputed = {
@@ -316,7 +318,10 @@ class BacktestEngine:
                                     },
                                     "trend_angle": {"slope": slopes[abs_idx]},
                                     "ema_sequence": {
-                                        "emas": {p: ema_vals[p][abs_idx] for p in [8, 21, 50, 200]}
+                                        "emas": {
+                                            p: ema_vals[p][abs_idx]
+                                            for p in [8, 21, 50, 200]
+                                        }
                                     },
                                     "momentum": {"rsi": rsi_vals[abs_idx]},
                                 }
@@ -368,10 +373,7 @@ class BacktestEngine:
         )
 
         # 4. Finalization: Close any trailing trades
-        if len(close_vals) > 0:
-            self._close_all_trades(active_trades, close_vals[-1], time_vals[-1])
-        else:
-            active_trades.clear()
+        self._close_all_trades(active_trades, close_vals[-1], time_vals[-1])
         report = self._calculate_performance()
 
         duration = time.perf_counter() - start_wall_time

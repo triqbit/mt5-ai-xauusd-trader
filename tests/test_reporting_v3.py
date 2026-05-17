@@ -16,7 +16,9 @@ from src.research.reporting import (
 def test_enhanced_sections_integration():
     """Verify that new sections integrate correctly with the orchestrator and reporter."""
     orchestrator = ResearchOrchestrator(
-        title="Enhanced Audit", executive_summary="Testing new sections.", conclusion="Conclusion."
+        title="Enhanced Audit",
+        executive_summary="Testing new sections.",
+        conclusion="Conclusion."
     )
 
     # 1. Test DriftMetric with psi_score
@@ -28,10 +30,10 @@ def test_enhanced_sections_integration():
                 current="105",
                 drift_pct=5.0,
                 psi_score=0.042,
-                status="STABLE",
+                status="STABLE"
             )
         ],
-        feature_shifts="None",
+        feature_shifts="None"
     )
     orchestrator.add_section(drift_section)
 
@@ -41,7 +43,7 @@ def test_enhanced_sections_integration():
         regime_alignment=0.9,
         session_alignment=0.8,
         volatility_alignment=0.7,
-        insights="High alignment detected.",
+        insights="High alignment detected."
     )
     orchestrator.add_section(confluence)
 
@@ -51,7 +53,7 @@ def test_enhanced_sections_integration():
         backtest_engine="Test Engine",
         lookback_period="2023-2024",
         assumptions=["Assumption 1"],
-        risk_limits=["Limit 1"],
+        risk_limits=["Limit 1"]
     )
     orchestrator.add_section(methodology)
 
@@ -72,12 +74,11 @@ def test_enhanced_sections_integration():
     # Verify HTML rendering
     html = reporter.generate_html(report)
     assert "Strategic Confluence Analysis" in html
-    assert "confluence_score * 100" not in html  # ensure it's rendered not raw template
+    assert "confluence_score * 100" not in html # ensure it's rendered not raw template
     assert "85.0%" in html
     assert "PSI" in html
     assert "0.042" in html
     assert "Methodology & Audit Trail" in html
-
 
 def test_terminal_output_new_sections(capsys):
     """Verify terminal formatting for new sections."""
@@ -89,16 +90,16 @@ def test_terminal_output_new_sections(capsys):
             regime_alignment=0.9,
             session_alignment=0.8,
             volatility_alignment=0.7,
-            insights="High alignment detected.",
+            insights="High alignment detected."
         ),
         methodology=MethodologySection(
             data_source="Source",
             backtest_engine="Engine",
             lookback_period="Period",
             assumptions=[],
-            risk_limits=[],
+            risk_limits=[]
         ),
-        conclusion="Done.",
+        conclusion="Done."
     )
 
     reporter = ResearchReporter()

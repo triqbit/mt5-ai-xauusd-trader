@@ -3,7 +3,6 @@ MT5 AI/ML Trading Bot - Migration Safety Script
 Automates the verification of Alembic migrations by performing
 an upgrade-downgrade-upgrade cycle on a temporary database.
 """
-
 import os
 import sys
 
@@ -47,7 +46,6 @@ def verify_migrations():
         print("\nREMEDIATION: Check for SQL syntax errors, broken references, or")
         print("non-reversible operations (missing downgrade logic) in migrations/versions/.")
         import traceback
-
         traceback.print_exc()
         print("=" * 60)
         return False
@@ -55,7 +53,6 @@ def verify_migrations():
     finally:
         if os.path.exists(temp_db):
             os.remove(temp_db)
-
 
 if __name__ == "__main__":
     if not verify_migrations():

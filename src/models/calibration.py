@@ -35,10 +35,10 @@ class CalibrationResult(BaseModel):
 
     brier_score: float
     reliability: float  # Brier decomposition: Reliability (lower is better)
-    resolution: float  # Brier decomposition: Resolution (higher is better)
+    resolution: float   # Brier decomposition: Resolution (higher is better)
     uncertainty: float  # Brier decomposition: Uncertainty
-    ece: float  # Expected Calibration Error
-    mce: float  # Maximum Calibration Error
+    ece: float          # Expected Calibration Error
+    mce: float          # Maximum Calibration Error
     buckets: list[ConfidenceBucket]
     optimal_threshold: float = 0.5
     status: str = "PROVISIONAL"
@@ -265,7 +265,9 @@ class CalibrationEngine:
 
         return float(best_threshold)
 
-    def apply_temperature_scaling(self, confidences: np.ndarray, temperature: float) -> np.ndarray:
+    def apply_temperature_scaling(
+        self, confidences: np.ndarray, temperature: float
+    ) -> np.ndarray:
         """
         Adjust confidence scores using temperature scaling.
         Confidence = sigmoid(logit / T)
