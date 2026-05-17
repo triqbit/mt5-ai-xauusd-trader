@@ -92,6 +92,7 @@ class RobustnessMetrics(BaseModel):
     max_drawdown_consistency: float
     is_oos_gap: float
     stability_penalty: float
+    parameter_sensitivities: dict[str, float] = Field(default_factory=dict)
     regime_consistency: float
     robustness_score: float
     walk_forward_efficiency: float = 0.0
@@ -128,6 +129,20 @@ class WalkForwardResult(BaseModel):
         with open(filepath, "w") as f:
             f.write(self.model_dump_json(indent=4))
 
+    def get_best_strategy(
+        self, strategy_factory: Callable[..., BenchmarkStrategy]
+    ) -> BenchmarkStrategy:
+        """
+        Instantiate the strategy with the best parameters found.
+
+        Args:
+            strategy_factory: The factory function used during optimization.
+
+        Returns:
+            BenchmarkStrategy: Strategy instance with optimal parameters.
+        """
+        return strategy_factory(**self.best_params)
+
     def to_report_section(self) -> Any:
         """
         Convert result to HyperparameterSection for ResearchReporter.
@@ -139,12 +154,20 @@ class WalkForwardResult(BaseModel):
 
         params = []
         for name, value in self.best_params.items():
+            sensitivity_val = self.metrics.parameter_sensitivities.get(name, 0.0)
+            sensitivity_txt = (
+                f"Low (CV: {sensitivity_val:.2f})"
+                if sensitivity_val < 0.2
+                else f"Medium (CV: {sensitivity_val:.2f})"
+                if sensitivity_val < 0.5
+                else f"High (CV: {sensitivity_val:.2f})"
+            )
             params.append(
                 ParameterRobustness(
                     name=name,
                     range="Optimized",
                     optimal=str(value),
-                    sensitivity="Tracked via stability penalty",
+                    sensitivity=sensitivity_txt,
                 )
             )
 
@@ -252,7 +275,7 @@ class WalkForwardOptimizer:
 
     def _calculate_stability_penalty(
         self, params: dict[str, Any], data: pd.DataFrame, perturbation_pct: float = 0.05
-    ) -> float:
+    ) -> tuple[float, dict[str, float]]:
         """
         Calculates a penalty for parameter instability by perturbing parameters.
 
@@ -266,41 +289,37 @@ class WalkForwardOptimizer:
             perturbation_pct: Percentage to perturb parameters (default 5%).
 
         Returns:
-            float: Coefficient of Variation (CV) of Sharpe ratios under perturbation.
+            Tuple[float, Dict[str, float]]: (Aggregate CV penalty, Per-parameter sensitivities).
         """
-        perturbations = []
+        all_perturbations = []
+        param_sensitivities = {}
         try:
             base_metrics, _ = self._evaluate_strategy(data, params)
             base_sharpe = base_metrics.get("Sharpe Ratio", 0.0)
             if np.isnan(base_sharpe):
-                return 10.0  # Fragility safeguard
-            perturbations.append(base_sharpe)
+                return 10.0, {}  # Fragility safeguard
+            all_perturbations.append(base_sharpe)
 
             for key, value in params.items():
                 if isinstance(value, (int, float)) and not isinstance(value, bool):
                     original_val = float(value)
                     is_int = isinstance(value, int)
+                    param_perturbations = [base_sharpe]
 
-                    # Small perturbation (e.g. 5%)
-                    # Ensure a minimum delta for small or zero values
-                    # Use a smaller epsilon for floats to be more scale-robust
-                    delta: float
-                    if is_int:
-                        delta = float(max(1, round(abs(original_val) * perturbation_pct)))
-                    else:
-                        # For floats, use a robust epsilon that scales with the value
-                        # but provides a sensible floor for near-zero values.
-                        delta = max(1e-5, abs(original_val) * perturbation_pct)
+                    delta = (
+                        float(max(1, round(abs(original_val) * perturbation_pct)))
+                        if is_int
+                        else max(1e-5, abs(original_val) * perturbation_pct)
+                    )
 
                     for direction in [-1, 1]:
                         perturbed_params = params.copy()
-                        # Ensure we don't accidentally introduce floats for integer parameters
-                        new_val = original_val + (direction * delta)
+                        new_val = (
+                            round(original_val + (direction * delta))
+                            if is_int
+                            else original_val + (direction * delta)
+                        )
 
-                        if is_int:
-                            new_val = round(new_val)
-
-                        # Skip if no actual change
                         if new_val == original_val:
                             continue
 
@@ -310,30 +329,35 @@ class WalkForwardOptimizer:
                             p_metrics, _ = self._evaluate_strategy(data, perturbed_params)
                             p_sharpe = p_metrics.get("Sharpe Ratio", 0.0)
                             if not np.isnan(p_sharpe):
-                                perturbations.append(float(p_sharpe))
-                                # Strict Fragility: if small change causes a catastrophic drop, penalize heavily
+                                param_perturbations.append(float(p_sharpe))
+                                all_perturbations.append(float(p_sharpe))
                                 if p_sharpe < 0 and base_sharpe > 0:
                                     logger.warning("Fragility detected for %s=%s", key, new_val)
-                                    return 10.0
+                                    return 10.0, {}
                             else:
-                                return 10.0  # Fragility safeguard
+                                return 10.0, {}
                         except Exception as e:
                             logger.debug("Perturbation failed for %s=%s: %s", key, new_val, e)
-                            return 10.0  # Conservative penalty for failure
+                            return 10.0, {}
+
+                    # Calculate per-parameter sensitivity (CV)
+                    if len(param_perturbations) > 1:
+                        p_mean = np.mean(param_perturbations)
+                        p_std = np.std(param_perturbations)
+                        param_sensitivities[key] = float(p_std / (abs(p_mean) + 1e-9))
+
         except Exception as e:
             logger.warning("Stability calculation failed: %s", e)
-            return 10.0  # Fragility safeguard
+            return 10.0, {}
 
-        if len(perturbations) < 2:
-            return 0.0
+        if not all_perturbations:
+            return 0.0, {}
 
-        mean_sharpe = np.mean(perturbations)
-        std_sharpe = np.std(perturbations)
+        mean_sharpe = np.mean(all_perturbations)
+        std_sharpe = np.std(all_perturbations)
+        aggregate_cv = std_sharpe / (abs(mean_sharpe) + 1e-9)
 
-        # Scale-invariant CV penalty
-        # High CV indicates high sensitivity to parameter changes (instability)
-        cv = std_sharpe / (abs(mean_sharpe) + 1e-9)
-        return float(np.clip(cv, 0.0, 10.0))
+        return float(np.clip(aggregate_cv, 0.0, 10.0)), param_sensitivities
 
     def _calculate_regime_consistency(self, data: pd.DataFrame, returns: np.ndarray) -> float:
         """
@@ -474,9 +498,19 @@ class WalkForwardOptimizer:
             n_stability_windows = min(3, len(windows))
             indices = np.linspace(0, len(windows) - 1, n_stability_windows, dtype=int)
             stability_scores = []
+            all_param_sens = []
             for idx in indices:
-                stability_scores.append(self._calculate_stability_penalty(params, windows[idx][0]))
+                penalty, param_sens = self._calculate_stability_penalty(params, windows[idx][0])
+                stability_scores.append(penalty)
+                all_param_sens.append(param_sens)
+
             stability = float(np.mean(stability_scores))
+            avg_param_sens = {}
+            if all_param_sens:
+                for k in params.keys():
+                    vals = [s[k] for s in all_param_sens if k in s]
+                    if vals:
+                        avg_param_sens[k] = float(np.mean(vals))
 
             # Average regime consistency across all windows
             regime_cons = float(np.mean(regime_cons_list))
@@ -506,6 +540,7 @@ class WalkForwardOptimizer:
             trial.set_user_attr("dd_cons", float(np.clip(dd_cons, 0, 1)))
             trial.set_user_attr("gap", float(gap))
             trial.set_user_attr("stability", float(stability))
+            trial.set_user_attr("param_sensitivities", avg_param_sens)
             trial.set_user_attr("regime_cons", float(regime_cons))
             trial.set_user_attr("violated", bool(violated))
             trial.set_user_attr("walk_forward_efficiency", float(wfe_val))
@@ -548,6 +583,7 @@ class WalkForwardOptimizer:
             max_drawdown_consistency=best_trial.user_attrs["dd_cons"],
             is_oos_gap=best_trial.user_attrs["gap"],
             stability_penalty=best_trial.user_attrs["stability"],
+            parameter_sensitivities=best_trial.user_attrs["param_sensitivities"],
             regime_consistency=best_trial.user_attrs["regime_cons"],
             walk_forward_efficiency=best_trial.user_attrs["walk_forward_efficiency"],
             robustness_score=best_trial.user_attrs["robustness_score"],
