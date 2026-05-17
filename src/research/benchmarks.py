@@ -206,6 +206,35 @@ class NaiveDirectionalStrategy:
         return signals
 
 
+class NaiveReversalStrategy:
+    """
+    Naive Mean Reversion (opposite of last candle direction) strategy.
+
+    Generates a SELL signal if the last candle was bullish, and a BUY
+    signal if it was bearish.
+    """
+
+    @property
+    def name(self) -> str:
+        return "Naive_Reversal"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals based on opposite of previous candle direction.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
+        diff = df["close"].diff()
+        signals = np.zeros(len(df))
+        signals[diff > 0] = -1.0
+        signals[diff < 0] = 1.0
+        return signals
+
+
 class BuyAndHoldStrategy:
     """
     Simple Buy and Hold baseline.
@@ -276,6 +305,53 @@ class RiskFilteredBaseline:
         mask = volatility < self.vol_threshold_pct
         signals[mask & (fast_ema > slow_ema)] = 1.0
         signals[mask & (fast_ema < slow_ema)] = -1.0
+        return signals
+
+
+class MomentumVolatilityStrategy:
+    """
+    Momentum baseline with a volatility filter.
+
+    Generates signals based on Rate of Change (ROC), but only when
+    rolling volatility is within an acceptable range.
+    """
+
+    def __init__(
+        self, window: int = 14, threshold: float = 0.0, vol_threshold_pct: float = 0.02
+    ):
+        """
+        Initialize the Momentum Volatility strategy.
+
+        Args:
+            window: Period for calculating ROC and volatility.
+            threshold: Minimum ROC required for a signal.
+            vol_threshold_pct: Max allowed volatility (as decimal).
+        """
+        self.window = window
+        self.threshold = threshold
+        self.vol_threshold_pct = vol_threshold_pct
+
+    @property
+    def name(self) -> str:
+        return f"Momentum_Vol_Filtered_{self.window}_T{self.threshold}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using ROC and volatility filtering.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
+        roc = df["close"].pct_change(periods=self.window)
+        volatility = df["close"].rolling(window=self.window).std() / df["close"]
+
+        signals = np.zeros(len(df))
+        mask = volatility < self.vol_threshold_pct
+        signals[mask & (roc > self.threshold)] = 1.0
+        signals[mask & (roc < -self.threshold)] = -1.0
         return signals
 
 
@@ -837,30 +913,44 @@ class BenchmarkEvaluator:
         s_final = s_active[-min_len:]
         b_final = b_active[-min_len:]
 
-        # Paired t-test on return distributions
-        t_stat, p_value = stats.ttest_rel(s_final, b_final)
-
-        # Wilcoxon signed-rank test (non-parametric)
-        wilcoxon_p = 1.0
-        try:
-            if not np.array_equal(s_final, b_final):
-                _, wilcoxon_p = stats.wilcoxon(s_final, b_final)
-        except Exception:
-            wilcoxon_p = 1.0
-
         outperformance = s_metrics["Total Return"] - b_metrics["Total Return"]
         sharpe_diff = s_metrics["Sharpe Ratio"] - b_metrics["Sharpe Ratio"]
+        note = ""
+
+        # Check for zero-variance differences to prevent NaN in statistical tests
+        diff = s_final - b_final
+        if np.all(diff == 0):
+            t_stat, p_value, wilcoxon_p = 0.0, 1.0, 1.0
+            note = "Identical return distributions"
+        elif np.std(diff) < 1e-12:
+            # Constant non-zero difference
+            t_stat, p_value, wilcoxon_p = 0.0, 0.0, 0.0
+            note = "Constant outperformance"
+        else:
+            # Paired t-test on return distributions
+            t_stat, p_value = stats.ttest_rel(s_final, b_final)
+
+            # Wilcoxon signed-rank test (non-parametric)
+            wilcoxon_p = 1.0
+            try:
+                _, wilcoxon_p = stats.wilcoxon(s_final, b_final)
+            except Exception:
+                wilcoxon_p = 1.0
+
+        # Handle potential NaNs from stats functions
+        p_value = float(p_value) if not np.isnan(p_value) else 1.0
+        wilcoxon_p = float(wilcoxon_p) if not np.isnan(wilcoxon_p) else 1.0
+        t_stat = float(t_stat) if not np.isnan(t_stat) else 0.0
 
         return {
             "Outperformance": outperformance,
             "Sharpe Improvement": sharpe_diff,
             "Relative Return": outperformance / (abs(b_metrics["Total Return"]) + 1e-9),
-            "T-Statistic": float(t_stat),
-            "P-Value": float(p_value),
-            "Wilcoxon P-Value": float(wilcoxon_p),
-            "Significant": bool(p_value < 0.05 or wilcoxon_p < 0.05)
-            if not np.isnan(p_value)
-            else False,
+            "T-Statistic": t_stat,
+            "P-Value": p_value,
+            "Wilcoxon P-Value": wilcoxon_p,
+            "Significant": bool(p_value < 0.05 or wilcoxon_p < 0.05),
+            "Note": note,
         }
 
     def to_report_section(self, baseline_name: str) -> Any:
