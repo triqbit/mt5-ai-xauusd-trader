@@ -25,6 +25,8 @@ from src.research.benchmarks import (
     MomentumStrategy,
     NaiveDirectionalStrategy,
     PPOAdapter,
+    MomentumVolatilityStrategy,
+    NaiveReversalStrategy,
     RandomStrategy,
     RegimeFilterBaseline,
     RiskFilteredBaseline,
@@ -108,8 +110,29 @@ def test_naive_directional_signals(sample_data):
     assert np.all(np.isin(signals, [0, 1, -1]))
 
 
+def test_naive_reversal_signals(sample_data):
+    strategy = NaiveReversalStrategy()
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+    # Verify reversal: if price went up, signal should be -1
+    diff = sample_data["close"].diff()
+    for i in range(1, len(signals)):
+        if diff[i] > 0:
+            assert signals[i] == -1.0
+        elif diff[i] < 0:
+            assert signals[i] == 1.0
+
+
 def test_risk_filtered_signals(sample_data):
     strategy = RiskFilteredBaseline(vol_threshold_pct=0.01)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+
+
+def test_momentum_volatility_signals(sample_data):
+    strategy = MomentumVolatilityStrategy(window=5, threshold=0.0, vol_threshold_pct=0.01)
     signals = strategy.predict(sample_data)
     assert len(signals) == len(sample_data)
     assert np.all(np.isin(signals, [0, 1, -1]))
@@ -344,6 +367,37 @@ def test_comparison_no_trades(sample_data):
     comp = evaluator.compare_to_baseline(s1.name, s2.name)
     assert "error" not in comp
     assert comp["Outperformance"] == evaluator.results[s1.name]["Total Return"]
+
+
+def test_comparison_robustness(sample_data):
+    """Test BenchmarkEvaluator robustness against zero-variance returns."""
+    evaluator = BenchmarkEvaluator(sample_data)
+
+    # Two identical strategies
+    s1 = EMACrossoverStrategy(5, 10)
+    s2 = EMACrossoverStrategy(5, 10)
+
+    evaluator.evaluate_all([s1])
+    # Manually inject identical results for s2
+    evaluator.results[s2.name] = evaluator.results[s1.name]
+    evaluator.results[s2.name + "_returns"] = evaluator.results[s1.name + "_returns"]
+
+    comp = evaluator.compare_to_baseline(s1.name, s2.name)
+    assert comp["P-Value"] == 1.0
+    assert comp["Wilcoxon P-Value"] == 1.0
+    assert comp["Note"] == "Identical return distributions"
+
+    # Strategy with constant outperformance (not possible with real signals usually, but good for stress test)
+    evaluator.results["Constant_Outperformance_returns"] = (
+        evaluator.results[s1.name + "_returns"] + 0.01
+    )
+    evaluator.results["Constant_Outperformance"] = evaluator.results[s1.name].copy()
+    evaluator.results["Constant_Outperformance"]["Total Return"] += 0.1
+
+    comp2 = evaluator.compare_to_baseline("Constant_Outperformance", s1.name)
+    assert comp2["P-Value"] == 0.0
+    assert comp2["Significant"] is True
+    assert comp2["Note"] == "Constant outperformance"
 
 
 def test_regime_aware_adapter(sample_data):
