@@ -474,3 +474,56 @@ class TradeLogger:
                         session.commit()
 
                 return metrics
+
+    def get_reconciliation_data(self) -> dict[str, Any]:
+        """
+        Fetch data required to reconcile RiskManager state after a restart.
+        Returns historical PnL sequence and today's stats.
+        """
+        with self.Session() as session:
+            # 1. All-time historical PnLs for all-time peak reconstruction
+            all_pnls = list(
+                session.execute(
+                    select(Trade.pnl)
+                    .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    .order_by(Trade.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            # 2. Today's stats
+            today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            today_trades = list(
+                session.execute(
+                    select(Trade.pnl)
+                    .where(
+                        Trade.status == "CLOSED",
+                        Trade.is_deleted.is_(False),
+                        Trade.updated_at >= today_start,
+                    )
+                    .order_by(Trade.updated_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            return {
+                "all_pnls": [float(p) for p in all_pnls],
+                "today_pnls": [float(p) for p in today_trades],
+                "today_count": len(today_trades),
+                "today_realised_pnl": sum(today_trades) if today_trades else 0.0,
+            }
+
+    def get_open_trades(self) -> dict[str, int]:
+        """
+        Retrieve a mapping of symbol to ticket for currently open trades.
+        Used to restore RiskManager.open_positions after restart.
+        """
+        with self.Session() as session:
+            open_trades = session.execute(
+                select(Trade.symbol, Trade.ticket).where(
+                    Trade.status == "OPEN", Trade.is_deleted.is_(False)
+                )
+            ).all()
+            return {symbol: int(ticket) for symbol, ticket in open_trades}

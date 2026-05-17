@@ -64,7 +64,22 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 
 @lru_cache(maxsize=16)
+def _get_engine_cached(db_url: str) -> Engine:
+    return _get_engine_internal(db_url)
+
+
 def get_engine(db_url: str) -> Engine:
+    """
+    Create and return a SQLAlchemy engine.
+    Uses LRU cache for persistent URLs, but bypasses it for unique in-memory URLs
+    (e.g., sqlite:///:memory-{uuid}:) to ensure test isolation.
+    """
+    if ":memory-" in db_url:
+        return _get_engine_internal(db_url)
+    return _get_engine_cached(db_url)
+
+
+def _get_engine_internal(db_url: str) -> Engine:
     """
     Create and return a cached SQLAlchemy engine.
     Aligned with DATABASE_STANDARDS.md for connection pooling and resilience.
