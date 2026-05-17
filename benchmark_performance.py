@@ -2,7 +2,7 @@
 import time
 import pandas as pd
 import numpy as np
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.core.trade_logger import TradeLogger
 import os
 
