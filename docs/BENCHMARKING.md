@@ -18,8 +18,10 @@ The following rule-based baselines are available in `src/research/benchmarks.py`
 - **Volatility Breakout**: Bollinger Band breakout strategy.
 - **Donchian Channel Breakout**: Trend-following breakout based on high/low price channels (`DonchianChannelStrategy`).
 - **Regime-Filtered Meta-strategy**: Filters signals from an underlying strategy based on specified market regimes.
-- **Naive Directional**: Follows the direction of the previous candle.
+- **Naive Directional**: Follows the direction of the previous candle (`NaiveDirectionalStrategy`).
+- **Naive Reversal**: Bets against the direction of the previous candle (`NaiveReversalStrategy`).
 - **Risk-Filtered EMA**: EMA Crossover supplemented with a volatility filter to avoid choppy markets.
+- **Momentum Volatility Filtered**: ROC momentum with a rolling volatility filter (`MomentumVolatilityStrategy`).
 - **Mean Reversion (RSI)**: RSI-based overbought/oversold reversal strategy.
 - **Random (Null Hypothesis)**: Generates random signals to establish a baseline for statistical significance.
 
