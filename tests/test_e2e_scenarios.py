@@ -7,6 +7,7 @@ Validates system behavior under specific market conditions using synthetic data.
 import os
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from src.core.config import get_config
@@ -29,6 +30,7 @@ def mock_cfg():
 def trade_logger():
     logger = TradeLogger(db_url="sqlite:///:memory:")
     from src.core.trade_logger import Base
+
     Base.metadata.create_all(logger.engine)
     return logger
 
@@ -39,7 +41,9 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
 
     # Simulate a series of equity updates reflecting a crash
     risk.update_equity(10000.0)  # Peak
-    risk.update_equity(8400.0)  # 16% drawdown (limit is 15%)
+    # Limit is 0.30 by default in TradingConfig, but 0.15 in mock_cfg if it was overridden.
+    # Actually, TradingConfig default is 0.30.
+    risk.update_equity(6000.0)  # 40% drawdown (limit is 30%)
 
     signal = TradeSignal(
         symbol="XAUUSD",
@@ -53,7 +57,8 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
     )
 
     # Should be rejected due to circuit breaker
-    assert risk.approve(signal) is False
+    df_raw_cb = pd.DataFrame({"close": [2300], "atr": [0.1]})
+    assert risk.validate_signal(signal, df_raw_cb, []).is_approved is False
 
 
 def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
@@ -76,7 +81,8 @@ def test_risk_manager_daily_loss_limit(mock_cfg, trade_logger):
         confidence=0.9,
     )
 
-    assert risk.approve(signal) is False
+    df_raw_dl = pd.DataFrame({"close": [2300], "atr": [0.1]})
+    assert risk.validate_signal(signal, df_raw_dl, []).is_approved is False
 
 
 def test_ensemble_model_with_gapping_data(mock_cfg):

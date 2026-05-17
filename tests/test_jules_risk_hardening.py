@@ -5,6 +5,7 @@ Verifies the 8-layer safety cascade, consecutive loss blocking, and model calibr
 
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from src.core.config import TradingConfig
@@ -22,12 +23,25 @@ def mock_config():
     cfg.risk_per_trade = 0.01
     cfg.min_confidence = 0.55
     cfg.max_losing_streak = 3
+    cfg.max_drawdown = 0.15
+    cfg.max_trades_per_day = 20
+    cfg.max_single_direction_pct = 0.3
+    cfg.max_total_notional_pct = 1.0
+    cfg.min_lot_size = 0.01
+    cfg.max_position_size_pct = 0.1
+    cfg.volatility_high_threshold = 1.5
+    cfg.volatility_very_high_threshold = 2.0
+    cfg.volatility_extreme_threshold = 3.0
+    cfg.daily_loss_lvl1 = 0.02
+    cfg.daily_loss_lvl2 = 0.03
+    cfg.daily_loss_lvl3 = 0.04
     cfg.model_drift_threshold = 0.3
     cfg.model_accuracy_floor = 0.5
     cfg.model_calibration_threshold = 0.25
     cfg.telegram_token = MagicMock()
     cfg.telegram_token.get_secret_value.return_value = ""
     return cfg
+
 
 @pytest.fixture
 def mock_signal():
@@ -39,8 +53,9 @@ def mock_signal():
         take_profit=2020.0,
         lot_size=0.1,
         confidence=0.7,
-        algorithm="ensemble"
+        algorithm="ensemble",
     )
+
 
 def test_risk_manager_consecutive_losses(mock_config, mock_signal):
     """Verify that RiskManager blocks trades after max consecutive losses."""
@@ -50,37 +65,41 @@ def test_risk_manager_consecutive_losses(mock_config, mock_signal):
     rm.record_pnl(-100.0)
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 2
-    assert rm.approve(mock_signal) is True
+    df_raw = pd.DataFrame({"close": [2000], "atr": [0.1]})
+    assert rm.validate_signal(mock_signal, df_raw, []).is_approved is True
 
     # 2. Third loss (hit limit) - should reject
     rm.record_pnl(-100.0)
     assert rm.daily.consecutive_losses == 3
-    assert rm.approve(mock_signal) is False
+    assert rm.validate_signal(mock_signal, df_raw, []).is_approved is False
 
     # 3. Reset on profit
     rm.record_pnl(50.0)
     assert rm.daily.consecutive_losses == 0
-    assert rm.approve(mock_signal) is True
+    assert rm.validate_signal(mock_signal, df_raw, []).is_approved is True
+
 
 def test_risk_manager_model_health(mock_config, mock_signal):
     """Verify that RiskManager blocks trades based on model health metrics."""
     rm = RiskManager(mock_config, account_balance=10000.0)
+    df_raw = pd.DataFrame({"close": [2000], "atr": [0.1]})
 
     # 1. Healthy model
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is True
+    assert rm.validate_signal(mock_signal, df_raw, [], model_health=health).is_approved is True
 
     # 2. High drift
     health = {"drift": 0.4, "accuracy": 0.8, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.validate_signal(mock_signal, df_raw, [], model_health=health).is_approved is False
 
     # 3. Low accuracy
     health = {"drift": 0.1, "accuracy": 0.4, "calibration": 0.05}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.validate_signal(mock_signal, df_raw, [], model_health=health).is_approved is False
 
     # 4. High calibration error
     health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.3}
-    assert rm.approve(mock_signal, model_health=health) is False
+    assert rm.validate_signal(mock_signal, df_raw, [], model_health=health).is_approved is False
+
 
 def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
     """Verify that AuditedRiskManager traces all 8 layers."""
@@ -92,19 +111,27 @@ def test_audited_risk_manager_8_layer_trace(mock_config, mock_signal):
 
         # Test approval with all 8 layers passing
         health = {"drift": 0.1, "accuracy": 0.8, "calibration": 0.1}
-        arm.approve(mock_signal, model_health=health)
+        df_raw = pd.DataFrame({"close": [2000], "atr": [0.1]})
+        arm.validate_signal(mock_signal, df_raw, [], model_health=health)
 
         # Verify the decision chain passed to log_risk_decision
         call_args = mock_audit.log_risk_decision.call_args[1]
         decision_chain = call_args["decision_chain"]
 
         expected_layers = [
-            "circuit_breaker", "daily_loss", "max_positions", "symbol_allocation",
-            "min_confidence", "risk_reward", "consecutive_losses", "model_health"
+            "circuit_breaker",
+            "daily_loss",
+            "max_positions",
+            "symbol_allocation",
+            "min_confidence",
+            "risk_reward",
+            "consecutive_losses",
+            "model_health",
         ]
         for layer in expected_layers:
             assert layer in decision_chain
             assert decision_chain[layer] is True
+
 
 def test_monitor_calibration_alert(mock_config):
     """Verify that Monitor alerts on high calibration error."""
