@@ -9,11 +9,13 @@ from .event_intelligence import (
     EventIntelligence,
 )
 from .event_models import MacroEvent, RiskStatus
+from .feature_engineering import FeatureEngineer
 
 __all__ = [
     "EventCategory",
     "EventImpact",
     "EventIntelligence",
+    "FeatureEngineer",
     "MacroEvent",
     "RiskStatus",
 ]
