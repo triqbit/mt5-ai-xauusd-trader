@@ -88,8 +88,12 @@ def categorize_commits(commits, labels=None):
         subject = lines[0]
         # Filter out metadata lines from body (Co-authored-by, etc.)
         body_lines = [
-            l for l in lines[1:]
-            if not any(marker in l for marker in ["Co-authored-by:", "Signed-off-by:", "PR-URL:", "---------"])
+            line
+            for line in lines[1:]
+            if not any(
+                marker in line
+                for marker in ["Co-authored-by:", "Signed-off-by:", "PR-URL:", "---------"]
+            )
         ]
         body = "\n".join(body_lines).strip()
 
@@ -107,7 +111,9 @@ def categorize_commits(commits, labels=None):
             # Capitalize first letter of message
             message = message[0].upper() + message[1:]
 
-            is_breaking = breaking == "!" or "BREAKING CHANGE:" in body or "BREAKING-CHANGE:" in body
+            is_breaking = (
+                breaking == "!" or "BREAKING CHANGE:" in body or "BREAKING-CHANGE:" in body
+            )
 
             entry = f"- {message}"
             if scope:
@@ -179,7 +185,9 @@ def update_changelog(categories):
         header = f"### {category}"
         if header not in unreleased_content:
             # If category doesn't exist, append to the end of the unreleased section
-            unreleased_content = unreleased_content.rstrip() + f"\n\n{header}\n" + "\n".join(entries) + "\n"
+            unreleased_content = (
+                unreleased_content.rstrip() + f"\n\n{header}\n" + "\n".join(entries) + "\n"
+            )
         else:
             # If category exists, append only new entries
             lines = unreleased_content.splitlines()
@@ -198,10 +206,14 @@ def update_changelog(categories):
                         break
 
                 # Backtrack to avoid inserting before empty lines
-                while end_index > category_index + 1 and not lines[end_index-1].strip():
+                while end_index > category_index + 1 and not lines[end_index - 1].strip():
                     end_index -= 1
 
-                existing_entries = [line.strip() for line in lines[category_index+1:end_index] if line.strip().startswith("- ")]
+                existing_entries = [
+                    line.strip()
+                    for line in lines[category_index + 1 : end_index]
+                    if line.strip().startswith("- ")
+                ]
                 for entry in entries:
                     if entry not in existing_entries:
                         lines.insert(end_index, entry)
@@ -209,7 +221,13 @@ def update_changelog(categories):
 
                 unreleased_content = "\n".join(lines)
 
-    new_content = prefix + unreleased_header + unreleased_content.rstrip() + "\n\n" + rest_of_changelog.lstrip()
+    new_content = (
+        prefix
+        + unreleased_header
+        + unreleased_content.rstrip()
+        + "\n\n"
+        + rest_of_changelog.lstrip()
+    )
     changelog_path.write_text(new_content)
     return True
 
