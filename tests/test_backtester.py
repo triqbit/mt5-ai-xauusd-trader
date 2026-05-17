@@ -57,11 +57,7 @@ def test_backtest_run(sample_data):
     model = MockModel()
 
     report = engine.run_walk_forward(
-        sample_data,
-        model,
-        train_window=100,
-        test_window=50,
-        step_size=50
+        sample_data, model, train_window=100, test_window=50, step_size=50
     )
 
     assert report.total_trades > 0
@@ -80,11 +76,7 @@ def test_backtest_performance_optimized_loop(sample_data):
     model = MockModel()
 
     report = engine.run_walk_forward(
-        sample_data,
-        model,
-        train_window=200,
-        test_window=100,
-        step_size=100
+        sample_data, model, train_window=200, test_window=100, step_size=100
     )
 
     # Basic validity checks for the optimized loop execution
@@ -117,11 +109,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
     step_size = 50
 
     engine.run_walk_forward(
-        sample_data,
-        model,
-        train_window=train_window,
-        test_window=test_window,
-        step_size=step_size
+        sample_data, model, train_window=train_window, test_window=test_window, step_size=step_size
     )
 
     assert len(captured_obs) > 0
@@ -130,6 +118,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
     # (since they should be normalized)
     # We need to compute features to compare
     from src.data.feature_engineering import FeatureEngineer
+
     fe = FeatureEngineer(normalize=False)
     raw_features = fe.compute_features(sample_data, drop_ohlcv=False)
 

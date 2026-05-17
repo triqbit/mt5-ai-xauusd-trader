@@ -309,7 +309,7 @@ class RiskManager:
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit {self.cfg.max_drawdown*100}% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit {self.cfg.max_drawdown * 100}% limit",
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)

@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
@@ -631,7 +631,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )

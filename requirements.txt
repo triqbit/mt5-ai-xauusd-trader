@@ -24,6 +24,8 @@ httpx==0.28.1
 
 # ── MetaTrader 5 ────────────────────────────────────────────
 MetaTrader5==5.0.5735; sys_platform == 'win32'
+python-socketio==5.14.0
+python-engineio==4.11.2
 metaapi-cloud-sdk==29.1.1
 
 # ── Database ────────────────────────────────────────────────
@@ -63,7 +65,6 @@ ruff==0.9.6
 mypy==1.15.0
 
 # ── Utilities ───────────────────────────────────────────────
-python-socketio==5.14.0
 python-dateutil==2.9.0.post0
 nest-asyncio==1.6.0
 pytz==2026.2

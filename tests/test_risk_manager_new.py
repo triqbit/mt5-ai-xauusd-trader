@@ -10,22 +10,23 @@ def risk_manager():
     cfg = TradingConfig(MT5_PASSWORD="test", MT5_SERVER="test")
     return RiskManager(cfg, 10000.0)
 
+
 def test_drawdown_breaker(risk_manager):
-    risk_manager.update_equity(6000.0) # 40% drawdown
+    risk_manager.update_equity(6000.0)  # 40% drawdown
     assert not risk_manager._check_circuit_breaker()
+
 
 def test_daily_loss_breaker(risk_manager):
     risk_manager.update_equity(10000.0)
-    risk_manager.record_pnl(-600.0) # 6% loss
+    risk_manager.record_pnl(-600.0)  # 6% loss
     assert risk_manager.get_daily_loss_level() >= 4
 
+
 def test_calculate_position_size(risk_manager):
-    data = pd.DataFrame({
-        "atr": [1.0] * 100,
-        "close": [2300.0] * 100
-    })
+    data = pd.DataFrame({"atr": [1.0] * 100, "close": [2300.0] * 100})
     size = risk_manager.calculate_position_size("XAUUSD", data)
     assert size >= 0.01
+
 
 def test_validate_signal_rejection(risk_manager):
     from src.core.constants import SignalDirection
@@ -39,7 +40,7 @@ def test_validate_signal_rejection(risk_manager):
         take_profit=2320.0,
         lot_size=0.1,
         algorithm="ppo",
-        confidence=0.4 # Below default 0.55
+        confidence=0.4,  # Below default 0.55
     )
 
     data = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
