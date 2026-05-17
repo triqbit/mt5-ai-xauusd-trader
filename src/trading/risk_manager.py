@@ -165,6 +165,49 @@ class RiskManager:
         else:
             self.daily.consecutive_losses = 0
 
+    def reconcile_state(self, initial_balance: float) -> None:
+        """
+        Reconcile internal state from the database.
+        Crucial for maintaining risk circuit breakers across restarts.
+        """
+        if not self.trade_logger:
+            logger.warning("No trade logger available for reconciliation")
+            return
+
+        try:
+            data = self.trade_logger.get_reconciliation_data()
+            logger.info("Reconciling risk state | data=%s", data)
+
+            # Update daily stats
+            self.daily.realised_pnl = data["daily_realised_pnl"]
+            self.daily.trade_count = data["daily_trade_count"]
+
+            # Update open positions
+            self.open_positions = data["open_positions"]
+
+            # Update equity trackers
+            # Note: initial_balance passed here is the CURRENT balance from the broker.
+            # total_pnl is the sum of all historical closed trades.
+            # We assume initial_deposit + total_pnl = initial_balance (if no withdrawals/deposits)
+            # Peak equity needs to be relative to the current balance.
+            total_pnl = data["total_pnl"]
+            historical_max_pnl = data["historical_max_pnl"]
+
+            # If total_pnl = 0, initial_deposit = initial_balance
+            # deposit = balance - total_pnl
+            deposit = initial_balance - total_pnl
+            self.peak_equity = max(initial_balance, deposit + historical_max_pnl)
+            self.daily.peak_equity = max(initial_balance, self.peak_equity)
+
+            logger.info(
+                "Risk reconciliation COMPLETE | daily_pnl=%.2f positions=%d peak_equity=%.2f",
+                self.daily.realised_pnl,
+                len(self.open_positions),
+                self.peak_equity,
+            )
+        except Exception as e:
+            logger.error("Failed to reconcile risk state: %s", e, exc_info=True)
+
     def reset_daily(self) -> None:
         """Must be called at the start of each trading day."""
         if self.monitor:

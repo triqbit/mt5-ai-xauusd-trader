@@ -1480,6 +1480,11 @@ def main() -> int:
     )
 
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
+    # Reconcile risk state from database to maintain circuit breaker integrity across restarts
+    with status_ctx:
+        risk.reconcile_state(balance)
+
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,

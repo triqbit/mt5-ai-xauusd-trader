@@ -351,6 +351,76 @@ class TradeLogger:
                 select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             ).scalar_one_or_none()
 
+    def get_open_trades(self) -> dict[str, int]:
+        """
+        Fetch all currently open trades from the database.
+        Returns:
+            dict[str, int]: Mapping of symbol to ticket ID.
+        """
+        with self.Session() as session:
+            stmt = select(Trade).where(Trade.status == "OPEN", Trade.is_deleted.is_(False))
+            trades = session.execute(stmt).scalars().all()
+            return {t.symbol: t.ticket for t in trades}
+
+    def get_reconciliation_data(self) -> dict[str, Any]:
+        """
+        Fetch data needed to reconcile RiskManager state after restart.
+        Includes:
+            - Daily realised PnL (since start of current day UTC)
+            - Peak equity (all-time)
+            - Current open positions
+        """
+        now = datetime.now(UTC)
+        today_start = datetime(now.year, now.month, now.day, tzinfo=UTC)
+
+        with self.Session() as session:
+            # 1. Daily realised PnL
+            # We look at trades closed today.
+            daily_pnl = (
+                session.execute(
+                    select(func.sum(Trade.pnl)).where(
+                        Trade.status == "CLOSED",
+                        Trade.updated_at >= today_start,
+                        Trade.is_deleted.is_(False),
+                    )
+                ).scalar()
+                or 0.0
+            )
+
+            # 2. Daily trade count
+            daily_count = (
+                session.execute(
+                    select(func.count(Trade.id)).where(
+                        Trade.status == "CLOSED",
+                        Trade.updated_at >= today_start,
+                        Trade.is_deleted.is_(False),
+                    )
+                ).scalar()
+                or 0
+            )
+
+            # 3. All-time peak equity approximation
+            pnls = (
+                session.execute(
+                    select(Trade.pnl)
+                    .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    .order_by(Trade.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            cumulative_pnl = np.cumsum([0.0, *pnls])
+            historical_max_pnl = np.max(cumulative_pnl) if len(cumulative_pnl) > 0 else 0.0
+
+            return {
+                "daily_realised_pnl": float(daily_pnl),
+                "daily_trade_count": int(daily_count),
+                "total_pnl": float(cumulative_pnl[-1]) if len(cumulative_pnl) > 0 else 0.0,
+                "historical_max_pnl": float(historical_max_pnl),
+                "open_positions": self.get_open_trades(),
+            }
+
     def log_risk_event(
         self,
         event_type: str,
