@@ -8,10 +8,10 @@ import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+from dotenv import load_dotenv
+
 # Use timezone.utc for compatibility with Python 3.10
 UTC = timezone.utc
-
-from dotenv import load_dotenv
 
 
 def get_db_path(env_var, default_filename):
@@ -108,8 +108,10 @@ def generate_report():
     if not risk_events and not audit_logs and not recent_trades:
         print("\nNo significant operational events detected in the last 24 hours.")
 
-    if trades_conn: trades_conn.close()
-    if audit_conn: audit_conn.close()
+    if trades_conn:
+        trades_conn.close()
+    if audit_conn:
+        audit_conn.close()
 
 if __name__ == "__main__":
     generate_report()

@@ -19,7 +19,12 @@ from sqlalchemy import select
 
 # Standardize mocks for use across all tests and imports
 mock_torch = MagicMock()
-class MockTensor: pass
+
+
+class MockTensor:
+    pass
+
+
 mock_torch.Tensor = MockTensor
 mock_sb3 = MagicMock()
 mock_talib = MagicMock()

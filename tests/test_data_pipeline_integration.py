@@ -25,14 +25,14 @@ def default_talib_effect(data, *args, **kwargs):
 
 mock_talib.RSI.side_effect = default_talib_effect
 mock_talib.MACD.side_effect = lambda d, *a, **k: (np.random.rand(len(d)), np.random.rand(len(d)), np.random.rand(len(d)))
-mock_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.ATR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
 mock_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
 mock_talib.EMA.side_effect = default_talib_effect
-mock_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-mock_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+mock_talib.ADX.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+mock_talib.STOCH.side_effect = lambda h, low, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
 mock_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
-mock_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
-mock_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+mock_talib.MFI.side_effect = lambda h, low, c, v, *a, **k: np.random.rand(len(c))
+mock_talib.CCI.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
 mock_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
 mock_talib.get_function_groups.return_value = {"Pattern Recognition": []}
 
@@ -74,17 +74,17 @@ def setup_mock_talib(m_talib):
     """Refined helper to ensure mock talib doesn't cause unpacking errors."""
     m_talib.RSI.side_effect = lambda data, *a, **k: np.random.rand(len(data))
     m_talib.MACD.side_effect = lambda data, *a, **k: (np.random.rand(len(data)), np.random.rand(len(data)), np.random.rand(len(data)))
-    m_talib.ATR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.ATR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
     m_talib.BBANDS.side_effect = lambda c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)), np.random.rand(len(c)))
     m_talib.EMA.side_effect = lambda data, *a, **k: np.random.rand(len(data))
-    m_talib.ADX.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-    m_talib.STOCH.side_effect = lambda h, l, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
+    m_talib.ADX.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+    m_talib.STOCH.side_effect = lambda h, low, c, *a, **k: (np.random.rand(len(c)), np.random.rand(len(c)))
     m_talib.OBV.side_effect = lambda c, v, *a, **k: np.random.rand(len(c))
-    m_talib.MFI.side_effect = lambda h, l, c, v, *a, **k: np.random.rand(len(c))
-    m_talib.CCI.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.MFI.side_effect = lambda h, low, c, v, *a, **k: np.random.rand(len(c))
+    m_talib.CCI.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
     m_talib.MOM.side_effect = lambda c, *a, **k: np.random.rand(len(c))
-    m_talib.WILLR.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
-    m_talib.ULTOSC.side_effect = lambda h, l, c, *a, **k: np.random.rand(len(c))
+    m_talib.WILLR.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
+    m_talib.ULTOSC.side_effect = lambda h, low, c, *a, **k: np.random.rand(len(c))
     m_talib.LINEARREG_SLOPE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_TRENDLINE.side_effect = lambda x, *a, **k: np.random.rand(len(x))
     m_talib.HT_DCPERIOD.side_effect = lambda x, *a, **k: np.random.rand(len(x))
@@ -167,6 +167,6 @@ def test_mtf_feature_alignment(data_generator, feature_engineer):
         setup_mock_talib(mock_talib)
         features = feature_engineer.compute_features(df)
 
-    mtf_cols = [c for c in features.columns if "mtf_" in c]
+    mtf_cols = [col for col in features.columns if "mtf_" in col]
     assert len(mtf_cols) > 0
     assert not features[mtf_cols].iloc[-1].isnull().any()

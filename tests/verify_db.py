@@ -6,10 +6,15 @@ from unittest.mock import MagicMock
 sys.modules["talib"] = MagicMock()
 sys.modules["MetaTrader5"] = MagicMock()
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from src.core.trade_logger import Base, ModelSignal, RiskEvent, Trade
+from src.core.trade_logger import (  # noqa: E402
+    Base,
+    ModelSignal,
+    RiskEvent,
+    Trade,
+)
 
 
 def verify_db(db_url="sqlite:///trades.db"):

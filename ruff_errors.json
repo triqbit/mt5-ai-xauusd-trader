@@ -1,0 +1,648 @@
+[
+  {
+    "cell": null,
+    "code": "SIM102",
+    "end_location": {
+      "column": 52,
+      "row": 41
+    },
+    "filename": "/app/scripts/check_release_notes.py",
+    "fix": null,
+    "location": {
+      "column": 9,
+      "row": 39
+    },
+    "message": "Use a single `if` statement instead of nested `if` statements",
+    "noqa_row": 39,
+    "url": "https://docs.astral.sh/ruff/rules/collapsible-if"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 31,
+      "row": 14
+    },
+    "filename": "/app/scripts/generate_incident_report.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 14
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 14,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E701",
+    "end_location": {
+      "column": 20,
+      "row": 111
+    },
+    "filename": "/app/scripts/generate_incident_report.py",
+    "fix": null,
+    "location": {
+      "column": 19,
+      "row": 111
+    },
+    "message": "Multiple statements on one line (colon)",
+    "noqa_row": 111,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
+  },
+  {
+    "cell": null,
+    "code": "E701",
+    "end_location": {
+      "column": 19,
+      "row": 112
+    },
+    "filename": "/app/scripts/generate_incident_report.py",
+    "fix": null,
+    "location": {
+      "column": 18,
+      "row": 112
+    },
+    "message": "Multiple statements on one line (colon)",
+    "noqa_row": 112,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 20,
+      "row": 91
+    },
+    "filename": "/app/scripts/update_changelog.py",
+    "fix": null,
+    "location": {
+      "column": 19,
+      "row": 91
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 91,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 41,
+      "row": 28
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 40,
+      "row": 28
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 28,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 41,
+      "row": 31
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 40,
+      "row": 31
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 31,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 43,
+      "row": 32
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 42,
+      "row": 32
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 32,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 41,
+      "row": 34
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 40,
+      "row": 34
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 34,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 41,
+      "row": 35
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 40,
+      "row": 35
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 35,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 42,
+      "row": 77
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 41,
+      "row": 77
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 77,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 42,
+      "row": 80
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 41,
+      "row": 80
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 80,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 44,
+      "row": 81
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 43,
+      "row": 81
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 81,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 42,
+      "row": 83
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 41,
+      "row": 83
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 83,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 42,
+      "row": 84
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 41,
+      "row": 84
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 84,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 44,
+      "row": 86
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 43,
+      "row": 86
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 86,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E741",
+    "end_location": {
+      "column": 45,
+      "row": 87
+    },
+    "filename": "/app/tests/test_data_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 44,
+      "row": 87
+    },
+    "message": "Ambiguous variable name: `l`",
+    "noqa_row": 87,
+    "url": "https://docs.astral.sh/ruff/rules/ambiguous-variable-name"
+  },
+  {
+    "cell": null,
+    "code": "E701",
+    "end_location": {
+      "column": 18,
+      "row": 21
+    },
+    "filename": "/app/tests/test_decision_pipeline_integration.py",
+    "fix": null,
+    "location": {
+      "column": 17,
+      "row": 21
+    },
+    "message": "Multiple statements on one line (colon)",
+    "noqa_row": 21,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 32,
+      "row": 15
+    },
+    "filename": "/app/tests/test_doctor_diagnostics.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 15
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 15,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "SIM117",
+    "end_location": {
+      "column": 160,
+      "row": 56
+    },
+    "filename": "/app/tests/test_doctor_diagnostics.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 55
+    },
+    "message": "Use a single `with` statement with multiple contexts instead of nested `with` statements",
+    "noqa_row": 55,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-with-statements"
+  },
+  {
+    "cell": null,
+    "code": "SIM117",
+    "end_location": {
+      "column": 70,
+      "row": 78
+    },
+    "filename": "/app/tests/test_doctor_diagnostics.py",
+    "fix": null,
+    "location": {
+      "column": 5,
+      "row": 77
+    },
+    "message": "Use a single `with` statement with multiple contexts instead of nested `with` statements",
+    "noqa_row": 77,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-with-statements"
+  },
+  {
+    "cell": null,
+    "code": "E701",
+    "end_location": {
+      "column": 18,
+      "row": 22
+    },
+    "filename": "/app/tests/test_enterprise_audit_integration.py",
+    "fix": null,
+    "location": {
+      "column": 17,
+      "row": 22
+    },
+    "message": "Multiple statements on one line (colon)",
+    "noqa_row": 22,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 43,
+      "row": 9
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 9
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 9,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 19,
+      "row": 11
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 11
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 11,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 20,
+      "row": 12
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 12
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 12,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 41,
+      "row": 14
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 14
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 14,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 46,
+      "row": 15
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 15
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 15,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 46,
+      "row": 16
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 16
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 16,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 68,
+      "row": 17
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 17
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 17,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 75,
+      "row": 18
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 18
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 18,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 49,
+      "row": 19
+    },
+    "filename": "/app/tests/test_institutional_integration.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 19
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 19,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "B017",
+    "end_location": {
+      "column": 34,
+      "row": 36
+    },
+    "filename": "/app/tests/test_jules05_stability.py",
+    "fix": null,
+    "location": {
+      "column": 10,
+      "row": 36
+    },
+    "message": "`pytest.raises(Exception)` should be considered evil",
+    "noqa_row": 36,
+    "url": "https://docs.astral.sh/ruff/rules/assert-raises-exception"
+  },
+  {
+    "cell": null,
+    "code": "E701",
+    "end_location": {
+      "column": 28,
+      "row": 277
+    },
+    "filename": "/app/tests/test_rl_evaluation.py",
+    "fix": null,
+    "location": {
+      "column": 27,
+      "row": 277
+    },
+    "message": "Multiple statements on one line (colon)",
+    "noqa_row": 277,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
+  },
+  {
+    "cell": null,
+    "code": "E701",
+    "end_location": {
+      "column": 28,
+      "row": 278
+    },
+    "filename": "/app/tests/test_rl_evaluation.py",
+    "fix": null,
+    "location": {
+      "column": 27,
+      "row": 278
+    },
+    "message": "Multiple statements on one line (colon)",
+    "noqa_row": 278,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
+  },
+  {
+    "cell": null,
+    "code": "E701",
+    "end_location": {
+      "column": 28,
+      "row": 287
+    },
+    "filename": "/app/tests/test_rl_evaluation.py",
+    "fix": null,
+    "location": {
+      "column": 27,
+      "row": 287
+    },
+    "message": "Multiple statements on one line (colon)",
+    "noqa_row": 287,
+    "url": "https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-colon"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 37,
+      "row": 9
+    },
+    "filename": "/app/tests/verify_db.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 9
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 9,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 40,
+      "row": 10
+    },
+    "filename": "/app/tests/verify_db.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 10
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 10,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  },
+  {
+    "cell": null,
+    "code": "E402",
+    "end_location": {
+      "column": 70,
+      "row": 12
+    },
+    "filename": "/app/tests/verify_db.py",
+    "fix": null,
+    "location": {
+      "column": 1,
+      "row": 12
+    },
+    "message": "Module level import not at top of file",
+    "noqa_row": 12,
+    "url": "https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file"
+  }
+]
