@@ -14,7 +14,7 @@ from enum import Enum
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -102,9 +102,9 @@ class HyperparameterSection(BaseModel):
 
     stability_score: float
     parameters: list[ParameterRobustness]
+    insights: str
     walk_forward_efficiency: float = 0.0
     grade: str = "F"
-    insights: str
 
 
 class PatternConcentration(BaseModel):
@@ -328,12 +328,12 @@ class ExecutionQualitySection(BaseModel):
 class RiskAuditSection(BaseModel):
     """Section for high-level risk and compliance auditing."""
 
-    status: SectionStatus = SectionStatus.VERIFIED
     portfolio_heat: float
     hhi_score: float
     drawdown_limit_compliance: bool
     leverage_compliance: bool
     audit_notes: str
+    status: SectionStatus = SectionStatus.VERIFIED
 
 
 class DataQualitySection(BaseModel):
@@ -505,7 +505,8 @@ class ResearchReporter:
         """Print a scannable version of the report to the terminal."""
         status_color = (
             "green"
-            if report.overall_status in [SectionStatus.VERIFIED, SectionStatus.STABLE, SectionStatus.OK]
+            if report.overall_status
+            in [SectionStatus.VERIFIED, SectionStatus.STABLE, SectionStatus.OK]
             else "red"
             if report.overall_status in [SectionStatus.CRITICAL, SectionStatus.REJECTED]
             else "yellow"
