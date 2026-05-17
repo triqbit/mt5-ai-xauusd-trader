@@ -32,4 +32,9 @@ To prevent "flip-flopping" and ensure institutional-grade stability, several saf
 The `DynamicEnsemble` is integrated into the `EnsembleModel`, which uses the dynamic weights to calculate a weighted consensus signal. It also supports autonomous closed-loop tracking via `record_prediction` and `record_outcome` methods.
 
 ## Verification
-Institutional verification is performed via `tests/test_dynamic_ensemble.py`, covering 23+ scenarios including regime-specific behavior, volatility thresholds, and stability under extreme conditions.
+Institutional verification is performed via `tests/test_dynamic_ensemble.py`, covering 27 scenarios including regime-specific behavior, volatility thresholds, and stability under extreme conditions.
+
+## Recent Improvements
+- **Python 3.10 Compatibility**: Switched to `timezone.utc` for broader environment support.
+- **Structured Logging**: Integrated `structlog` for enhanced traceability in institutional research workflows.
+- **Refined Drift Logic**: Improved the blending of accuracy and calibration drift for more reliable degradation signals.
