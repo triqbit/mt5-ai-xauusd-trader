@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
@@ -44,12 +44,12 @@ class AuditMixin:
     """Audit columns as per DATABASE_STANDARDS.md."""
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), nullable=False, index=True
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -74,7 +74,7 @@ class ModelSignal(Base, AuditMixin):
     confidence: Mapped[float | None] = mapped_column(Float)
     volatility: Mapped[float | None] = mapped_column(Float)
     trace_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
     trade: Mapped["Trade"] = relationship("Trade", back_populates="signal", uselist=False)
@@ -187,7 +187,7 @@ class PerformanceMetric(Base, AuditMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), index=True
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
     )
     sharpe_ratio: Mapped[float | None] = mapped_column(Float)
     profit_factor: Mapped[float | None] = mapped_column(Float)
@@ -230,7 +230,7 @@ class TradeLogger:
                 confidence=signal_data.get("confidence"),
                 volatility=signal_data.get("volatility"),
                 trace_id=trace_id,
-                timestamp=signal_data.get("timestamp", datetime.now(UTC)),
+                timestamp=signal_data.get("timestamp", datetime.now(timezone.utc)),
             )
             session.add(signal)
             session.commit()

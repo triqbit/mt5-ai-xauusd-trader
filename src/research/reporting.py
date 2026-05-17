@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
@@ -346,7 +346,7 @@ class ResearchReport(BaseModel):
     title: str
     executive_summary: str
     conclusion: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     author: str = "Jules Research"
     overall_status: str = "PROVISIONAL"
 
