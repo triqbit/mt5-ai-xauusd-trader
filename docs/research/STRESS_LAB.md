@@ -23,6 +23,8 @@ Each stress test generates a comprehensive report including:
 - **Breaking Points**: Identifies the exact level of friction (e.g., number of delay steps) where a strategy becomes unprofitable.
 - **Alpha Decay Metrics**: Calculates quantitative degradation slopes (e.g., return loss in bps per bp of slippage) derived from sensitivity analysis.
 - **Institutional Metrics**: Tracks Profit Factor (PF) and Recovery Factor across all scenarios.
+- **Cost Attribution**: Tracks total commission costs and slippage impact (in currency units) for granular performance degradation analysis.
+- **Financial Modeling**: Incorporates per-lot commissions (defaulting to 7.0 per lot) into both realized P&L and unrealized mark-to-market equity.
 - **Hardened Analytics**: Implements robust decay calculations for Sharpe and Sortino ratios, handling negative or near-zero baselines with absolute scaling and outlier clipping for enterprise stability.
 
 ## Usage
