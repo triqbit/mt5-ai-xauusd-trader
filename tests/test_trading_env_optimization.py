@@ -29,7 +29,7 @@ def test_trading_env_optimized_observation():
     np.testing.assert_array_almost_equal(obs, data[0:window_size])
 
     # 3. Step forward and check observation
-    obs, reward, terminated, truncated, info = env.step(1)
+    obs, _reward, _terminated, _truncated, _info = env.step(1)
     # After 1 step, current_step = window_size + 1
     # observation window should be [1 : window_size + 1]
     np.testing.assert_array_almost_equal(obs, data[1:window_size+1])

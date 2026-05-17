@@ -24,9 +24,9 @@ import pandas as pd
 import structlog
 
 from src.core.audit_log import get_audit_logger
-from src.core.feature_engineering import FeatureEngineer
 from src.core.profiler import profile
 from src.core.schemas import TradeSignal
+from src.data.feature_engineering import FeatureEngineer
 from src.trading.execution_filter import ExecutionFilter
 
 logger = structlog.get_logger(__name__)
@@ -114,10 +114,10 @@ class BacktestEngine:
         """
         start_wall_time = time.perf_counter()
         logger.info(
-            "Starting walk-forward backtest | train=%d test=%d step=%d",
-            train_window,
-            test_window,
-            step_size,
+            "Starting walk-forward backtest",
+            train=train_window,
+            test=test_window,
+            step=step_size,
         )
 
         try:
@@ -139,7 +139,7 @@ class BacktestEngine:
             logger.debug("AuditLogger not available - skipping backtest_started log")
 
         # 1. Pre-calculate all possible features for the entire dataset
-        logger.info("Pre-calculating features for the entire dataset...")
+        logger.info("Pre-calculating features for the entire dataset")
         # Ensure we get raw features for proper walk-forward normalization
         original_norm = self.fe.normalize
         self.fe.normalize = False
@@ -161,7 +161,7 @@ class BacktestEngine:
             return PerformanceReport()
 
         # 2. Pre-calculate metrics for the ExecutionFilter to avoid O(N) in loop
-        logger.info("Pre-calculating execution filter metrics...")
+        logger.info("Pre-calculating execution filter metrics")
 
         with profile("bt_ef_precomputation_total"):
             # Calculate ATR for SL/TP and Volatility filter

@@ -11,9 +11,11 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import pandas as pd
+
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
-from src.trading.risk_manager import RiskManager
+from src.trading.risk_manager import RiskDecision, RiskManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +26,29 @@ class AuditedRiskManager(RiskManager):
     Evaluates the full decision chain for traceability.
     """
 
-    def approve(
+    def validate_signal(
         self,
         signal: TradeSignal,
-        signal_id: Optional[int] = None,
+        market_data: pd.DataFrame,
+        open_positions: list[dict],
         model_health: Optional[dict] = None,
-    ) -> bool:
+        signal_id: Optional[int] = None,
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision indicating approval status and adjusted lot size.
         Logs the full decision chain to the audit log.
         """
         decision_chain = {
             "circuit_breaker": self._check_circuit_breaker(),
             "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
+            "max_positions": self._check_max_positions(open_positions),
             "symbol_allocation": self._check_symbol_allocation(signal.symbol),
             "min_confidence": self._check_minimum_confidence(signal.confidence),
             "risk_reward": self._check_risk_reward(signal),
             "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
+            "directional_exposure": self._check_directional_exposure(signal, open_positions),
         }
 
         passed = all(decision_chain.values())
@@ -97,4 +102,9 @@ class AuditedRiskManager(RiskManager):
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+            return RiskDecision(is_approved=False, reason=reason_str)
+
+        # Calculate lot size
+        lot_size = self.calculate_position_size(signal.symbol, market_data)
+
+        return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=lot_size)

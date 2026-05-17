@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
@@ -414,11 +414,20 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                    risk_decision = (
+                        risk.validate_signal(
+                            signal,
+                            df_raw,
+                            connector.get_positions(cfg.symbol),
+                            model_health=health,
+                            signal_id=signal_id,
+                        )
                         if direction != 0
-                        else False
+                        else None
                     )
+                    risk_approved = risk_decision.is_approved if risk_decision else False
+                    if risk_decision and risk_decision.is_approved:
+                        signal.lot_size = risk_decision.adjusted_lot_size
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -1462,9 +1471,9 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent
