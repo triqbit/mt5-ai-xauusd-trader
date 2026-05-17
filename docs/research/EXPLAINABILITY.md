@@ -5,7 +5,7 @@ The explainability system in `src/core/explainability.py` provides institutional
 ## Components
 
 - **Execution Filters**: Detailed trace of all technical and operational gates.
-- **Model Attribution**: Individual model contributions and dominance tracking within the ensemble.
+- **Model Attribution**: Individual model contributions and dominance tracking within the ensemble, powered by the [Dynamic Ensemble Weighting Engine](./DYNAMIC_ENSEMBLE.md).
 - **Feature Cluster Contributions**: Automated grouping of features into categories like Momentum, Volatility, Trend, and Volume.
 - **Regime Context**: Alignment with detected market regimes, trading sessions, and volatility states.
 - **Risk Assessment**: Breakdown of risk-reward ratios, drawdown impact, and Kelly-based sizing.

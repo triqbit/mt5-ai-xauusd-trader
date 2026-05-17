@@ -437,7 +437,7 @@ class TestDynamicEnsemble(unittest.TestCase):
     def test_brier_score_calibration(self):
         """Verify that calibration error uses Brier Score (squared error)."""
         # Prediction confidence 0.8, outcome correct (1.0)
-        # Brier score = (0.8 - 1.0)^2 = 0.04
+        # Brier score = (0.8 - 1.0)**2 = 0.04
         self.ensemble.record_prediction("ppo", SignalDirection.BUY, 0.8)
         self.ensemble.record_outcome("ppo", SignalDirection.BUY)
 
@@ -445,7 +445,7 @@ class TestDynamicEnsemble(unittest.TestCase):
         self.assertAlmostEqual(metrics["calibration_error"], 0.04)
 
         # Prediction confidence 0.8, outcome incorrect (0.0)
-        # Brier score = (0.8 - 0.0)^2 = 0.64
+        # Brier score = (0.8 - 0.0)**2 = 0.64
         # Avg = (0.04 + 0.64) / 2 = 0.34
         self.ensemble.record_prediction("lstm", SignalDirection.BUY, 0.8)
         self.ensemble.record_outcome("lstm", SignalDirection.SELL)
@@ -475,16 +475,6 @@ class TestDynamicEnsemble(unittest.TestCase):
         self.assertEqual(metrics["drift_score"], 1.0)
 
         # Let's try a less extreme case
-        # Reset and use 10 predictions
-        self.ensemble._history["lstm"].clear()
-        # 10 total. 5 correct first. Then 3 correct of last 5.
-        # Wait, recent_split = max(1, 10 // 5) = 2
-        # First 8: 6 correct.
-        # Last 2: 0 correct.
-        # Total acc = 6/10 = 0.6
-        # Recent acc = 0/2 = 0.0
-        # Drift = (0.6 - 0.0) / (0.6 + 1e-9) * 2.0 = 2.0 -> cap 1.0
-
         # Try:
         # First 8: 8 correct.
         # Last 2: 1 correct.
