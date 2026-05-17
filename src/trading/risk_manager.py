@@ -172,6 +172,61 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
+    def reconcile_state(self, initial_balance: float) -> None:
+        """
+        Reconcile internal risk state from the database.
+        Restores daily stats, peak equity, and open position tracking.
+        """
+        if not self.trade_logger:
+            logger.warning("TradeLogger not available for state reconciliation")
+            return
+
+        try:
+            recon = self.trade_logger.get_reconciliation_data()
+
+            # 1. Restore Daily Stats
+            self.daily.realised_pnl = recon["today_realised_pnl"]
+            self.daily.trade_count = recon["today_count"]
+
+            # Daily peak equity reconstruction
+            # We start from current balance and work backwards through today's trades
+            current_today_balance = initial_balance
+            today_pnls = recon["today_pnls"]
+
+            # Sort today's PnLs descending to work backwards from current balance
+            # (Last trade pnl was added last to reach current balance)
+            today_peak = current_today_balance
+            temp_balance = current_today_balance
+            for pnl in reversed(today_pnls):
+                temp_balance -= pnl
+                if temp_balance > today_peak:
+                    today_peak = temp_balance
+            self.daily.peak_equity = max(today_peak, initial_balance)
+
+            # 2. Restore All-time Peak Equity (for Drawdown Circuit Breaker)
+            all_pnls = recon["all_pnls"]
+            # Start from the balance that existed before any trades in the DB
+            # pre_trade_balance = current_balance - sum(all_pnls)
+            pre_trade_balance = initial_balance - sum(all_pnls)
+
+            # Build equity curve to find historic peak
+            equity_curve = [pre_trade_balance]
+            curr = pre_trade_balance
+            for pnl in all_pnls:
+                curr += pnl
+                equity_curve.append(curr)
+
+            self.peak_equity = max(equity_curve)
+
+            logger.info(
+                "Risk state reconciled | realised_pnl=%.2f peak_equity=%.2f",
+                self.daily.realised_pnl,
+                self.peak_equity,
+            )
+
+        except Exception as e:
+            logger.error("Failed to reconcile risk state: %s", e, exc_info=True)
+
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:

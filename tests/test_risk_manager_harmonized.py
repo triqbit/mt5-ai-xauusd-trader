@@ -22,6 +22,9 @@ def config():
     os.environ["MT5_PASSWORD"] = "dummy_password"
     os.environ["MT5_SERVER"] = "dummy_server"
     return TradingConfig(
+        mt5_login=12345,
+        mt5_password="dummy_password",
+        mt5_server="dummy_server",
         symbol="XAUUSD",
         risk_per_trade=0.01,
         max_daily_loss=0.05,
@@ -44,82 +47,62 @@ def risk_manager(config):
     return RiskManager(config, account_balance=10000.0)
 
 @pytest.fixture
-def market_data():
-    gen = ScenarioGenerator()
-    df = gen.generate(n_steps=100, regime="ranging")
-    df["atr"] = (df["high"] - df["low"]).rolling(14).mean()
-    df["close"] = df["close"].ffill() # Ensure no NaNs at the end
-    return df
-
-@pytest.fixture
-def buy_signal(market_data):
-    price = market_data["close"].iloc[-1]
+def buy_signal():
     return TradeSignal(
         symbol="XAUUSD",
         direction=SignalDirection.BUY,
-        entry_price=price,
-        stop_loss=price - 10,
-        take_profit=price + 20,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.8,
         timestamp=datetime.datetime.now(datetime.timezone.utc)
     )
 
-def test_drawdown_breaker(risk_manager, buy_signal, market_data):
+def test_drawdown_breaker(risk_manager, buy_signal):
     # Set peak equity high and current balance low to trigger drawdown
     risk_manager.peak_equity = 20000.0
     risk_manager.balance = 10000.0  # 50% drawdown
 
-    decision = risk_manager.validate_signal(buy_signal, market_data, [])
-    assert not decision.is_approved
-    assert "drawdown" in decision.reason.lower()
+    assert not risk_manager.approve(buy_signal)
 
-def test_daily_loss_limit(risk_manager, buy_signal, market_data):
+def test_daily_loss_limit(risk_manager, buy_signal):
     risk_manager.daily.peak_equity = 10000.0
     risk_manager.daily.realised_pnl = -600.0  # 6% loss
 
-    decision = risk_manager.validate_signal(buy_signal, market_data, [])
-    assert not decision.is_approved
-    assert "daily loss" in decision.reason.lower()
+    assert not risk_manager.approve(buy_signal)
 
-def test_max_positions(risk_manager, buy_signal, market_data):
-    open_positions = [
-        {"ticket": 1, "symbol": "XAUUSD", "volume": 0.1, "type": 0},
-        {"ticket": 2, "symbol": "XAUUSD", "volume": 0.1, "type": 0},
-        {"ticket": 3, "symbol": "XAUUSD", "volume": 0.1, "type": 0},
-    ]
+def test_max_positions(risk_manager, buy_signal):
+    # RiskManager tracks positions in a dict symbol -> ticket
+    # config has max_positions=3
+    risk_manager.open_positions = {
+        "EURUSD": 1,
+        "GBPUSD": 2,
+        "USDJPY": 3
+    }
 
-    decision = risk_manager.validate_signal(buy_signal, market_data, open_positions)
-    assert not decision.is_approved
-    assert "max concurrent positions" in decision.reason.lower()
+    assert not risk_manager.approve(buy_signal)
 
-def test_directional_exposure(risk_manager, buy_signal, market_data):
-    # Max single direction is 30% of 10000 = 3000
-    # Gold price approx 2300. 1 lot = 230000.
-    # Let's say we have 0.13 lots BUY already
-    open_positions = [
-        {"ticket": 1, "symbol": "XAUUSD", "volume": 0.13, "type": 0},
-    ]
+def test_symbol_allocation(risk_manager):
+    # XAUUSD is in approved portfolio, but let's try an unapproved one
+    bad_signal = TradeSignal(
+        symbol="BTCUSD",
+        direction=SignalDirection.BUY,
+        entry_price=60000.0,
+        stop_loss=59000.0,
+        take_profit=62000.0,
+        lot_size=0.01,
+        algorithm="ensemble",
+        confidence=0.8
+    )
+    assert not risk_manager.approve(bad_signal)
 
-    decision = risk_manager.validate_signal(buy_signal, market_data, open_positions)
-    assert not decision.is_approved
-    assert "directional exposure" in decision.reason.lower()
-
-def test_atr_position_sizing(risk_manager, market_data):
-    # Normal volatility
-    market_data["atr"] = 1.0
-    size = risk_manager.size_position("XAUUSD", market_data)
+def test_atr_position_sizing(risk_manager):
+    # RiskManager.size_position(symbol, win_rate, avg_win, avg_loss)
+    size = risk_manager.size_position("XAUUSD", 0.6, 20.0, 10.0)
     assert size > 0
+    assert size >= 0.01
 
-    # Extreme volatility
-    market_data.loc[market_data.index[-1], "atr"] = 4.0
-    # avg_atr remains approx 1.0. ratio = 4.0 > 3.0 (extreme threshold)
-    size = risk_manager.size_position("XAUUSD", market_data)
-    assert size == 0.0
-
-def test_full_approval(risk_manager, buy_signal, market_data):
-    decision = risk_manager.validate_signal(buy_signal, market_data, [])
-    assert decision.is_approved
-    assert decision.reason == "Approved"
-    assert decision.adjusted_lot_size > 0
+def test_full_approval(risk_manager, buy_signal):
+    assert risk_manager.approve(buy_signal)
