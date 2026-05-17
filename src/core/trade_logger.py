@@ -351,6 +351,57 @@ class TradeLogger:
                 select(Trade).where(Trade.ticket == ticket, Trade.is_deleted.is_(False))
             ).scalar_one_or_none()
 
+    def get_reconciliation_data(self) -> dict[str, Any]:
+        """
+        Fetch data required to reconcile RiskManager state after a restart.
+        Returns today's realized PnL, trade count, and historical PnL series.
+        """
+        now = datetime.now(UTC)
+        today_start = datetime(now.year, now.month, now.day, tzinfo=UTC)
+
+        with self.Session() as session:
+            # 1. Today's realized PnL and count (using updated_at for multi-day trades)
+            today_stats = session.execute(
+                select(
+                    func.sum(Trade.pnl).label("pnl"),
+                    func.count(Trade.id).label("count"),
+                ).where(
+                    Trade.status == "CLOSED",
+                    Trade.is_deleted.is_(False),
+                    Trade.updated_at >= today_start,
+                )
+            ).one()
+
+            # 2. Historical PnL series for peak equity calculation
+            pnls = (
+                session.execute(
+                    select(Trade.pnl)
+                    .where(Trade.status == "CLOSED", Trade.is_deleted.is_(False))
+                    .order_by(Trade.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            return {
+                "daily_pnl": float(today_stats.pnl or 0.0),
+                "daily_count": int(today_stats.count or 0),
+                "pnl_series": [float(p) for p in pnls],
+            }
+
+    def get_open_trades(self) -> dict[str, int]:
+        """
+        Retrieve mapping of symbol to ticket for all currently open trades.
+        Used to restore RiskManager's operational context.
+        """
+        with self.Session() as session:
+            results = session.execute(
+                select(Trade.symbol, Trade.ticket).where(
+                    Trade.status == "OPEN", Trade.is_deleted.is_(False)
+                )
+            ).all()
+            return {r.symbol: r.ticket for r in results}
+
     def log_risk_event(
         self,
         event_type: str,
