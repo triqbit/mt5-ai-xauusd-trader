@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
@@ -414,11 +414,18 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    if direction != 0:
+                        current_positions = connector.get_positions(cfg.symbol)
+                        risk_decision = risk.validate_signal(
+                            signal, df_raw, current_positions, model_health=health
+                        )
+                        risk_approved = risk_decision.is_approved
+                        if risk_approved:
+                            signal.lot_size = risk_decision.adjusted_lot_size
+                        else:
+                            log.warning("Risk REJECTED", reason=risk_decision.reason)
+                    else:
+                        risk_approved = False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -1462,7 +1469,7 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
     from src.models.ensemble import EnsembleModel

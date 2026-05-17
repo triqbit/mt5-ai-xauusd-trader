@@ -12,7 +12,8 @@ from src.trading.capital_allocator import (
     StrategyConfig,
 )
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_engine import RiskDecision, RiskEngine
+from src.trading.risk_manager import RiskDecision, RiskManager
+from src.trading.audited_risk_manager import AuditedRiskManager
 
 __all__ = [
     "AllocationRequest",
@@ -23,7 +24,8 @@ __all__ = [
     "PerformanceReport",
     "RejectionCode",
     "RiskDecision",
-    "RiskEngine",
+    "RiskManager",
+    "AuditedRiskManager",
     "StrategyConfig",
     "TradeSignal",
 ]

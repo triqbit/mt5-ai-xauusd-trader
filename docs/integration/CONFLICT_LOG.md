@@ -105,3 +105,19 @@
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
 - **Owner**: Jules05
+
+## [2026-05-16] - Risk Management & Domain Separation Harmonization
+
+### 1. Risk Management API Fragmentation
+- **Conflict**: `RiskManager` (src/trading/risk_manager.py) uses legacy 6-layer logic and `approve()` API. `RiskEngine` (src/trading/risk_engine.py) implements the target 8-layer ATR-based logic and `validate_signal()` API. `main.py` is caught between both, attempting to use `AuditedRiskManager` (subclass of legacy `RiskManager`) with some 8-layer expectations.
+- **Agents**: Jules01, Jules05
+- **Impact**: High. Prevents the system from meeting the 8-layer safety mandate and causes governance test failures.
+- **Resolution**: Harmonize `RiskManager` and `AuditedRiskManager` to implement the 8-layer cascade and `validate_signal()` API. Deprecate and remove `RiskEngine`.
+- **Owner**: Jules05
+
+### 2. Feature Engineering Domain Misplacement
+- **Conflict**: `FeatureEngineer` is located in `src/core/feature_engineering.py`, violating the domain separation principle that places data processing in `src/data/`. Memory indicates a previous move to `src/data/` that is not reflected in the current file system.
+- **Agents**: Jules01, Jules05
+- **Impact**: Medium. Architectural drift and import confusion across the codebase.
+- **Resolution**: Relocate `FeatureEngineer` to `src/data/feature_engineering.py` and update all system-wide imports.
+- **Owner**: Jules05
