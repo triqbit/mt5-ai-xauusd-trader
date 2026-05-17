@@ -507,7 +507,7 @@ class WalkForwardOptimizer:
             stability = float(np.mean(stability_scores))
             avg_param_sens = {}
             if all_param_sens:
-                for k in params.keys():
+                for k in params:
                     vals = [s[k] for s in all_param_sens if k in s]
                     if vals:
                         avg_param_sens[k] = float(np.mean(vals))
