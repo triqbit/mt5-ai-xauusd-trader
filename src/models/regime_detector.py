@@ -26,6 +26,7 @@ from __future__ import annotations
 import contextlib
 import os
 import stat
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -287,6 +288,49 @@ class RegimeDetector:
             return float(corr) if not np.isnan(corr) else 0.0
         return 0.0
 
+    def _calculate_session_alignment(self, timestamp: datetime) -> float:
+        """
+        Calculates alignment with major trading sessions (London/NY).
+        London: 08:00 - 17:00 UTC
+        New York: 13:00 - 22:00 UTC
+        Overlap: 13:00 - 17:00 UTC
+        """
+        # Ensure we are working with UTC
+        if timestamp.tzinfo is not None:
+            # Convert to UTC if localized
+            timestamp = timestamp.astimezone(timezone.utc)
+
+        hour = timestamp.hour + timestamp.minute / 60.0
+
+        # London session
+        is_london = 8.0 <= hour < 17.0
+        # NY session
+        is_ny = 13.0 <= hour < 22.0
+
+        if is_london and is_ny:
+            return 1.0  # Peak overlap
+        if is_london or is_ny:
+            return 0.8  # Active session
+
+        # Asian session (approximate)
+        is_tokyo = (0.0 <= hour < 9.0) or (hour >= 23.0)
+        if is_tokyo:
+            return 0.5
+
+        return 0.3  # Low activity
+
+    def _calculate_volatility_alignment(self, regime: MarketRegime, atr_ratio: float) -> float:
+        """
+        Calculates how well the current volatility matches the detected regime.
+        """
+        if regime in [MarketRegime.NEWS_SHOCK, MarketRegime.VOLATILE_BREAKOUT]:
+            return float(np.clip(atr_ratio / 1.5, 0.5, 1.0))
+        if regime == MarketRegime.TRENDING:
+            return 1.0 if 0.8 <= atr_ratio <= 2.5 else 0.6
+        if regime in [MarketRegime.RANGING, MarketRegime.LOW_VOLATILITY_DRIFT]:
+            return float(np.clip(1.2 / (atr_ratio + 1e-9), 0.5, 1.0))
+        return 0.5
+
     def detect(self, data: pd.DataFrame) -> RegimeInfo:
         """
         Detect current market regime from OHLCV data.
@@ -378,11 +422,22 @@ class RegimeDetector:
                 MarketRegime.UNKNOWN.value: 1.0 - confidence,
             }
 
+        # Session and Volatility Alignment
+        current_time = data.index[-1]
+        if not isinstance(current_time, datetime):
+            # Fallback for non-datetime index
+            current_time = datetime.now(timezone.utc)
+
+        session_align = self._calculate_session_alignment(current_time)
+        vol_align = self._calculate_volatility_alignment(label, atr_ratio)
+
         regime_info = RegimeInfo(
             label=label,
             confidence=float(np.clip(confidence, 0.0, 1.0)),
             transition_score=float(np.clip(transition_score, 0.0, 1.0)),
             volatility_index=float(atr_ratio),
+            session_alignment=session_align,
+            volatility_alignment=vol_align,
             transition_probabilities=transition_probabilities,
             raw_features=raw_features,
         )
@@ -483,8 +538,6 @@ class RegimeDetector:
         """
         Analyze a historical DataFrame and generate a RegimeAnalysisReport.
         """
-        from datetime import UTC, datetime
-
         from src.research.reporting import RegimeSummary
 
         if "regime" not in df.columns:
@@ -530,7 +583,7 @@ class RegimeDetector:
             )
 
         return RegimeAnalysisReport(
-            timestamp=datetime.now(UTC).isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             counts_pct=counts.to_dict(),
             avg_durations=avg_durations.to_dict(),
             transitions=transitions,
@@ -556,17 +609,25 @@ class RegimeDetector:
             transition_scores = [0.0] * len(df)
             volatility_indices = [0.0] * len(df)
 
+            # Add alignment columns in iterative mode
+            session_alignments = [0.5] * len(df)
+            volatility_alignments = [0.5] * len(df)
+
             for i in range(self.long_window - 1, len(df)):
                 info = self.detect(df.iloc[: i + 1])
                 regimes[i] = info.label.value
                 confidences[i] = info.confidence
                 transition_scores[i] = info.transition_score
                 volatility_indices[i] = info.volatility_index
+                session_alignments[i] = info.session_alignment
+                volatility_alignments[i] = info.volatility_alignment
 
             df["regime"] = regimes
             df["regime_confidence"] = confidences
             df["regime_transition_score"] = transition_scores
             df["volatility_index"] = volatility_indices
+            df["session_alignment"] = session_alignments
+            df["volatility_alignment"] = volatility_alignments
             return df
 
         # Vectorized implementation
@@ -656,15 +717,61 @@ class RegimeDetector:
                 + np.clip(vov / 3.0, 0, 0.2)
             )
 
+        # Vectorized alignment
+        session_alignments = np.array([0.5] * len(df))
+        if isinstance(data.index, pd.DatetimeIndex):
+            # Ensure we are using UTC hours for session alignment
+            idx_utc = data.index
+            if idx_utc.tz is not None:
+                idx_utc = idx_utc.tz_convert(timezone.utc)
+
+            # Efficiently calculate session alignment for all timestamps
+            times = idx_utc.hour + idx_utc.minute / 60.0
+
+            # 1. Peak overlap (London & NY): 13:00 - 17:00 UTC
+            is_overlap = (times >= 13.0) & (times < 17.0)
+            # 2. Active session (London or NY): 08:00 - 13:00 or 17:00 - 22:00
+            is_active = ((times >= 8.0) & (times < 13.0)) | ((times >= 17.0) & (times < 22.0))
+            # 3. Asian session: 00:00 - 08:00 or 22:00 - 24:00
+            is_asian = (times < 8.0) | (times >= 22.0)
+
+            session_alignments[is_overlap] = 1.0
+            session_alignments[is_active] = 0.8
+            session_alignments[is_asian] = 0.5
+            # Fallback for any gaps (though masks should cover 24h)
+            session_alignments[~(is_overlap | is_active | is_asian)] = 0.3
+
+        volatility_alignments = np.array([0.5] * len(df))
+        # Vectorized volatility alignment (simple version for now)
+        # We can use the already calculated 'regimes' and 'atr_ratio'
+        atr_ratio_vals = features["atr_ratio"].values
+        regimes_arr = np.array(regimes)
+        for r_val in MarketRegime:
+            mask = regimes_arr == r_val.value
+            if mask.any():
+                atr_vals = atr_ratio_vals[mask]
+                if r_val in [MarketRegime.NEWS_SHOCK, MarketRegime.VOLATILE_BREAKOUT]:
+                    volatility_alignments[mask] = np.clip(atr_vals / 1.5, 0.5, 1.0)
+                elif r_val == MarketRegime.TRENDING:
+                    volatility_alignments[mask] = np.where(
+                        (atr_vals >= 0.8) & (atr_vals <= 2.5), 1.0, 0.6
+                    )
+                elif r_val in [MarketRegime.RANGING, MarketRegime.LOW_VOLATILITY_DRIFT]:
+                    volatility_alignments[mask] = np.clip(1.2 / (atr_vals + 1e-9), 0.5, 1.0)
+
         # Mask out burn-in period
         regimes[: self.long_window - 1] = [MarketRegime.UNKNOWN.value] * (self.long_window - 1)
         confidences[: self.long_window - 1] = 0.0
         transition_scores[: self.long_window - 1] = 0.0
+        session_alignments[: self.long_window - 1] = 0.5
+        volatility_alignments[: self.long_window - 1] = 0.5
 
         df["regime"] = regimes
         df["regime_confidence"] = confidences
         df["regime_transition_score"] = transition_scores
         df["volatility_index"] = features["atr_ratio"]
+        df["session_alignment"] = session_alignments
+        df["volatility_alignment"] = volatility_alignments
 
         return df
 
