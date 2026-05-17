@@ -1,9 +1,11 @@
-
-import logging
 import io
-import structlog
+import logging
+import sys
+
 from pydantic import SecretStr
-from src.core.log_config import SecretMaskingProcessor, get_masking_processor
+
+from src.core.log_config import SecretMaskingProcessor
+
 
 def test_pydantic_secret_masking_direct():
     """Verify that Pydantic SecretStr objects are masked when passed directly to redact_any."""
@@ -12,6 +14,7 @@ def test_pydantic_secret_masking_direct():
 
     # Even if not in processor.secrets, it should be masked because it has get_secret_value
     assert processor.redact_any(secret) == "[MASKED]"
+
 
 def test_logging_traceback_redaction():
     """Verify that standard logging redacts secrets from tracebacks and stack traces."""
@@ -37,6 +40,7 @@ def test_logging_traceback_redaction():
     # Ensure it's in the traceback area
     assert "ValueError: Error with [MASKED]" in output
 
+
 def test_logging_stack_info_redaction():
     """Verify that standard logging redacts secrets from stack_info."""
     stream = io.StringIO()
@@ -61,6 +65,7 @@ def test_logging_stack_info_redaction():
     assert "[MASKED]" in record.msg
     assert "[MASKED]" in record.stack_info
 
+
 def test_structlog_traceback_redaction():
     """Verify that the masking processor works with structlog's event_dict after format_exc_info."""
     processor = SecretMaskingProcessor()
@@ -68,15 +73,13 @@ def test_structlog_traceback_redaction():
     processor.secrets.add(secret_val)
 
     # After format_exc_info, the exception string is in the 'exception' key
-    event_dict = {
-        "event": "failure",
-        "exception": f"Traceback...\nValueError: {secret_val}"
-    }
+    event_dict = {"event": "failure", "exception": f"Traceback...\nValueError: {secret_val}"}
 
     redacted = processor(None, "error", event_dict)
 
     assert secret_val not in redacted["exception"]
     assert "[MASKED]" in redacted["exception"]
+
 
 def test_proactive_exc_info_formatting():
     """Verify that Filter proactively formats and redacts exc_info if exc_text is missing."""
@@ -87,10 +90,14 @@ def test_proactive_exc_info_formatting():
     try:
         raise ValueError(f"Panic with {secret_val}")
     except ValueError:
-        import sys
         record = logging.LogRecord(
-            name="test", level=logging.ERROR, pathname="p", lineno=1,
-            msg="msg", args=(), exc_info=sys.exc_info()
+            name="test",
+            level=logging.ERROR,
+            pathname="p",
+            lineno=1,
+            msg="msg",
+            args=(),
+            exc_info=sys.exc_info(),
         )
 
     assert not hasattr(record, "exc_text") or record.exc_text is None
