@@ -171,7 +171,7 @@ class DynamicEnsemble:
         Returns:
             - accuracy: Win rate over the window.
             - calibration_error: Average deviation between confidence and outcome.
-            - drift_score: Measure of recent performance degradation vs long-term.
+            - drift_score: Comprehensive measure of recent performance degradation.
         """
         history = self._history.get(model_name, [])
         if not history:
@@ -180,24 +180,33 @@ class DynamicEnsemble:
         # 1. Accuracy (Win Rate)
         acc = sum(h["accuracy_gain"] for h in history) / len(history)
 
-        # 2. Calibration Error
+        # 2. Calibration Error (Brier Score)
         cal = sum(h["calibration_error"] for h in history) / len(history)
 
         # 3. Drift Detection (Recent 20% vs Full Window)
-        # Sensitivity-ratio approach: (acc - recent_acc) / (acc + 1e-9) * 2.0
-        drift = 0.0
+        acc_drift = 0.0
+        cal_drift = 0.0
         if len(history) >= 10:
             recent_split = max(1, len(history) // 5)
-            recent_acc = (
-                sum(h["accuracy_gain"] for h in list(history)[-recent_split:]) / recent_split
-            )
+            recent_history = list(history)[-recent_split:]
+
+            # 3.1 Accuracy Drift
+            recent_acc = sum(h["accuracy_gain"] for h in recent_history) / recent_split
             # Drift is high if recent performance is significantly lower than window average
-            drift = float(np.clip((acc - recent_acc) / (acc + 1e-9) * 2.0, 0.0, 1.0))
+            acc_drift = float(np.clip((acc - recent_acc) / (acc + 1e-9) * 2.0, 0.0, 1.0))
+
+            # 3.2 Calibration Drift (Reliability Decay)
+            recent_cal = sum(h["calibration_error"] for h in recent_history) / recent_split
+            # Drift is high if recent calibration error is significantly higher than window average
+            cal_drift = float(np.clip((recent_cal - cal) / (max(cal, 0.01)) * 2.0, 0.0, 1.0))
+
+        # Blend drifts: Accuracy decay is primary, Calibration decay is secondary
+        drift_score = float(np.clip(0.7 * acc_drift + 0.3 * cal_drift, 0.0, 1.0))
 
         return {
             "accuracy": float(acc),
             "calibration_error": float(cal),
-            "drift_score": drift,
+            "drift_score": drift_score,
         }
 
     def update_weights(
@@ -249,7 +258,12 @@ class DynamicEnsemble:
 
             # Core scoring formula: High weight on accuracy, penalized by drift and miscalibration.
             # Institutional weightings: accuracy (1.0x), calibration (0.3x penalty), drift (0.4x penalty)
-            score = acc - (0.3 * cal) - (0.4 * drift)
+            drift_penalty = 0.4
+            if volatility > 2.0:
+                # Increase drift penalty by 50% in high volatility contexts
+                drift_penalty *= 1.5
+
+            score = acc - (0.3 * cal) - (drift_penalty * drift)
 
             # Regime-based adjustments (XAUUSD heuristics)
             if regime == MarketRegime.NEWS_SHOCK:
