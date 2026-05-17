@@ -67,8 +67,11 @@ def test_robustness_scoring_components(sample_data):
     params = {"fast_window": 9, "slow_window": 21}
 
     # Test stability penalty
-    stability = optimizer._calculate_stability_penalty(params, sample_data)
-    assert isinstance(stability, float)
+    penalty, sensitivities = optimizer._calculate_stability_penalty(params, sample_data)
+    assert isinstance(penalty, float)
+    assert isinstance(sensitivities, dict)
+    assert "fast_window" in sensitivities
+    assert "slow_window" in sensitivities
 
     # Test type-safe perturbations for integers
     int_params = {"window": 10}
@@ -77,8 +80,9 @@ def test_robustness_scoring_components(sample_data):
         {"Sharpe Ratio": 1.0 + (p["window"] * 0.01)},
         np.zeros(len(d)),
     )
-    stability_int = optimizer._calculate_stability_penalty(int_params, sample_data)
-    assert isinstance(stability_int, float)
+    penalty_int, sens_int = optimizer._calculate_stability_penalty(int_params, sample_data)
+    assert isinstance(penalty_int, float)
+    assert "window" in sens_int
 
     # Test handling of zero values in stability penalty
     zero_params = {"param": 0.0}
@@ -86,8 +90,8 @@ def test_robustness_scoring_components(sample_data):
         {"Sharpe Ratio": 1.0 + (p["param"] * 0.1)},
         np.zeros(len(d)),
     )
-    stability_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
-    assert stability_zero > 0.0  # Should be non-zero due to epsilon perturbation
+    penalty_zero, sens_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
+    assert penalty_zero > 0.0  # Should be non-zero due to epsilon perturbation
 
     # Test regime consistency
     consistency = optimizer._calculate_regime_consistency(optimizer.data, params)
@@ -122,6 +126,10 @@ def test_full_optimization_run(sample_data):
     assert 0 <= result.metrics.win_rate_consistency <= 1.0
     assert 0 <= result.metrics.max_drawdown_consistency <= 1.0
     assert len(result.oos_returns) > 0
+
+    # Verify granular sensitivities
+    assert "fast_window" in result.metrics.parameter_sensitivities
+    assert "slow_window" in result.metrics.parameter_sensitivities
 
     # Verify window results
     assert len(result.window_results) >= 3
@@ -302,7 +310,7 @@ def test_ranking_by_robustness(sample_data):
             return 5.0  # High penalty
         return 0.0
 
-    optimizer._calculate_stability_penalty = mock_stability
+    optimizer._calculate_stability_penalty = lambda p, d: (mock_stability(p, d), {})
 
     result = optimizer.run_optimization()
 
@@ -375,7 +383,7 @@ def test_stability_penalty_fragility_safeguard(sample_data):
 
     optimizer._evaluate_strategy = failing_eval
     params = {"param": 0.5}
-    penalty = optimizer._calculate_stability_penalty(params, sample_data)
+    penalty, _ = optimizer._calculate_stability_penalty(params, sample_data)
     assert penalty == 10.0
 
 
@@ -406,7 +414,7 @@ def test_stability_penalty_scale_invariance(sample_data):
 
     optimizer._evaluate_strategy = mock_eval
     params = {"p1": 100.0}
-    cv_penalty = optimizer._calculate_stability_penalty(params, sample_data)
+    cv_penalty, _ = optimizer._calculate_stability_penalty(params, sample_data)
     assert 0.07 < cv_penalty < 0.09
 
 
@@ -549,7 +557,7 @@ def test_strict_fragility_penalty(sample_data):
 
     optimizer._evaluate_strategy = mock_eval
     params = {"fast_window": 10, "slow_window": 20}
-    penalty = optimizer._calculate_stability_penalty(params, sample_data)
+    penalty, _ = optimizer._calculate_stability_penalty(params, sample_data)
 
     # Should return the maximum penalty of 10.0 due to fragility (positive to negative flip)
     assert penalty == 10.0
@@ -612,6 +620,25 @@ def test_stability_penalty_zero_value_robustness(sample_data):
     optimizer._calculate_stability_penalty(params, sample_data)
 
     assert all(d >= 1e-5 for d in captured_deltas)
+
+
+def test_get_best_strategy(sample_data):
+    """Verifies the get_best_strategy method."""
+
+    def param_space(trial):
+        return {
+            "fast_window": trial.suggest_int("fast_window", 10, 10),
+            "slow_window": trial.suggest_int("slow_window", 20, 20),
+        }
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, param_space, config)
+    result = optimizer.run_optimization()
+
+    strategy = result.get_best_strategy(EMACrossoverStrategy)
+    assert isinstance(strategy, EMACrossoverStrategy)
+    assert strategy.fast_window == 10
+    assert strategy.slow_window == 20
 
 
 def test_regime_consistency_single_regime_fallback(sample_data):
