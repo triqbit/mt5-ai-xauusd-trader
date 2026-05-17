@@ -9,8 +9,8 @@ Ensures that runtime validation strictly prevents inconsistent decision states.
 import pytest
 from pydantic import ValidationError
 
-from src.core.schemas import ExecutionDecision, RiskDecision, TradeSignal
 from src.core.constants import SignalDirection
+from src.core.schemas import ExecutionDecision, RiskDecision, TradeSignal
 
 
 def test_risk_decision_valid_approval():
