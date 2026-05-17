@@ -20,12 +20,17 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
+
+if TYPE_CHECKING:
+    from src.trading.risk_engine import RiskDecision
 
 logger = logging.getLogger(__name__)
 
@@ -76,23 +81,27 @@ class RiskManager:
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
     # -- Public API ---------------------------------------------------------
-    def approve(
+    def validate_signal(
         self,
         signal: TradeSignal,
-        signal_id: Optional[int] = None,
+        market_data: Optional[pd.DataFrame] = None,
+        open_positions: Optional[List[dict]] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+        signal_id: Optional[int] = None,
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns a RiskDecision object.
         """
+        from src.trading.risk_engine import RiskDecision
+
         rejection_reason = ""
         if not self._check_circuit_breaker():
             rejection_reason = "Circuit breaker active"
         elif not self._check_daily_loss():
             rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
+        elif not self._check_max_positions(open_positions):
+            rejection_reason = "Max concurrent positions reached"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
         elif not self._check_minimum_confidence(signal.confidence):
@@ -105,6 +114,31 @@ class RiskManager:
             rejection_reason = "Model health metrics below threshold"
 
         passed = rejection_reason == ""
+
+        # Calculate lot size if passed and market_data provided
+        adjusted_lots = signal.lot_size
+        if passed:
+            if market_data is not None:
+                adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
+
+            # Layer 4: Exposure Limits (requires open_positions)
+            if open_positions is not None:
+                from src.trading.risk_engine import RiskEngine
+
+                engine_stub = RiskEngine(self.cfg, self.balance)
+                engine_stub.daily = self.daily
+
+                # Check directional exposure
+                if not engine_stub._check_directional_exposure(signal, open_positions):
+                    passed = False
+                    rejection_reason = "Max directional exposure reached (30%)"
+                # Check total notional
+                elif market_data is not None and not engine_stub._check_total_notional(
+                    signal, open_positions, market_data
+                ):
+                    passed = False
+                    rejection_reason = "Total notional exposure exceeds equity"
+
         if not passed:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
@@ -119,7 +153,67 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+
+        return RiskDecision(
+            is_approved=passed,
+            reason=rejection_reason or "Approved",
+            adjusted_lot_size=adjusted_lots,
+        )
+
+    def approve(
+        self,
+        signal: TradeSignal,
+        signal_id: Optional[int] = None,
+        model_health: Optional[dict] = None,
+    ) -> bool:
+        """Legacy compatibility wrapper."""
+        decision = self.validate_signal(signal, model_health=model_health, signal_id=signal_id)
+        return decision.is_approved
+
+    def calculate_position_size(self, symbol: str, market_data: pd.DataFrame) -> float:
+        """
+        ATR-based position sizing according to RISK_LIMITS.md.
+        """
+        if market_data.empty:
+            return self.cfg.min_lot_size
+
+        # Find ATR column (resilient matching)
+        atr_col = next((c for c in market_data.columns if "atr" in c.lower()), None)
+        if not atr_col:
+            return self.cfg.min_lot_size
+
+        current_atr = market_data[atr_col].iloc[-1]
+        # Use approx 30 days of data for average ATR if possible (8640 M5 bars)
+        avg_atr = market_data[atr_col].tail(8640).mean()
+
+        vol_multiplier = 1.0
+        ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
+
+        if ratio > self.cfg.volatility_extreme_threshold:
+            return 0.0
+        elif ratio > self.cfg.volatility_very_high_threshold:
+            vol_multiplier = 0.5
+        elif ratio > self.cfg.volatility_high_threshold:
+            vol_multiplier = 0.75
+
+        # Sizing: risk 1% (cfg.risk_per_trade) of balance
+        risk_amount = self.balance * self.cfg.risk_per_trade
+        # ATR * 100 converts gold ATR to $ per lot (for XAUUSD)
+        # We ensure current_atr is not zero to avoid division by zero
+        if current_atr <= 0:
+            return self.cfg.min_lot_size
+        lot_size = (risk_amount / (current_atr * 100)) * vol_multiplier
+
+        # Cap at Max Position Size (10% of equity)
+        max_notional = self.balance * self.cfg.max_position_size_pct
+        price_col = next((c for c in market_data.columns if "close" in c.lower()), "close")
+        price = market_data[price_col].iloc[-1]
+        max_lots = max_notional / (price * 100)
+
+        final_lots = min(lot_size, max_lots)
+        final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
+
+        return final_lots
 
     def size_position(
         self,
@@ -213,7 +307,7 @@ class RiskManager:
 
     def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
+        if drawdown >= self.cfg.max_drawdown:
             logger.critical(
                 "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
                 drawdown * 100,
@@ -221,7 +315,7 @@ class RiskManager:
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
+                    description=f"Drawdown {drawdown * 100:.1f}% hit {self.cfg.max_drawdown*100:.1f}% limit",
                 )
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
@@ -237,8 +331,9 @@ class RiskManager:
             return False
         return True
 
-    def _check_max_positions(self) -> bool:
-        if len(self.open_positions) >= self.cfg.max_positions:
+    def _check_max_positions(self, open_positions: Optional[List[dict]] = None) -> bool:
+        count = len(open_positions) if open_positions is not None else len(self.open_positions)
+        if count >= self.cfg.max_positions:
             logger.debug("Max positions reached (%d)", self.cfg.max_positions)
             return False
         return True

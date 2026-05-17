@@ -73,7 +73,7 @@ def test_drawdown_breaker(risk_manager, buy_signal, market_data):
 
     decision = risk_manager.validate_signal(buy_signal, market_data, [])
     assert not decision.is_approved
-    assert "drawdown" in decision.reason.lower()
+    assert "circuit breaker" in decision.reason.lower()
 
 def test_daily_loss_limit(risk_manager, buy_signal, market_data):
     risk_manager.daily.peak_equity = 10000.0
@@ -81,7 +81,7 @@ def test_daily_loss_limit(risk_manager, buy_signal, market_data):
 
     decision = risk_manager.validate_signal(buy_signal, market_data, [])
     assert not decision.is_approved
-    assert "daily loss" in decision.reason.lower()
+    assert "circuit breaker" in decision.reason.lower()
 
 def test_max_positions(risk_manager, buy_signal, market_data):
     open_positions = [
@@ -109,13 +109,13 @@ def test_directional_exposure(risk_manager, buy_signal, market_data):
 def test_atr_position_sizing(risk_manager, market_data):
     # Normal volatility
     market_data["atr"] = 1.0
-    size = risk_manager.size_position("XAUUSD", market_data)
+    size = risk_manager.calculate_position_size("XAUUSD", market_data)
     assert size > 0
 
     # Extreme volatility
     market_data.loc[market_data.index[-1], "atr"] = 4.0
     # avg_atr remains approx 1.0. ratio = 4.0 > 3.0 (extreme threshold)
-    size = risk_manager.size_position("XAUUSD", market_data)
+    size = risk_manager.calculate_position_size("XAUUSD", market_data)
     assert size == 0.0
 
 def test_full_approval(risk_manager, buy_signal, market_data):
