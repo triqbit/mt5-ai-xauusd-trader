@@ -21,19 +21,10 @@ import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class RiskDecision:
-    """Decision details from the RiskEngine."""
-
-    is_approved: bool
-    reason: str = ""
-    adjusted_lot_size: float = 0.0
 
 
 @dataclass
@@ -108,51 +99,55 @@ class RiskEngine:
         """
         # Layer 1: Circuit Breakers (Equity Drawdown)
         if not self._check_drawdown_breaker():
-            return RiskDecision(False, "Hard drawdown limit reached")
+            return RiskDecision(is_approved=False, reason="Hard drawdown limit reached")
 
         # Layer 2: Daily Loss Limits (Level 4)
         if self.get_daily_loss_level() >= 4:
-            return RiskDecision(False, "Daily loss limit reached (Level 4)")
+            return RiskDecision(is_approved=False, reason="Daily loss limit reached (Level 4)")
 
         # Layer 3: Activity Limits
         if self.daily.trade_count >= self.cfg.max_trades_per_day:
-            return RiskDecision(False, "Max daily trades reached")
+            return RiskDecision(is_approved=False, reason="Max daily trades reached")
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
-            return RiskDecision(False, "Max consecutive losses reached")
+            return RiskDecision(is_approved=False, reason="Max consecutive losses reached")
 
         # Layer 4: Exposure Limits
         if len(open_positions) >= self.cfg.max_positions:
-            return RiskDecision(False, "Max concurrent positions reached")
+            return RiskDecision(is_approved=False, reason="Max concurrent positions reached")
         if not self._check_directional_exposure(signal, open_positions):
-            return RiskDecision(False, "Max directional exposure reached (30%)")
+            return RiskDecision(is_approved=False, reason="Max directional exposure reached (30%)")
         if not self._check_total_notional(signal, open_positions, market_data):
-            return RiskDecision(False, "Total notional exposure exceeds equity")
+            return RiskDecision(is_approved=False, reason="Total notional exposure exceeds equity")
 
         # Layer 5: Symbol Allocation (Simplified for XAUUSD focus)
         if signal.symbol != self.cfg.symbol:
-            return RiskDecision(False, f"Symbol {signal.symbol} not in approved list")
+            return RiskDecision(is_approved=False, reason=f"Symbol {signal.symbol} not in approved list")
 
         # Layer 6: Prediction Limits
         if signal.confidence < self.cfg.min_confidence:
             return RiskDecision(
-                False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
+                is_approved=False, reason=f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
             )
 
         # Layer 7: Risk-Reward Validation (Min 1.5 R:R)
         if not self._check_risk_reward(signal):
-            return RiskDecision(False, "Risk-Reward ratio below 1.5")
+            return RiskDecision(is_approved=False, reason="Risk-Reward ratio below 1.5")
 
         # Layer 8: Model Health
         if not self._check_model_health(model_health):
-            return RiskDecision(False, "Model health metrics below threshold")
+            return RiskDecision(is_approved=False, reason="Model health metrics below threshold")
 
         # Calculate final lot size using ATR-based sizing
         adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
 
         if adjusted_lots < self.cfg.min_lot_size:
-            return RiskDecision(False, f"Calculated lot size {adjusted_lots} below minimum")
+            return RiskDecision(
+                is_approved=False,
+                reason=f"Calculated lot size {adjusted_lots} below minimum",
+                adjusted_lot_size=0.0,
+            )
 
-        return RiskDecision(True, "Approved", adjusted_lots)
+        return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=adjusted_lots)
 
     def calculate_position_size(self, symbol: str, market_data: pd.DataFrame) -> float:
         """

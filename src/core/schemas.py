@@ -21,7 +21,43 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from src.core.constants import SYMBOL_PATTERN, SignalDirection
+from src.core.constants import MIN_RR_RATIO, SYMBOL_PATTERN, SignalDirection
+
+
+class RiskDecision(BaseModel):
+    """
+    Structured result of the risk engine validation.
+    Enforces technical trust by ensuring every decision is explicit and auditable.
+
+    This model is immutable (frozen) and forbids extra fields.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="Final risk approval: True if passed all layers")
+    reason: str = Field("", description="Detailed reason for the decision (especially if rejected)")
+    adjusted_lot_size: float = Field(
+        0.0, ge=0.0, description="The final calculated lot size after risk-based adjustments"
+    )
+    trace: dict[str, Any] = Field(
+        default_factory=dict, description="Detailed audit trace of all risk layers evaluated"
+    )
+
+    @model_validator(mode="after")
+    def validate_approval_state(self) -> RiskDecision:
+        """
+        Ensure consistency between is_approved and reason/lot_size.
+        """
+        if not self.is_approved:
+            if not self.reason:
+                raise ValueError("A rejected risk decision must provide a 'reason'.")
+            if self.adjusted_lot_size > 0:
+                raise ValueError("A rejected risk decision cannot have an adjusted lot size > 0.")
+        else:
+            if not self.reason:
+                # Default to approved if not specified
+                object.__setattr__(self, "reason", "Approved")
+        return self
 
 
 class TradeSignal(BaseModel):
@@ -92,11 +128,10 @@ class TradeSignal(BaseModel):
             raise ValueError("Risk (Entry - SL) must be greater than zero")
 
         rr_ratio = reward / risk
-        min_rr = 1.5
 
-        if rr_ratio < min_rr:
+        if rr_ratio < MIN_RR_RATIO:
             raise ValueError(
-                f"Risk-Reward ratio ({rr_ratio:.2f}) is below the required minimum of {min_rr}. "
+                f"Risk-Reward ratio ({rr_ratio:.2f}) is below the required minimum of {MIN_RR_RATIO}. "
                 f"Risk: {risk:.2f}, Reward: {reward:.2f}"
             )
 

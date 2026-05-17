@@ -20,22 +20,8 @@ from scipy import stats
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
-    from src.core.schemas import TradeSignal
 
-
-@dataclass
-class ExecutionDecision:
-    """Result of the 6-layer execution filter cascade."""
-
-    signal: TradeSignal
-    confidence_score: float
-    blocked_by: str | None
-    trace: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def is_approved(self) -> bool:
-        """Returns True if the signal passed all 6 layers."""
-        return self.blocked_by is None
+from src.core.schemas import ExecutionDecision, TradeSignal
 
 logger = logging.getLogger(__name__)
 

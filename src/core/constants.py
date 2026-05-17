@@ -15,6 +15,9 @@ from typing import Literal
 # Enforces institutional naming conventions for financial instruments.
 SYMBOL_PATTERN = r"^[A-Z0-9]{3,20}$"
 
+# Institutional Risk Management Standards
+MIN_RR_RATIO = 1.5  # Standard minimum Risk-to-Reward ratio
+
 # --- Timeframes ---
 # Strict Literal type for static analysis of trading intervals.
 VALID_TIMEFRAMES = Literal[
