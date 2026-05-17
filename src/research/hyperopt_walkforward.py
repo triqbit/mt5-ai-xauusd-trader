@@ -77,6 +77,8 @@ class WalkForwardConfig(BaseModel):
     min_oos_sharpe: float = Field(-float("inf"), description="Minimum allowed OOS Sharpe Ratio")
     max_oos_drawdown: float = Field(1.0, description="Maximum allowed OOS Drawdown (fraction)")
     min_trades_per_window: int = Field(5, description="Minimum trades required in each OOS window")
+    min_regime_consistency: float = Field(0.0, description="Minimum required regime consistency score")
+    min_walk_forward_efficiency: float = Field(0.0, description="Minimum required WFE (OOS / IS Sharpe)")
 
 
 class RobustnessMetrics(BaseModel):
@@ -97,6 +99,44 @@ class RobustnessMetrics(BaseModel):
     robustness_score: float
     walk_forward_efficiency: float = 0.0
     constraints_violated: bool = False
+    grade: str = "F"
+
+    def calculate_grade(self) -> str:
+        """
+        Assigns an institutional robustness grade (A-F).
+
+        Criteria:
+        - A: Excellent robustness (>1.0), high WFE (>0.7), high regime consistency (>0.7), no violations.
+        - B: Good robustness (>0.6), moderate WFE (>0.5), no major violations.
+        - C: Acceptable robustness (>0.3), no major violations.
+        - D: Poor robustness or minor violations.
+        - F: Critical failure or major constraint violations.
+        """
+        if self.constraints_violated:
+            return "F"
+
+        if (
+            self.robustness_score > 1.0
+            and self.walk_forward_efficiency > 0.7
+            and self.regime_consistency > 0.7
+            and self.oos_sharpe_mean > 1.0
+        ):
+            return "A"
+
+        if (
+            self.robustness_score > 0.6
+            and self.walk_forward_efficiency > 0.5
+            and self.oos_sharpe_mean > 0.5
+        ):
+            return "B"
+
+        if self.robustness_score > 0.3 and self.oos_sharpe_mean > 0.0:
+            return "C"
+
+        if self.robustness_score > 0.0:
+            return "D"
+
+        return "F"
 
 
 class WindowResult(BaseModel):
@@ -173,6 +213,7 @@ class WalkForwardResult(BaseModel):
 
         violation_txt = " | [CONSTRAINTS VIOLATED]" if self.metrics.constraints_violated else ""
         insights = (
+            f"Grade: {self.metrics.grade} | "
             f"OOS Sharpe Mean: {self.metrics.oos_sharpe_mean:.2f} | "
             f"WFE: {self.metrics.walk_forward_efficiency:.2f} | "
             f"Worst OOS Sharpe: {self.metrics.worst_window_sharpe:.2f} | "
@@ -486,6 +527,17 @@ class WalkForwardOptimizer:
                 constraint_penalty += 10.0 * (max_oos_dd - self.config.max_oos_drawdown)
                 violated = True
 
+            # Average regime consistency across all windows
+            regime_cons = float(np.mean(regime_cons_list))
+            if regime_cons < self.config.min_regime_consistency:
+                constraint_penalty += 10.0 * (self.config.min_regime_consistency - regime_cons)
+                violated = True
+
+            wfe_val = oos_mean / (is_mean + 1e-9)
+            if wfe_val < self.config.min_walk_forward_efficiency:
+                constraint_penalty += 10.0 * (self.config.min_walk_forward_efficiency - wfe_val)
+                violated = True
+
             # Consistency metrics (1 - CV)
             wr_cons = 1.0 - (np.std(oos_win_rates) / (np.mean(oos_win_rates) + 1e-9))
             dd_cons = 1.0 - (np.std(oos_max_drawdowns) / (np.mean(oos_max_drawdowns) + 1e-9))
@@ -512,13 +564,9 @@ class WalkForwardOptimizer:
                     if vals:
                         avg_param_sens[k] = float(np.mean(vals))
 
-            # Average regime consistency across all windows
-            regime_cons = float(np.mean(regime_cons_list))
-
             # Calculate Robustness Score
             # Reward: high OOS Sharpe, worst-case Sharpe, consistency, high WFE
             # Penalize: high OOS Variance, high IS/OOS Gap, High parameter sensitivity, Low regime consistency, Constraints violated
-            wfe_val = oos_mean / (is_mean + 1e-9)
             w = self.config.robustness_weights
             robustness = (
                 (w.oos_mean * oos_mean)
@@ -589,6 +637,7 @@ class WalkForwardOptimizer:
             robustness_score=best_trial.user_attrs["robustness_score"],
             constraints_violated=best_trial.user_attrs["violated"],
         )
+        metrics.grade = metrics.calculate_grade()
 
         # Generate window results for best params and aggregate returns
         window_results = []

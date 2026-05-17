@@ -676,3 +676,134 @@ def test_window_alignment_and_no_gaps(sample_data):
 
         # OOS must follow IS
         assert test_curr.index[0] == train_curr.index[-1] + 1
+
+
+def test_min_regime_consistency_constraint(sample_data):
+    """Verifies that the min_regime_consistency constraint is enforced."""
+
+    def param_space(trial):
+        return {"param": 1}
+
+    # Set an impossible regime consistency requirement
+    config = WalkForwardConfig(
+        n_trials=1,
+        train_size=100,
+        test_size=20,
+        step_size=50,
+        min_regime_consistency=2.0,  # Max is 1.0
+    )
+
+    class DummyStrategy:
+        def __init__(self, **kwargs):
+            self.name = "Dummy"
+
+        def predict(self, df):
+            return np.zeros(len(df))
+
+    optimizer = WalkForwardOptimizer(
+        data=sample_data, strategy_factory=DummyStrategy, param_space=param_space, config=config
+    )
+
+    result = optimizer.run_optimization()
+    assert result.metrics.constraints_violated is True
+    assert result.metrics.grade == "F"
+
+
+def test_min_wfe_constraint(sample_data):
+    """Verifies that the min_walk_forward_efficiency constraint is enforced."""
+
+    def param_space(trial):
+        return {"param": 1}
+
+    # Set an impossible WFE requirement
+    config = WalkForwardConfig(
+        n_trials=1,
+        train_size=100,
+        test_size=20,
+        step_size=50,
+        min_walk_forward_efficiency=10.0,
+    )
+
+    class DummyStrategy:
+        def __init__(self, **kwargs):
+            self.name = "Dummy"
+
+        def predict(self, df):
+            return np.zeros(len(df))
+
+    optimizer = WalkForwardOptimizer(
+        data=sample_data, strategy_factory=DummyStrategy, param_space=param_space, config=config
+    )
+
+    result = optimizer.run_optimization()
+    assert result.metrics.constraints_violated is True
+    assert result.metrics.grade == "F"
+
+
+def test_robustness_grading_logic():
+    """Verifies the institutional robustness grading logic in RobustnessMetrics."""
+    from src.research.hyperopt_walkforward import RobustnessMetrics
+
+    # Grade A: Perfect
+    m_a = RobustnessMetrics(
+        oos_sharpe_mean=1.5,
+        oos_sharpe_std=0.1,
+        worst_window_sharpe=1.2,
+        win_rate_consistency=0.9,
+        max_drawdown_consistency=0.9,
+        is_oos_gap=0.1,
+        stability_penalty=0.05,
+        regime_consistency=0.8,
+        robustness_score=1.1,
+        walk_forward_efficiency=0.8,
+        constraints_violated=False,
+    )
+    assert m_a.calculate_grade() == "A"
+
+    # Grade B: Good
+    m_b = RobustnessMetrics(
+        oos_sharpe_mean=0.6,
+        oos_sharpe_std=0.2,
+        worst_window_sharpe=0.4,
+        win_rate_consistency=0.8,
+        max_drawdown_consistency=0.8,
+        is_oos_gap=0.2,
+        stability_penalty=0.1,
+        regime_consistency=0.6,
+        robustness_score=0.7,
+        walk_forward_efficiency=0.6,
+        constraints_violated=False,
+    )
+    assert m_b.calculate_grade() == "B"
+
+    # Grade C: Acceptable
+    m_c = RobustnessMetrics(
+        oos_sharpe_mean=0.2,
+        oos_sharpe_std=0.3,
+        worst_window_sharpe=0.0,
+        win_rate_consistency=0.6,
+        max_drawdown_consistency=0.6,
+        is_oos_gap=0.4,
+        stability_penalty=0.2,
+        regime_consistency=0.4,
+        robustness_score=0.4,
+        walk_forward_efficiency=0.4,
+        constraints_violated=False,
+    )
+    assert m_c.calculate_grade() == "C"
+
+    # Grade F: Violation
+    m_f = RobustnessMetrics(
+        oos_sharpe_mean=2.0,
+        oos_sharpe_std=0.0,
+        worst_window_sharpe=2.0,
+        win_rate_consistency=1.0,
+        max_drawdown_consistency=1.0,
+        is_oos_gap=0.0,
+        stability_penalty=0.0,
+        regime_consistency=1.0,
+        robustness_score=2.0,
+        walk_forward_efficiency=1.0,
+        constraints_violated=True,  # Constraint violation
+    )
+    assert m_f.calculate_grade() == "F"
