@@ -274,8 +274,10 @@ def test_get_prediction_robustness():
 
     class MultiAgent:
         def predict(self, obs):
-            if obs[0] == 1: return (np.array([1]), {"info": "sb3"})
-            if obs[0] == 2: return [2, 0]
+            if obs[0] == 1:
+                return (np.array([1]), {"info": "sb3"})
+            if obs[0] == 2:
+                return [2, 0]
             if obs[0] == 3:
                 from src.core.constants import SignalDirection
                 from src.models.base_model import Signal
@@ -284,7 +286,8 @@ def test_get_prediction_robustness():
                 class MockEnum:
                     value = 1
                 return MockEnum()
-            if obs[0] == 5: return -1 # Test explicit SELL mapping
+            if obs[0] == 5:
+                return -1  # Test explicit SELL mapping
             return 0
 
     assert evaluator._get_prediction(MultiAgent(), np.array([1])) == 1

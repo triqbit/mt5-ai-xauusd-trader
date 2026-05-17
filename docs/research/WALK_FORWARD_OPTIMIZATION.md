@@ -24,6 +24,11 @@ Configurations are ranked by a multi-factor `Robustness Score` rather than simpl
 
 ### 3. Institutional Reporting
 WFO results are integrated into the `ResearchReport` framework.
+- **Robustness Grade**: A qualitative grade (A-F) based on institutional standards:
+    - **A**: Excellent robustness (>1.0), high WFE (>0.7), high regime consistency (>0.7), no violations.
+    - **B**: Good robustness (>0.6), moderate WFE (>0.5), no major violations.
+    - **C**: Acceptable robustness (>0.3), no major violations.
+    - **F**: Critical failure or constraint violations.
 - **Stability Score**: An aggregate robustness metric scaled from 0 to 100.
 - **Parameter Analysis**: Each optimized parameter is tagged with a qualitative sensitivity label:
     - **Low**: CV < 0.2
@@ -32,7 +37,11 @@ WFO results are integrated into the `ResearchReport` framework.
 
 ### 4. Anti-Overfitting Safeguards
 - **Fragility Safeguards**: A high penalty (10.0) is applied if parameter perturbations lead to failures or extreme performance drops.
-- **Constraint Enforcement**: Minimum allowed OOS Sharpe and maximum allowed OOS Drawdown are strictly enforced.
+- **Constraint Enforcement**: Institutional constraints are strictly enforced. Configurations failing any of these incur heavy penalties:
+    - **Min OOS Sharpe**: Minimum allowed Sharpe ratio in out-of-sample windows.
+    - **Max OOS Drawdown**: Maximum allowed drawdown in out-of-sample windows.
+    - **Min Regime Consistency**: Minimum required stability across market regimes.
+    - **Min Walk-Forward Efficiency**: Minimum required ratio of OOS to IS performance.
 - **Minimum Trade Threshold**: A `min_trades_per_window` constraint (default: 5) ensures that OOS performance is statistically grounded. Windows with too few trades incur a linear penalty to the robustness score.
 
 ## Usage
