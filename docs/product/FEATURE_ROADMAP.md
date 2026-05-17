@@ -1,30 +1,22 @@
-# 🗺️ Strategic Feature Roadmap - May 16, 2026
+# 🗺️ Strategic Feature Roadmap - May 17, 2026
 
-This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an institutional-grade "Glass Box" system. It reflects the latest maturity assessment and the 13-area anti-friction strategy.
+This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an institutional-grade "Glass Box" system. It reflects the latest maturity assessment following the successful harmonization of the Risk Management API and Feature Engineering pipeline.
 
 ---
 
-## 📊 Repo Maturity Assessment (May 16, 2026)
+## 📊 Repo Maturity Assessment (May 17, 2026)
 
 | Category | Maturity | Gaps & Observations |
 | :--- | :--- | :--- |
-| **Product Capability** | 🟡 8.5/10 | **Status:** High-throughput execution loop (P50=1.38ms) is verified. **Gap:** Fragmentation in Risk Management—`RiskManager` still uses 6-layer logic while `RiskEngine` (harmonized) is disconnected. |
-| **Usability** | 🟡 7.5/10 | **Status:** Decision Cockpit TUI is functional. **Gap:** Operator is tethered to the terminal; lacks mobile command/control and signal approval flow. |
-| **Safety** | 🟢 8.8/10 | **Status:** AuditedRiskManager and circuit breakers are structurally enforced. **Gap:** Emergency "Flatten & Fence" (Emergency Kill Switch) remains a verified stub in the Makefile/scripts. |
-| **Intelligence** | 🟡 7.2/10 | **Status:** Regime stability scoring and WFO framework are live. **Gap:** `main.py` live loop still uses stubs for real-time Macro Risk (FRED/YFinance). |
+| **Product Capability** | 🟢 9.3/10 | **Status:** Risk Management Harmonization (8-layer cascade) and Feature Engineering relocation are complete. Core execution loop (P50=31.59ms) is highly optimized. **Gap:** Lack of multi-symbol concurrent execution (currently single symbol focus). |
+| **Usability** | 🟡 7.5/10 | **Status:** Decision Cockpit TUI and Setup Wizard are live. **Gap:** Operator is tethered to the terminal; lacks mobile command/control and interactive signal approval flow. |
+| **Safety** | 🟢 8.8/10 | **Status:** AuditedRiskManager, circuit breakers, and daily loss levels are structurally enforced. **Gap:** Emergency "Flatten & Fence" (Emergency Kill Switch) remains a verified stub in the Makefile. |
+| **Intelligence** | 🟡 7.2/10 | **Status:** Regime detection and WFO framework are live. **Gap:** `main.py` live loop still uses stubs for real-time Macro Risk (FRED/YFinance). |
 | **Market Differentiation** | 🟢 8.5/10 | **Status:** "Glass Box" transparency and signal attribution are the standard. **Gap:** XAUUSD-specific fractal efficiency (Hurst Exponent) and sentiment data feeds are defined but not live. |
 
 ---
 
 ## 🚀 High Priority (Next 2 Weeks)
-
-- **Main Alignment: Risk Management Harmonization**
-  - **Score:** 10/10 | **Cost:** S | **Dependency Readiness:** 🟢 High
-  - **Why:** Critical architectural debt. Consolidation of the 8-layer risk cascade into `RiskManager` to restore test integrity and safety parity.
-  - **Strategic Importance:** 10/10
-  - **Implementation Cost:** S
-  - **Operational Leverage:** High (Restores core system truth and safety)
-  - **End-user Value:** Reliable, verified institutional risk controls.
 
 - **Production-Grade Emergency Kill Switch ("Flatten & Fence")**
   - **Score:** 9.9/10 | **Cost:** S | **Dependency Readiness:** 🟢 High
@@ -76,7 +68,7 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an instituti
   - **Operational Leverage:** Medium (Optimizes fill probability in changing liquidity)
   - **End-user Value:** Automatically "backs off" during toxic liquidity or broker degradation.
 
-##  Telescope Future Consideration
+## 🔭 Future Consideration
 
 - **Institutional Gold Flow & Physical Demand Proxies**
   - **Score:** 7.9/10 | **Cost:** L | **Dependency Readiness:** 🟢 High
