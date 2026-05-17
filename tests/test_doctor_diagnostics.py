@@ -57,8 +57,9 @@ def test_check_env_file_missing():
 def test_check_env_file_placeholders():
     """Verify .env check warns about placeholders."""
     mock_content = "MT5_PASSWORD=YOUR_PASSWORD_HERE\nMT5_SERVER=test"
-    with patch("scripts.doctor.Path.exists", return_value=True):
-        with patch(
+    with (
+        patch("scripts.doctor.Path.exists", return_value=True),
+        patch(
             "builtins.open",
             MagicMock(
                 return_value=MagicMock(
@@ -67,10 +68,11 @@ def test_check_env_file_placeholders():
                     )
                 )
             ),
-        ):
-            res = doctor.check_env_file()
-            assert res.status == "WARNING"
-            assert "YOUR_PASSWORD_HERE" in res.message
+        ),
+    ):
+        res = doctor.check_env_file()
+        assert res.status == "WARNING"
+        assert "YOUR_PASSWORD_HERE" in res.message
 
 
 def test_check_talib_linkage_error():

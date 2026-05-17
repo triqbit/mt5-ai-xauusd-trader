@@ -29,7 +29,7 @@ def test_strategy_config_validation():
     StrategyConfig(strategy_id="TEST", symbol="XAUUSD", model_family="ensemble", capital_cap=100.0)
 
     # This should fail validation
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         StrategyConfig(
             strategy_id="TEST", symbol="XAUUSD", model_family="ensemble", capital_cap=0.0
         )

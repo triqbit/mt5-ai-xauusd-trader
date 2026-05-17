@@ -117,14 +117,10 @@ class RiskManager:
             rejection_reason = "Max consecutive losses reached"
         elif not self._check_model_health(model_health):
             rejection_reason = "Model health metrics below threshold"
+        elif not self._check_directional_exposure(signal, open_positions):
+            rejection_reason = "Max directional exposure reached (30%)"
 
-        passed = rejection_reason == ""
-        if passed:
-            # New Layer 4 Check: Directional Exposure
-            if not self._check_directional_exposure(signal, open_positions):
-                rejection_reason = "Max directional exposure reached (30%)"
-                passed = False
-        if not passed:
+        if rejection_reason:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
@@ -141,8 +137,6 @@ class RiskManager:
             return RiskDecision(is_approved=False, reason=rejection_reason)
 
         # Calculate lot size
-        # For backward compatibility, we'll use a simplified version of size_position
-        # or a better ATR-based one if market_data is available
         lot_size = self.calculate_position_size(signal.symbol, market_data)
 
         return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=lot_size)
@@ -160,13 +154,13 @@ class RiskManager:
         vol_multiplier = 1.0
         ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
 
-        if hasattr(self.cfg, "volatility_extreme_threshold"):
-            if ratio > self.cfg.volatility_extreme_threshold:
-                return 0.0
-            elif ratio > self.cfg.volatility_very_high_threshold:
-                vol_multiplier = 0.5
-            elif ratio > self.cfg.volatility_high_threshold:
-                vol_multiplier = 0.75
+        if hasattr(self.cfg, "volatility_extreme_threshold") and ratio > self.cfg.volatility_extreme_threshold:
+            return 0.0
+
+        if hasattr(self.cfg, "volatility_very_high_threshold") and ratio > self.cfg.volatility_very_high_threshold:
+            vol_multiplier = 0.5
+        elif hasattr(self.cfg, "volatility_high_threshold") and ratio > self.cfg.volatility_high_threshold:
+            vol_multiplier = 0.75
 
         # Sizing: risk 1% (cfg.risk_per_trade) of balance
         risk_amount = self.balance * self.cfg.risk_per_trade
@@ -183,7 +177,6 @@ class RiskManager:
         model_health: Optional[dict] = None,
     ) -> bool:
         """Legacy approval method for backward compatibility."""
-        # Create dummy market data and open positions if not provided
         decision = self.validate_signal(
             signal, pd.DataFrame(), [], model_health=model_health, signal_id=signal_id
         )
@@ -242,7 +235,7 @@ class RiskManager:
 
     # -- Private filter layers ----------------------------------------------
     def _check_directional_exposure(self, signal: TradeSignal, open_positions: list[dict]) -> bool:
-        """30% net directional exposure."""
+        \"\"\"30% net directional exposure.\"\"\"
         net_lots = 0.0
         for pos in open_positions:
             vol = pos.get("volume", 0.0)
@@ -337,7 +330,7 @@ class RiskManager:
         return True
 
     def _check_symbol_allocation(self, symbol: str) -> bool:
-        """Block trading on symbols not in the All-Weather portfolio."""
+        \"\"\"Block trading on symbols not in the All-Weather portfolio.\"\"\"
         if symbol not in ALLOCATION_WEIGHTS:
             logger.warning("Symbol %s not in approved portfolio", symbol)
             return False

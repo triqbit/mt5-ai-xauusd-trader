@@ -1,10 +1,10 @@
-"""
+\"\"\"
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/audited_risk_manager.py
 Subclass of RiskManager that adds comprehensive audit logging to the decision chain.
 Author : triqbit
 License: MIT
-"""
+\"\"\"
 
 from __future__ import annotations
 
@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 class AuditedRiskManager(RiskManager):
-    """
+    \"\"\"
     Enterprise Risk Manager with integrated audit logging.
     Evaluates the full decision chain for traceability.
-    """
+    \"\"\"
 
     def validate_signal(
         self,
@@ -34,20 +34,21 @@ class AuditedRiskManager(RiskManager):
         model_health: Optional[dict] = None,
         signal_id: Optional[int] = None,
     ) -> RiskDecision:
-        """
+        \"\"\"
         Run the full 8-layer risk filter cascade.
         Returns RiskDecision indicating approval status and adjusted lot size.
         Logs the full decision chain to the audit log.
-        """
+        \"\"\"
         decision_chain = {
             "circuit_breaker": self._check_circuit_breaker(),
             "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
+            "max_positions": self._check_max_positions(open_positions),
             "symbol_allocation": self._check_symbol_allocation(signal.symbol),
             "min_confidence": self._check_minimum_confidence(signal.confidence),
             "risk_reward": self._check_risk_reward(signal),
             "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
+            "directional_exposure": self._check_directional_exposure(signal, open_positions),
         }
 
         passed = all(decision_chain.values())
