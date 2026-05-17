@@ -241,9 +241,7 @@ class RiskManager:
         logger.info("Daily stats reset")
 
     # -- Private filter layers ----------------------------------------------
-    def _check_directional_exposure(
-        self, signal: TradeSignal, open_positions: list[dict]
-    ) -> bool:
+    def _check_directional_exposure(self, signal: TradeSignal, open_positions: list[dict]) -> bool:
         """30% net directional exposure."""
         net_lots = 0.0
         for pos in open_positions:
