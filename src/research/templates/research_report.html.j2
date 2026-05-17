@@ -92,6 +92,8 @@
                 {% if trade_patterns %}<a href="#trade-patterns">Patterns</a>{% endif %}
                 {% if model_drift %}<a href="#model-drift">Drift</a>{% endif %}
                 {% if allocation_insights %}<a href="#allocation-insights">Allocation</a>{% endif %}
+                {% if risk_audit %}<a href="#risk-audit">Risk</a>{% endif %}
+                {% if data_quality %}<a href="#data-quality">Data</a>{% endif %}
                 {% if benchmarks %}<a href="#benchmarks">Benchmarks</a>{% endif %}
                 {% if rl_evaluation %}<a href="#rl-evaluation">RL</a>{% endif %}
                 {% if rare_events %}<a href="#rare-events">Rare</a>{% endif %}
@@ -197,6 +199,8 @@
             {% if trade_patterns %}<li><a href="#trade-patterns">{{ ns.count }}. Trade Pattern Findings</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if model_drift %}<li><a href="#model-drift">{{ ns.count }}. Model Drift Observations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if allocation_insights %}<li><a href="#allocation-insights">{{ ns.count }}. Capital Allocation Insights</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if risk_audit %}<li><a href="#risk-audit">{{ ns.count }}. Risk & Compliance Audit</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
+            {% if data_quality %}<li><a href="#data-quality">{{ ns.count }}. Data Integrity & Quality</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if benchmarks %}<li><a href="#benchmarks">{{ ns.count }}. Benchmark Comparisons</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if rl_evaluation %}<li><a href="#rl-evaluation">{{ ns.count }}. RL Agent Evaluation</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
             {% if rare_events %}<li><a href="#rare-events">{{ ns.count }}. Rare Event Simulations</a></li>{% set ns.count = ns.count + 1 %}{% endif %}
@@ -515,6 +519,11 @@
     {% if allocation_insights %}
     {% set ns.count = ns.count + 1 %}
     <section id="allocation-insights">
+        <div style="float: right;">
+            <span class="badge {% if allocation_insights.is_compliant %}badge-stable{% else %}badge-critical{% endif %}">
+                COMPLIANCE: {{ 'PASS' if allocation_insights.is_compliant else 'FAIL' }}
+            </span>
+        </div>
         <h2>{{ ns.count }}. Capital Allocation Insights</h2>
         <div style="display: flex; gap: 40px; margin-bottom: 20px;">
             <div>Portfolio Heat: <strong style="font-size: 1.2rem; color: var(--primary);">{{ allocation_insights.total_heat_pct|round(1) }}%</strong></div>
@@ -549,6 +558,76 @@
             {% endfor %}
         </ul>
         {% endif %}
+    </section>
+    {% endif %}
+
+    {% if risk_audit %}
+    {% set ns.count = ns.count + 1 %}
+    <section id="risk-audit">
+        <div style="float: right;">
+            <span class="badge {% if risk_audit.status == 'VERIFIED' %}badge-stable{% else %}badge-warning{% endif %}">
+                AUDIT: {{ risk_audit.status }}
+            </span>
+        </div>
+        <h2>{{ ns.count }}. Risk & Compliance Audit</h2>
+        <div class="grid-2">
+            <div>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>Portfolio Heat</td>
+                            <td><strong>{{ (risk_audit.portfolio_heat * 100)|round(1) }}%</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Diversification (HHI)</td>
+                            <td><code>{{ risk_audit.hhi_score|round(3) }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Drawdown Compliance</td>
+                            <td><span class="{% if risk_audit.drawdown_limit_compliance %}pass{% else %}fail{% endif %}">{{ 'PASS' if risk_audit.drawdown_limit_compliance else 'FAIL' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td>Leverage Compliance</td>
+                            <td><span class="{% if risk_audit.leverage_compliance %}pass{% else %}fail{% endif %}">{{ 'PASS' if risk_audit.leverage_compliance else 'FAIL' }}</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="insight-box">
+                <strong>Auditor Notes:</strong><br>
+                {{ risk_audit.audit_notes }}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if data_quality %}
+    {% set ns.count = ns.count + 1 %}
+    <section id="data-quality">
+        <div style="float: right;"><span class="badge badge-stable">DATA: {{ data_quality.status }}</span></div>
+        <h2>{{ ns.count }}. Data Integrity & Quality</h2>
+        <div class="score-container">
+            <span>Feed Health:</span>
+            <div class="progress-bar" role="progressbar" aria-valuenow="{{ data_quality.feed_health }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill {% if data_quality.feed_health < 90 %}fill-low{% elif data_quality.feed_health < 98 %}fill-medium{% else %}fill-high{% endif %}" style="width: {{ data_quality.feed_health }}%;"></div>
+            </div>
+            <span class="score">{{ data_quality.feed_health|round(1) }}%</span>
+        </div>
+        <div class="kpi-dashboard" style="margin-top: 1.5rem;">
+            <div class="kpi-card" style="border-top-color: var(--secondary);">
+                <span class="kpi-value">{{ data_quality.missing_bars }}</span>
+                <span class="kpi-label">Missing Bars</span>
+            </div>
+            <div class="kpi-card" style="border-top-color: var(--warning);">
+                <span class="kpi-value">{{ data_quality.stale_bars }}</span>
+                <span class="kpi-label">Stale Bars</span>
+            </div>
+            <div class="kpi-card" style="border-top-color: var(--danger);">
+                <span class="kpi-value">{{ data_quality.gap_count }}</span>
+                <span class="kpi-label">Gaps Detected</span>
+            </div>
+        </div>
+        <p style="margin-top: 1rem; opacity: 0.8;">Primary Data Source: <code>{{ data_quality.data_source }}</code></p>
     </section>
     {% endif %}
 

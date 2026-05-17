@@ -9,7 +9,8 @@ License: MIT
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
@@ -17,6 +18,30 @@ from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+
+# --- Shared Utility Models ---
+
+
+class SectionStatus(str, Enum):
+    """Institutional status levels for report sections."""
+
+    STABLE = "STABLE"
+    OK = "OK"
+    VERIFIED = "VERIFIED"
+    PROVISIONAL = "PROVISIONAL"
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
+    REJECTED = "REJECTED"
+
+
+class PerformanceMetric(BaseModel):
+    """Standardized representation of a single performance or risk metric."""
+
+    name: str
+    value: str
+    status: SectionStatus = SectionStatus.OK
+    benchmark_delta: str | None = None
+
 
 # --- Pydantic Models for Sections ---
 
@@ -56,8 +81,10 @@ class StressTestSection(BaseModel):
     resilience_score: float
     baseline: StressedMetric
     scenarios: list[StressedMetric]
-    fragility_indicators: list[str]
-    failure_points: list[str]
+    sharpe_decay: float = 0.0
+    win_rate_decay: float = 0.0
+    fragility_indicators: list[str] = Field(default_factory=list)
+    failure_points: list[str] = Field(default_factory=list)
     insights: str = ""
 
 
@@ -76,6 +103,8 @@ class HyperparameterSection(BaseModel):
     stability_score: float
     parameters: list[ParameterRobustness]
     insights: str
+    walk_forward_efficiency: float = 0.0
+    grade: str = "F"
 
 
 class PatternConcentration(BaseModel):
@@ -170,6 +199,8 @@ class AllocationSection(BaseModel):
     allocations: list[AllocationEntry]
     rejection_summary: dict[str, int]
     diversification_score: float = 1.0
+    max_strategy_risk: float = 0.3
+    is_compliant: bool = True
 
 
 class BenchmarkComparison(BaseModel):
@@ -294,6 +325,28 @@ class ExecutionQualitySection(BaseModel):
     rejected_count: int
 
 
+class RiskAuditSection(BaseModel):
+    """Section for high-level risk and compliance auditing."""
+
+    portfolio_heat: float
+    hhi_score: float
+    drawdown_limit_compliance: bool
+    leverage_compliance: bool
+    audit_notes: str
+    status: SectionStatus = SectionStatus.VERIFIED
+
+
+class DataQualitySection(BaseModel):
+    """Section for data integrity and feed reliability analysis."""
+
+    feed_health: float  # 0 to 100
+    missing_bars: int
+    stale_bars: int
+    gap_count: int
+    data_source: str
+    status: SectionStatus = SectionStatus.STABLE
+
+
 class StrategicConfluenceSection(BaseModel):
     """Section for regime-signal alignment and strategic confluence."""
 
@@ -346,9 +399,9 @@ class ResearchReport(BaseModel):
     title: str
     executive_summary: str
     conclusion: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     author: str = "Jules Research"
-    overall_status: str = "PROVISIONAL"
+    overall_status: SectionStatus = SectionStatus.PROVISIONAL
 
     regime_analysis: RegimeSection | None = None
     stress_tests: StressTestSection | None = None
@@ -356,6 +409,8 @@ class ResearchReport(BaseModel):
     trade_patterns: TradePatternSection | None = None
     model_drift: ModelDriftSection | None = None
     allocation_insights: AllocationSection | None = None
+    risk_audit: RiskAuditSection | None = None
+    data_quality: DataQualitySection | None = None
     benchmarks: BenchmarkSection | None = None
     rl_evaluation: RLSection | None = None
     rare_events: RareEventSection | None = None
@@ -448,12 +503,19 @@ class ResearchReporter:
 
     def format_for_terminal(self, report: ResearchReport) -> None:
         """Print a scannable version of the report to the terminal."""
-        status_color = "green" if report.overall_status == "VERIFIED" else "yellow"
+        status_color = (
+            "green"
+            if report.overall_status
+            in [SectionStatus.VERIFIED, SectionStatus.STABLE, SectionStatus.OK]
+            else "red"
+            if report.overall_status in [SectionStatus.CRITICAL, SectionStatus.REJECTED]
+            else "yellow"
+        )
         self.console.print(
             Panel(
                 f"[bold blue]{report.title}[/]\n"
                 f"[dim]Date: {report.timestamp} | Author: {report.author}[/]\n"
-                f"Status: [{status_color}]{report.overall_status}[/]"
+                f"Status: [{status_color}]{report.overall_status.value}[/]"
             )
         )
 
@@ -760,7 +822,7 @@ class ResearchOrchestrator:
         title: str,
         executive_summary: str,
         conclusion: str,
-        overall_status: str = "PROVISIONAL",
+        overall_status: SectionStatus = SectionStatus.PROVISIONAL,
         recommendations: list[str] | None = None,
     ):
         self.report = ResearchReport(
@@ -785,6 +847,10 @@ class ResearchOrchestrator:
             self.report.model_drift = section
         elif isinstance(section, AllocationSection):
             self.report.allocation_insights = section
+        elif isinstance(section, RiskAuditSection):
+            self.report.risk_audit = section
+        elif isinstance(section, DataQualitySection):
+            self.report.data_quality = section
         elif isinstance(section, BenchmarkSection):
             self.report.benchmarks = section
         elif isinstance(section, RLSection):
@@ -802,7 +868,7 @@ class ResearchOrchestrator:
         else:
             raise ValueError(f"Unknown section type: {type(section)}")
 
-    def set_status(self, status: str) -> None:
+    def set_status(self, status: SectionStatus) -> None:
         """Set the overall status of the report."""
         self.report.overall_status = status
 

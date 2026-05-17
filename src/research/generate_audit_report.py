@@ -19,6 +19,7 @@ from src.research.reporting import (
     CalibrationBucket,
     CalibrationSection,
     CombinationMotif,
+    DataQualitySection,
     DriftMetric,
     ExecutionMetric,
     ExecutionQualitySection,
@@ -33,6 +34,8 @@ from src.research.reporting import (
     RegimeSummary,
     ResearchOrchestrator,
     ResearchReporter,
+    RiskAuditSection,
+    SectionStatus,
     SignalMotif,
     StrategicConfluenceSection,
     StressedMetric,
@@ -55,7 +58,7 @@ def generate_full_audit():
         ),
         conclusion="The strategy is suitable for deployment in production with a 'Verified' status, "
         "provided macro guardrails are active.",
-        overall_status="VERIFIED",
+        overall_status=SectionStatus.VERIFIED,
         recommendations=[
             "Reduce risk multiplier during high-impact news windows.",
             "Recalibrate LSTM confidence thresholds every 30 days.",
@@ -97,6 +100,8 @@ def generate_full_audit():
             profit_factor="1.95",
             outcome="PASS",
         ),
+        sharpe_decay=0.12,
+        win_rate_decay=0.08,
         scenarios=[
             StressedMetric(
                 name="Spread Widening (3x)",
@@ -154,6 +159,8 @@ def generate_full_audit():
                 name="volatility_lookback", range="10-50", optimal="20", sensitivity="Low"
             ),
         ],
+        walk_forward_efficiency=0.88,
+        grade="A",
         insights="OOS Sharpe Mean: 2.15 | WFE: 0.88 | Worst OOS Sharpe: 1.45 | IS-OOS Gap: 0.25",
     )
     orchestrator.add_section(hyper_section)
@@ -403,7 +410,29 @@ def generate_full_audit():
     )
     orchestrator.add_section(confluence_section)
 
-    # 13. Methodology
+    # 13. Risk & Compliance Audit
+    risk_audit_section = RiskAuditSection(
+        status=SectionStatus.VERIFIED,
+        portfolio_heat=0.425,
+        hhi_score=0.125,
+        drawdown_limit_compliance=True,
+        leverage_compliance=True,
+        audit_notes="Portfolio risk metrics are within institutional limits. HHI indicates healthy diversification.",
+    )
+    orchestrator.add_section(risk_audit_section)
+
+    # 14. Data Quality
+    data_quality_section = DataQualitySection(
+        feed_health=99.8,
+        missing_bars=5,
+        stale_bars=2,
+        gap_count=1,
+        data_source="MetaAPI / XAUUSD_M5",
+        status=SectionStatus.STABLE,
+    )
+    orchestrator.add_section(data_quality_section)
+
+    # 15. Methodology
     methodology_section = MethodologySection(
         data_source="MetaAPI Tick Data / Dukascopy Historical",
         backtest_engine="High-Fidelity Discrete Event Simulator V4",

@@ -10,6 +10,7 @@ from src.research.reporting import (
     AllocationEntry,
     AllocationSection,
     CombinationMotif,
+    DataQualitySection,
     RareEventSection,
     RareEventSummary,
     RegimeSection,
@@ -17,6 +18,8 @@ from src.research.reporting import (
     ResearchOrchestrator,
     ResearchReport,
     ResearchReporter,
+    RiskAuditSection,
+    SectionStatus,
     SignalMotif,
     StressedMetric,
     StressTestSection,
@@ -521,6 +524,93 @@ def test_terminal_dynamic_numbering(mocker):
     assert found_rl, (
         f"RL Evaluation should be section 2, but header not found correctly in: {calls}"
     )
+
+
+def test_risk_audit_reporting():
+    """Verify RiskAuditSection reporting."""
+    risk_section = RiskAuditSection(
+        status=SectionStatus.VERIFIED,
+        portfolio_heat=0.45,
+        hhi_score=0.12,
+        drawdown_limit_compliance=True,
+        leverage_compliance=True,
+        audit_notes="Portfolio risk is well-contained.",
+    )
+
+    report = ResearchReport(
+        title="Risk Audit",
+        executive_summary="Testing risk.",
+        risk_audit=risk_section,
+        conclusion="Safe.",
+    )
+
+    reporter = ResearchReporter()
+    md = reporter.generate_markdown(report)
+    html = reporter.generate_html(report)
+
+    assert "Risk & Compliance Audit" in md
+    assert "45.0%" in md
+    assert "Portfolio risk is well-contained." in md
+
+    assert "Risk & Compliance Audit" in html
+    assert "VERIFIED" in html.upper()
+    assert "0.12" in html
+
+
+def test_data_quality_reporting():
+    """Verify DataQualitySection reporting."""
+    data_section = DataQualitySection(
+        feed_health=98.5,
+        missing_bars=10,
+        stale_bars=5,
+        gap_count=2,
+        data_source="MetaAPI",
+        status=SectionStatus.STABLE,
+    )
+
+    report = ResearchReport(
+        title="Data Audit",
+        executive_summary="Testing data.",
+        data_quality=data_section,
+        conclusion="Data is clean.",
+    )
+
+    reporter = ResearchReporter()
+    md = reporter.generate_markdown(report)
+    html = reporter.generate_html(report)
+
+    assert "Data Integrity & Quality" in md
+    assert "98.5%" in md
+    assert "MetaAPI" in md
+
+    assert "Data Integrity & Quality" in html
+    assert "STABLE" in html.upper()
+    assert "98.5%" in html
+    assert "Gaps Detected" in html
+
+
+def test_enhanced_stress_test_reporting():
+    """Verify enhanced StressTestSection with decay fields."""
+    stress_section = StressTestSection(
+        resilience_score=92.0,
+        baseline=StressedMetric(
+            name="Baseline", total_return="10%", max_drawdown="5%", sharpe="2.0", outcome="PASS"
+        ),
+        scenarios=[],
+        sharpe_decay=0.15,
+        win_rate_decay=0.05,
+    )
+
+    report = ResearchReport(
+        title="Stress Audit",
+        executive_summary="Summary",
+        stress_tests=stress_section,
+        conclusion="Robust.",
+    )
+
+    reporter = ResearchReporter()
+    md = reporter.generate_markdown(report)
+    assert "**Sharpe Decay:** 15.0%" in md
 
 
 def test_generate_audit_report_smoke_test():
