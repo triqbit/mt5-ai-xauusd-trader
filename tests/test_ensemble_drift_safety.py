@@ -77,23 +77,24 @@ class TestEnsembleDriftSafety(unittest.TestCase):
         # std([0.95, 0.45, 0.95]) = ~0.235 (just below 0.25 trigger)
 
         # Let's make it more divergent:
-        signals["dreamer"] = Signal(direction=SignalDirection.BUY, confidence=0.1)
-        # std([0.95, 0.1, 0.95]) = ~0.4 (exceeds 0.25)
+        # Use 0.41 to avoid Veto Power (threshold 0.40) but still trigger high entropy
+        signals["dreamer"] = Signal(direction=SignalDirection.BUY, confidence=0.41)
+        # std([0.95, 0.41, 0.95]) = ~0.2545 (exceeds 0.25 trigger)
 
         result = self.ensemble.aggregate_signals(signals)
 
         self.assertIn("entropy_penalty", result.metadata)
         self.assertEqual(result.metadata["entropy_penalty"], 0.10)
 
-        # Expected confidence (weighted) = (0.95*0.333 + 0.1*0.333 + 0.95*0.334) * 0.9
-        # ~ (0.316 + 0.033 + 0.317) * 0.9 = 0.666 * 0.9 = 0.599
-        self.assertLess(result.confidence, 0.666)
+        # Expected confidence (weighted) = (0.95*0.333 + 0.41*0.333 + 0.95*0.334) * 0.9
+        # ~ (0.316 + 0.136 + 0.317) * 0.9 = 0.77 * 0.9 = 0.693
+        self.assertLess(result.confidence, 0.77)
 
     def test_combined_safeguards(self):
         """Verify both safeguards can apply simultaneously."""
         signals = {
             "ppo": Signal(direction=SignalDirection.BUY, confidence=0.95),
-            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.1),
+            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.41),
             "lstm": Signal(direction=SignalDirection.BUY, confidence=0.95)
         }
 
@@ -110,10 +111,10 @@ class TestEnsembleDriftSafety(unittest.TestCase):
         self.assertIn("drift_penalty", result.metadata)
         self.assertIn("entropy_penalty", result.metadata)
 
-        # Base confidence ~ 0.666
-        # After drift penalty (20%) -> ~0.533
-        # After entropy penalty (10%) -> ~0.48
-        self.assertLess(result.confidence, 0.5)
+        # Base confidence ~ 0.77
+        # After drift penalty (20%) -> ~0.616
+        # After entropy penalty (10%) -> ~0.554
+        self.assertLess(result.confidence, 0.6)
 
 if __name__ == "__main__":
     unittest.main()
