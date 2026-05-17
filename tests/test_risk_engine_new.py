@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from src.core.config import TradingConfig
-from src.trading.risk_engine import RiskEngine
+from src.trading.risk_manager import RiskManager as RiskEngine
 
 
 @pytest.fixture
