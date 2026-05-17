@@ -142,6 +142,12 @@ class RegimeInfo(BaseModel):
         ..., ge=0.0, le=1.0, description="Likelihood of a regime transition"
     )
     volatility_index: float = Field(..., description="Normalized volatility metric")
+    session_alignment: float = Field(
+        0.5, ge=0.0, le=1.0, description="Alignment with current trading session (0.0 to 1.0)."
+    )
+    volatility_alignment: float = Field(
+        0.5, ge=0.0, le=1.0, description="Alignment with current volatility state (0.0 to 1.0)."
+    )
     transition_probabilities: dict[str, float] = Field(
         default_factory=dict,
         description="Full distribution of probabilities for potential next regimes",

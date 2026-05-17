@@ -136,6 +136,12 @@ class RegimeContext(BaseModel):
     regime_alignment_score: float = Field(
         0.0, ge=0.0, le=1.0, description="Quantitative strategy suitability for this regime."
     )
+    session_alignment: float = Field(
+        0.0, ge=0.0, le=1.0, description="Alignment with current trading session (0.0 to 1.0)."
+    )
+    volatility_alignment: float = Field(
+        0.0, ge=0.0, le=1.0, description="Alignment with current volatility state (0.0 to 1.0)."
+    )
     summary: str = Field(
         "Market state stable", description="Contextual summary of the market state"
     )
@@ -288,6 +294,8 @@ class SignalExplainer:
         feature_impacts: list[dict[str, Any]] | dict[str, float] | None = None,
         model_confidences: dict[str, float] | None = None,
         signal_id: int | None = None,
+        session_alignment: float = 0.5,
+        volatility_alignment: float = 0.5,
     ) -> SignalExplanation:
         """
         Generate a comprehensive explanation for a trade signal.
@@ -454,16 +462,24 @@ class SignalExplainer:
                 volatility_state="Normal",
                 is_favorable=True,
                 regime_alignment_score=0.5,
+                session_alignment=session_alignment,
+                volatility_alignment=volatility_alignment,
                 summary="No market regime context available.",
             )
         elif hasattr(regime_info, "label"):  # RegimeInfo pydantic model
             alignment = regime_info.confidence if regime_info.confidence > 0.6 else 0.4
+            # Use alignment values from RegimeInfo if provided, otherwise use explicit overrides
+            s_align = getattr(regime_info, "session_alignment", session_alignment)
+            v_align = getattr(regime_info, "volatility_alignment", volatility_alignment)
+
             regime_context = RegimeContext(
                 regime_name=str(regime_info.label.value).title(),
                 confidence=regime_info.confidence,
                 volatility_state="High" if regime_info.volatility_index > 1.5 else "Normal",
                 is_favorable=regime_info.confidence > 0.6,
                 regime_alignment_score=alignment,
+                session_alignment=s_align,
+                volatility_alignment=v_align,
                 summary=f"Market in {regime_info.label.value} state with {regime_info.confidence:.1%} confidence.",
             )
         elif isinstance(regime_info, dict):
@@ -473,6 +489,8 @@ class SignalExplainer:
                 volatility_state=regime_info.get("volatility", "Normal"),
                 is_favorable=regime_info.get("is_favorable", True),
                 regime_alignment_score=regime_info.get("alignment_score", 0.5),
+                session_alignment=regime_info.get("session_alignment", session_alignment),
+                volatility_alignment=regime_info.get("volatility_alignment", volatility_alignment),
                 summary=regime_info.get("summary", "Market state stable"),
             )
         else:
@@ -482,6 +500,8 @@ class SignalExplainer:
                 confidence=0.0,
                 volatility_state="Normal",
                 is_favorable=False,
+                session_alignment=session_alignment,
+                volatility_alignment=volatility_alignment,
                 summary="Malformed regime context detected.",
             )
 

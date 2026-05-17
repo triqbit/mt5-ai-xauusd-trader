@@ -736,3 +736,63 @@ def test_advanced_metrics_calculation():
     attr = explanation.machine_attribution
     assert attr["model_dominance_ratios"]["ppo"] == ppo_attr.dominance_ratio
     assert attr["regime_alignment_score"] == 0.9
+
+
+def test_to_report_section_integration():
+    """Test the to_report_section method for ResearchReport integration."""
+    explainer = SignalExplainer()
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={
+            "name": "Trending",
+            "alignment_score": 0.8,
+            "session_alignment": 0.7,
+            "volatility_alignment": 0.6,
+        },
+    )
+
+    from src.research.reporting import StrategicConfluenceSection
+    section = StrategicConfluenceSection.from_explanation(explanation)
+
+    # Verify section type
+    assert isinstance(section, StrategicConfluenceSection)
+
+    # Verify scores
+    assert section.regime_alignment == 0.8
+    assert section.session_alignment == 0.7
+    assert section.volatility_alignment == 0.6
+
+    # Weighted score logic:
+    # 40% Model Confidence (0.8 * 0.4 = 0.32)
+    # 30% Regime Alignment (0.8 * 0.3 = 0.24)
+    # 15% Session Alignment (0.7 * 0.15 = 0.105)
+    # 15% Volatility Alignment (0.6 * 0.15 = 0.09)
+    # Total: 0.32 + 0.24 + 0.105 + 0.09 = 0.755
+    assert abs(section.confluence_score - 0.755) < 1e-6
+    assert section.insights == explanation.human_readable_summary
+
+
+def test_explain_with_alignment_overrides():
+    """Test that SignalExplainer respects session and volatility alignment overrides."""
+    explainer = SignalExplainer()
+
+    explanation = explainer.explain(
+        symbol="XAUUSD",
+        direction=1,
+        confidence=0.8,
+        model_votes={"ppo": 1},
+        model_weights={"ppo": 1.0},
+        risk_data={"passed": True},
+        regime_info={"name": "Trending"},
+        session_alignment=0.9,
+        volatility_alignment=0.1,
+    )
+
+    assert explanation.regime_context.session_alignment == 0.9
+    assert explanation.regime_context.volatility_alignment == 0.1
