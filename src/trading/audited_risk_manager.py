@@ -73,7 +73,11 @@ class AuditedRiskManager(RiskManager):
             audit = get_audit_logger()
             audit.log_risk_decision(
                 symbol=signal.symbol,
-                direction=int(signal.direction.value if hasattr(signal.direction, "value") else signal.direction),
+                direction=int(
+                    signal.direction.value
+                    if hasattr(signal.direction, "value")
+                    else signal.direction
+                ),
                 decision_chain={k: bool(v) for k, v in decision_chain.items()},
                 passed=bool(is_approved),
             )
@@ -84,7 +88,10 @@ class AuditedRiskManager(RiskManager):
                     operator="system",
                     action="circuit_breaker_triggered",
                     reason=f"Hard drawdown limit hit during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": {k: bool(v) for k, v in decision_chain.items()}},
+                    metadata={
+                        "symbol": signal.symbol,
+                        "decision_chain": {k: bool(v) for k, v in decision_chain.items()},
+                    },
                 )
 
             if not decision_chain.get("daily_loss", True):
@@ -92,7 +99,10 @@ class AuditedRiskManager(RiskManager):
                     operator="system",
                     action="daily_loss_limit_triggered",
                     reason=f"Daily loss limit reached during signal validation for {signal.symbol}",
-                    metadata={"symbol": signal.symbol, "decision_chain": {k: bool(v) for k, v in decision_chain.items()}},
+                    metadata={
+                        "symbol": signal.symbol,
+                        "decision_chain": {k: bool(v) for k, v in decision_chain.items()},
+                    },
                 )
 
         except (RuntimeError, ImportError):

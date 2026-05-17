@@ -30,6 +30,7 @@ def test_db(tmp_path):
     db_file = tmp_path / "trading_test.db"
     return f"sqlite:///{db_file}"
 
+
 @pytest.fixture
 def mock_connector():
     connector = MagicMock()
@@ -39,6 +40,7 @@ def mock_connector():
         if "XAUUSD" in symbol:
             return {"digits": 2, "contract_size": 100.0, "point": 0.01, "pip_size": 0.1}
         return None
+
     connector.get_symbol_properties.side_effect = get_props
 
     # Mock rates for opportunity cost and drift calculations
@@ -47,28 +49,33 @@ def mock_connector():
 
     m5_data = []
     for i in range(100):
-        m5_data.append({
-            "time": base_time + timedelta(minutes=5*i),
-            "open": 2300.0 + i,
-            "high": 2305.0 + i,
-            "low": 2295.0 + i,
-            "close": 2302.0 + i,
-            "spread": 20
-        })
+        m5_data.append(
+            {
+                "time": base_time + timedelta(minutes=5 * i),
+                "open": 2300.0 + i,
+                "high": 2305.0 + i,
+                "low": 2295.0 + i,
+                "close": 2302.0 + i,
+                "spread": 20,
+            }
+        )
     connector.get_rates.return_value = pd.DataFrame(m5_data)
     connector.get_rates_range.return_value = pd.DataFrame(m5_data)
 
     # Mock ticks for alpha decay
     ticks_data = []
     for i in range(10):
-        ticks_data.append({
-            "time": base_time + timedelta(seconds=i),
-            "bid": 2299.95 + i*0.1,
-            "ask": 2300.05 + i*0.1
-        })
+        ticks_data.append(
+            {
+                "time": base_time + timedelta(seconds=i),
+                "bid": 2299.95 + i * 0.1,
+                "ask": 2300.05 + i * 0.1,
+            }
+        )
     connector.get_ticks_range.return_value = pd.DataFrame(ticks_data)
 
     return connector
+
 
 def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
     """
@@ -103,11 +110,11 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
         direction=1,
         entry_price=2300.0,
         stop_loss=2290.0,
-        take_profit=2305.0, # Low R:R (0.5), will be rejected by RiskManager
+        take_profit=2305.0,  # Low R:R (0.5), will be rejected by RiskManager
         lot_size=0.1,
         algorithm="test_algo",
         confidence=0.8,
-        timestamp=signal_time
+        timestamp=signal_time,
     )
 
     # Manually log signal to get ID
@@ -122,7 +129,9 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
 
     # Verify RiskEvent is in DB
     with trade_logger.Session() as session:
-        event = session.execute(select(RiskEvent).where(RiskEvent.signal_id == signal_id)).scalar_one_or_none()
+        event = session.execute(
+            select(RiskEvent).where(RiskEvent.signal_id == signal_id)
+        ).scalar_one_or_none()
         assert event is not None
         assert "risk_reward" in event.description
 
@@ -133,11 +142,11 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
         direction=1,
         entry_price=2300.0,
         stop_loss=2290.0,
-        take_profit=2320.0, # 2.0 R:R
+        take_profit=2320.0,  # 2.0 R:R
         lot_size=0.1,
         algorithm="test_algo",
         confidence=0.9,
-        timestamp=trade_signal_time
+        timestamp=trade_signal_time,
     )
 
     signal_id_2 = trade_logger.log_signal(valid_signal.model_dump())
@@ -152,18 +161,13 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
         ticket=ticket,
         symbol="XAUUSD",
         direction=1,
-        entry_price=2300.5, # 5 pips slippage
+        entry_price=2300.5,  # 5 pips slippage
         lot_size=0.1,
-        signal_id=signal_id_2
+        signal_id=signal_id_2,
     )
 
     # Update to closed
-    trade_logger.update_trade(
-        ticket=ticket,
-        exit_price=2310.0,
-        pnl=95.0,
-        drawdown_impact=0.01
-    )
+    trade_logger.update_trade(ticket=ticket, exit_price=2310.0, pnl=95.0, drawdown_impact=0.01)
 
     # --- ANALYSIS PHASE ---
 
@@ -173,11 +177,13 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
 
     assert len(blocked_analyses) >= 1
     analysis = next(a for a in blocked_analyses if a.signal_id == signal_id)
-    assert analysis.opportunity_cost_pnl > 0 # Since mock price went up to 2302+
+    assert analysis.opportunity_cost_pnl > 0  # Since mock price went up to 2302+
 
     # Verify DB persistence for blocked
     with trade_logger.Session() as session:
-        db_blocked = session.execute(select(BlockedSignalAnalysis).where(BlockedSignalAnalysis.signal_id == signal_id)).scalar_one_or_none()
+        db_blocked = session.execute(
+            select(BlockedSignalAnalysis).where(BlockedSignalAnalysis.signal_id == signal_id)
+        ).scalar_one_or_none()
         assert db_blocked is not None
         assert db_blocked.rejection_reason == event.description
 
@@ -192,7 +198,9 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
 
     # Verify DB persistence for quality
     with trade_logger.Session() as session:
-        db_quality = session.execute(select(ExecutionQuality).where(ExecutionQuality.trade_id == trade_id)).scalar_one_or_none()
+        db_quality = session.execute(
+            select(ExecutionQuality).where(ExecutionQuality.trade_id == trade_id)
+        ).scalar_one_or_none()
         assert db_quality is not None
         assert db_quality.slippage_pips == pytest.approx(5.0)
 

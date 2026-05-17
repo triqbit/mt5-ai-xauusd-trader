@@ -217,7 +217,9 @@ class RiskManager:
         # ATR * 100 converts gold ATR to $ per lot (approx)
         # For XAUUSD, 1 lot = 100 oz. 1 point = $0.01. ATR is in price.
         # So ATR * 100 is $ risk per lot.
-        lot_size = (risk_amount / (current_atr * 100)) * total_multiplier if current_atr > 0 else 0.01
+        lot_size = (
+            (risk_amount / (current_atr * 100)) * total_multiplier if current_atr > 0 else 0.01
+        )
 
         # Cap at Max Position Size (10% of equity)
         max_notional = self.balance * self.cfg.max_position_size_pct
@@ -241,7 +243,9 @@ class RiskManager:
         Legacy fractional Kelly Criterion position sizing.
         DEPRECATED: Use calculate_position_size instead.
         """
-        logger.warning("RiskManager.size_position() is deprecated. Use calculate_position_size() instead.")
+        logger.warning(
+            "RiskManager.size_position() is deprecated. Use calculate_position_size() instead."
+        )
         if avg_loss == 0:
             return 0.01
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
