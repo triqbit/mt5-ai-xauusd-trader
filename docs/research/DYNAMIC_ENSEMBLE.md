@@ -13,7 +13,7 @@ Models are scored using a composite formula that balances performance against re
 
 *   **Accuracy**: Win-rate or normalized Sharpe over a rolling window.
 *   **Calibration Error**: Measures how well a model's confidence aligns with its actual success (using Brier score logic).
-*   **Drift Score**: Detects recent performance degradation (tracking the last 20% of history vs. the full window).
+*   **Drift Score**: A blended metric detecting both **Accuracy Drift** (70% weight) and **Calibration Drift** (30% weight) by comparing recent history (last 20%) vs. the full window. Calibration drift specifically identifies "reliability decay" where a model's confidence estimates become less predictive.
 
 ### 2. Market Regime Awareness
 The engine applies XAUUSD-specific heuristics that modulate both scoring weights and adaptation rates based on the `MarketRegime` detected:
@@ -26,7 +26,7 @@ To prevent "flip-flopping" and ensure institutional-grade stability, several saf
 *   **EMA Decay**: Weights transition towards targets using an Exponential Moving Average (smoothing factor).
 *   **Swing Caps**: The maximum weight change per update is strictly limited by `max_swing` (default 5%).
 *   **Oscillation Dampening**: If target weights begin to alternate rapidly across the current weight, the adaptation rate is aggressively reduced (0.2x multiplier).
-*   **Volatility Scaling**: In high-volatility environments, the adaptation speed slows down automatically to avoid reacting to transient noise.
+*   **Volatility Scaling**: In high-volatility environments, the adaptation speed slows down automatically to avoid reacting to transient noise. Additionally, if the `volatility_index` exceeds 2.0, the **Drift Penalty** is automatically increased by 50% to enforce defensive weighting during turbulent periods.
 
 ## Integration
 The `DynamicEnsemble` is integrated into the `EnsembleModel`, which uses the dynamic weights to calculate a weighted consensus signal. It also supports autonomous closed-loop tracking via `record_prediction` and `record_outcome` methods.
