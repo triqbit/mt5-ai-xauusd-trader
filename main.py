@@ -195,10 +195,11 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = 60  # seconds between signal evaluations
+    poll_interval = cfg.poll_interval  # seconds between signal evaluations
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
+    regime_info = None  # Initialise for dashboard visibility
     while True:
         # 0. Generate unique trace ID for this iteration
         structlog.contextvars.clear_contextvars()
@@ -635,13 +636,43 @@ def run_live(
 
                 # Wait for next interval with operator feedback
                 if console:
+                    # Live Session Dashboard in status line
                     with console.status(
                         "[bold blue]Waiting for next signal evaluation..."
                     ) as status:
                         for i in range(poll_interval, 0, -1):
-                            status.update(
-                                f"[bold blue]Waiting for next signal evaluation ({i}s remaining)..."
-                            )
+                            # Gather real-time metrics for the status dashboard
+                            try:
+                                equity = risk.balance
+                                daily_pnl = risk.daily.realised_pnl
+                                open_pos = len(risk.open_positions)
+                                regime_label = (
+                                    regime_info.label.value.upper()
+                                    if regime_info
+                                    else "INITIALISING"
+                                )
+
+                                pnl_color = "green" if daily_pnl >= 0 else "red"
+                                regime_color = (
+                                    "cyan"
+                                    if regime_label in ("TRENDING", "VOLATILE_BREAKOUT")
+                                    else "yellow"
+                                )
+
+                                dashboard = (
+                                    f"[bold blue]Live Dashboard[/] | "
+                                    f"Equity: [bold white]${equity:,.2f}[/] | "
+                                    f"Daily PnL: [bold {pnl_color}]${daily_pnl:+.2f}[/] | "
+                                    f"Positions: [bold white]{open_pos}[/] | "
+                                    f"Regime: [bold {regime_color}]{regime_label}[/] | "
+                                    f"Next Signal: [bold cyan]{i}s[/]"
+                                )
+                                status.update(dashboard)
+                            except Exception:
+                                # Fallback if metrics retrieval fails
+                                status.update(
+                                    f"[bold blue]Waiting for next signal evaluation ({i}s remaining)..."
+                                )
                             time.sleep(1)
                 else:
                     time.sleep(poll_interval)
@@ -719,6 +750,7 @@ def run_setup_wizard() -> int:
     timeframe = Prompt.ask(
         "Default timeframe", choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"], default="M5"
     )
+    poll_interval = IntPrompt.ask("Signal polling interval (seconds)", default=60)
 
     # 2. MT5 Credentials
     console.print("\n[bold]2. MetaTrader 5 Credentials[/]")
@@ -776,6 +808,8 @@ def run_setup_wizard() -> int:
                     lines.append(f"TIMEFRAME={timeframe}\n")
                 elif line.startswith("MODE="):
                     lines.append(f"MODE={mode}\n")
+                elif line.startswith("POLL_INTERVAL="):
+                    lines.append(f"POLL_INTERVAL={poll_interval}\n")
                 elif line.startswith("METAAPI_TOKEN=") and meta_token:
                     lines.append(f"METAAPI_TOKEN={meta_token}\n")
                 elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
@@ -791,6 +825,7 @@ def run_setup_wizard() -> int:
             f"SYMBOL={symbol}\n",
             f"TIMEFRAME={timeframe}\n",
             f"MODE={mode}\n",
+            f"POLL_INTERVAL={poll_interval}\n",
             f"METAAPI_TOKEN={meta_token}\n",
             f"METAAPI_ACCOUNT_ID={meta_id}\n",
         ]
@@ -825,32 +860,32 @@ Usage Examples:
   python main.py --check
 
   # Start trading in DEMO mode with Ensemble algorithm
-  python main.py --mode demo --symbol XAUUSD --algo ensemble
+  python main.py -m demo -s XAUUSD -a ensemble
 
   # Start LIVE trading (requires explicit confirmation)
-  python main.py --mode live --algo ensemble --confirm-live
+  python main.py -m live -a ensemble --confirm-live
 
   # Run a walk-forward backtest for a specific period
-  python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
+  python main.py -m backtest --start 2017-01-01 --end 2026-03-30 -a ppo
         """,
     )
-    p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
+    p.add_argument("-v", "--version", action="version", version=f"%(prog)s {get_system_version()}")
 
     # -- Execution Group
     execution = p.add_argument_group("Execution Options")
     execution.add_argument(
-        "--mode",
+        "-m", "--mode",
         choices=["demo", "live", "backtest"],
         help="Execution mode: 'demo' (paper), 'live' (real money), or 'backtest' (simulation).",
     )
     execution.add_argument(
-        "--algo",
+        "-a", "--algo",
         dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
         help="AI algorithm architecture to use for signal generation.",
     )
-    execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
-    execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
+    execution.add_argument("-s", "--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
+    execution.add_argument("-t", "--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
     execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",
