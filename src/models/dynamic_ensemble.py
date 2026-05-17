@@ -9,17 +9,17 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from collections import deque
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import numpy as np
+import structlog
 
 from src.core.constants import SignalDirection
 from src.models.regime_detector import MarketRegime, RegimeInfo
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 __all__ = ["DynamicEnsemble"]
 
@@ -121,7 +121,7 @@ class DynamicEnsemble:
             confidence: Model's internal confidence score (0.0 to 1.0).
         """
         if model_name not in self.model_names:
-            logger.warning("Attempted to record prediction for unknown model: %s", model_name)
+            logger.warning("Attempted to record prediction for unknown model", model_name=model_name)
             return
 
         self._pending_predictions[model_name] = {
@@ -160,7 +160,7 @@ class DynamicEnsemble:
                 "accuracy_gain": accuracy_gain,
                 "confidence": prediction["confidence"],
                 "calibration_error": cal_error,
-                "timestamp": datetime.now(UTC),
+                "timestamp": datetime.now(timezone.utc),
             }
         )
 
@@ -363,7 +363,7 @@ class DynamicEnsemble:
         self._prev_target_weights = self._target_weights.copy()
         self._target_weights = new_targets.copy()
 
-        logger.debug("Ensemble weights updated: %s", self.weights)
+        logger.debug("ensemble_weights_updated", weights=self.weights)
         return self.weights
 
     def _normalize_with_floor(self, scores: dict[str, float], floor: float) -> dict[str, float]:
