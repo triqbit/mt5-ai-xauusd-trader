@@ -1,6 +1,5 @@
 """Core configuration and settings."""
 
-from typing import TYPE_CHECKING
 
 from src.core.audit_log import AuditLogger, get_audit_logger
 from src.core.config import TradingConfig, get_config
