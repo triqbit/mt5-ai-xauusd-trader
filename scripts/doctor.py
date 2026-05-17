@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 # Configure minimal logging for the doctor
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("doctor")
 
 # Try to import rich for beautiful output, fallback to plain text if missing
@@ -21,11 +21,13 @@ try:
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
+
     HAS_RICH = True
     console = Console()
 except ImportError:
     HAS_RICH = False
     console = None
+
 
 def get_system_version() -> str:
     try:
@@ -58,9 +60,10 @@ def parse_version(v_str: str) -> tuple[int, ...]:
 class DiagnosticCheck:
     def __init__(self, name, status, message, remedy="N/A"):
         self.name = name
-        self.status = status # "OK", "WARNING", "FAILED"
+        self.status = status  # "OK", "WARNING", "FAILED"
         self.message = message
         self.remedy = remedy
+
 
 def check_python_version():
     version = sys.version_info
@@ -68,12 +71,8 @@ def check_python_version():
     if version.major == 3 and version.minor >= 10:
         return DiagnosticCheck("Python Version", "OK", msg)
     else:
-        return DiagnosticCheck(
-            "Python Version",
-            "FAILED",
-            msg,
-            "Install Python 3.10 or higher."
-        )
+        return DiagnosticCheck("Python Version", "FAILED", msg, "Install Python 3.10 or higher.")
+
 
 CORE_DEPENDENCIES = {
     "numpy": ("numpy", "1.26.4"),
@@ -102,12 +101,13 @@ CORE_DEPENDENCIES = {
     "redis": ("redis", "7.4.0"),
     "alembic": ("alembic", "1.14.1"),
     "prometheus-client": ("prometheus_client", "0.21.1"),
-    "python-socketio": ("socketio", "5.14.0"),
+    "python-socketio": ("socketio", "4.6.1"),
     "pytz": ("pytz", "2026.2"),
     "psycopg2-binary": ("psycopg2", "2.9.10"),
     "python-telegram-bot": ("telegram", "21.10"),
     "optuna": ("optuna", "4.8.0"),
 }
+
 
 def check_dependencies(dependencies=None):
     try:
@@ -207,7 +207,9 @@ def check_requirement_harmonization():
                 else:
                     all_requirements[package] = {"version": version, "file": req_file.name}
         except Exception as e:
-            return DiagnosticCheck("Requirement Sync", "FAILED", f"Error parsing {req_file.name}: {e}")
+            return DiagnosticCheck(
+                "Requirement Sync", "FAILED", f"Error parsing {req_file.name}: {e}"
+            )
 
     if mismatches:
         return DiagnosticCheck(
@@ -218,6 +220,7 @@ def check_requirement_harmonization():
         )
     else:
         return DiagnosticCheck("Requirement Sync", "OK", f"All {len(req_files)} files harmonized")
+
 
 def check_env_file():
     env_path = Path(".env")
@@ -233,23 +236,25 @@ def check_env_file():
                         ".env Configuration",
                         "WARNING",
                         f"Found placeholders: {', '.join(found)}",
-                        "Update .env with real credentials."
+                        "Update .env with real credentials.",
                     )
             return DiagnosticCheck(".env Configuration", "OK", ".env exists and appears configured")
         except Exception as e:
-             return DiagnosticCheck(".env Configuration", "FAILED", f"Error reading .env: {e}")
+            return DiagnosticCheck(".env Configuration", "FAILED", f"Error reading .env: {e}")
     else:
         return DiagnosticCheck(
             ".env Configuration",
             "FAILED",
             ".env is missing",
-            "Copy .env.example to .env and fill in details."
+            "Copy .env.example to .env and fill in details.",
         )
+
 
 def check_talib():
     try:
         import numpy as np
         import talib
+
         # Try to call a simple function to ensure the C library is also linked
         talib.SMA(np.array([1.0, 2.0, 3.0]), timeperiod=2)
         return DiagnosticCheck("TA-Lib Library", "OK", "C-Library linked and functional")
@@ -258,34 +263,46 @@ def check_talib():
             "TA-Lib Library",
             "WARNING",
             "Python wrapper not installed",
-            "The bot will use internal fallbacks. Run 'pip install TA-Lib' for full performance."
+            "The bot will use internal fallbacks. Run 'pip install TA-Lib' for full performance.",
         )
     except Exception as e:
         return DiagnosticCheck(
             "TA-Lib Library",
             "WARNING",
             f"Linkage error: {e}",
-            "The bot will use internal fallbacks. Ensure TA-Lib C-library is installed for full performance (e.g., brew install ta-lib)."
+            "The bot will use internal fallbacks. Ensure TA-Lib C-library is installed for full performance (e.g., brew install ta-lib).",
         )
+
 
 def check_hardware_acceleration():
     try:
         import torch
+
         if torch.cuda.is_available():
             msg = f"GPU (CUDA: {torch.cuda.get_device_name(0)})"
             return DiagnosticCheck("Hardware Accel", "OK", msg)
         elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             return DiagnosticCheck("Hardware Accel", "OK", "GPU (Apple MPS)")
         else:
-            return DiagnosticCheck("Hardware Accel", "WARNING", "Running on CPU only", "Install CUDA drivers if GPU is available.")
+            return DiagnosticCheck(
+                "Hardware Accel",
+                "WARNING",
+                "Running on CPU only",
+                "Install CUDA drivers if GPU is available.",
+            )
     except Exception:
-        return DiagnosticCheck("Hardware Accel", "FAILED", "Torch not installed", "Run 'pip install torch'")
+        return DiagnosticCheck(
+            "Hardware Accel", "FAILED", "Torch not installed", "Run 'pip install torch'"
+        )
+
 
 def check_database():
     try:
         from sqlalchemy import create_engine, text
+
         try:
             from dotenv import load_dotenv
+
             load_dotenv()
         except Exception:
             pass
@@ -293,14 +310,26 @@ def check_database():
         db_url = os.getenv("DATABASE_URL", "sqlite:///trades.db")
 
         # Disable logging for the check
-        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+        logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
-        engine = create_engine(str(db_url), connect_args={'connect_timeout': 2} if "postgres" in db_url else {})
+        engine = create_engine(
+            str(db_url), connect_args={"connect_timeout": 2} if "postgres" in db_url else {}
+        )
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        return DiagnosticCheck("Database Connectivity", "OK", f"Connected to {db_url.split('@')[-1] if '@' in db_url else db_url}")
+        return DiagnosticCheck(
+            "Database Connectivity",
+            "OK",
+            f"Connected to {db_url.split('@')[-1] if '@' in db_url else db_url}",
+        )
     except Exception as e:
-        return DiagnosticCheck("Database Connectivity", "FAILED", str(e), "Verify DATABASE_URL and ensure the database server is running.")
+        return DiagnosticCheck(
+            "Database Connectivity",
+            "FAILED",
+            str(e),
+            "Verify DATABASE_URL and ensure the database server is running.",
+        )
+
 
 def check_file_permissions():
     if sys.platform == "win32":
@@ -325,12 +354,14 @@ def check_file_permissions():
             "File Permissions",
             "WARNING",
             f"Insecure: {', '.join(insecure)}",
-            "Run 'chmod 600 .env' etc."
+            "Run 'chmod 600 .env' etc.",
         )
+
 
 def check_mt5_config():
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except Exception:
         pass
@@ -346,8 +377,9 @@ def check_mt5_config():
             "MT5 Credentials",
             "WARNING",
             "Incomplete MT5 configuration",
-            "Check MT5_LOGIN, MT5_PASSWORD, and MT5_SERVER in .env"
+            "Check MT5_LOGIN, MT5_PASSWORD, and MT5_SERVER in .env",
         )
+
 
 def main():
     # Ensure root is in path
@@ -369,10 +401,14 @@ def main():
     version = get_system_version()
 
     if HAS_RICH:
-        console.print(Panel(
-            Text.from_markup(f"[bold blue]MT5 AI/ML Trading Bot - System Doctor[/]\n[dim]Version {version} | {platform.system()} {platform.release()}[/]"),
-            border_style="blue"
-        ))
+        console.print(
+            Panel(
+                Text.from_markup(
+                    f"[bold blue]MT5 AI/ML Trading Bot - System Doctor[/]\n[dim]Version {version} | {platform.system()} {platform.release()}[/]"
+                ),
+                border_style="blue",
+            )
+        )
 
         table = Table(box=None, expand=True)
         table.add_column("Check", style="cyan")
@@ -381,22 +417,34 @@ def main():
         table.add_column("Suggested Remedy", style="green")
 
         for c in checks:
-            status_color = "green" if c.status == "OK" else "yellow" if c.status == "WARNING" else "red"
+            status_color = (
+                "green" if c.status == "OK" else "yellow" if c.status == "WARNING" else "red"
+            )
             table.add_row(
                 c.name,
                 f"[{status_color}]{c.status}[/]",
                 c.message,
-                c.remedy if c.status != "OK" else ""
+                c.remedy if c.status != "OK" else "",
             )
 
         console.print(table)
 
         failed = any(c.status == "FAILED" for c in checks)
         if failed:
-            console.print(Panel("[bold red]SYSTEM HAS CRITICAL ISSUES[/]\nPlease resolve the 'FAILED' items above before starting the bot.", border_style="red"))
+            console.print(
+                Panel(
+                    "[bold red]SYSTEM HAS CRITICAL ISSUES[/]\nPlease resolve the 'FAILED' items above before starting the bot.",
+                    border_style="red",
+                )
+            )
             sys.exit(1)
         else:
-            console.print(Panel("[bold green]SYSTEM READY[/]\nYour environment is correctly configured for trading.", border_style="green"))
+            console.print(
+                Panel(
+                    "[bold green]SYSTEM READY[/]\nYour environment is correctly configured for trading.",
+                    border_style="green",
+                )
+            )
             sys.exit(0)
     else:
         # Plain text fallback
@@ -418,6 +466,7 @@ def main():
         else:
             print("SYSTEM READY.")
             sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

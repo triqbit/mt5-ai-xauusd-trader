@@ -89,7 +89,7 @@ class RiskManager:
 
         # 2. Restore peak equity (all-time)
         # Handle accounts that only have losses by including 0.0 in cumulative series
-        pnl_series = [0.0] + reconciled_data.get("pnl_series", [])
+        pnl_series = [0.0, *reconciled_data.get("pnl_series", [])]
         cumulative_pnl = list(accumulate(pnl_series))
         historical_peak_pnl = max(cumulative_pnl) if cumulative_pnl else 0.0
 
