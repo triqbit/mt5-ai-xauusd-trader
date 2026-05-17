@@ -6,17 +6,17 @@ import pytest
 
 pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch  # noqa: E402
 
-import numpy as np
-import pandas as pd
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
-from src.core.schemas import TradeSignal
-from src.core.trade_logger import TradeLogger
-from src.models.ensemble import EnsembleModel
-from src.models.regime_detector import MarketRegime, RegimeDetector
-from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
-from src.trading.risk_manager import RiskManager
+from src.core.schemas import TradeSignal  # noqa: E402
+from src.core.trade_logger import TradeLogger  # noqa: E402
+from src.models.ensemble import EnsembleModel  # noqa: E402
+from src.models.regime_detector import MarketRegime, RegimeDetector  # noqa: E402
+from src.trading.capital_allocator import CapitalAllocator, StrategyConfig  # noqa: E402
+from src.trading.risk_manager import RiskManager  # noqa: E402
 
 
 @pytest.fixture

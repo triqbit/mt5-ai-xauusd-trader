@@ -76,9 +76,9 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.add_log_level,
             structlog.stdlib.PositionalArgumentsFormatter(),
-            get_masking_processor(),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
+            get_masking_processor(),
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.BoundLogger,
@@ -691,7 +691,6 @@ def run_setup_wizard() -> int:
     Interactive guided setup wizard for initial configuration.
     Helps users configure .env without manual text editing.
     """
-    import getpass
     import platform
 
     try:
@@ -734,7 +733,7 @@ def run_setup_wizard() -> int:
     # Use getpass for password to avoid echoing
     password = ""
     while not password:
-        password = getpass.getpass("MT5 Account Password: ")
+        password = Prompt.ask("MT5 Account Password", password=True)
         if not password:
             console.print("[red]Password cannot be empty.[/]")
 
@@ -747,7 +746,10 @@ def run_setup_wizard() -> int:
     meta_token = ""
     meta_id = ""
     if use_meta == "y":
-        meta_token = Prompt.ask("MetaAPI Token")
+        while not meta_token:
+            meta_token = Prompt.ask("MetaAPI Token", password=True)
+            if not meta_token:
+                console.print("[red]Token cannot be empty.[/]")
         meta_id = Prompt.ask("MetaAPI Account ID")
 
     # 4. Confirm and Save
@@ -760,43 +762,36 @@ def run_setup_wizard() -> int:
     env_path = Path(".env")
     example_path = Path(".env.example")
 
-    lines = []
+    config_data = {
+        "MT5_LOGIN": str(login),
+        "MT5_PASSWORD": password,
+        "MT5_SERVER": server,
+        "SYMBOL": symbol,
+        "TIMEFRAME": timeframe,
+        "MODE": mode,
+        "METAAPI_TOKEN": meta_token,
+        "METAAPI_ACCOUNT_ID": meta_id,
+    }
+
+    final_lines = []
     if example_path.exists():
         with open(example_path, "r") as f:
             for line in f:
-                if line.startswith("MT5_LOGIN="):
-                    lines.append(f"MT5_LOGIN={login}\n")
-                elif line.startswith("MT5_PASSWORD="):
-                    lines.append(f"MT5_PASSWORD={password}\n")
-                elif line.startswith("MT5_SERVER="):
-                    lines.append(f"MT5_SERVER={server}\n")
-                elif line.startswith("SYMBOL="):
-                    lines.append(f"SYMBOL={symbol}\n")
-                elif line.startswith("TIMEFRAME="):
-                    lines.append(f"TIMEFRAME={timeframe}\n")
-                elif line.startswith("MODE="):
-                    lines.append(f"MODE={mode}\n")
-                elif line.startswith("METAAPI_TOKEN=") and meta_token:
-                    lines.append(f"METAAPI_TOKEN={meta_token}\n")
-                elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
-                    lines.append(f"METAAPI_ACCOUNT_ID={meta_id}\n")
-                else:
-                    lines.append(line)
+                matched = False
+                for key, val in config_data.items():
+                    if line.startswith(f"{key}=") and val:
+                        final_lines.append(f"{key}={val}\n")
+                        matched = True
+                        break
+                if not matched:
+                    final_lines.append(line)
     else:
-        # Fallback if .env.example is missing
-        lines = [
-            f"MT5_LOGIN={login}\n",
-            f"MT5_PASSWORD={password}\n",
-            f"MT5_SERVER={server}\n",
-            f"SYMBOL={symbol}\n",
-            f"TIMEFRAME={timeframe}\n",
-            f"MODE={mode}\n",
-            f"METAAPI_TOKEN={meta_token}\n",
-            f"METAAPI_ACCOUNT_ID={meta_id}\n",
-        ]
+        for key, val in config_data.items():
+            if val:
+                final_lines.append(f"{key}={val}\n")
 
     with open(env_path, "w") as f:
-        f.writelines(lines)
+        f.writelines(final_lines)
 
     # Secure permissions
     import contextlib

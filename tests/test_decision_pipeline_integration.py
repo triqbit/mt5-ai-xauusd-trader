@@ -18,7 +18,8 @@ import pytest
 mock_torch = MagicMock()
 # Scipy's array_api_compat checks issubclass(cls, torch.Tensor)
 # We need to provide a real class to avoid TypeError
-class MockTensor: pass
+class MockTensor:
+    pass
 mock_torch.Tensor = MockTensor
 
 mock_sb3 = MagicMock()
