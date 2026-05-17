@@ -25,7 +25,25 @@ To prevent "fat-finger" errors or model malfunctions, the following directional 
 
 Any signal that violates these boundaries or fails the minimum R:R check will raise a `ValidationError` and will be blocked before reaching the risk engine or broker.
 
-## 2. Decision Support Invariants
+## 2. Decision Pipeline Schemas
+
+To ensure every trading decision is explicit and auditable, the pipeline utilizes structured Pydantic models for Risk and Execution results.
+
+### 2.1 RiskDecision Schema
+Defined in `src/core/schemas.py`, this model governs the output of `RiskManager` and `RiskEngine`.
+- **Invariants**:
+    - If `is_approved` is False, a `reason` MUST be provided.
+    - If `is_approved` is False, `adjusted_lot_size` MUST be `0.0`.
+- **Auditability**: Contains a `trace` dictionary capturing the pass/fail state of all 8 risk layers.
+
+### 2.2 ExecutionDecision Schema
+Defined in `src/core/schemas.py`, this model governs the output of the `ExecutionFilter` cascade.
+- **Invariants**:
+    - If `is_approved` is False, the `blocked_by` filter name MUST be provided.
+    - If `is_approved` is True, `blocked_by` MUST be None.
+- **Auditability**: Captures a full `trace` of technical indicator validations (ATR, RSI, EMA, etc.).
+
+## 3. Decision Support Invariants
 
 To maintain institutional trust, the `DecisionPacket` in `src/core/decision_support.py` enforces logical consistency between decision dimensions:
 1. **Binary Executability**: If `is_executable` is True, there must be ZERO `blocking_reasons`.

@@ -24,7 +24,7 @@ from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
@@ -81,31 +81,27 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns a RiskDecision object.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
-        elif not self._check_consecutive_losses():
-            rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
-            rejection_reason = "Model health metrics below threshold"
+        trace = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+            "consecutive_losses": self._check_consecutive_losses(),
+            "model_health": self._check_model_health(model_health),
+        }
 
-        passed = rejection_reason == ""
+        passed = all(trace.values())
+        rejection_reason = ""
         if not passed:
+            failed_layers = [k for k, v in trace.items() if not v]
+            rejection_reason = f"Risk layers failed: {', '.join(failed_layers)}"
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
@@ -119,7 +115,24 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+
+        # Note: RiskManager in this repo doesn't seem to have a complex calculate_position_size
+        # like RiskEngine, but it has size_position.
+        # For simplicity and backward compatibility in this run, we'll use a fixed value or call sizing if approved.
+        adjusted_lots = 0.0
+        if passed:
+            # We don't have all the params for size_position here, so we'll leave it to main.py
+            # or use the signal's lot_size if we want to trust it.
+            # However, RiskDecision expects adjusted_lot_size.
+            # In the current main.py flow, lot_size is calculated BEFORE risk.approve.
+            adjusted_lots = signal.lot_size
+
+        return RiskDecision(
+            is_approved=passed,
+            reason=rejection_reason if not passed else "Approved",
+            adjusted_lot_size=adjusted_lots,
+            trace=trace,
+        )
 
     def size_position(
         self,

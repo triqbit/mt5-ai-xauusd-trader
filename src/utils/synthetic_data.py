@@ -1219,13 +1219,16 @@ class InstitutionalFlowGenerator:
         returns_steady = self.gen.rng.normal(0.0005, 0.0001, one_third)
 
         # Phase 2: Parabolic blow-off
-        returns_climax = np.linspace(0.001, 0.005, one_third) + self.gen.rng.normal(0, 0.0005, one_third)
+        returns_climax = np.linspace(0.001, 0.005, one_third) + self.gen.rng.normal(
+            0, 0.0005, one_third
+        )
 
         # Phase 3: Sharp reversal
         returns_collapse = self.gen.rng.normal(-0.004, 0.001, n_steps - 2 * one_third)
 
         returns = np.concatenate([returns_steady, returns_climax, returns_collapse])
         return self.gen._generate_base(n_steps, start_price, returns)
+
 
 class LifecycleScenarioBuilder:
     """
@@ -1237,7 +1240,9 @@ class LifecycleScenarioBuilder:
         self.gen = ScenarioGenerator(seed=seed)
         self.macro = MacroScenarioBuilder()
 
-    def flash_crash_recovery_cycle(self, n_steps: int = 300) -> tuple[pd.DataFrame, list[MacroEvent]]:
+    def flash_crash_recovery_cycle(
+        self, n_steps: int = 300
+    ) -> tuple[pd.DataFrame, list[MacroEvent]]:
         """
         Sequence:
         - 1/3: Ranging (Normal)
@@ -1251,9 +1256,7 @@ class LifecycleScenarioBuilder:
 
         # 2. Flash Crash
         df_crash = self.gen.generate(
-            n_steps=one_third,
-            regime="flash_crash",
-            start_price=df_normal["close"].iloc[-1]
+            n_steps=one_third, regime="flash_crash", start_price=df_normal["close"].iloc[-1]
         )
 
         # 3. Stabilization and Recovery
@@ -1262,7 +1265,7 @@ class LifecycleScenarioBuilder:
             regime="trending",
             start_price=df_crash["close"].iloc[-1],
             trend_strength=0.0005,
-            volatility=0.0001
+            volatility=0.0001,
         )
 
         df = pd.concat([df_normal, df_crash, df_recovery])
@@ -1271,7 +1274,9 @@ class LifecycleScenarioBuilder:
 
         return df, []
 
-    def news_block_lifecycle(self, n_steps: int = 200) -> tuple[pd.DataFrame, list[MacroEvent], datetime]:
+    def news_block_lifecycle(
+        self, n_steps: int = 200
+    ) -> tuple[pd.DataFrame, list[MacroEvent], datetime]:
         """
         Sequence:
         - Ranging -> High Impact News -> News Shock Price Action -> Post-news stabilization.
@@ -1279,11 +1284,7 @@ class LifecycleScenarioBuilder:
         mid = n_steps // 2
         start_date = datetime(2024, 5, 22, 11, 0, tzinfo=UTC)
 
-        df = self.gen.generate(
-            n_steps=n_steps,
-            regime="news_shock",
-            start_date=start_date
-        )
+        df = self.gen.generate(n_steps=n_steps, regime="news_shock", start_date=start_date)
 
         # News event at 12:30 (middle of the 200-bar window if freq is 5min)
         # 200 * 5min = 1000min ~= 16h. 11:00 + 500min ~= 19:20.
@@ -1317,15 +1318,17 @@ class ExecutionQualityScenarioBuilder:
             # High slippage: 2.0 to 5.0 pips (threshold is usually 1.0)
             slippage = self.rng.uniform(2.0, 5.0)
 
-            trades.append({
-                "ticket": 1000 + i,
-                "symbol": "XAUUSD",
-                "direction": 1,
-                "pnl": pnl,
-                "slippage_pips": slippage,
-                "execution_latency_ms": self.rng.uniform(500, 2000),
-                "status": "CLOSED"
-            })
+            trades.append(
+                {
+                    "ticket": 1000 + i,
+                    "symbol": "XAUUSD",
+                    "direction": 1,
+                    "pnl": pnl,
+                    "slippage_pips": slippage,
+                    "execution_latency_ms": self.rng.uniform(500, 2000),
+                    "status": "CLOSED",
+                }
+            )
         return trades
 
     def high_performance_sequence(self, n_trades: int = 30) -> list[dict[str, Any]]:
@@ -1340,15 +1343,17 @@ class ExecutionQualityScenarioBuilder:
             # Low slippage: 0.1 to 0.5 pips
             slippage = self.rng.uniform(0.1, 0.5)
 
-            trades.append({
-                "ticket": 2000 + i,
-                "symbol": "XAUUSD",
-                "direction": 1,
-                "pnl": pnl,
-                "slippage_pips": slippage,
-                "execution_latency_ms": self.rng.uniform(50, 150),
-                "status": "CLOSED"
-            })
+            trades.append(
+                {
+                    "ticket": 2000 + i,
+                    "symbol": "XAUUSD",
+                    "direction": 1,
+                    "pnl": pnl,
+                    "slippage_pips": slippage,
+                    "execution_latency_ms": self.rng.uniform(50, 150),
+                    "status": "CLOSED",
+                }
+            )
         return trades
 
     def edge_case_fills(self) -> list[dict[str, Any]]:
@@ -1360,8 +1365,37 @@ class ExecutionQualityScenarioBuilder:
         4. Partial fill (represented by small lot size)
         """
         return [
-            {"ticket": 3001, "symbol": "XAUUSD", "direction": 1, "pnl": 100.0, "slippage_pips": 0.0, "status": "CLOSED"},
-            {"ticket": 3002, "symbol": "XAUUSD", "direction": 1, "pnl": -500.0, "slippage_pips": 10.0, "status": "CLOSED"},
-            {"ticket": 3003, "symbol": "XAUUSD", "direction": 1, "pnl": 0.0, "slippage_pips": 0.5, "status": "CLOSED"},
-            {"ticket": 3004, "symbol": "XAUUSD", "direction": 1, "pnl": 10.0, "slippage_pips": 0.2, "status": "CLOSED", "lot_size": 0.01},
+            {
+                "ticket": 3001,
+                "symbol": "XAUUSD",
+                "direction": 1,
+                "pnl": 100.0,
+                "slippage_pips": 0.0,
+                "status": "CLOSED",
+            },
+            {
+                "ticket": 3002,
+                "symbol": "XAUUSD",
+                "direction": 1,
+                "pnl": -500.0,
+                "slippage_pips": 10.0,
+                "status": "CLOSED",
+            },
+            {
+                "ticket": 3003,
+                "symbol": "XAUUSD",
+                "direction": 1,
+                "pnl": 0.0,
+                "slippage_pips": 0.5,
+                "status": "CLOSED",
+            },
+            {
+                "ticket": 3004,
+                "symbol": "XAUUSD",
+                "direction": 1,
+                "pnl": 10.0,
+                "slippage_pips": 0.2,
+                "status": "CLOSED",
+                "lot_size": 0.01,
+            },
         ]

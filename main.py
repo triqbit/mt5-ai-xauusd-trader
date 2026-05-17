@@ -414,11 +414,14 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    if direction != 0:
+                        risk_decision = risk.approve(
+                            signal, signal_id=signal_id, model_health=health
+                        )
+                        risk_approved = risk_decision.is_approved
+                    else:
+                        risk_decision = None
+                        risk_approved = False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -461,14 +464,16 @@ def run_live(
                         model_weights = signal_obj.metadata.get("weights", {cfg.algorithm: 1.0})
 
                         risk_data = {
-                            "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "passed": risk_decision.is_approved if risk_decision else False,
+                            "rejection_reasons": [risk_decision.reason]
+                            if risk_decision and not risk_decision.is_approved
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
+                            "summary": risk_decision.reason
+                            if risk_decision
                             else "Risk gate rejected",
                         }
 
@@ -482,23 +487,7 @@ def run_live(
                             "summary": f"Market is {regime_info.label.value}",
                         }
 
-                        execution_data = None
-                        if filter_decision:
-                            execution_data = {
-                                "passed": filter_decision.is_approved,
-                                "summary": filter_decision.blocked_by
-                                if not filter_decision.is_approved
-                                else "All filters passed",
-                                "filters": [
-                                    {
-                                        "name": filter_decision.blocked_by,
-                                        "passed": False,
-                                        "message": f"Blocked by {filter_decision.blocked_by}",
-                                    }
-                                ]
-                                if not filter_decision.is_approved
-                                else [],
-                            }
+                        execution_data = filter_decision
 
                         explanation = explainer.explain(
                             symbol=cfg.symbol,
@@ -620,7 +609,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )

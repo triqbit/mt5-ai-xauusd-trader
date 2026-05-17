@@ -37,8 +37,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.core.constants import ModelAction, SignalDirection
 
 if TYPE_CHECKING:
+    from src.core.schemas import ExecutionDecision
     from src.models.regime_detector import RegimeInfo
-    from src.trading.execution_filter import ExecutionDecision
 
 logger = logging.getLogger(__name__)
 
