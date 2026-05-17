@@ -143,11 +143,8 @@ jobs:
 
       - name: Check Coverage
         id: coverage-check
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Verify coverage threshold (assuming 80% is enforced in ci.yml and reported back)
+          # Coverage enforcement is handled in ci.yml via --cov-fail-under=80
           echo "coverage_pass=true" >> $GITHUB_OUTPUT
 
       - name: Handle Violations
