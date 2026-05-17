@@ -30,11 +30,11 @@ from src.models.base_model import BaseModel, Signal
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
-    from src.models.regime_detector import RegimeInfo
 from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMModel
 from src.models.ppo_agent import PPOAgent
+from src.models.regime_detector import MarketRegime, RegimeInfo
 
 logger = logging.getLogger(__name__)
 
@@ -156,12 +156,19 @@ class EnsembleModel(BaseModel):
             self.weights,
         )
 
-    def aggregate_signals(self, signals: Dict[str, Signal], symbol: str = "unknown") -> Signal:
+    def aggregate_signals(
+        self,
+        signals: Dict[str, Signal],
+        symbol: str = "unknown",
+        regime_info: Optional[RegimeInfo] = None,
+    ) -> Signal:
         """
         Aggregates pre-calculated signals from sub-models using weighted consensus.
 
         Args:
             signals: Dictionary of algorithm names and their predicted Signal.
+            symbol: Trading symbol identifier.
+            regime_info: Optional market regime information for adaptive safety.
 
         Returns:
             Signal: The aggregated consensus signal.
@@ -214,23 +221,78 @@ class EnsembleModel(BaseModel):
             "per_algo_signals": {k: s._asdict() for k, s in signals.items()},
         }
 
-        # 3. Consensus Determination
+        # 3. Adaptive Consensus Threshold Determination
+        # We increase the consensus requirement during unstable market regimes
+        # to ensure stronger agreement before committing capital.
+        dynamic_threshold = self.consensus_threshold
+
+        if regime_info:
+            # 3.1 Regime-Based Hardening
+            if regime_info.label in (MarketRegime.NEWS_SHOCK, MarketRegime.VOLATILE_BREAKOUT):
+                # Increase required consensus to 80% during news or breakouts
+                dynamic_threshold = max(dynamic_threshold, 0.80)
+                logger.info(
+                    "Regime-adaptive safety active | symbol=%s | regime=%s | consensus_threshold raised to %.2f",
+                    symbol,
+                    regime_info.label.value,
+                    dynamic_threshold,
+                )
+
+            # 3.2 Transition-Aware Hardening
+            # If a regime shift is likely (high transition_score), we require 10% more agreement
+            if regime_info.transition_score > 0.70:
+                dynamic_threshold = min(0.95, dynamic_threshold + 0.10)
+                logger.info(
+                    "Transition-aware safety active | symbol=%s | score=%.2f | consensus_threshold raised to %.2f",
+                    symbol,
+                    regime_info.transition_score,
+                    dynamic_threshold,
+                )
+
+        metadata["dynamic_threshold"] = dynamic_threshold
+
+        # 4. Consensus Determination
         direction = SignalDirection.HOLD
         confidence = weighted_hold_conf
 
-        if weighted_buy_conf >= self.consensus_threshold:
+        if weighted_buy_conf >= dynamic_threshold:
             direction = SignalDirection.BUY
             confidence = weighted_buy_conf
-        elif weighted_sell_conf >= self.consensus_threshold:
+        elif weighted_sell_conf >= dynamic_threshold:
             direction = SignalDirection.SELL
             confidence = weighted_sell_conf
+
+        # 5. Veto Power Safety Logic
+        # If any sub-model contributing to the winning direction has dangerously low confidence
+        # (< 0.40), we force HOLD regardless of weighted consensus.
+        # We only consider models that have a non-zero weight in the current ensemble.
+        if direction != SignalDirection.HOLD:
+            for name, sig in signals.items():
+                if (
+                    sig.direction == direction
+                    and self.weights.get(name, 0.0) > 0
+                    and sig.confidence < 0.40
+                ):
+                    logger.warning(
+                        "Veto power active | symbol=%s | model=%s | confidence=%.2f | forcing HOLD",
+                        symbol,
+                        name,
+                        sig.confidence,
+                    )
+                    metadata["veto_active"] = True
+                    metadata["veto_model"] = name
+                    return Signal(
+                        direction=SignalDirection.HOLD,
+                        confidence=0.0,
+                        metadata=metadata,
+                    )
 
         if direction == SignalDirection.HOLD:
             return Signal(direction=direction, confidence=confidence, metadata=metadata)
 
-        # 4. Defensive Safeguards (Risk Control & Drift Monitoring)
+        # 6. Defensive Safeguards (Risk Control & Drift Monitoring)
 
-        # 4.1 Drift-Aware Confidence Penalty
+        # 6.1 Drift-Aware Confidence Penalty
         # If aggregate drift is rising, we proactively reduce confidence to trigger safer sizing
         # or block trades before hard limits are hit.
         health = self.get_health_metrics()
@@ -254,7 +316,7 @@ class EnsembleModel(BaseModel):
             )
             metadata["drift_penalty"] = drift_penalty
 
-        # 4.2 Entropy Guard (Consistency Check)
+        # 6.2 Entropy Guard (Consistency Check)
         # If sub-models are highly divergent in their confidence, it indicates uncertainty.
         winning_signals = [s for s in signals.values() if s.direction == direction]
         if len(winning_signals) > 1:
@@ -321,7 +383,9 @@ class EnsembleModel(BaseModel):
                     "lstm", votes["lstm"].direction, votes["lstm"].confidence
                 )
 
-        return self.aggregate_signals(votes, symbol=kwargs.get("symbol", "unknown"))
+        return self.aggregate_signals(
+            votes, symbol=kwargs.get("symbol", "unknown"), regime_info=regime_info
+        )
 
 
 __all__ = ["EnsembleModel"]

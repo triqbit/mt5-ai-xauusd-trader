@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Adaptive Ensemble Safety:** Implemented "Veto Power" (blocks trades if any sub-model has <0.40 confidence) and regime-adaptive consensus thresholds (raises to 80% during NEWS_SHOCK or VOLATILE_BREAKOUT).
+- **Transition-Aware Hardening:** Automatically increases required ensemble consensus during high-likelihood market regime shifts.
 - **Resilient Bootstrapping:** Enhanced `scripts/bootstrap.sh` to handle TA-Lib installation failures gracefully, allowing setup to complete with functional fallbacks.
 - **Accurate Diagnostics:** Updated `scripts/doctor.py` to report missing TA-Lib as a WARNING instead of a CRITICAL FAILURE, aligning with the bot's built-in fallback capabilities.
 - **Interactive Setup Wizard:** Introduced a guided CLI configuration wizard (`python main.py --setup`) to simplify `.env` initialization and MT5 credential management.
