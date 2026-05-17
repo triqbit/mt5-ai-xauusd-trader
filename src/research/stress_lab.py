@@ -87,6 +87,7 @@ class StressScenario(BaseModel):
 
     # Configuration overrides
     lot_size: float = 0.1
+    commission_per_lot: float = 7.0  # Matches BacktestEngine default
     seed: int = 42
 
 
@@ -121,6 +122,8 @@ class StressTestMetrics(BaseModel):
     execution_quality_score: float  # 0.0 to 1.0
     latency_impact: float  # Percentage impact of delays
     max_slippage_experienced: float = 0.0  # Max bps of slippage seen
+    total_commission_cost: float = 0.0
+    total_slippage_cost: float = 0.0
     sortino_ratio: float = 0.0
 
 
@@ -221,16 +224,17 @@ class StressLab:
         data: pd.DataFrame,
         initial_balance: float = 10000.0,
         contract_multiplier: float = 100.0,  # Default for XAUUSD
+        commission_per_lot: float = 7.0,
     ):
         self.strategy = strategy
         self.data = data.copy()
         self.initial_balance = initial_balance
         self.contract_multiplier = contract_multiplier
+        self.commission_per_lot = commission_per_lot
         self.results: dict[str, StressTestMetrics] = {}
         self.sensitivity_data: dict[str, list[tuple[float, float]]] = {}
 
-    @staticmethod
-    def create_execution_hell_scenario() -> StressScenario:
+    def create_execution_hell_scenario(self) -> StressScenario:
         """Create a scenario with high slippage, wide spreads, and delays."""
         return StressScenario(
             name="Execution Hell",
@@ -245,10 +249,10 @@ class StressLab:
             execution_delay_steps=3,
             execution_delay_jitter=2,
             service_failure_prob=0.05,
+            commission_per_lot=self.commission_per_lot,
         )
 
-    @staticmethod
-    def create_liquidity_crisis_scenario() -> StressScenario:
+    def create_liquidity_crisis_scenario(self) -> StressScenario:
         """Create a scenario with missing data and extreme choppy price action."""
         return StressScenario(
             name="Liquidity Crisis",
@@ -260,10 +264,10 @@ class StressLab:
             spread_multiplier=2.5,
             spread_spike_prob=0.05,
             spread_spike_magnitude=1.0,
+            commission_per_lot=self.commission_per_lot,
         )
 
-    @staticmethod
-    def create_regime_shock_scenario() -> StressScenario:
+    def create_regime_shock_scenario(self) -> StressScenario:
         """Create a scenario with frequent and violent regime transitions."""
         return StressScenario(
             name="Regime Shock",
@@ -271,10 +275,10 @@ class StressLab:
             severity=StressSeverity.HIGH,
             regime_flip_prob=0.1,
             choppy_breakout_prob=0.05,
+            commission_per_lot=self.commission_per_lot,
         )
 
-    @staticmethod
-    def create_flash_crash_scenario() -> StressScenario:
+    def create_flash_crash_scenario(self) -> StressScenario:
         """Create a scenario with a violent flash crash event."""
         return StressScenario(
             name="Flash Crash",
@@ -285,10 +289,10 @@ class StressLab:
             slippage_spike_prob=0.2,
             slippage_spike_magnitude_bps=200.0,
             spread_multiplier=5.0,
+            commission_per_lot=self.commission_per_lot,
         )
 
-    @staticmethod
-    def create_data_freeze_scenario() -> StressScenario:
+    def create_data_freeze_scenario(self) -> StressScenario:
         """Create a scenario with prolonged stale price data (API/Feed freeze)."""
         return StressScenario(
             name="Data Freeze",
@@ -297,6 +301,7 @@ class StressLab:
             stale_data_prob=0.8,
             missing_tick_prob=0.1,
             spread_multiplier=1.5,
+            commission_per_lot=self.commission_per_lot,
         )
 
     def run_standard_suite(self, baseline_metrics: StressTestMetrics) -> ResilienceReport:
@@ -353,6 +358,7 @@ class StressLab:
             scenario = StressScenario(
                 name=f"Sensitivity_{parameter}_{val_str}",
                 description=f"Sensitivity test for {parameter} at {val_str}",
+                commission_per_lot=self.commission_per_lot,
             )
             setattr(scenario, parameter, val)
             metrics = self.run_scenario(scenario)
@@ -778,6 +784,8 @@ class StressLab:
         rng = np.random.default_rng(scenario.seed)
         latency_hits = 0
         max_slippage = 0.0
+        total_commission = 0.0
+        total_slippage = 0.0
 
         for i in range(1, n):
             # 1. Determine signal with delay and jitter
@@ -815,19 +823,31 @@ class StressLab:
             # Exit existing position if signal changed or is zero
             if position == 1 and current_sig != 1:
                 exit_price = current_price - (current_spread / 2) - slippage
-                pnl = (exit_price - entry_price) * lot_size * contract_multiplier
+                raw_pnl = (exit_price - entry_price) * lot_size * contract_multiplier
+                commission = lot_size * scenario.commission_per_lot
+                total_commission += commission
+                total_slippage += slippage * lot_size * contract_multiplier
+
+                pnl = raw_pnl - commission
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
             elif position == -1 and current_sig != -1:
                 exit_price = current_price + (current_spread / 2) + slippage
-                pnl = (entry_price - exit_price) * lot_size * contract_multiplier
+                raw_pnl = (entry_price - exit_price) * lot_size * contract_multiplier
+                commission = lot_size * scenario.commission_per_lot
+                total_commission += commission
+                total_slippage += slippage * lot_size * contract_multiplier
+
+                pnl = raw_pnl - commission
                 trade_pnls.append(pnl)
                 cash += pnl
                 position = 0
 
             # Open new position if signal is non-zero
             if position == 0 and current_sig != 0:
+                total_slippage += slippage * lot_size * contract_multiplier
+
                 if current_sig == 1:
                     position = 1
                     entry_price = current_price + (current_spread / 2) + slippage
@@ -835,17 +855,18 @@ class StressLab:
                     position = -1
                     entry_price = current_price - (current_spread / 2) - slippage
 
-            # Update Equity (Mark-to-Market including potential exit cost)
+            # Update Equity (Mark-to-Market including potential exit cost and commission)
             exit_cost = (current_spread / 2) + slippage
+            commission = lot_size * scenario.commission_per_lot
             if position == 1:
                 unrealized = (
                     ((current_price - exit_cost) - entry_price) * lot_size * contract_multiplier
-                )
+                ) - commission
                 equity[i] = cash + unrealized
             elif position == -1:
                 unrealized = (
                     (entry_price - (current_price + exit_cost)) * lot_size * contract_multiplier
-                )
+                ) - commission
                 equity[i] = cash + unrealized
             else:
                 equity[i] = cash
@@ -896,5 +917,7 @@ class StressLab:
             execution_quality_score=1.0 - (latency_hits / n),
             latency_impact=latency_hits / n,
             max_slippage_experienced=max_slippage,
+            total_commission_cost=total_commission,
+            total_slippage_cost=total_slippage,
             sortino_ratio=sortino,
         )
