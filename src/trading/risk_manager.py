@@ -3,13 +3,10 @@ MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/risk_manager.py
 
 Enterprise risk management engine implementing:
-  - Kelly Criterion position sizing (fractional)
-  - Ray Dalio All-Weather portfolio allocation
-  - Dynamic drawdown protection & circuit breakers
-  - 6-layer entry filter cascade
-
-This module relies on the unified TradeSignal schema from src.core.schemas
-to ensure all signals entering the risk engine are technically valid.
+  - ATR-based position sizing (14-period vs 30-day average)
+  - Cascading daily loss circuit breakers (Level 1-4)
+  - Drawdown safeguards and exposure limits
+  - 8-layer safety cascade signal validation
 
 Author : triqbit
 License: MIT
@@ -20,7 +17,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -29,17 +28,26 @@ from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
 
-# Ray Dalio All-Weather allocation weights
+# Ray Dalio All-Weather allocation weights (Legacy reference)
 ALLOCATION_WEIGHTS: Dict[str, float] = {
-    "XAUUSD": 0.18,  # Gold - inflation hedge
-    "USDCHF": 0.15,  # CHF - deflation hedge
-    "GBPUSD": 0.13,  # GBP - growth / balanced
-    "EURUSD": 0.12,  # EUR - growth / balanced
-    "XAGUSD": 0.12,  # Silver - commodity
-    "AUDUSD": 0.15,  # AUD - commodity currency
-    "USDJPY": 0.08,  # JPY - carry trade
-    "EURJPY": 0.07,  # EUR/JPY cross
+    "XAUUSD": 0.18,
+    "USDCHF": 0.15,
+    "GBPUSD": 0.13,
+    "EURUSD": 0.12,
+    "XAGUSD": 0.12,
+    "AUDUSD": 0.15,
+    "USDJPY": 0.08,
+    "EURJPY": 0.07,
 }
+
+
+@dataclass
+class RiskDecision:
+    """Decision details from the RiskManager."""
+
+    is_approved: bool
+    reason: str = ""
+    adjusted_lot_size: float = 0.0
 
 
 @dataclass
@@ -55,8 +63,8 @@ class DailyStats:
 
 class RiskManager:
     """
-    Central risk authority.
-    Every signal must be approved here before reaching the order router.
+    Institutional risk authority.
+    Enforces RISK_LIMITS.md safeguards via an 8-layer cascade.
     """
 
     def __init__(
@@ -70,83 +78,127 @@ class RiskManager:
         self.balance = account_balance
         self.peak_equity = account_balance
         self.daily = DailyStats(peak_equity=account_balance)
-        self.open_positions: Dict[str, int] = {}  # symbol -> ticket
+        self.open_positions: Dict[str, int] = {}  # symbol -> ticket (legacy tracking)
         self.trade_logger = logger_db
         self.monitor = monitor
         logger.info("RiskManager initialised | balance=%.2f", account_balance)
 
-    # -- Public API ---------------------------------------------------------
-    def approve(
+    def validate_signal(
         self,
         signal: TradeSignal,
-        signal_id: Optional[int] = None,
-        model_health: Optional[dict] = None,
-    ) -> bool:
+        market_data: pd.DataFrame,
+        open_positions: List[Dict[str, Any]],
+        model_health: Optional[Dict[str, float]] = None,
+    ) -> RiskDecision:
         """
-        Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Validate a trade signal against the 8-layer cascade.
         """
-        rejection_reason = ""
-        if not self._check_circuit_breaker():
-            rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
-            rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
-            rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
-            rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
-            rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
-            rejection_reason = "Risk-Reward ratio too low"
-        elif not self._check_consecutive_losses():
-            rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
-            rejection_reason = "Model health metrics below threshold"
+        # Layer 1: Circuit Breakers (Equity Drawdown)
+        if not self._check_drawdown_breaker():
+            return RiskDecision(False, "Hard drawdown limit reached")
 
-        passed = rejection_reason == ""
-        if not passed:
-            logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
-                signal.symbol,
-                signal.direction,
-                rejection_reason,
+        # Layer 2: Daily Loss Limits
+        if self.get_daily_loss_level() >= 4:
+            return RiskDecision(False, "Daily loss limit reached (Level 4)")
+
+        # Layer 3: Activity Limits
+        if self.daily.trade_count >= self.cfg.max_trades_per_day:
+            return RiskDecision(False, "Max daily trades reached")
+        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
+            return RiskDecision(False, "Max consecutive losses reached")
+
+        # Layer 4: Exposure Limits
+        if len(open_positions) >= self.cfg.max_positions:
+            return RiskDecision(False, "Max concurrent positions reached")
+        if not self._check_directional_exposure(signal, open_positions):
+            return RiskDecision(False, "Max directional exposure reached (30%)")
+        if not self._check_total_notional(signal, open_positions, market_data):
+            return RiskDecision(False, "Total notional exposure exceeds equity")
+
+        # Layer 5: Symbol Allocation
+        if signal.symbol != self.cfg.symbol:
+            return RiskDecision(False, f"Symbol {signal.symbol} not in approved list")
+
+        # Layer 6: Prediction Limits
+        if signal.confidence < self.cfg.min_confidence:
+            return RiskDecision(
+                False, f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
             )
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=rejection_reason,
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
-        return passed
 
-    def size_position(
-        self,
-        symbol: str,
-        win_rate: float,
-        avg_win: float,
-        avg_loss: float,
-        pip_value: float = 1.0,
-    ) -> float:
-        """
-        Fractional Kelly Criterion position sizing.
-        Returns lot size capped at max risk per trade.
-        """
-        if avg_loss == 0:
-            return 0.01  # minimum lot
-        kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
-        kelly_fraction = max(0.0, min(kelly_fraction, 0.25))  # cap at 25% Kelly
-        risk_capital = self.balance * self.cfg.risk_per_trade
-        lot_size = (risk_capital * kelly_fraction) / (avg_loss * pip_value)
-        lot_size = max(0.01, round(lot_size, 2))
-        logger.debug(
-            "Kelly sizing | kelly=%.3f risk_cap=%.2f lots=%.2f",
-            kelly_fraction,
-            risk_capital,
-            lot_size,
-        )
-        return lot_size
+        # Layer 7: Risk-Reward Validation
+        if not self._check_risk_reward(signal):
+            return RiskDecision(False, "Risk-Reward ratio below 1.5")
+
+        # Layer 8: Model Health
+        if not self._check_model_health(model_health):
+            return RiskDecision(False, "Model health metrics below threshold")
+
+        # Calculate final lot size using ATR-based sizing
+        adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
+
+        if adjusted_lots < self.cfg.min_lot_size:
+            return RiskDecision(False, f"Calculated lot size {adjusted_lots} below minimum")
+
+        return RiskDecision(True, "Approved", adjusted_lots)
+
+    def calculate_position_size(self, symbol: str, market_data: pd.DataFrame) -> float:
+        """ATR-based position sizing."""
+        if market_data.empty:
+            return self.cfg.min_lot_size
+
+        # Find ATR column (resilient to different TF prefixes)
+        atr_col = "atr"
+        if atr_col not in market_data.columns:
+            atr_cols = [c for c in market_data.columns if "atr" in c.lower()]
+            if atr_cols:
+                atr_col = atr_cols[0]
+            else:
+                logger.warning("ATR column not found in market_data, falling back to min lot size")
+                return self.cfg.min_lot_size
+
+        # Find Close column
+        close_col = "close"
+        if close_col not in market_data.columns:
+            close_cols = [c for c in market_data.columns if "close" in c.lower()]
+            if close_cols:
+                close_col = close_cols[0]
+            else:
+                logger.warning("Close column not found in market_data")
+                return self.cfg.min_lot_size
+
+        current_atr = market_data[atr_col].iloc[-1]
+        # Approx 30 days of M5 (8640 bars) - use whatever history is available
+        avg_atr = market_data[atr_col].tail(8640).mean()
+
+        vol_multiplier = 1.0
+        ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
+
+        if ratio > self.cfg.volatility_extreme_threshold:
+            return 0.0
+        elif ratio > self.cfg.volatility_very_high_threshold:
+            vol_multiplier = 0.5
+        elif ratio > self.cfg.volatility_high_threshold:
+            vol_multiplier = 0.75
+
+        loss_multiplier = self.get_size_multiplier_from_loss()
+        total_multiplier = vol_multiplier * loss_multiplier
+
+        if total_multiplier <= 0:
+            return 0.0
+
+        risk_amount = self.balance * self.cfg.risk_per_trade
+        # ATR * 100 converts gold ATR to $ per lot (Institutional standard for XAUUSD)
+        lot_size = (risk_amount / (current_atr * 100)) * total_multiplier
+
+        # Cap at Max Position Size (10% of equity)
+        max_notional = self.balance * self.cfg.max_position_size_pct
+        price = market_data[close_col].iloc[-1]
+        max_lots = max_notional / (price * 100)
+
+        final_lots = min(lot_size, max_lots)
+        final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
+
+        return final_lots
 
     def update_equity(self, current_equity: float) -> None:
         """Call after every closed trade or on heartbeat."""
@@ -172,100 +224,97 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
-    # -- Private filter layers ----------------------------------------------
-    def _check_consecutive_losses(self) -> bool:
-        if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
-            logger.warning(
-                "Losing streak limit hit: %d (Limit: %d)",
-                self.daily.consecutive_losses,
-                self.cfg.max_losing_streak,
-            )
-            return False
-        return True
+    # -- Internal cascade layers -------------------------------------------
 
-    def _check_model_health(self, health: Optional[dict]) -> bool:
-        if health is None:
+    def _check_drawdown_breaker(self) -> bool:
+        """Layer 1: Equity Drawdown."""
+        if self.peak_equity <= 0:
             return True
-
-        drift = float(health.get("drift", 0.0))
-        accuracy = float(health.get("accuracy", 1.0))
-        calibration = float(health.get("calibration", 0.0))
-
-        if drift > self.cfg.model_drift_threshold:
-            logger.warning(
-                "Model drift too high: %.2f > %.2f", drift, self.cfg.model_drift_threshold
-            )
-            return False
-        if accuracy < self.cfg.model_accuracy_floor:
-            logger.warning(
-                "Model accuracy too low: %.2f < %.2f", accuracy, self.cfg.model_accuracy_floor
-            )
-            return False
-        if calibration > self.cfg.model_calibration_threshold:
-            logger.warning(
-                "Model calibration error too high: %.2f > %.2f",
-                calibration,
-                self.cfg.model_calibration_threshold,
-            )
-            return False
-
-        return True
-
-    def _check_circuit_breaker(self) -> bool:
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
-        if drawdown >= 0.15:  # 15% peak-to-valley kills all trading
-            logger.critical(
-                "CIRCUIT BREAKER: drawdown=%.1f%% - trading halted",
-                drawdown * 100,
-            )
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="CIRCUIT_BREAKER",
-                    description=f"Drawdown {drawdown * 100:.1f}% hit 15% limit",
-                )
+        if drawdown >= self.cfg.max_drawdown:
+            logger.critical("CIRCUIT BREAKER: Drawdown %.2f%% hit limit", drawdown * 100)
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
             return False
         return True
 
-    def _check_daily_loss(self) -> bool:
-        if self.daily.peak_equity == 0:
-            return True
+    def get_daily_loss_level(self) -> int:
+        """Layer 2: Daily Loss Level (0-4)."""
+        if self.daily.peak_equity <= 0 or self.daily.realised_pnl >= 0:
+            return 0
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if self.daily.realised_pnl < 0 and loss_pct >= self.cfg.max_daily_loss:
-            logger.warning("Daily loss limit hit: %.1f%%", loss_pct * 100)
-            return False
-        return True
+        if loss_pct >= self.cfg.max_daily_loss:
+            return 4
+        if loss_pct >= self.cfg.daily_loss_lvl3:
+            return 3
+        if loss_pct >= self.cfg.daily_loss_lvl2:
+            return 2
+        if loss_pct >= self.cfg.daily_loss_lvl1:
+            return 1
+        return 0
 
-    def _check_max_positions(self) -> bool:
-        if len(self.open_positions) >= self.cfg.max_positions:
-            logger.debug("Max positions reached (%d)", self.cfg.max_positions)
-            return False
-        return True
+    def _check_directional_exposure(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]]
+    ) -> bool:
+        """Layer 4: 30% net directional exposure."""
+        net_lots = 0.0
+        for pos in open_positions:
+            vol = pos.get("volume", 0.0)
+            if pos.get("type") == 0:  # BUY
+                net_lots += vol
+            else:  # SELL
+                net_lots -= vol
 
-    def _check_symbol_allocation(self, symbol: str) -> bool:
-        """Block trading on symbols not in the All-Weather portfolio."""
-        if symbol not in ALLOCATION_WEIGHTS:
-            logger.warning("Symbol %s not in approved portfolio", symbol)
-            return False
-        return True
+        net_lots += self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
+        price_estimate = 2300.0
+        notional = abs(net_lots) * price_estimate * 100
+        exposure_pct = notional / self.balance if self.balance > 0 else 1.0
+        return exposure_pct <= self.cfg.max_single_direction_pct
 
-    def _check_minimum_confidence(self, confidence: float, threshold: float = 0.55) -> bool:
-        if confidence < threshold:
-            logger.debug("Confidence %.2f below threshold %.2f", confidence, threshold)
-            return False
-        return True
+    def _check_total_notional(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
+    ) -> bool:
+        """Layer 4: Total notional < 100% equity."""
+        total_lots = sum(pos.get("volume", 0.0) for pos in open_positions) + self.cfg.min_lot_size
+        price = market_data["close"].iloc[-1] if not market_data.empty else 2300.0
+        total_notional = total_lots * price * 100
+        return total_notional < (self.balance * self.cfg.max_total_notional_pct)
 
     def _check_risk_reward(self, signal: TradeSignal, min_rr: float = 1.5) -> bool:
+        """Layer 7: Minimum 1.5 Risk-Reward."""
         risk = abs(signal.entry_price - signal.stop_loss)
         reward = abs(signal.take_profit - signal.entry_price)
-        if risk == 0:
+        return reward >= (risk * min_rr) if risk > 0 else False
+
+    def _check_model_health(self, health: Optional[Dict[str, float]]) -> bool:
+        """Layer 8: Model Health Metrics."""
+        if health is None:
+            return True
+        if health.get("drift", 0.0) > self.cfg.model_drift_threshold:
             return False
-        rr = reward / risk
-        if rr < min_rr:
-            logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
+        if health.get("accuracy", 1.0) < self.cfg.model_accuracy_floor:
             return False
-        return True
+        return health.get("calibration", 0.0) <= self.cfg.model_calibration_threshold
+
+    def get_size_multiplier_from_loss(self) -> float:
+        """Multiplier based on daily loss level."""
+        level = self.get_daily_loss_level()
+        mapping = {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.25, 4: 0.0}
+        return mapping.get(level, 0.0)
+
+    # -- Legacy methods (for backward compatibility during migration) -------
+    def approve(self, signal: TradeSignal, **kwargs) -> bool:
+        """Legacy approve method. Returns False for safety."""
+        logger.error(
+            "CRITICAL: Legacy approve() called on RiskManager. This method is deprecated "
+            "and returns False to prevent unvalidated trades. Update caller to validate_signal()."
+        )
+        return False
+
+    def size_position(self, symbol: str, win_rate: float = 0.5, **kwargs) -> float:
+        """Legacy size_position method."""
+        logger.warning("Legacy size_position() called. Use calculate_position_size() instead.")
+        return self.cfg.min_lot_size
 
 
-__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]
+__all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskDecision", "RiskManager"]

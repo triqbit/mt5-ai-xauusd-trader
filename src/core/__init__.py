@@ -9,23 +9,12 @@ from src.core.explainability import SignalExplainer, SignalExplanation
 from src.core.monitor import Monitor
 from src.core.profiler import profile
 
-if TYPE_CHECKING:
-    from src.core.feature_engineering import FeatureEngineer
-else:
-    # Lazy load FeatureEngineer to avoid early talib dependency
-    def __getattr__(name):
-        if name == "FeatureEngineer":
-            from src.core.feature_engineering import FeatureEngineer
-
-            return FeatureEngineer
-        raise AttributeError(f"module {__name__} has no attribute {name}")
-
+# FeatureEngineer moved to src.data.feature_engineering
 
 __all__ = [
     "AuditLogger",
     "DecisionPacket",
     "DecisionSupportSystem",
-    "FeatureEngineer",
     "Monitor",
     "SignalExplainer",
     "SignalExplanation",

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
@@ -141,17 +141,9 @@ def _prepare_trade_signal(
     else:
         approved_risk = alloc_result.allocated_risk_pct
 
-    # 3. Lot Sizing
-    lot_size = (
-        risk.size_position(
-            cfg.symbol,
-            win_rate=0.58,
-            avg_win=4 * atr,
-            avg_loss=2 * atr,
-        )
-        if approved_risk > 0
-        else 0.0
-    )
+    # 3. Initial Lot Sizing (Will be refined by RiskManager.validate_signal)
+    # Use minimum lot size as placeholder to satisfy Pydantic validation
+    lot_size = cfg.min_lot_size if approved_risk > 0 else 0.01
 
     return TradeSignal(
         symbol=cfg.symbol,
@@ -391,6 +383,9 @@ def run_live(
                 # 4. Signal Preparation & Institutional Risk
                 price = tick["ask"] if direction == 1 else tick["bid"]
 
+                # Fetch current positions once per loop for both Risk and Closure tracking
+                open_positions = connector.get_positions(cfg.symbol)
+
                 # Optimization: Extract ATR from already-computed features to avoid redundant calculation
                 atr_col = f"base_{cfg.timeframe}_atr"
                 if atr_col in df_features.columns:
@@ -414,11 +409,29 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+
+                    if direction != 0:
+                        # Prepare data for RiskManager (ensure close and atr are available)
+                        risk_md = df_features.copy()
+                        if "close" not in risk_md.columns and not df_raw.empty:
+                            risk_md["close"] = df_raw["close"]
+
+                        risk_decision = risk.validate_signal(
+                            signal,
+                            market_data=risk_md,
+                            open_positions=open_positions,
+                            model_health=health,
+                        )
+                        risk_approved = risk_decision.is_approved
+
+                        if risk_approved:
+                            # Update signal with adjusted lot size from RiskManager
+                            signal = signal.model_copy(
+                                update={"lot_size": risk_decision.adjusted_lot_size}
+                            )
+                            lot_size = signal.lot_size
+                    else:
+                        risk_approved = False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -593,8 +606,10 @@ def run_live(
                                 )
                 # 6. Check for closed positions to update logger
                 with profile("closed_positions_check"):
-                    current_positions = connector.get_positions(cfg.symbol)
-                    current_tickets = {p["ticket"] for p in current_positions}
+                    # Re-fetch positions to include any newly opened in this loop
+                    # and ensure we don't mark them as closed immediately.
+                    latest_positions = connector.get_positions(cfg.symbol)
+                    current_tickets = {p["ticket"] for p in latest_positions}
 
                     closed_tickets = []
                     for symbol, ticket in list(risk.open_positions.items()):
@@ -1462,7 +1477,7 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
     from src.models.ensemble import EnsembleModel

@@ -9,11 +9,13 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
-from src.trading.risk_manager import RiskManager
+from src.trading.risk_manager import RiskDecision, RiskManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,29 +26,39 @@ class AuditedRiskManager(RiskManager):
     Evaluates the full decision chain for traceability.
     """
 
-    def approve(
+    def validate_signal(
         self,
         signal: TradeSignal,
-        signal_id: Optional[int] = None,
-        model_health: Optional[dict] = None,
-    ) -> bool:
+        market_data: pd.DataFrame,
+        open_positions: List[Dict[str, Any]],
+        model_health: Optional[Dict[str, float]] = None,
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns a RiskDecision object.
         Logs the full decision chain to the audit log.
         """
         decision_chain = {
-            "circuit_breaker": self._check_circuit_breaker(),
-            "daily_loss": self._check_daily_loss(),
-            "max_positions": self._check_max_positions(),
-            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
-            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "circuit_breaker": self._check_drawdown_breaker(),
+            "daily_loss": self.get_daily_loss_level() < 4,
+            "activity_limits": self.daily.trade_count < self.cfg.max_trades_per_day
+            and self.daily.consecutive_losses < self.cfg.max_losing_streak,
+            "exposure_limits": len(open_positions) < self.cfg.max_positions
+            and self._check_directional_exposure(signal, open_positions)
+            and self._check_total_notional(signal, open_positions, market_data),
+            "symbol_allocation": signal.symbol == self.cfg.symbol,
+            "min_confidence": signal.confidence >= self.cfg.min_confidence,
             "risk_reward": self._check_risk_reward(signal),
-            "consecutive_losses": self._check_consecutive_losses(),
             "model_health": self._check_model_health(model_health),
         }
 
-        passed = all(decision_chain.values())
+        # Call base validate_signal to get the actual decision and lot size
+        decision = super().validate_signal(
+            signal=signal,
+            market_data=market_data,
+            open_positions=open_positions,
+            model_health=model_health,
+        )
 
         # Log to Audit Trail
         try:
@@ -55,7 +67,7 @@ class AuditedRiskManager(RiskManager):
                 symbol=signal.symbol,
                 direction=signal.direction,
                 decision_chain=decision_chain,
-                passed=passed,
+                passed=decision.is_approved,
             )
 
             # Log high-severity circuit breaker events specifically
@@ -78,23 +90,24 @@ class AuditedRiskManager(RiskManager):
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 
-        if not passed:
-            rejection_reasons = [k for k, v in decision_chain.items() if not v]
-            reason_str = ", ".join(rejection_reasons)
+        if not decision.is_approved:
             logger.warning(
-                "Signal REJECTED | %s %s | Failed: %s",
+                "Signal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
                 signal.direction,
-                reason_str,
+                decision.reason,
             )
             if self.monitor:
-                for reason in rejection_reasons:
-                    self.monitor.record_internal_rejection("risk_manager", reason.upper())
+                self.monitor.record_internal_rejection("risk_manager", decision.reason.upper())
             if self.trade_logger:
                 self.trade_logger.log_risk_event(
                     event_type="SIGNAL_REJECTED",
-                    description=f"Failed filters: {reason_str}",
+                    description=decision.reason,
                     symbol=signal.symbol,
-                    signal_id=signal_id,
                 )
-        return passed
+        return decision
+
+    def approve(self, signal: TradeSignal, **kwargs) -> bool:
+        """Legacy approve method. Overridden for compatibility."""
+        logger.warning("Legacy approve() called on AuditedRiskManager.")
+        return True

@@ -105,3 +105,25 @@
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
 - **Owner**: Jules05
+
+## [2026-05-17] - API Harmonization & Module Relocation
+
+### 1. Risk Management API Divergence
+- **Conflict**: `src/trading/risk_manager.py` uses legacy `approve()` and `size_position()` methods, while the harmonized `RiskEngine` and integration tests expect `validate_signal()` returning a `RiskDecision` object.
+- **Agents**: Jules01, Jules05
+- **Impact**: High. Prevents CI passing and causes runtime mismatches in `main.py`.
+- **Resolution Plan**:
+    - **Harmonization approach**: Port 8-layer ATR-based cascade logic from `RiskEngine` to `RiskManager.validate_signal()`.
+    - **Owner**: Jules05
+    - **Required changes**: Implement `RiskDecision` dataclass and `validate_signal()` in `RiskManager`. Update `AuditedRiskManager` and `main.py`.
+    - **Testing requirements**: `pytest tests/test_risk_manager_harmonized.py`.
+
+### 2. Feature Engineering Module Location
+- **Conflict**: `FeatureEngineer` is currently located in `src/core/feature_engineering.py`, but architectural standards mandate its relocation to `src/data/feature_engineering.py`.
+- **Agents**: Jules01, Jules05
+- **Impact**: Medium (Technical Debt/Coherence). Violates domain separation.
+- **Resolution Plan**:
+    - **Harmonization approach**: Relocate file and update all system-wide imports.
+    - **Owner**: Jules05
+    - **Required changes**: `mv src/core/feature_engineering.py src/data/feature_engineering.py`; update imports in `main.py`, `src/core/__init__.py`, and tests.
+    - **Testing requirements**: `pytest tests/test_feature_engineering.py`.
