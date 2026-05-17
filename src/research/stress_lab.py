@@ -197,6 +197,8 @@ class ResilienceReport(BaseModel):
             resilience_score=self.resilience_score,
             baseline=_map_metric("Baseline", self.baseline_metrics),
             scenarios=main_scenarios,
+            sharpe_decay=self.sharpe_decay,
+            win_rate_decay=self.win_rate_decay,
             fragility_indicators=self.fragility_indicators,
             failure_points=self.failure_points,
             insights=self.degradation_summary,

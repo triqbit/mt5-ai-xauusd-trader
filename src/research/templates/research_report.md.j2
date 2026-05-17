@@ -24,6 +24,10 @@
 {% set ns.count = ns.count + 1 %}{% endif %}
 {% if allocation_insights %}{{ ns.count }}. [Capital Allocation Insights](#{{ ns.count }}-capital-allocation-insights)
 {% set ns.count = ns.count + 1 %}{% endif %}
+{% if risk_audit %}{{ ns.count }}. [Risk & Compliance Audit](#{{ ns.count }}-risk--compliance-audit)
+{% set ns.count = ns.count + 1 %}{% endif %}
+{% if data_quality %}{{ ns.count }}. [Data Integrity & Quality](#{{ ns.count }}-data-integrity--quality)
+{% set ns.count = ns.count + 1 %}{% endif %}
 {% if benchmarks %}{{ ns.count }}. [Benchmark Comparisons](#{{ ns.count }}-benchmark-comparisons)
 {% set ns.count = ns.count + 1 %}{% endif %}
 {% if rl_evaluation %}{{ ns.count }}. [RL Agent Evaluation](#{{ ns.count }}-rl-agent-evaluation)
@@ -66,7 +70,7 @@
 {% if stress_tests %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Stress Test Outcomes
-**Resilience Score:** {{ stress_tests.resilience_score }}/100
+**Resilience Score:** {{ stress_tests.resilience_score }}/100 | **Sharpe Decay:** {{ (stress_tests.sharpe_decay * 100)|round(1) }}%
 
 | Scenario | Total Return | Max Drawdown | Sharpe | Recov | PF | Outcome |
 |----------|--------------|--------------|--------|-------|----|---------|
@@ -92,7 +96,7 @@
 {% if hyperparameter_robustness %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Hyperparameter Robustness
-**Stability Score:** {{ hyperparameter_robustness.stability_score }}/100
+**Stability Score:** {{ hyperparameter_robustness.stability_score }}/100 | **Grade:** {{ hyperparameter_robustness.grade }} | **WFE:** {{ hyperparameter_robustness.walk_forward_efficiency|round(2) }}
 
 | Parameter | Range Tested | Optimal Value | Sensitivity |
 |-----------|--------------|---------------|-------------|
@@ -158,7 +162,7 @@
 {% if allocation_insights %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Capital Allocation Insights
-**Portfolio Heat:** {{ allocation_insights.total_heat_pct }}% | **Diversification Score:** {{ allocation_insights.diversification_score|round(2) }}
+**Portfolio Heat:** {{ allocation_insights.total_heat_pct|round(1) }}% | **Diversification Score:** {{ allocation_insights.diversification_score|round(2) }} | **Compliant:** {{ 'YES' if allocation_insights.is_compliant else 'NO' }}
 
 | Symbol/Family | Allocated | Heat | Performance Multiplier |
 |---------------|-----------|------|------------------------|
@@ -253,6 +257,32 @@
 
 **Strategic Insights:**
 {{ strategic_confluence.insights }}
+{% endif %}
+
+{% if risk_audit %}
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Risk & Compliance Audit
+**Audit Status:** {{ risk_audit.status }}
+
+- **Portfolio Heat:** {{ (risk_audit.portfolio_heat * 100)|round(1) }}%
+- **Diversification (HHI):** {{ risk_audit.hhi_score|round(3) }}
+- **Drawdown Limit Compliance:** {{ 'PASS' if risk_audit.drawdown_limit_compliance else 'FAIL' }}
+- **Leverage Compliance:** {{ 'PASS' if risk_audit.leverage_compliance else 'FAIL' }}
+
+**Auditor Notes:**
+{{ risk_audit.audit_notes }}
+{% endif %}
+
+{% if data_quality %}
+{% set ns.count = ns.count + 1 %}
+## {{ ns.count }}. Data Integrity & Quality
+**Data Status:** {{ data_quality.status }}
+
+- **Feed Health:** {{ data_quality.feed_health|round(1) }}%
+- **Missing Bars:** {{ data_quality.missing_bars }}
+- **Stale Bars:** {{ data_quality.stale_bars }}
+- **Gaps Detected:** {{ data_quality.gap_count }}
+- **Primary Source:** {{ data_quality.data_source }}
 {% endif %}
 
 {% if methodology %}

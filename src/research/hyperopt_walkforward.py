@@ -231,6 +231,8 @@ class WalkForwardResult(BaseModel):
         return HyperparameterSection(
             stability_score=display_score,
             parameters=params,
+            walk_forward_efficiency=float(self.metrics.walk_forward_efficiency),
+            grade=self.metrics.grade,
             insights=insights,
         )
 
