@@ -165,14 +165,13 @@ class RiskManager:
         Wraps validate_signal with default empty context.
         """
         decision = self.validate_signal(signal, pd.DataFrame(), [], model_health)
-        if not decision.is_approved:
-            if self.trade_logger:
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=decision.reason,
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
+        if not decision.is_approved and self.trade_logger:
+            self.trade_logger.log_risk_event(
+                event_type="SIGNAL_REJECTED",
+                description=decision.reason,
+                symbol=signal.symbol,
+                signal_id=signal_id,
+            )
         return decision.is_approved
 
     def size_position(self, symbol: str, market_data: pd.DataFrame) -> float:
