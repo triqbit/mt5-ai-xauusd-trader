@@ -400,13 +400,13 @@ def run_live(
                                 entry_price=price,
                                 stop_loss=price - (direction * 2 * atr),
                                 take_profit=price + (direction * 4 * atr),
-                                lot_size=0.01, # Placeholder, will be adjusted
+                                lot_size=0.01,  # Placeholder, will be adjusted
                                 algorithm=cfg.algorithm,
                                 confidence=confidence,
                             ),
                             market_data=df_raw,
                             open_positions=connector.get_positions(cfg.symbol),
-                            model_health=health
+                            model_health=health,
                         )
                         if direction != 0
                         else RiskDecision(False, "Hold signal")
@@ -629,7 +629,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
