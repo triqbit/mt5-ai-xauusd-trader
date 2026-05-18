@@ -3,17 +3,19 @@ Tests for Anomaly and Enhanced Adversarial Scenario Builders.
 """
 
 import pytest
-import numpy as np
-import pandas as pd
+
 from src.utils.synthetic_data import AdversarialScenarioBuilder, AnomalyScenarioBuilder
+
 
 @pytest.fixture
 def adversarial_builder():
     return AdversarialScenarioBuilder(seed=42)
 
+
 @pytest.fixture
 def anomaly_builder():
     return AnomalyScenarioBuilder(seed=42)
+
 
 def test_ema_crossover_flicker(adversarial_builder):
     df = adversarial_builder.ema_crossover_flicker(n_steps=50)
@@ -28,12 +30,15 @@ def test_ema_crossover_flicker(adversarial_builder):
     crossovers = 0
     for i in range(len(flicker_part) - 1):
         idx = flicker_part.index[i]
-        next_idx = flicker_part.index[i+1]
-        if (df.loc[idx, "close"] > ema21.loc[idx]) != (df.loc[next_idx, "close"] > ema21.loc[next_idx]):
+        next_idx = flicker_part.index[i + 1]
+        if (df.loc[idx, "close"] > ema21.loc[idx]) != (
+            df.loc[next_idx, "close"] > ema21.loc[next_idx]
+        ):
             crossovers += 1
 
     # We expect high frequency crossovers
     assert crossovers > 10
+
 
 def test_rsi_boundary_oscillation(adversarial_builder):
     df = adversarial_builder.rsi_boundary_oscillation(n_steps=100)
@@ -51,6 +56,7 @@ def test_rsi_boundary_oscillation(adversarial_builder):
     assert osc_rsi.mean() > 60
     assert osc_rsi.std() < 5.0  # Stable around the target
 
+
 def test_ghost_spikes(anomaly_builder):
     df = anomaly_builder.ghost_spikes(n_steps=100)
     # Check for extreme wicks at specific indices
@@ -65,6 +71,7 @@ def test_ghost_spikes(anomaly_builder):
     for i in [20, 40, 60, 80]:
         idx = df.index[i]
         assert abs(df.loc[idx, "close"] - df.loc[idx, "open"]) < 1.0
+
 
 def test_stale_data_with_noise(anomaly_builder):
     df = anomaly_builder.stale_data_with_noise(n_steps=100)

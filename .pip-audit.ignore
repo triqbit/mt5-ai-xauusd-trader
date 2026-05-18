@@ -1,0 +1,4 @@
+# Upstream constraint from metaapi-cloud-sdk
+python-socketio
+# Dependency of metaapi-cloud-sdk
+python-engineio
