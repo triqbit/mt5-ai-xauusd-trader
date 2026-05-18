@@ -265,6 +265,11 @@ class RLMetric(BaseModel):
     commission_drag: float = 0.0
     profit_concentration: float = 0.0
     regime_stability: float = 0.0
+    mae_avg: float = 0.0
+    mfe_avg: float = 0.0
+    p_value: float = 1.0
+    session_diversification: float = 0.0
+    flip_flop_rate: float = 0.0
 
 
 class RLSection(BaseModel):
