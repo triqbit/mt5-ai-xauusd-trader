@@ -18,7 +18,10 @@ import pytest
 mock_torch = MagicMock()
 # Scipy's array_api_compat checks issubclass(cls, torch.Tensor)
 # We need to provide a real class to avoid TypeError
-class MockTensor: pass
+class MockTensor:
+    pass
+
+
 mock_torch.Tensor = MockTensor
 
 mock_sb3 = MagicMock()
@@ -101,7 +104,7 @@ def test_decision_pipeline_full_confluence(
     df["base_M5_ema_21"] = df["close"].ewm(span=21).mean()
     df["base_M5_ema_50"] = df["close"].ewm(span=50).mean()
     df["base_M5_ema_200"] = df["close"].ewm(span=200).mean()
-    df["base_M5_rsi"] = 60.0 # Bullish momentum
+    df["base_M5_rsi"] = 60.0
     df["base_M5_atr"] = 1.0
 
     regime_info = RegimeInfo(

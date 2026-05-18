@@ -33,7 +33,8 @@ def test_strategy_config_validation():
     )
 
     # This should fail validation
-    with pytest.raises(Exception):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
         StrategyConfig(
             strategy_id="TEST",
             symbol="XAUUSD",

@@ -1,15 +1,15 @@
-try:
-    import torch
-except ImportError:
-    torch = None
-import pytest
-
-pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
-
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+import pytest
+
+try:
+    import torch
+except ImportError:
+    torch = None
+
+pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
