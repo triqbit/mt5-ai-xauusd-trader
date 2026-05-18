@@ -43,7 +43,7 @@ def test_high_spread_injection(scenario_gen):
 
 def test_flash_crash_recovery_cycle(lifecycle_builder):
     """Verify the multi-stage flash crash recovery sequence."""
-    df, events = lifecycle_builder.flash_crash_recovery_cycle(n_steps=300)
+    df, _events = lifecycle_builder.flash_crash_recovery_cycle(n_steps=300)
     assert len(df) == 300
 
     # Use RegimeDetector to verify the stages
