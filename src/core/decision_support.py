@@ -27,10 +27,10 @@ License: MIT
 
 from __future__ import annotations
 
-import structlog
 from datetime import datetime, timezone
 from typing import Any
 
+import structlog
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.core.constants import DecisionStatus, SignalDirection
@@ -112,9 +112,7 @@ class PerformanceContext(BaseModel):
     trade_frequency: float = Field(
         0.0, ge=0.0, description="Average trades per day in the analysis window."
     )
-    avg_hold_time: float = Field(
-        0.0, ge=0.0, description="Average trade duration in hours."
-    )
+    avg_hold_time: float = Field(0.0, ge=0.0, description="Average trade duration in hours.")
     profit_concentration: float = Field(
         0.0, ge=0.0, le=1.0, description="Percentage of profit from top 10% of trades."
     )
