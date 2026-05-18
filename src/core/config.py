@@ -64,6 +64,12 @@ class TradingConfig(BaseSettings):
     timeframe: VALID_TIMEFRAMES = Field(
         default="M5", description="The chart timeframe for analysis (e.g., M5, H1)"
     )
+    poll_interval: int = Field(
+        default=60,
+        ge=1,
+        description="Interval in seconds between market data polling and signal evaluation",
+        validation_alias="POLL_INTERVAL",
+    )
     mode: Literal["demo", "live", "backtest"] = Field(
         default="demo",
         description="Execution mode: demo, live, or backtest",

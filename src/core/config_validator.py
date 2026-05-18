@@ -46,6 +46,7 @@ class ConfigValidator:
         self._check_margin_and_volatility_limits()
         self._check_execution_parameters()
         self._check_behavior_caps()
+        self._check_operational_parameters()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -586,6 +587,27 @@ class ConfigValidator:
                     f"Execution latency threshold {self.config.execution_latency_threshold}s exceeds 5s limit.",
                     True,
                     "Reduce EXECUTION_LATENCY_THRESHOLD to 5.0 or less.",
+                )
+            )
+
+    def _check_operational_parameters(self) -> None:
+        """Verify operational and polling parameters."""
+        if self.config.poll_interval > 3600:
+            self.errors.append(
+                ValidationError(
+                    "POLL_INTERVAL",
+                    f"Polling interval ({self.config.poll_interval}s) exceeds 1 hour.",
+                    False,
+                    "Ensure this long interval is intended for your strategy.",
+                )
+            )
+        if self.config.poll_interval < 1:
+            self.errors.append(
+                ValidationError(
+                    "POLL_INTERVAL",
+                    f"Invalid polling interval: {self.config.poll_interval}s.",
+                    True,
+                    "Set POLL_INTERVAL to at least 1 second.",
                 )
             )
 

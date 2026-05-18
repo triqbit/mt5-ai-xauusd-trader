@@ -208,7 +208,7 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = 60  # seconds between signal evaluations
+    poll_interval = cfg.poll_interval
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -734,6 +734,7 @@ def run_setup_wizard() -> int:
     timeframe = Prompt.ask(
         "Default timeframe", choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"], default="M5"
     )
+    poll_interval = IntPrompt.ask("Polling interval (seconds)", default=60)
 
     # 2. MT5 Credentials
     console.print("\n[bold]2. MetaTrader 5 Credentials[/]")
@@ -792,6 +793,8 @@ def run_setup_wizard() -> int:
                     lines.append(f"SYMBOL={symbol}\n")
                 elif line.startswith("TIMEFRAME="):
                     lines.append(f"TIMEFRAME={timeframe}\n")
+                elif line.startswith("POLL_INTERVAL="):
+                    lines.append(f"POLL_INTERVAL={poll_interval}\n")
                 elif line.startswith("MODE="):
                     lines.append(f"MODE={mode}\n")
                 elif line.startswith("METAAPI_TOKEN=") and meta_token:
@@ -808,6 +811,7 @@ def run_setup_wizard() -> int:
             f"MT5_SERVER={server}\n",
             f"SYMBOL={symbol}\n",
             f"TIMEFRAME={timeframe}\n",
+            f"POLL_INTERVAL={poll_interval}\n",
             f"MODE={mode}\n",
             f"METAAPI_TOKEN={meta_token}\n",
             f"METAAPI_ACCOUNT_ID={meta_id}\n",
@@ -869,6 +873,11 @@ Usage Examples:
     )
     execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
     execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
+    execution.add_argument(
+        "--poll-interval",
+        type=int,
+        help="Interval in seconds between market data polling (default: 60).",
+    )
     execution.add_argument(
         "--confirm-live",
         dest="confirm_live_trading",
