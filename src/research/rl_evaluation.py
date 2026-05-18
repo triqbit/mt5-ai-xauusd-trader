@@ -425,6 +425,12 @@ class RLEvaluator:
                     gain_to_pain_ratio=report.stability.gain_to_pain_ratio,
                     lake_ratio=report.stability.lake_ratio,
                     portfolio_heat=report.exposure.avg_portfolio_heat,
+                    trade_frequency=report.turnover.trade_frequency,
+                    avg_hold_time=report.turnover.avg_hold_time,
+                    action_entropy=report.turnover.action_entropy,
+                    commission_drag=report.reward_decomposition.commission_drag,
+                    profit_concentration=report.reward_decomposition.profit_concentration,
+                    regime_stability=report.stability.regime_stability_score,
                 )
             )
 

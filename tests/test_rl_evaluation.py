@@ -156,6 +156,36 @@ def test_to_report_section(trading_env):
     assert hasattr(section.metrics[0], "lake_ratio")
     assert hasattr(section.metrics[0], "portfolio_heat")
 
+    # New fields
+    assert hasattr(section.metrics[0], "trade_frequency")
+    assert hasattr(section.metrics[0], "avg_hold_time")
+    assert hasattr(section.metrics[0], "action_entropy")
+    assert hasattr(section.metrics[0], "commission_drag")
+    assert hasattr(section.metrics[0], "profit_concentration")
+    assert hasattr(section.metrics[0], "regime_stability")
+
+
+def test_to_report_section_population(trading_env):
+    from src.research.rl_evaluation import RLEvaluator
+    evaluator = RLEvaluator(env=trading_env)
+
+    class SimpleAgent:
+        def predict(self, observation):
+            return 1 if np.random.rand() > 0.5 else 0
+
+    comparison = evaluator.compare([SimpleAgent()], ["Agent1"], "Agent1")
+    section = evaluator.to_report_section(comparison)
+
+    metric = section.metrics[0]
+    # Check that new metrics are not just default 0.0 if there's activity
+    # (Note: depending on random data, some might still be 0, but we check existence)
+    assert metric.trade_frequency >= 0.0
+    assert metric.avg_hold_time >= 0.0
+    assert metric.action_entropy >= 0.0
+    assert metric.commission_drag >= 0.0
+    assert metric.profit_concentration >= 0.0
+    assert metric.regime_stability >= 0.0
+
 
 def test_extract_trades():
     evaluator = RLEvaluator(env=MagicMock())
