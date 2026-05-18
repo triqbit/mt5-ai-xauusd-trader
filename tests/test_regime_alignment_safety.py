@@ -1,10 +1,12 @@
 import unittest
 from unittest.mock import MagicMock
+
 from src.core.config import TradingConfig
 from src.core.constants import SignalDirection
 from src.models.base_model import Signal
 from src.models.ensemble import EnsembleModel
-from src.models.regime_detector import RegimeInfo, MarketRegime
+from src.models.regime_detector import MarketRegime, RegimeInfo
+
 
 class TestRegimeAlignmentSafety(unittest.TestCase):
     def setUp(self):
@@ -20,16 +22,16 @@ class TestRegimeAlignmentSafety(unittest.TestCase):
         self.signals = {
             "ppo": Signal(direction=SignalDirection.BUY, confidence=0.9),
             "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "lstm": Signal(direction=SignalDirection.BUY, confidence=0.9)
+            "lstm": Signal(direction=SignalDirection.BUY, confidence=0.9),
         }
 
         # Mock DynamicEnsemble metrics to avoid drift penalty
-        self.ensemble.dynamic_ensemble.calculate_metrics = MagicMock(return_value={
-            "accuracy": 0.8, "drift_score": 0.0, "calibration_error": 0.0
-        })
-        self.ensemble.dynamic_ensemble.get_weights = MagicMock(return_value={
-            "ppo": 0.333, "dreamer": 0.333, "lstm": 0.334
-        })
+        self.ensemble.dynamic_ensemble.calculate_metrics = MagicMock(
+            return_value={"accuracy": 0.8, "drift_score": 0.0, "calibration_error": 0.0}
+        )
+        self.ensemble.dynamic_ensemble.get_weights = MagicMock(
+            return_value={"ppo": 0.333, "dreamer": 0.333, "lstm": 0.334}
+        )
 
     def test_high_stability_alignment(self):
         """Scenario A: High stability and alignment should result in no penalty."""
@@ -41,7 +43,7 @@ class TestRegimeAlignmentSafety(unittest.TestCase):
             session_alignment=1.0,
             volatility_alignment=1.0,
             transition_probabilities={"trending": 0.9},
-            raw_features={}
+            raw_features={},
         )
 
         result = self.ensemble.aggregate_signals(self.signals, regime_info=regime_info)
@@ -62,7 +64,7 @@ class TestRegimeAlignmentSafety(unittest.TestCase):
             session_alignment=0.6,
             volatility_alignment=0.6,
             transition_probabilities={"ranging": 0.6, "trending": 0.4},
-            raw_features={}
+            raw_features={},
         )
 
         result = self.ensemble.aggregate_signals(self.signals, regime_info=regime_info)
@@ -87,7 +89,7 @@ class TestRegimeAlignmentSafety(unittest.TestCase):
             session_alignment=0.2,
             volatility_alignment=0.2,
             transition_probabilities={"news_shock": 0.3, "volatile_breakout": 0.7},
-            raw_features={}
+            raw_features={},
         )
 
         result = self.ensemble.aggregate_signals(self.signals, regime_info=regime_info)
@@ -95,6 +97,7 @@ class TestRegimeAlignmentSafety(unittest.TestCase):
         self.assertEqual(result.direction, SignalDirection.HOLD)
         self.assertEqual(result.metadata.get("reason"), "Critical market context instability")
         self.assertAlmostEqual(result.metadata.get("market_context_stability"), 0.25)
+
 
 if __name__ == "__main__":
     unittest.main()

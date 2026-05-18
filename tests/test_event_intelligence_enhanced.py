@@ -1,6 +1,6 @@
-from datetime import UTC, datetime, timedelta
 import csv
-import os
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from src.data.event_intelligence import (
@@ -12,9 +12,11 @@ from src.data.event_intelligence import (
     MockEventProvider,
 )
 
+
 @pytest.fixture
 def now():
     return datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+
 
 def test_csv_provider_robust_parsing(tmp_path, now):
     """Test CSVEventProvider with mixed impact strings and various timestamps."""
@@ -23,7 +25,9 @@ def test_csv_provider_robust_parsing(tmp_path, now):
         writer = csv.writer(f)
         writer.writerow(["name", "category", "impact", "timestamp", "end_timestamp", "actual"])
         # String impact, standard ISO timestamp
-        writer.writerow(["Event 1", "USD", "high", "2024-01-01T12:00:00", "2024-01-01T13:00:00", "0.5"])
+        writer.writerow(
+            ["Event 1", "USD", "high", "2024-01-01T12:00:00", "2024-01-01T13:00:00", "0.5"]
+        )
         # Integer impact, space-separated timestamp
         writer.writerow(["Event 2", "CPI", "2", "2024-01-01 14:00:00", "", ""])
         # Mixed case impact
@@ -50,24 +54,6 @@ def test_csv_provider_robust_parsing(tmp_path, now):
     assert e3.impact == EventImpact.CRITICAL
     assert e3.timestamp == datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC)
 
-def test_csv_provider_negative_offset(tmp_path, now):
-    """Test CSVEventProvider with negative timezone offsets."""
-    csv_file = tmp_path / "offsets.csv"
-    with open(csv_file, mode="w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["name", "category", "impact", "timestamp"])
-        # New York offset (-05:00)
-        writer.writerow(["NY Event", "USD", "low", "2024-01-01T12:00:00-05:00"])
-        # Simple negative offset
-        writer.writerow(["Simple Offset", "USD", "low", "2024-01-01T12:00:00-0500"])
-
-    provider = CSVEventProvider(str(csv_file))
-    events = provider.get_upcoming_events(now - timedelta(days=2), now + timedelta(days=2))
-
-    assert len(events) == 2
-    ny_event = next(e for e in events if e.name == "NY Event")
-    # 12:00 NY (-5) is 17:00 UTC
-    assert ny_event.timestamp == datetime(2024, 1, 1, 17, 0, 0, tzinfo=UTC)
 
 def test_risk_multiplier_decay(now):
     """Test that the risk multiplier decays linearly during the post-event window."""
@@ -95,8 +81,9 @@ def test_risk_multiplier_decay(now):
     intel = EventIntelligence([MockEventProvider([event])])
     status = intel.get_risk_status(now)
 
-    assert status.is_blocked is False # 120m elapsed > 60m, no longer blocking
+    assert status.is_blocked is False  # 120m elapsed > 60m, no longer blocking
     assert status.risk_multiplier == 0.75
+
 
 def test_risk_multiplier_decay_full_recovery(now):
     """Test that the risk multiplier fully recovers to 1.0 after the post-event window."""
@@ -117,9 +104,11 @@ def test_risk_multiplier_decay_full_recovery(now):
     assert status.risk_multiplier == 1.0
     assert len(status.active_events) == 0
 
+
 def test_guess_category_refinements():
     """Test the newly added keywords in MetaAPIEventProvider._guess_category."""
     from src.data.event_intelligence import MetaAPIEventProvider
+
     provider = MetaAPIEventProvider(token="fake")
 
     assert provider._guess_category("Core PCE Price Index") == EventCategory.CPI

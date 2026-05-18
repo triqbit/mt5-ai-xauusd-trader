@@ -132,14 +132,7 @@ class CSVEventProvider(BaseEventProvider):
             ts_str = ts_str.replace(" ", "T")
 
         # Ensure ISO format with timezone if missing
-        # Check for offset indicators: +, Z, or - (only after time separator T)
-        has_tz = "+" in ts_str or ts_str.endswith("Z")
-        if not has_tz and "T" in ts_str:
-            time_part = ts_str.split("T")[1]
-            if "-" in time_part:
-                has_tz = True
-
-        if not has_tz:
+        if "+" not in ts_str and not ts_str.endswith("Z"):
             # Assume UTC if no timezone is provided
             ts_str += "+00:00"
 
@@ -453,7 +446,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                 ]
             )
             and "PHILLY FED" not in name_upper
-        ) or "FEDERAL OPEN MARKET COMMITTEE" in name_upper:
+        ):
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
@@ -469,10 +462,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                     "CUT",
                 ]
             )
-        ) or any(
-            kw in name_upper
-            for kw in ["FUNDS RATE", "MONETARY POLICY", "INTEREST RATE", "CASH RATE"]
-        ):
+        ) or any(kw in name_upper for kw in ["FUNDS RATE", "MONETARY POLICY"]):
             return EventCategory.RATES
         if any(
             kw in name_upper
