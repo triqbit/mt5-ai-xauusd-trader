@@ -18,7 +18,7 @@ pandas==2.2.3
 TA-Lib==0.6.8
 
 # ── Data Acquisition ────────────────────────────────────────
-requests==2.33.1
+requests==2.34.2
 aiohttp==3.13.4
 httpx==0.28.1
 
