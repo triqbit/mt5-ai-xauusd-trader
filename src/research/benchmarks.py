@@ -316,9 +316,7 @@ class MomentumVolatilityStrategy:
     rolling volatility is within an acceptable range.
     """
 
-    def __init__(
-        self, window: int = 14, threshold: float = 0.0, vol_threshold_pct: float = 0.02
-    ):
+    def __init__(self, window: int = 14, threshold: float = 0.0, vol_threshold_pct: float = 0.02):
         """
         Initialize the Momentum Volatility strategy.
 

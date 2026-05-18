@@ -734,9 +734,7 @@ def run_setup_wizard() -> int:
     timeframe = Prompt.ask(
         "Default timeframe", choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"], default="M5"
     )
-    poll_interval = IntPrompt.ask(
-        "Polling interval (seconds)", default=60
-    )
+    poll_interval = IntPrompt.ask("Polling interval (seconds)", default=60)
 
     # 2. MT5 Credentials
     console.print("\n[bold]2. MetaTrader 5 Credentials[/]")
