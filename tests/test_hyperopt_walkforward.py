@@ -90,7 +90,7 @@ def test_robustness_scoring_components(sample_data):
         {"Sharpe Ratio": 1.0 + (p["param"] * 0.1)},
         np.zeros(len(d)),
     )
-    penalty_zero, sens_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
+    penalty_zero, _sens_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
     assert penalty_zero > 0.0  # Should be non-zero due to epsilon perturbation
 
     # Test regime consistency
@@ -807,3 +807,79 @@ def test_robustness_grading_logic():
         constraints_violated=True,  # Constraint violation
     )
     assert m_f.calculate_grade() == "F"
+
+
+def test_reporting_integration(sample_data):
+    """Verifies integration with the reporting framework."""
+    from src.research.reporting import HyperparameterSection
+
+    def param_space(trial):
+        return {"fast_window": trial.suggest_int("fast_window", 10, 10)}
+
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, param_space, config)
+    result = optimizer.run_optimization()
+
+    section = result.to_report_section()
+    assert isinstance(section, HyperparameterSection)
+    assert section.stability_score >= 0
+    assert len(section.parameters) == 1
+    assert section.parameters[0].name == "fast_window"
+    assert section.grade in ["A", "B", "C", "D", "F"]
+    assert "OOS Sharpe Mean" in section.insights
+
+
+def test_bars_per_year_refined(sample_data):
+    """Verifies that the refined bars_per_year is used correctly in calculations."""
+    # Default is 6240
+    config = WalkForwardConfig(n_trials=1, train_size=100, test_size=20, step_size=50)
+    assert config.bars_per_year == 6240
+
+    optimizer = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, lambda t: {}, config)
+
+    # Mock returns with known mean and std
+    returns = np.array([0.01] * 100)
+    returns[0] = 0.02  # mean = 0.0101, std approx 0.001
+
+    # We need to test if bars_per_year is used in Sharpe calculation.
+    # _evaluate_strategy uses config.bars_per_year through BenchmarkEvaluator.
+    def mock_predict(data):
+        return pd.Series(1, index=data.index) # Always long
+
+    # Manually trigger a calculation that uses bars_per_year
+    # BenchmarkEvaluator calculates Sharpe as (mean/std) * sqrt(bars_per_year)
+    from src.research.benchmarks import BenchmarkEvaluator
+    BenchmarkEvaluator(sample_data.iloc[:100], bars_per_year=config.bars_per_year)
+
+    # We need to mock the returns inside the evaluator
+    # BenchmarkEvaluator computes returns from close prices and signals.
+    # A simpler way is to check the internal _calculate_regime_consistency which we know uses it.
+
+    # Let's mock a data frame with two regimes
+    data = sample_data.copy().iloc[:100]
+    data["regime"] = "ranging"
+    data.loc[0:49, "regime"] = "trending"
+    data.loc[50:99, "regime"] = "ranging"
+
+    # Sharpe = (mean/std) * sqrt(6240)
+    # If we use 252 instead, Sharpe would be significantly lower.
+
+    # We can use a custom config to verify scaling
+    config_small = WalkForwardConfig(bars_per_year=252)
+    optimizer_small = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, lambda t: {}, config_small)
+
+    # consistency calculation doesn't directly return Sharpe, but uses it internally.
+    # To really verify bars_per_year, we should check a method that returns a value scaled by it.
+    # _evaluate_strategy returns metrics including "Sharpe Ratio"
+
+    params = {"fast_window": 10, "slow_window": 20}
+    metrics_6240, _ = optimizer._evaluate_strategy(sample_data.iloc[:100], params)
+    metrics_252, _ = optimizer_small._evaluate_strategy(sample_data.iloc[:100], params)
+
+    sharpe_6240 = metrics_6240["Sharpe Ratio"]
+    sharpe_252 = metrics_252["Sharpe Ratio"]
+
+    if sharpe_252 != 0:
+        # Ratio should be sqrt(6240) / sqrt(252)
+        expected_ratio = np.sqrt(6240) / np.sqrt(252)
+        assert sharpe_6240 / sharpe_252 == pytest.approx(expected_ratio)
