@@ -78,6 +78,9 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
 - **Win Rate Floor**: If win rate <45%, reduce position size to 25%
 - **Drift Threshold**: If model drift >0.3, retrain immediately
 - **Drift-Aware Confidence Penalty**: Proactively reduce signal confidence if aggregate model drift exceeds 50% of the safety threshold (drift > 0.15). Reduces confidence by up to 20%.
+- **Market Context Alignment Guard**: Analyzes the stability and reliability of the current market regime. It calculates a unified `context_stability` factor by blending regime confidence, session alignment, volatility alignment, and transition stability.
+  - **Graduated Penalty**: If `context_stability < 0.70`, apply a linear confidence penalty (up to 15%).
+  - **Hard Block**: If `context_stability < 0.40`, force a `HOLD` signal to prevent trading in unstable or indeterminate market states.
 - **Entropy Guard**: Monitor divergence between sub-model confidences. If internal consensus is weak (std > 0.25), apply a 10% safety penalty to final confidence.
 - **Calibration Threshold**: Halt trading if Expected Calibration Error (ECE) > 0.25
 - **Daily Retraining**: Update model daily with latest data

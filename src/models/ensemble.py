@@ -316,7 +316,55 @@ class EnsembleModel(BaseModel):
             )
             metadata["drift_penalty"] = drift_penalty
 
-        # 6.2 Entropy Guard (Consistency Check)
+        # 6.2 Market Context Alignment Guard (Regime Stability Check)
+        # Evaluates the quality of the market state before approving signals.
+        if regime_info:
+            # Calculate a unified context stability factor (0.0 to 1.0)
+            # Factors: regime confidence, session alignment, volatility alignment, and transition stability.
+            context_stability = float(
+                np.mean(
+                    [
+                        regime_info.confidence,
+                        regime_info.session_alignment,
+                        regime_info.volatility_alignment,
+                        (1.0 - regime_info.transition_score),
+                    ]
+                )
+            )
+            metadata["market_context_stability"] = context_stability
+
+            # 6.2.1 Critical Instability Check (Hard Block)
+            if context_stability < 0.40:
+                logger.warning(
+                    "Market context instability active | symbol=%s | stability=%.2f | forcing HOLD",
+                    symbol,
+                    context_stability,
+                )
+                metadata["reason"] = "Critical market context instability"
+                return Signal(
+                    direction=SignalDirection.HOLD,
+                    confidence=0.0,
+                    metadata=metadata,
+                )
+
+            # 6.2.2 Graduated Alignment Penalty
+            # If stability is below institutional baseline (70%), apply a linear penalty.
+            if context_stability < 0.70:
+                # Penalty scales from 0% at 0.7 stability up to 15% at 0.4 stability.
+                # Formula: (0.7 - stability) * 0.5
+                alignment_penalty = (0.70 - context_stability) * 0.5
+                old_conf = confidence
+                confidence *= 1.0 - alignment_penalty
+                logger.warning(
+                    "Market alignment safeguard active | symbol=%s | stability=%.2f | confidence reduced: %.2f -> %.2f",
+                    symbol,
+                    context_stability,
+                    old_conf,
+                    confidence,
+                )
+                metadata["market_context_penalty"] = alignment_penalty
+
+        # 6.3 Entropy Guard (Consistency Check)
         # If sub-models are highly divergent in their confidence, it indicates uncertainty.
         winning_signals = [s for s in signals.values() if s.direction == direction]
         if len(winning_signals) > 1:
