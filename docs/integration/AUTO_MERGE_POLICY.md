@@ -1,6 +1,6 @@
 # Auto-Merge Policy
 
-This document defines the strict auto-merge policy for the MT5 AI/ML Trading Bot project. The goal is to eliminate 80% of manual approval friction while maintaining enterprise safety.
+This document defines the strict auto-merge policy for the MT5 AI/ML Trading Bot project. The goal is to eliminate 80% of manual approval friction while maintaining enterprise safety for a trading system.
 
 ## Auto-Merge Criteria
 
@@ -10,21 +10,21 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 - ✅ **Approvals:** Required code owners have approved the pull request.
 - ✅ **No Merge Conflicts:** No conflicts with the target branch.
 - ✅ **Safety:** No high-risk files (as defined below) are touched.
-- ✅ **Test Coverage:** Tests must be added or updated for any new functionality (mandatory if `src/` or `main.py` is touched).
-- ✅ **Documentation:** Documentation must be updated where required by the change (mandatory if `src/` or `main.py` is touched).
+- ✅ **Test Coverage:** Tests must be added or updated for any new functionality.
+- ✅ **Documentation:** Documentation must be updated where required by the change.
 - ✅ **Observability:** Observability and logging must meet project standards (standard `structlog`, no plain `print()` statements in `src/`).
-- ✅ **Architecture:** Changes must fit within existing architectural conventions.
+- ✅ **Architecture:** Change fits existing architectural conventions.
 
 ## Block and Escalate Rules
 
 Automatically **BLOCK** and **ESCALATE** if any of these are true:
 
-- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py`, `src/trading/mt5_connector.py`, or files interacting with MT5 order placement.
-- 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py`, `src/trading/risk_engine.py`, `src/trading/risk_manager.py`, `src/trading/audited_risk_manager.py`, `src/trading/capital_allocator.py`, or `src/trading/execution_filter.py`.
-- 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*`, `.env.*`, or `src/core/config.py`.
-- 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
-- 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile`, `docker-compose.yml`.
-- 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*`.
+- 🚨 **Changes to live trading execution logic:** Modification to core execution paths or connectors.
+- 🚨 **Modifications to risk parameters or position sizing:** Changes to risk engines, managers, or allocation logic.
+- 🚨 **Credential, secret, or auth surface changes:** Any change to secrets management or authentication configuration.
+- 🚨 **Destructive database migrations:** Migrations that alter historical trade data or schema.
+- 🚨 **Docker deployment or infrastructure control changes:** Changes to containerization or orchestration files.
+- 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to deployment pipelines.
 
 ## High-Risk Files (Auto-Merge Prohibited)
 
@@ -63,7 +63,7 @@ The following patterns trigger an automatic block and escalation:
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
-| 2026-05-18 | N/A | Policy Update | 🤖 Jules05: Strict auto-merge policy maintenance and pattern alignment | [System Change] |
+| 2026-05-18 | N/A | Policy Update | 🤖 Jules05: Auto-merge policy update and alignment with enterprise safety standards | [System Change] |
 | 2026-05-15 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Unified with requirements) | [System Change] |
 | 2026-05-13 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Refined high-risk patterns & categories) | [System Change] |
 | 2026-05-08 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (including docker-compose and ci.yml) | [System Change] |
