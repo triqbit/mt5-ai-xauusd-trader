@@ -15,7 +15,7 @@ scikit-learn==1.6.1
 pandas==2.2.3
 
 # ── Technical Analysis ──────────────────────────────────────
-TA-Lib==0.6.4
+TA-Lib==0.6.8
 
 # ── Data Acquisition ────────────────────────────────────────
 requests==2.33.1
