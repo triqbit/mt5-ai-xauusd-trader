@@ -24,15 +24,22 @@ Key capabilities:
 - **Trade Frequency**: Number of trades per 1000 steps.
 - **Average Hold Time**: Duration of positions in steps.
 - **Action Entropy**: Detects policy collapse or over-concentration in specific actions.
+- **Flip-Flop Rate**: Measures the frequency of rapid Buy/Sell reversals.
 
 ### Reward Decomposition
 - **Commission Drag**: Percentage impact of transaction costs on gross returns.
 - **Profit Concentration**: Ratio of the top 10% of trades to total net profit.
+- **MAE/MFE**: Maximum Adverse Excursion and Maximum Favorable Excursion tracking for entry quality.
 - **Risk-Adjusted PnL**: PnL penalized by return volatility.
 
-### Regime Sensitivity
+### Regime & Session Sensitivity
 - **Regime-Specific Performance**: Partitioned PnL analysis across trending, ranging, and shock regimes.
+- **Session Attribution**: Breakdown of performance across Asian, London, and New York sessions (UTC).
+- **Session Entropy**: Measures how well performance is distributed across different trading sessions.
 - **Regime Stability Score**: Consistency of performance (inverse CoV of Sharpe) across different market environments.
+
+### Statistical Rigor
+- **p-values**: Calculates statistical significance of RL agent outperformance relative to baselines using paired t-tests.
 
 ## Usage Example
 
