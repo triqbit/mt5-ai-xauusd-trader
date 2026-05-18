@@ -90,7 +90,7 @@ def test_robustness_scoring_components(sample_data):
         {"Sharpe Ratio": 1.0 + (p["param"] * 0.1)},
         np.zeros(len(d)),
     )
-    penalty_zero, sens_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
+    penalty_zero, _sens_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
     assert penalty_zero > 0.0  # Should be non-zero due to epsilon perturbation
 
     # Test regime consistency
