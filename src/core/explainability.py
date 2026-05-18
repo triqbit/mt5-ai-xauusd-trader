@@ -628,7 +628,9 @@ class SignalExplainer:
                 "contrarian signals are given higher weight in this context."
             )
         elif "volatile" in regime_lower:
-            strategic_edge = "Elevated volatility requires tighter execution gates and reduced sizing."
+            strategic_edge = (
+                "Elevated volatility requires tighter execution gates and reduced sizing."
+            )
         else:
             strategic_edge = "Market state stable, following base ensemble consensus."
 
