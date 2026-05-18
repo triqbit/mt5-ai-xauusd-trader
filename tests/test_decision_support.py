@@ -121,16 +121,17 @@ def test_assemble_packet_full_approval(mock_explanation, mock_regime, mock_macro
 def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_risk):
     dss = DecisionSupportSystem()
 
-    # 1. High Confidence Case (Unanimous, High Regime Confidence, Good RR)
+    # 1. High Confidence Case (Unanimous, High Regime Confidence, Good RR, High Alignment)
     mock_explanation.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.9, weight=1.0)
     ]
     mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+    mock_explanation.regime_context.regime_alignment_score = 1.0
     mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
 
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
-    assert packet.decision_score == 100.0  # (1.0*40) + (1.0*30) + (20 + 10)
+    assert packet.decision_score == 100.0  # (1.0*40) + ((1.0+1.0)/2 * 30) + (20 + 10)
     assert packet.status_level == DecisionStatus.EXECUTE
     assert packet.consensus_score == 40.0
     assert packet.regime_score == 30.0
@@ -141,14 +142,19 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     mock_explanation.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.8, weight=1.0)
     ]
+    mock_explanation.regime_context.regime_alignment_score = 0.8
     mock_regime = mock_regime.model_copy(update={"confidence": 0.5})
     mock_explanation.risk_assessment.risk_reward_ratio = 2.0  # (2/3)*20 = 13.33
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.8})
 
     # Consensus score: 1.0 * 40 = 40
-    # Regime score: 0.5 * 30 = 15
+    # Regime score: ((0.5 + 0.8) / 2) * 30 = 19.5
     # Risk score: 13.33 + 8 = 21.33
-    # Total ~ 76.33
+    # Total ~ 80.83 -> This is EXECUTE now because >= 80.
+    # Adjust mock to stay in REVIEW range
+    mock_explanation.regime_context.regime_alignment_score = 0.5
+    # Regime score: ((0.5 + 0.5) / 2) * 30 = 15.0
+    # Total = 40 + 15 + 21.33 = 76.33
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
     assert 76.0 < packet.decision_score < 77.0
     assert packet.status_level == DecisionStatus.REVIEW
@@ -159,12 +165,13 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.5, weight=0.5),
         ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.5, weight=0.5),
     ]
+    mock_explanation.regime_context.regime_alignment_score = 0.5
     mock_regime = mock_regime.model_copy(update={"confidence": 0.5})
     mock_explanation.risk_assessment.risk_reward_ratio = 1.0  # (1/3)*20 = 6.66
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.5})
 
     # Consensus score: 0.5 * 40 = 20
-    # Regime score: 0.5 * 30 = 15
+    # Regime score: ((0.5 + 0.5) / 2) * 30 = 15
     # Risk score: 6.66 + 5 = 11.66
     # Total ~ 46.66
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
@@ -183,6 +190,7 @@ def test_decision_augmentation_logic(mock_explanation, mock_regime, mock_macro_r
     mock_explanation.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.9, weight=1.0)
     ]
+    mock_explanation.regime_context.regime_alignment_score = 1.0
     mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
     mock_explanation.risk_assessment.risk_reward_ratio = 3.0
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.25})
@@ -420,6 +428,7 @@ def test_high_conviction_labeling(mock_explanation, mock_regime, mock_macro_risk
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
     ]
     mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+    mock_explanation.regime_context.regime_alignment_score = 1.0
     mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
 
@@ -451,10 +460,11 @@ def test_review_status_assignment(mock_explanation, mock_regime, mock_macro_risk
     mock_explanation.model_attributions = [
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.7, weight=1.0)
     ]
-    # Reduce regime confidence to lower the score
+    # Reduce regime confidence and alignment to lower the score
     mock_regime = mock_regime.model_copy(update={"confidence": 0.4})
+    mock_explanation.regime_context.regime_alignment_score = 0.4
 
-    # Score will be around 40*1.0 + 30*0.4 + 23.33 = 40 + 12 + 23.33 = 75.33
+    # Score will be around 40*1.0 + 30*((0.4+0.4)/2) + 23.33 = 40 + 12 + 23.33 = 75.33
     packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
 
     assert packet.is_executable is True
@@ -558,6 +568,7 @@ def test_extreme_decision_scores(mock_explanation, mock_regime, mock_macro_risk)
         ModelAttribution(model_name="M1", vote=SignalDirection.SELL, confidence=1.0, weight=1.0)
     ]
     mock_explanation.risk_assessment.risk_reward_ratio = 0.0
+    mock_explanation.regime_context.regime_alignment_score = 0.0
     mock_regime = mock_regime.model_copy(update={"confidence": 0.0})
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.0})
 
@@ -571,6 +582,7 @@ def test_extreme_decision_scores(mock_explanation, mock_regime, mock_macro_risk)
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
     ]
     mock_explanation.risk_assessment.risk_reward_ratio = 5.0  # (5/3) clamped to 1.0 -> 20pts
+    mock_explanation.regime_context.regime_alignment_score = 1.0
     mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
 
@@ -661,6 +673,7 @@ def test_sizing_multiplier_scaling(mock_explanation, mock_regime, mock_macro_ris
         ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
     ]
     mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+    mock_explanation.regime_context.regime_alignment_score = 1.0
     mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
 
@@ -675,10 +688,11 @@ def test_sizing_multiplier_scaling(mock_explanation, mock_regime, mock_macro_ris
         ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.5, weight=0.5),
     ]
     # Consensus score: (0.5/1.0) * 40 = 20
-    # Regime score: 0.5 * 30 = 15
+    # Regime score: ((0.5 + 0.5) / 2) * 30 = 15
     # Risk score: (1.5/3)*20 + 0.5*10 = 10 + 5 = 15
     # Total = 20 + 15 + 15 = 50
     mock_regime = mock_regime.model_copy(update={"confidence": 0.5})
+    mock_explanation.regime_context.regime_alignment_score = 0.5
     mock_explanation.risk_assessment.risk_reward_ratio = 1.5
     mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.5})
 
