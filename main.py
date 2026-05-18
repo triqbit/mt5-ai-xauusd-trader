@@ -31,8 +31,8 @@ if TYPE_CHECKING:
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
-    from src.models.base_model import BaseModel
     from src.data.event_intelligence import EventIntelligence
+    from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
     from src.trading.execution_filter import ExecutionFilter
@@ -204,7 +204,6 @@ def run_live(
         MT5DataError,
     )
     from src.core.explainability import SignalExplainer
-    from src.data.event_intelligence import RiskStatus
 
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
@@ -634,7 +633,9 @@ def run_live(
 
                                     # Update allocator performance for feedback loop
                                     if updated_trade and allocator:
-                                        strat_id = f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        strat_id = (
+                                            f"{cfg.algorithm.upper()}_{cfg.symbol}_{cfg.timeframe}"
+                                        )
                                         allocator.update_strategy_performance(
                                             strat_id, updated_trade.pnl
                                         )
@@ -1482,14 +1483,14 @@ def main() -> int:
     from src.core.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
-    from src.models.ensemble import EnsembleModel
-    from src.models.lstm_model import LSTMModel
-    from src.models.ppo_agent import PPOAgent
     from src.data.event_intelligence import (
         EventIntelligence,
         MetaAPIEventProvider,
         TradingViewEventProvider,
     )
+    from src.models.ensemble import EnsembleModel
+    from src.models.lstm_model import LSTMModel
+    from src.models.ppo_agent import PPOAgent
     from src.models.regime_detector import RegimeDetector
     from src.models.transformer_model import TimeSeriesTransformer
     from src.trading.audited_risk_manager import AuditedRiskManager
@@ -1511,9 +1512,7 @@ def main() -> int:
     # Always include TradingView mock as a baseline/fallback for deterministic patterns
     providers.append(TradingViewEventProvider())
 
-    event_intelligence = EventIntelligence(
-        providers=providers, fail_safe_blocked=False, config=cfg
-    )
+    event_intelligence = EventIntelligence(providers=providers, fail_safe_blocked=False, config=cfg)
 
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,

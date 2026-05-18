@@ -1,4 +1,3 @@
-from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,6 +9,7 @@ from src.core.config import TradingConfig
 @pytest.fixture
 def cfg():
     return TradingConfig(MT5_PASSWORD="fake", MT5_SERVER="fake", risk_per_trade=0.01)
+
 
 def test_prepare_trade_signal_with_macro_multiplier(cfg):
     risk_manager = MagicMock()
@@ -31,7 +31,7 @@ def test_prepare_trade_signal_with_macro_multiplier(cfg):
         atr=10.0,
         risk=risk_manager,
         allocator=allocator,
-        risk_multiplier=1.0
+        risk_multiplier=1.0,
     )
     assert signal_normal.lot_size == 0.1
 
@@ -44,7 +44,7 @@ def test_prepare_trade_signal_with_macro_multiplier(cfg):
         atr=10.0,
         risk=risk_manager,
         allocator=allocator,
-        risk_multiplier=0.5
+        risk_multiplier=0.5,
     )
     # 0.1 * 0.5 = 0.05
     assert signal_reduced.lot_size == 0.05
@@ -58,7 +58,7 @@ def test_prepare_trade_signal_with_macro_multiplier(cfg):
         atr=10.0,
         risk=risk_manager,
         allocator=allocator,
-        risk_multiplier=0.1
+        risk_multiplier=0.1,
     )
     # 0.1 * 0.1 = 0.01
     assert signal_extreme.lot_size == 0.01
