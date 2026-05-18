@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -72,7 +72,7 @@ class WalkForwardConfig(BaseModel):
     seed: int = 42
     commission: float = 0.0002
     bars_per_year: int = Field(
-        252, description="Bars per year for annualization (e.g. 252 for Daily)"
+        6240, description="Bars per year for annualization (e.g. 252 for Daily, 6240 for H1)"
     )
     min_oos_sharpe: float = Field(-float("inf"), description="Minimum allowed OOS Sharpe Ratio")
     max_oos_drawdown: float = Field(1.0, description="Maximum allowed OOS Drawdown (fraction)")
@@ -157,7 +157,7 @@ class WalkForwardResult(BaseModel):
     metrics: RobustnessMetrics
     window_results: list[WindowResult]
     oos_returns: list[float] = Field(default_factory=list, description="Aggregated OOS returns")
-    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def save_json(self, filepath: str) -> None:
         """
