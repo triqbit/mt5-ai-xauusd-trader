@@ -25,7 +25,7 @@ def mock_env_data():
     # Create 200 steps of data to allow for regime detection (needs 100)
     data = np.random.randn(200, 5).astype(np.float32)
     # Add some trend to make it less random
-    data[:, 3] = np.linspace(100, 110, 200) # Close price
+    data[:, 3] = np.linspace(100, 110, 200)  # Close price
     return data
 
 
@@ -65,7 +65,7 @@ def test_mean_reversion_baseline_predict():
     assert baseline.predict(obs_buy) == 1
 
     obs_sell = np.zeros(52)
-    obs_sell[-4] = 2.0   # Very overbought
+    obs_sell[-4] = 2.0  # Very overbought
     assert baseline.predict(obs_sell) == 2
 
     obs_hold = np.zeros(52)
@@ -115,9 +115,7 @@ def test_compare_agents(trading_env):
             return 2
 
     comparison = evaluator.compare(
-        agents=[BuyAgent(), SellAgent()],
-        agent_names=["Buyer", "Seller"],
-        baseline_name="Buyer"
+        agents=[BuyAgent(), SellAgent()], agent_names=["Buyer", "Seller"], baseline_name="Buyer"
     )
 
     assert comparison.baseline_name == "Buyer"
@@ -128,6 +126,7 @@ def test_compare_agents(trading_env):
 def test_signal_adapter_compatibility(trading_env):
     from src.core.constants import SignalDirection
     from src.models.base_model import Signal
+
     evaluator = RLEvaluator(env=trading_env)
 
     class SignalAgent:
@@ -141,6 +140,7 @@ def test_signal_adapter_compatibility(trading_env):
 
 def test_to_report_section(trading_env):
     from src.research.reporting import RLSection
+
     evaluator = RLEvaluator(env=trading_env)
 
     class SimpleAgent:
@@ -172,6 +172,7 @@ def test_to_report_section(trading_env):
 
 def test_to_report_section_population(trading_env):
     from src.research.rl_evaluation import RLEvaluator
+
     evaluator = RLEvaluator(env=trading_env)
 
     class SimpleAgent:
@@ -194,10 +195,12 @@ def test_to_report_section_population(trading_env):
 
 def test_extract_trades():
     evaluator = RLEvaluator(env=MagicMock())
-    df = pd.DataFrame({
-        "balances": [1000, 1000, 1010, 1010, 1015], # balances[1] is entry step (after reset)
-        "positions": [0, 1, 1, 1, 0]
-    })
+    df = pd.DataFrame(
+        {
+            "balances": [1000, 1000, 1010, 1010, 1015],  # balances[1] is entry step (after reset)
+            "positions": [0, 1, 1, 1, 0],
+        }
+    )
     # Entry at index 1. Exit at index 4.
     # PnL = balances[4] - balances[entry_idx - 1] = balances[4] - balances[0] = 1015 - 1000 = 15.0
     trades = evaluator._extract_trades(df)
@@ -205,10 +208,7 @@ def test_extract_trades():
     assert trades[0]["pnl"] == 15.0
     assert trades[0]["hold_time"] == 3
 
-    df2 = pd.DataFrame({
-        "balances": [1000, 1010, 1020, 1030, 1030],
-        "positions": [0, 1, 1, 1, 0]
-    })
+    df2 = pd.DataFrame({"balances": [1000, 1010, 1020, 1030, 1030], "positions": [0, 1, 1, 1, 0]})
     # Entry at index 1. Exit at index 4.
     # PnL = balances[4] - balances[0] = 1030 - 1000 = 30.0
     trades2 = evaluator._extract_trades(df2)
@@ -217,10 +217,7 @@ def test_extract_trades():
     assert trades2[0]["hold_time"] == 3
 
     # Multiple trades
-    df3 = pd.DataFrame({
-        "balances": [1000, 1050, 1050, 1050, 1100],
-        "positions": [0, 1, 0, 1, 0]
-    })
+    df3 = pd.DataFrame({"balances": [1000, 1050, 1050, 1050, 1100], "positions": [0, 1, 0, 1, 0]})
     # Trade 1: Entry 1, Exit 2. PnL = balances[2] - balances[0] = 1050 - 1000 = 50.0
     # Trade 2: Entry 3, Exit 4. PnL = balances[4] - balances[2] = 1100 - 1050 = 50.0
     trades3 = evaluator._extract_trades(df3)
@@ -231,27 +228,22 @@ def test_extract_trades():
 
 def test_calculate_drawdown():
     evaluator = RLEvaluator(env=MagicMock())
-    df = pd.DataFrame({
-        "balances": [100, 110, 100, 90, 105, 120]
-    })
+    df = pd.DataFrame({"balances": [100, 110, 100, 90, 105, 120]})
     dd_metrics = evaluator._calculate_drawdown(df)
     # Peak: 110. Drop to 90. Drawdown = (110 - 90) / 110 = 20 / 110 approx 0.1818
-    assert dd_metrics.max_drawdown == pytest.approx(20/110)
-    assert dd_metrics.max_drawdown_duration == 3 # steps where balance < peak: [100, 90, 105]
+    assert dd_metrics.max_drawdown == pytest.approx(20 / 110)
+    assert dd_metrics.max_drawdown_duration == 3  # steps where balance < peak: [100, 90, 105]
 
 
 def test_reward_decomposition():
     evaluator = RLEvaluator(env=MagicMock())
-    df = pd.DataFrame({
-        "balances": [1000, 1050],
-        "commissions": [0, 10]
-    })
+    df = pd.DataFrame({"balances": [1000, 1050], "commissions": [0, 10]})
     trades = [{"pnl": 50.0, "hold_time": 10}]
     decomp = evaluator._calculate_reward_decomposition(df, trades)
     assert decomp.net_pnl == 50.0
     assert decomp.total_commissions == 10.0
     assert decomp.gross_pnl == 60.0
-    assert decomp.commission_drag == pytest.approx(10/60 * 100)
+    assert decomp.commission_drag == pytest.approx(10 / 60 * 100)
     assert decomp.avg_win == 50.0
     assert decomp.avg_loss == 0.0
 
@@ -264,16 +256,17 @@ def test_advanced_stability_metrics(trading_env):
     class TrendAgent:
         def __init__(self):
             self.step = 0
+
         def predict(self, observation):
             self.step += 1
             if self.step < 10:
-                return 1 # Buy
+                return 1  # Buy
             if self.step == 10:
-                return 2 # Close
+                return 2  # Close
             if self.step == 20:
-                return 1 # Buy again
+                return 1  # Buy again
             if self.step == 30:
-                return 2 # Close again
+                return 2  # Close again
             return 0
 
     report = evaluator.evaluate(TrendAgent(), agent_name="Trend")
@@ -340,10 +333,7 @@ def test_get_prediction_robustness():
 
 def test_profit_concentration():
     evaluator = RLEvaluator(env=MagicMock())
-    df = pd.DataFrame({
-        "balances": [1000, 1100],
-        "commissions": [0, 0]
-    })
+    df = pd.DataFrame({"balances": [1000, 1100], "commissions": [0, 0]})
     # 10 trades, top 1 is 50% of profit
     trades = [{"pnl": 50.0, "hold_time": 1}] + [{"pnl": 5.55, "hold_time": 1}] * 9
     # Total net_pnl = 100 (approx)
@@ -390,32 +380,39 @@ def test_parameterized_indices(mock_env_data):
 
 def test_turnover_metrics():
     evaluator = RLEvaluator(env=MagicMock())
-    df = pd.DataFrame({
-        "balances": [1000] * 100,
-        "actions": [0, 1, 2, 0] * 25
-    })
-    trades = [
-        {"pnl": 10.0, "hold_time": 5},
-        {"pnl": -5.0, "hold_time": 15}
-    ]
+    df = pd.DataFrame({"balances": [1000] * 100, "actions": [0, 1, 2, 0] * 25})
+    trades = [{"pnl": 10.0, "hold_time": 5}, {"pnl": -5.0, "hold_time": 15}]
     turnover = evaluator._calculate_turnover(df, trades)
     assert turnover.total_trades == 2
     assert turnover.avg_hold_time == 10.0
     assert turnover.max_hold_time == 15
     assert turnover.min_hold_time == 5
-    assert turnover.trade_frequency == (2/100) * 1000
+    assert turnover.trade_frequency == (2 / 100) * 1000
     assert turnover.action_entropy > 0.0
 
 
 def test_regime_stability_metric():
     from src.models.regime_detector import MarketRegime
     from src.research.rl_evaluation import RegimePerformance
+
     evaluator = RLEvaluator(env=MagicMock())
 
     # High consistency
     regime_perf_stable = [
-        RegimePerformance(regime=MarketRegime.TRENDING, sharpe_ratio=2.0, win_rate=0.6, total_trades=10, profit_factor=2.0),
-        RegimePerformance(regime=MarketRegime.RANGING, sharpe_ratio=1.9, win_rate=0.55, total_trades=10, profit_factor=1.8)
+        RegimePerformance(
+            regime=MarketRegime.TRENDING,
+            sharpe_ratio=2.0,
+            win_rate=0.6,
+            total_trades=10,
+            profit_factor=2.0,
+        ),
+        RegimePerformance(
+            regime=MarketRegime.RANGING,
+            sharpe_ratio=1.9,
+            win_rate=0.55,
+            total_trades=10,
+            profit_factor=1.8,
+        ),
     ]
     stability_stable = evaluator._calculate_stability(
         pd.DataFrame({"balances": [100, 110, 120]}), [], 0.05, regime_perf_stable
@@ -423,8 +420,20 @@ def test_regime_stability_metric():
 
     # Low consistency
     regime_perf_unstable = [
-        RegimePerformance(regime=MarketRegime.TRENDING, sharpe_ratio=5.0, win_rate=0.8, total_trades=10, profit_factor=4.0),
-        RegimePerformance(regime=MarketRegime.RANGING, sharpe_ratio=0.1, win_rate=0.4, total_trades=10, profit_factor=1.0)
+        RegimePerformance(
+            regime=MarketRegime.TRENDING,
+            sharpe_ratio=5.0,
+            win_rate=0.8,
+            total_trades=10,
+            profit_factor=4.0,
+        ),
+        RegimePerformance(
+            regime=MarketRegime.RANGING,
+            sharpe_ratio=0.1,
+            win_rate=0.4,
+            total_trades=10,
+            profit_factor=1.0,
+        ),
     ]
     stability_unstable = evaluator._calculate_stability(
         pd.DataFrame({"balances": [100, 110, 120]}), [], 0.05, regime_perf_unstable
@@ -468,6 +477,7 @@ def test_risk_adjusted_pnl():
 
 def test_supervised_baseline():
     from src.research.rl_evaluation import SupervisedBaseline
+
     mock_model = MagicMock()
     mock_model.predict.return_value = np.array([1])
     baseline = SupervisedBaseline(mock_model)
@@ -480,10 +490,7 @@ def test_supervised_baseline():
 def test_extract_trades_at_step_0():
     # Test bug fix: position open at step 0
     evaluator = RLEvaluator(env=MagicMock())
-    df = pd.DataFrame({
-        "balances": [1000, 1010, 1005],
-        "positions": [1, 1, 0]
-    })
+    df = pd.DataFrame({"balances": [1000, 1010, 1005], "positions": [1, 1, 0]})
     # Trade from 0 to 2. PnL = balances[2] - balances[0] = 1005 - 1000 = 5.0
     trades = evaluator._extract_trades(df)
     assert len(trades) == 1

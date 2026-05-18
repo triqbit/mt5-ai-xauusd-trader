@@ -640,9 +640,7 @@ class RLEvaluator:
 
         # Close final open position
         if in_position:
-            trades.append(
-                process_trade(len(df) - 1, entry_idx, entry_price, positions[entry_idx])
-            )
+            trades.append(process_trade(len(df) - 1, entry_idx, entry_price, positions[entry_idx]))
 
         return trades
 
@@ -868,7 +866,7 @@ class RLEvaluator:
             # Synthetic hours from index if not available
             hours = df["steps"] % 24
 
-        session_counts = {name: 0 for name in sessions}
+        session_counts = dict.fromkeys(sessions, 0)
 
         for trade in trades:
             entry_idx = trade["entry_idx"]
