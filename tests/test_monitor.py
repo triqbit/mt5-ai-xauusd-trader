@@ -17,9 +17,12 @@ from src.core.monitor import (
     DATA_FRESHNESS_GAUGE,
     DISK_USAGE_GAUGE,
     DRAWDOWN_GAUGE,
+    ENSEMBLE_DISSENT_COUNTER,
+    ENSEMBLE_VETO_COUNTER,
     EQUITY_GAUGE,
     EXECUTION_LATENCY_HISTOGRAM,
     FILL_RATE_GAUGE,
+    MARKET_STABILITY_GAUGE,
     MEMORY_USAGE_GAUGE,
     MODEL_ACCURACY_GAUGE,
     MODEL_DRIFT_GAUGE,
@@ -27,6 +30,8 @@ from src.core.monitor import (
     PARTIAL_FILL_COUNTER,
     REJECTED_ORDER_COUNTER,
     SHARPE_RATIO_GAUGE,
+    SIGNAL_CONFLUENCE_HISTOGRAM,
+    SIGNAL_FUNNEL_COUNTER,
     SLIPPAGE_HISTOGRAM,
     SYSTEM_ERROR_COUNTER,
     TRADE_COUNTER,
@@ -380,6 +385,37 @@ class TestMonitor(unittest.TestCase):
         msg = self.monitor.bot.send_message.call_args[1]["text"]
         self.assertIn("Model Retraining Failed", msg)
         self.assertIn("Disk full", msg)
+
+    def test_record_funnel_stage(self):
+        with patch.object(SIGNAL_FUNNEL_COUNTER, "labels") as mock_labels:
+            mock_counter = MagicMock()
+            mock_labels.return_value = mock_counter
+            self.monitor.record_funnel_stage("ensemble", "passed")
+            mock_labels.assert_called_once_with(stage="ensemble", status="passed")
+            mock_counter.inc.assert_called_once()
+
+    def test_record_ensemble_dissent(self):
+        with patch.object(ENSEMBLE_DISSENT_COUNTER, "inc") as mock_inc:
+            self.monitor.record_ensemble_dissent()
+            mock_inc.assert_called_once()
+
+    def test_record_ensemble_veto(self):
+        with patch.object(ENSEMBLE_VETO_COUNTER, "labels") as mock_labels:
+            mock_counter = MagicMock()
+            mock_labels.return_value = mock_counter
+            self.monitor.record_ensemble_veto("ppo")
+            mock_labels.assert_called_once_with(model="ppo")
+            mock_counter.inc.assert_called_once()
+
+    def test_log_market_stability(self):
+        with patch.object(MARKET_STABILITY_GAUGE, "set") as mock_set:
+            self.monitor.log_market_stability(0.85)
+            mock_set.assert_called_once_with(0.85)
+
+    def test_log_confluence_score(self):
+        with patch.object(SIGNAL_CONFLUENCE_HISTOGRAM, "observe") as mock_observe:
+            self.monitor.log_confluence_score(0.75)
+            mock_observe.assert_called_once_with(0.75)
 
 if __name__ == '__main__':
     unittest.main()

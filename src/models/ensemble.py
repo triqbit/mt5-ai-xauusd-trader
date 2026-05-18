@@ -182,6 +182,11 @@ class EnsembleModel(BaseModel):
 
         if has_buy and has_sell:
             logger.warning("Dissent detected: BUY and SELL conflict. Returning HOLD.")
+            # Record dissent telemetry
+            if self.cfg and hasattr(self.cfg, "monitor") and self.cfg.monitor:
+                self.cfg.monitor.record_ensemble_dissent()
+                self.cfg.monitor.record_funnel_stage("ensemble", "dissent")
+
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
@@ -279,6 +284,11 @@ class EnsembleModel(BaseModel):
                         name,
                         sig.confidence,
                     )
+                    # Record veto telemetry
+                    if self.cfg and hasattr(self.cfg, "monitor") and self.cfg.monitor:
+                        self.cfg.monitor.record_ensemble_veto(name)
+                        self.cfg.monitor.record_funnel_stage("ensemble", f"veto_{name}")
+
                     metadata["veto_active"] = True
                     metadata["veto_model"] = name
                     return Signal(
@@ -288,7 +298,13 @@ class EnsembleModel(BaseModel):
                     )
 
         if direction == SignalDirection.HOLD:
+            if self.cfg and hasattr(self.cfg, "monitor") and self.cfg.monitor:
+                self.cfg.monitor.record_funnel_stage("ensemble", "hold")
             return Signal(direction=direction, confidence=confidence, metadata=metadata)
+
+        # Record ensemble pass
+        if self.cfg and hasattr(self.cfg, "monitor") and self.cfg.monitor:
+            self.cfg.monitor.record_funnel_stage("ensemble", "passed")
 
         # 6. Defensive Safeguards (Risk Control & Drift Monitoring)
 
@@ -332,6 +348,8 @@ class EnsembleModel(BaseModel):
                 )
             )
             metadata["market_context_stability"] = context_stability
+            if self.cfg and hasattr(self.cfg, "monitor") and self.cfg.monitor:
+                self.cfg.monitor.log_market_stability(context_stability)
 
             # 6.2.1 Critical Instability Check (Hard Block)
             if context_stability < 0.40:
@@ -340,6 +358,9 @@ class EnsembleModel(BaseModel):
                     symbol,
                     context_stability,
                 )
+                if self.cfg and hasattr(self.cfg, "monitor") and self.cfg.monitor:
+                    self.cfg.monitor.record_funnel_stage("ensemble", "unstable_context")
+
                 metadata["reason"] = "Critical market context instability"
                 return Signal(
                     direction=SignalDirection.HOLD,

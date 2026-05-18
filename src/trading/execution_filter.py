@@ -220,8 +220,12 @@ class ExecutionFilter:
                 blocked_by = reason
                 break
 
-        if blocked_by and self.monitor:
-            self.monitor.record_internal_rejection("execution_filter", blocked_by)
+        if self.monitor:
+            if blocked_by:
+                self.monitor.record_internal_rejection("execution_filter", blocked_by)
+                self.monitor.record_funnel_stage("execution_filter", f"blocked_{blocked_by}")
+            else:
+                self.monitor.record_funnel_stage("execution_filter", "passed")
 
         return ExecutionDecision(
             signal=signal,

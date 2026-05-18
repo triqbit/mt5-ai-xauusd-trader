@@ -243,6 +243,8 @@ def run_live(
                     monitor.log_equity(balance)
             except Exception as e:
                 log.error("Failed to update account metrics", error=str(e))
+                if monitor:
+                    monitor.log_system_error("AccountMetrics", f"Balance update failed: {e}")
 
         # 0.1 Check for day change to trigger daily summary
         current_date = datetime.now(timezone.utc).date()
@@ -565,6 +567,40 @@ def run_live(
                             dss.format_for_operator(packet, console=console)
                         else:
                             log.info(dss.format_for_operator(packet))
+
+                # 8.1 Log Iteration Heartbeat (Decision Funnel)
+                if monitor:
+                    confluence = 0.0
+                    if direction != 0 and "explanation" in locals():
+                        confluence = explanation.get_confluence_score()
+                    monitor.log_confluence_score(confluence)
+
+                    # Overall funnel outcome log
+                    final_status = "HOLD"
+                    if direction != 0:
+                        if not risk_approved:
+                            final_status = "REJECTED_RISK"
+                        elif "filter_decision" in locals() and filter_decision and not filter_decision.is_approved:
+                            final_status = f"BLOCKED_{filter_decision.blocked_by}"
+                        else:
+                            final_status = "APPROVED"
+
+                    # Extract stability from signal metadata if available
+                    stability = 0.0
+                    if "signal_obj" in locals() and hasattr(signal_obj, "metadata"):
+                        stability = signal_obj.metadata.get("market_context_stability", 0.0)
+
+                    log.info(
+                        "iteration_summary",
+                        symbol=cfg.symbol,
+                        direction=direction,
+                        confidence=confidence,
+                        regime=regime_info.label.value if regime_info else "UNKNOWN",
+                        stability=stability,
+                        confluence=confluence,
+                        status=final_status,
+                        balance=balance,
+                    )
 
                 if risk_approved and direction != 0:
                     with profile("execution"):

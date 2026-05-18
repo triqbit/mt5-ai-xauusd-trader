@@ -88,6 +88,31 @@ DATA_FRESHNESS_GAUGE = Gauge(
     "trading_data_freshness_seconds", "Age of latest data point in seconds"
 )
 
+# 6. Decision Funnel Metrics
+SIGNAL_FUNNEL_COUNTER = Counter(
+    "trading_signal_funnel_total",
+    "Total signals passing through each funnel stage",
+    ["stage", "status"],
+)
+SIGNAL_CONFLUENCE_HISTOGRAM = Histogram(
+    "trading_signal_confluence_score",
+    "Unified confluence score for generated signals",
+    buckets=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+)
+ENSEMBLE_DISSENT_COUNTER = Counter(
+    "trading_ensemble_dissent_total",
+    "Total count of internal ensemble model conflicts",
+)
+ENSEMBLE_VETO_COUNTER = Counter(
+    "trading_ensemble_veto_total",
+    "Total count of low-confidence model vetoes",
+    ["model"],
+)
+MARKET_STABILITY_GAUGE = Gauge(
+    "trading_market_stability_score",
+    "Unified market context stability score",
+)
+
 
 class Monitor:
     """
@@ -363,6 +388,31 @@ class Monitor:
         """Record a partial fill."""
         PARTIAL_FILL_COUNTER.inc()
         logger.info("partial_fill_recorded")
+
+    def record_funnel_stage(self, stage: str, status: str) -> None:
+        """Record a signal's progress through the decision funnel."""
+        SIGNAL_FUNNEL_COUNTER.labels(stage=stage, status=status).inc()
+        logger.debug("funnel_stage_recorded", stage=stage, status=status)
+
+    def record_ensemble_dissent(self) -> None:
+        """Record a hard dissent conflict in the ensemble."""
+        ENSEMBLE_DISSENT_COUNTER.inc()
+        logger.warning("ensemble_dissent_recorded")
+
+    def record_ensemble_veto(self, model: str) -> None:
+        """Record a veto from a specific model."""
+        ENSEMBLE_VETO_COUNTER.labels(model=model).inc()
+        logger.warning("ensemble_veto_recorded", model=model)
+
+    def log_market_stability(self, stability: float) -> None:
+        """Log unified market stability score."""
+        MARKET_STABILITY_GAUGE.set(stability)
+        logger.debug("market_stability_logged", stability=stability)
+
+    def log_confluence_score(self, score: float) -> None:
+        """Log consolidated confluence score."""
+        SIGNAL_CONFLUENCE_HISTOGRAM.observe(score)
+        logger.debug("confluence_score_logged", score=score)
 
     def log_model_performance(
         self, accuracy: float, drift_score: float, calibration_error: float = 0.0

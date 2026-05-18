@@ -48,6 +48,10 @@ class AuditedRiskManager(RiskManager):
 
         passed = all(decision_chain.values())
 
+        # Record funnel telemetry
+        if self.monitor:
+            self.monitor.record_funnel_stage("risk_manager", "passed" if passed else "rejected")
+
         # Log to Audit Trail
         try:
             audit = get_audit_logger()
