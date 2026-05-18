@@ -1,13 +1,13 @@
-# 🎯 Jules05: Deterministic Merge Queue [2026-05-16]
+# 🎯 Jules05: Deterministic Merge Queue [2026-05-18]
 
 This document serves as the authoritative source of truth for the integration state and merge priorities of the repository, managed by Jules05.
 
 ## 📊 Summary State
-- **Merge-Ready**: 1
-- **Fix-Required**: 20+ (Divergent branches/roots)
-- **Blocked**: 0
-- **Risky (Escalated)**: 18
-- **Superseded/Stale**: 500+
+- **Merge-Ready**: 1 (System Core Harmonization)
+- **Fix-Required**: 900+ (Divergent branches/roots)
+- **Blocked**: All feature branches (until Harmonization is merged)
+- **Risky (Escalated)**: 22 (Trading logic, Risk parameters, Secrets)
+- **Superseded/Stale**: 500+ (Pre-May 15 work)
 
 ---
 
@@ -15,53 +15,51 @@ This document serves as the authoritative source of truth for the integration st
 
 | Order | PR # | Branch | Classification | Rationale | Next Action |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 | #1187 | `tech-debt-cleanup-16405513240068772382` | merge-ready | **BASE:** Big Bang Harmonization. Resolves architectural drift and implements 8-layer safety cascade. Must merge before any other PRs. | Merge to main. |
-| 2 | #1245 | `feat/risk-drift-safeguards-unification-12257166877906468723` | fix-required | **RISK:** Veto power and schema unification. High value but divergent root history. | Rebase on #1187. |
-| 3 | #1257 | `feat/institutional-capital-allocator-16513485529532250136` | fix-required | **STRATEGY:** Institutional Capital Allocator. Divergent root history. | Rebase on #1187. |
-| 4 | #1248 | `feat/macro-risk-intelligence-4109573103476842992` | fix-required | **INTELLIGENCE:** Macro Risk System. Divergent root history. | Rebase on #1187. |
-| 5 | #1256 | `observability-funnel-metrics-16831189211973735111` | fix-required | **OBSERVABILITY:** Decision funnel metrics. Divergent root history. | Rebase on #1187. |
+| 1 | #1280 | `jules05-coherence-improvements-345411350074474294` | merge-ready | **SYSTEM BASE:** Final Architectural Harmonization. Restores 8-layer Risk cascade and FE relocation missing from main. | Merge to main to fix history root. |
+| 2 | #1281 | `ux-improvements-ergonomics-dashboard-12183713617457102929` | fix-required | **OPERATIONAL:** High-value UX and dashboard. Divergent root. | Rebase on #1 |
+| 3 | #1289 | `jules02/db-reliability-reconciliation-5838315454598989615` | fix-required | **RESILIENCE:** Database state reconciliation. Divergent root. | Rebase on #1 |
+| 4 | #1331 | `origin/feat-journal-mining-9218891329532634376` | risky | **INTELLIGENCE:** Journal Mining Engine. Touches Risk/Trading. | Rebase on #1 and escalate for review. |
+| 5 | #1248 | `origin/feat/macro-event-intelligence-14255609916559759297` | risky | **INTELLIGENCE:** Macro Risk System. Touches Trading Logic. | Rebase on #1 and escalate for review. |
 
 ---
 
 ## 🛠️ Fix Required (Architectural Divergence)
 
-The following PRs are currently classified as Fix Required because they are disconnected roots or stale relative to the Big Bang commit (`e23adfa`). Merging them as-is would destroy the harmonized architecture or cause severe conflicts.
+The following PRs are currently classified as Fix Required because they are **DISCONNECTED ROOTS**. They do not share a common history with the harmonized base. Merging them will cause catastrophic repo state.
 
 | PR # | Branch | Reason | Next Action |
 | :--- | :--- | :--- | :--- |
-| #1247 | `main-16694512644741550359` | **CI:** Quality gate improvements. Divergent root. | Jules02 to rebase. |
-| #1244 | `security-hardening-logging-7970842447214562324` | **SECURITY:** Log hardening. Divergent root. | Jules02 to rebase. |
-| #1242 | `product-coherence-improvements-10678569114578149311` | **COHERENCE:** Systematic cleanup. Divergent root. | Jules05 to rebase. |
-| #1227 | `jules02-db-reconciliation-6133725546972143180` | **STALE:** Missing Big Bang base. | Jules02 to rebase. |
-| #1223 | `feat/stress-lab-severity-tracking-15885290868617108463` | **STALE:** Missing Big Bang base. | Jules04 to rebase. |
+| #1332 | `origin/feat/decision-support-enhancements-11601613281179904091` | **INTELLIGENCE:** Enhancements to DSS. | Jules04 to rebase. |
+| #1333 | `origin/feat/dynamic-ensemble-weighting-15335634625429745056` | **INTELLIGENCE:** Dynamic weighting. | Jules04 to rebase. |
+| #1334 | `origin/feat/disciplined-walk-forward-optimization-11022305099089601426` | **STRATEGY:** WFO Hardening. | Jules04 to rebase. |
+| #1335 | `origin/jules-risk-control-regime-alignment-13039405778714390006` | **RISK:** Regime alignment. | Jules02 to rebase. |
 
 ---
 
 ## ⚠️ Escalation List (Requires Human Sign-off)
 
-The following changes touch high-risk areas and require manual review per the Jules05 Escalation Policy.
+Per `docs/integration/AUTO_MERGE_POLICY.md`, the following changes must be manually reviewed by a human lead.
 
 | PR # | Branch | Reason for Escalation | Impact Area |
 | :--- | :--- | :--- | :--- |
-| #1257 | `feat/institutional-capital-allocator-...` | **RISK:** Major overhaul of capital management. | Capital Allocation |
-| #1245 | `feat/risk-drift-safeguards-unification-...` | **RISK:** Changes to `RiskManager` and veto power. | Risk Management |
-| #1248 | `feat/macro-risk-intelligence-...` | **TRADING:** New signal filtering logic. | Trading Logic |
-| #1247 | `main-16694512644741550359` | **CI:** Touches all workflow files. | CI/CD |
-| #1244 | `security-hardening-logging-...` | **SECURITY:** Changes to logging and dependencies. | Security |
+| #1257 | `feat/institutional-capital-allocator-699780167318509855` | **RISK:** Overhaul of capital management logic. | Risk Management |
+| #1248 | `feat/macro-event-intelligence-14255609916559759297` | **TRADING:** New signal filtering logic. | Trading Execution |
+| #1280 | `jules05-coherence-improvements-345411350074474294` | **SYSTEM:** Large-scale structural refactor. | Architecture |
+| #1278 | `jules02-synthetic-scenarios-anomalies-7965438557383609497` | **QUALITY:** Touches core test utilities. | CI/CD Stability |
 
 ---
 
 ## 📅 Stale / Superseded / Low-Priority
 
-- **Action Required:** Bulk close 500+ stale PRs/branches dated before 2026-05-16 that are not active or rebased.
-- **Superseded:** All PRs pre-dating the Big Bang (2026-05-14) that have not been rebased.
+- **Bulk Closure Pending:** 500+ PRs opened before 2026-05-15 that are not active or rebased on the Big Bang root (`e23adfa`).
+- **Superseded:** `origin/main` (a93f3e8) is technically superseded by the harmonized state in `origin/jules05-coherence-improvements-...` until a force-merge/rebase occurs.
 
 ---
 
 ## 🚨 Critical Process Alert
-**Integration Status:** Transitioning to Release Candidate v1.1.0-rc10.
-**Warning:** Severe divergence detected. The repository has multiple disconnected roots.
-**Requirement:** All agents MUST rebase active work on the harmonized base (#1187 / `e23adfa`) immediately. Do not create new root commits.
+**Status:** 🔴 CRITICAL FRAGMENTATION
+**Warning:** The `main` branch does not contain the harmonized Risk API or Feature Engineering structure.
+**Directive:** ALL AGENTS must stop creating new feature branches until the `jules05-coherence-improvements` branch is merged and history is stabilized.
 
 ---
-*Last Updated: 2026-05-16 by Jules05*
+*Last Updated: 2026-05-18 by Jules05*
