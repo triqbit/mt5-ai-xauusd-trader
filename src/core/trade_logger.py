@@ -344,6 +344,24 @@ class TradeLogger:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
                 return None
 
+    def get_reconciliation_data(self) -> list[float]:
+        """
+        Fetch PnL values for all trades closed today (UTC).
+        Used to reconcile RiskManager state after a restart.
+        """
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        with self.Session() as session:
+            pnls = session.execute(
+                select(Trade.pnl)
+                .where(
+                    Trade.status == "CLOSED",
+                    Trade.updated_at >= today_start,
+                    Trade.is_deleted.is_(False),
+                )
+                .order_by(Trade.updated_at.asc())
+            ).scalars().all()
+            return [float(p) for p in pnls]
+
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""
         with self.Session() as session:

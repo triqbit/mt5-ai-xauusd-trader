@@ -17,6 +17,7 @@ License: MIT
 
 from __future__ import annotations
 
+import itertools
 import logging
 from dataclasses import dataclass, field
 from datetime import date
@@ -171,6 +172,52 @@ class RiskManager:
             self.monitor.send_daily_summary(self.daily.realised_pnl, self.daily.trade_count)
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
+
+    def reconcile_state(self, initial_balance: float, reconciled_data: list[float]) -> None:
+        """
+        Reconstruct internal risk state from a list of PnL values.
+        Ensures daily loss limits and consecutive loss streaks are preserved
+        after a system restart.
+
+        Args:
+            initial_balance: Account balance at the start of the day.
+            reconciled_data: List of realized PnL values for trades closed today.
+        """
+        if not reconciled_data:
+            logger.info("No intraday trades found for reconciliation.")
+            return
+
+        logger.info("Reconciling risk state with %d trades...", len(reconciled_data))
+
+        # Reconstruct equity curve for the day
+        daily_equity_curve = list(itertools.accumulate(reconciled_data, initial=initial_balance))
+
+        # 1. Update Daily Stats
+        self.daily.realised_pnl = sum(reconciled_data)
+        self.daily.trade_count = len(reconciled_data)
+        self.daily.peak_equity = max(daily_equity_curve)
+
+        # 2. Reconstruct consecutive loss streak
+        consecutive_losses = 0
+        for pnl in reconciled_data:
+            if pnl < 0:
+                consecutive_losses += 1
+            else:
+                consecutive_losses = 0
+        self.daily.consecutive_losses = consecutive_losses
+
+        # 3. Update Global State
+        self.balance = daily_equity_curve[-1]
+        # Peak equity is the maximum of all daily peaks (including this one)
+        self.peak_equity = max(self.peak_equity, self.daily.peak_equity)
+
+        logger.info(
+            "Risk state reconciled | balance=%.2f realised_pnl=%.2f streak=%d peak=%.2f",
+            self.balance,
+            self.daily.realised_pnl,
+            self.daily.consecutive_losses,
+            self.daily.peak_equity,
+        )
 
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:

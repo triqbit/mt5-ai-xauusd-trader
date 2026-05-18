@@ -1483,6 +1483,26 @@ def main() -> int:
     )
 
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
+    # 4. Risk State Reconciliation
+    # Reconstruct intraday state (daily PnL, streaks, peak equity) from database
+    # to ensure risk limits are respected after a system restart.
+    try:
+        reconciliation_data = trade_logger.get_reconciliation_data()
+        if reconciliation_data:
+            # We assume initial balance for the day was (current_balance - total_daily_pnl)
+            # This is a heuristic that works if no other external deposits/withdrawals occurred.
+            total_pnl = sum(reconciliation_data)
+            initial_daily_balance = balance - total_pnl
+            risk.reconcile_state(initial_daily_balance, reconciliation_data)
+            log.info(
+                "Risk state reconciled successfully",
+                trades_recovered=len(reconciliation_data),
+                daily_pnl=total_pnl,
+            )
+    except Exception as e:
+        log.error("Risk reconciliation failed", error=str(e))
+
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
