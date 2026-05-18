@@ -18,7 +18,8 @@ This dashboard provides real-time visibility into the technical health, process 
 ### 🧪 CI & Testing
 - **Latest Release Candidate:** v1.1.0-rc5
 - **Test Results (2026-05-18):** 931 passed, 9 failed.
-- **Regressions:** `RiskManager` interface mismatch and `python-socketio` dependency synchronization failure (5.14.0 vs 5.11.1).
+- **Regressions:** `RiskManager` interface mismatch.
+- **Dependency Status:** Harmonized `python-socketio` to `4.6.1` to satisfy `metaapi-cloud-sdk` constraints.
 - **Primary Bottleneck:** Interface drift between core logic and harmonized tests following monolithic grafts.
 
 ### 🧹 Code Quality (Ruff)
