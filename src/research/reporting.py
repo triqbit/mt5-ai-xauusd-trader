@@ -257,6 +257,12 @@ class RLMetric(BaseModel):
     gain_to_pain_ratio: float = 0.0
     lake_ratio: float = 0.0
     portfolio_heat: float = 0.0
+    trade_frequency: float = 0.0
+    avg_hold_time: float = 0.0
+    action_entropy: float = 0.0
+    commission_drag: float = 0.0
+    profit_concentration: float = 0.0
+    regime_stability: float = 0.0
 
 
 class RLSection(BaseModel):

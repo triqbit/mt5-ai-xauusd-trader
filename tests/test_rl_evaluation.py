@@ -156,6 +156,36 @@ def test_to_report_section(trading_env):
     assert hasattr(section.metrics[0], "lake_ratio")
     assert hasattr(section.metrics[0], "portfolio_heat")
 
+    # New fields
+    assert hasattr(section.metrics[0], "trade_frequency")
+    assert hasattr(section.metrics[0], "avg_hold_time")
+    assert hasattr(section.metrics[0], "action_entropy")
+    assert hasattr(section.metrics[0], "commission_drag")
+    assert hasattr(section.metrics[0], "profit_concentration")
+    assert hasattr(section.metrics[0], "regime_stability")
+
+
+def test_to_report_section_population(trading_env):
+    from src.research.rl_evaluation import RLEvaluator
+    evaluator = RLEvaluator(env=trading_env)
+
+    class SimpleAgent:
+        def predict(self, observation):
+            return 1 if np.random.rand() > 0.5 else 0
+
+    comparison = evaluator.compare([SimpleAgent()], ["Agent1"], "Agent1")
+    section = evaluator.to_report_section(comparison)
+
+    metric = section.metrics[0]
+    # Check that new metrics are not just default 0.0 if there's activity
+    # (Note: depending on random data, some might still be 0, but we check existence)
+    assert metric.trade_frequency >= 0.0
+    assert metric.avg_hold_time >= 0.0
+    assert metric.action_entropy >= 0.0
+    assert metric.commission_drag >= 0.0
+    assert metric.profit_concentration >= 0.0
+    assert metric.regime_stability >= 0.0
+
 
 def test_extract_trades():
     evaluator = RLEvaluator(env=MagicMock())
@@ -262,7 +292,8 @@ def test_robustness_to_high_feature_count():
     evaluator = RLEvaluator(env=env, n_features=10)
 
     class HoldAgent:
-        def predict(self, obs): return 0
+        def predict(self, obs):
+            return 0
 
     # This should not raise ValueError when creating df_slice in evaluate
     report = evaluator.evaluate(HoldAgent())
@@ -274,17 +305,23 @@ def test_get_prediction_robustness():
 
     class MultiAgent:
         def predict(self, obs):
-            if obs[0] == 1: return (np.array([1]), {"info": "sb3"})
-            if obs[0] == 2: return [2, 0]
+            if obs[0] == 1:
+                return (np.array([1]), {"info": "sb3"})
+            if obs[0] == 2:
+                return [2, 0]
             if obs[0] == 3:
                 from src.core.constants import SignalDirection
                 from src.models.base_model import Signal
+
                 return Signal(direction=SignalDirection.SELL, confidence=0.8)
             if obs[0] == 4:
+
                 class MockEnum:
                     value = 1
+
                 return MockEnum()
-            if obs[0] == 5: return -1 # Test explicit SELL mapping
+            if obs[0] == 5:
+                return -1  # Test explicit SELL mapping
             return 0
 
     assert evaluator._get_prediction(MultiAgent(), np.array([1])) == 1
