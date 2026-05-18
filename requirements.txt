@@ -63,6 +63,7 @@ ruff==0.15.13
 mypy==2.1.0
 
 # ── Utilities ───────────────────────────────────────────────
+# pinned to 4.6.1 to satisfy metaapi-cloud-sdk constraints (<5.0.0)
 python-socketio==4.6.1
 python-dateutil==2.9.0.post0
 nest-asyncio==1.6.0

@@ -777,48 +777,77 @@ def run_setup_wizard() -> int:
 
     # Write to .env
     env_path = Path(".env")
-    example_path = Path(".env.example")
 
-    lines = []
-    if example_path.exists():
-        with open(example_path, "r") as f:
+    current_env = {}
+    if env_path.exists():
+        with open(env_path, "r") as f:
             for line in f:
-                if line.startswith("MT5_LOGIN="):
-                    lines.append(f"MT5_LOGIN={login}\n")
-                elif line.startswith("MT5_PASSWORD="):
-                    lines.append(f"MT5_PASSWORD={password}\n")
-                elif line.startswith("MT5_SERVER="):
-                    lines.append(f"MT5_SERVER={server}\n")
-                elif line.startswith("SYMBOL="):
-                    lines.append(f"SYMBOL={symbol}\n")
-                elif line.startswith("TIMEFRAME="):
-                    lines.append(f"TIMEFRAME={timeframe}\n")
-                elif line.startswith("POLL_INTERVAL="):
-                    lines.append(f"POLL_INTERVAL={poll_interval}\n")
-                elif line.startswith("MODE="):
-                    lines.append(f"MODE={mode}\n")
-                elif line.startswith("METAAPI_TOKEN=") and meta_token:
-                    lines.append(f"METAAPI_TOKEN={meta_token}\n")
-                elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
-                    lines.append(f"METAAPI_ACCOUNT_ID={meta_id}\n")
-                else:
-                    lines.append(line)
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    current_env[k] = v
+
+    # Update with new values
+    updates = {
+        "MT5_LOGIN": str(login),
+        "MT5_PASSWORD": password,
+        "MT5_SERVER": server,
+        "SYMBOL": symbol,
+        "TIMEFRAME": timeframe,
+        "POLL_INTERVAL": str(poll_interval),
+        "MODE": mode,
+    }
+    if meta_token:
+        updates["METAAPI_TOKEN"] = meta_token
+    if meta_id:
+        updates["METAAPI_ACCOUNT_ID"] = meta_id
+
+    # If .env exists, we'll try to preserve its structure
+    if env_path.exists():
+        new_lines = []
+        seen_keys = set()
+        with open(env_path, "r") as f:
+            for line in f:
+                key_found = False
+                for k, v in updates.items():
+                    if line.startswith(f"{k}="):
+                        new_lines.append(f"{k}={v}\n")
+                        seen_keys.add(k)
+                        key_found = True
+                        break
+                if not key_found:
+                    new_lines.append(line)
+
+        # Append any new keys that weren't in the original file
+        for k, v in updates.items():
+            if k not in seen_keys:
+                new_lines.append(f"{k}={v}\n")
     else:
-        # Fallback if .env.example is missing
-        lines = [
-            f"MT5_LOGIN={login}\n",
-            f"MT5_PASSWORD={password}\n",
-            f"MT5_SERVER={server}\n",
-            f"SYMBOL={symbol}\n",
-            f"TIMEFRAME={timeframe}\n",
-            f"POLL_INTERVAL={poll_interval}\n",
-            f"MODE={mode}\n",
-            f"METAAPI_TOKEN={meta_token}\n",
-            f"METAAPI_ACCOUNT_ID={meta_id}\n",
-        ]
+        # Use .env.example as a template if .env doesn't exist
+        example_path = Path(".env.example")
+        new_lines = []
+        seen_keys = set()
+        if example_path.exists():
+            with open(example_path, "r") as f:
+                for line in f:
+                    key_found = False
+                    for k, v in updates.items():
+                        if line.startswith(f"{k}="):
+                            new_lines.append(f"{k}={v}\n")
+                            seen_keys.add(k)
+                            key_found = True
+                            break
+                    if not key_found:
+                        new_lines.append(line)
+            # Append missing keys
+            for k, v in updates.items():
+                if k not in seen_keys:
+                    new_lines.append(f"{k}={v}\n")
+        else:
+            # Absolute fallback
+            new_lines = [f"{k}={v}\n" for k, v in updates.items()]
 
     with open(env_path, "w") as f:
-        f.writelines(lines)
+        f.writelines(new_lines)
 
     # Secure permissions
     import contextlib

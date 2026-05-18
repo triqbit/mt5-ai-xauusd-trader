@@ -25,6 +25,7 @@ pydantic-settings==2.14.1
 metaapi-cloud-sdk==29.1.1
 
 # -- Testing -------------------------------------------------------
+# pinned to 4.6.1 to satisfy metaapi-cloud-sdk constraints (<5.0.0)
 python-socketio==4.6.1
 optuna==4.8.0
 pytest==9.0.3
