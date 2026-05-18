@@ -59,7 +59,7 @@ dependencies = [
 dev = [
     "pre-commit==4.1.0",
     "ruff==0.15.13",
-    "mypy==1.15.0",
+    "mypy==2.1.0",
     "pip-audit",
 ]
 test = [
