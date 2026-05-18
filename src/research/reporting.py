@@ -220,6 +220,8 @@ class BenchmarkComparison(BaseModel):
     lake_ratio: str = "0.00"
     tail_ratio: str = "0.00"
     common_sense_ratio: str = "0.00"
+    information_ratio: str = "0.00"
+    omega_ratio: str = "0.00"
 
 
 class BenchmarkSection(BaseModel):
@@ -689,7 +691,8 @@ class ResearchReporter:
             table.add_column("PF")
             table.add_column("SQN")
             table.add_column("Recov")
-            table.add_column("Calmar")
+            table.add_column("IR")
+            table.add_column("Omega")
             table.add_column("P-Value")
             for b in report.benchmarks.comparisons:
                 table.add_row(
@@ -700,7 +703,8 @@ class ResearchReporter:
                     f"[{self._get_color_for_metric(b.profit_factor, 'pf')}]{b.profit_factor}[/]",
                     b.sqn,
                     f"[{self._get_color_for_metric(b.recovery_factor, 'recovery')}]{b.recovery_factor}[/]",
-                    b.calmar_ratio,
+                    b.information_ratio,
+                    b.omega_ratio,
                     b.p_value,
                 )
             self.console.print(table)

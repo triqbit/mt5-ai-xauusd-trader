@@ -129,3 +129,85 @@ def test_adapter_robustness_short_df():
     assert len(signals) == 10
     assert np.all(signals == 0)
     assert not mock_model.predict.called
+
+
+def test_supertrend_signals(sample_data):
+    from src.research.benchmarks import SuperTrendStrategy
+
+    strategy = SuperTrendStrategy(window=10, multiplier=3.0)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+    # First 'window' signals should be 0
+    assert np.all(signals[:10] == 0)
+    # At least some signals should be non-zero
+    assert np.any(signals != 0)
+
+
+def test_london_breakout_signals():
+    from src.research.benchmarks import LondonBreakoutStrategy
+
+    np.random.seed(42)
+    n = 500
+    dates = pd.date_range(start="2024-01-01", periods=n, freq="1h")
+    close = 2000 + np.cumsum(np.random.randn(n))
+    df = pd.DataFrame(
+        {
+            "open": close - np.random.randn(n),
+            "high": close + np.abs(np.random.randn(n)),
+            "low": close - np.abs(np.random.randn(n)),
+            "close": close,
+            "tick_volume": np.random.randint(100, 1000, n),
+        },
+        index=dates,
+    )
+
+    strategy = LondonBreakoutStrategy(range_start="00:00", range_end="08:00")
+    signals = strategy.predict(df)
+    assert len(signals) == len(df)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+    # Should have relatively few signals (max 1 per day)
+    # Each trade lasts until end of day (24 bars max per day, but starting from breakout)
+    # This check is a bit complex due to persistence, but we can check num of transitions
+    transitions = np.diff(signals)
+    assert np.sum(transitions != 0) <= (len(df) / 24) * 2
+
+
+def test_new_metrics_in_evaluator(sample_data):
+    from src.research.benchmarks import BenchmarkEvaluator, SuperTrendStrategy
+
+    evaluator = BenchmarkEvaluator(sample_data)
+    strategy = SuperTrendStrategy(window=10)
+    results = evaluator.evaluate_all([strategy])
+
+    assert "Omega Ratio" in results.columns
+    # Check if value is float and reasonably not NaN if there's any trade
+    if results.iloc[0]["Num Trades"] > 0:
+        assert not np.isnan(results.iloc[0]["Omega Ratio"])
+
+
+def test_new_metrics_in_comparison(sample_data):
+    from src.research.benchmarks import BenchmarkEvaluator, SuperTrendStrategy
+
+    evaluator = BenchmarkEvaluator(sample_data)
+    s1 = SuperTrendStrategy(window=5)
+    s2 = SuperTrendStrategy(window=10)
+    evaluator.evaluate_all([s1, s2])
+
+    comp = evaluator.compare_to_baseline(s1.name, s2.name)
+    assert "Information Ratio" in comp
+    assert not np.isnan(comp["Information Ratio"])
+
+
+def test_report_section_with_new_metrics(sample_data):
+    from src.research.benchmarks import BenchmarkEvaluator, SuperTrendStrategy
+
+    evaluator = BenchmarkEvaluator(sample_data)
+    s1 = SuperTrendStrategy(window=5)
+    s2 = SuperTrendStrategy(window=10)
+    evaluator.evaluate_all([s1, s2])
+
+    section = evaluator.to_report_section(baseline_name=s2.name)
+    assert hasattr(section.comparisons[0], "information_ratio")
+    assert hasattr(section.comparisons[0], "omega_ratio")
+    # In sample data they might be "0.00" if no outperformance or no gains
