@@ -63,7 +63,7 @@ ruff==0.9.6
 mypy==1.15.0
 
 # ── Utilities ───────────────────────────────────────────────
-python-socketio==4.6.1
+python-socketio==5.16.1
 python-dateutil==2.9.0.post0
 nest-asyncio==1.6.0
 pytz==2026.2
