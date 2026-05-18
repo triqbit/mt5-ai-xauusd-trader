@@ -163,6 +163,11 @@ def test_to_report_section(trading_env):
     assert hasattr(section.metrics[0], "commission_drag")
     assert hasattr(section.metrics[0], "profit_concentration")
     assert hasattr(section.metrics[0], "regime_stability")
+    assert hasattr(section.metrics[0], "mae_avg")
+    assert hasattr(section.metrics[0], "mfe_avg")
+    assert hasattr(section.metrics[0], "p_value")
+    assert hasattr(section.metrics[0], "session_diversification")
+    assert hasattr(section.metrics[0], "flip_flop_rate")
 
 
 def test_to_report_section_population(trading_env):
@@ -502,3 +507,122 @@ def test_empty_dataframe_handling():
 
     decomp = evaluator._calculate_reward_decomposition(df, [])
     assert decomp.net_pnl == 0.0
+
+
+def test_calculate_mae_mfe():
+    evaluator = RLEvaluator(env=MagicMock())
+    # Long trade with volatility
+    df = pd.DataFrame(
+        {
+            "balances": [1000, 1000, 1010, 990, 1020, 1020],
+            "positions": [0, 1, 1, 1, 1, 0],
+            "prices": [100, 100, 110, 90, 120, 120],
+        }
+    )
+    # Entry at index 1, price 100.
+    # Prices during trade: [100, 110, 90, 120]
+    # MFE = 120 - 100 = 20
+    # MAE = 90 - 100 = -10
+    trades = evaluator._extract_trades(df)
+    assert len(trades) == 1
+    assert trades[0]["mfe"] == 20.0
+    assert trades[0]["mae"] == -10.0
+
+
+def test_session_performance_attribution():
+    evaluator = RLEvaluator(env=MagicMock())
+    # Mock trades at different synthetic steps (hours)
+    # Asian: 22-07, London: 8-17, NY: 13-22
+    # step 1 -> hour 1 (Asian)
+    # step 10 -> hour 10 (London)
+    # step 20 -> hour 20 (NY)
+    df = pd.DataFrame({"steps": np.arange(30)})
+    trades = [
+        {"entry_idx": 1, "pnl": 10},  # Asian
+        {"entry_idx": 10, "pnl": 20},  # London
+        {"entry_idx": 20, "pnl": -5},  # NY
+    ]
+    perf = evaluator._calculate_session_performance(df, trades)
+    assert "session_diversification" in perf
+    assert perf["session_diversification"] > 0.0
+
+
+def test_statistical_comparison_logic(trading_env):
+    evaluator = RLEvaluator(env=trading_env)
+
+    class ConstantAgent:
+        def __init__(self, action):
+            self.action = action
+
+        def predict(self, observation):
+            return self.action
+
+    comparison = evaluator.compare(
+        agents=[ConstantAgent(1)], agent_names=["Agent1"], baseline_name="Baseline"
+    )
+
+    assert "Agent1" in comparison.p_values
+    assert isinstance(comparison.p_values["Agent1"], float)
+
+
+def test_flip_flop_detection():
+    evaluator = RLEvaluator(env=MagicMock())
+    # Agent alternating Buy (1) and Sell (2) every step
+    df = pd.DataFrame(
+        {
+            "balances": [1000] * 10,
+            "actions": [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+        }
+    )
+    turnover = evaluator._calculate_turnover(df, [])
+    # 9 potential reversal points, all are reversals
+    assert turnover.flip_flop_rate == 1.0
+
+    # No reversals
+    df2 = pd.DataFrame(
+        {
+            "balances": [1000] * 10,
+            "actions": [1, 1, 1, 1, 0, 0, 0, 2, 2, 2],
+        }
+    )
+    turnover2 = evaluator._calculate_turnover(df2, [])
+    assert turnover2.flip_flop_rate == 0.0
+
+
+def test_extract_trades_reversal():
+    evaluator = RLEvaluator(env=MagicMock())
+    # Long reversal to Short
+    df = pd.DataFrame(
+        {
+            "balances": [1000, 1000, 1010, 1005, 995],
+            "positions": [0, 1, 1, -1, -1],
+            "prices": [100, 100, 110, 105, 95],
+        }
+    )
+    # Trade 1: Entry index 1 (price 100). Exit index 3 (price 105). Long.
+    # Trade 2: Entry index 3 (price 105). Exit index 4 (price 95). Short.
+    trades = evaluator._extract_trades(df)
+    assert len(trades) == 2
+    assert trades[0]["pnl"] == 5.0
+    assert trades[0]["direction"] == 1
+    # Trade 2: entry at index 3, exit at index 4.
+    # pnl = balances[4] - balances[2] = 995 - 1010 = -15.0
+    assert trades[1]["pnl"] == -15.0
+    assert trades[1]["direction"] == -1
+
+
+def test_extract_trades_initial_position():
+    evaluator = RLEvaluator(env=MagicMock())
+    # Position open from step 0
+    df = pd.DataFrame(
+        {
+            "balances": [1000, 1010, 1005],
+            "positions": [1, 1, 0],
+            "prices": [100, 110, 105],
+        }
+    )
+    # Trade 1: Entry 0, Exit 2.
+    trades = evaluator._extract_trades(df)
+    assert len(trades) == 1
+    assert trades[0]["entry_idx"] == 0
+    assert trades[0]["pnl"] == 5.0

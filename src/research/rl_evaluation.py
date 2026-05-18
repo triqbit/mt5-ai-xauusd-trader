@@ -56,6 +56,8 @@ class StabilityMetrics(BaseModel):
     lake_ratio: float = Field(
         default=0.0, description="Ratio of drawdown area to total duration (Lake Ratio)"
     )
+    mae_avg: float = Field(default=0.0, description="Average Maximum Adverse Excursion")
+    mfe_avg: float = Field(default=0.0, description="Average Maximum Favorable Excursion")
 
 
 class ExposureMetrics(BaseModel):
@@ -81,6 +83,9 @@ class TurnoverMetrics(BaseModel):
     turnover_ratio: float = Field(..., description="Total traded volume relative to balance")
     action_entropy: float = Field(
         default=0.0, description="Entropy of action distribution (detects policy collapse)"
+    )
+    flip_flop_rate: float = Field(
+        default=0.0, description="Percentage of actions that are immediate reversals"
     )
 
 
@@ -138,6 +143,9 @@ class RLReport(BaseModel):
     regime_sensitivity: list[RegimePerformance]
     reward_decomposition: RewardDecomposition
     overall_win_rate: float
+    session_diversification: float = Field(
+        default=0.0, description="Normalized entropy of trade distribution across sessions"
+    )
 
 
 class RLComparison(BaseModel):
@@ -147,6 +155,9 @@ class RLComparison(BaseModel):
     agent_reports: list[RLReport]
     performance_gap_pct: float = Field(..., description="Gap between best RL agent and baseline")
     best_agent: str
+    p_values: dict[str, float] = Field(
+        default_factory=dict, description="P-values of agents against baseline"
+    )
 
 
 class MomentumBaseline:
@@ -287,10 +298,73 @@ class RLEvaluator:
         Run a full evaluation of the agent and generate a typed report.
         Tracks mark-to-market equity for institutional-grade return analysis.
         """
+        report, _ = self.evaluate_with_history(agent, agent_name)
+        return report
+
+    def compare(
+        self, agents: list[Any], agent_names: list[str], baseline_name: str = "Momentum"
+    ) -> RLComparison:
+        """Compare multiple agents against a baseline with statistical significance."""
+        reports = []
+        agent_returns = {}
+
+        for agent, name in zip(agents, agent_names, strict=True):
+            report, df_history = self.evaluate_with_history(agent, name)
+            reports.append(report)
+            if "balances" in df_history.columns:
+                agent_returns[name] = df_history["balances"].pct_change().fillna(0).values
+
+        # Find baseline report
+        baseline_report = next((r for r in reports if r.agent_name == baseline_name), None)
+        if not baseline_report:
+            # If baseline not in list, run it separately
+            baseline_agent = MomentumBaseline()
+            baseline_report, df_baseline = self.evaluate_with_history(baseline_agent, baseline_name)
+            reports.append(baseline_report)
+            agent_returns[baseline_name] = df_baseline["balances"].pct_change().fillna(0).values
+
+        # Calculate performance gap and best agent
+        best_report = max(reports, key=lambda r: r.stability.sharpe_ratio)
+        baseline_sharpe = baseline_report.stability.sharpe_ratio
+        best_sharpe = best_report.stability.sharpe_ratio
+
+        gap = (
+            ((best_sharpe - baseline_sharpe) / abs(baseline_sharpe) * 100)
+            if baseline_sharpe != 0
+            else 0.0
+        )
+
+        # Statistical significance (P-values)
+        p_values = {}
+        b_rets = agent_returns.get(baseline_name)
+        if b_rets is not None:
+            for name, a_rets in agent_returns.items():
+                if name == baseline_name:
+                    continue
+                # Ensure same length for paired test
+                min_len = min(len(a_rets), len(b_rets))
+                if min_len > 1:
+                    try:
+                        _, p_val = stats.ttest_rel(a_rets[:min_len], b_rets[:min_len])
+                        p_values[name] = float(p_val) if not np.isnan(p_val) else 1.0
+                    except Exception:
+                        p_values[name] = 1.0
+
+        return RLComparison(
+            baseline_name=baseline_name,
+            agent_reports=reports,
+            performance_gap_pct=float(gap),
+            best_agent=best_report.agent_name,
+            p_values=p_values,
+        )
+
+    def evaluate_with_history(
+        self, agent: RLModel, agent_name: str = "RL_Agent"
+    ) -> tuple[RLReport, pd.DataFrame]:
+        """Run evaluation and return both report and raw history DataFrame."""
         obs, _ = self.env.reset()
         done = False
 
-        # Pre-calculate market regimes for the entire dataset for performance
         regime_labels = []
         if hasattr(self.env, "data"):
             data_df = pd.DataFrame(
@@ -304,10 +378,11 @@ class RLEvaluator:
             "steps": [],
             "actions": [],
             "rewards": [],
-            "balances": [],  # This will store Mark-to-Market Equity
+            "balances": [],
             "positions": [],
             "regimes": [],
             "commissions": [],
+            "prices": [],
         }
 
         step_idx = 0
@@ -315,7 +390,6 @@ class RLEvaluator:
             action = self._get_prediction(agent, obs)
             next_obs, reward, terminated, truncated, info = self.env.step(action)
 
-            # Detect market regime from pre-calculated labels
             current_regime = MarketRegime.UNKNOWN
             current_price = 0.0
             if hasattr(self.env, "data") and hasattr(self.env, "current_step"):
@@ -329,14 +403,10 @@ class RLEvaluator:
                     except ValueError:
                         current_regime = MarketRegime.UNKNOWN
 
-            # Calculate Mark-to-Market Equity
-            # Equity = Realized Balance + Unrealized PnL
             realized_balance = info["balance"]
             position = info["position"]
             unrealized_pnl = 0.0
             if position != 0 and hasattr(self.env, "entry_price"):
-                # Simplified: assuming 1.0 lot size and direct price diff (XAUUSD-like)
-                # In a real environment, this should use the environment's own equity calculation if available
                 unrealized_pnl = (current_price - self.env.entry_price) * position
 
             mtm_equity = realized_balance + unrealized_pnl
@@ -348,48 +418,14 @@ class RLEvaluator:
             history["positions"].append(position)
             history["regimes"].append(current_regime)
             history["commissions"].append(info.get("cumulative_commissions", 0.0))
+            history["prices"].append(current_price)
 
             obs = next_obs
             done = terminated or truncated
             step_idx += 1
 
         df_history = pd.DataFrame(history)
-
-        return self._generate_report(agent_name, df_history)
-
-    def compare(
-        self, agents: list[Any], agent_names: list[str], baseline_name: str = "Momentum"
-    ) -> RLComparison:
-        """Compare multiple agents against a baseline."""
-        reports = []
-        for agent, name in zip(agents, agent_names, strict=True):
-            reports.append(self.evaluate(agent, name))
-
-        # Find baseline report
-        baseline_report = next((r for r in reports if r.agent_name == baseline_name), None)
-        if not baseline_report:
-            # If baseline not in list, run it separately
-            baseline_agent = MomentumBaseline()
-            baseline_report = self.evaluate(baseline_agent, baseline_name)
-            reports.append(baseline_report)
-
-        # Calculate performance gap and best agent
-        best_report = max(reports, key=lambda r: r.stability.sharpe_ratio)
-        baseline_sharpe = baseline_report.stability.sharpe_ratio
-        best_sharpe = best_report.stability.sharpe_ratio
-
-        gap = (
-            ((best_sharpe - baseline_sharpe) / abs(baseline_sharpe) * 100)
-            if baseline_sharpe != 0
-            else 0.0
-        )
-
-        return RLComparison(
-            baseline_name=baseline_name,
-            agent_reports=reports,
-            performance_gap_pct=float(gap),
-            best_agent=best_report.agent_name,
-        )
+        return self._generate_report(agent_name, df_history), df_history
 
     def to_report_section(self, comparison: RLComparison) -> Any:
         """
@@ -424,6 +460,11 @@ class RLEvaluator:
                     common_sense_ratio=report.stability.common_sense_ratio,
                     gain_to_pain_ratio=report.stability.gain_to_pain_ratio,
                     lake_ratio=report.stability.lake_ratio,
+                    mae_avg=report.stability.mae_avg,
+                    mfe_avg=report.stability.mfe_avg,
+                    p_value=comparison.p_values.get(report.agent_name, 1.0),
+                    session_diversification=report.session_diversification,
+                    flip_flop_rate=report.turnover.flip_flop_rate,
                     portfolio_heat=report.exposure.avg_portfolio_heat,
                     trade_frequency=report.turnover.trade_frequency,
                     avg_hold_time=report.turnover.avg_hold_time,
@@ -502,6 +543,7 @@ class RLEvaluator:
         turnover = self._calculate_turnover(df, trades)
         exposure = self._calculate_exposure(df)
         reward_decomp = self._calculate_reward_decomposition(df, trades, stability.volatility)
+        session_perf = self._calculate_session_performance(df, trades)
 
         trade_pnls = [t["pnl"] for t in trades]
         win_rate = len([p for p in trade_pnls if p > 0]) / len(trade_pnls) if trade_pnls else 0.0
@@ -519,48 +561,88 @@ class RLEvaluator:
             regime_sensitivity=regime_sensitivity,
             reward_decomposition=reward_decomp,
             overall_win_rate=win_rate,
+            session_diversification=session_perf.get("session_diversification", 0.0),
         )
 
     def _extract_trades(self, df: pd.DataFrame) -> list[dict[str, Any]]:
         """
-        Extract detailed trade information from history.
-        Each trade contains: pnl, hold_time.
-        Uses total PnL from entry to exit.
+        Extract detailed trade information including MAE/MFE metrics.
+        Handles direct position reversals (Long to Short) and initial positions at step 0.
+        MAE: Max Adverse Excursion (max unrealized loss during trade)
+        MFE: Max Favorable Excursion (max unrealized profit during trade)
         """
         trades = []
         balances = df["balances"].values
         positions = df["positions"].values
+        prices = df["prices"].values if "prices" in df.columns else np.zeros(len(df))
+
+        if len(df) == 0:
+            return []
 
         entry_idx = 0
+        entry_price = 0.0
         in_position = False
 
-        # Special case: position already open at step 0
+        def process_trade(end_idx: int, e_idx: int, e_price: float, pos_size: float):
+            prev_idx = max(0, e_idx - 1)
+            pnl = balances[end_idx] - balances[prev_idx]
+            hold_time = end_idx - e_idx
+
+            # Calculate MAE / MFE from price action during trade
+            trade_prices = prices[e_idx : end_idx + 1]
+            if len(trade_prices) > 0 and e_price != 0:
+                # Excursion is based on price difference from entry * position direction
+                price_diffs = (trade_prices - e_price) * pos_size
+                mfe = np.max(price_diffs)
+                mae = np.min(price_diffs)
+            else:
+                mfe, mae = 0.0, 0.0
+
+            return {
+                "pnl": float(pnl),
+                "hold_time": int(hold_time),
+                "mae": float(mae),
+                "mfe": float(mfe),
+                "entry_idx": e_idx,
+                "exit_idx": end_idx,
+                "direction": 1 if pos_size > 0 else -1,
+            }
+
+        # Handle initial position at step 0
         if positions[0] != 0:
             entry_idx = 0
+            entry_price = prices[0]
             in_position = True
 
         for i in range(1, len(df)):
-            # Entry detected
-            if positions[i - 1] == 0 and positions[i] != 0:
+            prev_pos = positions[i - 1]
+            curr_pos = positions[i]
+
+            # Case 1: Entry from flat
+            if prev_pos == 0 and curr_pos != 0:
                 entry_idx = i
+                entry_price = prices[i]
                 in_position = True
-            # Exit detected
-            elif positions[i - 1] != 0 and positions[i] == 0:
-                # PnL is the change in MtM equity from the step BEFORE entry to the exit step
-                # If entry was at 0, we use 0 as the reference point for balance change
-                prev_idx = max(0, entry_idx - 1)
-                pnl = balances[i] - balances[prev_idx]
-                hold_time = i - entry_idx
-                trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
+
+            # Case 2: Exit to flat
+            elif prev_pos != 0 and curr_pos == 0:
+                trades.append(process_trade(i, entry_idx, entry_price, prev_pos))
                 in_position = False
 
-        # Handle final open position
+            # Case 3: Direct Reversal (e.g. 1.0 to -1.0)
+            elif prev_pos != 0 and curr_pos != 0 and prev_pos != curr_pos:
+                # Close previous trade
+                trades.append(process_trade(i, entry_idx, entry_price, prev_pos))
+                # Open new trade at same index
+                entry_idx = i
+                entry_price = prices[i]
+                in_position = True
+
+        # Close final open position
         if in_position:
-            i = len(df) - 1
-            prev_idx = max(0, entry_idx - 1)
-            pnl = balances[i] - balances[prev_idx]
-            hold_time = i - entry_idx
-            trades.append({"pnl": float(pnl), "hold_time": int(hold_time)})
+            trades.append(
+                process_trade(len(df) - 1, entry_idx, entry_price, positions[entry_idx])
+            )
 
         return trades
 
@@ -691,6 +773,10 @@ class RLEvaluator:
                     cov = std_sharpe / abs(mean_sharpe)
                     regime_stability = 1.0 / (1.0 + cov)
 
+        # Average MAE / MFE
+        mae_avg = np.mean([t["mae"] for t in trades]) if trades else 0.0
+        mfe_avg = np.mean([t["mfe"] for t in trades]) if trades else 0.0
+
         return StabilityMetrics(
             sharpe_ratio=float(sharpe),
             sortino_ratio=float(sortino),
@@ -711,12 +797,14 @@ class RLEvaluator:
             gain_to_pain_ratio=float(gain_to_pain_ratio),
             regime_stability_score=float(regime_stability),
             lake_ratio=float(lake_ratio),
+            mae_avg=float(mae_avg),
+            mfe_avg=float(mfe_avg),
         )
 
     def _calculate_turnover(
         self, df: pd.DataFrame, trades: list[dict[str, Any]]
     ) -> TurnoverMetrics:
-        """Assess trading activity and execution costs, including policy entropy."""
+        """Assess trading activity and execution costs, including policy entropy and flip-flop rate."""
         num_trades = len(trades)
         hold_times = [t["hold_time"] for t in trades]
 
@@ -726,15 +814,23 @@ class RLEvaluator:
 
         trade_freq = (num_trades / len(df)) * 1000 if len(df) > 0 else 0.0
 
-        # Turnover ratio: rough estimate of traded volume relative to initial balance
-        # In this env, each trade is 1.0 unit.
-        turnover_ratio = (num_trades * 1.0) / (df["balances"].iloc[0]) if len(df) > 0 else 0.0
-
         # Action entropy: H(X) = -sum(p(x) * log(p(x)))
         action_entropy = 0.0
         if "actions" in df.columns and len(df) > 0:
             counts = df["actions"].value_counts(normalize=True).values
             action_entropy = -np.sum(counts * np.log(counts + 1e-9))
+
+        # Flip-flop rate: % of actions that are direct reversals within short window
+        flip_flop_rate = 0.0
+        if "actions" in df.columns and len(df) > 1:
+            actions = df["actions"].values
+            reversals = 0
+            for i in range(1, len(actions)):
+                if (actions[i - 1] == 1 and actions[i] == 2) or (
+                    actions[i - 1] == 2 and actions[i] == 1
+                ):
+                    reversals += 1
+            flip_flop_rate = reversals / (len(actions) - 1)
 
         initial_balance = df["balances"].iloc[0] if len(df) > 0 else 1.0
         turnover_ratio = (num_trades * 1.0) / (initial_balance)
@@ -747,7 +843,52 @@ class RLEvaluator:
             total_trades=num_trades,
             turnover_ratio=float(turnover_ratio),
             action_entropy=float(action_entropy),
+            flip_flop_rate=float(flip_flop_rate),
         )
+
+    def _calculate_session_performance(
+        self, df: pd.DataFrame, trades: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """
+        Attribute performance to trading sessions and calculate diversification entropy.
+        If DatetimeIndex is missing, assumes 1 step = 1 hour (synthetic mapping).
+        """
+        # Session UTC hours
+        sessions = {
+            "Asian": (22, 7),
+            "Tokyo": (0, 9),
+            "London": (8, 17),
+            "New York": (13, 22),
+        }
+
+        # Check if we have timestamps, otherwise assume index-based hours (simplification)
+        if isinstance(df.index, pd.DatetimeIndex):
+            hours = df.index.hour
+        else:
+            # Synthetic hours from index if not available
+            hours = df["steps"] % 24
+
+        session_counts = {name: 0 for name in sessions}
+
+        for trade in trades:
+            entry_idx = trade["entry_idx"]
+            hour = int(hours[entry_idx])
+            for name, (start, end) in sessions.items():
+                if (start < end and start <= hour < end) or (
+                    start >= end and (hour >= start or hour < end)
+                ):
+                    session_counts[name] += 1
+
+        total_trades = sum(session_counts.values())
+        diversification = 0.0
+        if total_trades > 0:
+            probs = [count / total_trades for count in session_counts.values() if count > 0]
+            if len(probs) > 1:
+                # Normalized Entropy: H / log(N)
+                entropy = -np.sum([p * np.log(p) for p in probs])
+                diversification = entropy / np.log(len(sessions))
+
+        return {"session_diversification": float(diversification)}
 
     def _calculate_exposure(self, df: pd.DataFrame) -> ExposureMetrics:
         """Assess portfolio exposure and time-at-risk."""
