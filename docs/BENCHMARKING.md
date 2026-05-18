@@ -16,6 +16,8 @@ The following rule-based baselines are available in `src/research/benchmarks.py`
 - **EMA Crossover**: Simple trend-following using fast and slow Exponential Moving Averages.
 - **Momentum (ROC)**: Momentum-based strategy using Rate of Change with a configurable noise-filtering threshold.
 - **Volatility Breakout**: Bollinger Band breakout strategy.
+- **SuperTrend**: ATR-based trend-following strategy (`SuperTrendStrategy`).
+- **London Breakout**: Session-aware breakout strategy optimized for XAUUSD (`LondonBreakoutStrategy`).
 - **Donchian Channel Breakout**: Trend-following breakout based on high/low price channels (`DonchianChannelStrategy`).
 - **Regime-Filtered Meta-strategy**: Filters signals from an underlying strategy based on specified market regimes.
 - **Naive Directional**: Follows the direction of the previous candle (`NaiveDirectionalStrategy`).
@@ -33,6 +35,8 @@ The `BenchmarkEvaluator` calculates high-fidelity metrics beyond simple returns:
 - **Sharpe Ratio**: Risk-adjusted return (annualized).
 - **Sortino Ratio**: Downside risk-adjusted return.
 - **Calmar / Recovery Factor**: Ratio of total return to maximum drawdown.
+- **Information Ratio**: Annualized excess returns over tracking error against the benchmark.
+- **Omega Ratio**: Probability-weighted gains vs. losses (using a 0.0 threshold).
 - **Annualized Volatility**: Standard deviation of daily returns scaled to one year.
 - **System Quality Number (SQN)**: Evaluates trade quality and expectancy relative to volatility.
 - **Profit Factor**: Gross Profit / Gross Loss.

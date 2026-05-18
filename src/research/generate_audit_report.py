@@ -284,6 +284,8 @@ def generate_full_audit():
                 lake_ratio="0.65",
                 tail_ratio="0.85",
                 common_sense_ratio="1.23",
+                information_ratio="0.85",
+                omega_ratio="1.42",
             ),
             BenchmarkComparison(
                 name="Momentum_ROC",
@@ -296,6 +298,8 @@ def generate_full_audit():
                 lake_ratio="0.72",
                 tail_ratio="0.75",
                 common_sense_ratio="0.94",
+                information_ratio="0.42",
+                omega_ratio="1.15",
             ),
         ],
         statistical_summary="Compared 2 strategies against Ensemble. 2 showed outperformance.",
