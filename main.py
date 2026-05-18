@@ -27,11 +27,11 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
     from src.data.event_intelligence import EventIntelligence
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.base_model import BaseModel
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
@@ -434,14 +434,18 @@ def run_live(
                     open_positions_mt5 = connector.get_positions(cfg.symbol)
 
                     risk_decision = (
-                        risk.validate_signal(signal, df_features, open_positions_mt5, model_health=health)
+                        risk.validate_signal(
+                            signal, df_features, open_positions_mt5, model_health=health
+                        )
                         if direction != 0
                         else None
                     )
 
                     risk_approved = risk_decision.is_approved if risk_decision else False
                     if risk_decision and risk_decision.adjusted_lot_size > 0:
-                        signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
+                        signal = signal.model_copy(
+                            update={"lot_size": risk_decision.adjusted_lot_size}
+                        )
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -485,7 +489,9 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [risk_decision.reason] if risk_decision and not risk_decision.is_approved else [],
+                            "rejection_reasons": [risk_decision.reason]
+                            if risk_decision and not risk_decision.is_approved
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
@@ -1484,7 +1490,6 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.data.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
     from src.data.event_intelligence import (
@@ -1492,6 +1497,7 @@ def main() -> int:
         MetaAPIEventProvider,
         TradingViewEventProvider,
     )
+    from src.data.feature_engineering import FeatureEngineer
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent

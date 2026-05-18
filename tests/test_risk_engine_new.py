@@ -2,20 +2,20 @@ import pandas as pd
 import pytest
 
 from src.core.config import TradingConfig
-from src.trading.risk_engine import RiskEngine
+from src.trading.risk_manager import RiskManager
 
 
 @pytest.fixture
 def risk_engine():
     cfg = TradingConfig(MT5_PASSWORD="test", MT5_SERVER="test")
-    return RiskEngine(cfg, 10000.0)
+    return RiskManager(cfg, 10000.0)
 
 def test_drawdown_breaker(risk_engine):
-    risk_engine.update_metrics(6000.0) # 40% drawdown
-    assert not risk_engine._check_drawdown_breaker()
+    risk_engine.update_equity(6000.0) # 40% drawdown
+    assert not risk_engine._check_circuit_breaker()
 
 def test_daily_loss_breaker(risk_engine):
-    risk_engine.update_metrics(10000.0, realized_pnl=-600.0) # 6% loss
+    risk_engine.update_equity(10000.0); risk_engine.record_pnl(-600.0) # 6% loss
     assert risk_engine.get_daily_loss_level() >= 4
 
 def test_calculate_position_size(risk_engine):

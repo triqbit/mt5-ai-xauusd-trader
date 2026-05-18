@@ -137,9 +137,7 @@ class RiskManager:
 
         # Layer 6: Prediction Limits
         if not self._check_minimum_confidence(signal.confidence):
-            return RiskDecision(
-                False, f"Confidence {signal.confidence:.2f} too low"
-            )
+            return RiskDecision(False, f"Confidence {signal.confidence:.2f} too low")
 
         # Layer 7: Risk-Reward Validation
         if not self._check_risk_reward(signal):
@@ -180,7 +178,7 @@ class RiskManager:
 
         passed = all(decision.values())
         if not passed:
-            rejection_reason = [k for k, v in decision.items() if not v][0]
+            rejection_reason = next(k for k, v in decision.items() if not v)
             logger.warning(
                 "Signal REJECTED",
                 symbol=signal.symbol,
@@ -331,10 +329,14 @@ class RiskManager:
         calibration = float(health.get("calibration", 0.0))
 
         if drift > self.cfg.model_drift_threshold:
-            logger.warning("Model drift too high", drift=drift, threshold=self.cfg.model_drift_threshold)
+            logger.warning(
+                "Model drift too high", drift=drift, threshold=self.cfg.model_drift_threshold
+            )
             return False
         if accuracy < self.cfg.model_accuracy_floor:
-            logger.warning("Model accuracy too low", accuracy=accuracy, floor=self.cfg.model_accuracy_floor)
+            logger.warning(
+                "Model accuracy too low", accuracy=accuracy, floor=self.cfg.model_accuracy_floor
+            )
             return False
         if calibration > self.cfg.model_calibration_threshold:
             logger.warning(
@@ -421,8 +423,13 @@ class RiskManager:
         self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
     ) -> bool:
         """Total notional < 100% equity."""
-        total_lots = sum(pos.get("volume", pos.get("lot_size", 0.0)) for pos in open_positions) + self.cfg.min_lot_size
-        price = float(market_data["close"].iloc[-1]) if not market_data.empty else signal.entry_price
+        total_lots = (
+            sum(pos.get("volume", pos.get("lot_size", 0.0)) for pos in open_positions)
+            + self.cfg.min_lot_size
+        )
+        price = (
+            float(market_data["close"].iloc[-1]) if not market_data.empty else signal.entry_price
+        )
         total_notional = total_lots * price * 100
         return total_notional < (self.balance * self.cfg.max_total_notional_pct)
 

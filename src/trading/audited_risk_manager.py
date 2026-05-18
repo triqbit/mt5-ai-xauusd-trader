@@ -37,9 +37,7 @@ class AuditedRiskManager(RiskManager):
         """
         Run the full 8-layer risk filter cascade with audit logging.
         """
-        decision = super().validate_signal(
-            signal, market_data, open_positions, model_health
-        )
+        decision = super().validate_signal(signal, market_data, open_positions, model_health)
 
         # Detailed chain for audit logging
         decision_chain = {
@@ -82,9 +80,10 @@ class AuditedRiskManager(RiskManager):
         except Exception:
             logger.debug("AuditLogger not available for risk decision logging")
 
-        if not decision.is_approved:
-            if self.monitor:
-                self.monitor.record_internal_rejection("risk_manager", decision.reason.upper().replace(" ", "_"))
+        if not decision.is_approved and self.monitor:
+            self.monitor.record_internal_rejection(
+                "risk_manager", decision.reason.upper().replace(" ", "_")
+            )
 
         return decision
 

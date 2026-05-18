@@ -22,21 +22,16 @@ def test_monitor_logging_fix():
     # This should not raise TypeError anymore due to proxy_to_logger positional args
     monitor.send_message("test message")
 
+
 def test_strategy_config_validation():
     """Verify StrategyConfig enforces gt=0 for capital_cap."""
     # This should pass
-    StrategyConfig(
-        strategy_id="TEST",
-        symbol="XAUUSD",
-        model_family="ensemble",
-        capital_cap=100.0
-    )
+    StrategyConfig(strategy_id="TEST", symbol="XAUUSD", model_family="ensemble", capital_cap=100.0)
 
     # This should fail validation
-    with pytest.raises(Exception):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
         StrategyConfig(
-            strategy_id="TEST",
-            symbol="XAUUSD",
-            model_family="ensemble",
-            capital_cap=0.0
+            strategy_id="TEST", symbol="XAUUSD", model_family="ensemble", capital_cap=0.0
         )
