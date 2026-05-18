@@ -639,6 +639,27 @@ class TestRegimeDetector(unittest.TestCase):
         # idx[40] is roughly 10:00
         self.assertEqual(df["session_alignment"].iloc[40], 0.8)
 
+    def test_print_transition_matrix_safe(self):
+        """Verify that print_transition_matrix handles None and populated states."""
+        # 1. None state - since we use structlog, we check caplog if possible
+        # but for this test we'll just ensure it doesn't crash as we've verified the output manually.
+        self.detector.print_transition_matrix()
+
+        # 2. Populated state
+        np.random.seed(42)
+        data = pd.DataFrame(
+            {
+                "close": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "high": 2001.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "low": 1999.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "open": 2000.0 + np.cumsum(np.random.randn(100) * 0.1),
+                "tick_volume": np.full(100, 100.0),
+            }
+        )
+        self.detector.fit(data, n_clusters=2)
+        # Should not raise exception
+        self.detector.print_transition_matrix()
+
 
 if __name__ == "__main__":
     unittest.main()
