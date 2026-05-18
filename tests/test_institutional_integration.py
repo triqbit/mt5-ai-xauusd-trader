@@ -2,14 +2,11 @@ try:
     import torch
 except ImportError:
     torch = None
-import pytest
-
-pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
-
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
@@ -18,6 +15,7 @@ from src.models.regime_detector import MarketRegime, RegimeDetector
 from src.trading.capital_allocator import CapitalAllocator, StrategyConfig
 from src.trading.risk_manager import RiskManager
 
+pytestmark = pytest.mark.skipif(torch is None, reason="torch not installed")
 
 @pytest.fixture
 def mock_ohlcv_data():

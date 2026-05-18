@@ -653,6 +653,147 @@ class ADXStrategy:
         return signals
 
 
+class SuperTrendStrategy:
+    """
+    SuperTrend baseline strategy.
+
+    A trend-following indicator that uses ATR to define bands around the
+    median price. It switches direction when the close price crosses the bands.
+    """
+
+    def __init__(self, window: int = 10, multiplier: float = 3.0):
+        """
+        Initialize the SuperTrend strategy.
+
+        Args:
+            window: Period for ATR calculation.
+            multiplier: Multiplier for the ATR-based offset.
+        """
+        self.window = window
+        self.multiplier = multiplier
+
+    @property
+    def name(self) -> str:
+        return f"SuperTrend_{self.window}_{self.multiplier}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using SuperTrend logic.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
+        high = df["high"].values
+        low = df["low"].values
+        close = df["close"].values
+
+        # Median Price
+        hl2 = (high + low) / 2
+
+        # ATR calculation
+        tr1 = high - low
+        prev_close = pd.Series(close).shift(1).values
+        tr2 = np.abs(high - prev_close)
+        tr3 = np.abs(low - prev_close)
+        tr = np.nan_to_num(np.maximum(tr1, np.maximum(tr2, tr3)), nan=tr1[0])
+        atr = pd.Series(tr).rolling(window=self.window).mean().values
+
+        upper_band = hl2 + (self.multiplier * atr)
+        lower_band = hl2 - (self.multiplier * atr)
+
+        signals = np.zeros(len(df))
+        trend = 1  # 1 for UP, -1 for DOWN
+
+        # Refined SuperTrend logic to prevent bands from moving unfavorably
+        for i in range(self.window, len(df)):
+            if close[i - 1] > upper_band[i - 1]:
+                trend = 1
+            elif close[i - 1] < lower_band[i - 1]:
+                trend = -1
+
+            if trend == 1:
+                if lower_band[i] < lower_band[i - 1]:
+                    lower_band[i] = lower_band[i - 1]
+                signals[i] = 1.0
+            else:
+                if upper_band[i] > upper_band[i - 1]:
+                    upper_band[i] = upper_band[i - 1]
+                signals[i] = -1.0
+
+        return signals
+
+
+class LondonBreakoutStrategy:
+    """
+    London Breakout baseline strategy.
+
+    Trades the breakout of the Asian session range (usually 00:00 to 08:00 GMT).
+    Specifically optimized for XAUUSD which often has high volatility at London open.
+    """
+
+    def __init__(self, range_start: str = "00:00", range_end: str = "08:00"):
+        """
+        Initialize the London Breakout strategy.
+
+        Args:
+            range_start: Start of the range definition period (HH:MM).
+            range_end: End of the range definition period (HH:MM).
+        """
+        self.range_start = range_start
+        self.range_end = range_end
+
+    @property
+    def name(self) -> str:
+        return f"London_Breakout_{self.range_start.replace(':', '')}_{self.range_end.replace(':', '')}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using London Breakout logic.
+
+        Args:
+            df: OHLCV DataFrame with DatetimeIndex.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
+        if not isinstance(df.index, pd.DatetimeIndex):
+            return np.zeros(len(df))
+
+        signals = np.zeros(len(df))
+
+        # Group by day to handle each daily breakout independently
+        for _, day_data in df.groupby(df.index.date):
+            # Identify the range definition session
+            session_range = day_data.between_time(self.range_start, self.range_end)
+            if session_range.empty:
+                continue
+
+            high_target = session_range["high"].max()
+            low_target = session_range["low"].min()
+
+            # Analyze price action after the range period
+            after_range = day_data[day_data.index > session_range.index[-1]]
+
+            day_end_pos = df.index.get_loc(day_data.index[-1])
+
+            for idx, row in after_range.iterrows():
+                # Locate position in original signal array
+                pos = df.index.get_loc(idx)
+                if row["close"] > high_target:
+                    # Maintain signal until end of trading day
+                    signals[pos : day_end_pos + 1] = 1.0
+                    break  # One breakout trade per day
+                elif row["close"] < low_target:
+                    # Maintain signal until end of trading day
+                    signals[pos : day_end_pos + 1] = -1.0
+                    break
+
+        return signals
+
+
 class BenchmarkEvaluator:
     """
     Evaluates multiple strategies and generates comparative reports.
@@ -844,6 +985,7 @@ class BenchmarkEvaluator:
 
         calmar = total_return / max_drawdown if max_drawdown > 0 else 0.0
         common_sense_ratio = tail_ratio * (profit_factor if profit_factor != float("inf") else 1.0)
+        omega_ratio = gain_to_pain  # Threshold of 0.0
 
         # Store daily returns for statistical testing
         self.results[name + "_returns"] = daily_returns
@@ -869,6 +1011,7 @@ class BenchmarkEvaluator:
             "Tail Ratio": tail_ratio,
             "Common Sense Ratio": common_sense_ratio,
             "Gain to Pain Ratio": gain_to_pain,
+            "Omega Ratio": omega_ratio,
             "Lake Ratio": lake_ratio,
             "Stability Score": float(stability_score),
         }
@@ -915,6 +1058,15 @@ class BenchmarkEvaluator:
 
         outperformance = s_metrics["Total Return"] - b_metrics["Total Return"]
         sharpe_diff = s_metrics["Sharpe Ratio"] - b_metrics["Sharpe Ratio"]
+
+        # Information Ratio: (Rp - Rb) / TrackingError
+        diff_returns = s_final - b_final
+        avg_diff = np.mean(diff_returns)
+        std_diff = np.std(diff_returns)
+        info_ratio = (
+            (avg_diff / std_diff * np.sqrt(self.bars_per_year)) if std_diff > 1e-12 else 0.0
+        )
+
         note = ""
 
         # Check for zero-variance differences to prevent NaN in statistical tests
@@ -945,6 +1097,7 @@ class BenchmarkEvaluator:
         return {
             "Outperformance": outperformance,
             "Sharpe Improvement": sharpe_diff,
+            "Information Ratio": info_ratio,
             "Relative Return": outperformance / (abs(b_metrics["Total Return"]) + 1e-9),
             "T-Statistic": t_stat,
             "P-Value": p_value,
@@ -987,6 +1140,8 @@ class BenchmarkEvaluator:
                     lake_ratio=f"{metrics.get('Lake Ratio', 0.0):.2f}",
                     tail_ratio=f"{metrics.get('Tail Ratio', 0.0):.2f}",
                     common_sense_ratio=f"{metrics.get('Common Sense Ratio', 0.0):.2f}",
+                    information_ratio=f"{comp.get('Information Ratio', 0.0):.2f}",
+                    omega_ratio=f"{metrics.get('Omega Ratio', 0.0):.2f}",
                 )
             )
 

@@ -646,6 +646,8 @@
                 <th scope="col" title="Profit Factor: Gross Profit / Gross Loss.">PF</th>
                 <th scope="col" title="Recovery Factor: Net Profit / Max Drawdown.">Recov</th>
                 <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
+                <th scope="col" title="Information Ratio: (Return - Baseline Return) / Tracking Error.">IR</th>
+                <th scope="col" title="Omega Ratio: Probability-weighted gains vs losses. Threshold 0.">Omega</th>
                 <th scope="col" title="Ulcer Index: measures drawdown stress (lower is better).">Ulcer</th>
                 <th scope="col" title="Lake Ratio: Ratio of time in drawdown to total time.">Lake</th>
                 <th scope="col" title="Tail Ratio: Ratio of 95th to 5th percentile returns.">Tail</th>
@@ -664,6 +666,8 @@
                 <td>{{ b.profit_factor }}</td>
                 <td>{{ b.recovery_factor }}</td>
                 <td>{{ b.sqn }}</td>
+                <td>{{ b.information_ratio }}</td>
+                <td>{{ b.omega_ratio }}</td>
                 <td>{{ b.ulcer_index }}</td>
                 <td>{{ b.lake_ratio }}</td>
                 <td>{{ b.tail_ratio }}</td>

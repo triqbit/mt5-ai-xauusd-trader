@@ -8,11 +8,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import scripts.doctor as doctor
+
 # Add root to sys.path to allow importing scripts.doctor
 root = Path(__file__).resolve().parents[1]
 sys.path.append(str(root))
 
-import scripts.doctor as doctor
 
 
 def test_check_python_version():
@@ -52,8 +53,7 @@ def test_check_env_file_missing():
 def test_check_env_file_placeholders():
     """Verify .env check warns about placeholders."""
     mock_content = "MT5_PASSWORD=YOUR_PASSWORD_HERE\nMT5_SERVER=test"
-    with patch("scripts.doctor.Path.exists", return_value=True):
-        with patch("builtins.open", MagicMock(return_value=MagicMock(__enter__=MagicMock(return_value=MagicMock(read=MagicMock(return_value=mock_content)))))):
+    with patch("scripts.doctor.Path.exists", return_value=True), patch("builtins.open", MagicMock(return_value=MagicMock(__enter__=MagicMock(return_value=MagicMock(read=MagicMock(return_value=mock_content)))))):
             res = doctor.check_env_file()
             assert res.status == "WARNING"
             assert "YOUR_PASSWORD_HERE" in res.message
@@ -74,8 +74,7 @@ def test_check_file_permissions_linux():
     mock_stat = MagicMock()
     mock_stat.st_mode = 0o666 # Insecure
 
-    with patch("scripts.doctor.Path.exists", return_value=True):
-        with patch("scripts.doctor.os.stat", return_value=mock_stat):
+    with patch("scripts.doctor.Path.exists", return_value=True), patch("scripts.doctor.os.stat", return_value=mock_stat):
             res = doctor.check_file_permissions()
             assert res.status == "WARNING"
             assert "Insecure" in res.message

@@ -158,6 +158,7 @@ def main():
         ("CVaR_95", "{:.2%}", True),
         ("Ulcer Index", "{:.4f}", False),
         ("Stability Score", "{:.2f}", True),
+        ("Omega Ratio", "{:.2f}", True),
     ]
 
     for label, fmt, higher_is_better in metrics_to_show:
@@ -187,7 +188,7 @@ def main():
     table_sig = Table()
     table_sig.add_column("Test")
     table_sig.add_column("Result")
-    table_sig.add_column("P-Value")
+    table_sig.add_column("P-Value / Metric")
     table_sig.add_column("Status")
 
     t_p = comp.get("P-Value", 1.0)
@@ -198,6 +199,7 @@ def main():
 
     table_sig.add_row("Paired T-test", f"t={comp.get('T-Statistic', 0):.4f}", f"{t_p:.4f}", t_status)
     table_sig.add_row("Wilcoxon Signed-Rank", "N/A", f"{w_p:.4f}", w_status)
+    table_sig.add_row("Information Ratio", "N/A", f"{comp.get('Information Ratio', 0.0):.4f}", "N/A")
 
     console.print(table_sig)
 

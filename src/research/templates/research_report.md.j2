@@ -179,10 +179,10 @@
 {% if benchmarks %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Benchmark Comparisons
-| Strategy | Return | Sharpe | MaxDD | CVaR | PF | Recov | SQN | Ulcer | Lake | Tail | CSR | P-Value |
-|----------|--------|--------|-------|------|----|-------|-----|-------|------|------|-----|---------|
+| Strategy | Return | Sharpe | MaxDD | CVaR | PF | Recov | SQN | IR | Omega | Ulcer | Lake | Tail | CSR | P-Value |
+|----------|--------|--------|-------|------|----|-------|-----|----|-------|-------|------|------|-----|---------|
 {% for b in benchmarks.comparisons %}
-| {{ b.name }} | {{ b.total_return }} | {{ b.sharpe }} | {{ b.max_drawdown }} | {{ b.expected_shortfall }} | {{ b.profit_factor }} | {{ b.recovery_factor }} | {{ b.sqn }} | {{ b.ulcer_index }} | {{ b.lake_ratio }} | {{ b.tail_ratio }} | {{ b.common_sense_ratio }} | {{ b.p_value }} |
+| {{ b.name }} | {{ b.total_return }} | {{ b.sharpe }} | {{ b.max_drawdown }} | {{ b.expected_shortfall }} | {{ b.profit_factor }} | {{ b.recovery_factor }} | {{ b.sqn }} | {{ b.information_ratio }} | {{ b.omega_ratio }} | {{ b.ulcer_index }} | {{ b.lake_ratio }} | {{ b.tail_ratio }} | {{ b.common_sense_ratio }} | {{ b.p_value }} |
 {% endfor %}
 
 **Statistical Significance:**
