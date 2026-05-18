@@ -68,6 +68,7 @@ backups/
 # Database
 *.db
 !trades.db.example
+file:*
 
 # IDE
 .vscode/

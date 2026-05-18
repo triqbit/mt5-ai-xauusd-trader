@@ -6,9 +6,9 @@ This dashboard provides real-time visibility into the technical health, process 
 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
-| **CI Success Rate** | 🟢 95% | RC v1.1.0-rc5 verified and stable. |
-| **Lint Debt** | 🟡 4,400+ Issues | Primarily un-sorted imports and unused variables in tests. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (19 consecutive days). |
+| **CI Success Rate** | 🟡 99% | 931/940 tests passing; 9 regressions in RiskManager and Reporting. |
+| **Lint Debt** | 🟡 4,400+ Issues | 61 critical ruff errors detected in latest graft. |
+| **Process Integrity** | 🔴 RED | 20 days of history destruction; untracked artifacts cleaned. |
 | **Evidence Maturity** | 🟡 Emerging | 1 verified audit; 5 upcoming enterprise scorecards. |
 
 ---
@@ -17,8 +17,9 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 🧪 CI & Testing
 - **Latest Release Candidate:** v1.1.0-rc5
-- **Test Coverage Target:** >80% (Current: Maintaining coverage above threshold)
-- **Primary Bottleneck:** Environment stability (dependency conflicts in `requirements-linux.txt`).
+- **Test Results (2026-05-18):** 931 passed, 9 failed.
+- **Regressions:** `RiskManager` interface mismatch and `python-socketio` dependency synchronization failure (5.14.0 vs 5.11.1).
+- **Primary Bottleneck:** Interface drift between core logic and harmonized tests following monolithic grafts.
 
 ### 🧹 Code Quality (Ruff)
 - **Total Errors:** 4,400+
@@ -30,7 +31,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
-- **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes in trading and risk modules. Nineteenth consecutive day of history destruction recorded on 2026-05-17, with PR #1286 executing the latest system-wide swap.
+- **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes in trading and risk modules. Twentieth consecutive day of history destruction recorded on 2026-05-18, with PR #1331 executing the latest system-wide swap.
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
