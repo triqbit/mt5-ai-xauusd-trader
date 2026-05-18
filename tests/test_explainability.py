@@ -300,6 +300,9 @@ def test_signal_explainer_feature_clustering():
     momentum = next(c for c in explanation.feature_contributions if c.cluster_name == "Momentum")
     assert momentum.contribution_score == 0.7  # (0.8 + 0.6) / 2
     assert momentum.impact_level == "High"
+    assert "Top drivers:" in momentum.summary
+    assert "base_M5_rsi (+0.80)" in momentum.summary
+    assert "base_M5_macd (+0.60)" in momentum.summary
 
 
 def test_signal_explainer_new_keywords_categorization():

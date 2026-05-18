@@ -267,6 +267,8 @@ class SignalExplainer:
             "log_returns",
             "dist_ema",
             "dist_vwap",
+            "efficiency_ratio",
+            "z_score",
         ],
         "Volatility": [
             "atr",
@@ -278,9 +280,13 @@ class SignalExplainer:
             "ht_sine",
             "body_size",
             "day_range",
+            "vol_of_vol",
+            "vol_clustering",
+            "kurtosis",
+            "skewness",
         ],
         "Trend": ["slope", "ema", "adx", "ht_"],
-        "Volume": ["vol", "obv", "vwap", "vpt", "vp_", "rvol", "vol_sma_20"],
+        "Volume": ["vol", "obv", "vwap", "vpt", "vp_", "rvol", "vol_sma_20", "volume_ratio"],
         "Patterns": ["pattern_"],
     }
 
@@ -547,32 +553,39 @@ class SignalExplainer:
                 if isinstance(fi, dict)
             ]
         elif isinstance(feature_impacts, dict):
-            cluster_scores: dict[str, list[float]] = {k: [] for k in self.FEATURE_MAPPING}
-            cluster_scores["Other"] = []
+            cluster_data: dict[str, list[tuple[str, float]]] = {k: [] for k in self.FEATURE_MAPPING}
+            cluster_data["Other"] = []
 
             for feat, score in feature_impacts.items():
                 found = False
                 for cluster, keywords in self.FEATURE_MAPPING.items():
                     if any(kw in feat.lower() for kw in keywords):
-                        cluster_scores[cluster].append(score)
+                        cluster_data[cluster].append((feat, score))
                         found = True
                         break
                 if not found:
-                    cluster_scores["Other"].append(score)
+                    cluster_data["Other"].append((feat, score))
 
-            for cluster, scores in cluster_scores.items():
-                if not scores:
+            for cluster, items in cluster_data.items():
+                if not items:
                     continue
+
+                scores = [item[1] for item in items]
                 avg_score = sum(scores) / len(scores)
                 abs_avg = abs(avg_score)
                 impact = "High" if abs_avg > 0.6 else "Medium" if abs_avg > 0.3 else "Low"
+
+                # Identify top drivers by absolute contribution for institutional transparency
+                sorted_items = sorted(items, key=lambda x: abs(x[1]), reverse=True)
+                top_drivers = [f"{name} ({score:+.2f})" for name, score in sorted_items[:3]]
+                summary = f"Aggregate impact from {len(items)} features. Top drivers: {', '.join(top_drivers)}"
 
                 contributions.append(
                     FeatureContribution(
                         cluster_name=cluster,
                         contribution_score=avg_score,
                         impact_level=impact,
-                        summary=f"Aggregate impact from {len(scores)} {cluster.lower()} features",
+                        summary=summary,
                     )
                 )
 
@@ -586,12 +599,36 @@ class SignalExplainer:
         strategic_edge = ""
         if "trending" in regime_lower:
             strategic_edge = (
-                "Trending regimes provide high-velocity environments for momentum models."
+                "Trending regimes provide high-velocity environments for momentum models, "
+                "favoring persistent directional strength."
             )
         elif "ranging" in regime_lower:
-            strategic_edge = "Mean-reversion setups are prioritized in ranging regimes."
+            strategic_edge = (
+                "Mean-reversion setups are prioritized in ranging regimes, "
+                "where price oscillates within established liquidity corridors."
+            )
+        elif "volatile_breakout" in regime_lower:
+            strategic_edge = (
+                "Breakout regimes signal high-momentum expansions; "
+                "models prioritize volatility-adjusted entries with tight trailing protection."
+            )
+        elif "low_volatility_drift" in regime_lower:
+            strategic_edge = (
+                "Quiet drift regimes require high precision; models favor steady "
+                "low-volatility trends with minimal slippage impact."
+            )
+        elif "news_shock" in regime_lower:
+            strategic_edge = (
+                "News shocks trigger extreme non-linear price dislocations; "
+                "automated execution is typically restricted to preserve capital."
+            )
+        elif "mean_reversion" in regime_lower:
+            strategic_edge = (
+                "Overextended price states indicate corrective snap-back potential; "
+                "contrarian signals are given higher weight in this context."
+            )
         elif "volatile" in regime_lower:
-            strategic_edge = "Elevated volatility requires tighter execution gates."
+            strategic_edge = "Elevated volatility requires tighter execution gates and reduced sizing."
         else:
             strategic_edge = "Market state stable, following base ensemble consensus."
 
