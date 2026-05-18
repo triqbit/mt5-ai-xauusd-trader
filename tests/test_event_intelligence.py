@@ -238,10 +238,10 @@ def test_json_provider(tmp_path, now):
     assert events[0].impact == EventImpact.HIGH
 
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider(mock_get_client, now):
     mock_client = MagicMock()
-    mock_init_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
     mock_get = mock_client.get
 
     mock_response = MagicMock()
@@ -301,10 +301,10 @@ def test_guess_category_new_keywords():
     assert provider._guess_category("US Treasury Bond Auction") == EventCategory.USD_MACRO
 
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider_filtering(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider_filtering(mock_get_client, now):
     mock_client = MagicMock()
-    mock_init_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
     mock_get = mock_client.get
 
     mock_response = MagicMock()
@@ -363,10 +363,10 @@ def test_json_provider_error(tmp_path):
     assert provider.get_upcoming_events(datetime.now(), datetime.now()) is None
 
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider_error(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider_error(mock_get_client, now):
     mock_client = MagicMock()
-    mock_init_client.return_value = mock_client
+    mock_get_client.return_value = mock_client
     mock_get = mock_client.get
 
     mock_get.side_effect = Exception("Network Error")

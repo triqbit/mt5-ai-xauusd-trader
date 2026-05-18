@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
     from src.models.base_model import BaseModel
+    from src.data.event_intelligence import EventIntelligence
     from src.models.regime_detector import RegimeDetector
     from src.trading.capital_allocator import CapitalAllocator
     from src.trading.execution_filter import ExecutionFilter
@@ -108,6 +109,7 @@ def _prepare_trade_signal(
     risk: "RiskManager",
     allocator: "CapitalAllocator",
     audit_logger: Optional["AuditLogger"] = None,
+    risk_multiplier: float = 1.0,
 ) -> "TradeSignal":
     """
     Consolidated helper to calculate stop-loss, take-profit, and lot-size
@@ -153,6 +155,17 @@ def _prepare_trade_signal(
         else 0.0
     )
 
+    # 4. Apply Macro Risk Multiplier
+    if risk_multiplier < 1.0:
+        old_lot = lot_size
+        lot_size = round(lot_size * risk_multiplier, 2)
+        log.info(
+            "Macro risk reduction applied",
+            multiplier=risk_multiplier,
+            old_lot=old_lot,
+            new_lot=lot_size,
+        )
+
     return TradeSignal(
         symbol=cfg.symbol,
         direction=direction,
@@ -171,6 +184,7 @@ def run_live(
     risk: "RiskManager",
     model: "BaseModel",
     execution_filter: "ExecutionFilter",
+    event_intelligence: "EventIntelligence",
     feature_engineer: "FeatureEngineer",
     regime_detector: "RegimeDetector",
     allocator: "CapitalAllocator",
@@ -391,6 +405,9 @@ def run_live(
                 # 4. Signal Preparation & Institutional Risk
                 price = tick["ask"] if direction == 1 else tick["bid"]
 
+                # 4.1 Fetch Macro Risk Context
+                macro_risk = event_intelligence.get_risk_status(datetime.now(timezone.utc))
+
                 # Optimization: Extract ATR from already-computed features to avoid redundant calculation
                 atr_col = f"base_{cfg.timeframe}_atr"
                 if atr_col in df_features.columns:
@@ -408,6 +425,7 @@ def run_live(
                         risk=risk,
                         allocator=allocator,
                         audit_logger=audit_logger,
+                        risk_multiplier=macro_risk.risk_multiplier,
                     )
                 lot_size = signal.lot_size
 
@@ -516,7 +534,7 @@ def run_live(
                             audit_logger.log(
                                 actor="system",
                                 action="decision_explanation",
-                                details=f"Decision trace for {cfg.symbol}: {explanation.get('summary', 'No summary')}",
+                                details=f"Decision trace for {cfg.symbol}: {explanation.human_readable_summary}",
                                 metadata={
                                     "symbol": cfg.symbol,
                                     "direction": direction,
@@ -524,13 +542,9 @@ def run_live(
                                     "risk_data": risk_data,
                                     "regime_data": regime_data,
                                     "execution_data": execution_data,
+                                    "macro_risk": macro_risk.model_dump(mode="json"),
                                 },
                             )
-
-                        # Use a stub for macro risk since we don't have a live feed in this loop yet
-                        macro_risk = RiskStatus(
-                            is_blocked=False, active_events=[], reason="No active data"
-                        )
 
                         # Optimization: Use real performance metrics from TradeLogger
                         if trade_logger:
@@ -1471,6 +1485,11 @@ def main() -> int:
     from src.models.ensemble import EnsembleModel
     from src.models.lstm_model import LSTMModel
     from src.models.ppo_agent import PPOAgent
+    from src.data.event_intelligence import (
+        EventIntelligence,
+        MetaAPIEventProvider,
+        TradingViewEventProvider,
+    )
     from src.models.regime_detector import RegimeDetector
     from src.models.transformer_model import TimeSeriesTransformer
     from src.trading.audited_risk_manager import AuditedRiskManager
@@ -1483,9 +1502,23 @@ def main() -> int:
     )
 
     risk = AuditedRiskManager(cfg, account_balance=balance, logger_db=trade_logger, monitor=monitor)
+
+    # 5. Initialize Macro Intelligence
+    providers = []
+    if cfg.metaapi_token:
+        providers.append(MetaAPIEventProvider(token=cfg.metaapi_token.get_secret_value()))
+
+    # Always include TradingView mock as a baseline/fallback for deterministic patterns
+    providers.append(TradingViewEventProvider())
+
+    event_intelligence = EventIntelligence(
+        providers=providers, fail_safe_blocked=False, config=cfg
+    )
+
     execution_filter = ExecutionFilter(
         max_drawdown=cfg.max_drawdown if hasattr(cfg, "max_drawdown") else 0.15,
         config=cfg,
+        event_intelligence=event_intelligence,
         monitor=monitor,
     )
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe)
@@ -1627,6 +1660,7 @@ def main() -> int:
                 risk,
                 model,
                 execution_filter,
+                event_intelligence,
                 feature_engineer,
                 regime_detector,
                 allocator,
@@ -1648,6 +1682,8 @@ def main() -> int:
             )
         if connector._is_initialized:
             connector.disconnect()
+        if event_intelligence:
+            event_intelligence.close()
         if audit_logger:
             audit_logger.log_operator_action(
                 operator="system",

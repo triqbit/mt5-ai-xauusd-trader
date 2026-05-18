@@ -25,6 +25,7 @@ __all__ = [
     "EventCategory",
     "EventImpact",
     "EventIntelligence",
+    "CSVEventProvider",
     "GeopoliticalEventProvider",
     "JSONEventProvider",
     "MacroEvent",
@@ -96,6 +97,61 @@ class JSONEventProvider(BaseEventProvider):
             return events
         except Exception as e:
             logger.error(f"Error reading JSON events: {e}")
+            return None
+
+
+class CSVEventProvider(BaseEventProvider):
+    """Provider that reads events from a local CSV file."""
+
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+
+    def get_upcoming_events(
+        self, start_time: datetime, end_time: datetime
+    ) -> list[MacroEvent] | None:
+        import csv
+        import os
+
+        if not os.path.exists(self.file_path):
+            logger.warning(f"Event file {self.file_path} not found.")
+            return None
+
+        try:
+            events = []
+            with open(self.file_path, newline="") as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    # Basic conversion for CSV rows
+                    item = {
+                        "name": row["name"],
+                        "category": row.get("category", EventCategory.OTHER.value),
+                        "impact": int(row.get("impact", 1)),
+                        "timestamp": row["timestamp"],
+                    }
+                    if row.get("end_timestamp"):
+                        item["end_timestamp"] = row["end_timestamp"]
+                    if row.get("actual"):
+                        item["actual"] = float(row["actual"])
+                    if row.get("forecast"):
+                        item["forecast"] = float(row["forecast"])
+                    if row.get("previous"):
+                        item["previous"] = float(row["previous"])
+
+                    # CSV timestamps might be naive, assume UTC
+                    ts = row["timestamp"]
+                    if "T" not in ts and " " in ts:
+                        ts = ts.replace(" ", "T")
+
+                    item["timestamp"] = ts
+
+                    event = MacroEvent(**item)
+                    if (
+                        event.end_timestamp or event.timestamp
+                    ) >= start_time and event.timestamp <= end_time:
+                        events.append(event)
+            return events
+        except Exception as e:
+            logger.error(f"Error reading CSV events: {e}")
             return None
 
 
@@ -232,13 +288,20 @@ class MetaAPIEventProvider(BaseEventProvider):
             "high": EventImpact.HIGH,
             "critical": EventImpact.CRITICAL,
         }
-        self._client = self._init_client()
+        self._client: httpx.Client | None = None
 
-    def _init_client(self) -> httpx.Client:
-        return httpx.Client(
-            timeout=httpx.Timeout(15.0, connect=5.0),
-            limits=httpx.Limits(max_connections=5, max_keepalive_connections=2),
-        )
+    def _get_client(self) -> httpx.Client:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.Client(
+                timeout=httpx.Timeout(15.0, connect=5.0),
+                limits=httpx.Limits(max_connections=5, max_keepalive_connections=2),
+            )
+        return self._client
+
+    def close(self) -> None:
+        """Closes the underlying HTTP client."""
+        if self._client and not self._client.is_closed:
+            self._client.close()
 
     def get_upcoming_events(
         self, start_time: datetime, end_time: datetime
@@ -259,7 +322,8 @@ class MetaAPIEventProvider(BaseEventProvider):
                 start_time=start_time.isoformat(),
                 end_time=end_time.isoformat(),
             )
-            response = self._client.get(url, params=params, headers=headers)
+            client = self._get_client()
+            response = client.get(url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
 
@@ -312,7 +376,10 @@ class MetaAPIEventProvider(BaseEventProvider):
     def _guess_category(self, name: str) -> EventCategory:
         """Guesses the event category based on the event name."""
         name_upper = name.upper()
-        if any(kw in name_upper for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI"]):
+        if any(
+            kw in name_upper
+            for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI", "COST OF LIVING"]
+        ):
             return EventCategory.CPI
         if any(
             kw in name_upper
@@ -324,13 +391,23 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "JOBLESS",
                 "JOBLESS CLAIMS",
                 "ADP",
+                "LABOR MARKET",
+                "LABOUR MARKET",
             ]
         ):
             return EventCategory.NFP
         if (
             any(
                 kw in name_upper
-                for kw in ["FOMC", "FED ", "FEDERAL RESERVE", "POWELL", "DOT PLOT", "BEIGE BOOK"]
+                for kw in [
+                    "FOMC",
+                    "FED ",
+                    "FEDERAL RESERVE",
+                    "POWELL",
+                    "DOT PLOT",
+                    "BEIGE BOOK",
+                    "MONETARY POLICY REPORT",
+                ]
             )
             and "PHILLY FED" not in name_upper
         ):
@@ -368,6 +445,10 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "ATTACK",
                 "COUP",
                 "NUCLEAR",
+                "GEOPOLITICS",
+                "BARRAGE",
+                "INVASION",
+                "CEASEFIRE",
             ]
         ):
             return EventCategory.GEOPOLITICAL
@@ -393,6 +474,10 @@ class MetaAPIEventProvider(BaseEventProvider):
                 "OPEC",
                 "PERSONAL INCOME",
                 "SPENDING",
+                "SERVICES INDEX",
+                "BUSINESS CLIMATE",
+                "CONSUMER SENTIMENT",
+                "CORE PCE",
             ]
         ):
             return EventCategory.USD_MACRO
@@ -646,3 +731,9 @@ class EventIntelligence:
     def get_risk_multiplier(self, current_time: datetime | None = None) -> float:
         """Helper to get the current risk multiplier."""
         return self.get_risk_status(current_time).risk_multiplier
+
+    def close(self) -> None:
+        """Closes all underlying event providers."""
+        for provider in self.providers:
+            if hasattr(provider, "close") and callable(provider.close):
+                provider.close()

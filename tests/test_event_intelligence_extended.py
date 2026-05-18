@@ -16,10 +16,10 @@ from src.data.event_intelligence import (
 def now():
     return datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider_comprehensive(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider_comprehensive(mock_get_client, now):
     mock_session = MagicMock()
-    mock_init_client.return_value = mock_session
+    mock_get_client.return_value = mock_session
     mock_get = mock_session.get
 
     """Test MetaAPI provider with various event types and countries."""
@@ -164,11 +164,11 @@ def test_stricter_major_event_multipliers(now):
     # risk_multiplier must be 0.0 if is_blocked is True
     assert status_major.risk_multiplier == 0.0
 
-@patch("src.data.event_intelligence.MetaAPIEventProvider._init_client")
-def test_metaapi_provider_unsupported_impact(mock_init_client, now):
+@patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
+def test_metaapi_provider_unsupported_impact(mock_get_client, now):
     """Test fallback for unknown impact levels in MetaAPI."""
     mock_session = MagicMock()
-    mock_init_client.return_value = mock_session
+    mock_get_client.return_value = mock_session
     mock_get = mock_session.get
 
     mock_response = MagicMock()
