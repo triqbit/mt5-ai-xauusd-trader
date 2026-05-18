@@ -29,16 +29,16 @@ def test_setup_wizard_save_logic():
         example_content = "MT5_LOGIN=0\nMT5_PASSWORD=\nMT5_SERVER=\nSYMBOL=\nTIMEFRAME=\nMODE=\n"
         m = mock_open(read_data=example_content)
 
-        with patch("builtins.open", m):
+        with patch("builtins.open", m), patch("main.os.open", return_value=999), patch("main.os.fdopen", return_value=m.return_value):
             result = run_setup_wizard()
 
             assert result == 0
 
-            # Use writelines as in main.py
-            # Collect all lines from all writelines calls
+            # Use write as in main.py
+            # Collect all lines from all write calls
             written_lines = []
-            for call in m.return_value.writelines.call_args_list:
-                written_lines.extend(call.args[0])
+            for call in m.return_value.write.call_args_list:
+                written_lines.append(call.args[0])
 
             written_data = "".join(written_lines)
 
