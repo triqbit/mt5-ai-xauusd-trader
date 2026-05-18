@@ -30,6 +30,12 @@ Detects patterns indicative of psychological or systemic fragility:
 ### 4. Session & Volatility Analysis
 Breaks down performance by Sydney, Tokyo, London, and New York sessions, and segments outcomes by volatility buckets to identify regime-specific weaknesses.
 
+## Institutional Standards
+The engine utilizes industry-standard thresholds for anomaly detection:
+- **Z-Score Threshold (1.5):** Statistical significance for identifying session-based overtrading.
+- **Alpha Decay (30%):** A drop of 30% or more in the rolling Profit Factor triggers a strategy decay alert.
+- **Weak State Correlation (70%):** High correlation between risk blocks and drawdown clusters indicates systemic fragility.
+
 ## Usage
 The analytics are automatically integrated into the institutional research reporting pipeline.
 

@@ -206,7 +206,10 @@ class JournalReport(BaseModel):
             risks.append(
                 BehavioralRisk(
                     type="Overtrading",
-                    description=f"Statistical overtrading detected in sessions: {', '.join(overtrading_sessions)} (Z-score > 1.5).",
+                    description=(
+                        f"Statistical overtrading detected in sessions: {', '.join(overtrading_sessions)} "
+                        f"(Z-score > {JournalMiner.Z_SCORE_THRESHOLD})."
+                    ),
                 )
             )
 
@@ -239,7 +242,7 @@ class JournalReport(BaseModel):
 
         # High risk block correlation during weak states
         for block in self.risk_block_summary:
-            if block.weak_state_correlation > 0.7:
+            if block.weak_state_correlation > JournalMiner.WEAK_STATE_CORRELATION:
                 risks.append(
                     BehavioralRisk(
                         type="Strategy Fragility",
@@ -344,14 +347,15 @@ class JournalReport(BaseModel):
             )
 
         # Block Reasons linked to weak strategy states
-        weak_state_blocks = [b for b in self.risk_block_summary if b.weak_state_correlation > 0.6]
-        for block in weak_state_blocks:
-            risks.append(
-                BehavioralRisk(
-                    type="Cluster Warning",
-                    description=f"Block reason '{block.reason}' is highly correlated with weak strategy states ({block.weak_state_correlation:.1%}).",
+        # Cluster warning threshold is slightly lower than strict fragility
+        for block in self.risk_block_summary:
+            if block.weak_state_correlation > (JournalMiner.WEAK_STATE_CORRELATION - 0.1):
+                risks.append(
+                    BehavioralRisk(
+                        type="Cluster Warning",
+                        description=f"Block reason '{block.reason}' is highly correlated with weak strategy states ({block.weak_state_correlation:.1%}).",
+                    )
                 )
-            )
 
         primary_insight = "Strategy shows consistent performance across most sessions."
         if risks:
@@ -405,7 +409,22 @@ class JournalReport(BaseModel):
 
 
 class JournalMiner:
-    """Enterprise pattern recognition engine for trade journals."""
+    """
+    Enterprise pattern recognition engine for trade journals.
+
+    Analyzes executed and rejected trades to detect behavioral risks, strategy decay,
+    and recurring performance motifs. Implements institutional-grade statistical
+    checks including Z-score overtrading detection and alpha decay monitoring.
+    """
+
+    # Institutional Standard Thresholds
+    Z_SCORE_THRESHOLD = 1.5  # Statistical significance for overtrading
+    PF_DECAY_THRESHOLD = -0.3  # 30% drop in Profit Factor indicates alpha decay
+    WEAK_STATE_CORRELATION = 0.7  # High correlation between blocks and drawdowns
+    CONSECUTIVE_WINS_THRESHOLD = 3  # Threshold for checking overconfidence (greed)
+    REVENGE_WINDOW_MINS = 30  # Window for detecting tilt/revenge trading
+    PRE_DRAWDOWN_WINDOW_HOURS = 24  # Lookback for identifying pre-cluster motifs
+    DECAY_WINDOW_SIZE = 20  # Number of trades to check for alpha decay
 
     def __init__(self, db_url: str = "sqlite:///trades.db") -> None:
         self.engine = get_engine(db_url)
@@ -430,7 +449,12 @@ class JournalMiner:
         return active
 
     def get_session_stats(self, trades_df: pd.DataFrame) -> list[SessionAnalysis]:
-        """Detect overtrading and performance per session using Z-score statistics."""
+        """
+        Detect overtrading and performance per session using Z-score statistics.
+
+        Identifies sessions with statistically significant higher trade frequency than average,
+        which often correlates with impulsive behavior or 'revenge' sessions.
+        """
         if trades_df.empty:
             return []
 
@@ -480,14 +504,14 @@ class JournalMiner:
                 else (float("inf") if gross_profit > 0 else 0.0)
             )
 
-            # Institutional standard: Z-score > 1.5 indicates significant overtrading
+            # Institutional standard: Z-score > Z_SCORE_THRESHOLD indicates significant overtrading
             results.append(
                 SessionAnalysis(
                     session_name=name,
                     trade_count=trade_count,
                     win_rate=win_rate,
                     profit_factor=profit_factor,
-                    is_overtrading=z_score > 1.5,
+                    is_overtrading=z_score > self.Z_SCORE_THRESHOLD,
                     z_score=z_score,
                 )
             )
@@ -495,7 +519,12 @@ class JournalMiner:
         return results
 
     def analyze_volatility_patterns(self, signals_df: pd.DataFrame) -> list[VolatilityPattern]:
-        """Analyze false positives under specific volatility conditions."""
+        """
+        Analyze false positives under specific volatility conditions.
+
+        Categorizes market volatility into buckets and calculates the false positive rate
+        of signals to identify regimes where models may be prone to overfitting or noise.
+        """
         if signals_df.empty or "volatility" not in signals_df.columns:
             return []
 
@@ -543,7 +572,7 @@ class JournalMiner:
         return results
 
     def detect_overconfidence(
-        self, trades_df: pd.DataFrame, consecutive_wins_threshold: int = 3
+        self, trades_df: pd.DataFrame, consecutive_wins_threshold: int = CONSECUTIVE_WINS_THRESHOLD
     ) -> list[OverconfidenceEvent]:
         """
         Detect potential 'overconfidence' or greed.
@@ -592,7 +621,7 @@ class JournalMiner:
         return events
 
     def detect_revenge_trading(
-        self, trades_df: pd.DataFrame, window_minutes: int = 30
+        self, trades_df: pd.DataFrame, window_minutes: int = REVENGE_WINDOW_MINS
     ) -> list[RevengeTrade]:
         """
         Detect potential 'revenge trading' (tilt).
@@ -1017,7 +1046,7 @@ class JournalMiner:
         signals_df: pd.DataFrame,
         trades_df: pd.DataFrame = None,
         blocked_df: pd.DataFrame = None,
-        weak_state_window_hours: int = 24,
+        weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS,
     ) -> list[BlockReasonSummary]:
         """Summarize recurring risk block reasons with weak state correlation and efficiency."""
         if risk_events_df.empty:
@@ -1091,7 +1120,10 @@ class JournalMiner:
         return "Extreme"
 
     def detect_pre_drawdown_motifs(
-        self, signals_df: pd.DataFrame, trades_df: pd.DataFrame, window_hours: int = 6
+        self,
+        signals_df: pd.DataFrame,
+        trades_df: pd.DataFrame,
+        window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS,
     ) -> list[SignalMotif]:
         """
         Identify signal motifs that frequently occur shortly before a drawdown cluster.
@@ -1140,17 +1172,18 @@ class JournalMiner:
         self, signals_df: pd.DataFrame, trades_df: pd.DataFrame = None
     ) -> list[SignalMotif]:
         """
-        Find recurring motifs in signals, especially focusing on losing combinations.
+        Find recurring motifs in signals to identify robust performance clusters.
 
-        If trades_df is provided, it specifically highlights motifs found within drawdown clusters.
-        Motifs are scored by 'toxic potential', which favors high frequency and low win rates.
+        Identifies high-probability winning (Golden) and losing (Toxic) signal combinations
+        based on algorithm, direction, volatility, and session. If trades_df is provided,
+        it also tracks motif presence within historical drawdown clusters.
 
         Args:
             signals_df: DataFrame containing model signals.
             trades_df: Optional DataFrame of executed trades to identify cluster overlap.
 
         Returns:
-            Sorted list of SignalMotif objects, most toxic first.
+            Sorted list of SignalMotif objects, ordered by statistical significance.
         """
         if signals_df.empty or "volatility" not in signals_df.columns:
             return []
@@ -1284,7 +1317,7 @@ class JournalMiner:
         self,
         risk_events_df: pd.DataFrame,
         trades_df: pd.DataFrame,
-        window_hours: int = 24,
+        window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS,
     ) -> dict[str, float]:
         """
         Detect if risk blocks increase during 'weak strategy states'.
@@ -1460,13 +1493,14 @@ class JournalMiner:
         return results
 
     def analyze_performance_decay(
-        self, trades_df: pd.DataFrame, window_size: int = 20
+        self, trades_df: pd.DataFrame, window_size: int = DECAY_WINDOW_SIZE
     ) -> PerformanceDecay | None:
         """
         Detect rolling performance decay based on profit factor trends.
 
-        Analyzes the last N trades and compares their profit factor to the
-        preceding baseline to detect if the strategy alpha is degrading.
+        Analyzes alpha degradation by comparing the Profit Factor of recent trades
+        against a trailing baseline. Significant drops trigger a decay alert,
+        suggesting the strategy may no longer be aligned with current market regimes.
         """
         if trades_df.empty or len(trades_df) < window_size * 2:
             return None
@@ -1495,12 +1529,12 @@ class JournalMiner:
         return PerformanceDecay(
             window_size=window_size,
             profit_factor_trend=float(pf_trend),
-            is_decaying=pf_trend < -0.3,  # 30% drop in PF is significant decay
+            is_decaying=pf_trend < self.PF_DECAY_THRESHOLD,
             recent_pf=float(recent_pf),
             baseline_pf=float(baseline_pf),
         )
 
-    def run_mining(self, weak_state_window_hours: int = 24) -> JournalReport:
+    def run_mining(self, weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS) -> JournalReport:
         """Execute full mining suite and return typed report."""
         from src.core.trade_logger import BlockedSignalAnalysis
 
