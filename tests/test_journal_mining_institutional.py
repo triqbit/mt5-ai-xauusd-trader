@@ -1,12 +1,20 @@
-import pytest
-import pandas as pd
 from datetime import datetime, timezone
-from src.analytics.journal_mining import JournalMiner, JournalReport, PerformanceDecay, BlockReasonSummary
+
+import pandas as pd
+
+from src.analytics.journal_mining import (
+    BlockReasonSummary,
+    JournalMiner,
+    JournalReport,
+    PerformanceDecay,
+)
+
 
 def test_institutional_thresholds():
     assert JournalMiner.Z_SCORE_THRESHOLD == 1.5
     assert JournalMiner.PF_DECAY_THRESHOLD == -0.3
     assert JournalMiner.WEAK_STATE_CORRELATION == 0.7
+
 
 def test_overtrading_alert_z_score():
     miner = JournalMiner(db_url="sqlite:///:memory:")
@@ -25,6 +33,7 @@ def test_overtrading_alert_z_score():
     assert london.is_overtrading is True
     assert london.z_score > 1.5
 
+
 def test_alpha_decay_mapping():
     report = JournalReport(
         session_analysis=[],
@@ -37,14 +46,15 @@ def test_alpha_decay_mapping():
             profit_factor_trend=-0.35,
             is_decaying=True,
             recent_pf=0.8,
-            baseline_pf=1.23
-        )
+            baseline_pf=1.23,
+        ),
     )
 
     section = report.to_report_section()
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Alpha Decay" in risk_types
     assert "dropped by 35.0%" in section.behavioral_risks[0].description
+
 
 def test_strategy_fragility_mapping():
     report = JournalReport(
@@ -54,15 +64,12 @@ def test_strategy_fragility_mapping():
         profitable_concentrations=[],
         risk_block_summary=[
             BlockReasonSummary(
-                reason="MAX_DD",
-                count=5,
-                impacted_algorithms=["ppo"],
-                weak_state_correlation=0.75
+                reason="MAX_DD", count=5, impacted_algorithms=["ppo"], weak_state_correlation=0.75
             )
-        ]
+        ],
     )
 
     section = report.to_report_section()
     risk_types = [r.type for r in section.behavioral_risks]
     assert "Strategy Fragility" in risk_types
-    assert "Cluster Warning" in risk_types # 0.75 > 0.6 as well
+    assert "Cluster Warning" in risk_types  # 0.75 > 0.6 as well
