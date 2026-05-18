@@ -62,13 +62,13 @@ class TradingConfig(BaseSettings):
         validation_alias="SYMBOL",
     )
     timeframe: VALID_TIMEFRAMES = Field(
-        default="M5", description="The chart timeframe for analysis (e.g., M5, H1)"
-    )
     poll_interval: int = Field(
         default=60,
         ge=1,
         description="Interval in seconds between market data polling and signal evaluation",
         validation_alias="POLL_INTERVAL",
+    )
+        default="M5", description="The chart timeframe for analysis (e.g., M5, H1)"
     )
     mode: Literal["demo", "live", "backtest"] = Field(
         default="demo",
@@ -136,15 +136,9 @@ class TradingConfig(BaseSettings):
     allocator_max_total_heat: float = Field(default=0.70, description="Max 70% of budget committed")
     allocator_max_symbol_risk: float = Field(default=0.40, description="Max 40% per symbol")
     allocator_max_family_risk: float = Field(default=0.40, description="Max 40% per model family")
-    allocator_performance_step: float = Field(
-        default=0.05, description="Adjustment step for performance"
-    )
-    allocator_decay_rate: float = Field(
-        default=0.001, description="Rate at which multiplier returns to 1.0"
-    )
-    allocator_soft_limit_buffer: float = Field(
-        default=0.10, description="Buffer for diversification guard"
-    )
+    allocator_performance_step: float = Field(default=0.05, description="Adjustment step for performance")
+    allocator_decay_rate: float = Field(default=0.001, description="Rate at which multiplier returns to 1.0")
+    allocator_soft_limit_buffer: float = Field(default=0.10, description="Buffer for diversification guard")
 
     # Volatility Thresholds
     volatility_high_threshold: float = Field(

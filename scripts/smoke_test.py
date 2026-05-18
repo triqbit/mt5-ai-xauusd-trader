@@ -26,7 +26,6 @@ except ImportError:
     print("Error: 'httpx' library is required. Run 'pip install httpx'.")
     sys.exit(1)
 
-
 def check_api_health(base_url: str, retries: int = 1, delay: int = 5) -> Dict[str, Any]:
     """Check liveness and readiness endpoints with optional retries."""
     results = {"liveness": False, "readiness": False, "components": {}}
@@ -65,7 +64,6 @@ def check_api_health(base_url: str, retries: int = 1, delay: int = 5) -> Dict[st
 
     return results
 
-
 def check_metrics(base_url: str) -> bool:
     """Verify Prometheus metrics endpoint."""
     try:
@@ -75,7 +73,6 @@ def check_metrics(base_url: str) -> bool:
     except Exception:
         pass
     return False
-
 
 def check_audit_trail(db_path: str) -> bool:
     """Verify that a startup event exists in the audit trail."""
@@ -100,19 +97,12 @@ def check_audit_trail(db_path: str) -> bool:
         print(f"⚠️ Audit Trace Check Failed: {e}")
         return False
 
-
 def main():
     parser = argparse.ArgumentParser(description="MT5 Bot Smoke Tests")
-    parser.add_argument(
-        "--url", default="http://localhost:8000", help="Base URL of the running bot"
-    )
+    parser.add_argument("--url", default="http://localhost:8000", help="Base URL of the running bot")
     parser.add_argument("--audit-db", default="audit.db", help="Path to audit.db")
-    parser.add_argument(
-        "--wait", type=int, default=0, help="Wait N seconds before starting (for startup)"
-    )
-    parser.add_argument(
-        "--retries", type=int, default=1, help="Number of times to retry API checks"
-    )
+    parser.add_argument("--wait", type=int, default=0, help="Wait N seconds before starting (for startup)")
+    parser.add_argument("--retries", type=int, default=1, help="Number of times to retry API checks")
     parser.add_argument("--delay", type=int, default=5, help="Delay between retries in seconds")
     args = parser.parse_args()
 
@@ -139,13 +129,7 @@ def main():
     if api_results["components"]:
         print("\nComponent Status:")
         for name, info in api_results["components"].items():
-            status_icon = (
-                "✅"
-                if info["status"] == "healthy"
-                else "⚠️"
-                if info["status"] == "degraded"
-                else "❌"
-            )
+            status_icon = "✅" if info["status"] == "healthy" else "⚠️" if info["status"] == "degraded" else "❌"
             print(f"  {status_icon} {name:12}: {info['status'].upper()} - {info['message']}")
 
     # 3. Infrastructure
@@ -163,7 +147,6 @@ def main():
     else:
         print("🚀 SMOKE TEST PASSED: Deployment is operational.")
         sys.exit(0)
-
 
 if __name__ == "__main__":
     main()

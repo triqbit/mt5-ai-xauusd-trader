@@ -1,3 +1,4 @@
+
 import os
 import sys
 from pathlib import Path
@@ -19,7 +20,6 @@ def mock_config(tmp_path):
     config.mode = "demo"
     return config
 
-
 def test_regime_detector_load_path_validation(tmp_path):
     """Verify that RegimeDetector rejects models from untrusted paths."""
     detector = RegimeDetector()
@@ -40,7 +40,6 @@ def test_regime_detector_load_path_validation(tmp_path):
     with patch("src.models.regime_detector.Path.is_relative_to", return_value=False):
         detector.load_model(str(untrusted_path))
         assert detector._gmm is None
-
 
 def test_regime_detector_load_path_bypass_attempt(tmp_path):
     """Verify that RegimeDetector rejects models that attempt to bypass with string prefixes."""
@@ -65,7 +64,6 @@ def test_regime_detector_load_path_bypass_attempt(tmp_path):
         # and we must ensure it doesn't match /tmp (which it will if we don't mock it, because it IS in /tmp)
 
         real_is_relative_to = Path.is_relative_to
-
         def mock_is_relative(self, other):
             # Block the /tmp check specifically for this test to ensure it hits the models check logic
             if str(other) in ("/tmp", "/var/tmp"):
@@ -76,7 +74,6 @@ def test_regime_detector_load_path_bypass_attempt(tmp_path):
         with patch("src.models.regime_detector.Path.is_relative_to", mock_is_relative):
             detector.load_model(str(untrusted_path))
             assert detector._gmm is None
-
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission hardening only on Linux/Mac")
 def test_config_validator_auto_hardening(tmp_path, mock_config):
@@ -97,11 +94,9 @@ def test_config_validator_auto_hardening(tmp_path, mock_config):
     # Verify permissions are hardened to 0o600
     assert (os.stat(env_file).st_mode & 0o777) == 0o600
 
-
 def test_regime_detector_load_from_trusted_path(tmp_path):
     """Verify that RegimeDetector accepts models from the trusted models/ directory."""
     from src.core.config import ROOT
-
     trusted_dir = ROOT / "models" / "trained"
     trusted_dir.mkdir(parents=True, exist_ok=True)
 
@@ -122,12 +117,10 @@ def test_regime_detector_load_from_trusted_path(tmp_path):
         if trusted_path.exists():
             trusted_path.unlink()
 
-
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission check only on Linux/Mac")
 def test_regime_detector_insecure_permissions(tmp_path):
     """Verify that RegimeDetector rejects models with insecure permissions."""
     from src.core.config import ROOT
-
     trusted_dir = ROOT / "models" / "trained"
     trusted_dir.mkdir(parents=True, exist_ok=True)
 

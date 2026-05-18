@@ -1,3 +1,4 @@
+
 import numpy as np
 import pandas as pd
 
@@ -31,8 +32,7 @@ def test_trading_env_optimized_observation():
     obs, reward, terminated, truncated, info = env.step(1)
     # After 1 step, current_step = window_size + 1
     # observation window should be [1 : window_size + 1]
-    np.testing.assert_array_almost_equal(obs, data[1 : window_size + 1])
-
+    np.testing.assert_array_almost_equal(obs, data[1:window_size+1])
 
 def test_trading_env_none_data():
     """Verify handling of None DataFrame."""
@@ -40,8 +40,7 @@ def test_trading_env_none_data():
     assert env._data is None
     obs, _ = env.reset()
     assert np.all(obs == 0)
-    assert obs.shape == (20, 140)  # Default features
-
+    assert obs.shape == (20, 140) # Default features
 
 def test_trading_env_empty_data():
     """Verify handling of empty DataFrame."""
@@ -50,12 +49,11 @@ def test_trading_env_empty_data():
     env = TradingEnv(df=df, window_size=20)
     assert env.observation_space.shape == (20, 0)
 
-
 def test_observation_dtype():
     """Verify that observation always returns float32."""
     n_rows = 50
     n_features = 5
-    data = np.random.randn(n_rows, n_features).astype(np.float64)  # Input as float64
+    data = np.random.randn(n_rows, n_features).astype(np.float64) # Input as float64
     df = pd.DataFrame(data)
 
     env = TradingEnv(df=df, window_size=10)

@@ -22,10 +22,10 @@ logger = structlog.get_logger(__name__)
 
 __all__ = [
     "BaseEventProvider",
-    "CSVEventProvider",
     "EventCategory",
     "EventImpact",
     "EventIntelligence",
+    "CSVEventProvider",
     "GeopoliticalEventProvider",
     "JSONEventProvider",
     "MacroEvent",

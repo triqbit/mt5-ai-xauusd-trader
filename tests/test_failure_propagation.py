@@ -28,14 +28,13 @@ def test_execution_filter_exception_handling():
         take_profit=2320.0,
         lot_size=0.1,
         algorithm="test",
-        confidence=0.9,
+        confidence=0.9
     )
 
     with patch.object(ExecutionFilter, "validate", side_effect=RuntimeError("Filter Explosion!")):
         with pytest.raises(RuntimeError) as excinfo:
             filter_obj.validate(signal)
         assert "Filter Explosion!" in str(excinfo.value)
-
 
 def test_main_loop_error_handling_structure():
     """
@@ -48,5 +47,5 @@ def test_main_loop_error_handling_structure():
 
     source = inspect.getsource(main.run_live)
     assert "except Exception as exc:" in source
-    assert 'log.exception("Unhandled error in trading loop: %s", exc)' in source
+    assert "log.exception(\"Unhandled error in trading loop: %s\", exc)" in source
     assert "time.sleep(poll_interval)" in source

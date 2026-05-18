@@ -29,7 +29,6 @@ def mock_cfg():
 def trade_logger():
     logger = TradeLogger(db_url="sqlite:///:memory:")
     from src.core.trade_logger import Base
-
     Base.metadata.create_all(logger.engine)
     return logger
 

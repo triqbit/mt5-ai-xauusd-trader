@@ -23,9 +23,7 @@ def bump_pyproject(root: Path, version: str, dry_run: bool = False):
         return False
 
     content = path.read_text()
-    new_content = re.sub(
-        r'(^version\s*=\s*")([^"]+)(")', rf"\g<1>{version}\g<3>", content, flags=re.MULTILINE
-    )
+    new_content = re.sub(r'(^version\s*=\s*")([^"]+)(")', rf'\g<1>{version}\g<3>', content, flags=re.MULTILINE)
 
     if content == new_content:
         print(f"Warning: Version in {path} is already {version} or could not be updated.")
@@ -43,9 +41,7 @@ def bump_init(root: Path, version: str, dry_run: bool = False):
         return True
 
     content = path.read_text()
-    new_content = re.sub(
-        r'(^__version__\s*=\s*")([^"]+)(")', rf"\g<1>{version}\g<3>", content, flags=re.MULTILINE
-    )
+    new_content = re.sub(r'(^__version__\s*=\s*")([^"]+)(")', rf'\g<1>{version}\g<3>', content, flags=re.MULTILINE)
 
     if content == new_content:
         print(f"Warning: Version in {path} is already {version} or could not be updated.")
@@ -91,9 +87,7 @@ def main():
 
     # Validate version format
     if not re.match(r"^\d+\.\d+\.\d+(-[a-z0-9.]+)?$", version):
-        print(
-            f"Error: Invalid version format '{version}'. Must be SemVer (e.g., 1.2.3 or 1.2.3-rc.1)"
-        )
+        print(f"Error: Invalid version format '{version}'. Must be SemVer (e.g., 1.2.3 or 1.2.3-rc.1)")
         sys.exit(1)
 
     success = True

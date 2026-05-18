@@ -16,7 +16,6 @@ from src.data.event_intelligence import (
 def now():
     return datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-
 @patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
 def test_metaapi_provider_comprehensive(mock_get_client, now):
     mock_session = MagicMock()
@@ -33,36 +32,36 @@ def test_metaapi_provider_comprehensive(mock_get_client, now):
             "impact": "high",
             "time": "2023-01-01T12:30:00.000Z",
             "currency": "USD",
-            "country": "US",
+            "country": "US"
         },
         {
             "event": "FOMC Statement",
             "impact": "critical",
             "time": "2023-01-01T14:00:00.000Z",
             "currency": "USD",
-            "country": "US",
+            "country": "US"
         },
         {
             "event": "Geopolitical Tension in Middle East",
             "impact": "high",
             "time": "2023-01-01T12:00:00.000Z",
             "currency": "EUR",
-            "country": "DE",
+            "country": "DE"
         },
         {
             "event": "German ZEW Economic Sentiment",
             "impact": "medium",
             "time": "2023-01-01T10:00:00.000Z",
             "currency": "EUR",
-            "country": "DE",
+            "country": "DE"
         },
         {
             "event": "ECB Monetary Policy Statement",
             "impact": "high",
             "time": "2023-01-01T13:45:00.000Z",
             "currency": "EUR",
-            "country": "EU",
-        },
+            "country": "EU"
+        }
     ]
     mock_get.return_value = mock_response
 
@@ -79,26 +78,25 @@ def test_metaapi_provider_comprehensive(mock_get_client, now):
     assert "ECB Monetary Policy Statement" in names
     assert "German ZEW Economic Sentiment" not in names
 
-
 def test_multi_provider_deduplication(now):
     """Test that EventIntelligence correctly de-duplicates events from multiple providers."""
     event1 = MacroEvent(
         name="Shared Event",
         category=EventCategory.CPI,
         impact=EventImpact.HIGH,
-        timestamp=now + timedelta(minutes=30),
+        timestamp=now + timedelta(minutes=30)
     )
     event2 = MacroEvent(
         name="Shared Event",
         category=EventCategory.CPI,
         impact=EventImpact.HIGH,
-        timestamp=now + timedelta(minutes=30),
+        timestamp=now + timedelta(minutes=30)
     )
     event3 = MacroEvent(
         name="Unique Event",
         category=EventCategory.USD,
         impact=EventImpact.LOW,
-        timestamp=now + timedelta(minutes=60),
+        timestamp=now + timedelta(minutes=60)
     )
 
     provider1 = MagicMock()
@@ -115,14 +113,13 @@ def test_multi_provider_deduplication(now):
     assert names.count("Shared Event") == 1
     assert "Unique Event" in names
 
-
 def test_provider_failure_resilience(now):
     """Test that EventIntelligence survives when some providers fail."""
     event = MacroEvent(
         name="Success Event",
         category=EventCategory.USD,
         impact=EventImpact.LOW,
-        timestamp=now + timedelta(minutes=2),
+        timestamp=now + timedelta(minutes=2)
     )
 
     provider_fail = MagicMock()
@@ -137,7 +134,6 @@ def test_provider_failure_resilience(now):
     assert len(status.active_events) == 1
     assert status.active_events[0].name == "Success Event"
 
-
 def test_stricter_major_event_multipliers(now):
     """Test that FOMC/NFP/RATES have stricter multipliers."""
     # Generic HIGH impact
@@ -145,7 +141,7 @@ def test_stricter_major_event_multipliers(now):
         name="Generic High",
         category=EventCategory.OTHER,
         impact=EventImpact.HIGH,
-        timestamp=now + timedelta(minutes=5),
+        timestamp=now + timedelta(minutes=5)
     )
     provider = MagicMock()
     provider.get_upcoming_events.return_value = [event_generic]
@@ -159,7 +155,7 @@ def test_stricter_major_event_multipliers(now):
         name="FOMC Decision",
         category=EventCategory.FOMC,
         impact=EventImpact.HIGH,
-        timestamp=now + timedelta(minutes=5),
+        timestamp=now + timedelta(minutes=5)
     )
     provider_major = MagicMock()
     provider_major.get_upcoming_events.return_value = [event_major]
@@ -167,7 +163,6 @@ def test_stricter_major_event_multipliers(now):
     status_major = intel_major.get_risk_status(now)
     # risk_multiplier must be 0.0 if is_blocked is True
     assert status_major.risk_multiplier == 0.0
-
 
 @patch("src.data.event_intelligence.MetaAPIEventProvider._get_client")
 def test_metaapi_provider_unsupported_impact(mock_get_client, now):
@@ -181,10 +176,10 @@ def test_metaapi_provider_unsupported_impact(mock_get_client, now):
     mock_response.json.return_value = [
         {
             "event": "Unknown Impact Event",
-            "impact": "extreme",  # Not in our map
+            "impact": "extreme", # Not in our map
             "time": "2023-01-01T12:30:00.000Z",
             "currency": "USD",
-            "country": "US",
+            "country": "US"
         }
     ]
     mock_get.return_value = mock_response
@@ -192,4 +187,4 @@ def test_metaapi_provider_unsupported_impact(mock_get_client, now):
     provider = MetaAPIEventProvider(token="fake")
     events = provider.get_upcoming_events(now, now + timedelta(hours=1))
     assert len(events) == 1
-    assert events[0].impact == EventImpact.LOW  # Default fallback
+    assert events[0].impact == EventImpact.LOW # Default fallback

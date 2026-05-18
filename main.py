@@ -208,7 +208,7 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = cfg.poll_interval
+    poll_interval = cfg.poll_interval  # seconds between signal evaluations
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -898,6 +898,11 @@ Usage Examples:
 
   # Start LIVE trading (requires explicit confirmation)
   python main.py --mode live --algo ensemble --confirm-live
+    execution.add_argument(
+        "--poll-interval",
+        type=int,
+        help="Interval in seconds between market data polling and signal evaluation.",
+    )
 
   # Run a walk-forward backtest for a specific period
   python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
@@ -922,14 +927,14 @@ Usage Examples:
     execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
     execution.add_argument(
         "--confirm-live",
-        dest="confirm_live_trading",
-        action="store_true",
-        help="Explicitly acknowledge and confirm LIVE trading execution.",
-    )
     execution.add_argument(
         "--poll-interval",
         type=int,
         help="Interval in seconds between market data polling and signal evaluation.",
+    )
+        dest="confirm_live_trading",
+        action="store_true",
+        help="Explicitly acknowledge and confirm LIVE trading execution.",
     )
 
     # -- Backtest Group
@@ -1673,6 +1678,11 @@ def main() -> int:
         next_steps.add_row("Demo Trading:  ", f"python main.py --mode demo --algo {cfg.algorithm}")
         next_steps.add_row(
             "Live Trading:  ", f"python main.py --mode live --algo {cfg.algorithm} --confirm-live"
+    execution.add_argument(
+        "--poll-interval",
+        type=int,
+        help="Interval in seconds between market data polling and signal evaluation.",
+    )
         )
         next_steps.add_row(
             "Backtesting:   ",

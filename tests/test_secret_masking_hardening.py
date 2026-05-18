@@ -1,3 +1,4 @@
+
 from pydantic import SecretStr
 
 from src.core.config import TradingConfig
@@ -12,7 +13,7 @@ def test_dynamic_secret_discovery():
         MT5_SERVER="test_server",
         redis_url=SecretStr("redis://:redis_pass_123@localhost:6379/0"),
         database_url=SecretStr("postgresql://user:db_pass_456@localhost:5432/db"),
-        telegram_token=SecretStr("bot123:tele_secret_789"),
+        telegram_token=SecretStr("bot123:tele_secret_789")
     )
 
     processor = SecretMaskingProcessor()
@@ -28,7 +29,7 @@ def test_dynamic_secret_discovery():
     log_event = {
         "msg": "Failed to connect to redis with pass redis_pass_123",
         "details": "Database error for db_pass_456",
-        "meta": {"token": "bot123:tele_secret_789"},
+        "meta": {"token": "bot123:tele_secret_789"}
     }
 
     redacted = processor.redact_any(log_event)
@@ -36,7 +37,6 @@ def test_dynamic_secret_discovery():
     assert redacted["msg"] == "Failed to connect to redis with pass [MASKED]"
     assert redacted["details"] == "Database error for [MASKED]"
     assert redacted["meta"]["token"] == "[MASKED]"
-
 
 def test_url_password_extraction_robustness():
     """Test various URL formats for password extraction."""
@@ -47,7 +47,7 @@ def test_url_password_extraction_robustness():
         "redis://user:pass1@host",
         "postgresql://u:pass2@h:p/db",
         "mongodb+srv://u:pass3@cluster.mongodb.net",
-        "http://admin:pass4@127.0.0.1:8080",
+        "http://admin:pass4@127.0.0.1:8080"
     }
 
     # Trigger extraction logic (normally inside update_secrets)

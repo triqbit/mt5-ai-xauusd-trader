@@ -19,14 +19,13 @@ TARGETS = {
     "UPTIME": 0.995,
     "CI_SUCCESS": 0.95,
     "RTO_SECONDS": 900,  # 15 mins
-    "BACKTEST_P50": 300,  # 5 mins
-    "BACKTEST_P95": 480,  # 8 mins
-    "BACKTEST_P99": 720,  # 12 mins
-    "INFERENCE_P50": 0.010,  # 10ms
-    "INFERENCE_P95": 0.050,  # 50ms
-    "INFERENCE_P99": 0.100,  # 100ms
+    "BACKTEST_P50": 300, # 5 mins
+    "BACKTEST_P95": 480, # 8 mins
+    "BACKTEST_P99": 720, # 12 mins
+    "INFERENCE_P50": 0.010, # 10ms
+    "INFERENCE_P95": 0.050, # 50ms
+    "INFERENCE_P99": 0.100  # 100ms
 }
-
 
 def get_db_connection(path):
     if not os.path.exists(path):
@@ -35,7 +34,6 @@ def get_db_connection(path):
         return sqlite3.connect(path)
     except Exception:
         return None
-
 
 def calculate_backtest_slos(conn):
     """Analyze backtest durations against targets (<5m P50, <8m P95, <12m P99)."""
@@ -54,8 +52,8 @@ def calculate_backtest_slos(conn):
     for row in rows:
         try:
             meta = json.loads(row[0])
-            if "duration_seconds" in meta:
-                durations.append(meta["duration_seconds"])
+            if 'duration_seconds' in meta:
+                durations.append(meta['duration_seconds'])
         except Exception:
             continue
 
@@ -67,20 +65,17 @@ def calculate_backtest_slos(conn):
     p95 = durations[int(len(durations) * 0.95)]
     p99 = durations[int(len(durations) * 0.99)]
 
-    is_compliant = (
-        p50 < TARGETS["BACKTEST_P50"]
-        and p95 < TARGETS["BACKTEST_P95"]
-        and p99 < TARGETS["BACKTEST_P99"]
-    )
+    is_compliant = (p50 < TARGETS["BACKTEST_P50"] and
+                    p95 < TARGETS["BACKTEST_P95"] and
+                    p99 < TARGETS["BACKTEST_P99"])
     status = "✅" if is_compliant else "⚠️"
 
     return {
-        "P50": f"{p50 / 60:.2f} min",
-        "P95": f"{p95 / 60:.2f} min",
-        "P99": f"{p99 / 60:.2f} min",
-        "Status": status,
+        "P50": f"{p50/60:.2f} min",
+        "P95": f"{p95/60:.2f} min",
+        "P99": f"{p99/60:.2f} min",
+        "Status": status
     }
-
 
 def calculate_rto_slos(conn):
     """Analyze Recovery Time Objective (Target: 15 mins)."""
@@ -92,28 +87,26 @@ def calculate_rto_slos(conn):
     if not cursor.fetchone():
         return None
 
-    cursor.execute(
-        "SELECT created_at, metadata_json FROM audit_log WHERE action='system_restored' ORDER BY created_at DESC"
-    )
+    cursor.execute("SELECT created_at, metadata_json FROM audit_log WHERE action='system_restored' ORDER BY created_at DESC")
     restorations = cursor.fetchall()
 
     rto_durations = []
     for rest_time_str, meta_str in restorations:
         try:
             meta = json.loads(meta_str)
-            incident_id = meta.get("incident_id")
+            incident_id = meta.get('incident_id')
             if not incident_id:
                 continue
 
             cursor.execute(
                 "SELECT created_at FROM audit_log WHERE (action='startup_gate_failure' OR action LIKE 'operator_emergency%') "
                 "AND created_at < ? ORDER BY created_at DESC LIMIT 1",
-                (rest_time_str,),
+                (rest_time_str,)
             )
             failure = cursor.fetchone()
             if failure:
-                fail_time = datetime.fromisoformat(failure[0].replace("Z", "+00:00"))
-                rest_time = datetime.fromisoformat(rest_time_str.replace("Z", "+00:00"))
+                fail_time = datetime.fromisoformat(failure[0].replace('Z', '+00:00'))
+                rest_time = datetime.fromisoformat(rest_time_str.replace('Z', '+00:00'))
                 duration = (rest_time - fail_time).total_seconds()
                 rto_durations.append(duration)
         except Exception:
@@ -127,11 +120,10 @@ def calculate_rto_slos(conn):
     status = "✅" if max_rto < TARGETS["RTO_SECONDS"] else "⚠️"
 
     return {
-        "Avg RTO": f"{avg_rto / 60:.2f} min",
-        "Max RTO": f"{max_rto / 60:.2f} min",
-        "Status": status,
+        "Avg RTO": f"{avg_rto/60:.2f} min",
+        "Max RTO": f"{max_rto/60:.2f} min",
+        "Status": status
     }
-
 
 def calculate_error_budget(conn):
     """Calculate consumed error budget for Availability (30-day window)."""
@@ -160,9 +152,8 @@ def calculate_error_budget(conn):
         "Failure Count (30d)": failure_count,
         "Est. Downtime": f"{estimated_downtime_mins} min",
         "Budget Remaining": f"{remaining_pct:.1f}%",
-        "Status": "✅" if remaining_pct > 0 else "🛑 STABILITY FREEZE",
+        "Status": "✅" if remaining_pct > 0 else "🛑 STABILITY FREEZE"
     }
-
 
 def main():
     print("=== MT5 AI/ML Trading Bot - SLO Compliance Audit ===")
@@ -202,7 +193,6 @@ def main():
     print("  (Note: Real-time latency and CI rates require Prometheus/GitHub API integration)")
 
     conn.close()
-
 
 if __name__ == "__main__":
     main()

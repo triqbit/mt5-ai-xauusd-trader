@@ -1,7 +1,6 @@
 """
 Tests for system harmonization and cross-agent conflict resolution.
 """
-
 from unittest.mock import MagicMock, patch
 
 
@@ -16,21 +15,26 @@ def test_risk_manager_consolidated_initialization():
     logger = MagicMock(spec=TradeLogger)
     monitor = MagicMock(spec=Monitor)
 
-    risk = RiskManager(config=config, account_balance=10000.0, logger_db=logger, monitor=monitor)
+    risk = RiskManager(
+        config=config,
+        account_balance=10000.0,
+        logger_db=logger,
+        monitor=monitor
+    )
 
     assert risk.trade_logger == logger
     assert risk.monitor == monitor
     assert risk.balance == 10000.0
 
-
 def test_config_singleton_loading():
     """Verify get_config returns a TradingConfig singleton."""
     # Ensure environment variables required for validation are present and valid
-    with patch.dict(
-        "os.environ", {"MT5_PASSWORD": "dummy", "MT5_SERVER": "dummy", "RISK_PER_TRADE": "0.01"}
-    ):
+    with patch.dict("os.environ", {
+        "MT5_PASSWORD": "dummy",
+        "MT5_SERVER": "dummy",
+        "RISK_PER_TRADE": "0.01"
+    }):
         from src.core.config import TradingConfig, get_config
-
         # We need to clear the lru_cache for testing purpose if it was already populated
         get_config.cache_clear()
         cfg1 = get_config()
@@ -42,7 +46,6 @@ def test_config_singleton_loading():
 def test_model_action_to_direction_mapping():
     """Verify that ModelAction maps correctly to SignalDirection."""
     from src.core.constants import ModelAction, SignalDirection
-
     assert ModelAction.HOLD.to_direction() == SignalDirection.HOLD
     assert ModelAction.BUY.to_direction() == SignalDirection.BUY
     assert ModelAction.SELL.to_direction() == SignalDirection.SELL
@@ -56,7 +59,6 @@ def test_signal_explainer_mapping_alignment():
     """Verify that SignalExplainer uses unified ModelAction mapping."""
     from src.core.constants import SignalDirection
     from src.core.explainability import SignalExplainer
-
     explainer = SignalExplainer()
 
     # Votes: ppo=1 (BUY), lstm=2 (SELL)
@@ -70,7 +72,7 @@ def test_signal_explainer_mapping_alignment():
         model_votes=model_votes,
         model_weights=model_weights,
         risk_data={"passed": True},
-        regime_info={"name": "Trending"},
+        regime_info={"name": "Trending"}
     )
 
     # Verify attribution mapping

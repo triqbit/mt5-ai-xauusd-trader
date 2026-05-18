@@ -21,7 +21,7 @@ logger = structlog.get_logger(__name__)
 
 class CircuitState(Enum):
     CLOSED = "CLOSED"  # Normal operation
-    OPEN = "OPEN"  # Failing, requests blocked
+    OPEN = "OPEN"      # Failing, requests blocked
     HALF_OPEN = "HALF_OPEN"  # Testing if service recovered
 
 
@@ -98,20 +98,18 @@ class CircuitBreaker:
         self._failure_count += 1
         self._last_failure_time = time.time()
 
-        if (
-            self._state == CircuitState.HALF_OPEN or self._failure_count >= self.failure_threshold
-        ) and self._state != CircuitState.OPEN:
-            previous_state = self._state
-            self._state = CircuitState.OPEN
-            logger.error(
-                "circuit_breaker_tripped",
-                name=self.name,
-                state=self._state.value,
-                from_state=previous_state.value,
-                failure_count=self._failure_count,
-                error=str(exception),
-            )
-            self._report_state(self._state)
+        if (self._state == CircuitState.HALF_OPEN or self._failure_count >= self.failure_threshold) and self._state != CircuitState.OPEN:
+                previous_state = self._state
+                self._state = CircuitState.OPEN
+                logger.error(
+                    "circuit_breaker_tripped",
+                    name=self.name,
+                    state=self._state.value,
+                    from_state=previous_state.value,
+                    failure_count=self._failure_count,
+                    error=str(exception),
+                )
+                self._report_state(self._state)
 
     def _report_state(self, state: CircuitState) -> None:
         """Report current state to the monitor."""
