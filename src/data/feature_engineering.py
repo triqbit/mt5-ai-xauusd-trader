@@ -1,6 +1,6 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
-src/core/feature_engineering.py
+src/data/feature_engineering.py
 Institutional-grade feature engineering pipeline for XAUUSD.
 Computes 140+ technical features including multi-timeframe analysis,
 candle patterns, and volume profiles.
@@ -8,11 +8,11 @@ candle patterns, and volume profiles.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import numpy as np
 import pandas as pd
+import structlog
 
 try:
     import talib
@@ -24,7 +24,7 @@ except ImportError:
 
 from src.core.profiler import profile
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class FeatureEngineer:
