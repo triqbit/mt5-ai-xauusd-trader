@@ -927,6 +927,34 @@ class RegimeDetector:
 
         logger.info("gmm_fit_complete", n_clusters=n_selected, bic=best_bic)
 
+    def print_transition_matrix(self) -> None:
+        """
+        Prints the regime transition matrix to the terminal using rich.
+        Useful for institutional explainability and audit.
+        """
+        if self.transition_matrix is None:
+            logger.warning("No transition matrix available. Run fit() or label_history() first.")
+            return
+
+        from rich.console import Console
+        from rich.table import Table
+
+        console = Console()
+        table = Table(title="Regime Transition Probability Matrix", border_style="cyan")
+
+        table.add_column("From \\ To", style="bold white")
+        for col in self.transition_matrix.columns:
+            table.add_column(str(col).upper(), justify="right")
+
+        for idx, row in self.transition_matrix.iterrows():
+            formatted_row = [str(idx).upper()]
+            for val in row:
+                color = "green" if val > 0.5 else "yellow" if val > 0.2 else "white"
+                formatted_row.append(f"[{color}]{val:.2%}[/{color}]")
+            table.add_row(*formatted_row)
+
+        console.print(table)
+
     def save_model(self, filepath: str) -> None:
         """
         Persists the GMM model and cluster mappings to disk.
