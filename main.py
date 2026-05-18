@@ -14,6 +14,7 @@ License: MIT
 from __future__ import annotations
 
 import argparse
+from dotenv import set_key
 import os
 import sys
 import time
@@ -748,10 +749,10 @@ def run_setup_wizard() -> int:
     login = IntPrompt.ask("MT5 Account Login (Number)", default=0)
 
     # Use getpass for password to avoid echoing
-    mt5_pass = ""
-    while not mt5_pass:
-        mt5_pass = getpass.getpass("MT5 Account Password: ")
-        if not mt5_pass:
+    password = ""
+    while not password:
+        password = getpass.getpass("MT5 Account Password: ")
+        if not password:
             console.print("[red]Password cannot be empty.[/]")
 
     server = Prompt.ask("MT5 Broker Server (e.g., IC-Markets-Demo)", default="YOUR_SERVER_HERE")
@@ -760,14 +761,14 @@ def run_setup_wizard() -> int:
     console.print("\n[bold]3. MetaAPI Cloud Fallback (Optional)[/]")
     console.print("[dim]Required for non-Windows environments or cloud failover.[/]")
     use_meta = Prompt.ask("Do you want to configure MetaAPI?", choices=["y", "n"], default="n")
-    m_token = ""
-    m_id = ""
+    meta_token = ""
+    meta_id = ""
     if use_meta == "y":
-        while not m_token:
-            m_token = getpass.getpass("MetaAPI Token: ")
-            if not m_token:
+        while not meta_token:
+            meta_token = getpass.getpass("MetaAPI Token: ")
+            if not meta_token:
                 console.print("[red]Token cannot be empty.[/]")
-        m_id = Prompt.ask("MetaAPI Account ID")
+        meta_id = Prompt.ask("MetaAPI Account ID")
 
     # 4. Confirm and Save
     console.print("\n[bold]4. Review & Save[/]")
@@ -775,81 +776,34 @@ def run_setup_wizard() -> int:
         console.print("[yellow]Setup aborted. No changes made.[/]")
         return 0
 
-    # Write to .env
+    # Write to .env using python-dotenv for safe preservation of comments/formatting
     env_path = Path(".env")
-    example_path = Path(".env.example")
+    if not env_path.exists():
+        # Initialize .env from .env.example if missing
+        example_path = Path(".env.example")
+        if example_path.exists():
+            import shutil
 
-    # Update logic that avoids storing passwords in generic dictionaries to satisfy static analysis
-    def get_updated_line(key: str, current_line: str) -> str:
-        if key == "MT5_LOGIN":
-            return f"MT5_LOGIN={login}\n"
-        if key == "MT5_PASSWORD":
-            # Using concatenation to potentially avoid some f-string sensitive data detection patterns
-            return "MT5_PASSWORD=" + str(mt5_pass) + "\n"
-        if key == "MT5_SERVER":
-            return f"MT5_SERVER={server}\n"
-        if key == "SYMBOL":
-            return f"SYMBOL={symbol}\n"
-        if key == "TIMEFRAME":
-            return f"TIMEFRAME={timeframe}\n"
-        if key == "POLL_INTERVAL":
-            return f"POLL_INTERVAL={poll_interval}\n"
-        if key == "MODE":
-            return f"MODE={mode}\n"
-        if key == "METAAPI_TOKEN" and m_token:
-            return "METAAPI_TOKEN=" + str(m_token) + "\n"
-        if key == "METAAPI_ACCOUNT_ID" and m_id:
-            return f"METAAPI_ACCOUNT_ID={m_id}\n"
-        return current_line
+            shutil.copy(example_path, env_path)
+        else:
+            env_path.touch()
 
-    target_keys = [
-        "MT5_LOGIN",
-        "MT5_PASSWORD",
-        "MT5_SERVER",
-        "SYMBOL",
-        "TIMEFRAME",
-        "POLL_INTERVAL",
-        "MODE",
-        "METAAPI_TOKEN",
-        "METAAPI_ACCOUNT_ID",
-    ]
+        # Secure permissions immediately on Unix
+        if os.name != "nt":
+            os.chmod(env_path, 0o600)
 
-    new_lines = []
-    seen_keys = set()
-
-    # Use .env if it exists, otherwise .env.example
-    source_path = env_path if env_path.exists() else example_path
-
-    if source_path.exists():
-        with open(source_path, "r") as f:
-            for line in f:
-                key_found = False
-                for k in target_keys:
-                    if line.startswith(f"{k}="):
-                        new_lines.append(get_updated_line(k, line))
-                        seen_keys.add(k)
-                        key_found = True
-                        break
-                if not key_found:
-                    new_lines.append(line)
-
-    # Append missing keys
-    for k in target_keys:
-        if k not in seen_keys:
-            line = get_updated_line(k, "")
-            if line:
-                new_lines.append(line)
-
-    # Ensure restricted permissions during creation (Linux/Mac)
-    if os.name != "nt":
-        fd = os.open(env_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            for line in new_lines:
-                f.write(line)
-    else:
-        with open(env_path, "w") as f:
-            for line in new_lines:
-                f.write(line)
+    # Use set_key to update values one-by-one safely
+    set_key(str(env_path), "MT5_LOGIN", str(login))
+    set_key(str(env_path), "MT5_PASSWORD", password)
+    set_key(str(env_path), "MT5_SERVER", server)
+    set_key(str(env_path), "SYMBOL", symbol)
+    set_key(str(env_path), "TIMEFRAME", timeframe)
+    set_key(str(env_path), "POLL_INTERVAL", str(poll_interval))
+    set_key(str(env_path), "MODE", mode)
+    if meta_token:
+        set_key(str(env_path), "METAAPI_TOKEN", meta_token)
+    if meta_id:
+        set_key(str(env_path), "METAAPI_ACCOUNT_ID", meta_id)
 
     console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
     console.print(

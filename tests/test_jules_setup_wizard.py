@@ -29,21 +29,14 @@ def test_setup_wizard_save_logic():
         example_content = "MT5_LOGIN=0\nMT5_PASSWORD=\nMT5_SERVER=\nSYMBOL=\nTIMEFRAME=\nMODE=\n"
         m = mock_open(read_data=example_content)
 
-        with patch("builtins.open", m), patch("main.os.open", return_value=999), patch("main.os.fdopen", return_value=m.return_value):
+        with patch("main.set_key") as mock_set_key:
             result = run_setup_wizard()
 
             assert result == 0
 
-            # Use write as in main.py
-            # Collect all lines from all write calls
-            written_lines = []
-            for call in m.return_value.write.call_args_list:
-                written_lines.append(call.args[0])
-
-            written_data = "".join(written_lines)
-
-            assert "MT5_LOGIN=123456\n" in written_data
-            assert "MT5_PASSWORD=secure_pass\n" in written_data
-            assert "MT5_SERVER=IC-Markets-Demo\n" in written_data
-            assert "SYMBOL=XAUUSD\n" in written_data
-            assert "MODE=demo\n" in written_data
+            # Verify set_key calls
+            mock_set_key.assert_any_call(".env", "MT5_LOGIN", "123456")
+            mock_set_key.assert_any_call(".env", "MT5_PASSWORD", "secure_pass")
+            mock_set_key.assert_any_call(".env", "MT5_SERVER", "IC-Markets-Demo")
+            mock_set_key.assert_any_call(".env", "SYMBOL", "XAUUSD")
+            mock_set_key.assert_any_call(".env", "MODE", "demo")
