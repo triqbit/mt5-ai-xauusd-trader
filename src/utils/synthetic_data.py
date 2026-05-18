@@ -1132,6 +1132,91 @@ class AdversarialScenarioBuilder:
             returns[i] = self.gen.rng.normal(0, vol)
         return self.gen._generate_base(n_steps, start_price, returns)
 
+    def ema_crossover_flicker(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Oscillations triggering frequent indicator crossovers.
+        Tests 'signal flicker' and 'consistency' guards.
+        """
+        # We want price to dance around the EMA21
+        # First, generate a base to establish EMA
+        df = self.gen.generate(n_steps=200, regime="ranging", start_price=start_price)
+        # Calculate EMA manually for targeting
+        ema21 = df["close"].ewm(span=21, adjust=False).mean().iloc[-1]
+
+        # Now generate flickering steps
+        flicker_returns = []
+        current_p = ema21
+        for i in range(n_steps):
+            # Oscillate by 0.01% above and below the target
+            target = ema21 * (1.0001 if i % 2 == 0 else 0.9999)
+            ret = np.log(target / current_p)
+            flicker_returns.append(ret)
+            current_p = target
+
+        df_flicker = self.gen._generate_base(n_steps, ema21, np.array(flicker_returns))
+        return pd.concat([df.iloc[-100:], df_flicker])
+
+    def rsi_boundary_oscillation(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Pinning RSI at thresholds (e.g., 70-75) to test boundary conditions.
+        """
+        # Start with a trend to push RSI up
+        df_trend = self.gen.generate(
+            n_steps=100, regime="trending", trend_strength=0.001, start_price=start_price
+        )
+        last_price = df_trend["close"].iloc[-1]
+
+        # Oscillate to keep RSI near 70
+        osc_returns = []
+        current_p = last_price
+        for i in range(n_steps):
+            # Small moves to maintain momentum without overextending
+            ret = 0.0001 if i % 2 == 0 else -0.00005
+            osc_returns.append(ret)
+            current_p *= np.exp(ret)
+
+        df_osc = self.gen._generate_base(n_steps, last_price, np.array(osc_returns))
+        return pd.concat([df_trend, df_osc])
+
+
+class AnomalyScenarioBuilder:
+    """
+    Generates deterministic sequences for technical anomalies.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.gen = ScenarioGenerator(seed=seed)
+
+    def ghost_spikes(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Extreme wicks with no impact on closing price.
+        Tests robustness of noise filters vs real volatility.
+        """
+        df = self.gen.generate(n_steps, regime="ranging", start_price=start_price, volatility=0.0001)
+        # Inject ghost spikes: massive high/low but close remains near open
+        for i in [20, 40, 60, 80]:
+            if i < len(df):
+                idx = df.index[i]
+                if i % 40 == 20:
+                    df.at[idx, "high"] = df.at[idx, "open"] + 50.0
+                else:
+                    df.at[idx, "low"] = df.at[idx, "open"] - 50.0
+        return df
+
+    def stale_data_with_noise(self, n_steps: int = 100, start_price: float = 2300.0) -> pd.DataFrame:
+        """
+        Simulates data feed freezes with minimal floating-point jitter.
+        Tests 'stale data' detection logic.
+        """
+        df = self.gen.generate(n_steps, regime="ranging", start_price=start_price, volatility=0.0)
+        # Add tiny jitter (1e-6)
+        noise = self.gen.rng.uniform(-0.000001, 0.000001, n_steps)
+        df["close"] += noise
+        df["open"] = df["close"].shift(1).fillna(start_price)
+        df["high"] = df[["open", "close"]].max(axis=1) + 0.000001
+        df["low"] = df[["open", "close"]].min(axis=1) - 0.000001
+        return df
+
 
 class InstitutionalFlowGenerator:
     """
