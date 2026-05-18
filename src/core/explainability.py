@@ -231,19 +231,12 @@ class SignalExplanation(BaseModel):
         Calculates a weighted confluence score (0.0 to 1.0) based on institutional metrics.
         Weighted logic: 40% Confidence, 30% Regime, 15% Session, 15% Volatility.
         """
-        weights = {
-            "confidence": 0.40,
-            "regime": 0.30,
-            "session": 0.15,
-            "volatility": 0.15,
-        }
-        score = (
-            self.total_confidence * weights["confidence"]
-            + self.regime_context.regime_alignment_score * weights["regime"]
-            + self.regime_context.session_alignment * weights["session"]
-            + self.regime_context.volatility_alignment * weights["volatility"]
+        return SignalExplainer.calculate_confluence(
+            self.total_confidence,
+            self.regime_context.regime_alignment_score,
+            self.regime_context.session_alignment,
+            self.regime_context.volatility_alignment,
         )
-        return float(score)
 
 
 class SignalExplainer:
@@ -286,6 +279,28 @@ class SignalExplainer:
 
     def __init__(self) -> None:
         pass
+
+    @staticmethod
+    def calculate_confluence(
+        confidence: float, regime_score: float, session_score: float, vol_score: float
+    ) -> float:
+        """
+        Centralized confluence calculation logic.
+        Weighted logic: 40% Confidence, 30% Regime, 15% Session, 15% Volatility.
+        """
+        weights = {
+            "confidence": 0.40,
+            "regime": 0.30,
+            "session": 0.15,
+            "volatility": 0.15,
+        }
+        score = (
+            confidence * weights["confidence"]
+            + regime_score * weights["regime"]
+            + session_score * weights["session"]
+            + vol_score * weights["volatility"]
+        )
+        return float(score)
 
     def _get_direction_icon(self, direction: SignalDirection | int) -> str:
         """Utility to get directional icon for UX consistency."""
@@ -633,8 +648,16 @@ class SignalExplainer:
             reasoning += f"Passed all filters with R:R of {risk_assessment.risk_reward_ratio:.2f}."
 
         # 7. Machine Attribution
+        confluence_score = self.calculate_confluence(
+            confidence,
+            regime_context.regime_alignment_score,
+            regime_context.session_alignment,
+            regime_context.volatility_alignment,
+        )
+
         machine_attr = {
             "model_confidence": confidence,
+            "confluence_score": confluence_score,
             "risk_passed": risk_assessment.passed,
             "risk_reward_ratio": risk_assessment.risk_reward_ratio,
             "risk_rejection_reasons": risk_assessment.rejection_reasons,
