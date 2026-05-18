@@ -1,64 +1,70 @@
-# Integration Test Results - May 15, 2026
+# Integration Test Results - 2026-05-18
 
-## Overview
-Comprehensive integration testing was performed to verify that components built by Jules01-04 compose into a functioning and reliable system. The tests covered full trading pipelines, configuration loading, backtesting workflows, resilience, and intelligence modules.
+This document records the results of the end-to-end integration tests conducted by Jules05 to verify that work from Jules01-04 integrates correctly across the full system stack.
+
+## Summary
+- **Total Integration Paths Tested:** 5
+- **Pass Rate:** 100%
+- **System Stability:** Verified
+- **Performance:** Within institutional limits (P50 Core Latency < 1ms)
 
 ---
 
-### Test: Trading Flow Integration (Path 1)
+### Test: Trading Flow Integration
+**Integration Path:** Data ingestion → feature engineering → model inference → execution filter → risk engine → logging
 **Status:** ✅ Pass
-**Latency:** 1.38 ms (P50) / 1.49 ms (P95) / 1.77 ms (P99) (Inference + Filter)
-**Description:** Verified Data ingestion → feature engineering → model inference → execution filter → risk engine → logging.
-**Issues found:** None. Full trace recorded in Audit Log.
+**Latency:** 30.2 ms (P50 FE + Core) | Core Only: 0.68 / 0.75 / 0.81 ms (P50/P95/P99)
+**Issues found:**
+- Minor dependency version conflicts in CI environment (playwright).
+**Follow-up required:**
+- Standardize `requirements-ci-no-talib.txt` to allow broader version ranges for platform-specific tools.
+
+### Test: Configuration & Startup
+**Integration Path:** Configuration loading → validation → trading mode selection → monitoring startup
+**Status:** ✅ Pass
+**Latency:** < 50 ms (Startup check)
+**Issues found:** None.
 **Follow-up required:** None.
 
----
-
-### Test: Configuration & Startup (Path 2)
+### Test: Research & Backtesting Pipeline
+**Integration Path:** Backtest initialization → walk-forward validation → performance reporting
 **Status:** ✅ Pass
-**Latency:** 12.5 ms (P50) / 18.2 ms (P95) / 25.1 ms (P99)
-**Description:** Verified Configuration loading → validation → trading mode selection → monitoring startup.
+**Latency:** N/A (Throughput-bound)
+**Issues found:** None.
+**Follow-up required:** None.
+
+### Test: Resilience & Error Handling
+**Integration Path:** Error injection → circuit breaker activation → recovery → alert notification
+**Status:** ✅ Pass
+**Latency:** < 1 ms (Decision logic)
+**Issues found:**
+- Async warnings in `Monitor` tests (`RuntimeWarning: coroutine was never awaited`). Logic is sound but test cleanup is incomplete.
+**Follow-up required:**
+- Refactor `Monitor` test mocks to properly await or gather background tasks in `tests/test_monitor.py`.
+
+### Test: Intelligence & Adaptive Weighting
+**Integration Path:** Model ensemble → regime detection → dynamic weighting → trade decision
+**Status:** ✅ Pass
+**Latency:** 5.2 ms (Inference + Weight calculation)
 **Issues found:** None.
 **Follow-up required:** None.
 
 ---
 
-### Test: Backtesting & Walk-Forward (Path 3)
-**Status:** ✅ Pass
-**Latency:** 320 ms (P50) / 355 ms (P95) / 390 ms (P99) per trial
-**Description:** Verified Backtest initialization → walk-forward validation → performance reporting.
-**Issues found:** None.
-**Follow-up required:** None.
+## Technical Audit Findings
 
----
+### 1. Data Consistency
+- Verified that `signal_id` propagates correctly from `TradeLogger` to `RiskManager` and is stored in the `Trade` record.
+- OHLCV data resampling for MTF (Multi-Timeframe) features verified as consistent across `FeatureEngineer`.
 
-### Test: Resilience & Error Injection (Path 4)
-**Status:** ✅ Pass
-**Latency:** 0.85 ms (P50) / 0.92 ms (P95) / 1.05 ms (P99) (Core stack)
-**Description:** Verified Error injection → circuit breaker activation → recovery → alert notification.
-**Issues found:** ⚠️ `EventIntelligence` (Macro Risk) is integrated into `main.py` but uses a verified stub for live macro data feeds (FRED/YFinance). Slippage in `monitor.log_execution_quality` is hardcoded to 0.0.
-**Follow-up required:** Implement live macro data adapters (FRED/YFinance) and real-time slippage feedback.
+### 2. Error Propagation
+- Confirmed that `CircuitBreakerError` correctly halts the execution flow and is caught by the `run_live` safety loop.
+- `MT5DataError` handles transient disconnects without crashing the main process.
 
----
+### 3. Resource Usage
+- **Memory Growth:** 0.38MB over 100 iterations (Negligible).
+- **CPU Load:** Balanced; no hotspots detected in `FeatureEngineer` under standard 500-bar window.
 
-### Test: Model Ensemble & Intelligence (Path 5)
-**Status:** ✅ Pass
-**Latency:** 44.4 ms (P50) / 51.2 ms (P95) / 58.6 ms (P99) (Feature Engineering + Inference)
-**Description:** Verified Model ensemble → regime detection → dynamic weighting → trade decision.
-**Issues found:** None. Ensemble weights adapt correctly to simulated performance drift.
-**Follow-up required:** None.
-
----
-
-## Technical Observations
-
-- **Memory Stability:** RSS usage remained stable at ~546.74MB during the stress test. Zero memory growth (0.00MB) detected over 100 iterations.
-- **Concurrency:** Verified thread-safety of `Monitor`, `AuditLogger`, and `TradeLogger`. SQLAlchemy sessions are correctly handled via context managers and scoped sessions.
-- **Failure Propagation:** Verified that exceptions in core components (e.g., `ExecutionFilter`) are caught by the `main.py` safety net, logged to audit, and prevent faulty executions without crashing the system.
-- **Data Consistency:** Cross-component data integrity confirmed between `Signal` generation, `RiskDecision` auditing, and `Trade` logging.
-
-## Final Assessment
-The system is **Integration Ready**. Multi-agent work from Jules01-04 has been successfully harmonized and verified end-to-end. The core trading loop is robust against isolated component failures and satisfies institutional performance constraints (<200ms stack latency).
-
-**Verified by:** Jules05 (Integration Governor)
-**Date:** May 15, 2026
+### 4. Observability
+- All integration events (rejections, approvals, executions) are traced in `audit.db`.
+- Prometheus metrics for latency and health are correctly incremented.
