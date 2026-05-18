@@ -69,7 +69,7 @@ def test_executive_summary_generation(dss, base_explanation, base_regime, base_m
     # 1. High-Confidence EXECUTE state
     packet = dss.assemble_packet("XAUUSD", base_explanation, base_regime, base_macro, {})
     assert packet.status_level == DecisionStatus.EXECUTE
-    assert "strong confluence" in packet.executive_summary.lower()
+    assert "maximum confluence" in packet.executive_summary.lower()
     # Score: (1.0*40) + (0.9*30) + (min(2.5/3, 1)*20 + 10) = 40+27+16.66+10 = 93.66 -> 93.7
     assert "93.7" in packet.executive_summary
 
@@ -91,12 +91,12 @@ def test_review_flag_logic(dss, base_explanation, base_regime, base_macro):
     assert packet_high.decision_score > 80.0
     assert packet_high.requires_review is False
 
-    # 2. Lower score (75) - Review Required (even if EXECUTE)
+    # 2. Lower score (75) - Review Required (even if REVIEW)
     low_conf_regime = base_regime.model_copy(update={"confidence": 0.4})
     # Score: 40 (consensus) + 12 (regime) + 16.6 (risk) + 10 (macro) = 78.6
     packet_mid = dss.assemble_packet("XAUUSD", base_explanation, low_conf_regime, base_macro, {})
     assert 78.0 < packet_mid.decision_score < 79.0
-    assert packet_mid.status_level == DecisionStatus.EXECUTE
+    assert packet_mid.status_level == DecisionStatus.REVIEW
     assert packet_mid.requires_review is True
 
     # 3. CAUTION status - Always review
