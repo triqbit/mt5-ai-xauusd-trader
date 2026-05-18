@@ -1,0 +1,4 @@
+# CVE-2025-61765: python-socketio < 5.11.0 allows insecure WebSocket connections (missing origin validation by default in some configurations)
+# We are pinned to 4.6.1 due to metaapi-cloud-sdk dependency constraints (< 5.0.0).
+# This is a documented operational risk.
+python-socketio CVE-2025-61765
