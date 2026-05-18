@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 
 from src.core.constants import SignalDirection
 from src.core.decision_support import (
@@ -496,8 +497,6 @@ def test_packet_serialization_completeness(mock_explanation, mock_regime, mock_m
 
 def test_packet_immutability():
     """Verify that DecisionPacket and PerformanceContext are frozen (immutable)."""
-    from pydantic import ValidationError
-
     with pytest.raises(ValidationError):
         packet = DecisionPacket(
             symbol="XAUUSD",
@@ -548,3 +547,159 @@ def test_decision_packet_field_completeness(mock_explanation, mock_regime, mock_
     assert isinstance(packet.performance, PerformanceContext)
     assert isinstance(packet.performance.sharpe_ratio, float)
     assert packet.performance.sharpe_ratio == 2.0
+
+
+def test_extreme_decision_scores(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that decision scores are correctly clamped and handle extreme cases."""
+    dss = DecisionSupportSystem()
+
+    # Case 1: Minimum possible score (0.0)
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.SELL, confidence=1.0, weight=1.0)
+    ]
+    mock_explanation.risk_assessment.risk_reward_ratio = 0.0
+    mock_regime = mock_regime.model_copy(update={"confidence": 0.0})
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.0})
+
+    packet_min = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert packet_min.decision_score == 0.0
+    assert packet_min.status_level == DecisionStatus.CAUTION  # Since it's executable (no blocks)
+
+    # Case 2: Maximum possible score (100.0)
+    mock_explanation.direction = SignalDirection.BUY
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
+    ]
+    mock_explanation.risk_assessment.risk_reward_ratio = 5.0  # (5/3) clamped to 1.0 -> 20pts
+    mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
+
+    packet_max = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert packet_max.decision_score == 100.0
+    assert packet_max.status_level == DecisionStatus.EXECUTE
+
+
+def test_missing_performance_metrics(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that DSS handles missing performance metrics gracefully."""
+    dss = DecisionSupportSystem()
+
+    # Empty metrics
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+
+    assert packet.performance.sharpe_ratio == 0.0
+    assert packet.performance.win_rate == 0.0
+    assert packet.performance.total_trades == 0
+    assert "Strategy performance is stable" not in packet.executive_summary
+
+
+def test_sizing_multiplier_clamping(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that sizing multiplier is always between 0.0 and 1.0."""
+    dss = DecisionSupportSystem()
+
+    # High score should result in sizing <= 1.0
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
+    ]
+    mock_explanation.risk_assessment.risk_reward_ratio = 10.0
+    mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
+
+    packet = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert 0.0 <= packet.sizing_multiplier <= 1.0
+
+    # Blocked state should result in 0.0
+    mock_macro_risk = mock_macro_risk.model_copy(update={"is_blocked": True, "reason": "Test"})
+    packet_blocked = dss.assemble_packet(
+        "XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {}
+    )
+    assert packet_blocked.sizing_multiplier == 0.0
+
+
+def test_invalid_executable_state_validation(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify Pydantic validator for executable state consistency."""
+    # Attempt to create an executable packet with blocking reasons
+    with pytest.raises(ValidationError, match="cannot be executable with active blocking reasons"):
+        DecisionPacket(
+            symbol="XAUUSD",
+            direction=SignalDirection.BUY,
+            consensus="Test",
+            status_level=DecisionStatus.EXECUTE,
+            decision_score=90.0,
+            is_executable=True,
+            blocking_reasons=["Some reason"],
+            explanation=mock_explanation,
+            regime=mock_regime,
+            macro_risk=mock_macro_risk,
+            performance=PerformanceContext(),
+        )
+
+
+def test_status_level_consistency_validation(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify that status level cannot be EXECUTE if is_executable is False."""
+    with pytest.raises(ValidationError, match="Status level cannot be EXECUTE if is_executable is False"):
+        DecisionPacket(
+            symbol="XAUUSD",
+            direction=SignalDirection.BUY,
+            consensus="Test",
+            status_level=DecisionStatus.EXECUTE,
+            decision_score=90.0,
+            is_executable=False,
+            blocking_reasons=[],
+            explanation=mock_explanation,
+            regime=mock_regime,
+            macro_risk=mock_macro_risk,
+            performance=PerformanceContext(),
+        )
+
+
+def test_sizing_multiplier_scaling(mock_explanation, mock_regime, mock_macro_risk):
+    """Verify non-linear scaling of sizing multiplier based on decision score."""
+    dss = DecisionSupportSystem()
+
+    # Case 1: Score 100 -> Multiplier should be 1.0 (if EXECUTE and macro 1.0)
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=1.0, weight=1.0)
+    ]
+    mock_explanation.risk_assessment.risk_reward_ratio = 3.0
+    mock_regime = mock_regime.model_copy(update={"confidence": 1.0})
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 1.0})
+
+    packet_100 = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert packet_100.decision_score == 100.0
+    assert packet_100.sizing_multiplier == 1.0
+
+    # Case 2: Score 50 -> Multiplier should be (0.5^1.5) * 0.5 (CAUTION penalty) * 0.5 (Macro)
+    # (0.5^1.5) approx 0.3535 * 0.5 * 0.5 = 0.088388
+    mock_explanation.model_attributions = [
+        ModelAttribution(model_name="M1", vote=SignalDirection.BUY, confidence=0.5, weight=0.5),
+        ModelAttribution(model_name="M2", vote=SignalDirection.SELL, confidence=0.5, weight=0.5),
+    ]
+    # Consensus score: (0.5/1.0) * 40 = 20
+    # Regime score: 0.5 * 30 = 15
+    # Risk score: (1.5/3)*20 + 0.5*10 = 10 + 5 = 15
+    # Total = 20 + 15 + 15 = 50
+    mock_regime = mock_regime.model_copy(update={"confidence": 0.5})
+    mock_explanation.risk_assessment.risk_reward_ratio = 1.5
+    mock_macro_risk = mock_macro_risk.model_copy(update={"risk_multiplier": 0.5})
+
+    packet_50 = dss.assemble_packet("XAUUSD", mock_explanation, mock_regime, mock_macro_risk, {})
+    assert packet_50.decision_score == 50.0
+    assert packet_50.status_level == DecisionStatus.CAUTION
+    expected_mult = (0.5**1.5) * 0.5 * 0.5
+    assert abs(packet_50.sizing_multiplier - expected_mult) < 1e-6
+
+    # Attempt to create an executable packet with BLOCKED status
+    with pytest.raises(ValidationError, match="cannot be executable with a BLOCKED status level"):
+        DecisionPacket(
+            symbol="XAUUSD",
+            direction=SignalDirection.BUY,
+            consensus="Test",
+            status_level=DecisionStatus.BLOCKED,
+            decision_score=90.0,
+            is_executable=True,
+            blocking_reasons=[],
+            explanation=mock_explanation,
+            regime=mock_regime,
+            macro_risk=mock_macro_risk,
+            performance=PerformanceContext(),
+        )

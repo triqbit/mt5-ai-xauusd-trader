@@ -28,7 +28,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -122,7 +122,7 @@ class DecisionPacket(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(UTC),
+        default_factory=lambda: datetime.now(timezone.utc),
         description="UTC timestamp when the decision was finalized.",
     )
     symbol: str = Field(..., description="Target trading symbol (e.g., XAUUSD).")
@@ -247,7 +247,7 @@ class DecisionSupportSystem:
         if is_executable:
             if decision_score >= 80.0:
                 status_level = DecisionStatus.EXECUTE
-            elif decision_score >= 60.0:
+            elif decision_score >= 70.0:
                 status_level = DecisionStatus.REVIEW
                 requires_review = True
             else:
