@@ -105,6 +105,45 @@ class CSVEventProvider(BaseEventProvider):
 
     def __init__(self, file_path: str):
         self.file_path = file_path
+        self._impact_map = {
+            "low": EventImpact.LOW,
+            "medium": EventImpact.MEDIUM,
+            "high": EventImpact.HIGH,
+            "critical": EventImpact.CRITICAL,
+        }
+
+    def _parse_impact(self, impact_str: str) -> int:
+        """Parses impact string or integer into EventImpact value."""
+        if not impact_str:
+            return EventImpact.LOW.value
+
+        try:
+            return int(impact_str)
+        except ValueError:
+            return self._impact_map.get(impact_str.lower(), EventImpact.LOW).value
+
+    def _parse_timestamp(self, ts_str: str) -> str:
+        """Standardizes timestamp strings for MacroEvent parsing."""
+        if not ts_str:
+            return ts_str
+
+        # Handle '2023-01-01 12:00:00' -> '2023-01-01T12:00:00'
+        if "T" not in ts_str and " " in ts_str:
+            ts_str = ts_str.replace(" ", "T")
+
+        # Ensure ISO format with timezone if missing
+        # Check for offset indicators: +, Z, or - (only after time separator T)
+        has_tz = "+" in ts_str or ts_str.endswith("Z")
+        if not has_tz and "T" in ts_str:
+            time_part = ts_str.split("T")[1]
+            if "-" in time_part:
+                has_tz = True
+
+        if not has_tz:
+            # Assume UTC if no timezone is provided
+            ts_str += "+00:00"
+
+        return ts_str
 
     def get_upcoming_events(
         self, start_time: datetime, end_time: datetime
@@ -121,28 +160,23 @@ class CSVEventProvider(BaseEventProvider):
             with open(self.file_path, newline="") as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
-                    # Basic conversion for CSV rows
+                    # Robust conversion for CSV rows
                     item = {
                         "name": row["name"],
                         "category": row.get("category", EventCategory.OTHER.value),
-                        "impact": int(row.get("impact", 1)),
-                        "timestamp": row["timestamp"],
+                        "impact": self._parse_impact(row.get("impact", "1")),
+                        "timestamp": self._parse_timestamp(row["timestamp"]),
                     }
+
                     if row.get("end_timestamp"):
-                        item["end_timestamp"] = row["end_timestamp"]
-                    if row.get("actual"):
+                        item["end_timestamp"] = self._parse_timestamp(row["end_timestamp"])
+
+                    if row.get("actual") and row["actual"].strip():
                         item["actual"] = float(row["actual"])
-                    if row.get("forecast"):
+                    if row.get("forecast") and row["forecast"].strip():
                         item["forecast"] = float(row["forecast"])
-                    if row.get("previous"):
+                    if row.get("previous") and row["previous"].strip():
                         item["previous"] = float(row["previous"])
-
-                    # CSV timestamps might be naive, assume UTC
-                    ts = row["timestamp"]
-                    if "T" not in ts and " " in ts:
-                        ts = ts.replace(" ", "T")
-
-                    item["timestamp"] = ts
 
                     event = MacroEvent(**item)
                     if (
@@ -378,13 +412,22 @@ class MetaAPIEventProvider(BaseEventProvider):
         name_upper = name.upper()
         if any(
             kw in name_upper
-            for kw in ["CPI", "INFLATION", "PCE", "CONSUMER PRICE", "PPI", "COST OF LIVING"]
+            for kw in [
+                "CPI",
+                "INFLATION",
+                "PCE",
+                "CONSUMER PRICE",
+                "CONSUMER PRICE INDEX",
+                "PPI",
+                "COST OF LIVING",
+            ]
         ):
             return EventCategory.CPI
         if any(
             kw in name_upper
             for kw in [
                 "NON-FARM PAYROLL",
+                "NONFARM PAYROLL",
                 "NFP",
                 "UNEMPLOYMENT",
                 "EMPLOYMENT",
@@ -410,7 +453,7 @@ class MetaAPIEventProvider(BaseEventProvider):
                 ]
             )
             and "PHILLY FED" not in name_upper
-        ):
+        ) or "FEDERAL OPEN MARKET COMMITTEE" in name_upper:
             return EventCategory.FOMC
         if (
             any(kw in name_upper for kw in ["RATE", "INTEREST", "DECISION", "BENCHMARK"])
@@ -426,7 +469,10 @@ class MetaAPIEventProvider(BaseEventProvider):
                     "CUT",
                 ]
             )
-        ) or any(kw in name_upper for kw in ["FUNDS RATE", "MONETARY POLICY"]):
+        ) or any(
+            kw in name_upper
+            for kw in ["FUNDS RATE", "MONETARY POLICY", "INTEREST RATE", "CASH RATE"]
+        ):
             return EventCategory.RATES
         if any(
             kw in name_upper
@@ -695,18 +741,28 @@ class EventIntelligence:
                     is_blocked = True
                     blocking_events.append(event)
 
-                # Calculate multiplier using severity_score (1.0 - severity_score)
+                # Calculate base multiplier using severity_score (1.0 - severity_score)
                 # But we apply stricter caps for institutional safety
-                event_mult = max(0.0, round(1.0 - event.severity_score, 2))
+                base_mult = max(0.0, round(1.0 - event.severity_score, 2))
 
                 # Extra institutional guardrails for major events
                 if event.category in major_categories and event.impact >= EventImpact.HIGH:
                     # Major high-impact events should never have more than 0.25 multiplier
-                    event_mult = min(event_mult, 0.25)
+                    base_mult = min(base_mult, 0.25)
 
                 # CRITICAL events always zero the multiplier
                 if event.impact == EventImpact.CRITICAL:
-                    event_mult = 0.0
+                    base_mult = 0.0
+
+                # Apply decaying multiplier for post-event cooldown windows
+                event_end = event.end_timestamp or event.timestamp
+                if now > event_end and post_window > 0:
+                    elapsed = (now - event_end).total_seconds() / 60.0
+                    decay_factor = min(1.0, elapsed / post_window)
+                    event_mult = base_mult + (1.0 - base_mult) * decay_factor
+                    event_mult = round(event_mult, 2)
+                else:
+                    event_mult = base_mult
 
                 min_multiplier = min(min_multiplier, event_mult)
 
