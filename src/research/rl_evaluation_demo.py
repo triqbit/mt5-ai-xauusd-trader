@@ -8,20 +8,19 @@ from __future__ import annotations
 
 import logging
 import os
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timezone
 
 from src.environment.gym_env import TradingEnv
 from src.models.ppo_agent import PPOAgent
 from src.models.regime_detector import RegimeDetector
-from src.research.rl_evaluation import (
-    RLEvaluator,
-    MomentumBaseline,
-    MeanReversionBaseline,
-    RandomBaseline
-)
 from src.research.reporting import ResearchOrchestrator, ResearchReporter, SectionStatus
+from src.research.rl_evaluation import (
+    MeanReversionBaseline,
+    RandomBaseline,
+    RLEvaluator,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +33,7 @@ def generate_synthetic_data(n_steps: int = 500) -> np.ndarray:
     # Base price
     price = 2000.0
     prices = []
-    for i in range(n_steps):
+    for _ in range(n_steps):
         # Add some trend and noise
         change = np.random.normal(0.1, 1.5)
         price += change
@@ -64,7 +63,6 @@ def run_demo():
     # Note: We use a fresh PPOAgent which will act randomly since it's not trained
     # In a real scenario, you would load a trained model.
     ppo_agent = PPOAgent(env=env)
-    momentum_agent = MomentumBaseline()
     mean_rev_agent = MeanReversionBaseline()
     random_agent = RandomBaseline()
 
@@ -77,7 +75,7 @@ def run_demo():
     comparison = evaluator.compare(
         agents=[ppo_agent, mean_rev_agent, random_agent],
         agent_names=["PPO_Agent_Untrained", "Mean_Reversion", "Random"],
-        baseline_name="Momentum" # Evaluator will run Momentum internally if not in list
+        baseline_name="Momentum",  # Evaluator will run Momentum internally if not in list
     )
 
     # 5. Generate Research Report
