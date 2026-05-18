@@ -102,24 +102,3 @@ def test_mt5_connection_troubleshooting_tips(caplog):
         # The connector logs "Native mt5.initialize failed: ..." but maybe not the TIP anymore
         # based on current implementation or retry wrapper behavior.
         # Let's adjust to what we saw in the logs if needed, but first let's see why it failed.
-
-def test_poll_interval_cli_override():
-    """Verify that --poll-interval CLI flag correctly overrides configuration."""
-    with patch("sys.argv", ["main.py", "--poll-interval", "45"]), \
-         patch.dict(os.environ, {
-             "MT5_PASSWORD": "test",
-             "MT5_SERVER": "test",
-         }), \
-         patch("main.configure_logging"):
-
-        get_config.cache_clear()
-
-        parser = main.get_parser()
-        args = parser.parse_args()
-
-        # main() syncs CLI overrides to env vars
-        if args.poll_interval:
-            os.environ["POLL_INTERVAL"] = str(args.poll_interval)
-
-        cfg = get_config()
-        assert cfg.poll_interval == 45

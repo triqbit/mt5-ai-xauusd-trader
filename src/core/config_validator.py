@@ -46,6 +46,7 @@ class ConfigValidator:
         self._check_margin_and_volatility_limits()
         self._check_execution_parameters()
         self._check_behavior_caps()
+        self._check_operational_parameters()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -589,17 +590,28 @@ class ConfigValidator:
                 )
             )
 
-    def _check_behavior_caps(self) -> None:
-        # 0. Polling interval validation
+    def _check_operational_parameters(self) -> None:
+        """Verify operational and polling parameters."""
         if self.config.poll_interval > 3600:
             self.errors.append(
                 ValidationError(
                     "POLL_INTERVAL",
-                    f"Polling interval {self.config.poll_interval}s is very long (>1 hour).",
+                    f"Polling interval ({self.config.poll_interval}s) exceeds 1 hour.",
                     False,
-                    "Verify if this is intentional for your strategy.",
+                    "Ensure this long interval is intended for your strategy.",
                 )
             )
+        if self.config.poll_interval < 1:
+            self.errors.append(
+                ValidationError(
+                    "POLL_INTERVAL",
+                    f"Invalid polling interval: {self.config.poll_interval}s.",
+                    True,
+                    "Set POLL_INTERVAL to at least 1 second.",
+                )
+            )
+
+    def _check_behavior_caps(self) -> None:
         """Verify behavior-based caps (Daily win, streaks)."""
         # 1. Daily Win Cap (RISK_LIMITS.md 2.2)
         if self.config.daily_win_cap > 0.10:

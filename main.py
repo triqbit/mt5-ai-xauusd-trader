@@ -208,7 +208,7 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = cfg.poll_interval  # seconds between signal evaluations
+    poll_interval = cfg.poll_interval
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -779,55 +779,8 @@ def run_setup_wizard() -> int:
     env_path = Path(".env")
     example_path = Path(".env.example")
 
-    # Track which keys we've handled to append missing ones later
-    handled_keys = set()
     lines = []
-
-    if env_path.exists():
-        # Update existing .env
-        with open(env_path, "r") as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    lines.append(line)
-                    continue
-
-                key = stripped.split("=")[0]
-                if key == "MT5_LOGIN":
-                    lines.append(f"MT5_LOGIN={login}\n")
-                    handled_keys.add(key)
-                elif key == "MT5_PASSWORD":
-                    lines.append(f"MT5_PASSWORD={password}\n")
-                    handled_keys.add(key)
-                elif key == "MT5_SERVER":
-                    lines.append(f"MT5_SERVER={server}\n")
-                    handled_keys.add(key)
-                elif key == "SYMBOL":
-                    lines.append(f"SYMBOL={symbol}\n")
-                    handled_keys.add(key)
-                elif key == "TIMEFRAME":
-                    lines.append(f"TIMEFRAME={timeframe}\n")
-                    handled_keys.add(key)
-                elif key == "POLL_INTERVAL":
-                    lines.append(f"POLL_INTERVAL={poll_interval}\n")
-                    handled_keys.add(key)
-                elif key == "MODE":
-                    lines.append(f"MODE={mode}\n")
-                    handled_keys.add(key)
-                elif key == "METAAPI_TOKEN" and meta_token:
-                    lines.append(f"METAAPI_TOKEN={meta_token}\n")
-                    handled_keys.add(key)
-                elif key == "METAAPI_ACCOUNT_ID" and meta_id:
-                    lines.append(f"METAAPI_ACCOUNT_ID={meta_id}\n")
-                    handled_keys.add(key)
-                else:
-                    lines.append(line)
-
-        # Append new keys that weren't in the original .env
-        if "POLL_INTERVAL" not in handled_keys:
-            lines.append(f"POLL_INTERVAL={poll_interval}\n")
-    elif example_path.exists():
-        # Create from example
+    if example_path.exists():
         with open(example_path, "r") as f:
             for line in f:
                 if line.startswith("MT5_LOGIN="):
@@ -898,11 +851,6 @@ Usage Examples:
 
   # Start LIVE trading (requires explicit confirmation)
   python main.py --mode live --algo ensemble --confirm-live
-    execution.add_argument(
-        "--poll-interval",
-        type=int,
-        help="Interval in seconds between market data polling and signal evaluation.",
-    )
 
   # Run a walk-forward backtest for a specific period
   python main.py --mode backtest --start 2017-01-01 --end 2026-03-30 --algo ppo
@@ -926,12 +874,12 @@ Usage Examples:
     execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
     execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
     execution.add_argument(
-        "--confirm-live",
-    execution.add_argument(
         "--poll-interval",
         type=int,
-        help="Interval in seconds between market data polling and signal evaluation.",
+        help="Interval in seconds between market data polling (default: 60).",
     )
+    execution.add_argument(
+        "--confirm-live",
         dest="confirm_live_trading",
         action="store_true",
         help="Explicitly acknowledge and confirm LIVE trading execution.",
@@ -1678,11 +1626,6 @@ def main() -> int:
         next_steps.add_row("Demo Trading:  ", f"python main.py --mode demo --algo {cfg.algorithm}")
         next_steps.add_row(
             "Live Trading:  ", f"python main.py --mode live --algo {cfg.algorithm} --confirm-live"
-    execution.add_argument(
-        "--poll-interval",
-        type=int,
-        help="Interval in seconds between market data polling and signal evaluation.",
-    )
         )
         next_steps.add_row(
             "Backtesting:   ",
