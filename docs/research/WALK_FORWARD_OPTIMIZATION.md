@@ -19,7 +19,7 @@ Configurations are ranked by a multi-factor `Robustness Score` rather than simpl
 - **IS-OOS Gap**: Penalty for strategies that perform significantly better in training than in testing (overfitting).
 - **Walk-Forward Efficiency (WFE)**: Ratio of OOS Sharpe to IS Sharpe. High WFE indicates a strategy that translates well from training to live-simulated trading. The score rewards WFE up to 1.2.
 - **Regime Consistency**: Performance stability across different market regimes (Trending, Ranging, etc.), frequency-weighted to ensure statistical significance. Gracefully handles sparse data by returning a neutral score (0.5) when fewer than two regimes are present.
-- **Stability Penalty**: Sensitivity of performance to small parameter perturbations. Uses scale-robust epsilon (1e-5) for float parameters and ensures integer parameters remain integers during sensitivity sweeps. Calculated using Coefficient of Variation (CV) with fragility safeguards.
+- **Stability Penalty**: Sensitivity of performance to small parameter perturbations. Uses scale-robust epsilon (1e-5) for float parameters and ensures integer parameters remain integers during sensitivity sweeps. Calculated using Coefficient of Variation (CV) with fragility safeguards. Uses a default annualization of 6240 bars/year, optimized for H1 intraday XAUUSD trading.
 - **Granular Sensitivity Tracking**: The optimizer now tracks individual Coefficient of Variation (CV) scores for each parameter across windows. This identifies which specific hyperparameters are most responsible for strategy fragility.
 
 ### 3. Institutional Reporting

@@ -90,7 +90,7 @@ def test_robustness_scoring_components(sample_data):
         {"Sharpe Ratio": 1.0 + (p["param"] * 0.1)},
         np.zeros(len(d)),
     )
-    penalty_zero, sens_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
+    penalty_zero, _sens_zero = optimizer._calculate_stability_penalty(zero_params, sample_data)
     assert penalty_zero > 0.0  # Should be non-zero due to epsilon perturbation
 
     # Test regime consistency
@@ -849,7 +849,7 @@ def test_bars_per_year_refined(sample_data):
     # Manually trigger a calculation that uses bars_per_year
     # BenchmarkEvaluator calculates Sharpe as (mean/std) * sqrt(bars_per_year)
     from src.research.benchmarks import BenchmarkEvaluator
-    evaluator = BenchmarkEvaluator(sample_data.iloc[:100], bars_per_year=config.bars_per_year)
+    _ = BenchmarkEvaluator(sample_data.iloc[:100], bars_per_year=config.bars_per_year)
 
     # We need to mock the returns inside the evaluator
     # BenchmarkEvaluator computes returns from close prices and signals.
