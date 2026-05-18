@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from src.core.audit_log import AuditLogger
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
     from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
@@ -431,11 +431,17 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
+                    open_positions_mt5 = connector.get_positions(cfg.symbol)
+
+                    risk_decision = (
+                        risk.validate_signal(signal, df_features, open_positions_mt5, model_health=health)
                         if direction != 0
-                        else False
+                        else None
                     )
+
+                    risk_approved = risk_decision.is_approved if risk_decision else False
+                    if risk_decision and risk_decision.adjusted_lot_size > 0:
+                        signal = signal.model_copy(update={"lot_size": risk_decision.adjusted_lot_size})
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -479,14 +485,12 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": [risk_decision.reason] if risk_decision and not risk_decision.is_approved else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason if risk_decision else "No signal",
                         }
 
                         regime_data = {
@@ -601,7 +605,7 @@ def run_live(
                                     symbol=cfg.symbol,
                                     direction=direction,
                                     entry_price=price,
-                                    lot_size=lot_size,
+                                    lot_size=signal.lot_size,
                                     signal_id=signal_id,
                                 )
                 # 6. Check for closed positions to update logger
@@ -865,7 +869,7 @@ Usage Examples:
         "--algo",
         dest="algorithm",
         choices=["ppo", "dreamer", "lstm", "ensemble", "transformer"],
-        help="AI algorithm architecture to use for signal generation.",
+        help="AI architecture to use for raw signal generation.",
     )
     execution.add_argument("--symbol", help="Trading symbol ticker (e.g., XAUUSD, EURUSD).")
     execution.add_argument("--timeframe", help="Chart timeframe for analysis (e.g., M5, H1, D1).")
@@ -1480,7 +1484,7 @@ def main() -> int:
             )
             return 1
     from src.core.decision_support import DecisionSupportSystem
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.core.health import HealthStatus, init_health_checker
     from src.core.trade_logger import TradeLogger
     from src.data.event_intelligence import (
