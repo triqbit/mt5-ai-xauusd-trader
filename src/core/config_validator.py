@@ -726,10 +726,26 @@ class ConfigValidator:
 
         sensitive_files = [
             Path(".env"),
-            Path("trades.db"),
-            Path("audit.db"),
             self.config.model_config.get("env_file"),
         ]
+
+        # Dynamically discover SQLite databases from config
+        from sqlalchemy.engine import make_url
+        for url_field in [self.config.database_url, self.config.redis_url]:
+            try:
+                url_str = url_field.get_secret_value() if hasattr(url_field, "get_secret_value") else str(url_field)
+                if url_str.startswith("sqlite") and ":memory:" not in url_str:
+                    url = make_url(url_str)
+                    if url.database:
+                        sensitive_files.append(Path(url.database))
+            except Exception:
+                continue
+
+        # Add default SQLite files as fallback if they exist
+        for fallback in ["trades.db", "audit.db"]:
+            p = Path(fallback)
+            if p.exists():
+                sensitive_files.append(p)
 
         # Filter out None and duplicates
         unique_paths = {Path(p).resolve() for p in sensitive_files if p and Path(p).exists()}

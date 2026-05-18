@@ -62,7 +62,7 @@ class SecretMaskingProcessor(logging.Filter):
                 if isinstance(secret_val, bytes):
                     secret_val = secret_val.decode("utf-8", errors="replace")
 
-                if isinstance(secret_val, str) and len(secret_val) > 3:
+                if isinstance(secret_val, str) and secret_val:
                     self.secrets.add(secret_val)
 
         # Generic URL credential extraction: protocol://user:password@host
@@ -76,7 +76,7 @@ class SecretMaskingProcessor(logging.Filter):
                     if ":" in auth_part:
                         # Password is the part after the LAST colon in the auth section
                         password = auth_part.rsplit(":", 1)[1]
-                        if password and len(password) > 3:
+                        if password:
                             self.secrets.add(password)
                 except (IndexError, ValueError):
                     continue
@@ -99,7 +99,7 @@ class SecretMaskingProcessor(logging.Filter):
 
         if isinstance(data, str):
             # 2. Mask known secret values in strings
-            if not self.secrets or len(data) < 4:
+            if not self.secrets:
                 return data
             result = data
             for secret in self.secrets:
