@@ -521,9 +521,9 @@ def test_terminal_dynamic_numbering(mocker):
     found_rl = any("2. RL Agent Evaluation" in s for s in calls)
 
     assert found_regime, f"Regime analysis header not found in: {calls}"
-    assert found_rl, (
-        f"RL Evaluation should be section 2, but header not found correctly in: {calls}"
-    )
+    assert (
+        found_rl
+    ), f"RL Evaluation should be section 2, but header not found correctly in: {calls}"
 
 
 def test_risk_audit_reporting():
