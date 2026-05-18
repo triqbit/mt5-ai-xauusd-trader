@@ -580,7 +580,11 @@ def run_live(
                     if direction != 0:
                         if not risk_approved:
                             final_status = "REJECTED_RISK"
-                        elif "filter_decision" in locals() and filter_decision and not filter_decision.is_approved:
+                        elif (
+                            "filter_decision" in locals()
+                            and filter_decision
+                            and not filter_decision.is_approved
+                        ):
                             final_status = f"BLOCKED_{filter_decision.blocked_by}"
                         else:
                             final_status = "APPROVED"
