@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
-from src.trading.risk_manager import RiskManager, DailyStats
+
+import pytest
+
+from src.trading.risk_manager import RiskManager
+
 
 @pytest.fixture
 def mock_config():
@@ -10,6 +13,7 @@ def mock_config():
     cfg.risk_per_trade = 0.01
     return cfg
 
+
 def test_reconcile_state_empty(mock_config):
     risk = RiskManager(mock_config, account_balance=10000.0)
     risk.reconcile_state(10000.0, [])
@@ -18,6 +22,7 @@ def test_reconcile_state_empty(mock_config):
     assert risk.daily.realised_pnl == 0.0
     assert risk.daily.trade_count == 0
     assert risk.daily.consecutive_losses == 0
+
 
 def test_reconcile_state_with_trades(mock_config):
     # Initial balance: 10000
@@ -38,6 +43,7 @@ def test_reconcile_state_with_trades(mock_config):
     assert risk.daily.peak_equity == 10250.0
     assert risk.daily.consecutive_losses == 0
 
+
 def test_reconcile_state_streak_and_drawdown(mock_config):
     # Initial balance: 10000
     # Trades: +100, -50, -50, -50
@@ -57,6 +63,7 @@ def test_reconcile_state_streak_and_drawdown(mock_config):
     assert risk.daily.peak_equity == 10100.0
     assert risk.daily.consecutive_losses == 3
     assert risk.peak_equity == 10100.0
+
 
 def test_reconcile_state_complex_peak(mock_config):
     # Initial balance: 10000
