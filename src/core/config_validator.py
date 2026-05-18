@@ -590,7 +590,18 @@ class ConfigValidator:
             )
 
     def _check_behavior_caps(self) -> None:
-        """Verify behavior-based caps (Daily win, streaks)."""
+        """Verify behavior-based caps (Daily win, streaks, polling)."""
+        # 0. Polling interval validation
+        if self.config.poll_interval > 3600:
+            self.errors.append(
+                ValidationError(
+                    "POLL_INTERVAL",
+                    f"Polling interval {self.config.poll_interval}s is very long (>1 hour).",
+                    False,
+                    "Verify if this is intentional for your strategy.",
+                )
+            )
+
         # 1. Daily Win Cap (RISK_LIMITS.md 2.2)
         if self.config.daily_win_cap > 0.10:
             self.errors.append(

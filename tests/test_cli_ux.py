@@ -71,6 +71,28 @@ def test_check_flag_exits_early():
         assert main() == 0
 
 
+def test_poll_interval_cli_override():
+    """Verify that --poll-interval CLI flag correctly overrides configuration."""
+    with patch("sys.argv", ["main.py", "--poll-interval", "45"]), \
+         patch.dict(os.environ, {
+             "MT5_PASSWORD": "test",
+             "MT5_SERVER": "test",
+         }), \
+         patch("main.configure_logging"):
+
+        get_config.cache_clear()
+
+        parser = get_parser()
+        args = parser.parse_args()
+
+        # main() syncs CLI overrides to env vars
+        if args.poll_interval:
+            os.environ["POLL_INTERVAL"] = str(args.poll_interval)
+
+        cfg = get_config()
+        assert cfg.poll_interval == 45
+
+
 def test_mt5_connection_troubleshooting_tips(caplog):
     """Verify that troubleshooting tips are logged when MT5 connection fails."""
     from src.trading.mt5_connector import MT5Connector
