@@ -6,6 +6,9 @@ on:
     branches: [main]
   pull_request_review:
     types: [submitted]
+  status:
+  check_run:
+    types: [completed]
 
 permissions:
   contents: write
@@ -24,7 +27,6 @@ jobs:
       has_tests: ${{ steps.compliance-check.outputs.has_tests }}
       has_docs: ${{ steps.compliance-check.outputs.has_docs }}
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
-      coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
       observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
     steps:
       - uses: actions/checkout@v5
@@ -32,14 +34,29 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get PR Information
+        id: pr-info
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          if [ -z "$PR_NUMBER" ]; then
+            # If triggered by status or check_run, we need to find the PR
+            PR_NUMBER=$(gh pr list --head "${{ github.head_ref || github.event.check_run.check_suite.head_branch }}" --format '{{.number}}' --limit 1)
+          fi
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v47
+        with:
+          pull_request_number: ${{ steps.pr-info.outputs.pr_number }}
 
       - name: Check for High-Risk Files
         id: risk-check
         run: |
           # Patterns that strictly block and escalate as per Jules05 mandate
+
           # Category: Live Trading Execution Logic
           EXECUTION_PATTERNS=(
             "src/trading/executor.py"
@@ -85,7 +102,6 @@ jobs:
                 echo "🚨 HIGH-RISK FILE DETECTED: $file"
                 TOUCHED_HIGH_RISK=true
 
-                # Determine category for better reporting
                 for p in "${EXECUTION_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Live Trading Execution Logic"; fi; done
                 for p in "${RISK_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Risk Parameters / Position Sizing"; fi; done
                 for p in "${AUTH_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Credentials / Auth Surface"; fi; done
@@ -124,11 +140,10 @@ jobs:
       - name: Check Observability Standards
         id: observability-check
         run: |
-          # Scan changed files in src/ for plain print statements (non-structlog/non-rich)
           BAD_LOGGING=false
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [[ "$file" =~ ^src/ ]]; then
-              if grep -E "\bprint\(" "$file" | grep -v "console.print" > /dev/null; then
+              if grep -E "\bprint\(" "$file" | grep -v "console.print" | grep -v "#" > /dev/null; then
                 echo "❌ OBSERVABILITY VIOLATION: Plain print statement found in $file"
                 BAD_LOGGING=true
               fi
@@ -141,11 +156,32 @@ jobs:
             echo "observability_pass=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check Coverage
-        id: coverage-check
+      - name: Verify CI Status and Approvals
+        id: verification
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         run: |
-          # Coverage enforcement is handled in ci.yml via --cov-fail-under=80
-          echo "coverage_pass=true" >> $GITHUB_OUTPUT
+          # Check for required approvals
+          APPROVALS=$(gh pr view $PR_NUMBER --json reviews --template '{{range .reviews}}{{if eq .state "APPROVED"}}x{{end}}{{end}}' | wc -c)
+          if [ "$APPROVALS" -eq 0 ]; then
+            echo "::warning::PR lacks required approvals."
+            echo "approvals_pass=false" >> $GITHUB_OUTPUT
+          else
+            echo "approvals_pass=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Check CI status (all checks must be successful)
+          CI_STATUS=$(gh pr view $PR_NUMBER --json statusCheckRollup --template '{{range .statusCheckRollup}}{{if ne .status "COMPLETED"}}pending{{else if ne .conclusion "SUCCESS"}}failure{{end}}{{end}}')
+          if [[ "$CI_STATUS" =~ "failure" ]]; then
+             echo "::error::CI checks failed."
+             echo "ci_pass=false" >> $GITHUB_OUTPUT
+          elif [[ "$CI_STATUS" =~ "pending" ]]; then
+             echo "::warning::CI checks are still pending."
+             echo "ci_pass=pending" >> $GITHUB_OUTPUT
+          else
+             echo "ci_pass=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Handle Violations
         if: |
@@ -155,7 +191,7 @@ jobs:
           steps.observability-check.outputs.observability_pass == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         run: |
           REASON="The following auto-merge criteria were not met:"
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
@@ -183,7 +219,10 @@ jobs:
     name: Enable Auto-Merge
     needs: enforce-policy
     runs-on: ubuntu-latest
-    if: success()
+    if: |
+      success() &&
+      needs.enforce-policy.outputs.risk_status == 'pass' &&
+      needs.enforce-policy.outputs.observability_pass == 'true'
     steps:
       - uses: actions/checkout@v5
       - name: Enable Auto-Merge
@@ -191,4 +230,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled."
+          # Final check on CI and Approvals before enabling
+          APPROVALS=$(gh pr view $PR_NUMBER --json reviews --template '{{range .reviews}}{{if eq .state "APPROVED"}}x{{end}}{{end}}' | wc -c)
+          CI_STATUS=$(gh pr view $PR_NUMBER --json statusCheckRollup --template '{{range .statusCheckRollup}}{{if ne .status "COMPLETED"}}pending{{else if ne .conclusion "SUCCESS"}}failure{{end}}{{end}}')
+
+          if [ "$APPROVALS" -gt 0 ] && [ -z "$CI_STATUS" ]; then
+            gh pr merge $PR_NUMBER --auto --squash --delete-branch || echo "⚠️ Auto-merge could not be enabled."
+          else
+            echo "Conditions for auto-merge not yet met (Approvals: $APPROVALS, CI Status: $CI_STATUS)."
+          fi
