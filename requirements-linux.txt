@@ -58,7 +58,7 @@ hypothesis==6.125.2
 optuna==4.8.0
 pre-commit==4.1.0
 ruff==0.15.13
-mypy==1.15.0
+mypy==2.1.0
 
 # ── Utilities ───────────────────────────────────────────────
 python-dateutil==2.9.0.post0
