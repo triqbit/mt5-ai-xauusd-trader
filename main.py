@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from src.core.decision_support import DecisionSupportSystem
     from src.core.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
-    from src.core.schemas import TradeSignal
+    from src.core.schemas import ModelSignal, RiskDecision, TradeSignal
     from src.core.trade_logger import TradeLogger
     from src.data.event_intelligence import EventIntelligence
     from src.models.base_model import BaseModel
@@ -432,11 +432,12 @@ def run_live(
                 # 6. Risk approval gate
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
+                    risk_decision = (
                         risk.approve(signal, signal_id=signal_id, model_health=health)
                         if direction != 0
-                        else False
+                        else None
                     )
+                    risk_approved = risk_decision.is_approved if risk_decision else False
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -480,14 +481,15 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [],
+                            "rejection_reasons": [risk_decision.blocked_by]
+                            if risk_decision and not risk_approved and risk_decision.blocked_by
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": "Passed all risk gates"
-                            if risk_approved
-                            else "Risk gate rejected",
+                            "summary": risk_decision.reason if risk_decision else "Risk gate rejected",
+                            "trace": risk_decision.trace if risk_decision else {},
                         }
 
                         regime_data = {

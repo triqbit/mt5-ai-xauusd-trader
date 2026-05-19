@@ -24,7 +24,7 @@ from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 
 logger = logging.getLogger(__name__)
@@ -81,30 +81,61 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision.
         """
+        trace = {
+            "circuit_breaker": self._check_circuit_breaker(),
+            "daily_loss": self._check_daily_loss(),
+            "max_positions": self._check_max_positions(),
+            "symbol_allocation": self._check_symbol_allocation(signal.symbol),
+            "min_confidence": self._check_minimum_confidence(signal.confidence),
+            "risk_reward": self._check_risk_reward(signal),
+            "consecutive_losses": self._check_consecutive_losses(),
+            "model_health": self._check_model_health(model_health),
+        }
+
         rejection_reason = ""
-        if not self._check_circuit_breaker():
+        blocked_by = None
+
+        if not trace["circuit_breaker"]:
             rejection_reason = "Circuit breaker active"
-        elif not self._check_daily_loss():
+            blocked_by = "CIRCUIT_BREAKER"
+        elif not trace["daily_loss"]:
             rejection_reason = "Daily loss limit reached"
-        elif not self._check_max_positions():
+            blocked_by = "DAILY_LOSS_LIMIT"
+        elif not trace["max_positions"]:
             rejection_reason = "Max positions reached"
-        elif not self._check_symbol_allocation(signal.symbol):
+            blocked_by = "MAX_POSITIONS"
+        elif not trace["symbol_allocation"]:
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
-        elif not self._check_minimum_confidence(signal.confidence):
+            blocked_by = "SYMBOL_ALLOCATION"
+        elif not trace["min_confidence"]:
             rejection_reason = f"Confidence {signal.confidence:.2f} too low"
-        elif not self._check_risk_reward(signal):
+            blocked_by = "PREDICTION_LIMIT"
+        elif not trace["risk_reward"]:
             rejection_reason = "Risk-Reward ratio too low"
-        elif not self._check_consecutive_losses():
+            blocked_by = "RISK_REWARD"
+        elif not trace["consecutive_losses"]:
             rejection_reason = "Max consecutive losses reached"
-        elif not self._check_model_health(model_health):
+            blocked_by = "ACTIVITY_LIMIT"
+        elif not trace["model_health"]:
             rejection_reason = "Model health metrics below threshold"
+            blocked_by = "MODEL_HEALTH"
 
         passed = rejection_reason == ""
+
+        decision = RiskDecision(
+            signal=signal,
+            is_approved=passed,
+            reason=rejection_reason or "Approved",
+            blocked_by=blocked_by,
+            trace=trace,
+            adjusted_lot_size=signal.lot_size if passed else 0.0
+        )
+
         if not passed:
             logger.warning(
                 "Signal REJECTED | %s %s | Reason: %s",
@@ -119,7 +150,7 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+        return decision
 
     def size_position(
         self,

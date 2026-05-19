@@ -26,7 +26,8 @@ except ImportError:
 
 from src.core.constants import SignalDirection
 from src.core.profiler import profile
-from src.models.base_model import BaseModel, Signal
+from src.models.base_model import BaseModel
+from src.core.schemas import ModelSignal
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
@@ -158,23 +159,23 @@ class EnsembleModel(BaseModel):
 
     def aggregate_signals(
         self,
-        signals: Dict[str, Signal],
+        signals: Dict[str, ModelSignal],
         symbol: str = "unknown",
         regime_info: Optional[RegimeInfo] = None,
-    ) -> Signal:
+    ) -> ModelSignal:
         """
         Aggregates pre-calculated signals from sub-models using weighted consensus.
 
         Args:
-            signals: Dictionary of algorithm names and their predicted Signal.
+            signals: Dictionary of algorithm names and their predicted ModelSignal.
             symbol: Trading symbol identifier.
             regime_info: Optional market regime information for adaptive safety.
 
         Returns:
-            Signal: The aggregated consensus signal.
+            ModelSignal: The aggregated consensus signal.
         """
         if not signals:
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0)
+            return ModelSignal(direction=SignalDirection.HOLD, confidence=0.0)
 
         # 1. Dissent Check: Block if there are conflicting BUY and SELL signals
         has_buy = any(s.direction == SignalDirection.BUY for s in signals.values())
@@ -182,7 +183,7 @@ class EnsembleModel(BaseModel):
 
         if has_buy and has_sell:
             logger.warning("Dissent detected: BUY and SELL conflict. Returning HOLD.")
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={
@@ -218,7 +219,7 @@ class EnsembleModel(BaseModel):
             },
             "weights": self.weights,
             "per_algo_votes": {k: s.direction for k, s in signals.items()},
-            "per_algo_signals": {k: s._asdict() for k, s in signals.items()},
+            "per_algo_signals": {k: s.model_dump() for k, s in signals.items()},
         }
 
         # 3. Adaptive Consensus Threshold Determination
@@ -281,14 +282,14 @@ class EnsembleModel(BaseModel):
                     )
                     metadata["veto_active"] = True
                     metadata["veto_model"] = name
-                    return Signal(
+                    return ModelSignal(
                         direction=SignalDirection.HOLD,
                         confidence=0.0,
                         metadata=metadata,
                     )
 
         if direction == SignalDirection.HOLD:
-            return Signal(direction=direction, confidence=confidence, metadata=metadata)
+            return ModelSignal(direction=direction, confidence=confidence, metadata=metadata)
 
         # 6. Defensive Safeguards (Risk Control & Drift Monitoring)
 
@@ -341,7 +342,7 @@ class EnsembleModel(BaseModel):
                     context_stability,
                 )
                 metadata["reason"] = "Critical market context instability"
-                return Signal(
+                return ModelSignal(
                     direction=SignalDirection.HOLD,
                     confidence=0.0,
                     metadata=metadata,
@@ -382,13 +383,13 @@ class EnsembleModel(BaseModel):
                 )
                 metadata["entropy_penalty"] = 0.10
 
-        return Signal(direction=direction, confidence=confidence, metadata=metadata)
+        return ModelSignal(direction=direction, confidence=confidence, metadata=metadata)
 
     def predict(
         self,
         features: np.ndarray,
         **kwargs: Any,
-    ) -> Signal:
+    ) -> ModelSignal:
         """
         Generate a trading signal from input features using internal models.
 
@@ -399,11 +400,11 @@ class EnsembleModel(BaseModel):
                 regime_info (RegimeInfo): Market regime information.
 
         Returns:
-            Signal: Consolidated ensemble signal.
+            ModelSignal: Consolidated ensemble signal.
         """
         seq = kwargs.get("seq")
         regime_info = kwargs.get("regime_info")
-        votes: Dict[str, Signal] = {}
+        votes: Dict[str, ModelSignal] = {}
 
         # PPO prediction
         if self.ppo_agent is not None:

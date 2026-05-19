@@ -1,5 +1,5 @@
 from src.core.constants import SignalDirection
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal as Signal
 from src.models.ensemble import EnsembleModel
 
 

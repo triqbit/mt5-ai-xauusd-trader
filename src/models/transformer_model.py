@@ -17,7 +17,8 @@ except ImportError:
     nn = None
 
 from src.core.constants import ModelAction, SignalDirection
-from src.models.base_model import BaseModel, Signal
+from src.models.base_model import BaseModel
+from src.core.schemas import ModelSignal
 
 
 class TimeSeriesTransformer(BaseModel):
@@ -78,7 +79,7 @@ class TimeSeriesTransformer(BaseModel):
         if self._module:
             self._module.load_state_dict(state_dict)
 
-    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> ModelSignal:
         """
         Generate a trading signal from input features using the Transformer model.
 
@@ -87,10 +88,10 @@ class TimeSeriesTransformer(BaseModel):
             **kwargs: Must contain 'seq' (np.ndarray) of shape (seq_len, input_dim).
 
         Returns:
-            Signal: Consolidated signal.
+            ModelSignal: Consolidated signal.
         """
         if not torch or not nn or not self._module:
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "PyTorch missing"},
@@ -122,13 +123,13 @@ class TimeSeriesTransformer(BaseModel):
             # Explicitly map ModelAction to SignalDirection via helper
             direction = ModelAction(action_idx).to_direction()
 
-            return Signal(
+            return ModelSignal(
                 direction=direction,
                 confidence=confidence,
                 metadata={"probabilities": probs_np.tolist()},
             )
         except Exception as e:
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": str(e)},
