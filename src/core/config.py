@@ -69,6 +69,13 @@ class TradingConfig(BaseSettings):
         description="Execution mode: demo, live, or backtest",
         validation_alias="MODE",
     )
+    poll_interval: int = Field(
+        default=60,
+        ge=1,
+        le=86400,
+        description="Market data polling frequency in seconds",
+        validation_alias="POLL_INTERVAL",
+    )
 
     # ── Risk Parameters (per RISK_LIMITS.md) ──────────────────────────────────
     max_positions: int = Field(
