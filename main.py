@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import sys
 import time
 import uuid
@@ -813,14 +814,21 @@ def run_setup_wizard() -> int:
             f"METAAPI_ACCOUNT_ID={meta_id}\n",
         ]
 
-    with open(env_path, "w") as f:
-        f.writelines(lines)
+    # Enterprise Security: Use os.open with 0o600 to prevent world-readable race condition
+    if os.name != "nt":
+        fd = os.open(env_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.writelines(lines)
+    else:
+        with open(env_path, "w") as f:
+            f.writelines(lines)
 
-    # Secure permissions
+    # Secure permissions (double-check)
     import contextlib
 
     with contextlib.suppress(Exception):
-        os.chmod(env_path, 0o600)
+        if os.name != "nt":
+            os.chmod(env_path, 0o600)
 
     console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
     console.print(
@@ -1096,9 +1104,16 @@ def main() -> int:
                 )
                 choice = input("\nRun Setup Wizard? [Y/n]: ").strip().lower()
                 if choice in ["", "y", "yes"]:
-                    # Create basic directories first
+                    # Create basic directories first with restrictive permissions
                     for d in ["data", "logs", "models/trained"]:
-                        Path(d).mkdir(parents=True, exist_ok=True)
+                        # Enterprise Security: Restricted access to data directories (0o700)
+                        p = Path(d)
+                        if os.name != "nt":
+                            p.mkdir(parents=True, exist_ok=True, mode=0o700)
+                            if p.exists():
+                                os.chmod(p, 0o700)
+                        else:
+                            p.mkdir(parents=True, exist_ok=True)
                     return run_setup_wizard()
                 else:
                     print(
@@ -1120,9 +1135,16 @@ def main() -> int:
                     with contextlib.suppress(Exception):
                         os.chmod(env_file, 0o600)
 
-                    # Ensure required directories exist
+                    # Ensure required directories exist with restrictive permissions
                     for d in ["data", "logs", "models/trained"]:
-                        Path(d).mkdir(parents=True, exist_ok=True)
+                        # Enterprise Security: Restricted access to data directories (0o700)
+                        p = Path(d)
+                        if os.name != "nt":
+                            p.mkdir(parents=True, exist_ok=True, mode=0o700)
+                            if p.exists():
+                                os.chmod(p, 0o700)
+                        else:
+                            p.mkdir(parents=True, exist_ok=True)
 
                     print("✅ Created .env with secure permissions and initialized directories.")
                     print("👉 Please edit .env with your credentials before proceeding.\n")
