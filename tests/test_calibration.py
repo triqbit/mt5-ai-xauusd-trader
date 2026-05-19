@@ -78,3 +78,63 @@ def test_overconfidence_mitigation():
     # If ECE is low, it should do nothing or very little
     stable = engine.mitigate_overconfidence(confidences, ece=0.01)
     assert np.all(stable == confidences)
+
+
+def test_calibration_fit_temperature():
+    """Verify temperature scaling fitting."""
+    engine = CalibrationEngine()
+    # Overconfident data: says 0.9, but actually 0.5 accuracy
+    confidences = np.full(100, 0.9)
+    outcomes = np.array([1] * 50 + [0] * 50)
+
+    # Before fit, ECE is high
+    res_before = engine.analyze(confidences, outcomes)
+    assert res_before.ece > 0.3
+
+    engine.fit(confidences, outcomes, method="temperature")
+    assert engine.temperature > 1.0  # T > 1 softens overconfidence
+
+    calibrated = engine.calibrate(confidences)
+    res_after = engine.analyze(calibrated, outcomes)
+    assert res_after.ece < res_before.ece
+
+
+def test_calibration_fit_platt():
+    """Verify Platt scaling fitting."""
+    engine = CalibrationEngine()
+    confidences = np.linspace(0.1, 0.9, 100)
+    # Binary outcomes with some correlation
+    outcomes = (confidences > 0.5).astype(int)
+
+    engine.fit(confidences, outcomes, method="platt")
+    assert engine._platt_model is not None
+
+    calibrated = engine.calibrate(confidences)
+    assert len(calibrated) == len(confidences)
+    assert np.all(calibrated >= 0) and np.all(calibrated <= 1)
+
+
+def test_calibration_fit_isotonic():
+    """Verify Isotonic scaling fitting."""
+    engine = CalibrationEngine()
+    confidences = np.linspace(0.1, 0.9, 100)
+    outcomes = (confidences > 0.4).astype(int)
+
+    engine.fit(confidences, outcomes, method="isotonic")
+    assert engine._isotonic_model is not None
+
+    calibrated = engine.calibrate(confidences)
+    assert np.all(np.diff(calibrated) >= 0)  # Isotonic must be monotonic
+
+
+def test_get_calibration_curve():
+    """Verify calibration curve data generation."""
+    engine = CalibrationEngine(n_bins=5)
+    confidences = np.array([0.1, 0.3, 0.5, 0.7, 0.9])
+    outcomes = np.array([0, 0, 1, 1, 1])
+
+    mean_pred, frac_pos = engine.get_calibration_curve(confidences, outcomes)
+    assert len(mean_pred) == len(frac_pos)
+    assert mean_pred[0] == 0.1
+    assert frac_pos[0] == 0.0
+    assert frac_pos[-1] == 1.0
