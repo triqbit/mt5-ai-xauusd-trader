@@ -211,3 +211,13 @@ def test_report_section_with_new_metrics(sample_data):
     assert hasattr(section.comparisons[0], "information_ratio")
     assert hasattr(section.comparisons[0], "omega_ratio")
     # In sample data they might be "0.00" if no outperformance or no gains
+
+
+def test_volatility_expansion_signals(sample_data):
+    from src.research.benchmarks import VolatilityExpansionStrategy
+
+    strategy = VolatilityExpansionStrategy(window=10, multiplier=1.5)
+    signals = strategy.predict(sample_data)
+    assert len(signals) == len(sample_data)
+    assert np.all(np.isin(signals, [0, 1, -1]))
+    assert np.all(signals[:10] == 0)

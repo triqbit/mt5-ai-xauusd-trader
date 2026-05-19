@@ -576,6 +576,62 @@ class DonchianChannelStrategy:
         return signals
 
 
+class VolatilityExpansionStrategy:
+    """
+    Volatility Expansion baseline strategy.
+
+    Generates signals when the current candle's range exceeds a multiple
+    of the Average True Range (ATR), indicating a potential breakout.
+    """
+
+    def __init__(self, window: int = 14, multiplier: float = 2.0):
+        """
+        Initialize the Volatility Expansion strategy.
+
+        Args:
+            window: Period for ATR calculation.
+            multiplier: Multiplier for the ATR-based expansion threshold.
+        """
+        self.window = window
+        self.multiplier = multiplier
+
+    @property
+    def name(self) -> str:
+        return f"Volatility_Expansion_{self.window}_{self.multiplier}"
+
+    def predict(self, df: pd.DataFrame) -> np.ndarray:
+        """
+        Predict signals using Volatility Expansion logic.
+
+        Args:
+            df: OHLCV DataFrame.
+
+        Returns:
+            np.ndarray: Signal array.
+        """
+        high = df["high"].values
+        low = df["low"].values
+        close = df["close"].values
+
+        tr1 = high - low
+        prev_close = pd.Series(close).shift(1).values
+        tr2 = np.abs(high - prev_close)
+        tr3 = np.abs(low - prev_close)
+        tr = np.nan_to_num(np.maximum(tr1, np.maximum(tr2, tr3)), nan=tr1[0])
+        atr = pd.Series(tr).rolling(window=self.window).mean().values
+
+        signals = np.zeros(len(df))
+        for i in range(self.window, len(df)):
+            candle_range = high[i] - low[i]
+            if candle_range > self.multiplier * atr[i - 1]:
+                if close[i] > close[i - 1]:
+                    signals[i] = 1.0
+                else:
+                    signals[i] = -1.0
+
+        return signals
+
+
 class ADXStrategy:
     """
     Trend-following strategy based on the Average Directional Index (ADX).
