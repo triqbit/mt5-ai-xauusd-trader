@@ -6,6 +6,8 @@ on:
     branches: [main]
   pull_request_review:
     types: [submitted]
+  check_suite:
+    types: [completed]
 
 permissions:
   contents: write
@@ -26,11 +28,11 @@ jobs:
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
       coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
       observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
+      pr_status_pass: ${{ steps.pr-status-check.outputs.pr_status_pass }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get changed files
         id: changed-files
@@ -40,36 +42,31 @@ jobs:
         id: risk-check
         run: |
           # Patterns that strictly block and escalate as per Jules05 mandate
-          # Category: Live Trading Execution Logic
           EXECUTION_PATTERNS=(
-            "src/trading/executor.py"
-            "src/trading/mt5_connector.py"
+            "src/trading/executor\.py"
+            "src/trading/mt5_connector\.py"
           )
-          # Category: Risk Parameters & Position Sizing
           RISK_PATTERNS=(
-            "src/core/risk_engine.py"
-            "src/trading/risk_engine.py"
-            "src/trading/risk_manager.py"
-            "src/trading/audited_risk_manager.py"
-            "src/trading/capital_allocator.py"
-            "src/trading/execution_filter.py"
+            "src/core/risk_engine\.py"
+            "src/trading/risk_engine\.py"
+            "src/trading/risk_manager\.py"
+            "src/trading/audited_risk_manager\.py"
+            "src/trading/capital_allocator\.py"
+            "src/trading/execution_filter\.py"
           )
-          # Category: Credentials, Secrets, & Auth Surface
           AUTH_PATTERNS=(
-            "config/secrets.*"
+            "config/secrets\.*"
             "\.env.*"
-            "src/core/config.py"
+            "src/core/config\.py"
           )
-          # Category: Docker & Infrastructure Control
           INFRA_PATTERNS=(
             "Dockerfile"
-            "docker-compose.yml"
+            "docker-compose\.yml"
           )
-          # Category: CI/CD Workflows affecting deployment
           CICD_PATTERNS=(
             "\.github/workflows/deploy.*"
+            "\.github/workflows/ci\.yml"
           )
-          # Category: Destructive Database Migrations
           DB_PATTERNS=(
             "migrations/.*"
           )
@@ -85,13 +82,12 @@ jobs:
                 echo "🚨 HIGH-RISK FILE DETECTED: $file"
                 TOUCHED_HIGH_RISK=true
 
-                # Determine category for better reporting
-                for p in "${EXECUTION_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Live Trading Execution Logic"; fi; done
-                for p in "${RISK_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Risk Parameters / Position Sizing"; fi; done
-                for p in "${AUTH_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Credentials / Auth Surface"; fi; done
-                for p in "${INFRA_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Docker / Infrastructure Control"; fi; done
-                for p in "${CICD_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="CI/CD Deployment Workflows"; fi; done
-                for p in "${DB_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Database Migrations"; fi; done
+                if [[ "$file" =~ src/trading/executor\.py ]] || [[ "$file" =~ src/trading/mt5_connector\.py ]]; then VIOLATED_CATEGORY="Live Trading Execution Logic"; fi
+                if [[ "$file" =~ src/core/risk_engine\.py ]] || [[ "$file" =~ src/trading/risk_engine\.py ]] || [[ "$file" =~ src/trading/risk_manager\.py ]]; then VIOLATED_CATEGORY="Risk Parameters / Position Sizing"; fi
+                if [[ "$file" =~ config/secrets\.* ]] || [[ "$file" =~ \.env.* ]] || [[ "$file" =~ src/core/config\.py ]]; then VIOLATED_CATEGORY="Credentials / Auth Surface"; fi
+                if [[ "$file" =~ Dockerfile ]] || [[ "$file" =~ docker-compose\.yml ]]; then VIOLATED_CATEGORY="Docker / Infrastructure Control"; fi
+                if [[ "$file" =~ \.github/workflows/deploy.* ]] || [[ "$file" =~ \.github/workflows/ci\.yml ]]; then VIOLATED_CATEGORY="CI/CD Deployment Workflows"; fi
+                if [[ "$file" =~ migrations/.* ]]; then VIOLATED_CATEGORY="Database Migrations"; fi
               fi
             done
           done
@@ -124,11 +120,10 @@ jobs:
       - name: Check Observability Standards
         id: observability-check
         run: |
-          # Scan changed files in src/ for plain print statements (non-structlog/non-rich)
           BAD_LOGGING=false
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [[ "$file" =~ ^src/ ]]; then
-              if grep -E "\bprint\(" "$file" | grep -v "console.print" > /dev/null; then
+              if sed 's/#.*//' "$file" | grep -E "\bprint\(" | grep -v "console\.print" > /dev/null; then
                 echo "❌ OBSERVABILITY VIOLATION: Plain print statement found in $file"
                 BAD_LOGGING=true
               fi
@@ -141,11 +136,28 @@ jobs:
             echo "observability_pass=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check Coverage
-        id: coverage-check
+      - name: Check PR Status (Approvals, Conflicts, CI)
+        id: pr-status-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Coverage enforcement is handled in ci.yml via --cov-fail-under=80
-          echo "coverage_pass=true" >> $GITHUB_OUTPUT
+          PR_DATA=$(gh pr view $PR_NUMBER --json reviewDecision,mergeable)
+          REVIEWS=$(echo "$PR_DATA" | jq -r '.reviewDecision')
+          MERGEABLE=$(echo "$PR_DATA" | jq -r '.mergeable')
+
+          PASS=true
+          if [ "$REVIEWS" != "APPROVED" ]; then
+            echo "❌ PR NOT APPROVED: $REVIEWS"
+            PASS=false
+          fi
+
+          if [ "$MERGEABLE" != "MERGEABLE" ]; then
+            echo "❌ PR HAS CONFLICTS OR UNKNOWN MERGEABILITY: $MERGEABLE"
+            PASS=false
+          fi
+
+          echo "pr_status_pass=$PASS" >> $GITHUB_OUTPUT
 
       - name: Handle Violations
         if: |
@@ -183,7 +195,7 @@ jobs:
     name: Enable Auto-Merge
     needs: enforce-policy
     runs-on: ubuntu-latest
-    if: success()
+    if: success() && needs.enforce-policy.outputs.pr_status_pass == 'true'
     steps:
       - uses: actions/checkout@v5
       - name: Enable Auto-Merge
