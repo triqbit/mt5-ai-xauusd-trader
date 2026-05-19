@@ -437,6 +437,10 @@ def run_live(
                         if direction != 0
                         else False
                     )
+                    if monitor and direction != 0:
+                        monitor.record_signal_funnel(
+                            "risk_manager", "passed" if risk_approved else "rejected"
+                        )
 
                 # 7. Execution Filter Cascade
                 filter_decision = None
@@ -458,6 +462,14 @@ def run_live(
                                 direction=signal.direction,
                                 trace=filter_decision.trace,
                                 is_approved=filter_decision.is_approved,
+                            )
+
+                        if monitor:
+                            monitor.record_signal_funnel(
+                                "execution_filter",
+                                "passed"
+                                if filter_decision.is_approved
+                                else f"blocked_{filter_decision.blocked_by.lower()}",
                             )
 
                         if not filter_decision.is_approved:
@@ -528,6 +540,9 @@ def run_live(
                             regime_info=regime_data,
                             execution_data=execution_data,
                         )
+
+                        if monitor:
+                            monitor.record_confluence(explanation.get_confluence_score())
 
                         # Log comprehensive decision trace for every non-hold signal
                         if audit_logger:
@@ -1563,7 +1578,7 @@ def main() -> int:
 
     # Model Factory based on configured algorithm
     if cfg.algorithm == "ensemble":
-        model = EnsembleModel(device="cpu", config=cfg)
+        model = EnsembleModel(device="cpu", config=cfg, monitor=monitor)
         ppo_path = args.model_dir / "ppo_xauusd.zip"
         lstm_path = args.model_dir / "lstm_xauusd.pt"
         if ppo_path.exists():
@@ -1589,7 +1604,7 @@ def main() -> int:
         log.warning(
             f"Algorithm {cfg.algorithm} not fully supported in main.py factory, falling back to Ensemble"
         )
-        model = EnsembleModel(device="cpu")
+        model = EnsembleModel(device="cpu", monitor=monitor)
 
     # Enterprise Health Gate
     health_checker = init_health_checker(
