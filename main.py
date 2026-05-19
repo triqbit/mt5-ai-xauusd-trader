@@ -209,7 +209,7 @@ def run_live(
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
     log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = cfg.poll_interval
+    poll_interval = 60  # seconds between signal evaluations
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -234,9 +234,6 @@ def run_live(
                 reason=f"periodic_check_loop_{loop_count}",
             )
         loop_count += 1
-
-        # 0. Initialize iteration variables
-        risk_approved = False
 
         # 0. Update account metrics at start of loop
         with profile("account_updates"):
@@ -667,16 +664,6 @@ def run_live(
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
-                # 7. Iteration Heartbeat for Institutional Observability
-                log.info(
-                    "iteration_summary",
-                    status="passed" if risk_approved else "filtered",
-                    confluence_score=explanation.get_confluence_score() if 'explanation' in locals() else 0.0,
-                    market_stability=regime_info.confidence if 'regime_info' in locals() else 0.0,
-                    direction=direction if 'direction' in locals() else 0,
-                    trace_id=structlog.contextvars.get_contextvars().get("trace_id"),
-                )
-
                 # Wait for next interval with operator feedback
                 if console:
                     with console.status(
@@ -764,7 +751,6 @@ def run_setup_wizard() -> int:
     timeframe = Prompt.ask(
         "Default timeframe", choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"], default="M5"
     )
-    poll_interval = IntPrompt.ask("Polling interval (seconds)", default=60)
 
     # 2. MT5 Credentials
     console.print("\n[bold]2. MetaTrader 5 Credentials[/]")
@@ -830,8 +816,6 @@ def run_setup_wizard() -> int:
                     lines.append(f"TIMEFRAME={timeframe}\n")
                 elif line.startswith("MODE="):
                     lines.append(f"MODE={mode}\n")
-                elif line.startswith("POLL_INTERVAL="):
-                    lines.append(f"POLL_INTERVAL={poll_interval}\n")
                 elif line.startswith("METAAPI_TOKEN=") and meta_token:
                     lines.append(f"METAAPI_TOKEN={meta_token.get_secret_value()}\n")
                 elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
@@ -847,7 +831,6 @@ def run_setup_wizard() -> int:
             f"SYMBOL={symbol}\n",
             f"TIMEFRAME={timeframe}\n",
             f"MODE={mode}\n",
-            f"POLL_INTERVAL={poll_interval}\n",
             f"METAAPI_TOKEN={meta_token.get_secret_value() if meta_token else ''}\n",
             f"METAAPI_ACCOUNT_ID={meta_id}\n",
         ]
@@ -1337,15 +1320,15 @@ def main() -> int:
 
             config_table.add_row(key, str(value), source)
 
-        if console:
-            console.print(
-                RichPanel(
-                    config_table,
-                    title="[bold blue]System Config[/]",
-                    border_style="blue",
-                    expand=False,
+            if console:
+                console.print(
+                    RichPanel(
+                        config_table,
+                        title="[bold blue]System Config[/]",
+                        border_style="blue",
+                        expand=False,
+                    )
                 )
-            )
         return 0
 
     # Re-verify if it was a Pydantic validation error if we somehow got past get_config()

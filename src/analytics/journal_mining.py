@@ -1534,9 +1534,7 @@ class JournalMiner:
             baseline_pf=float(baseline_pf),
         )
 
-    def run_mining(
-        self, weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS
-    ) -> JournalReport:
+    def run_mining(self, weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS) -> JournalReport:
         """Execute full mining suite and return typed report."""
         from src.core.trade_logger import BlockedSignalAnalysis
 

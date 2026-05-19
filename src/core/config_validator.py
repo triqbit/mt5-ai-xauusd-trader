@@ -46,7 +46,6 @@ class ConfigValidator:
         self._check_margin_and_volatility_limits()
         self._check_execution_parameters()
         self._check_behavior_caps()
-        self._check_operational_parameters()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -717,28 +716,6 @@ class ConfigValidator:
                     "Telegram notifications are active in backtest mode.",
                     False,
                     "Comment out TELEGRAM_TOKEN during backtests to avoid noise.",
-                )
-            )
-
-    def _check_operational_parameters(self) -> None:
-        """Verify operational parameters like polling intervals."""
-        # 1. Polling Interval validation
-        if self.config.poll_interval > 3600:
-            self.errors.append(
-                ValidationError(
-                    "POLL_INTERVAL",
-                    f"Poll interval {self.config.poll_interval}s exceeds 1 hour.",
-                    False,
-                    "Consider a shorter interval (e.g., 60s) for responsive trading.",
-                )
-            )
-        elif self.config.poll_interval < 1:
-            self.errors.append(
-                ValidationError(
-                    "POLL_INTERVAL",
-                    "Poll interval must be at least 1 second.",
-                    True,
-                    "Set POLL_INTERVAL to 1 or higher in .env.",
                 )
             )
 
