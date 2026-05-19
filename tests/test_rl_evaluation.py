@@ -125,7 +125,7 @@ def test_compare_agents(trading_env):
 
 def test_signal_adapter_compatibility(trading_env):
     from src.core.constants import SignalDirection
-    from src.models.base_model import Signal
+    from src.core.schemas import ModelSignal as Signal
 
     evaluator = RLEvaluator(env=trading_env)
 
@@ -309,7 +309,7 @@ def test_get_prediction_robustness():
                 return [2, 0]
             if obs[0] == 3:
                 from src.core.constants import SignalDirection
-                from src.models.base_model import Signal
+                from src.core.schemas import ModelSignal as Signal
 
                 return Signal(direction=SignalDirection.SELL, confidence=0.8)
             if obs[0] == 4:

@@ -24,6 +24,27 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from src.core.constants import SYMBOL_PATTERN, SignalDirection
 
 
+class ModelSignal(BaseModel):
+    """
+    Standardized model output schema.
+    Represents the raw prediction from an AI/ML model before risk vetting.
+
+    This model is immutable (frozen) and replaces the legacy Signal NamedTuple.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    direction: SignalDirection = Field(
+        ..., description="Predicted signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)"
+    )
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Model confidence score for the prediction"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Algorithm-specific metadata and audit data"
+    )
+
+
 class TradeSignal(BaseModel):
     """
     Enterprise-grade validated trading signal schema.
@@ -118,6 +139,39 @@ class TradeSignal(BaseModel):
                 raise ValueError(
                     f"SELL Take Profit ({self.take_profit}) must be below Entry Price ({self.entry_price})"
                 )
+        return self
+
+
+class RiskDecision(BaseModel):
+    """
+    Structured result of the risk management evaluation.
+    Enforces risk-aware decision making with mandatory rejection reasons.
+
+    Part of the 'Decision Funnel': Model -> Risk -> Filter.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    signal: TradeSignal = Field(..., description="The trade signal being evaluated")
+    is_approved: bool = Field(..., description="Risk approval status")
+    reason: str = Field(
+        default="", description="The primary reason for rejection or approval summary"
+    )
+    blocked_by: str | None = Field(
+        None, description="The specific risk layer that blocked execution"
+    )
+    adjusted_lot_size: float = Field(
+        default=0.0, ge=0.0, description="The lot size as calculated/adjusted by risk rules"
+    )
+    trace: dict[str, Any] = Field(
+        default_factory=dict, description="Audit trace of all risk layers evaluated"
+    )
+
+    @model_validator(mode="after")
+    def validate_risk_consistency(self) -> "RiskDecision":
+        """Ensure consistency between is_approved and blocked_by."""
+        if not self.is_approved and not self.blocked_by and not self.reason:
+            raise ValueError("A rejected risk decision must provide a reason or 'blocked_by'.")
         return self
 
 

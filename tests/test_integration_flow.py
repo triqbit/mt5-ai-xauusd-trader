@@ -247,7 +247,7 @@ def test_intelligence_ensemble_adaptation():
     obs = np.random.rand(140)
     # Mock models to ensure they participate
     from src.core.constants import SignalDirection
-    from src.models.base_model import Signal
+    from src.core.schemas import ModelSignal as Signal
     model.ppo_agent = MagicMock()
     model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
 

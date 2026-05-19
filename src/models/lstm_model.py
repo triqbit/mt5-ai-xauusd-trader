@@ -23,7 +23,8 @@ if TYPE_CHECKING:
     import torch
 
 from src.core.constants import ModelAction, SignalDirection
-from src.models.base_model import BaseModel, Signal
+from src.core.schemas import ModelSignal
+from src.models.base_model import BaseModel
 
 
 class LSTMAttentionModel(nn.Module if nn else object):
@@ -264,7 +265,7 @@ class LSTMModel(BaseModel):
         else:
             self.logger.warning("PyTorch not found. LSTMModel is disabled.")
 
-    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> ModelSignal:
         """
         Predicts price direction using the LSTM network.
 
@@ -274,7 +275,7 @@ class LSTMModel(BaseModel):
             **kwargs: Ignored.
 
         Returns:
-            A Signal object with direction, confidence, and probability distribution.
+            A ModelSignal object with direction, confidence, and probability distribution.
 
         Raises:
             ValueError: If features contain NaN/Inf or have invalid shape.
@@ -282,14 +283,14 @@ class LSTMModel(BaseModel):
         # Production-grade robustness: Check for NaN or Inf in input features
         if not np.isfinite(features).all():
             self.logger.error("Input features contain NaN or Inf values.")
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Invalid features: NaN or Inf detected"},
             )
 
         if self.model is None or not torch:
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Model not initialized or PyTorch missing"},
@@ -314,7 +315,7 @@ class LSTMModel(BaseModel):
             action_idx = int(np.argmax(probs))
             confidence = float(probs[action_idx])
 
-            return Signal(
+            return ModelSignal(
                 direction=ModelAction(action_idx).to_direction(),
                 confidence=confidence,
                 metadata={
@@ -327,7 +328,7 @@ class LSTMModel(BaseModel):
             self.logger.exception(f"Error during LSTM prediction: {e}")
             if isinstance(e, ValueError):
                 raise e
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": str(e)},

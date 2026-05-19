@@ -104,7 +104,7 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
 
         # 3. Model Inference
         from src.core.constants import SignalDirection
-        from src.models.base_model import Signal
+        from src.core.schemas import ModelSignal as Signal
         model.ppo_agent = MagicMock()
         model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
         signal_out = model.predict(obs, regime_info=regime_info)
@@ -309,7 +309,7 @@ def test_ensemble_intelligence_integration(sample_market_data):
 
     # 3. Decision
     from src.core.constants import SignalDirection
-    from src.models.base_model import Signal
+    from src.core.schemas import ModelSignal as Signal
     model.ppo_agent = MagicMock()
     model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
 

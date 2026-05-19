@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from src.core.constants import SignalDirection
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal as Signal
 from src.models.dreamer_agent import DreamerAgent
 from src.models.lstm_model import LSTMAttentionModel, LSTMModel, LSTMPricePredictor
 from src.models.ppo_agent import PPOAgent

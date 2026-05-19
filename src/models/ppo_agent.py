@@ -22,7 +22,8 @@ except ImportError:
     DummyVecEnv = None
 
 from src.core.constants import ModelAction, SignalDirection
-from src.models.base_model import BaseModel, Signal
+from src.core.schemas import ModelSignal
+from src.models.base_model import BaseModel
 
 
 class PPOAgent(BaseModel):
@@ -94,7 +95,7 @@ class PPOAgent(BaseModel):
         else:
             self.logger.debug("PPOAgent initialized without model or environment.")
 
-    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> ModelSignal:
         """
         Generate a trading signal from input features using the PPO policy.
 
@@ -103,7 +104,7 @@ class PPOAgent(BaseModel):
             **kwargs: Ignored.
 
         Returns:
-            A Signal object containing direction, confidence, and metadata.
+            A ModelSignal object containing direction, confidence, and metadata.
 
         Raises:
             ValueError: If features contain NaN/Inf or have invalid shape.
@@ -111,14 +112,14 @@ class PPOAgent(BaseModel):
         # Production-grade robustness: Check for NaN or Inf in input features
         if not np.isfinite(features).all():
             self.logger.error("Input features contain NaN or Inf values.")
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Invalid features: NaN or Inf detected"},
             )
 
         if self.model is None:
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Model not loaded"},
@@ -162,7 +163,7 @@ class PPOAgent(BaseModel):
                 direction = model_action.to_direction()
             except ValueError:
                 self.logger.error(f"Model returned invalid action index: {action_val}")
-                return Signal(
+                return ModelSignal(
                     direction=SignalDirection.HOLD,
                     confidence=0.0,
                     metadata={"error": f"Invalid action index {action_val}"},
@@ -182,13 +183,15 @@ class PPOAgent(BaseModel):
                         distribution = self.model.policy.get_distribution(obs_tensor)
                         # distribution.distribution.probs has shape (batch, n_actions)
                         probs_batch = distribution.distribution.probs.cpu().numpy()
-                        probs = probs_batch[0]  # Get probabilities for the first (and only) observation
+                        probs = probs_batch[
+                            0
+                        ]  # Get probabilities for the first (and only) observation
                         probabilities = probs.tolist()
                         confidence = float(probs[action_val])
                 except Exception as prob_err:
                     self.logger.debug(f"Could not extract probabilities from policy: {prob_err}")
 
-            return Signal(
+            return ModelSignal(
                 direction=direction,
                 confidence=confidence,
                 metadata={
@@ -202,7 +205,7 @@ class PPOAgent(BaseModel):
             self.logger.exception(f"Error during PPO prediction: {e}")
             if isinstance(e, ValueError):
                 raise e
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": str(e)},

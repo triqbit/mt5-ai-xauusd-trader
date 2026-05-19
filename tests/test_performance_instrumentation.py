@@ -42,7 +42,7 @@ def test_ensemble_model_profiling_blocks():
     model.ppo_agent = MagicMock()
     # Mock the return value of ppo.predict which returns a Signal
     from src.core.constants import SignalDirection
-    from src.models.base_model import Signal
+    from src.core.schemas import ModelSignal as Signal
     model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
 
     features = np.random.randn(140)

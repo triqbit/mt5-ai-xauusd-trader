@@ -23,9 +23,8 @@ from src.core.config import get_config
 from src.core.constants import SignalDirection
 from src.core.feature_engineering import FeatureEngineer
 from src.core.health import ComponentStatus, HealthStatus, init_health_checker
-from src.core.schemas import TradeSignal
+from src.core.schemas import ModelSignal as Signal, TradeSignal
 from src.core.trade_logger import RiskEvent, Trade, TradeLogger
-from src.models.base_model import Signal
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
