@@ -30,6 +30,9 @@ Detects patterns indicative of psychological or systemic fragility:
 ### 4. Session & Volatility Analysis
 Breaks down performance by Sydney, Tokyo, London, and New York sessions, and segments outcomes by volatility buckets to identify regime-specific weaknesses.
 
+### 5. Session Overlap Analysis
+Extracts performance metrics for periods where two major sessions are active simultaneously (e.g., London/New York overlap), which often represent periods of peak liquidity and volatility.
+
 ## Institutional Standards
 The engine utilizes industry-standard thresholds for anomaly detection:
 - **Z-Score Threshold (1.5):** Statistical significance for identifying session-based overtrading.

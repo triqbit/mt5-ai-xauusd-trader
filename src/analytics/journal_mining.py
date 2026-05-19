@@ -976,7 +976,12 @@ class JournalMiner:
         return sorted(results, key=lambda x: x.profit_factor, reverse=True)
 
     def analyze_session_overlaps(self, trades_df: pd.DataFrame) -> list[PatternConcentration]:
-        """Detect performance in session overlap periods (e.g. London/NY)."""
+        """
+        Detect performance in session overlap periods (e.g. London/NY).
+
+        Overlap periods often represent the highest liquidity and volatility,
+        which can be both highly profitable and high risk for certain models.
+        """
         if trades_df.empty:
             return []
 
@@ -1010,7 +1015,7 @@ class JournalMiner:
             results.append(
                 PatternConcentration(
                     attribute="session_overlap",
-                    value=overlap,
+                    value=str(overlap),
                     win_rate=win_rate,
                     profit_factor=profit_factor,
                     total_trades=trade_count,
@@ -1581,9 +1586,7 @@ class JournalMiner:
             baseline_pf=float(baseline_pf),
         )
 
-    def run_mining(
-        self, weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS
-    ) -> JournalReport:
+    def run_mining(self, weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS) -> JournalReport:
         """Execute full mining suite and return typed report."""
         from src.core.trade_logger import BlockedSignalAnalysis
 
