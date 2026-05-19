@@ -969,7 +969,59 @@ class JournalMiner:
                     )
                 )
 
+        # Session Overlaps (Enhancement)
+        overlap_stats = self.analyze_session_overlaps(trades_df)
+        results.extend(overlap_stats)
+
         return sorted(results, key=lambda x: x.profit_factor, reverse=True)
+
+    def analyze_session_overlaps(self, trades_df: pd.DataFrame) -> list[PatternConcentration]:
+        """
+        Detect performance in session overlap periods (e.g. London/NY).
+
+        Overlap periods often represent the highest liquidity and volatility,
+        which can be both highly profitable and high risk for certain models.
+        """
+        if trades_df.empty:
+            return []
+
+        df = trades_df.copy()
+        if "sessions" not in df.columns:
+            df["sessions"] = df["created_at"].apply(self._get_session)
+
+        df["overlap"] = df["sessions"].apply(
+            lambda x: " / ".join(sorted(x)) if len(x) > 1 else None
+        )
+
+        results = []
+        overlaps = df.dropna(subset=["overlap"])
+        if overlaps.empty:
+            return []
+
+        for overlap in overlaps["overlap"].unique():
+            group = overlaps[overlaps["overlap"] == overlap]
+            trade_count = len(group)
+            wins = group[group["pnl"] > 0]
+            losses = group[group["pnl"] < 0]
+            win_rate = len(wins) / trade_count
+            gross_profit = wins["pnl"].sum()
+            gross_loss = abs(losses["pnl"].sum())
+            profit_factor = (
+                gross_profit / gross_loss
+                if gross_loss > 0
+                else (float("inf") if gross_profit > 0 else 0.0)
+            )
+
+            results.append(
+                PatternConcentration(
+                    attribute="session_overlap",
+                    value=str(overlap),
+                    win_rate=win_rate,
+                    profit_factor=profit_factor,
+                    total_trades=trade_count,
+                )
+            )
+        return results
 
     def analyze_blocked_motifs(
         self, signals_df: pd.DataFrame, blocked_df: pd.DataFrame
@@ -1534,9 +1586,7 @@ class JournalMiner:
             baseline_pf=float(baseline_pf),
         )
 
-    def run_mining(
-        self, weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS
-    ) -> JournalReport:
+    def run_mining(self, weak_state_window_hours: int = PRE_DRAWDOWN_WINDOW_HOURS) -> JournalReport:
         """Execute full mining suite and return typed report."""
         from src.core.trade_logger import BlockedSignalAnalysis
 
@@ -1613,6 +1663,7 @@ class JournalMiner:
             blocked_df = pd.DataFrame(
                 [
                     {
+                        "signal_id": b.signal_id,
                         "rejection_reason": b.rejection_reason,
                         "would_have_won": b.would_have_won,
                         "opportunity_cost_pnl": b.opportunity_cost_pnl,
