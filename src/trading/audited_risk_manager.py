@@ -71,7 +71,6 @@ class AuditedRiskManager(RiskManager):
 
         if not passed:
             rejection_reasons = [k for k, v in decision_chain.items() if not v]
-            reason_str = ", ".join(rejection_reasons)
             if self.monitor:
                 for reason in rejection_reasons:
                     self.monitor.record_internal_rejection("risk_manager", reason.upper())

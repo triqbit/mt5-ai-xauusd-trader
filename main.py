@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from src.core.decision_support import DecisionSupportSystem
     from src.core.feature_engineering import FeatureEngineer
     from src.core.monitor import Monitor
-    from src.core.schemas import ModelSignal, RiskDecision, TradeSignal
+    from src.core.schemas import TradeSignal
     from src.core.trade_logger import TradeLogger
     from src.data.event_intelligence import EventIntelligence
     from src.models.base_model import BaseModel

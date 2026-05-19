@@ -26,8 +26,8 @@ except ImportError:
 
 from src.core.constants import SignalDirection
 from src.core.profiler import profile
-from src.models.base_model import BaseModel
 from src.core.schemas import ModelSignal
+from src.models.base_model import BaseModel
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
@@ -199,7 +199,7 @@ class EnsembleModel(BaseModel):
 
         total_active_weight = sum(self.weights.get(k, 0.0) for k in signals)
         if total_active_weight <= 0:
-            return Signal(direction=SignalDirection.HOLD, confidence=0.0)
+            return ModelSignal(direction=SignalDirection.HOLD, confidence=0.0)
 
         for name, sig in signals.items():
             norm_weight = self.weights.get(name, 0.0) / total_active_weight

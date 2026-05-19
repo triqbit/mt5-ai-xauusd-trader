@@ -170,9 +170,8 @@ class RiskDecision(BaseModel):
     @model_validator(mode="after")
     def validate_risk_consistency(self) -> "RiskDecision":
         """Ensure consistency between is_approved and blocked_by."""
-        if not self.is_approved:
-            if not self.blocked_by and not self.reason:
-                raise ValueError("A rejected risk decision must provide a reason or 'blocked_by'.")
+        if not self.is_approved and not self.blocked_by and not self.reason:
+            raise ValueError("A rejected risk decision must provide a reason or 'blocked_by'.")
         return self
 
 

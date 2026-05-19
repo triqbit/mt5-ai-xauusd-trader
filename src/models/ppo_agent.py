@@ -22,8 +22,8 @@ except ImportError:
     DummyVecEnv = None
 
 from src.core.constants import ModelAction, SignalDirection
-from src.models.base_model import BaseModel
 from src.core.schemas import ModelSignal
+from src.models.base_model import BaseModel
 
 
 class PPOAgent(BaseModel):
@@ -163,7 +163,7 @@ class PPOAgent(BaseModel):
                 direction = model_action.to_direction()
             except ValueError:
                 self.logger.error(f"Model returned invalid action index: {action_val}")
-                return Signal(
+                return ModelSignal(
                     direction=SignalDirection.HOLD,
                     confidence=0.0,
                     metadata={"error": f"Invalid action index {action_val}"},

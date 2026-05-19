@@ -13,8 +13,8 @@ from typing import Any
 import numpy as np
 
 from src.core.constants import SignalDirection
-from src.models.base_model import BaseModel
 from src.core.schemas import ModelSignal
+from src.models.base_model import BaseModel
 
 
 class DreamerAgent(BaseModel):

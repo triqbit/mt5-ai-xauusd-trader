@@ -18,9 +18,8 @@ from sqlalchemy import select
 from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.config import get_config
 from src.core.constants import SignalDirection
-from src.core.schemas import TradeSignal
+from src.core.schemas import ModelSignal as Signal, TradeSignal
 from src.core.trade_logger import TradeLogger
-from src.core.schemas import ModelSignal as Signal
 from src.models.ensemble import EnsembleModel
 from src.trading.execution_filter import ExecutionFilter
 

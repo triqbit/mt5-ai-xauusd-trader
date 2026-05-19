@@ -23,8 +23,8 @@ if TYPE_CHECKING:
     import torch
 
 from src.core.constants import ModelAction, SignalDirection
-from src.models.base_model import BaseModel
 from src.core.schemas import ModelSignal
+from src.models.base_model import BaseModel
 
 
 class LSTMAttentionModel(nn.Module if nn else object):
