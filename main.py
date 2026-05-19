@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import sys
 import time
 import uuid
@@ -707,7 +708,8 @@ def run_setup_wizard() -> int:
     Helps users configure .env without manual text editing.
     """
     import getpass
-    import platform
+
+    from pydantic import SecretStr
 
     try:
         from rich.console import Console
@@ -747,11 +749,13 @@ def run_setup_wizard() -> int:
     login = IntPrompt.ask("MT5 Account Login (Number)", default=0)
 
     # Use getpass for password to avoid echoing
-    password = ""
-    while not password:
-        password = getpass.getpass("MT5 Account Password: ")
-        if not password:
+    password_val = ""
+    while not password_val:
+        password_val = getpass.getpass("MT5 Account Password: ")
+        if not password_val:
             console.print("[red]Password cannot be empty.[/]")
+    password = SecretStr(password_val)
+    del password_val
 
     server = Prompt.ask("MT5 Broker Server (e.g., IC-Markets-Demo)", default="YOUR_SERVER_HERE")
 
@@ -759,13 +763,16 @@ def run_setup_wizard() -> int:
     console.print("\n[bold]3. MetaAPI Cloud Fallback (Optional)[/]")
     console.print("[dim]Required for non-Windows environments or cloud failover.[/]")
     use_meta = Prompt.ask("Do you want to configure MetaAPI?", choices=["y", "n"], default="n")
-    meta_token = ""
+    meta_token = None
     meta_id = ""
     if use_meta == "y":
-        while not meta_token:
-            meta_token = getpass.getpass("MetaAPI Token: ")
-            if not meta_token:
+        token_val = ""
+        while not token_val:
+            token_val = getpass.getpass("MetaAPI Token: ")
+            if not token_val:
                 console.print("[red]Token cannot be empty.[/]")
+        meta_token = SecretStr(token_val)
+        del token_val
         meta_id = Prompt.ask("MetaAPI Account ID")
 
     # 4. Confirm and Save
@@ -785,7 +792,7 @@ def run_setup_wizard() -> int:
                 if line.startswith("MT5_LOGIN="):
                     lines.append(f"MT5_LOGIN={login}\n")
                 elif line.startswith("MT5_PASSWORD="):
-                    lines.append(f"MT5_PASSWORD={password}\n")
+                    lines.append(f"MT5_PASSWORD={password.get_secret_value()}\n")
                 elif line.startswith("MT5_SERVER="):
                     lines.append(f"MT5_SERVER={server}\n")
                 elif line.startswith("SYMBOL="):
@@ -795,7 +802,7 @@ def run_setup_wizard() -> int:
                 elif line.startswith("MODE="):
                     lines.append(f"MODE={mode}\n")
                 elif line.startswith("METAAPI_TOKEN=") and meta_token:
-                    lines.append(f"METAAPI_TOKEN={meta_token}\n")
+                    lines.append(f"METAAPI_TOKEN={meta_token.get_secret_value()}\n")
                 elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
                     lines.append(f"METAAPI_ACCOUNT_ID={meta_id}\n")
                 else:
@@ -804,23 +811,30 @@ def run_setup_wizard() -> int:
         # Fallback if .env.example is missing
         lines = [
             f"MT5_LOGIN={login}\n",
-            f"MT5_PASSWORD={password}\n",
+            f"MT5_PASSWORD={password.get_secret_value()}\n",
             f"MT5_SERVER={server}\n",
             f"SYMBOL={symbol}\n",
             f"TIMEFRAME={timeframe}\n",
             f"MODE={mode}\n",
-            f"METAAPI_TOKEN={meta_token}\n",
+            f"METAAPI_TOKEN={meta_token.get_secret_value() if meta_token else ''}\n",
             f"METAAPI_ACCOUNT_ID={meta_id}\n",
         ]
 
-    with open(env_path, "w") as f:
-        f.writelines(lines)
+    # Enterprise Security: Use os.open with 0o600 to prevent world-readable race condition
+    if os.name != "nt":
+        fd = os.open(env_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.writelines(lines)
+    else:
+        with open(env_path, "w") as f:
+            f.writelines(lines)
 
-    # Secure permissions
+    # Secure permissions (double-check)
     import contextlib
 
     with contextlib.suppress(Exception):
-        os.chmod(env_path, 0o600)
+        if os.name != "nt":
+            os.chmod(env_path, 0o600)
 
     console.print("[bold green]✅ Configuration saved to .env with secure permissions.[/]")
     console.print(
@@ -1096,9 +1110,16 @@ def main() -> int:
                 )
                 choice = input("\nRun Setup Wizard? [Y/n]: ").strip().lower()
                 if choice in ["", "y", "yes"]:
-                    # Create basic directories first
+                    # Create basic directories first with restrictive permissions
                     for d in ["data", "logs", "models/trained"]:
-                        Path(d).mkdir(parents=True, exist_ok=True)
+                        # Enterprise Security: Restricted access to data directories (0o700)
+                        p = Path(d)
+                        if os.name != "nt":
+                            p.mkdir(parents=True, exist_ok=True, mode=0o700)
+                            if p.exists():
+                                os.chmod(p, 0o700)
+                        else:
+                            p.mkdir(parents=True, exist_ok=True)
                     return run_setup_wizard()
                 else:
                     print(
@@ -1120,9 +1141,16 @@ def main() -> int:
                     with contextlib.suppress(Exception):
                         os.chmod(env_file, 0o600)
 
-                    # Ensure required directories exist
+                    # Ensure required directories exist with restrictive permissions
                     for d in ["data", "logs", "models/trained"]:
-                        Path(d).mkdir(parents=True, exist_ok=True)
+                        # Enterprise Security: Restricted access to data directories (0o700)
+                        p = Path(d)
+                        if os.name != "nt":
+                            p.mkdir(parents=True, exist_ok=True, mode=0o700)
+                            if p.exists():
+                                os.chmod(p, 0o700)
+                        else:
+                            p.mkdir(parents=True, exist_ok=True)
 
                     print("✅ Created .env with secure permissions and initialized directories.")
                     print("👉 Please edit .env with your credentials before proceeding.\n")
@@ -1135,8 +1163,6 @@ def main() -> int:
 
     # 2. Handle missing dependencies gracefully for diagnostic flags
     if not HAS_DEPENDENCIES and not is_diagnostic:
-        import platform
-
         print("=" * 70)
         print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
         print("=" * 70)
@@ -1325,8 +1351,6 @@ def main() -> int:
             log.warning("Startup validation passed with warnings.")
 
     # ── Startup Summary ────────────────────────────────────────────────────────
-    import platform
-
     try:
         from rich.console import Console as RichConsole
         from rich.panel import Panel as RichPanel

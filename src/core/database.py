@@ -59,8 +59,12 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA busy_timeout=5000")
         cursor.execute("PRAGMA synchronous=NORMAL")
+        # Enterprise Security: Overwrite deleted data with zeroes
+        cursor.execute("PRAGMA secure_delete=ON")
         cursor.close()
-        logger.debug("SQLite pragmas (foreign_keys, WAL, busy_timeout, synchronous) enabled.")
+        logger.debug(
+            "SQLite pragmas (foreign_keys, WAL, busy_timeout, synchronous, secure_delete) enabled."
+        )
 
 
 @lru_cache(maxsize=16)
@@ -72,14 +76,30 @@ def get_engine(db_url: str) -> Engine:
     is_sqlite = db_url.startswith("sqlite")
 
     # Security: Enforce restrictive file permissions for SQLite databases
-    if is_sqlite and ":memory:" not in db_url and db_url != "sqlite://":
+    # Robust check for in-memory SQLite to skip file-system operations
+    is_memory = ":memory:" in db_url or db_url in ("sqlite://", "sqlite:///")
+
+    if is_sqlite and not is_memory:
         try:
             url = make_url(db_url)
             if url.database:
-                db_path = Path(url.database)
-                # Ensure parent directory exists
-                if not db_path.parent.exists():
-                    db_path.parent.mkdir(parents=True, exist_ok=True)
+                db_path = Path(url.database).resolve()
+                # Ensure parent directory exists with restrictive permissions
+                # Only harden if the parent is not the current working directory
+                # to avoid accidental lockouts from the project root.
+                cwd = Path.cwd().resolve()
+                if db_path.parent != cwd:
+                    if not db_path.parent.exists():
+                        # Enterprise Security: Restricted access to data directories (0o700)
+                        if os.name != "nt":
+                            db_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                        else:
+                            db_path.parent.mkdir(parents=True, exist_ok=True)
+                    elif os.name != "nt":
+                        # Enforce restrictive permissions on existing parent directory
+                        current_mode = stat.S_IMODE(os.stat(db_path.parent).st_mode)
+                        if current_mode & (stat.S_IRWXG | stat.S_IRWXO):
+                            os.chmod(db_path.parent, 0o700)
 
                 # Pre-create or harden existing file permissions
                 if not db_path.exists():
