@@ -720,53 +720,79 @@ class ConfigValidator:
             )
 
     def _check_file_permissions(self) -> None:
-        """Verify sensitive files have restrictive permissions (Linux/Mac only)."""
+        """Verify sensitive files and directories have restrictive permissions (Linux/Mac only)."""
         if sys.platform == "win32":
             return
 
+        # 1. Identify sensitive files dynamically from configuration
         sensitive_files = [
             Path(".env"),
-            Path("trades.db"),
-            Path("audit.db"),
             self.config.model_config.get("env_file"),
         ]
 
-        # Filter out None and duplicates
-        unique_paths = {Path(p).resolve() for p in sensitive_files if p and Path(p).exists()}
+        # Resolve SQLite database paths if applicable
+        db_urls = [self.config.database_url.get_secret_value()]
+        if hasattr(self.config, "redis_url") and self.config.redis_url:
+            db_urls.append(self.config.redis_url.get_secret_value())
 
-        for path in unique_paths:
-            try:
-                mode = os.stat(path).st_mode
-                # Check if group or others have any permissions (0o077 mask)
-                if mode & (stat.S_IRWXG | stat.S_IRWXO):
-                    current_mode = oct(stat.S_IMODE(mode))
+        from sqlalchemy.engine import make_url
 
-                    # Enterprise Security: Automated permission hardening
-                    try:
-                        os.chmod(path, 0o600)
-                        # Verify hardening
-                        new_mode = os.stat(path).st_mode
-                        if not (new_mode & (stat.S_IRWXG | stat.S_IRWXO)):
-                            # Only log a warning if it was insecure but successfully hardened
-                            self.errors.append(
-                                ValidationError(
-                                    "FILE_PERMISSION",
-                                    f"Hardened insecure permissions for {path.name} from {current_mode} to 0o600.",
-                                    False,
-                                    "N/A (Automatically Corrected)",
-                                )
-                            )
-                            continue
-                    except Exception as e:
-                        # If automated hardening fails, report as warning
+        for url_str in db_urls:
+            if url_str.startswith("sqlite"):
+                try:
+                    url = make_url(url_str)
+                    if url.database and ":memory:" not in url.database:
+                        sensitive_files.append(Path(url.database))
+                except Exception:
+                    continue
+
+        # Add default filenames as fallback
+        sensitive_files.extend([Path("trades.db"), Path("audit.db")])
+
+        # 2. Identify sensitive operational directories
+        sensitive_dirs = [
+            Path("data"),
+            Path("logs"),
+            Path("models/trained"),
+        ]
+
+        # Process Files (Target: 0o600)
+        unique_file_paths = {Path(p).resolve() for p in sensitive_files if p and Path(p).exists()}
+        for path in unique_file_paths:
+            self._harden_path(path, 0o600, stat.S_IRWXG | stat.S_IRWXO)
+
+        # Process Directories (Target: 0o700)
+        unique_dir_paths = {Path(p).resolve() for p in sensitive_dirs if p and Path(p).exists()}
+        for path in unique_dir_paths:
+            self._harden_path(path, 0o700, stat.S_IRWXG | stat.S_IRWXO)
+
+    def _harden_path(self, path: Path, target_mode: int, forbidden_mask: int) -> None:
+        """Helper to check and automatically harden file/directory permissions."""
+        try:
+            mode = os.stat(path).st_mode
+            if mode & forbidden_mask:
+                current_mode_str = oct(stat.S_IMODE(mode))
+                try:
+                    os.chmod(path, target_mode)
+                    # Verify hardening
+                    new_mode = os.stat(path).st_mode
+                    if not (new_mode & forbidden_mask):
                         self.errors.append(
                             ValidationError(
                                 "FILE_PERMISSION",
-                                f"Insecure permissions for {path.name}: {current_mode}. Automated hardening failed: {e}",
+                                f"Hardened insecure permissions for {path.name} from {current_mode_str} to {oct(target_mode)}.",
                                 False,
-                                f"Run 'chmod 600 {path.name}' manually.",
+                                "N/A (Automatically Corrected)",
                             )
                         )
-            except Exception:
-                # Log but don't fail if we can't check permissions
-                pass
+                except Exception as e:
+                    self.errors.append(
+                        ValidationError(
+                            "FILE_PERMISSION",
+                            f"Insecure permissions for {path.name}: {current_mode_str}. Automated hardening failed: {e}",
+                            False,
+                            f"Run 'chmod {oct(target_mode)[2:]} {path.name}' manually.",
+                        )
+                    )
+        except Exception:
+            pass

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Security Hardening (Jules02):**
+    - Enforced `0o700` permissions on operational directories (`data`, `logs`, `models/trained`) to prevent unauthorized local access.
+    - Implemented `PRAGMA secure_delete=ON` for SQLite databases to ensure deleted data is unrecoverable.
+    - Hardened `.env` file creation in the Setup Wizard using `os.open` with `0o600` to prevent race conditions and world-readable secrets.
+    - Enhanced secret masking to protect `SecretStr` values regardless of length (removed 4-character minimum).
+    - Hardened directory permissions for SQLite databases by ensuring parent folders are locked down to `0o700`.
 - **Adaptive Ensemble Safety:** Implemented "Veto Power" (blocks trades if any sub-model has <0.40 confidence) and regime-adaptive consensus thresholds (raises to 80% during NEWS_SHOCK or VOLATILE_BREAKOUT).
 - **Transition-Aware Hardening:** Automatically increases required ensemble consensus during high-likelihood market regime shifts.
 - **Resilient Bootstrapping:** Enhanced `scripts/bootstrap.sh` to handle TA-Lib installation failures gracefully, allowing setup to complete with functional fallbacks.
