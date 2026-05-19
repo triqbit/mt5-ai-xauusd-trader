@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Centralized Loop Control (Jules02):** Market data polling interval is now configurable via `POLL_INTERVAL` (1s-86400s) with operational safety warnings for intervals > 1 hour.
+- **Iteration Heartbeat:** Added a structured `iteration_summary` log to the live trading loop, providing real-time visibility into signal confluence, market stability, and decision status.
 - **Decision Funnel Telemetry:** Implemented a structured signal progression tracking system via `SIGNAL_FUNNEL_COUNTER` to observe decision drop-offs across ensemble, risk, and execution layers.
 - **Confluence Metrics:** Added `SIGNAL_CONFLUENCE_HISTOGRAM` to track the distribution of weighted confluence scores for institutional signal auditing.
 - **Security Hardening (Jules02):**
@@ -20,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Transition-Aware Hardening:** Automatically increases required ensemble consensus during high-likelihood market regime shifts.
 - **Resilient Bootstrapping:** Enhanced `scripts/bootstrap.sh` to handle TA-Lib installation failures gracefully, allowing setup to complete with functional fallbacks.
 - **Accurate Diagnostics:** Updated `scripts/doctor.py` to report missing TA-Lib as a WARNING instead of a CRITICAL FAILURE, aligning with the bot's built-in fallback capabilities.
-- **Interactive Setup Wizard:** Introduced a guided CLI configuration wizard (`python main.py --setup`) to simplify `.env` initialization and MT5 credential management.
+- **Interactive Setup Wizard:** Introduced a guided CLI configuration wizard (`python main.py --setup`) to simplify `.env` initialization and MT5 credential management. Added support for configuring `POLL_INTERVAL` during setup.
 - **Improved CLI Ergonomics:** Refactored argument parsing into logical groups (Execution, Backtesting, Setup, Logging) and enhanced `--help` readability.
 - **Enhanced Startup Visibility:** Updated the configuration summary panel to include masked MT5 account details and server information for operator verification.
 - **Comprehensive Monitoring System:** Implemented full monitoring and alerting system in `src/core/monitor.py` including equity curve tracking, Prometheus metrics, and granular Telegram alerts.
@@ -49,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement Institutional Decision Support System (#1086)
 
 ### Fixed
+- **CLI Configuration Display:** Optimized `--show-config` to print a single, high-fidelity summary table instead of repeating the table for every field.
 - **Dependency Harmonization:** Aligned `python-socketio` version to 5.14.0 across `requirements.txt` and `pyproject.toml` to resolve synchronization mismatches.
 - Resolve undefined name `batch_idx` in LSTMModel training loop.
 - Resolve starlette and fastapi version conflicts in requirements files.
