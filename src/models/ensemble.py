@@ -30,6 +30,7 @@ from src.models.base_model import BaseModel, Signal
 
 if TYPE_CHECKING:
     from src.core.config import TradingConfig
+    from src.core.monitor import Monitor
 from src.models.dreamer_agent import DreamerAgent
 from src.models.dynamic_ensemble import DynamicEnsemble
 from src.models.lstm_model import LSTMModel
@@ -56,6 +57,7 @@ class EnsembleModel(BaseModel):
         consensus_threshold: float = 0.60,
         model_weights: Optional[Dict[str, float]] = None,
         config: Optional[TradingConfig] = None,
+        monitor: Optional[Monitor] = None,
     ) -> None:
         """
         Initialize the EnsembleModel.
@@ -65,10 +67,12 @@ class EnsembleModel(BaseModel):
             consensus_threshold: Required weighted agreement (default 60%).
             model_weights: Initial weights for each algorithm.
             config: Optional trading configuration for risk thresholds.
+            monitor: Optional monitor instance for telemetry.
         """
         super().__init__()
         self.device = device
         self.cfg = config
+        self.monitor = monitor
         self.dynamic_ensemble = DynamicEnsemble(
             model_names=self.ALGORITHMS, smoothing_factor=0.1, max_swing=0.05, min_weight=0.05
         )
@@ -182,6 +186,8 @@ class EnsembleModel(BaseModel):
 
         if has_buy and has_sell:
             logger.warning("Dissent detected: BUY and SELL conflict. Returning HOLD.")
+            if self.monitor:
+                self.monitor.record_signal_funnel("ensemble", "dissent")
             return Signal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
@@ -281,6 +287,8 @@ class EnsembleModel(BaseModel):
                     )
                     metadata["veto_active"] = True
                     metadata["veto_model"] = name
+                    if self.monitor:
+                        self.monitor.record_signal_funnel("ensemble", "veto")
                     return Signal(
                         direction=SignalDirection.HOLD,
                         confidence=0.0,
@@ -288,6 +296,8 @@ class EnsembleModel(BaseModel):
                     )
 
         if direction == SignalDirection.HOLD:
+            if self.monitor:
+                self.monitor.record_signal_funnel("ensemble", "hold")
             return Signal(direction=direction, confidence=confidence, metadata=metadata)
 
         # 6. Defensive Safeguards (Risk Control & Drift Monitoring)
@@ -341,6 +351,8 @@ class EnsembleModel(BaseModel):
                     context_stability,
                 )
                 metadata["reason"] = "Critical market context instability"
+                if self.monitor:
+                    self.monitor.record_signal_funnel("ensemble", "hold")
                 return Signal(
                     direction=SignalDirection.HOLD,
                     confidence=0.0,
@@ -382,6 +394,8 @@ class EnsembleModel(BaseModel):
                 )
                 metadata["entropy_penalty"] = 0.10
 
+        if self.monitor:
+            self.monitor.record_signal_funnel("ensemble", "passed")
         return Signal(direction=direction, confidence=confidence, metadata=metadata)
 
     def predict(

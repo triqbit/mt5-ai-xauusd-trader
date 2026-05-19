@@ -88,6 +88,18 @@ DATA_FRESHNESS_GAUGE = Gauge(
     "trading_data_freshness_seconds", "Age of latest data point in seconds"
 )
 
+# 6. Signal Flow & Decision Funnel Metrics
+SIGNAL_FUNNEL_COUNTER = Counter(
+    "trading_signal_funnel_total",
+    "Trace of signal progression through the decision funnel",
+    ["stage", "status"],
+)
+SIGNAL_CONFLUENCE_HISTOGRAM = Histogram(
+    "trading_signal_confluence_score",
+    "Weighted confluence score of the trading signal",
+    buckets=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+)
+
 
 class Monitor:
     """
@@ -363,6 +375,19 @@ class Monitor:
         """Record a partial fill."""
         PARTIAL_FILL_COUNTER.inc()
         logger.info("partial_fill_recorded")
+
+    def record_signal_funnel(self, stage: str, status: str) -> None:
+        """
+        Record signal progression through the decision funnel.
+        Stages: 'ensemble', 'risk_manager', 'execution_filter'
+        """
+        SIGNAL_FUNNEL_COUNTER.labels(stage=stage, status=status).inc()
+        logger.debug("signal_funnel_recorded", stage=stage, status=status)
+
+    def record_confluence(self, score: float) -> None:
+        """Record the weighted confluence score of a signal."""
+        SIGNAL_CONFLUENCE_HISTOGRAM.observe(score)
+        logger.debug("signal_confluence_recorded", score=score)
 
     def log_model_performance(
         self, accuracy: float, drift_score: float, calibration_error: float = 0.0

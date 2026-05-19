@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Decision Funnel Telemetry:** Implemented a structured signal progression tracking system via `SIGNAL_FUNNEL_COUNTER` to observe decision drop-offs across ensemble, risk, and execution layers.
+- **Confluence Metrics:** Added `SIGNAL_CONFLUENCE_HISTOGRAM` to track the distribution of weighted confluence scores for institutional signal auditing.
 - **Security Hardening (Jules02):**
     - Enforced `0o700` permissions on operational directories (`data`, `logs`, `models/trained`) to prevent unauthorized local access.
     - Implemented `PRAGMA secure_delete=ON` for SQLite databases to ensure deleted data is unrecoverable.
