@@ -8,13 +8,16 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import numpy as np
+import structlog
 from pydantic import BaseModel
+from scipy.optimize import minimize_scalar
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 __all__ = ["CalibrationEngine", "CalibrationResult", "ConfidenceBucket"]
 
@@ -35,17 +38,21 @@ class CalibrationResult(BaseModel):
 
     brier_score: float
     reliability: float  # Brier decomposition: Reliability (lower is better)
-    resolution: float   # Brier decomposition: Resolution (higher is better)
+    resolution: float  # Brier decomposition: Resolution (higher is better)
     uncertainty: float  # Brier decomposition: Uncertainty
-    ece: float          # Expected Calibration Error
-    mce: float          # Maximum Calibration Error
+    ece: float  # Expected Calibration Error
+    mce: float  # Maximum Calibration Error
     buckets: list[ConfidenceBucket]
     optimal_threshold: float = 0.5
+    method: str = "none"
     status: str = "PROVISIONAL"
 
     def to_report_section(self) -> Any:
         """Convert result to CalibrationSection for ResearchReporter."""
-        from src.research.reporting import CalibrationBucket as ReportingBucket, CalibrationSection
+        from src.research.reporting import (
+            CalibrationBucket as ReportingBucket,
+            CalibrationSection,
+        )
 
         reporting_buckets = []
         for b in self.buckets:
@@ -58,11 +65,15 @@ class CalibrationResult(BaseModel):
                 )
             )
 
-        reliability_msg = "Model shows good alignment between confidence and accuracy."
-        if self.ece > 0.25:
-            reliability_msg = "Critical calibration error; confidence scores unreliable."
-        elif self.ece > 0.15:
-            reliability_msg = "Model is overconfident; calibration suggested."
+        reliability_msg = f"Model uses '{self.method}' calibration. "
+        if self.ece < 0.1:
+            reliability_msg += "Excellent alignment between confidence and accuracy."
+        elif self.ece < 0.15:
+            reliability_msg += "Good alignment; calibration performing well."
+        elif self.ece < 0.25:
+            reliability_msg += "Moderate calibration error; further tuning suggested."
+        else:
+            reliability_msg += "Critical calibration error; confidence scores unreliable."
 
         return CalibrationSection(
             brier_score=self.brier_score,
@@ -92,6 +103,131 @@ class CalibrationEngine:
             n_bins: Number of buckets for reliability analysis.
         """
         self.n_bins = n_bins
+        self.temperature = 1.0
+        self.method = "none"
+        self._is_fitted = False
+        self._isotonic_model: IsotonicRegression | None = None
+        self._platt_model: LogisticRegression | None = None
+
+    def fit(
+        self,
+        confidences: np.ndarray | list[float],
+        outcomes: np.ndarray | list[int],
+        method: str = "temperature",
+    ) -> None:
+        """
+        Optimize calibration parameters based on historical data.
+
+        Args:
+            confidences: Historical model confidence scores.
+            outcomes: Historical binary outcomes.
+            method: Calibration method ('temperature', 'platt', or 'isotonic').
+        """
+        conf = np.array(confidences)
+        y = np.array(outcomes)
+
+        if len(conf) < 5:
+            logger.warning("calibration_fitting_failed", reason="insufficient_data")
+            return
+
+        self.method = method
+
+        if method == "temperature":
+            # Optimize T using Brier score minimization
+            def objective(t: float) -> float:
+                scaled = self.apply_temperature_scaling(conf, t)
+                return float(np.mean((scaled - y) ** 2))
+
+            res = minimize_scalar(objective, bounds=(0.1, 10.0), method="bounded")
+            self.temperature = float(res.x)
+            logger.info("temperature_scaling_fitted", temperature=self.temperature)
+
+        elif method == "platt":
+            # Platt scaling requires both classes
+            if len(np.unique(y)) < 2:
+                logger.warning("platt_scaling_failed", reason="requires_both_classes")
+                return
+
+            # Logistic Regression on logits
+            eps = 1e-7
+            clamped_conf = np.clip(conf, eps, 1.0 - eps)
+            logits = np.log(clamped_conf / (1.0 - clamped_conf))
+
+            model = LogisticRegression()
+            model.fit(logits.reshape(-1, 1), y)
+            self._platt_model = model
+            logger.info("platt_scaling_fitted")
+
+        elif method == "isotonic":
+            # Isotonic regression requires both classes for meaningful calibration
+            if len(np.unique(y)) < 2:
+                logger.warning("isotonic_calibration_failed", reason="requires_both_classes")
+                return
+
+            # Isotonic Regression (non-parametric)
+            model = IsotonicRegression(out_of_bounds="clip")
+            model.fit(conf, y)
+            self._isotonic_model = model
+            logger.info("isotonic_calibration_fitted")
+
+        self._is_fitted = True
+
+    def calibrate(self, confidences: np.ndarray | list[float]) -> np.ndarray:
+        """
+        Apply the fitted calibration to new confidence scores.
+
+        Args:
+            confidences: Uncalibrated confidence scores.
+
+        Returns:
+            np.ndarray: Calibrated confidence scores.
+        """
+        conf = np.array(confidences)
+        if not self._is_fitted:
+            return conf
+
+        if self.method == "temperature":
+            return self.apply_temperature_scaling(conf, self.temperature)
+
+        if self.method == "platt" and self._platt_model:
+            eps = 1e-7
+            clamped_conf = np.clip(conf, eps, 1.0 - eps)
+            logits = np.log(clamped_conf / (1.0 - clamped_conf))
+            # predict_proba returns [P(0), P(1)]
+            return self._platt_model.predict_proba(logits.reshape(-1, 1))[:, 1]
+
+        if self.method == "isotonic" and self._isotonic_model:
+            return self._isotonic_model.transform(conf)
+
+        return conf
+
+    def get_calibration_curve(
+        self, confidences: np.ndarray | list[float], outcomes: np.ndarray | list[int]
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Compute calibration curve (Reliability Diagram) data.
+
+        Returns:
+            - mean_predicted_value: The mean predicted confidence in each bin.
+            - fraction_of_positives: The actual accuracy in each bin.
+        """
+        conf = np.array(confidences)
+        y = np.array(outcomes)
+
+        bins = np.linspace(0, 1, self.n_bins + 1)
+        indices = np.digitize(conf, bins) - 1
+        indices = np.clip(indices, 0, self.n_bins - 1)
+
+        mean_predicted_value = []
+        fraction_of_positives = []
+
+        for i in range(self.n_bins):
+            mask = indices == i
+            if np.any(mask):
+                mean_predicted_value.append(np.mean(conf[mask]))
+                fraction_of_positives.append(np.mean(y[mask]))
+
+        return np.array(mean_predicted_value), np.array(fraction_of_positives)
 
     def analyze(
         self,
@@ -145,6 +281,7 @@ class CalibrationEngine:
             mce=float(mce),
             buckets=buckets,
             optimal_threshold=float(opt_threshold),
+            method=self.method,
             status=status,
         )
 
@@ -265,9 +402,7 @@ class CalibrationEngine:
 
         return float(best_threshold)
 
-    def apply_temperature_scaling(
-        self, confidences: np.ndarray, temperature: float
-    ) -> np.ndarray:
+    def apply_temperature_scaling(self, confidences: np.ndarray, temperature: float) -> np.ndarray:
         """
         Adjust confidence scores using temperature scaling.
         Confidence = sigmoid(logit / T)
