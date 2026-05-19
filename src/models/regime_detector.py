@@ -37,6 +37,8 @@ import pandas as pd
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
 from scipy import stats
+
+# Standard sklearn imports
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 
@@ -533,6 +535,40 @@ class RegimeDetector:
         perf["total_return"] = df.groupby("regime")["returns"].sum()
 
         return perf
+
+    def print_transition_matrix(self) -> None:
+        """
+        Prints the regime transition matrix to the terminal using rich formatting.
+        Requires a fitted GMM or historically calculated matrix.
+        """
+        from rich.console import Console
+        from rich.table import Table
+
+        if self.transition_matrix is None:
+            logger.warning("No transition matrix available. Run fit() or label_history() first.")
+            return
+
+        console = Console()
+        table = Table(title="Market Regime Transition Matrix (Probabilities)")
+
+        # Add header column for "From/To"
+        table.add_column("From \\ To", justify="left", style="cyan", no_wrap=True)
+
+        # Add columns for each regime
+        regimes = self.transition_matrix.columns.tolist()
+        for reg in regimes:
+            table.add_column(reg, justify="right")
+
+        # Add rows
+        for from_reg in self.transition_matrix.index:
+            row_data = [str(from_reg)]
+            for to_reg in regimes:
+                prob = self.transition_matrix.loc[from_reg, to_reg]
+                color = "green" if prob > 0.5 else ("yellow" if prob > 0.2 else "white")
+                row_data.append(f"[{color}]{prob:.2%}[/{color}]")
+            table.add_row(*row_data)
+
+        console.print(table)
 
     def run_analysis(self, df: pd.DataFrame) -> RegimeAnalysisReport:
         """

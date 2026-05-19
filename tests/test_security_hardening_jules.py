@@ -15,6 +15,7 @@ from src.core.config import TradingConfig
 from src.core.database import get_engine
 from src.core.log_config import SecretMaskingProcessor
 
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission checks only on Linux/Mac")
 def test_sqlite_directory_permissions_hardening(tmp_path):
     """Verify that get_engine enforces 0o700 on parent directories."""
@@ -36,6 +37,7 @@ def test_sqlite_directory_permissions_hardening(tmp_path):
     mode = stat.S_IMODE(secure_dir.stat().st_mode)
     assert mode == 0o700, f"Expected hardening to 0o700, got {oct(mode)}"
 
+
 def test_sqlite_secure_delete_pragma(tmp_path):
     """Verify that secure_delete is enabled for SQLite connections."""
     db_file = tmp_path / "test_pragma.db"
@@ -48,14 +50,11 @@ def test_sqlite_secure_delete_pragma(tmp_path):
         # 1 means ON, 0 means OFF
         assert result == 1 or result == "1" or result is True
 
+
 def test_short_secret_masking():
     """Verify that short secrets (length < 4) are correctly masked."""
     # Create a config with a short password
-    config = TradingConfig(
-        MT5_PASSWORD=SecretStr("abc"),
-        MT5_SERVER="Broker-Demo",
-        MT5_LOGIN=12345
-    )
+    config = TradingConfig(MT5_PASSWORD=SecretStr("abc"), MT5_SERVER="Broker-Demo", MT5_LOGIN=12345)
 
     processor = SecretMaskingProcessor(config=config)
 
@@ -71,6 +70,7 @@ def test_short_secret_masking():
     # Verify that it doesn't over-mask common small words unless they are secrets
     assert processor.redact_any("test msg") == "test msg"
 
+
 def test_config_validator_directory_hardening(tmp_path):
     """Verify that ConfigValidator hardens operational directories."""
     from src.core.config_validator import ConfigValidator
@@ -80,11 +80,7 @@ def test_config_validator_directory_hardening(tmp_path):
     data_dir.mkdir(mode=0o755)
 
     # Create config
-    config = TradingConfig(
-        MT5_PASSWORD=SecretStr("password"),
-        MT5_SERVER="Server",
-        MT5_LOGIN=1
-    )
+    config = TradingConfig(MT5_PASSWORD=SecretStr("password"), MT5_SERVER="Server", MT5_LOGIN=1)
 
     validator = ConfigValidator(config)
 
@@ -93,6 +89,7 @@ def test_config_validator_directory_hardening(tmp_path):
 
     mode = stat.S_IMODE(data_dir.stat().st_mode)
     assert mode == 0o700
+
 
 if __name__ == "__main__":
     # Manual run support
