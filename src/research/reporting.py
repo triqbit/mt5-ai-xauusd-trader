@@ -512,6 +512,36 @@ class ResearchReporter:
             if val >= 0.45:
                 return "yellow"
             return "red"
+        if metric_type == "sortino":
+            if val >= 2.0:
+                return "green"
+            if val >= 1.0:
+                return "yellow"
+            return "red"
+        if metric_type == "sqn":
+            if val >= 3.0:
+                return "green"
+            if val >= 2.0:
+                return "yellow"
+            return "red"
+        if metric_type == "calmar":
+            if val >= 2.0:
+                return "green"
+            if val >= 1.0:
+                return "yellow"
+            return "red"
+        if metric_type in ["omega", "omega_ratio"]:
+            if val >= 1.5:
+                return "green"
+            if val >= 1.1:
+                return "yellow"
+            return "red"
+        if metric_type in ["ir", "information_ratio"]:
+            if val >= 1.0:
+                return "green"
+            if val >= 0.5:
+                return "yellow"
+            return "red"
         return "white"
 
     def format_for_terminal(self, report: ResearchReport) -> None:
@@ -551,7 +581,9 @@ class ResearchReporter:
             self.console.print(f"\n[bold red]{section_idx}. Stress Test Outcomes[/]")
             section_idx += 1
             self.console.print(
-                f"Resilience Score: [bold]{report.stress_tests.resilience_score}/100[/]"
+                f"Resilience Score: [bold]{report.stress_tests.resilience_score}/100[/] | "
+                f"Sharpe Decay: [bold]{report.stress_tests.sharpe_decay:.1%}[/] | "
+                f"Win Rate Decay: [bold]{report.stress_tests.win_rate_decay:.1%}[/]"
             )
             table = Table(box=None)
             table.add_column("Scenario")
@@ -628,8 +660,11 @@ class ResearchReporter:
                 m_table.add_column("Algo")
                 m_table.add_column("Vol")
                 m_table.add_column("Conf")
+                m_table.add_column("Sess")
+                m_table.add_column("Freq")
                 m_table.add_column("WR")
                 m_table.add_column("Exp")
+                m_table.add_column("Eff")
                 for m in report.trade_patterns.motifs:
                     wr_color = self._get_color_for_metric(m.win_rate, "win_rate")
                     exp_color = "green" if m.expectancy > 0 else "red"
@@ -637,8 +672,11 @@ class ResearchReporter:
                         m.algorithm,
                         m.volatility_bucket,
                         m.confidence_bucket,
+                        m.session,
+                        str(m.frequency),
                         f"[{wr_color}]{m.win_rate:.1%}[/]",
                         f"[{exp_color}]{m.expectancy:.2f}[/]",
+                        f"{m.efficiency_ratio:.2f}",
                     )
                 self.console.print(m_table)
 
@@ -727,16 +765,20 @@ class ResearchReporter:
             table.add_column("Recov")
             table.add_column("Exp")
             table.add_column("SQN")
+            table.add_column("Lake")
+            table.add_column("Tail")
             for m in report.rl_evaluation.metrics:
                 table.add_row(
                     m.agent_name,
                     f"[{self._get_color_for_metric(m.sharpe, 'sharpe')}]{m.sharpe:.2f}[/]",
-                    f"{m.sortino:.2f}",
+                    f"[{self._get_color_for_metric(m.sortino, 'sortino')}]{m.sortino:.2f}[/]",
                     f"[{self._get_color_for_metric(m.profit_factor, 'pf')}]{m.profit_factor:.2f}[/]",
                     f"{m.max_dd:.2%}",
                     f"[{self._get_color_for_metric(m.recovery_factor, 'recovery')}]{m.recovery_factor:.2f}[/]",
                     f"{m.expectancy:.2f}",
-                    f"{m.sqn:.2f}",
+                    f"[{self._get_color_for_metric(m.sqn, 'sqn')}]{m.sqn:.2f}[/]",
+                    f"{m.lake_ratio:.2f}",
+                    f"{m.tail_ratio:.2f}",
                 )
             self.console.print(table)
 

@@ -56,6 +56,9 @@
         .status-verified { background: #def7ec; color: #03543f; }
         .status-provisional { background: #fef3c7; color: #92400e; }
         .status-rejected { background: #fde8e8; color: #9b1c1c; }
+        .perf-high { color: var(--success); font-weight: 700; }
+        .perf-med { color: var(--warning); font-weight: 600; }
+        .perf-low { color: var(--danger); font-weight: 600; }
         .recommendation-list { list-style: none; padding: 0; }
         .recommendation-item { background: #f0fff4; border-left: 4px solid var(--success); padding: 1rem; margin-bottom: 10px; border-radius: 0 8px 8px 0; }
         .back-to-top { position: fixed; bottom: 30px; right: 30px; background: var(--primary); color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.3s, background 0.3s, opacity 0.3s, visibility 0.3s; z-index: 1000; font-weight: bold; opacity: 0; visibility: hidden; }
@@ -262,6 +265,10 @@
             </span>
         </div>
         <h2>{{ ns.count }}. Stress Test Outcomes</h2>
+        <p>
+            <strong>Sharpe Decay:</strong> <span class="{% if stress_tests.sharpe_decay > 0.3 %}perf-low{% elif stress_tests.sharpe_decay > 0.15 %}perf-med{% else %}perf-high{% endif %}">{{ (stress_tests.sharpe_decay * 100)|round(1) }}%</span> |
+            <strong>Win Rate Decay:</strong> <span class="{% if stress_tests.win_rate_decay > 0.1 %}perf-low{% elif stress_tests.win_rate_decay > 0.05 %}perf-med{% else %}perf-high{% endif %}">{{ (stress_tests.win_rate_decay * 100)|round(1) }}%</span>
+        </p>
         <div class="score-container">
             <span>Resilience Score:</span>
             <div class="progress-bar" role="progressbar" aria-valuenow="{{ stress_tests.resilience_score|round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="Strategy resilience score: {{ stress_tests.resilience_score|round(1) }} out of 100">
@@ -286,9 +293,9 @@
                     <td><strong>Baseline</strong></td>
                     <td>{{ stress_tests.baseline.total_return }}</td>
                     <td>{{ stress_tests.baseline.max_drawdown }}</td>
-                    <td>{{ stress_tests.baseline.sharpe }}</td>
-                    <td>{{ stress_tests.baseline.recovery_factor }}</td>
-                    <td>{{ stress_tests.baseline.profit_factor }}</td>
+                    <td><span class="{% if stress_tests.baseline.sharpe|float >= 2.0 %}perf-high{% elif stress_tests.baseline.sharpe|float >= 1.0 %}perf-med{% else %}perf-low{% endif %}">{{ stress_tests.baseline.sharpe }}</span></td>
+                    <td><span class="{% if stress_tests.baseline.recovery_factor|float >= 3.0 %}perf-high{% elif stress_tests.baseline.recovery_factor|float >= 2.0 %}perf-med{% else %}perf-low{% endif %}">{{ stress_tests.baseline.recovery_factor }}</span></td>
+                    <td><span class="{% if stress_tests.baseline.profit_factor|float >= 2.0 %}perf-high{% elif stress_tests.baseline.profit_factor|float >= 1.5 %}perf-med{% else %}perf-low{% endif %}">{{ stress_tests.baseline.profit_factor }}</span></td>
                     <td>-</td>
                 </tr>
                 {% for s in stress_tests.scenarios %}
@@ -296,9 +303,9 @@
                     <td>{{ s.name }}</td>
                     <td>{{ s.total_return }}</td>
                     <td>{{ s.max_drawdown }}</td>
-                    <td>{{ s.sharpe }}</td>
-                    <td>{{ s.recovery_factor }}</td>
-                    <td>{{ s.profit_factor }}</td>
+                    <td><span class="{% if s.sharpe|float >= 2.0 %}perf-high{% elif s.sharpe|float >= 1.0 %}perf-med{% else %}perf-low{% endif %}">{{ s.sharpe }}</span></td>
+                    <td><span class="{% if s.recovery_factor|float >= 3.0 %}perf-high{% elif s.recovery_factor|float >= 2.0 %}perf-med{% else %}perf-low{% endif %}">{{ s.recovery_factor }}</span></td>
+                    <td><span class="{% if s.profit_factor|float >= 2.0 %}perf-high{% elif s.profit_factor|float >= 1.5 %}perf-med{% else %}perf-low{% endif %}">{{ s.profit_factor }}</span></td>
                     <td class="{{ s.outcome.lower() }}">{{ s.outcome }}</td>
                 </tr>
                 {% endfor %}
@@ -388,6 +395,7 @@
                     <th scope="col">Value</th>
                     <th scope="col">Win Rate</th>
                     <th scope="col">Profit Factor</th>
+                    <th scope="col">Trades</th>
                 </tr>
             </thead>
             <tbody>
@@ -395,21 +403,24 @@
                 <tr>
                     <td>{{ c.attribute }}</td>
                     <td>{{ c.value }}</td>
-                    <td>{{ (c.win_rate * 100)|round(1) }}%</td>
-                    <td>{{ c.profit_factor|round(2) }}</td>
+                    <td><span class="{% if c.win_rate >= 0.55 %}perf-high{% elif c.win_rate >= 0.45 %}perf-med{% else %}perf-low{% endif %}">{{ (c.win_rate * 100)|round(1) }}%</span></td>
+                    <td><span class="{% if c.profit_factor >= 2.0 %}perf-high{% elif c.profit_factor >= 1.5 %}perf-med{% else %}perf-low{% endif %}">{{ c.profit_factor|round(2) }}</span></td>
+                    <td>{{ c.total_trades }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
         {% if trade_patterns.motifs %}
-        <h3>Signal Motifs (Losing Combinations)</h3>
+        <h3>Signal Motifs (Performance Clusters)</h3>
         <table>
             <thead>
                 <tr>
                     <th scope="col">Algorithm</th>
+                    <th scope="col">Session</th>
                     <th scope="col">Volatility</th>
                     <th scope="col">Confidence</th>
+                    <th scope="col">Frequency</th>
                     <th scope="col">Win Rate</th>
                     <th scope="col" title="Mathematical expectancy: expected PnL per trade.">Exp</th>
                     <th scope="col" title="Efficiency Ratio: measures quality of the capture relative to risk taken.">Eff</th>
@@ -417,16 +428,16 @@
             </thead>
             <tbody>
                 {% for m in trade_patterns.motifs %}
-                {% if m.win_rate < 0.5 %}
                 <tr>
                     <td>{{ m.algorithm }}</td>
+                    <td>{{ m.session }}</td>
                     <td>{{ m.volatility_bucket }}</td>
                     <td>{{ m.confidence_bucket }}</td>
-                    <td>{{ (m.win_rate * 100)|round(1) }}%</td>
-                    <td>{{ m.expectancy|round(2) }}</td>
+                    <td>{{ m.frequency }}</td>
+                    <td><span class="{% if m.win_rate >= 0.55 %}perf-high{% elif m.win_rate >= 0.45 %}perf-med{% else %}perf-low{% endif %}">{{ (m.win_rate * 100)|round(1) }}%</span></td>
+                    <td><span class="{% if m.expectancy > 0 %}perf-high{% else %}perf-low{% endif %}">{{ m.expectancy|round(2) }}</span></td>
                     <td>{{ m.efficiency_ratio|round(2) }}</td>
                 </tr>
-                {% endif %}
                 {% endfor %}
             </tbody>
         </table>
@@ -702,24 +713,60 @@
                     <th scope="col" title="Tail Ratio: Ratio of 95th percentile return to 5th percentile absolute return.">Tail</th>
                     <th scope="col" title="Lake Ratio: Ratio of time in drawdown to total time.">Lake</th>
                     <th scope="col" title="System Quality Number: Statistical significance of the trading system.">SQN</th>
+                    <th scope="col" title="Session Diversification: Normalized entropy of trade distribution across sessions.">Sess Div</th>
+                    <th scope="col" title="Flip-Flop Rate: Percentage of trades that are immediate position reversals.">Flip Rate</th>
                 </tr>
             </thead>
             <tbody>
                 {% for m in rl_evaluation.metrics %}
                 <tr>
                     <td><strong>{{ m.agent_name }}</strong></td>
-                    <td>{{ m.sharpe|round(2) }}</td>
-                    <td>{{ m.sortino|round(2) }}</td>
+                    <td><span class="{% if m.sharpe >= 2.0 %}perf-high{% elif m.sharpe >= 1.0 %}perf-med{% else %}perf-low{% endif %}">{{ m.sharpe|round(2) }}</span></td>
+                    <td><span class="{% if m.sortino >= 2.0 %}perf-high{% elif m.sortino >= 1.0 %}perf-med{% else %}perf-low{% endif %}">{{ m.sortino|round(2) }}</span></td>
                     <td>{{ (m.volatility * 100)|round(1) }}%</td>
-                    <td>{{ m.profit_factor|round(2) }}</td>
-                    <td>{{ m.expectancy|round(2) }}</td>
+                    <td><span class="{% if m.profit_factor >= 2.0 %}perf-high{% elif m.profit_factor >= 1.5 %}perf-med{% else %}perf-low{% endif %}">{{ m.profit_factor|round(2) }}</span></td>
+                    <td><span class="{% if m.expectancy > 0 %}perf-high{% else %}perf-low{% endif %}">{{ m.expectancy|round(2) }}</span></td>
                     <td>{{ (m.max_dd * 100)|round(1) }}%</td>
-                    <td>{{ m.recovery_factor|round(2) }}</td>
+                    <td><span class="{% if m.recovery_factor >= 3.0 %}perf-high{% elif m.recovery_factor >= 2.0 %}perf-med{% else %}perf-low{% endif %}">{{ m.recovery_factor|round(2) }}</span></td>
                     <td>{{ m.common_sense_ratio|round(2) }}</td>
                     <td>{{ m.gain_to_pain_ratio|round(2) }}</td>
                     <td>{{ m.tail_ratio|round(2) }}</td>
                     <td>{{ m.lake_ratio|round(2) }}</td>
-                    <td>{{ m.sqn|round(2) }}</td>
+                    <td><span class="{% if m.sqn >= 3.0 %}perf-high{% elif m.sqn >= 2.0 %}perf-med{% else %}perf-low{% endif %}">{{ m.sqn|round(2) }}</span></td>
+                    <td>{{ m.session_diversification|round(2) }}</td>
+                    <td>{{ m.flip_flop_rate|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h3>Attribution & Exposure</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col">Agent</th>
+                    <th scope="col">Avg Hold</th>
+                    <th scope="col">Trade Freq</th>
+                    <th scope="col">Action Entropy</th>
+                    <th scope="col" title="Percentage of gross profit lost to commissions.">Comm. Drag</th>
+                    <th scope="col" title="Percentage of profit from top 10% of trades.">Profit Conc.</th>
+                    <th scope="col" title="Consistency of performance across different market regimes.">Regime Stability</th>
+                    <th scope="col" title="Maximum Adverse Excursion: Worst floating loss during trade.">MAE (Avg)</th>
+                    <th scope="col" title="Maximum Favorable Excursion: Best floating profit during trade.">MFE (Avg)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in rl_evaluation.metrics %}
+                <tr>
+                    <td><strong>{{ m.agent_name }}</strong></td>
+                    <td>{{ m.avg_hold_time|round(1) }}h</td>
+                    <td>{{ m.trade_frequency|round(1) }}/d</td>
+                    <td>{{ m.action_entropy|round(2) }}</td>
+                    <td>{{ (m.commission_drag * 100)|round(2) }}%</td>
+                    <td>{{ (m.profit_concentration * 100)|round(1) }}%</td>
+                    <td>{{ m.regime_stability|round(2) }}</td>
+                    <td class="perf-low">{{ (m.mae_avg * 100)|round(2) }}%</td>
+                    <td class="perf-high">{{ (m.mfe_avg * 100)|round(2) }}%</td>
                 </tr>
                 {% endfor %}
             </tbody>
