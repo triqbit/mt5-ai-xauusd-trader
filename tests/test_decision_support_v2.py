@@ -44,7 +44,7 @@ def base_explanation():
         ],
         feature_contributions=[],
         risk_assessment=RiskAssessment(passed=True, risk_reward_ratio=2.5, summary="Good R:R"),
-        regime_context=RegimeContext(regime_name="Trending", confidence=0.9, is_favorable=True),
+        regime_context=RegimeContext(regime_name="Trending", confidence=0.9, is_favorable=True, regime_alignment_score=0.9),
         human_readable_summary="Signal shows momentum alignment.",
         machine_attribution={}
     )
@@ -70,7 +70,10 @@ def test_executive_summary_generation(dss, base_explanation, base_regime, base_m
     packet = dss.assemble_packet("XAUUSD", base_explanation, base_regime, base_macro, {})
     assert packet.status_level == DecisionStatus.EXECUTE
     assert "maximum confluence" in packet.executive_summary.lower()
-    # Score: (1.0*40) + (0.9*30) + (min(2.5/3, 1)*20 + 10) = 40+27+16.66+10 = 93.66 -> 93.7
+    # Consensus: 40
+    # Regime: ((0.9+0.9)/2)*30 = 27
+    # Risk: 16.66 + 10 = 26.66
+    # Total: 40 + 27 + 26.66 = 93.66 -> 93.7
     assert "93.7" in packet.executive_summary
 
     # 2. BLOCKED state
@@ -93,16 +96,35 @@ def test_review_flag_logic(dss, base_explanation, base_regime, base_macro):
 
     # 2. Lower score (75) - Review Required (even if REVIEW)
     low_conf_regime = base_regime.model_copy(update={"confidence": 0.4})
-    # Score: 40 (consensus) + 12 (regime) + 16.6 (risk) + 10 (macro) = 78.6
-    packet_mid = dss.assemble_packet("XAUUSD", base_explanation, low_conf_regime, base_macro, {})
-    assert 78.0 < packet_mid.decision_score < 79.0
+    # Consensus: 40
+    # Regime Alignment Score in base_explanation: 0.9
+    # Regime: ((0.4+0.9)/2)*30 = 0.65*30 = 19.5
+    # Risk: 26.66
+    # Total: 40 + 19.5 + 26.66 = 86.16 -> still EXECUTE
+
+    # Lower it more
+    vlow_align_explanation = base_explanation.model_copy(update={
+        "regime_context": RegimeContext(regime_name="Trending", confidence=0.9, is_favorable=True, regime_alignment_score=0.2)
+    })
+    # Consensus: 40
+    # Regime: ((0.4+0.2)/2)*30 = 0.3*30 = 9
+    # Risk: 26.66
+    # Total: 40 + 9 + 26.66 = 75.66
+    packet_mid = dss.assemble_packet("XAUUSD", vlow_align_explanation, low_conf_regime, base_macro, {})
+    assert 75.0 < packet_mid.decision_score < 76.0
     assert packet_mid.status_level == DecisionStatus.REVIEW
     assert packet_mid.requires_review is True
 
     # 3. CAUTION status - Always review
     vlow_conf_regime = base_regime.model_copy(update={"confidence": 0.1})
-    # Score: 40 + 3 + 16.6 + 10 = 69.6 -> CAUTION
-    packet_caution = dss.assemble_packet("XAUUSD", base_explanation, vlow_conf_regime, base_macro, {})
+    # Consensus: 40, Regime: ((0.1+0.2)/2)*30 = 4.5, Risk: 26.66 -> 71.16?
+    # Let's lower RR to be sure
+    caution_explanation = vlow_align_explanation.model_copy(update={
+        "risk_assessment": RiskAssessment(passed=True, risk_reward_ratio=1.0, summary="Low R:R")
+    })
+    # Risk: (1/3)*20 + 10 = 16.66
+    # Total: 40 + 4.5 + 16.66 = 61.16
+    packet_caution = dss.assemble_packet("XAUUSD", caution_explanation, vlow_conf_regime, base_macro, {})
     assert packet_caution.status_level == DecisionStatus.CAUTION
     assert packet_caution.requires_review is True
 
@@ -110,8 +132,15 @@ def test_dashboard_formatting_enhancements(dss, base_explanation, base_regime, b
     """Verify that new visual elements appear in the dashboard output."""
 
     # Set to CAUTION to trigger [REVIEW REQUIRED]
+    # We use the caution_explanation from above logic or similar
+    vlow_align_explanation = base_explanation.model_copy(update={
+        "regime_context": RegimeContext(regime_name="Trending", confidence=0.9, is_favorable=True, regime_alignment_score=0.2)
+    })
+    caution_explanation = vlow_align_explanation.model_copy(update={
+        "risk_assessment": RiskAssessment(passed=True, risk_reward_ratio=1.0, summary="Low R:R")
+    })
     caution_regime = base_regime.model_copy(update={"confidence": 0.1})
-    packet = dss.assemble_packet("XAUUSD", base_explanation, caution_regime, base_macro, {})
+    packet = dss.assemble_packet("XAUUSD", caution_explanation, caution_regime, base_macro, {})
 
     output = dss.format_for_operator(packet)
     assert "REVIEW REQUIRED" in output
