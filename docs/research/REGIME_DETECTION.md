@@ -45,6 +45,10 @@ The system supports two detection modes:
 
 The `label_history` method provides a performance-optimized, vectorized utility for adding regime classifications to historical DataFrames, suitable for backtesting and research.
 
+### Visualization
+
+The `print_transition_matrix` method provides a rich terminal visualization of the regime transition probabilities, allowing operators to understand the stability and typical paths of market state changes.
+
 ### Performance Analysis
 
 The `get_regime_performance` method calculates historical P&L analysis partitioned by market regime, providing critical metrics for strategy optimization:

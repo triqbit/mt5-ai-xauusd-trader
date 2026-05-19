@@ -15,6 +15,7 @@ from src.core.config import TradingConfig
 from src.core.database import get_engine
 from src.core.log_config import SecretMaskingProcessor
 
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission checks only on Linux/Mac")
 def test_sqlite_directory_permissions_hardening(tmp_path):
     """Verify that get_engine enforces 0o700 on parent directories."""
