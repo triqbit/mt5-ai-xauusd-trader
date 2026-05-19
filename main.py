@@ -488,7 +488,9 @@ def run_live(
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
                             else 0.0,
-                            "summary": risk_decision.reason if risk_decision else "Risk gate rejected",
+                            "summary": risk_decision.reason
+                            if risk_decision
+                            else "Risk gate rejected",
                             "trace": risk_decision.trace if risk_decision else {},
                         }
 
