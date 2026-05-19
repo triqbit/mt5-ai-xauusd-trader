@@ -69,6 +69,10 @@ jobs:
     needs: [quality, security]
     env:
       PYTHONPATH: .
+      MT5_LOGIN: "0"
+      MT5_PASSWORD: "test"
+      MT5_SERVER: "test"
+      MODE: "demo"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -95,11 +99,6 @@ jobs:
         run: python main.py --show-config
       - name: Run tests with coverage
         run: pytest tests/ --cov=src --cov-fail-under=80 -v
-        env:
-          MT5_LOGIN: "0"
-          MT5_PASSWORD: "test"
-          MT5_SERVER: "test"
-          MODE: "demo"
 
   # -----------------------------------------------------------
   # JOB 4: Docker Build - only on main, needs tests to pass
