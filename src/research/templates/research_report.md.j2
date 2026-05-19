@@ -70,7 +70,7 @@
 {% if stress_tests %}
 {% set ns.count = ns.count + 1 %}
 ## {{ ns.count }}. Stress Test Outcomes
-**Resilience Score:** {{ stress_tests.resilience_score }}/100 | **Sharpe Decay:** {{ (stress_tests.sharpe_decay * 100)|round(1) }}%
+**Resilience Score:** {{ stress_tests.resilience_score }}/100 | **Sharpe Decay:** {{ (stress_tests.sharpe_decay * 100)|round(1) }}% | **Win Rate Decay:** {{ (stress_tests.win_rate_decay * 100)|round(1) }}%
 
 | Scenario | Total Return | Max Drawdown | Sharpe | Recov | PF | Outcome |
 |----------|--------------|--------------|--------|-------|----|---------|
@@ -114,20 +114,18 @@
 **Key Insight:** {{ trade_patterns.primary_insight }}
 
 ### Profitable Concentrations
-| Attribute | Value | Win Rate | Profit Factor |
-|-----------|-------|----------|---------------|
+| Attribute | Value | Win Rate | Profit Factor | Trades |
+|-----------|-------|----------|---------------|--------|
 {% for c in trade_patterns.concentrations %}
-| {{ c.attribute }} | {{ c.value }} | {{ (c.win_rate * 100)|round(1) }}% | {{ c.profit_factor|round(2) }} |
+| {{ c.attribute }} | {{ c.value }} | {{ (c.win_rate * 100)|round(1) }}% | {{ c.profit_factor|round(2) }} | {{ c.total_trades }} |
 {% endfor %}
 
 {% if trade_patterns.motifs %}
-### Signal Motifs (Losing Combinations)
-| Algorithm | Volatility | Confidence | Frequency | Win Rate | Exp | Eff |
-|-----------|------------|------------|-----------|----------|-----|-----|
+### Signal Motifs (Performance Clusters)
+| Algorithm | Session | Volatility | Confidence | Frequency | Win Rate | Exp | Eff |
+|-----------|---------|------------|------------|-----------|----------|-----|-----|
 {% for m in trade_patterns.motifs %}
-{% if m.win_rate < 0.5 %}
-| {{ m.algorithm }} | {{ m.volatility_bucket }} | {{ m.confidence_bucket }} | {{ m.frequency }} | {{ (m.win_rate * 100)|round(1) }}% | {{ m.expectancy|round(2) }} | {{ m.efficiency_ratio|round(2) }} |
-{% endif %}
+| {{ m.algorithm }} | {{ m.session }} | {{ m.volatility_bucket }} | {{ m.confidence_bucket }} | {{ m.frequency }} | {{ (m.win_rate * 100)|round(1) }}% | {{ m.expectancy|round(2) }} | {{ m.efficiency_ratio|round(2) }} |
 {% endfor %}
 {% endif %}
 
@@ -194,10 +192,17 @@
 ## {{ ns.count }}. RL Agent Evaluation
 **Summary:** {{ rl_evaluation.comparison_summary }}
 
-| Agent | Sharpe | Sortino | Vol | PF | Exp | MaxDD | Recov | CSR | G2P | Lake | Tail | SQN |
-|-------|--------|---------|-----|----|-----|-------|-------|-----|-----|------|------|-----|
+| Agent | Sharpe | Sortino | Vol | PF | Exp | MaxDD | Recov | CSR | G2P | Lake | Tail | SQN | Sess Div | Flip Rate |
+|-------|--------|---------|-----|----|-----|-------|-------|-----|-----|------|------|-----|----------|-----------|
 {% for m in rl_evaluation.metrics %}
-| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.sortino|round(2) }} | {{ (m.volatility * 100)|round(1) }}% | {{ m.profit_factor|round(2) }} | {{ m.expectancy|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ m.recovery_factor|round(2) }} | {{ m.common_sense_ratio|round(2) }} | {{ m.gain_to_pain_ratio|round(2) }} | {{ m.lake_ratio|round(2) }} | {{ m.tail_ratio|round(2) }} | {{ m.sqn|round(2) }} |
+| {{ m.agent_name }} | {{ m.sharpe|round(2) }} | {{ m.sortino|round(2) }} | {{ (m.volatility * 100)|round(1) }}% | {{ m.profit_factor|round(2) }} | {{ m.expectancy|round(2) }} | {{ (m.max_dd * 100)|round(1) }}% | {{ m.recovery_factor|round(2) }} | {{ m.common_sense_ratio|round(2) }} | {{ m.gain_to_pain_ratio|round(2) }} | {{ m.lake_ratio|round(2) }} | {{ m.tail_ratio|round(2) }} | {{ m.sqn|round(2) }} | {{ m.session_diversification|round(2) }} | {{ m.flip_flop_rate|round(2) }} |
+{% endfor %}
+
+### Attribution & Exposure
+| Agent | Avg Hold | Trade Freq | Action Entropy | Comm. Drag | Profit Conc. | Regime Stability | MAE (Avg) | MFE (Avg) |
+|-------|----------|------------|----------------|------------|--------------|------------------|-----------|-----------|
+{% for m in rl_evaluation.metrics %}
+| {{ m.agent_name }} | {{ m.avg_hold_time|round(1) }}h | {{ m.trade_frequency|round(1) }}/d | {{ m.action_entropy|round(2) }} | {{ (m.commission_drag * 100)|round(2) }}% | {{ (m.profit_concentration * 100)|round(1) }}% | {{ m.regime_stability|round(2) }} | {{ (m.mae_avg * 100)|round(2) }}% | {{ (m.mfe_avg * 100)|round(2) }}% |
 {% endfor %}
 {% endif %}
 

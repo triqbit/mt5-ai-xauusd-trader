@@ -110,6 +110,7 @@ def test_markdown_generation(sample_report):
     assert "Tested with high fidelity." in markdown
     assert "2.5" in markdown
     assert "1.8" in markdown
+    assert "Win Rate Decay:" in markdown
 
 
 def test_terminal_formatting(sample_report, capsys):
@@ -363,6 +364,7 @@ def test_trade_pattern_motifs():
                 win_rate=0.2,
                 expectancy=-1.5,
                 efficiency_ratio=-0.4,
+                session="Asian",
             )
         ],
         combinations=[
@@ -389,7 +391,7 @@ def test_trade_pattern_motifs():
     html = reporter.generate_html(report)
 
     # Markdown checks
-    assert "### Signal Motifs (Losing Combinations)" in md
+    assert "### Signal Motifs (Performance Clusters)" in md
     assert "PPO" in md
     assert "20.0%" in md
     assert "-1.5" in md
@@ -400,7 +402,7 @@ def test_trade_pattern_motifs():
     assert "-2.0" in md
 
     # HTML checks
-    assert "Signal Motifs (Losing Combinations)" in html
+    assert "Signal Motifs (Performance Clusters)" in html
     assert "PPO" in html
     assert "20.0%" in html
     assert "-1.5" in html
@@ -611,6 +613,7 @@ def test_enhanced_stress_test_reporting():
     reporter = ResearchReporter()
     md = reporter.generate_markdown(report)
     assert "**Sharpe Decay:** 15.0%" in md
+    assert "**Win Rate Decay:** 5.0%" in md
 
 
 def test_generate_audit_report_smoke_test():
