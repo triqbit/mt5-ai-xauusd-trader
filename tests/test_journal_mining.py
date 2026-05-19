@@ -782,6 +782,23 @@ def test_profitable_patterns_extended(miner):
     assert algo_conf[0].value == "ensemble @ High Conf"
 
 
+def test_analyze_session_overlaps(miner):
+    # Sydney (22-07) and Tokyo (00-09) overlap from 00 to 07
+    now = datetime(2024, 1, 1, 2, 0, tzinfo=timezone.utc)
+    trades = pd.DataFrame(
+        [
+            {"id": 1, "pnl": 100.0, "created_at": now},
+            {"id": 2, "pnl": -50.0, "created_at": now + pd.Timedelta(minutes=5)},
+        ]
+    )
+
+    overlaps = miner.analyze_session_overlaps(trades)
+    assert len(overlaps) == 1
+    assert overlaps[0].attribute == "session_overlap"
+    assert "Sydney / Tokyo" in overlaps[0].value
+    assert overlaps[0].total_trades == 2
+
+
 def test_report_mapping_includes_total_trades(miner):
     from src.analytics.journal_mining import JournalReport, PatternConcentration
 
