@@ -1,6 +1,6 @@
-import sys
 import os
 import pkgutil
+import sys
 
 # Add current directory to sys.path
 sys.path.insert(0, os.path.abspath("."))
