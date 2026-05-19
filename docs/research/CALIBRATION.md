@@ -30,8 +30,13 @@ The engine can find the optimal confidence threshold to maximize a specific metr
 - **Precision:** Prioritizes signal accuracy over volume.
 - **Accuracy:** Maximizes overall correct predictions.
 
+### Calibration Methods
+The engine supports multiple calibration techniques via the `fit()` and `calibrate()` methods:
+- **Temperature Scaling:** Optimizes a single parameter (T) to minimize Brier score. It preserves the ranking of predictions but shifts the distribution.
+- **Platt Scaling:** Fits a logistic regression model on the logits of the predictions. Effective for sigmoid-based outputs.
+- **Isotonic Regression:** A non-parametric method that fits a monotonic function to the predictions. Most flexible but requires more data to avoid overfitting.
+
 ### Mitigation Strategies
-- **Temperature Scaling:** A post-processing technique to flatten or sharpen the probability distribution.
 - **Heuristic Damping:** Automatically reduces confidence scores when high ECE is detected to prevent overconfident execution.
 
 ## Research Integration
