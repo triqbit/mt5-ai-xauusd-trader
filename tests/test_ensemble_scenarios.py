@@ -3,6 +3,7 @@ Tests for EnsembleScenarioBuilder and its integration with EnsembleModel.
 """
 
 import pytest
+
 from src.core.constants import SignalDirection
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import MarketRegime
