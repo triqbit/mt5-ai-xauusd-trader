@@ -6,15 +6,14 @@ tests/test_security_hardening_jules.py
 import os
 import stat
 import sys
-from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
 from sqlalchemy import text
 
+from src.core.config import TradingConfig
 from src.core.database import get_engine
 from src.core.log_config import SecretMaskingProcessor
-from src.core.config import TradingConfig
-from pydantic import SecretStr
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission checks only on Linux/Mac")
 def test_sqlite_directory_permissions_hardening(tmp_path):
