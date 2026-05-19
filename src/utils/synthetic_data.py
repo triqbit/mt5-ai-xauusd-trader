@@ -8,15 +8,20 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import pandas as pd
 
-from src.core.constants import EventCategory, EventImpact
+from src.core.constants import EventCategory, EventImpact, SignalDirection
 from src.core.schemas import TradeSignal
 from src.data.event_models import MacroEvent, RiskStatus
+from src.models.base_model import Signal
+from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.trading.capital_allocator import AllocationRequest, StrategyConfig
+
+if TYPE_CHECKING:
+    from src.models.dynamic_ensemble import DynamicEnsemble
 
 
 class ScenarioGenerator:
@@ -1492,3 +1497,67 @@ class ExecutionQualityScenarioBuilder:
                 "lot_size": 0.01,
             },
         ]
+
+
+class EnsembleScenarioBuilder:
+    """
+    Generates deterministic signal dictionaries and ensemble states for testing.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.rng = np.random.default_rng(seed)
+
+    def consensus_signals(
+        self, direction: SignalDirection, confidence: float = 0.8
+    ) -> dict[str, Signal]:
+        """All models agree on a direction."""
+        return {
+            "ppo": Signal(direction=direction, confidence=confidence),
+            "dreamer": Signal(direction=direction, confidence=confidence),
+            "lstm": Signal(direction=direction, confidence=confidence),
+        }
+
+    def dissent_signals(self) -> dict[str, Signal]:
+        """Models have conflicting BUY/SELL directions."""
+        return {
+            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.8),
+            "dreamer": Signal(direction=SignalDirection.SELL, confidence=0.8),
+            "lstm": Signal(direction=SignalDirection.HOLD, confidence=0.0),
+        }
+
+    def veto_signals(self, direction: SignalDirection) -> dict[str, Signal]:
+        """Models agree on direction but one has very low confidence (<0.4)."""
+        return {
+            "ppo": Signal(direction=direction, confidence=0.9),
+            "dreamer": Signal(direction=direction, confidence=0.35),  # Trigger veto
+            "lstm": Signal(direction=direction, confidence=0.9),
+        }
+
+    def regime_context(self, regime: MarketRegime, transition_score: float = 0.0) -> RegimeInfo:
+        """Generates RegimeInfo for adaptive consensus testing."""
+        return RegimeInfo(
+            label=regime,
+            confidence=0.9,
+            transition_score=transition_score,
+            volatility_index=1.0 if regime != MarketRegime.NEWS_SHOCK else 3.5,
+            raw_features={},
+        )
+
+    def populate_ensemble_state(
+        self,
+        ensemble: DynamicEnsemble,
+        model_name: str,
+        pattern: list[bool],
+        confidence: float = 0.8,
+    ) -> None:
+        """
+        Populates DynamicEnsemble history with a specific success/failure pattern.
+        pattern: list of booleans (True = Correct, False = Incorrect)
+        """
+        for is_correct in pattern:
+            # We must use record_prediction + record_outcome to populate _history correctly
+            pred_dir = SignalDirection.BUY
+            actual_dir = SignalDirection.BUY if is_correct else SignalDirection.SELL
+
+            ensemble.record_prediction(model_name, pred_dir, confidence)
+            ensemble.record_outcome(model_name, actual_dir)
