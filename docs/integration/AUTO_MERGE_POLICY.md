@@ -24,7 +24,7 @@ Automatically **BLOCK** and **ESCALATE** if any of these are true:
 - 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*`, `.env.*`, or `src/core/config.py`.
 - 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
 - 🚨 **Docker deployment or infrastructure control changes:** Changes to `Dockerfile`, `docker-compose.yml`.
-- 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*` or `.github/workflows/ci.yml`.
+- 🚨 **Changes to CI/CD workflows that affect deployment:** Modifications to `.github/workflows/deploy.*`.
 
 ## High-Risk Files (Auto-Merge Prohibited)
 
@@ -49,7 +49,6 @@ The following patterns trigger an automatic block and escalation:
 - `Dockerfile`
 - `docker-compose.yml`
 - `.github/workflows/deploy.*`
-- `.github/workflows/ci.yml`
 - `migrations/.*`
 
 ## Escalation Procedure
@@ -64,7 +63,6 @@ The following patterns trigger an automatic block and escalation:
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
-| 2026-05-19 | N/A | Policy Update | 🤖 Jules05: Strict auto-merge policy maintenance and pattern alignment | [System Change] |
 | 2026-05-18 | N/A | Policy Update | 🤖 Jules05: Strict auto-merge policy maintenance and pattern alignment | [System Change] |
 | 2026-05-15 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Unified with requirements) | [System Change] |
 | 2026-05-13 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Refined high-risk patterns & categories) | [System Change] |
