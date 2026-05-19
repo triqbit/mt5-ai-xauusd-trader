@@ -110,6 +110,7 @@ def test_markdown_generation(sample_report):
     assert "Tested with high fidelity." in markdown
     assert "2.5" in markdown
     assert "1.8" in markdown
+    assert "Win Rate Decay:" in markdown
 
 
 def test_terminal_formatting(sample_report, capsys):
@@ -363,6 +364,7 @@ def test_trade_pattern_motifs():
                 win_rate=0.2,
                 expectancy=-1.5,
                 efficiency_ratio=-0.4,
+                session="Asian",
             )
         ],
         combinations=[

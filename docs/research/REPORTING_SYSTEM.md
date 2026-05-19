@@ -13,6 +13,9 @@ The research reporting system is a high-fidelity audit framework designed to pro
     - Mathematical Expectancy & Annualized Volatility
     - Recovery Factor & Profit Factor
     - Timing Efficiency & Spread-adjusted Edge Capture
+    - Sharpe and Win Rate Decay (Stress Testing)
+    - Session Diversification & Flip-Flop Rate (RL Evaluation)
+    - Maximum Adverse/Favorable Excursion (MAE/MFE)
 - **Automated Risk Triage:** Integrated 'Critical Research Warnings' panel in HTML reports that dynamically highlights FAIL/CRITICAL statuses from stress tests, model drift, and calibration audits.
 - **Professional Visualization:**
     - **KPI Dashboard:** High-density visual summaries of core strategy health.
