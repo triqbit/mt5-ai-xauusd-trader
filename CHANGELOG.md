@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Structured Iteration Heartbeat:** Implemented a high-fidelity polling cycle heartbeat in `main.py` with failure attribution and processing latency tracking.
+- **Enhanced Observability Metrics:** Added new Prometheus metrics (`trading_iteration_heartbeat_timestamp`, `trading_iteration_duration_seconds`, `trading_market_stability`) to the `Monitor` module for real-time system health tracking.
+- **Trace Correlation:** Updated Telegram alerting to automatically include `trace_id` snippets for direct linkage between mobile alerts and system logs.
 - **Decision Funnel Telemetry:** Implemented a structured signal progression tracking system via `SIGNAL_FUNNEL_COUNTER` to observe decision drop-offs across ensemble, risk, and execution layers.
 - **Confluence Metrics:** Added `SIGNAL_CONFLUENCE_HISTOGRAM` to track the distribution of weighted confluence scores for institutional signal auditing.
 - **Security Hardening (Jules02):**

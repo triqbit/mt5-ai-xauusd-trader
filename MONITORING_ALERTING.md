@@ -366,6 +366,7 @@ The following metrics are exposed by the `Monitor` module:
 - `trading_slippage_pips`: Difference between expected and actual price (Histogram)
 - `trading_fill_rate`: Percentage of orders filled at intended price (Gauge)
 - `trading_orders_rejected_total`: Total number of rejected orders (Counter)
+- `trading_market_stability`: Real-time market regime confidence/stability score (Gauge)
 
 ### 11.3 System Health
 - `system_cpu_usage_percent`: System CPU utilization percentage (Gauge)
@@ -373,6 +374,8 @@ The following metrics are exposed by the `Monitor` module:
 - `system_disk_usage_percent`: System disk usage percentage (Gauge)
 - `trading_system_errors`: Total count of system errors labeled by component (Counter)
 - `trading_block_duration_seconds`: Duration of trading code blocks labeled by label (Histogram)
+- `trading_iteration_heartbeat_timestamp`: Unix timestamp of the last iteration heartbeat (Gauge)
+- `trading_iteration_duration_seconds`: Total duration of a single trading iteration cycle (Histogram)
 
 ### 11.4 Model & Data
 - `trading_model_confidence`: Latest model prediction confidence (Gauge)
