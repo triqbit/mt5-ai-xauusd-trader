@@ -99,6 +99,17 @@ SIGNAL_CONFLUENCE_HISTOGRAM = Histogram(
     "Weighted confluence score of the trading signal",
     buckets=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
 )
+MARKET_STABILITY_GAUGE = Gauge(
+    "trading_market_stability", "Real-time market regime confidence/stability score"
+)
+
+# 7. Iteration Metrics
+ITERATION_HEARTBEAT_GAUGE = Gauge(
+    "trading_iteration_heartbeat_timestamp", "Unix timestamp of the last iteration heartbeat"
+)
+ITERATION_DURATION_HISTOGRAM = Histogram(
+    "trading_iteration_duration_seconds", "Total duration of a single trading iteration cycle"
+)
 
 
 class Monitor:
@@ -202,6 +213,13 @@ class Monitor:
         if not self.bot or not self.cfg.telegram_chat_id:
             logger.debug("telegram_not_configured", message=text)
             return
+
+        # Automatically append trace_id for easier correlation
+        import structlog.contextvars
+
+        trace_id = structlog.contextvars.get_contextvars().get("trace_id")
+        if trace_id:
+            text = f"{text}\n\n[Trace: {trace_id[:8]}]"
 
         async def _send():
             try:
@@ -388,6 +406,21 @@ class Monitor:
         """Record the weighted confluence score of a signal."""
         SIGNAL_CONFLUENCE_HISTOGRAM.observe(score)
         logger.debug("signal_confluence_recorded", score=score)
+
+    def record_market_stability(self, score: float) -> None:
+        """Record the real-time market stability/regime confidence score."""
+        MARKET_STABILITY_GAUGE.set(score)
+        logger.debug("market_stability_recorded", score=score)
+
+    def record_iteration_heartbeat(self) -> None:
+        """Record the timestamp of the latest iteration heartbeat."""
+        ITERATION_HEARTBEAT_GAUGE.set_to_current_time()
+        logger.debug("iteration_heartbeat_recorded")
+
+    def record_iteration_duration(self, seconds: float) -> None:
+        """Record the total duration of the iteration cycle."""
+        ITERATION_DURATION_HISTOGRAM.observe(seconds)
+        logger.debug("iteration_duration_recorded", duration_seconds=seconds)
 
     def log_model_performance(
         self, accuracy: float, drift_score: float, calibration_error: float = 0.0
