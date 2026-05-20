@@ -144,7 +144,9 @@ def _prepare_trade_signal(
     else:
         approved_risk = alloc_result.allocated_risk_pct
 
-    # 3. Lot Sizing
+    # 3. Lot Sizing (Institutional ATR-based or Kelly)
+    # Note: Full ATR-sizing is now performed inside RiskManager.validate_signal
+    # This legacy helper provides a fallback or Kelly-based alternative if needed.
     lot_size = (
         risk.size_position(
             cfg.symbol,
@@ -416,6 +418,8 @@ def run_live(
                     atr = float((df_raw["high"] - df_raw["low"]).rolling(14).mean().iloc[-1])
 
                 with profile("signal_preparation"):
+                    # Pre-calculate signal for validation
+                    # Note: lot_size here is a draft; it will be refined by RiskManager
                     signal = _prepare_trade_signal(
                         cfg=cfg,
                         direction=direction,
@@ -427,16 +431,26 @@ def run_live(
                         audit_logger=audit_logger,
                         risk_multiplier=macro_risk.risk_multiplier,
                     )
-                lot_size = signal.lot_size
 
-                # 6. Risk approval gate
+                # 6. Risk approval gate (Institutional 8-layer cascade)
                 with profile("risk_check"):
                     health = getattr(model, "get_health_metrics", lambda: None)()
-                    risk_approved = (
-                        risk.approve(signal, signal_id=signal_id, model_health=health)
-                        if direction != 0
-                        else False
-                    )
+                    risk_approved = False
+                    if direction != 0:
+                        open_positions = connector.get_positions(cfg.symbol)
+                        decision = risk.validate_signal(
+                            signal,
+                            df_raw,
+                            open_positions,
+                            model_health=health,
+                            signal_id=signal_id,
+                        )
+                        risk_approved = decision.is_approved
+                        if risk_approved:
+                            # Use the refined lot size from the institutional risk engine
+                            # Re-create signal with the approved lot size
+                            signal = signal.model_copy(update={"lot_size": decision.adjusted_lot_size})
+
                     if monitor and direction != 0:
                         monitor.record_signal_funnel(
                             "risk_manager", "passed" if risk_approved else "rejected"

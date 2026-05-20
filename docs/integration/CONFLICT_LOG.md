@@ -105,3 +105,19 @@
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
 - **Owner**: Jules05
+
+## [2026-05-20] - Risk Management API Drift & Logic Fragmentation
+
+### 1. Risk Management API Fragmentation (RiskEngine vs RiskManager)
+- **Conflict**: `RiskEngine` (developed by Jules01) and `RiskManager` (older standard) coexist. `AuditedRiskManager` (developed by Jules02) inherits from the older `RiskManager`, missing the institutional 8-layer cascade (directional exposure, total notional) and ATR-based sizing present in `RiskEngine`.
+- **Agents**: Jules01, Jules02, Jules03
+- **Impact**: High. Leads to inconsistent risk enforcement and incomplete audit trails.
+- **Resolution**: Harmonize `RiskManager` by integrating institutional logic from `RiskEngine`. Deprecate and remove `RiskEngine`.
+- **Owner**: Jules05
+
+### 2. Logic Displacement in `main.py`
+- **Conflict**: `main.py` (Jules01/Jules05) hardcodes SL/TP and lot-sizing logic in `_prepare_trade_signal`, duplicating and potentially bypassing the centralized risk engine's sizing logic.
+- **Agents**: Jules01, Jules05
+- **Impact**: Medium. Increases maintenance burden and risk of sizing errors.
+- **Resolution**: Delegate position sizing and SL/TP validation to the harmonized `RiskManager`.
+- **Owner**: Jules05
