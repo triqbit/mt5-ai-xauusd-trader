@@ -180,6 +180,11 @@ class TradingConfig(BaseSettings):
         default="redis://localhost:6379/0",
         description="Connection URL for the Redis instance used for caching/queuing",
     )
+    model_signing_key: SecretStr = Field(
+        default="CHANGE_ME_TO_A_SECURE_RANDOM_STRING_FOR_MODEL_INTEGRITY",
+        description="Secret key used to sign and verify serialized model files.",
+        validation_alias="MODEL_SIGNING_KEY",
+    )
 
     # ── Monitoring ──────────────────────────────────────────────────────────
     prometheus_port: int = Field(
